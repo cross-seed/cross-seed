@@ -3,6 +3,20 @@
 const parseTorrent = require("parse-torrent");
 const fs = require("fs");
 const path = require("path");
+const axios = require("axios").default;
+const querystring = require("querystring");
+
+const jackettServerUrl = "***REMOVED***";
+const jackettPath = "/api/v2.0/indexers/all/results";
+const jackettApiKey = "***REMOVED***";
+
+function makeJackettRequest(query) {
+	const params = querystring.stringify({
+		apikey: jackettApiKey,
+		Query: query
+	});
+	return axios.get(`${jackettServerUrl}${jackettPath}`, params);
+}
 
 function parseTorrentFromFilename(filename) {
 	const data = fs.readFileSync(filename);
@@ -11,15 +25,13 @@ function parseTorrentFromFilename(filename) {
 }
 
 function filterTorrentFile(info) {
-	if (info.files.length < 4) {
-		console.log(`not enough files: ${info.name}`);
-		return false;
-	}
 	const allMkvs = info.files.every(file => file.path.endsWith(".mkv"));
-	if (!allMkvs) {
-		console.log(`not all mkvs: ${info.name}`);
-		return false;
-	}
+	if (!allMkvs) return false;
+
+	const cb = file => file.path.split(path.sep).length <= 2;
+	const notNested = info.files.every(cb);
+	if (!notNested) return false;
+
 	return true;
 }
 
@@ -28,7 +40,10 @@ function main() {
 		.map(fn => path.join("torrents", fn));
 	const parsedTorrents = dirContents.map(parseTorrentFromFilename);
 	const filteredTorrents = parsedTorrents.filter(filterTorrentFile);
-	console.log(filteredTorrents.map(x => x.name));
+
+	const samples = filteredTorrents.slice(0, 4);
+	console.log(samples.map(t => t.name));
+
 }
 
 main();
