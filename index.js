@@ -57,7 +57,7 @@ function filterTorrentFile(info, index, arr) {
 	if (info.files.length === 1 && EPISODE_REGEX.test(info.files[0].name)) {
 		return false;
 	}
-	
+
 	const allMkvs = info.files.every((file) => file.path.endsWith(".mkv"));
 	if (!allMkvs) return false;
 
@@ -101,8 +101,8 @@ async function assessResult(result, ogInfo, hashesToExclude) {
 		console.log(`trees differ for ${name}: ${ogAnnounce}, ${newAnnounce}}`);
 		return null;
 	}
-	
-	const type = resultInfo.files.length === 1 ? "movie" : "packs"
+
+	const type = resultInfo.files.length === 1 ? "movie" : "packs";
 
 	return {
 		tracker: result.TrackerId,
@@ -155,15 +155,14 @@ async function main() {
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const samples = filteredTorrents.slice();
-	for (const [i, sample] of samples.entries()) {
-		const name = sample.name.replace(/.mkv$/, "")
-		const progress = chalk.blue(`[${i+1}/${samples.length}]`);
-		console.log(progress, chalk.dim("Searching for"), name);
-		await findOnOtherSites(sample, hashesToExclude);
-		await new Promise((r) => setTimeout(r, delay));
-	}
 
-	rl.close();
+	for (const [i, sample] of samples.entries()) {
+		const sleep = new Promise((r) => setTimeout(r, delay));
+		const name = sample.name.replace(/.mkv$/, "");
+		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
+		console.log(progress, chalk.dim("Searching for"), name);
+		await Promise.all([findOnOtherSites(sample, hashesToExclude), sleep]);
+	}
 }
 
 main();
