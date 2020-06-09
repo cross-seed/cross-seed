@@ -1,19 +1,25 @@
 {
-  "name": "cross-seed",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "axios": "^0.19.2",
-    "parse-torrent": "^7.1.3"
-  },
-  "type": "module",
-  "devDependencies": {
-    "prettier": "^2.0.5"
-  }
+	"name": "cross-seed",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"axios": "^0.19.2",
+		"minimist": "^1.2.5",
+		"parse-torrent": "^7.1.3"
+	},
+	"type": "module",
+	"devDependencies": {
+		"prettier": "^2.0.5"
+	},
+	"prettier": {
+		"tabWidth": 4,
+		"useTabs": true,
+		"htmlWhitespaceSensitivity": "ignore"
+	}
 }
