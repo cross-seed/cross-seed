@@ -5,11 +5,14 @@ const fs = require("fs");
 const path = require("path");
 const util = require("util");
 const querystring = require("querystring");
+const readline = require("readline");
 
 const axios = require("axios");
 const minimist = require("minimist");
 
+const EPISODE_REGEX = /S\d\dE\d\d/i;
 const jackettPath = "/api/v2.0/indexers/all/results";
+
 let jackettServerUrl;
 let jackettApiKey;
 let torrentDir;
@@ -20,19 +23,19 @@ const parseTorrentRemote = util.promisify(parseTorrent.remote);
 
 function parseCommandLineArgs() {
 	const options = minimist(process.argv.slice(2));
-	
+
 	if (!options._[0]) console.error("specify a directory containing torrents");
 	if (!options.o) console.error("specify an output directory with -o");
 	if (!options.u) console.error("specify jackett url with -u");
 	if (!options.k) console.error("specify jackett api key with -k");
 	if (!(options.k && options.u && options.o && options._[0])) return false;
-	
+
 	jackettServerUrl = options.u;
 	jackettApiKey = options.k;
 	torrentDir = options._[0];
-	outputDir = options.o
-	delay = (options.d || 10) * 1000
-	
+	outputDir = options.o;
+	delay = (options.d || 10) * 1000;
+
 	return true;
 }
 
@@ -51,6 +54,10 @@ function parseTorrentFromFilename(filename) {
 }
 
 function filterTorrentFile(info, index, arr) {
+	if (info.files.length === 1 && EPISODE_REGEX.test(info.files[0].name)) {
+		return false;
+	}
+	
 	const allMkvs = info.files.every((file) => file.path.endsWith(".mkv"));
 	if (!allMkvs) return false;
 
@@ -78,59 +85,68 @@ function compareFileTrees(a, b) {
 	return sortedA.every((elOfA, i) => cmp(elOfA, sortedB[i]));
 }
 
-async function assessJackettResult(result, ogInfo) {
+async function assessResult(result, ogInfo, hashesToExclude) {
 	const resultInfo = await parseTorrentRemote(result.Link);
 	if (resultInfo.length !== ogInfo.length) return null;
-	const name = ogInfo.name;
+	const name = resultInfo.name;
 	const announce1 = ogInfo.announce[0];
 	const announce2 = resultInfo.announce[0];
 
-	if (resultInfo.infoHash === ogInfo.infoHash) {
-		console.log(`hash match for ${name}: ${announce1}, ${announce2}`);
-		return null;
+	if (hashesToExclude.includes(resultInfo.infoHash)) {
+		console.log(`hash match for ${name} at ${announce1}`)
 	}
 
 	if (!compareFileTrees(resultInfo.files, ogInfo.files)) {
 		console.log(`trees differ for ${name}: ${announce1}, ${announce2}}`);
 		return null;
 	}
+	
+	const type = resultInfo.files.length === 1 ? "movie" : "packs"
 
 	return {
 		tracker: result.TrackerId,
+		type,
 		info: resultInfo,
 	};
 }
 
-async function findOnOtherSites(info) {
-	const response = await makeJackettRequest(info.name);
+async function findOnOtherSites(info, hashesToExclude) {
+	const response = await makeJackettRequest(info.name.replace(/.mkv$/, ""));
 	const results = response.data.Results;
-	const promises = results.map((result) => assessJackettResult(result, info));
+	const mapCb = (result) => assessResult(result, info, hashesToExclude);
+	const promises = results.map(mapCb);
 	const finished = await Promise.all(promises);
 	finished
 		.filter((e) => e !== null)
-		.forEach(({ tracker, info: { name } }) => {
+		.forEach(({ tracker, type, info: { name } }) => {
 			console.log(`Found ${name} on ${tracker}`);
-			saveTorrentFile(tracker, info);
+			saveTorrentFile(tracker, type, info);
 		});
 }
 
-function saveTorrentFile(tracker, info) {
+function saveTorrentFile(tracker, type, info) {
 	const buf = parseTorrent.toTorrentFile(info);
-	const filename = `[${tracker}]${info.name}.torrent`;
+	const name = info.name.replace(/.mkv$/, "");
+	const filename = `[${type}][${tracker}]${name}.torrent`;
 	fs.writeFileSync(path.join("x-seeds", filename), buf, {
 		mode: 0o644,
 	});
 }
 
 async function main() {
-	
 	const successfulParse = parseCommandLineArgs();
 	if (!successfulParse) return;
-	
+
+	const rl = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout,
+	});
+
 	const dirContents = fs
 		.readdirSync(torrentDir)
 		.map((fn) => path.join(torrentDir, fn));
 	const parsedTorrents = dirContents.map(parseTorrentFromFilename);
+	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
 	const filteredTorrents = parsedTorrents.filter(filterTorrentFile);
 
 	console.log(
@@ -139,15 +155,17 @@ async function main() {
 		filteredTorrents.length
 	);
 
-	fs.mkdirSync(outputDir, {
-		recursive: true,
-	});
+	fs.mkdirSync(outputDir, { recursive: true });
 	const samples = filteredTorrents.slice(0, 16);
 	for (sample of samples) {
-		console.log(`Searching for ${sample.name}...`);
+		readline.clearLine(process.stdout, 0);
+		rl.write(`Searching for ${sample.name.replace(/.mkv$/, "")}...`);
+		readline.cursorTo(process.stdout, 0);
 		await new Promise((r) => setTimeout(r, delay));
-		await findOnOtherSites(sample);
+		await findOnOtherSites(sample, hashesToExclude);
 	}
+
+	rl.close();
 }
 
 main();
