@@ -89,15 +89,16 @@ async function assessResult(result, ogInfo, hashesToExclude) {
 	const resultInfo = await parseTorrentRemote(result.Link);
 	if (resultInfo.length !== ogInfo.length) return null;
 	const name = resultInfo.name;
-	const announce1 = ogInfo.announce[0];
-	const announce2 = resultInfo.announce[0];
+	const ogAnnounce = ogInfo.announce[0];
+	const newAnnounce = resultInfo.announce[0];
 
 	if (hashesToExclude.includes(resultInfo.infoHash)) {
-		console.log(`hash match for ${name} at ${announce1}`)
+		console.log(`hash match for ${name} at ${newAnnounce}`);
+		return null;
 	}
 
 	if (!compareFileTrees(resultInfo.files, ogInfo.files)) {
-		console.log(`trees differ for ${name}: ${announce1}, ${announce2}}`);
+		console.log(`trees differ for ${name}: ${ogAnnounce}, ${newAnnounce}}`);
 		return null;
 	}
 	
