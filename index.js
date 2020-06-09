@@ -18,6 +18,7 @@ let jackettApiKey;
 let torrentDir;
 let outputDir;
 let delay = 10000;
+let offset = 0;
 
 const parseTorrentRemote = util.promisify(parseTorrent.remote);
 
@@ -34,6 +35,7 @@ function parseCommandLineArgs() {
 	jackettApiKey = options.k;
 	torrentDir = options._[0];
 	outputDir = options.o;
+	offset = options.s || offset;
 	delay = (options.d || 10) * 1000;
 
 	return true;
@@ -86,7 +88,11 @@ function compareFileTrees(a, b) {
 }
 
 async function assessResult(result, ogInfo, hashesToExclude) {
-	const resultInfo = await parseTorrentRemote(result.Link);
+	const resultInfo = await parseTorrentRemote(result.Link).catch((e) => {
+		console.error(chalk.red`error parsing torrent at ${result.Link}`);
+		return null;
+	});
+	if (resultInfo === null) return null;
 	if (resultInfo.length !== ogInfo.length) return null;
 	const name = resultInfo.name;
 	const ogAnnounce = ogInfo.announce[0];
@@ -154,7 +160,7 @@ async function main() {
 	);
 
 	fs.mkdirSync(outputDir, { recursive: true });
-	const samples = filteredTorrents.slice();
+	const samples = filteredTorrents.slice(offset);
 
 	for (const [i, sample] of samples.entries()) {
 		const sleep = new Promise((r) => setTimeout(r, delay));
