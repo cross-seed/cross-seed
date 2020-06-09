@@ -10,6 +10,7 @@
 	"license": "ISC",
 	"dependencies": {
 		"axios": "^0.19.2",
+		"chalk": "^4.1.0",
 		"minimist": "^1.2.5",
 		"parse-torrent": "^7.1.3"
 	},

@@ -5,10 +5,10 @@ const fs = require("fs");
 const path = require("path");
 const util = require("util");
 const querystring = require("querystring");
-const readline = require("readline");
 
 const axios = require("axios");
 const minimist = require("minimist");
+const chalk = require("chalk");
 
 const EPISODE_REGEX = /S\d\dE\d\d/i;
 const jackettPath = "/api/v2.0/indexers/all/results";
@@ -119,7 +119,9 @@ async function findOnOtherSites(info, hashesToExclude) {
 	finished
 		.filter((e) => e !== null)
 		.forEach(({ tracker, type, info: { name } }) => {
-			console.log(`Found ${name} on ${tracker}`);
+			const styledName = chalk.green.bold(name);
+			const styledTracker = chalk.bold(tracker);
+			console.log(`Found ${styledName} on ${styledTracker}`);
 			saveTorrentFile(tracker, type, info);
 		});
 }
@@ -137,11 +139,6 @@ async function main() {
 	const successfulParse = parseCommandLineArgs();
 	if (!successfulParse) return;
 
-	const rl = readline.createInterface({
-		input: process.stdin,
-		output: process.stdout,
-	});
-
 	const dirContents = fs
 		.readdirSync(torrentDir)
 		.map((fn) => path.join(torrentDir, fn));
@@ -156,13 +153,13 @@ async function main() {
 	);
 
 	fs.mkdirSync(outputDir, { recursive: true });
-	const samples = filteredTorrents.slice(0, 16);
-	for (sample of samples) {
-		readline.clearLine(process.stdout, 0);
-		rl.write(`Searching for ${sample.name.replace(/.mkv$/, "")}...`);
-		readline.cursorTo(process.stdout, 0);
-		await new Promise((r) => setTimeout(r, delay));
+	const samples = filteredTorrents.slice();
+	for (const [i, sample] of samples.entries()) {
+		const name = sample.name.replace(/.mkv$/, "")
+		const progress = chalk.blue(`[${i+1}/${samples.length}]`);
+		console.log(progress, chalk.dim("Searching for"), name);
 		await findOnOtherSites(sample, hashesToExclude);
+		await new Promise((r) => setTimeout(r, delay));
 	}
 
 	rl.close();
