@@ -22,7 +22,7 @@ axios@^0.19.2:
   dependencies:
     follow-redirects "1.5.10"
 
-bencode@^2.0.0:
+bencode@^2.0.0, bencode@^2.0.1:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/bencode/-/bencode-2.0.1.tgz#667a6a31c5e038d558608333da6b7c94e836c85b"
   integrity sha512-2uhEl8FdjSBUyb69qDTgOEeeqDTa+n3yMQzLW0cOzNf1Ow5bwcg3idf+qsWisIKRH8Bk8oC7UXL8irRcPA8ZEQ==

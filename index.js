@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-
+"use strict";
 const parseTorrent = require("parse-torrent");
 const fs = require("fs");
 const path = require("path");
