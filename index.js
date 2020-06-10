@@ -51,8 +51,7 @@ function makeJackettRequest(query) {
 
 function parseTorrentFromFilename(filename) {
 	const data = fs.readFileSync(filename);
-	const torrentInfo = parseTorrent(data);
-	return torrentInfo;
+	return parseTorrent(data);
 }
 
 function filterTorrentFile(info, index, arr) {
@@ -142,20 +141,14 @@ function saveTorrentFile(tracker, type, info) {
 	});
 }
 
-async function main() {
-	const successfulParse = parseCommandLineArgs();
-	if (!successfulParse) return;
-
-	const dirContents = fs
-		.readdirSync(torrentDir)
-		.map((fn) => path.join(torrentDir, fn));
-	const parsedTorrents = dirContents.map(parseTorrentFromFilename);
+async function batchDownloadCrossSeeds(torrentFilenames) {
+	const parsedTorrents = torrentFilenames.map(parseTorrentFromFilename);
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
 	const filteredTorrents = parsedTorrents.filter(filterTorrentFile);
 
 	console.log(
 		"Found %d torrents, %d suitable",
-		dirContents.length,
+		torrentFilenames.length,
 		filteredTorrents.length
 	);
 
@@ -169,6 +162,16 @@ async function main() {
 		console.log(progress, chalk.dim("Searching for"), name);
 		await Promise.all([findOnOtherSites(sample, hashesToExclude), sleep]);
 	}
+}
+
+async function main() {
+	const successfulParse = parseCommandLineArgs();
+	if (!successfulParse) return;
+
+	const dirContents = fs
+		.readdirSync(torrentDir)
+		.map((fn) => path.join(torrentDir, fn));
+	await batchDownloadCrossSeeds(dirContents);
 }
 
 main();
