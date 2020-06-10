@@ -125,11 +125,11 @@ async function findOnOtherSites(info, hashesToExclude) {
 	const finished = await Promise.all(promises);
 	finished
 		.filter((e) => e !== null)
-		.forEach(({ tracker, type, info: { name } }) => {
-			const styledName = chalk.green.bold(name);
+		.forEach(({ tracker, type, info: newInfo }) => {
+			const styledName = chalk.green.bold(newInfo.name);
 			const styledTracker = chalk.bold(tracker);
 			console.log(`Found ${styledName} on ${styledTracker}`);
-			saveTorrentFile(tracker, type, info);
+			saveTorrentFile(tracker, type, newInfo);
 		});
 }
 

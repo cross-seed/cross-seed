@@ -1,52 +1,50 @@
 "use strict";
 
 const fs = require("fs");
-const b = require("bencode");
 const path = require("path");
 
 const add_fast_resume = (meta, basepath) => {
-	let files = [];
-	let fpath = path.join(basepath, meta.info.name.toString("utf8"));
-	if ("files" in meta.info) {
-		for (let file of meta.info.files) {
-			let ffpath = fpath;
-			for (let dir of file.path) {
-				ffpath = path.join(ffpath, dir.toString("utf8"));
-			}
-			let obj = { path: ffpath, size: file.length };
-			files.push(obj);
-		}
+	const { info } = meta;
+	const { name, files: metaFiles } = info;
+	let files;
+	let topLevelPath = path.join(basepath, name.toString("utf8"));
+	if (metaFiles) {
+		// for each file, joins together all path segments into one path
+		// after converting segments from binary
+		files = metaFiles.map((file) => ({
+			path: path.join(
+				topLevelPath,
+				...file.path.map((seg) => seg.toString("utf8"))
+			),
+			size: file.length,
+		}));
 	} else {
-		let obj = {};
-		obj.path = fpath;
-		obj.size = meta.info.length;
-		files.push(obj);
+		files = [{ path: topLevelPath, size: meta.info.length }];
 	}
 
-	let resume = {};
-	resume.bitfield = Math.floor(meta.info.pieces.length / 20);
-	resume.files = [];
-	let piece_length = meta.info["piece length"];
+	let resume = {
+		bitfield: Math.floor(meta.info.pieces.length / 20),
+		files: [],
+	};
+	let pieceLength = meta.info["piece length"];
 	let offset = 0;
 
 	for (let file of files) {
-		try {
-			let states = fs.statSync(file.path);
-			if (states.size != file.size) {
-				throw new Error("Files not matching!");
-			}
-			let obj = {};
-			obj.priority = 1;
-			obj.mtime = Math.floor(states.mtimeMs / 1000);
-			obj.completed =
-				Math.floor(
-					(offset + file.size + piece_length - 1) / piece_length
-				) - Math.floor(offset / piece_length);
-			resume.files.push(obj);
-			offset += file.size;
-		} catch (err) {
+		let states = fs.statSync(file.path);
+		if (states.size !== file.size) {
 			throw new Error("Files not matching!");
 		}
+		const completed =
+			Math.floor((offset + file.size + pieceLength - 1) / pieceLength) -
+			Math.floor(offset / pieceLength);
+		let obj = {
+			priority: 1,
+			mtime: Math.floor(states.mtimeMs / 1000),
+			completed,
+		};
+
+		resume.files.push(obj);
+		offset += file.size;
 	}
 	meta.libtorrent_resume = resume;
 	return meta;
