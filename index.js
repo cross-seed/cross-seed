@@ -1,5 +1,5 @@
-#!/usr/bin/env node
 "use strict";
+
 const parseTorrent = require("parse-torrent");
 const fs = require("fs");
 const path = require("path");
@@ -9,26 +9,18 @@ const querystring = require("querystring");
 const axios = require("axios");
 const chalk = require("chalk");
 
-const config = require("config");
-
 const EPISODE_REGEX = /S\d\dE\d\d/i;
-const jackettPath = `/api/v2.0/indexers/${config.tracker}/results`;
-
-// let jackettServerUrl;
-// let jackettApiKey;
-// let torrentDir;
-// let outputDir;
-// let delay = 10000;
-// let offset = 0;
+let CONFIG;
 
 const parseTorrentRemote = util.promisify(parseTorrent.remote);
 
 function makeJackettRequest(query) {
+	const jackettPath = `/api/v2.0/indexers/${CONFIG.tracker}/results`;
 	const params = querystring.stringify({
-		apikey: config.jackettApiKey,
+		apikey: CONFIG.jackettApiKey,
 		Query: query,
 	});
-	return axios.get(`${config.jackettServerUrl}${jackettPath}?${params}`);
+	return axios.get(`${CONFIG.jackettServerUrl}${jackettPath}?${params}`);
 }
 
 function parseTorrentFromFilename(filename) {
@@ -129,9 +121,9 @@ function saveTorrentFile(tracker, type, info) {
 
 async function batchDownloadCrossSeeds() {
 	const dirContents = fs
-		.readdirSync(config.torrentDir)
+		.readdirSync(CONFIG.torrentDir)
 		.filter((fn) => path.extname(fn) === ".torrent")
-		.map((fn) => path.join(config.torrentDir, fn));
+		.map((fn) => path.join(CONFIG.torrentDir, fn));
 	const parsedTorrents = dirContents.map(parseTorrentFromFilename);
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
 	const filteredTorrents = parsedTorrents.filter(filterTorrentFile);
@@ -142,11 +134,11 @@ async function batchDownloadCrossSeeds() {
 		filteredTorrents.length
 	);
 
-	fs.mkdirSync(config.outputDir, { recursive: true });
-	const samples = filteredTorrents.slice(config.offset);
+	fs.mkdirSync(CONFIG.outputDir, { recursive: true });
+	const samples = filteredTorrents.slice(CONFIG.offset);
 	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
-		const sleep = new Promise((r) => setTimeout(r, config.delayMs));
+		const sleep = new Promise((r) => setTimeout(r, CONFIG.delay * 1000));
 		const name = sample.name.replace(/.mkv$/, "");
 		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
 		console.log(progress, chalk.dim("Searching for"), name);
@@ -161,4 +153,9 @@ async function batchDownloadCrossSeeds() {
 	);
 }
 
-module.exports = batchDownloadCrossSeeds;
+async function main(config) {
+	CONFIG = config;
+	return batchDownloadCrossSeeds();
+}
+
+module.exports = main;
