@@ -5,6 +5,7 @@ const chalk = require("chalk");
 const path = require("path");
 const fs = require("fs");
 const packageDotJson = require("../package.json");
+const template = require("../config.template");
 const main = require("../index");
 
 function setConfig(fn) {
@@ -64,10 +65,32 @@ program
 		Object.keys(overrides).forEach((key) => {
 			if (overrides[key] === undefined) delete overrides[key];
 		});
-		console.log({ ...configFile, ...overrides });
-		const config = { ...configFile, ...overrides };
+		const emptyTemplate = Object.keys(template).reduce(
+			(acc, cur) => ({ ...acc, [cur]: undefined }),
+			{}
+		);
+		const config = { ...emptyTemplate, ...configFile, ...overrides };
+		const valid = Object.entries(emptyTemplate).reduce((acc, [k, v]) => {
+			if (v === undefined) {
+				console.error(chalk.red("Missing configuration item:"), k);
+				return false;
+			}
+			return acc;
+		}, true);
 
-		main(config);
+		if (!valid) {
+			console.error("Please specify the missing item(s) in");
+			console.error("a configuration file or as command-line options.");
+			console.error(
+				"For more information, run\n\n\tcross-seed search --help\n"
+			);
+			return;
+		}
+		try {
+			main(config);
+		} catch (e) {
+			console.error(chalk.bold.red(e.message));
+		}
 	});
 
 program.parse();
