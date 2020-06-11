@@ -49,7 +49,7 @@ program
 	.action(generateConfig);
 
 program
-	.command("search", { isDefault: true })
+	.command("search")
 	.description("Search for cross-seeds")
 	.option("-c, --config <path>", "Path to configuration file", setConfig)
 	.option("-u, --jackett-server-url <url>", "Your Jackett server url")
