@@ -12,23 +12,23 @@ const chalk = require("chalk");
 const config = require("config");
 
 const EPISODE_REGEX = /S\d\dE\d\d/i;
-const jackettPath = "/api/v2.0/indexers/all/results";
+const jackettPath = `/api/v2.0/indexers/${config.tracker}/results`;
 
-let jackettServerUrl;
-let jackettApiKey;
-let torrentDir;
-let outputDir;
-let delay = 10000;
-let offset = 0;
+// let jackettServerUrl;
+// let jackettApiKey;
+// let torrentDir;
+// let outputDir;
+// let delay = 10000;
+// let offset = 0;
 
 const parseTorrentRemote = util.promisify(parseTorrent.remote);
 
 function makeJackettRequest(query) {
 	const params = querystring.stringify({
-		apikey: jackettApiKey,
+		apikey: config.jackettApiKey,
 		Query: query,
 	});
-	return axios.get(`${jackettServerUrl}${jackettPath}?${params}`);
+	return axios.get(`${config.jackettServerUrl}${jackettPath}?${params}`);
 }
 
 function parseTorrentFromFilename(filename) {
@@ -41,7 +41,9 @@ function filterTorrentFile(info, index, arr) {
 		return false;
 	}
 
-	const allMkvs = info.files.every((file) => file.path.endsWith(".mkv"));
+	const allMkvs = info.files.every(
+		(file) => path.extname(file.path) === ".mkv"
+	);
 	if (!allMkvs) return false;
 
 	const cb = (file) => file.path.split(path.sep).length <= 2;
@@ -104,14 +106,16 @@ async function findOnOtherSites(info, hashesToExclude) {
 	const mapCb = (result) => assessResult(result, info, hashesToExclude);
 	const promises = results.map(mapCb);
 	const finished = await Promise.all(promises);
-	finished
-		.filter((e) => e !== null)
-		.forEach(({ tracker, type, info: newInfo }) => {
-			const styledName = chalk.green.bold(newInfo.name);
-			const styledTracker = chalk.bold(tracker);
-			console.log(`Found ${styledName} on ${styledTracker}`);
-			saveTorrentFile(tracker, type, newInfo);
-		});
+	const successful = finished.filter((e) => e !== null);
+
+	successful.forEach(({ tracker, type, info: newInfo }) => {
+		const styledName = chalk.green.bold(newInfo.name);
+		const styledTracker = chalk.bold(tracker);
+		console.log(`Found ${styledName} on ${styledTracker}`);
+		saveTorrentFile(tracker, type, newInfo);
+	});
+
+	return successful.length;
 }
 
 function saveTorrentFile(tracker, type, info) {
@@ -123,37 +127,38 @@ function saveTorrentFile(tracker, type, info) {
 	});
 }
 
-async function batchDownloadCrossSeeds(torrentFilenames) {
-	const parsedTorrents = torrentFilenames.map(parseTorrentFromFilename);
+async function batchDownloadCrossSeeds() {
+	const dirContents = fs
+		.readdirSync(config.torrentDir)
+		.filter((fn) => path.extname(fn) === ".torrent")
+		.map((fn) => path.join(config.torrentDir, fn));
+	const parsedTorrents = dirContents.map(parseTorrentFromFilename);
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
 	const filteredTorrents = parsedTorrents.filter(filterTorrentFile);
 
 	console.log(
-		"Found %d torrents, %d suitable",
-		torrentFilenames.length,
+		"Found %d torrents, %d suitable to search for matches",
+		dirContents.length,
 		filteredTorrents.length
 	);
 
-	fs.mkdirSync(outputDir, { recursive: true });
-	const samples = filteredTorrents.slice(offset);
-
+	fs.mkdirSync(config.outputDir, { recursive: true });
+	const samples = filteredTorrents.slice(config.offset);
+	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
-		const sleep = new Promise((r) => setTimeout(r, delay));
+		const sleep = new Promise((r) => setTimeout(r, config.delayMs));
 		const name = sample.name.replace(/.mkv$/, "");
 		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
 		console.log(progress, chalk.dim("Searching for"), name);
-		await Promise.all([findOnOtherSites(sample, hashesToExclude), sleep]);
+		let numFoundPromise = findOnOtherSites(sample, hashesToExclude);
+		const [numFound] = await Promise.all([numFoundPromise, sleep]);
+		totalFound += numFound;
 	}
+	console.log(
+		chalk.cyan("Done! Found %s cross seeds from %s original torrents"),
+		chalk.bold.white(totalFound),
+		chalk.bold.white(samples.length)
+	);
 }
 
-async function main() {
-	const successfulParse = parseCommandLineArgs();
-	if (!successfulParse) return;
-
-	const dirContents = fs
-		.readdirSync(torrentDir)
-		.map((fn) => path.join(torrentDir, fn));
-	await batchDownloadCrossSeeds(dirContents);
-}
-
-main();
+module.exports = batchDownloadCrossSeeds;
