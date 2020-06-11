@@ -117,3 +117,4 @@ dist
 
 *.torrent
 torrents/
+config.js

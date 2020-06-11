@@ -7,8 +7,9 @@ const util = require("util");
 const querystring = require("querystring");
 
 const axios = require("axios");
-const minimist = require("minimist");
 const chalk = require("chalk");
+
+const config = require("config");
 
 const EPISODE_REGEX = /S\d\dE\d\d/i;
 const jackettPath = "/api/v2.0/indexers/all/results";
@@ -21,25 +22,6 @@ let delay = 10000;
 let offset = 0;
 
 const parseTorrentRemote = util.promisify(parseTorrent.remote);
-
-function parseCommandLineArgs() {
-	const options = minimist(process.argv.slice(2));
-
-	if (!options._[0]) console.error("specify a directory containing torrents");
-	if (!options.o) console.error("specify an output directory with -o");
-	if (!options.u) console.error("specify jackett url with -u");
-	if (!options.k) console.error("specify jackett api key with -k");
-	if (!(options.k && options.u && options.o && options._[0])) return false;
-
-	jackettServerUrl = options.u;
-	jackettApiKey = options.k;
-	torrentDir = options._[0];
-	outputDir = options.o;
-	offset = options.s || offset;
-	delay = (options.d || 10) * 1000;
-
-	return true;
-}
 
 function makeJackettRequest(query) {
 	const params = querystring.stringify({
