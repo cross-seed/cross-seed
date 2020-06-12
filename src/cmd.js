@@ -66,7 +66,7 @@ program
 			main(options);
 		} catch (e) {
 			console.error(chalk.bold.red(e.message));
-		
+
 	});
 
 program.parse();

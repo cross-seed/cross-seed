@@ -16,7 +16,7 @@ module.exports = {
 	// Trackers to search
 	// Set to [] if you want to search all trackers.
 	// Tracker ids can be found in their Torznab feed paths
-	trackers: ["oink"],
+	trackers: ["oink", "tehconnection"],
 
 	// directory containing torrent files.
 	// For rtorrent, this is your session directory
