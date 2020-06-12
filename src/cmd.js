@@ -41,7 +41,7 @@ program
 	.requiredOption(
 		"-t, --trackers <tracker>",
 		"Comma-separated list of Jackett tracker ids to search",
-		CONFIG.trackers.join(",")
+		CONFIG.trackers && CONFIG.trackers.join(",")
 	)
 	.requiredOption(
 		"-i, --torrent-dir <dir>",
@@ -66,7 +66,7 @@ program
 			main(options);
 		} catch (e) {
 			console.error(chalk.bold.red(e.message));
-
+		}
 	});
 
 program.parse();

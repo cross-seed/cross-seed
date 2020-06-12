@@ -40,11 +40,13 @@ Usage: cross-seed search [options]
 
 Search for cross-seeds
 
+
 Options:
   -u, --jackett-server-url <url>  Your Jackett server url
   -k, --jackett-api-key <key>     Your Jackett API key
   -d, --delay <delay>             Pause duration between searches
-  -t, --trackers <tracker>         Jackett tracker id to search
+  -t, --trackers <tracker>        Comma-separated list of Jackett tracker ids
+                                  to search
   -i, --torrent-dir <dir>         Directory with torrent files
   -s, --output-dir <dir>          Directory to save results in
   -o, --offset <offset>           Offset to start from
