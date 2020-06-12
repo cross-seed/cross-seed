@@ -13,11 +13,10 @@ module.exports = {
 	// It is not recommended to set this to less than 2 seconds.
 	delay: 10,
 
-	// Tracker to search. As of right now, can be one of:
-	// - the string "all"
-	// - a single tracker id as found in its Torznab feed
-	//   e.g. "oink"
-	tracker: "all",
+	// Trackers to search
+	// Set to [] if you want to search all trackers.
+	// Tracker ids can be found in their Torznab feed paths
+	trackers: ["oink"],
 
 	// directory containing torrent files.
 	// For rtorrent, this is your session directory

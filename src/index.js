@@ -15,10 +15,11 @@ let CONFIG;
 const parseTorrentRemote = util.promisify(parseTorrent.remote);
 
 function makeJackettRequest(query) {
-	const jackettPath = `/api/v2.0/indexers/${CONFIG.tracker}/results`;
+	const jackettPath = `/api/v2.0/indexers/all/results`;
 	const params = querystring.stringify({
 		apikey: CONFIG.jackettApiKey,
 		Query: query,
+		Tracker: CONFIG.trackers,
 	});
 	return axios.get(`${CONFIG.jackettServerUrl}${jackettPath}?${params}`);
 }
