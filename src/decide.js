@@ -23,19 +23,18 @@ function assessResultPreDownload(result, ogInfo) {
 
 async function assessResult(result, ogInfo, hashesToExclude) {
 	const { Title, TrackerId: tracker, Link } = result;
+
 	const shouldDownload = assessResultPreDownload(result, ogInfo);
 	if (!shouldDownload) {
 		console.log(`invalid size for ${Title} on ${tracker}`);
 		return null;
 	}
 
-	const info = await parseTorrentFromURL(Link).catch((e) => {
-		console.error(chalk.red`error parsing torrent at ${Link}`);
-		return null;
-	});
+	const info = await parseTorrentFromURL(Link);
 
 	// if you got rate limited or some other failure
-	if (info === null) return null;
+	if (!info) return info;
+
 	if (info.length !== ogInfo.length) return null;
 
 	const name = info.name;

@@ -1,16 +1,17 @@
 const util = require("util");
 const fs = require("fs");
 const path = require("path");
+const parseTorrent = require("parse-torrent");
+const remote = util.promisify(parseTorrent.remote);
 
 function parseTorrentFromFilename(filename) {
 	const data = fs.readFileSync(filename);
 	return parseTorrent(data);
 }
 
-function parseTorrentFromURL(result) {
-	const remote = util.promisify(require("parse-torrent").remote);
-	return remote(result.Link).catch((_) => {
-		console.error(chalk.red`error parsing torrent at ${result.Link}`);
+function parseTorrentFromURL(url) {
+	return remote(url).catch((_) => {
+		console.error(chalk.red`error parsing torrent at ${url}`);
 		return null;
 	});
 }

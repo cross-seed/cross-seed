@@ -1,5 +1,6 @@
 const EP_REGEX = /S\d\dE\d\d/i;
-const SEASON_REGEX = /^(.+)[. ](S\d\d)(?!E\d\d)/i;
+const SEASON_REGEX = /^(?<title>.+)[. ](?<season>S\d\d)(?!E\d\d)/i;
+const MOVIE_REGEX = /^(?<title>.+)[. ](?<year>\d{4})/i
 
 // because I'm sick of intellij whining at me
 const result = {
@@ -7,6 +8,7 @@ const result = {
 	TrackerId: undefined,
 	Results: undefined,
 	Title: undefined,
+	Size: undefined,
 }
 
-module.exports = { EP_REGEX, SEASON_REGEX };
+module.exports = { EP_REGEX, SEASON_REGEX, MOVIE_REGEX };
