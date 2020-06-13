@@ -22,13 +22,10 @@ function assessResultPreDownload(result, ogInfo) {
 }
 
 async function assessResult(result, ogInfo, hashesToExclude) {
-	const { Title, TrackerId: tracker, Link } = result;
+	const { TrackerId: tracker, Link } = result;
 
 	const shouldDownload = assessResultPreDownload(result, ogInfo);
-	if (!shouldDownload) {
-		console.log(`invalid size for ${Title} on ${tracker}`);
-		return null;
-	}
+	if (!shouldDownload) return null;
 
 	const info = await parseTorrentFromURL(Link);
 
