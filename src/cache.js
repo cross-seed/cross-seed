@@ -16,12 +16,10 @@ function loadFromDisk() {
 function write() {
 	const fpath = path.join(appDir(), "cache.json");
 	if (!fileExists) createAppDir();
-	console.log(cache);
 	fs.writeFileSync(fpath, JSON.stringify(cache));
 }
 
 function save(thing) {
-	console.log(cache);
 	cache.push(thing);
 	write();
 }

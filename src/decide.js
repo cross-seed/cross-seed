@@ -25,8 +25,7 @@ function assessResultPreDownload(result, ogInfo) {
 async function assessResultHelper(result, ogInfo, hashesToExclude) {
 	const { TrackerId: tracker, Link } = result;
 
-	const shouldDownload = assessResultPreDownload(result, ogInfo);
-	if (!shouldDownload) return null;
+	if (!assessResultPreDownload(result, ogInfo)) return null;
 
 	const info = await parseTorrentFromURL(Link);
 
@@ -34,21 +33,10 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 	if (!info) return info;
 
 	if (info.length !== ogInfo.length) return null;
-
-	const name = info.name;
-
-	if (hashesToExclude.includes(info.infoHash)) {
-		console.log(`hash match for ${name} on ${tracker}`);
-		return null;
-	}
-
-	if (!compareFileTrees(info.files, ogInfo.files)) {
-		console.log(`tree differs for ${name} on ${tracker}`);
-		return null;
-	}
+	if (hashesToExclude.includes(info.infoHash)) return null;
+	if (!compareFileTrees(info.files, ogInfo.files)) return null;
 
 	const tag = info.files.length === 1 ? "movie" : "pack";
-
 	return { tracker, tag, info };
 }
 
