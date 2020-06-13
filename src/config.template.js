@@ -1,5 +1,3 @@
-"use strict";
-
 // All of the configuration can be overridden with command-line flags,
 // and some are more useful as flags than permanent config (offset).
 // If you find yourself always using the same command-line flag, you can set

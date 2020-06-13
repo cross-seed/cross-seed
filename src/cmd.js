@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-"use strict";
+
 const { program } = require("commander");
 const chalk = require("chalk");
 const packageDotJson = require("../package.json");
@@ -35,7 +35,7 @@ program
 	.requiredOption(
 		"-d, --delay <delay>",
 		"Pause duration between searches",
-		(n) => parseInt(n),
+		parseFloat,
 		CONFIG.delay
 	)
 	.requiredOption(
