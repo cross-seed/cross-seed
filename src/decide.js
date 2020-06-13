@@ -1,4 +1,5 @@
 const { parseTorrentFromURL } = require("./torrent");
+const cache = require("./cache");
 
 function compareFileTrees(a, b) {
 	if (a.length !== b.length) return false;
@@ -21,7 +22,7 @@ function assessResultPreDownload(result, ogInfo) {
 	return result.Size >= lowerBound && result.Size <= upperBound;
 }
 
-async function assessResult(result, ogInfo, hashesToExclude) {
+async function assessResultHelper(result, ogInfo, hashesToExclude) {
 	const { TrackerId: tracker, Link } = result;
 
 	const shouldDownload = assessResultPreDownload(result, ogInfo);
@@ -51,4 +52,12 @@ async function assessResult(result, ogInfo, hashesToExclude) {
 	return { tracker, tag, info };
 }
 
-module.exports = { assessResult };
+function assessResultCaching(result, ogInfo, hashesToExclude) {
+	const cacheKey = `${ogInfo.name}|${result.Guid}`;
+	if (cache.includes(cacheKey)) return null;
+	const assessPromise = assessResultHelper(result, ogInfo, hashesToExclude);
+	assessPromise.then((assessed) => !assessed && cache.save(cacheKey));
+	return assessPromise;
+}
+
+module.exports = { assessResult: assessResultCaching };

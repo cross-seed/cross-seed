@@ -20,6 +20,11 @@ program
 	.action(generateConfig);
 
 program
+	.command("clear-cache")
+	.description("Clear the cache of downloaded-and-rejected torrents")
+	.action(() => require("./cache").clear());
+
+program
 	.command("search")
 	.description("Search for cross-seeds\n")
 	.requiredOption(

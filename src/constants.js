@@ -9,6 +9,7 @@ const result = {
 	Results: undefined,
 	Title: undefined,
 	Size: undefined,
+	Guid: undefined,
 }
 
 module.exports = { EP_REGEX, SEASON_REGEX, MOVIE_REGEX };
