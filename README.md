@@ -18,6 +18,8 @@ there too.
 
 I targeted Node v10, it may work on v8, definitely won't on v6.
 
+You will also need [Jackett](https://github.com/Jackett/Jackett) installed.
+
 ## Usage
 
 Invoking it is _almost_ as simple as:
