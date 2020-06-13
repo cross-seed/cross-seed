@@ -6,7 +6,7 @@ const result = {
 	Link: undefined,
 	TrackerId: undefined,
 	Results: undefined,
-
+	Title: undefined,
 }
 
 module.exports = { EP_REGEX, SEASON_REGEX };

@@ -18,38 +18,41 @@ function assessResultPreDownload(result, ogInfo) {
 	const { length } = ogInfo;
 	const lowerBound = length - 0.01 * length;
 	const upperBound = length + 0.01 * length;
-	if (result.Size < lowerBound || result.Size > upperBound) return false;
-	return true;
+	return result.Size >= lowerBound && result.Size <= upperBound;
 }
 
 async function assessResult(result, ogInfo, hashesToExclude) {
-	const resultInfo = await parseTorrentFromURL(result.Link).catch((e) => {
-		console.error(chalk.red`error parsing torrent at ${result.Link}`);
+	const { Title, TrackerId: tracker, Link } = result;
+	const shouldDownload = assessResultPreDownload(result, ogInfo);
+	if (!shouldDownload) {
+		console.log(`invalid size for ${Title} on ${tracker}`);
+		return null;
+	}
+
+	const info = await parseTorrentFromURL(Link).catch((e) => {
+		console.error(chalk.red`error parsing torrent at ${Link}`);
 		return null;
 	});
-	if (resultInfo === null) return null;
-	if (resultInfo.length !== ogInfo.length) return null;
-	const name = resultInfo.name;
-	const ogAnnounce = ogInfo.announce[0];
-	const newAnnounce = resultInfo.announce[0];
 
-	if (hashesToExclude.includes(resultInfo.infoHash)) {
-		console.log(`hash match for ${name} at ${newAnnounce}`);
+	// if you got rate limited or some other failure
+	if (info === null) return null;
+	if (info.length !== ogInfo.length) return null;
+
+	const name = info.name;
+
+	if (hashesToExclude.includes(info.infoHash)) {
+		console.log(`hash match for ${name} on ${tracker}`);
 		return null;
 	}
 
-	if (!compareFileTrees(resultInfo.files, ogInfo.files)) {
-		console.log(`trees differ for ${name}: ${ogAnnounce}, ${newAnnounce}`);
+	if (!compareFileTrees(info.files, ogInfo.files)) {
+		console.log(`tree differs for ${name} on ${tracker}`);
 		return null;
 	}
 
-	const type = resultInfo.files.length === 1 ? "movie" : "packs";
+	const tag = info.files.length === 1 ? "movie" : "pack";
 
-	return {
-		tracker: result.TrackerId,
-		type,
-		info: resultInfo,
-	};
+	return { tracker, tag, info };
 }
 
 module.exports = { assessResult };

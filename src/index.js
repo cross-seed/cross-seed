@@ -1,53 +1,65 @@
 const fs = require("fs");
 
 const chalk = require("chalk");
-const { loadTorrentDir } = require("./torrent");
-const { saveTorrentFile } = require("./torrent");
+const { loadTorrentDir, saveTorrentFile } = require("./torrent");
 const { filterTorrentFile } = require("./preFilter");
 const { assessResult } = require("./decide");
 const { makeJackettRequest } = require("./jackett");
 
-async function findOnOtherSites(info, hashesToExclude) {
-	const response = await makeJackettRequest(info.name.replace(/.mkv$/, ""));
-	const results = response.data.Results;
-	const mapCb = (result) => assessResult(result, info, hashesToExclude);
-	const promises = results.map(mapCb);
-	const finished = await Promise.all(promises);
-	const successful = finished.filter((e) => e !== null);
+async function findOnOtherSites(info, hashesToExclude, config) {
+	const assessEach = (result) => assessResult(result, info, hashesToExclude);
 
-	successful.forEach(({ tracker, type, info: newInfo }) => {
+	const query = info.name.replace(/.mkv$/, "");
+	const response = await makeJackettRequest(query, config);
+	const results = response.data.Results;
+
+	const loaded = await Promise.all(results.map(assessEach));
+	const successful = loaded.filter((e) => e !== null);
+
+	successful.forEach(({ tracker, tag, info: newInfo }) => {
 		const styledName = chalk.green.bold(newInfo.name);
 		const styledTracker = chalk.bold(tracker);
 		console.log(`Found ${styledName} on ${styledTracker}`);
-		saveTorrentFile(tracker, type, newInfo);
+		saveTorrentFile(tracker, tag, newInfo, config.outputDir);
 	});
 
 	return successful.length;
 }
 
+async function findMatchesBatch(samples, hashesToExclude, config) {
+	let totalFound = 0;
+
+	for (const [i, sample] of samples.entries()) {
+		const sleep = new Promise((r) => setTimeout(r, config.delay * 1000));
+
+		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
+		const name = sample.name.replace(/.mkv$/, "");
+		console.log(progress, chalk.dim("Searching for"), name);
+
+		let numFoundPromise = findOnOtherSites(sample, hashesToExclude, config);
+		const [numFound] = await Promise.all([numFoundPromise, sleep]);
+		totalFound += numFound;
+	}
+	return totalFound;
+}
+
 async function main(config) {
-	const parsedTorrents = loadTorrentDir(config.torrentDir);
+	const { torrentDir, offset, outputDir } = config;
+	const parsedTorrents = loadTorrentDir(torrentDir);
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
 	const filteredTorrents = parsedTorrents.filter(filterTorrentFile);
+	const samples = filteredTorrents.slice(offset);
 
 	console.log(
 		"Found %d torrents, %d suitable to search for matches",
 		parsedTorrents.length,
 		filteredTorrents.length
 	);
+	if (offset > 0) console.log("Starting at", offset);
 
-	fs.mkdirSync(config.outputDir, { recursive: true });
-	const samples = filteredTorrents.slice(config.offset);
-	let totalFound = 0;
-	for (const [i, sample] of samples.entries()) {
-		const sleep = new Promise((r) => setTimeout(r, config.delay * 1000));
-		const name = sample.name.replace(/.mkv$/, "");
-		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
-		console.log(progress, chalk.dim("Searching for"), name);
-		let numFoundPromise = findOnOtherSites(sample, hashesToExclude);
-		const [numFound] = await Promise.all([numFoundPromise, sleep]);
-		totalFound += numFound;
-	}
+	fs.mkdirSync(outputDir, { recursive: true });
+	let totalFound = await findMatchesBatch(samples, hashesToExclude, config);
+
 	console.log(
 		chalk.cyan("Done! Found %s cross seeds from %s original torrents"),
 		chalk.bold.white(totalFound),

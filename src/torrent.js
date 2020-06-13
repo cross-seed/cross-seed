@@ -15,8 +15,7 @@ function parseTorrentFromURL(result) {
 	});
 }
 
-function saveTorrentFile(tracker, tag = "", info, config) {
-	const { outputDir } = config;
+function saveTorrentFile(tracker, tag = "", info, outputDir) {
 	const buf = parseTorrent.toTorrentFile(info);
 	const name = info.name.replace(/.mkv$/, "");
 	const filename = `[${tag}][${tracker}]${name}.torrent`;
