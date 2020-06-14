@@ -12,13 +12,11 @@ delivery into your client.
 
 ## Requirements
 
-You need [node.js](https://nodejs.org/en/download) and npm for this app. It will
-work on Mac and on Linux; I haven't tested it on Windows but it probably works
-there too.
+-   [Node 10+](https://nodejs.org/en/download)
+-   [Jackett](https://github.com/Jackett/Jackett)
 
-I targeted Node v10, it may work on v8, definitely won't on v6.
-
-You will also need [Jackett](https://github.com/Jackett/Jackett) installed.
+It will work on Mac and on Linux; I haven't tested it on Windows but it probably
+works there too.
 
 ## Usage
 
