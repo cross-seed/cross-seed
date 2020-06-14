@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const parseTorrent = require("parse-torrent");
 const remote = util.promisify(parseTorrent.remote);
+const chalk = require("chalk");
 
 function parseTorrentFromFilename(filename) {
 	const data = fs.readFileSync(filename);
