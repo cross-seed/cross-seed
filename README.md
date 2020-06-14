@@ -44,13 +44,15 @@ Search for cross-seeds
 Options:
   -u, --jackett-server-url <url>  Your Jackett server url
   -k, --jackett-api-key <key>     Your Jackett API key
-  -d, --delay <delay>             Pause duration between searches
+  -d, --delay <delay>             Pause duration (seconds) between searches
+                                  (default: 10)
   -t, --trackers <tracker>        Comma-separated list of Jackett tracker ids
                                   to search
   -i, --torrent-dir <dir>         Directory with torrent files
   -s, --output-dir <dir>          Directory to save results in
-  -o, --offset <offset>           Offset to start from
+  -o, --offset <offset>           Offset to start from (default: 0)
   -h, --help                      display help for command
+
 ```
 
 ## Install
