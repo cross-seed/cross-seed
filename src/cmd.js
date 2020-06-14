@@ -39,9 +39,9 @@ program
 	)
 	.requiredOption(
 		"-d, --delay <delay>",
-		"Pause duration between searches",
+		"Pause duration (seconds) between searches",
 		parseFloat,
-		CONFIG.delay
+		CONFIG.delay || 10
 	)
 	.requiredOption(
 		"-t, --trackers <tracker>",
@@ -62,7 +62,7 @@ program
 		"-o, --offset <offset>",
 		"Offset to start from",
 		(n) => parseInt(n),
-		CONFIG.offset
+		CONFIG.offset || 0
 	)
 	.action((command) => {
 		const options = command.opts();
