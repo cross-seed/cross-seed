@@ -71,8 +71,7 @@ program
 	)
 	.action((command) => {
 		const options = command.opts();
-		console.log(options);
-		options.trackers = options.trackers.split(",");
+		options.trackers = options.trackers.split(",").filter((e) => e !== "");
 		try {
 			main(options);
 		} catch (e) {

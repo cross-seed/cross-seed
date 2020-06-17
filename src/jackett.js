@@ -12,7 +12,6 @@ function reformatTitleForSearching(name) {
 		: movieMatch
 		? movieMatch[0]
 		: name;
-	console.log(fullMatch);
 	return fullMatch.replace(".", " ");
 }
 

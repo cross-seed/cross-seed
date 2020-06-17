@@ -10,7 +10,6 @@ function loadFromDisk() {
 	if (fs.existsSync(fpath)) {
 		fileExists = true;
 		cache = require(fpath);
-		console.log(cache);
 	}
 }
 

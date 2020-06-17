@@ -1,5 +1,6 @@
 const { parseTorrentFromURL } = require("./torrent");
 const cache = require("./cache");
+const { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } = require("./constants");
 
 function compareFileTrees(a, b) {
 	if (a.length !== b.length) return false;
@@ -22,6 +23,16 @@ function assessResultPreDownload(result, ogInfo) {
 	return result.Size >= lowerBound && result.Size <= upperBound;
 }
 
+function getTag(name) {
+	return EP_REGEX.test(name)
+		? "episode"
+		: SEASON_REGEX.test(name)
+		? "pack"
+		: MOVIE_REGEX.test(name)
+		? "movie"
+		: "unknown";
+}
+
 async function assessResultHelper(result, ogInfo, hashesToExclude) {
 	const { TrackerId: tracker, Link } = result;
 
@@ -36,7 +47,7 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 	if (hashesToExclude.includes(info.infoHash)) return null;
 	if (!compareFileTrees(info.files, ogInfo.files)) return null;
 
-	const tag = info.files.length === 1 ? "movie" : "pack";
+	const tag = getTag(info.name);
 	return { tracker, tag, info };
 }
 
