@@ -1,14 +1,18 @@
 const axios = require("axios");
-const { SEASON_REGEX, MOVIE_REGEX } = require("./constants");
+const { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } = require("./constants");
 
 function reformatTitleForSearching(name) {
 	const seasonMatch = name.match(SEASON_REGEX);
 	const movieMatch = name.match(MOVIE_REGEX);
-	const fullMatch = seasonMatch
+	const episodeMatch = name.match(EP_REGEX);
+	const fullMatch = episodeMatch
+		? episodeMatch[0]
+		: seasonMatch
 		? seasonMatch[0]
 		: movieMatch
 		? movieMatch[0]
 		: name;
+	console.log(fullMatch);
 	return fullMatch.replace(".", " ");
 }
 

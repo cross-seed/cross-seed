@@ -9,7 +9,8 @@ function loadFromDisk() {
 	const fpath = path.join(appDir(), "cache.json");
 	if (fs.existsSync(fpath)) {
 		fileExists = true;
-		cache = JSON.parse(fs.readFileSync(fpath));
+		cache = require(fpath);
+		console.log(cache);
 	}
 }
 

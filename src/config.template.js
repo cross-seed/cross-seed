@@ -28,4 +28,7 @@ module.exports = {
 	// Lets you start searching from the middle of the list if you experience
 	// a failure.
 	offset: 0,
+
+	// Whether to search for single episode torrents
+	includeEpisodes: false,
 };

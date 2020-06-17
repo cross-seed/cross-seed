@@ -44,10 +44,12 @@ async function findMatchesBatch(samples, hashesToExclude, config) {
 }
 
 async function main(config) {
-	const { torrentDir, offset, outputDir } = config;
+	const { torrentDir, offset, outputDir, includeEpisodes } = config;
 	const parsedTorrents = loadTorrentDir(torrentDir);
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
-	const filteredTorrents = parsedTorrents.filter(filterTorrentFile);
+	const filteredTorrents = parsedTorrents.filter((e, i, a) =>
+		filterTorrentFile(e, i, a, includeEpisodes)
+	);
 	const samples = filteredTorrents.slice(offset);
 
 	console.log(

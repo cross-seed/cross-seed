@@ -64,8 +64,14 @@ program
 		(n) => parseInt(n),
 		CONFIG.offset || 0
 	)
+	.option(
+		"-e, --include-episodes",
+		"Include single-episode torrents in the search",
+		CONFIG.includeEpisodes || false
+	)
 	.action((command) => {
 		const options = command.opts();
+		console.log(options);
 		options.trackers = options.trackers.split(",");
 		try {
 			main(options);

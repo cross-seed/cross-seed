@@ -1,9 +1,13 @@
 const path = require("path");
 const { EP_REGEX } = require("./constants");
 
-function filterTorrentFile(info, index, arr) {
+function filterTorrentFile(info, index, arr, includeEpisodes) {
 	const { files } = info;
-	if (files.length === 1 && EP_REGEX.test(info.files[0].name)) {
+	if (
+		!includeEpisodes &&
+		files.length === 1 &&
+		EP_REGEX.test(info.files[0].name)
+	) {
 		return false;
 	}
 
