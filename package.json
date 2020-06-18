@@ -10,7 +10,7 @@
 		"cross-seed": "src/cmd.js"
 	},
 	"files": [
-		"src/**/*.js"
+		"src/"
 	],
 	"repository": {
 		"type": "git",
