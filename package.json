@@ -9,6 +9,7 @@
 	"bin": {
 		"cross-seed": "src/cmd.js"
 	},
+	"files": ["src"],
 	"repository": {
 		"type": "git",
 		"url": "git://github.com/mmgoodnow/cross-seed.git"

@@ -51,8 +51,9 @@ Options:
   -i, --torrent-dir <dir>         Directory with torrent files
   -s, --output-dir <dir>          Directory to save results in
   -o, --offset <offset>           Offset to start from (default: 0)
+  -e, --include-episodes          Include single-episode torrents in the search
+                                  (default: false)
   -h, --help                      display help for command
-
 ```
 
 ## Install
