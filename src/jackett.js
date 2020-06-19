@@ -1,4 +1,5 @@
-const axios = require("axios");
+const get = require("simple-get");
+const querystring = require("querystring");
 const { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } = require("./constants");
 
 function reformatTitleForSearching(name) {
@@ -23,7 +24,19 @@ function makeJackettRequest(name, config) {
 		Query: reformatTitleForSearching(name),
 		Tracker: trackers,
 	};
-	return axios.get(`${jackettServerUrl}${jackettPath}`, { params });
+	
+	const opts = {
+		method: "GET",
+		url: `${jackettServerUrl}${jackettPath}?${querystring.encode(params)}`,
+		json: true,
+	};
+
+	return new Promise((resolve, reject) => {
+		get.concat(opts, (err, res, data) => {
+			if (err) reject(err);
+			resolve({ ...res, data });
+		});
+	});
 }
 
 module.exports = { makeJackettRequest };
