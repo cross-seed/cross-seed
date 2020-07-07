@@ -1,4 +1,4 @@
-import { EXTENSIONS } from "./constants";
+const { EXTENSIONS } = require("./constants");
 
 function stripExtension(filename) {
 	for (const ext of EXTENSIONS) {
