@@ -28,18 +28,12 @@ function makeJackettRequest(name, config) {
 	const opts = {
 		method: "GET",
 		url: `${jackettServerUrl}${jackettPath}?${querystring.encode(params)}`,
+		json: true,
 	};
 
 	return new Promise((resolve, reject) => {
 		get.concat(opts, (err, res, data) => {
 			if (err) reject(err);
-			try {
-				const str = data.toString();
-				const cleansed = str.replace(/[\x00-\x1F]/g, "");
-				data = JSON.parse(cleansed);
-			} catch (e) {
-				reject(e);
-			}
 			resolve({ ...res, data });
 		});
 	});
