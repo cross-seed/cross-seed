@@ -11,7 +11,13 @@ async function findOnOtherSites(info, hashesToExclude, config) {
 	const assessEach = (result) => assessResult(result, info, hashesToExclude);
 
 	const query = stripExtension(info.name);
-	const response = await makeJackettRequest(query, config);
+	let response;
+	try {
+		response = await makeJackettRequest(query, config);
+	} catch (e) {
+		console.error(chalk.red`error querying Jackett for ${query}`)
+		return 0;
+	}
 	const results = response.data.Results;
 
 	const loaded = await Promise.all(results.map(assessEach));
