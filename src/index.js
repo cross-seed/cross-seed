@@ -1,6 +1,7 @@
 const fs = require("fs");
 
 const chalk = require("chalk");
+const { stripExtension } = require("./utils");
 const { loadTorrentDir, saveTorrentFile } = require("./torrent");
 const { filterTorrentFile } = require("./preFilter");
 const { assessResult } = require("./decide");
@@ -9,7 +10,7 @@ const { makeJackettRequest } = require("./jackett");
 async function findOnOtherSites(info, hashesToExclude, config) {
 	const assessEach = (result) => assessResult(result, info, hashesToExclude);
 
-	const query = info.name.replace(/.mkv$/, "");
+	const query = stripExtension(info.name);
 	const response = await makeJackettRequest(query, config);
 	const results = response.data.Results;
 
@@ -33,7 +34,7 @@ async function findMatchesBatch(samples, hashesToExclude, config) {
 		const sleep = new Promise((r) => setTimeout(r, config.delay * 1000));
 
 		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
-		const name = sample.name.replace(/.mkv$/, "");
+		const name = stripExtension(sample.name);
 		console.log(progress, chalk.dim("Searching for"), name);
 
 		let numFoundPromise = findOnOtherSites(sample, hashesToExclude, config);

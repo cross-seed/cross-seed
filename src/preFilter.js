@@ -1,5 +1,5 @@
 const path = require("path");
-const { EP_REGEX } = require("./constants");
+const { EP_REGEX, EXTENSIONS } = require("./constants");
 
 function filterTorrentFile(info, index, arr, includeEpisodes) {
 	const { files } = info;
@@ -11,8 +11,10 @@ function filterTorrentFile(info, index, arr, includeEpisodes) {
 		return false;
 	}
 
-	const allMkvs = files.every((file) => path.extname(file.path) === ".mkv");
-	if (!allMkvs) return false;
+	const allVideos = files.every((file) =>
+		EXTENSIONS.map(e => `.${e}`).includes(path.extname(file.path))
+	);
+	if (!allVideos) return false;
 
 	const cb = (file) => file.path.split(path.sep).length <= 2;
 	const notNested = files.every(cb);

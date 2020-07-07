@@ -4,6 +4,7 @@ const path = require("path");
 const parseTorrent = require("parse-torrent");
 const remote = util.promisify(parseTorrent.remote);
 const chalk = require("chalk");
+const { stripExtension } = require("./utils");
 
 function parseTorrentFromFilename(filename) {
 	const data = fs.readFileSync(filename);
@@ -19,7 +20,7 @@ function parseTorrentFromURL(url) {
 
 function saveTorrentFile(tracker, tag = "", info, outputDir) {
 	const buf = parseTorrent.toTorrentFile(info);
-	const name = info.name.replace(/.mkv$/, "");
+	const name = stripExtension(info.name);
 	const filename = `[${tag}][${tracker}]${name}.torrent`;
 	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });
 }
