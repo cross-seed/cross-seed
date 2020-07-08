@@ -5,7 +5,7 @@ const { stripExtension } = require("./utils");
 const { loadTorrentDir, saveTorrentFile } = require("./torrent");
 const { filterTorrentFile } = require("./preFilter");
 const { assessResult } = require("./decide");
-const { makeJackettRequest } = require("./jackett");
+const { makeJackettRequest, validateJackettApi } = require("./jackett");
 
 async function findOnOtherSites(info, hashesToExclude, config) {
 	const assessEach = (result) => assessResult(result, info, hashesToExclude);
@@ -64,6 +64,13 @@ async function main(config) {
 		parsedTorrents.length,
 		filteredTorrents.length
 	);
+
+	try {
+		await validateJackettApi(config);
+	} catch (e) {
+		return;
+	}
+
 	if (offset > 0) console.log("Starting at", offset);
 
 	fs.mkdirSync(outputDir, { recursive: true });
