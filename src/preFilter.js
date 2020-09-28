@@ -1,7 +1,7 @@
 const path = require("path");
 const { EP_REGEX, EXTENSIONS } = require("./constants");
 
-function filterTorrentFile(info, index, arr, includeEpisodes) {
+const filterTorrentFile = (includeEpisodes) => (info) => {
 	const { files } = info;
 	if (
 		!includeEpisodes &&
@@ -12,7 +12,7 @@ function filterTorrentFile(info, index, arr, includeEpisodes) {
 	}
 
 	const allVideos = files.every((file) =>
-		EXTENSIONS.map(e => `.${e}`).includes(path.extname(file.path))
+		EXTENSIONS.map((e) => `.${e}`).includes(path.extname(file.path))
 	);
 	if (!allVideos) return false;
 
@@ -20,10 +20,16 @@ function filterTorrentFile(info, index, arr, includeEpisodes) {
 	const notNested = files.every(cb);
 	if (!notNested) return false;
 
-	const firstOccurrence = arr.findIndex((e) => e.name === info.name);
-	if (index !== firstOccurrence) return false;
-
 	return true;
+};
+
+function filterDupes(metaFiles) {
+	return metaFiles.filter((info, index) => {
+		const firstOccurrence = metaFiles.findIndex(
+			(e) => e.name === info.name
+		);
+		return index === firstOccurrence;
+	});
 }
 
-module.exports = { filterTorrentFile };
+module.exports = { filterTorrentFile, filterDupes };

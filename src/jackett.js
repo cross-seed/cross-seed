@@ -47,7 +47,7 @@ function makeJackettRequest(name, config) {
 	const params = {
 		apikey: jackettApiKey,
 		Query: reformatTitleForSearching(name),
-		["Tracker[]"]: trackers,
+		"Tracker[]": trackers,
 	};
 
 	const opts = {

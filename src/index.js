@@ -2,8 +2,13 @@ const fs = require("fs");
 
 const chalk = require("chalk");
 const { stripExtension } = require("./utils");
-const { loadTorrentDir, saveTorrentFile } = require("./torrent");
-const { filterTorrentFile } = require("./preFilter");
+const {
+	loadTorrentDir,
+	saveTorrentFile,
+	getInfoHashesToExclude,
+	getTorrentByName,
+} = require("./torrent");
+const { filterTorrentFile, filterDupes } = require("./preFilter");
 const { assessResult } = require("./decide");
 const { makeJackettRequest, validateJackettApi } = require("./jackett");
 
@@ -15,7 +20,7 @@ async function findOnOtherSites(info, hashesToExclude, config) {
 	try {
 		response = await makeJackettRequest(query, config);
 	} catch (e) {
-		console.error(chalk.red`error querying Jackett for ${query}`)
+		console.error(chalk.red`error querying Jackett for ${query}`);
 		return 0;
 	}
 	const results = response.data.Results;
@@ -50,12 +55,20 @@ async function findMatchesBatch(samples, hashesToExclude, config) {
 	return totalFound;
 }
 
+async function searchForSingleTorrentByName(name, config) {
+	const { torrentDir } = config;
+	const hashesToExclude = getInfoHashesToExclude(torrentDir);
+	const meta = getTorrentByName(torrentDir, name);
+	console.log(meta);
+	return findOnOtherSites(meta, hashesToExclude, config);
+}
+
 async function main(config) {
 	const { torrentDir, offset, outputDir, includeEpisodes } = config;
 	const parsedTorrents = loadTorrentDir(torrentDir);
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
-	const filteredTorrents = parsedTorrents.filter((e, i, a) =>
-		filterTorrentFile(e, i, a, includeEpisodes)
+	const filteredTorrents = filterDupes(parsedTorrents).filter(
+		filterTorrentFile(includeEpisodes)
 	);
 	const samples = filteredTorrents.slice(offset);
 
@@ -83,4 +96,4 @@ async function main(config) {
 	);
 }
 
-module.exports = main;
+module.exports = { main, searchForSingleTorrentByName };
