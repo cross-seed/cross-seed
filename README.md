@@ -20,7 +20,7 @@ works there too.
 
 ## Usage
 
-Invoking it is _almost_ as simple as:
+Invoking `cross-seed` is _almost_ as simple as:
 
 ```shell script
 npx cross-seed
@@ -55,6 +55,31 @@ Options:
                                   (default: false)
   -h, --help                      display help for command
 ```
+
+## Daemon Mode (rtorrent only)
+
+`cross-seed` has a new feature called daemon mode, designed to work with Docker.
+It starts an HTTP server, listening on port 2468. It will respond to a POST
+request with a plaintext body containing the name of a torrent inside your
+torrent directory. As of right now it only works with rtorrent. I recommend
+[installing the app globally](#install) if you use daemon mode.
+
+To start the daemon, issue the following command:
+
+```shell script
+cross-seed daemon
+```
+
+Then, while the daemon is running, you can trigger a search with an HTTP
+request:
+
+```shell script
+curl -XPOST http://localhost:2468 --data '<torrent name here>'
+```
+
+If you are using rtorrent, you can adapt
+[these instructions](https://www.filebot.net/forums/viewtopic.php?p=5316#p5316)
+to run the `curl` command on finished download.
 
 ## Install
 

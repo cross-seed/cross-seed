@@ -33,16 +33,16 @@ const handleRequest = (config) => (req, res) => {
 
 async function serve(config) {
 	const { outputDir } = config;
-	// try {
-	// 	await validateJackettApi(config);
-	// } catch (e) {
-	// 	return;
-	// }
+	try {
+		await validateJackettApi(config);
+	} catch (e) {
+		return;
+	}
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const server = http.createServer(handleRequest(config));
 	server.listen(2468);
-	console.log("Server is running on port 2468");
+	console.log("Server is running on port 2468, ^C to stop.");
 }
 
 module.exports = { serve };
