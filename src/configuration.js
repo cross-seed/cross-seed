@@ -20,10 +20,15 @@ function createAppDir() {
 	return fs.mkdirSync(appDir(), { recursive: true });
 }
 
-function generateConfig() {
+function generateConfig(force = false) {
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
-	fs.copyFileSync(path.join(__dirname, "config.template.js"), dest);
+	const configPath = path.join(__dirname, "config.template.js");
+	if (!force && fs.existsSync(configPath)) {
+		console.log("Configuration file already exists. Override with --force");
+		return dest;
+	}
+	fs.copyFileSync(configPath, dest);
 	console.log("Configuration file created at", chalk.yellow.bold(dest));
 	return dest;
 }
