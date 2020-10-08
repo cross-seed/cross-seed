@@ -6,4 +6,5 @@ COPY . .
 RUN npm link
 EXPOSE 2468
 ENV CONFIG_DIR=/config
+RUN cross-seed gen-config
 CMD [ "cross-seed", "daemon" ]

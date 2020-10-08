@@ -25,7 +25,8 @@ function generateConfig(force = false) {
 	const dest = path.join(appDir(), "config.js");
 	const configPath = path.join(__dirname, "config.template.js");
 	if (!force && fs.existsSync(configPath)) {
-		console.log("Configuration file already exists. Override with --force");
+		console.error("Configuration file already exists.");
+		process.exitCode = 17; // EEXIST
 		return dest;
 	}
 	fs.copyFileSync(configPath, dest);
