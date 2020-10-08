@@ -23,15 +23,14 @@ function createAppDir() {
 function generateConfig(force = false) {
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
-	const configPath = path.join(__dirname, "config.template.js");
-	if (!force && fs.existsSync(configPath)) {
+	const templatePath = path.join(__dirname, "config.template.js");
+	if (!force && fs.existsSync(dest)) {
 		console.error("Configuration file already exists.");
 		process.exitCode = 17; // EEXIST
-		return dest;
+		return;
 	}
-	fs.copyFileSync(configPath, dest);
+	fs.copyFileSync(templatePath, dest);
 	console.log("Configuration file created at", chalk.yellow.bold(dest));
-	return dest;
 }
 
 function printUpdateInstructions(missingKeys) {

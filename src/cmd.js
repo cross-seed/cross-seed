@@ -49,7 +49,7 @@ program.version(
 program
 	.command("gen-config")
 	.description("Generate a config file")
-	.action(generateConfig);
+	.action(() => generateConfig());
 
 program
 	.command("clear-cache")
