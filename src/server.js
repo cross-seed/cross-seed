@@ -18,7 +18,11 @@ const handleRequest = (config) => (req, res) => {
 		const name = chunks.join("");
 		console.log("Received name", name);
 		try {
-			await searchForSingleTorrentByName(name, config);
+			const numSuccessful = await searchForSingleTorrentByName(
+				name,
+				config
+			);
+			console.log(`Found ${numSuccessful} torrents for ${name}`);
 		} catch (e) {
 			res.writeHead(500);
 			res.end();
