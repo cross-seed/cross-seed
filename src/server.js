@@ -1,6 +1,5 @@
 const fs = require("fs");
 const http = require("http");
-const chalk = require("chalk");
 
 const { searchForSingleTorrentByName } = require("./index");
 const { validateJackettApi } = require("./jackett");
