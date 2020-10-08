@@ -16,7 +16,7 @@ const handleRequest = (config) => (req, res) => {
 	req.on("data", (chunk) => chunks.push(chunk.toString()));
 	req.on("end", async () => {
 		const name = chunks.join("");
-		console.log(name);
+		console.log("Received name", name);
 		try {
 			await searchForSingleTorrentByName(name, config);
 		} catch (e) {

@@ -59,7 +59,6 @@ async function searchForSingleTorrentByName(name, config) {
 	const { torrentDir } = config;
 	const hashesToExclude = getInfoHashesToExclude(torrentDir);
 	const meta = getTorrentByName(torrentDir, name);
-	console.log(meta);
 	return findOnOtherSites(meta, hashesToExclude, config);
 }
 
