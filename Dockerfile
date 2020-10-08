@@ -7,4 +7,4 @@ RUN npm link
 RUN mkdir -p /config /torrents /output
 ENV CONFIG_DIR=/config
 EXPOSE 2468
-CMD cross-seed gen-config; cross-seed daemon
+CMD cross-seed gen-config --docker; cross-seed daemon

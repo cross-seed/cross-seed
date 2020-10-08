@@ -49,7 +49,14 @@ program.version(
 program
 	.command("gen-config")
 	.description("Generate a config file")
-	.action(() => generateConfig());
+	.option(
+		"-d, --docker",
+		"Generate the docker config instead of the normal one"
+	)
+	.action((command) => {
+		const options = command.opts();
+		generateConfig(options);
+	});
 
 program
 	.command("clear-cache")

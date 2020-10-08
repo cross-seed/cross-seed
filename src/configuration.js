@@ -20,10 +20,13 @@ function createAppDir() {
 	return fs.mkdirSync(appDir(), { recursive: true });
 }
 
-function generateConfig(force = false) {
+function generateConfig({ force = false, docker = false }) {
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
-	const templatePath = path.join(__dirname, "config.template.js");
+	const templatePath = path.join(
+		__dirname,
+		`config.template${docker ? ".docker" : ""}.js`
+	);
 	if (!force && fs.existsSync(dest)) {
 		console.error("Configuration file already exists.");
 		process.exitCode = 17; // EEXIST
