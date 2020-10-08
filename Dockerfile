@@ -4,6 +4,7 @@ COPY package*.json ./
 RUN npm ci --only=production
 COPY . .
 RUN npm link
-EXPOSE 2468
+RUN mkdir -p /config /torrents /output
 ENV CONFIG_DIR=/config
+EXPOSE 2468
 CMD cross-seed gen-config; cross-seed daemon
