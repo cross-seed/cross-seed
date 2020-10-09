@@ -56,30 +56,58 @@ Options:
   -h, --help                      display help for command
 ```
 
-## Daemon Mode (rtorrent only)
+## Daemon Mode (rtorrent only, Docker recommended)
 
-`cross-seed` has a new feature called daemon mode, designed to work with Docker.
-It starts an HTTP server, listening on port 2468. It will respond to a POST
-request with a plaintext body containing the name of a torrent inside your
-torrent directory. As of right now it only works with rtorrent. I recommend
-[installing the app globally](#install) if you use daemon mode.
+`cross-seed` has a new feature called daemon mode. It starts an HTTP server,
+listening on port 2468. It will respond to a POST request with a plaintext body
+containing the name of a torrent inside your torrent directory. As of right now
+it only works with rtorrent. I recommend using Docker if you plan to use
+cross-seed in daemon mode.
 
-To start the daemon, issue the following command:
+### Docker
 
-```shell script
-cross-seed daemon
+Here's a sample docker-compose blurb:
+
+```yaml
+version: "2.1"
+services:
+    cross-seed:
+        image: mmgoodnow/cross-seed:daemon
+        container_name: cross-seed
+        # not a bad idea to set this to a user that has read-only privileges
+        # to your rtorrent_sess folder and everything inside it
+        user: 1000:1000
+        volumes:
+            - /path/to/config/folder:/config
+            - /path/to/rtorrent_sess:/torrents
+            - /path/to/output/folder:/output
+        ports:
+            - 2468:2468
 ```
 
-Then, while the daemon is running, you can trigger a search with an HTTP
+While the daemon is running, you can trigger a search with an HTTP
 request:
 
 ```shell script
-curl -XPOST http://localhost:2468 --data '<torrent name here>'
+curl -XPOST http://localhost:2468/api/webhook --data '<torrent name here>'
 ```
 
 If you are using rtorrent, you can adapt
 [these instructions](https://www.filebot.net/forums/viewtopic.php?p=5316#p5316)
 to run the `curl` command on finished download.
+
+### How to run the daemon without docker
+
+If you don't want to use Docker, you can run the `cross-seed` daemon as a
+systemd service, or inside a `screen` instance. If you choose to do this, you
+will probably want to [fully install the app](#install).
+
+To start the daemon, issue the following command inside a `screen`:
+
+```shell script
+cross-seed daemon
+```
+Then detach from the screen.
 
 ## Install
 

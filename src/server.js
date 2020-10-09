@@ -44,7 +44,6 @@ async function serve(config) {
 	try {
 		await validateJackettApi(config);
 	} catch (e) {
-		console.log("jackett");
 		return;
 	}
 
