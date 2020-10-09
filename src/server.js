@@ -4,31 +4,43 @@ const http = require("http");
 const { searchForSingleTorrentByName } = require("./index");
 const { validateJackettApi } = require("./jackett");
 
-const handleRequest = (config) => (req, res) => {
+function getData(req) {
+	return new Promise((resolve) => {
+		const chunks = [];
+		req.on("data", (chunk) => {
+			chunks.push(chunk.toString());
+		});
+		req.on("end", async () => {
+			resolve(chunks.join(""));
+		});
+	});
+}
+
+const handleRequest = (config) => async (req, res) => {
 	if (req.method !== "POST") {
 		res.writeHead(405);
 		res.end();
 		return;
 	}
-
-	let chunks = [];
-	req.on("data", (chunk) => chunks.push(chunk.toString()));
-	req.on("end", async () => {
-		const name = chunks.join("");
-		console.log("Received name", name);
-		try {
-			const numFound = await searchForSingleTorrentByName(name, config);
-			console.log(`Found ${numFound} torrents for ${name}`);
-		} catch (e) {
-			res.writeHead(500);
-			res.end();
-			console.error(e.stack);
-			return;
-		}
-
-		res.writeHead(204);
+	if (req.url !== "/api/webhook") {
+		res.writeHead(404);
 		res.end();
-	});
+		return;
+	}
+	const name = await getData(req);
+	console.log("Received name", name);
+	try {
+		const numFound = await searchForSingleTorrentByName(name, config);
+		console.log(`Found ${numFound} torrents for ${name}`);
+	} catch (e) {
+		res.writeHead(500);
+		res.end();
+		console.error(e);
+		return;
+	}
+
+	res.writeHead(204);
+	res.end();
 };
 
 async function serve(config) {
@@ -36,6 +48,7 @@ async function serve(config) {
 	try {
 		await validateJackettApi(config);
 	} catch (e) {
+		console.log("jackett");
 		return;
 	}
 
