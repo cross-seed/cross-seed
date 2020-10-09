@@ -19,6 +19,7 @@
 	"author": "Michael Goodnow",
 	"license": "ISC",
 	"dependencies": {
+		"bencode": "^2.0.1",
 		"chalk": "^4.1.0",
 		"commander": "^5.1.0",
 		"parse-torrent": "^7.1.3",
