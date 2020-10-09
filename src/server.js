@@ -28,19 +28,15 @@ const handleRequest = (config) => async (req, res) => {
 		return;
 	}
 	const name = await getData(req);
+	res.writeHead(204);
+	res.end();
 	console.log("Received name", name);
 	try {
 		const numFound = await searchForSingleTorrentByName(name, config);
 		console.log(`Found ${numFound} torrents for ${name}`);
 	} catch (e) {
-		res.writeHead(500);
-		res.end();
 		console.error(e);
-		return;
 	}
-
-	res.writeHead(204);
-	res.end();
 };
 
 async function serve(config) {
