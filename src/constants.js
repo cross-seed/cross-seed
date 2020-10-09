@@ -4,8 +4,6 @@ const MOVIE_REGEX = /^(?<title>.+)[. ](?<year>\d{4})/i;
 
 const EXTENSIONS = ["mkv", "mp4", "avi"];
 
-const CONFIG_TEMPLATE_URL =
-	"https://github.com/mmgoodnow/cross-seed/blob/master/src/config.template.js";
 // because I'm sick of intellij whining at me
 const result = {
 	Link: undefined,
@@ -21,5 +19,4 @@ module.exports = {
 	SEASON_REGEX,
 	MOVIE_REGEX,
 	EXTENSIONS,
-	CONFIG_TEMPLATE_URL,
 };

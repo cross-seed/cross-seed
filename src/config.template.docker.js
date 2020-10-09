@@ -4,9 +4,6 @@
 // it here as a default.
 
 module.exports = {
-	// every time the configuration is changed, this will increment.
-	configVersion: 1,
-
 	jackettServerUrl: "http://jackett:9117/jackett",
 	jackettApiKey: "YOUR_JACKETT_API_KEY_HERE",
 
@@ -38,8 +35,4 @@ module.exports = {
 
 	// Whether to search for single episode torrents
 	includeEpisodes: false,
-
-	// added in configVersion 1
-	//
-	watchIntervalMins: 10,
 };
