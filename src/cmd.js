@@ -7,6 +7,7 @@ const { main } = require("./index");
 const { CONFIG, generateConfig } = require("./configuration");
 const { clear: clearCache } = require("./cache");
 const { serve } = require("./server");
+require("./signalHandlers");
 
 function addSharedOptions() {
 	return this.requiredOption(
@@ -22,7 +23,7 @@ function addSharedOptions() {
 		.requiredOption(
 			"-t, --trackers <tracker>",
 			"Comma-separated list of Jackett tracker ids to search",
-			CONFIG.trackers && CONFIG.trackers.join(",")
+			CONFIG.trackers ? CONFIG.trackers.join(",") : ""
 		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
@@ -71,6 +72,9 @@ program
 		const options = command.opts();
 		options.trackers = options.trackers.split(",").filter((e) => e !== "");
 		try {
+			if (process.env.DOCKER_ENV === "true") {
+				generateConfig({ docker: true });
+			}
 			await serve(options);
 		} catch (e) {
 			console.error(chalk.bold.red(e.message));

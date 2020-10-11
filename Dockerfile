@@ -4,7 +4,8 @@ COPY package*.json ./
 RUN npm ci --only=production
 VOLUME /config /torrents /output
 ENV CONFIG_DIR=/config
-COPY . .
+ENV DOCKER_ENV=true
+COPY src src
 RUN npm link
 EXPOSE 2468
-CMD cross-seed gen-config --docker; cross-seed daemon
+ENTRYPOINT ["cross-seed"]
