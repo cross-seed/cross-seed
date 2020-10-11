@@ -4,36 +4,49 @@ const { program, Command } = require("commander");
 const chalk = require("chalk");
 const packageDotJson = require("../package.json");
 const { main } = require("./index");
-const { CONFIG, generateConfig } = require("./configuration");
+const {
+	generateConfig,
+	getFileConfig,
+	setRuntimeConfig,
+} = require("./configuration");
 const { clear: clearCache } = require("./cache");
 const { serve } = require("./server");
 require("./signalHandlers");
+
+const fileConfig = getFileConfig();
+
+function fallback(...args) {
+	for (const arg of args) {
+		if (arg !== undefined) return arg;
+	}
+	return undefined;
+}
 
 function addSharedOptions() {
 	return this.requiredOption(
 		"-u, --jackett-server-url <url>",
 		"Your Jackett server url",
-		CONFIG.jackettServerUrl
+		fileConfig.jackettServerUrl
 	)
 		.requiredOption(
 			"-k, --jackett-api-key <key>",
 			"Your Jackett API key",
-			CONFIG.jackettApiKey
+			fileConfig.jackettApiKey
 		)
 		.requiredOption(
 			"-t, --trackers <tracker>",
 			"Comma-separated list of Jackett tracker ids to search",
-			CONFIG.trackers ? CONFIG.trackers.join(",") : ""
+			fallback(fileConfig.trackers && fileConfig.trackers.join(","), "")
 		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
 			"Directory with torrent files",
-			CONFIG.torrentDir
+			fileConfig.torrentDir
 		)
 		.requiredOption(
 			"-s, --output-dir <dir>",
 			"Directory to save results in",
-			CONFIG.outputDir
+			fileConfig.outputDir
 		);
 }
 // monkey patch Command with this addSharedOptions function
@@ -71,11 +84,12 @@ program
 	.action(async (command) => {
 		const options = command.opts();
 		options.trackers = options.trackers.split(",").filter((e) => e !== "");
+		setRuntimeConfig(options);
 		try {
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
-			await serve(options);
+			await serve();
 		} catch (e) {
 			console.error(chalk.bold.red(e.message));
 		}
@@ -89,24 +103,25 @@ program
 		"-o, --offset <offset>",
 		"Offset to start from",
 		(n) => parseInt(n),
-		CONFIG.offset || 0
+		0
 	)
 	.requiredOption(
 		"-d, --delay <delay>",
 		"Pause duration (seconds) between searches",
 		parseFloat,
-		CONFIG.delay || 10
+		fallback(fileConfig.delay, 10)
 	)
 	.option(
 		"-e, --include-episodes",
 		"Include single-episode torrents in the search",
-		CONFIG.includeEpisodes || false
+		fallback(fileConfig.includeEpisodes, false)
 	)
 	.action(async (command) => {
 		const options = command.opts();
 		options.trackers = options.trackers.split(",").filter((e) => e !== "");
+		setRuntimeConfig(options);
 		try {
-			await main(options);
+			await main();
 		} catch (e) {
 			console.error(chalk.bold.red(e.message));
 		}

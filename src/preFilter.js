@@ -1,7 +1,9 @@
 const path = require("path");
+const { getRuntimeConfig } = require("./configuration");
 const { EP_REGEX, EXTENSIONS } = require("./constants");
 
-const filterTorrentFile = (includeEpisodes) => (info) => {
+function filterTorrentFile(info) {
+	const { includeEpisodes } = getRuntimeConfig();
 	const { files } = info;
 	if (
 		!includeEpisodes &&
@@ -21,7 +23,7 @@ const filterTorrentFile = (includeEpisodes) => (info) => {
 	if (!notNested) return false;
 
 	return true;
-};
+}
 
 function filterDupes(metaFiles) {
 	return metaFiles.filter((info, index) => {

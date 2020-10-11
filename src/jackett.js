@@ -1,6 +1,7 @@
 const get = require("simple-get");
 const querystring = require("querystring");
 const chalk = require("chalk");
+const { getRuntimeConfig } = require("./configuration");
 const { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } = require("./constants");
 
 function reformatTitleForSearching(name) {
@@ -22,8 +23,8 @@ function fullJackettUrl(jackettServerUrl, params) {
 	return `${jackettServerUrl}${jackettPath}?${querystring.encode(params)}`;
 }
 
-async function validateJackettApi(config) {
-	const { jackettServerUrl, jackettApiKey: apikey } = config;
+async function validateJackettApi() {
+	const { jackettServerUrl, jackettApiKey: apikey } = getRuntimeConfig();
 
 	if (/\/$/.test(jackettServerUrl)) {
 		const msg = "Warning: Jackett server url should not end with '/'";
@@ -33,7 +34,7 @@ async function validateJackettApi(config) {
 	// search for gibberish so the results will be empty
 	const gibberish = "bscdjpstabgdspjdasmomdsenqciadsnocdpsikncaodsnimcdqsanc";
 	try {
-		await makeJackettRequest(gibberish, config);
+		await makeJackettRequest(gibberish);
 	} catch (e) {
 		const dummyUrl = fullJackettUrl(jackettServerUrl, { apikey });
 		console.error(chalk.red`Could not reach Jackett at the following URL:`);
@@ -42,8 +43,8 @@ async function validateJackettApi(config) {
 	}
 }
 
-function makeJackettRequest(name, config) {
-	const { jackettApiKey, trackers, jackettServerUrl } = config;
+function makeJackettRequest(name) {
+	const { jackettApiKey, trackers, jackettServerUrl } = getRuntimeConfig();
 	const params = {
 		apikey: jackettApiKey,
 		Query: reformatTitleForSearching(name),

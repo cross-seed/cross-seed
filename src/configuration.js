@@ -3,7 +3,16 @@ const path = require("path");
 const chalk = require("chalk");
 const packageDotJson = require("../package.json");
 
-let CONFIG = {};
+let runtimeConfig = {
+	jackettServerUrl: undefined,
+	jackettApiKey: undefined,
+	delay: undefined,
+	trackers: undefined,
+	torrentDir: undefined,
+	outputDir: undefined,
+	includeEpisodes: undefined,
+	verbose: undefined,
+};
 
 function appDir() {
 	return (
@@ -26,18 +35,35 @@ function generateConfig({ force = false, docker = false }) {
 		`config.template${docker ? ".docker" : ""}.js`
 	);
 	if (!force && fs.existsSync(dest)) {
-		console.error("Configuration file already exists.");
-		process.exitCode = 17; // EEXIST
+		console.log("Configuration file already exists.");
 		return;
 	}
 	fs.copyFileSync(templatePath, dest);
 	console.log("Configuration file created at", chalk.yellow.bold(dest));
 }
 
-try {
-	CONFIG = require(path.join(appDir(), "config.js"));
-} catch (_) {
-	// swallow error
+function getFileConfig() {
+	const path = path.join(appDir(), "config.js");
+	let fileConfig = {};
+	if (fs.existsSync(path)) {
+		fileConfig = require(path);
+	}
+	return fileConfig;
 }
 
-module.exports = { CONFIG, appDir, createAppDir, generateConfig };
+function setRuntimeConfig(configObj) {
+	runtimeConfig = configObj;
+}
+
+function getRuntimeConfig() {
+	return runtimeConfig;
+}
+
+module.exports = {
+	appDir,
+	createAppDir,
+	generateConfig,
+	getFileConfig,
+	setRuntimeConfig,
+	getRuntimeConfig,
+};

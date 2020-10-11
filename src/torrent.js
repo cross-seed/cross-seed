@@ -4,6 +4,7 @@ const path = require("path");
 const parseTorrent = require("parse-torrent");
 const remote = util.promisify(parseTorrent.remote);
 const chalk = require("chalk");
+const { getRuntimeConfig } = require("./configuration");
 const { stripExtension } = require("./utils");
 
 function parseTorrentFromFilename(filename) {
@@ -18,7 +19,8 @@ function parseTorrentFromURL(url) {
 	});
 }
 
-function saveTorrentFile(tracker, tag = "", info, outputDir) {
+function saveTorrentFile(tracker, tag = "", info) {
+	const { outputDir } = getRuntimeConfig();
 	const buf = parseTorrent.toTorrentFile(info);
 	const name = stripExtension(info.name);
 	const filename = `[${tag}][${tracker}]${name}.torrent`;
@@ -32,25 +34,29 @@ function findAllTorrentFilesInDir(torrentDir) {
 		.map((fn) => path.join(torrentDir, fn));
 }
 
-function getInfoHashesToExclude(torrentDir) {
+// this is rtorrent specific
+function getInfoHashesToExclude() {
+	const { torrentDir } = getRuntimeConfig();
 	return findAllTorrentFilesInDir(torrentDir).map((pathname) =>
 		path.basename(pathname, ".torrent").toLowerCase()
 	);
 }
 
-function loadTorrentDir(torrentDir) {
+function loadTorrentDir() {
+	const { torrentDir } = getRuntimeConfig();
 	const dirContents = findAllTorrentFilesInDir(torrentDir);
 	return dirContents.map(parseTorrentFromFilename);
 }
 
-function getTorrentByName(torrentDir, name) {
+function getTorrentByName(name) {
+	const { torrentDir } = getRuntimeConfig();
 	const dirContents = findAllTorrentFilesInDir(torrentDir);
 	const findResult = dirContents.find((filename) => {
 		const meta = parseTorrentFromFilename(filename);
 		return meta.name === name;
 	});
 	if (findResult === undefined) {
-		const message = `Error: could not find a torrent with the name ${name}`;
+		const message = `could not find a torrent with the name ${name}`;
 		throw new Error(message);
 	}
 	return parseTorrentFromFilename(findResult);
