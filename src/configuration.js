@@ -36,6 +36,8 @@ function generateConfig({ force = false, docker = false }) {
 
 try {
 	CONFIG = require(path.join(appDir(), "config.js"));
-} catch (_) {}
+} catch (_) {
+	// swallow error
+}
 
 module.exports = { CONFIG, appDir, createAppDir, generateConfig };
