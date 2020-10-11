@@ -114,7 +114,7 @@ Here's a sample docker-compose blurb:
 version: "2.1"
 services:
     cross-seed:
-        image: mmgoodnow/cross-seed:daemon
+        image: mmgoodnow/cross-seed
         container_name: cross-seed
         # not a bad idea to set this to a user that has read-only privileges
         # to your rtorrent_sess folder and everything inside it
