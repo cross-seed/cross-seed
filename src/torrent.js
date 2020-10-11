@@ -25,12 +25,35 @@ function saveTorrentFile(tracker, tag = "", info, outputDir) {
 	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });
 }
 
-function loadTorrentDir(torrentDir) {
-	const dirContents = fs
+function findAllTorrentFilesInDir(torrentDir) {
+	return fs
 		.readdirSync(torrentDir)
 		.filter((fn) => path.extname(fn) === ".torrent")
 		.map((fn) => path.join(torrentDir, fn));
+}
+
+function getInfoHashesToExclude(torrentDir) {
+	return findAllTorrentFilesInDir(torrentDir).map((pathname) =>
+		path.basename(pathname, ".torrent").toLowerCase()
+	);
+}
+
+function loadTorrentDir(torrentDir) {
+	const dirContents = findAllTorrentFilesInDir(torrentDir);
 	return dirContents.map(parseTorrentFromFilename);
+}
+
+function getTorrentByName(torrentDir, name) {
+	const dirContents = findAllTorrentFilesInDir(torrentDir);
+	const findResult = dirContents.find((filename) => {
+		const meta = parseTorrentFromFilename(filename);
+		return meta.name === name;
+	});
+	if (findResult === undefined) {
+		const message = `Error: could not find a torrent with the name ${name}`;
+		throw new Error(message);
+	}
+	return parseTorrentFromFilename(findResult);
 }
 
 module.exports = {
@@ -38,4 +61,6 @@ module.exports = {
 	parseTorrentFromURL,
 	saveTorrentFile,
 	loadTorrentDir,
+	getTorrentByName,
+	getInfoHashesToExclude,
 };
