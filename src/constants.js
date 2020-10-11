@@ -5,7 +5,7 @@ const MOVIE_REGEX = /^(?<title>.+)[. ](?<year>\d{4})/i;
 const EXTENSIONS = ["mkv", "mp4", "avi"];
 
 // because I'm sick of intellij whining at me
-const result = {
+const _result = {
 	Link: undefined,
 	TrackerId: undefined,
 	Results: undefined,
