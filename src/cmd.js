@@ -12,6 +12,7 @@ const {
 const { clear: clearCache } = require("./cache");
 const { serve } = require("./server");
 require("./signalHandlers");
+const logger = require("./logger");
 
 const fileConfig = getFileConfig();
 
@@ -91,7 +92,7 @@ program
 			}
 			await serve();
 		} catch (e) {
-			console.error(chalk.bold.red(e.message));
+			logger.error(chalk.bold.red(e.message));
 		}
 	});
 
@@ -123,7 +124,7 @@ program
 		try {
 			await main();
 		} catch (e) {
-			console.error(chalk.bold.red(e.message));
+			logger.error(chalk.bold.red(e.message));
 		}
 	});
 

@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const chalk = require("chalk");
 const packageDotJson = require("../package.json");
+const logger = require("./logger");
 
 let runtimeConfig = {
 	jackettServerUrl: undefined,
@@ -35,11 +36,11 @@ function generateConfig({ force = false, docker = false }) {
 		`config.template${docker ? ".docker" : ""}.js`
 	);
 	if (!force && fs.existsSync(dest)) {
-		console.log("Configuration file already exists.");
+		logger.log("Configuration file already exists.");
 		return;
 	}
 	fs.copyFileSync(templatePath, dest);
-	console.log("Configuration file created at", chalk.yellow.bold(dest));
+	logger.log("Configuration file created at", chalk.yellow.bold(dest));
 }
 
 function getFileConfig() {

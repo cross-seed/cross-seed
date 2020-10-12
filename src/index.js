@@ -12,6 +12,7 @@ const {
 const { filterTorrentFile, filterDupes } = require("./preFilter");
 const { assessResult } = require("./decide");
 const { makeJackettRequest, validateJackettApi } = require("./jackett");
+const logger = require("./logger");
 
 async function findOnOtherSites(info, hashesToExclude) {
 	const assessEach = (result) => assessResult(result, info, hashesToExclude);
@@ -21,7 +22,7 @@ async function findOnOtherSites(info, hashesToExclude) {
 	try {
 		response = await makeJackettRequest(query);
 	} catch (e) {
-		console.error(chalk.red`error querying Jackett for ${query}`);
+		logger.error(chalk.red`error querying Jackett for ${query}`);
 		return 0;
 	}
 	const results = response.data.Results;
@@ -32,7 +33,7 @@ async function findOnOtherSites(info, hashesToExclude) {
 	successful.forEach(({ tracker, tag, info: newInfo }) => {
 		const styledName = chalk.green.bold(newInfo.name);
 		const styledTracker = chalk.bold(tracker);
-		console.log(`Found ${styledName} on ${styledTracker}`);
+		logger.log(`Found ${styledName} on ${styledTracker}`);
 		saveTorrentFile(tracker, tag, newInfo);
 	});
 
@@ -48,7 +49,7 @@ async function findMatchesBatch(samples, hashesToExclude) {
 
 		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
 		const name = stripExtension(sample.name);
-		console.log(progress, chalk.dim("Searching for"), name);
+		logger.log(progress, chalk.dim("Searching for"), name);
 
 		let numFoundPromise = findOnOtherSites(sample, hashesToExclude);
 		const [numFound] = await Promise.all([numFoundPromise, sleep]);
@@ -72,7 +73,7 @@ async function main() {
 	);
 	const samples = filteredTorrents.slice(offset);
 
-	console.log(
+	logger.log(
 		"Found %d torrents, %d suitable to search for matches",
 		parsedTorrents.length,
 		filteredTorrents.length
@@ -84,12 +85,12 @@ async function main() {
 		return;
 	}
 
-	if (offset > 0) console.log("Starting at", offset);
+	if (offset > 0) logger.log("Starting at", offset);
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	let totalFound = await findMatchesBatch(samples, hashesToExclude);
 
-	console.log(
+	logger.log(
 		chalk.cyan("Done! Found %s cross seeds from %s original torrents"),
 		chalk.bold.white(totalFound),
 		chalk.bold.white(samples.length)

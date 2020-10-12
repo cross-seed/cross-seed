@@ -3,6 +3,7 @@ const querystring = require("querystring");
 const chalk = require("chalk");
 const { getRuntimeConfig } = require("./configuration");
 const { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } = require("./constants");
+const logger = require("./logger");
 
 function reformatTitleForSearching(name) {
 	const seasonMatch = name.match(SEASON_REGEX);
@@ -28,7 +29,7 @@ async function validateJackettApi() {
 
 	if (/\/$/.test(jackettServerUrl)) {
 		const msg = "Warning: Jackett server url should not end with '/'";
-		console.error(chalk.yellow(msg));
+		logger.error(chalk.yellow(msg));
 	}
 
 	// search for gibberish so the results will be empty
@@ -37,8 +38,8 @@ async function validateJackettApi() {
 		await makeJackettRequest(gibberish);
 	} catch (e) {
 		const dummyUrl = fullJackettUrl(jackettServerUrl, { apikey });
-		console.error(chalk.red`Could not reach Jackett at the following URL:`);
-		console.error(dummyUrl);
+		logger.error(chalk.red`Could not reach Jackett at the following URL:`);
+		logger.error(dummyUrl);
 		throw e;
 	}
 }

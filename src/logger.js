@@ -19,4 +19,8 @@ function warn(...args) {
 	console.warn(...args);
 }
 
-module.exports = { log, verbose, error, warn };
+const withPresetArgs = (loggerFn, ...presets) => (...args) => {
+	loggerFn(...presets, ...args);
+};
+
+module.exports = { log, verbose, error, warn, withPresetArgs };

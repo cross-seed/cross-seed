@@ -6,6 +6,7 @@ const remote = util.promisify(parseTorrent.remote);
 const chalk = require("chalk");
 const { getRuntimeConfig } = require("./configuration");
 const { stripExtension } = require("./utils");
+const logger = require("./logger");
 
 function parseTorrentFromFilename(filename) {
 	const data = fs.readFileSync(filename);
@@ -14,7 +15,7 @@ function parseTorrentFromFilename(filename) {
 
 function parseTorrentFromURL(url) {
 	return remote(url).catch((_) => {
-		console.error(chalk.red`error parsing torrent at ${url}`);
+		logger.error(chalk.red`error parsing torrent at ${url}`);
 		return null;
 	});
 }
