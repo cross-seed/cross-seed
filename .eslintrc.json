@@ -2,7 +2,7 @@
 	"env": {
 		"node": true,
 		"commonjs": true,
-		"es2021": true,
+		"es2021": true
 	},
 	"extends": "eslint:recommended",
 	"parserOptions": {
@@ -11,7 +11,10 @@
 	"rules": {
 		"no-unused-vars": [
 			"error",
-			{ "varsIgnorePattern": "^_", "argsIgnorePattern": "^_" }
+			{
+				"varsIgnorePattern": "^_",
+				"argsIgnorePattern": "^_"
+			}
 		]
 	}
 }
