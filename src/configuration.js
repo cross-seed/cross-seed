@@ -2,8 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const chalk = require("chalk");
 const packageDotJson = require("../package.json");
-
-let CONFIG = {};
+const logger = require("./logger");
 
 function appDir() {
 	return (
@@ -26,18 +25,25 @@ function generateConfig({ force = false, docker = false }) {
 		`config.template${docker ? ".docker" : ""}.js`
 	);
 	if (!force && fs.existsSync(dest)) {
-		console.error("Configuration file already exists.");
-		process.exitCode = 17; // EEXIST
+		logger.log("Configuration file already exists.");
 		return;
 	}
 	fs.copyFileSync(templatePath, dest);
-	console.log("Configuration file created at", chalk.yellow.bold(dest));
+	logger.log("Configuration file created at", chalk.yellow.bold(dest));
 }
 
-try {
-	CONFIG = require(path.join(appDir(), "config.js"));
-} catch (_) {
-	// swallow error
+function getFileConfig() {
+	const configPath = path.join(appDir(), "config.js");
+	let fileConfig = {};
+	if (fs.existsSync(configPath)) {
+		fileConfig = require(configPath);
+	}
+	return fileConfig;
 }
 
-module.exports = { CONFIG, appDir, createAppDir, generateConfig };
+module.exports = {
+	appDir,
+	createAppDir,
+	generateConfig,
+	getFileConfig,
+};

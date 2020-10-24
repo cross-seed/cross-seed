@@ -1,6 +1,8 @@
 const { parseTorrentFromURL } = require("./torrent");
 const cache = require("./cache");
 const { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } = require("./constants");
+const logger = require("./logger");
+const { partial } = require("./utils");
 
 function compareFileTrees(a, b) {
 	if (a.length !== b.length) return false;
@@ -16,7 +18,7 @@ function compareFileTrees(a, b) {
 	return sortedA.every((elOfA, i) => cmp(elOfA, sortedB[i]));
 }
 
-function assessResultPreDownload(result, ogInfo) {
+function sizeDoesMatch(result, ogInfo) {
 	const { length } = ogInfo;
 	const lowerBound = length - 0.01 * length;
 	const upperBound = length + 0.01 * length;
@@ -34,26 +36,51 @@ function getTag(name) {
 }
 
 async function assessResultHelper(result, ogInfo, hashesToExclude) {
-	const { TrackerId: tracker, Link } = result;
-
-	if (!assessResultPreDownload(result, ogInfo)) return null;
+	const { TrackerId: tracker, Link, Title } = result;
+	const logReason = partial(
+		logger.verbose,
+		"[decide]",
+		`${Title} from ${tracker} did not match ${ogInfo.name} because`
+	);
+	if (!sizeDoesMatch(result, ogInfo)) {
+		logReason("it has a different size");
+		return null;
+	}
 
 	const info = await parseTorrentFromURL(Link);
 
 	// if you got rate limited or some other failure
 	if (!info) return info;
 
-	if (info.length !== ogInfo.length) return null;
-	if (hashesToExclude.includes(info.infoHash)) return null;
-	if (!compareFileTrees(info.files, ogInfo.files)) return null;
+	if (info.length !== ogInfo.length) {
+		logReason("it has a different size");
+		return null;
+	}
+	if (hashesToExclude.includes(info.infoHash)) {
+		logReason("the info hash matches a torrent you already have");
+		return null;
+	}
+	if (!compareFileTrees(info.files, ogInfo.files)) {
+		logReason("it has a different file tree");
+		return null;
+	}
 
 	const tag = getTag(info.name);
 	return { tracker, tag, info };
 }
 
 function assessResultCaching(result, ogInfo, hashesToExclude) {
-	const cacheKey = `${ogInfo.name}|${result.Guid}`;
-	if (cache.includes(cacheKey)) return null;
+	const { Guid, Title, TrackerId: tracker } = result;
+	const cacheKey = `${ogInfo.name}|${Guid}`;
+	if (cache.includes(cacheKey)) {
+		const logReason = partial(
+			logger.verbose,
+			"[decide]",
+			`${Title} from ${tracker} did not match ${ogInfo.name} because`
+		);
+		logReason("it has been seen and rejected before");
+		return null;
+	}
 	const assessPromise = assessResultHelper(result, ogInfo, hashesToExclude);
 	assessPromise.then((assessed) => !assessed && cache.save(cacheKey));
 	return assessPromise;

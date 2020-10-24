@@ -3,6 +3,7 @@ const http = require("http");
 
 const { searchForSingleTorrentByName } = require("./index");
 const { validateJackettApi } = require("./jackett");
+const logger = require("./logger");
 
 function getData(req) {
 	return new Promise((resolve) => {
@@ -30,12 +31,12 @@ const handleRequest = (config) => async (req, res) => {
 	const name = await getData(req);
 	res.writeHead(204);
 	res.end();
-	console.log("Received name", name);
+	logger.log("Received name", name);
 	try {
 		const numFound = await searchForSingleTorrentByName(name, config);
-		console.log(`Found ${numFound} torrents for ${name}`);
+		logger.log(`Found ${numFound} torrents for ${name}`);
 	} catch (e) {
-		console.error(e);
+		logger.error(e);
 	}
 };
 
@@ -50,7 +51,7 @@ async function serve(config) {
 	fs.mkdirSync(outputDir, { recursive: true });
 	const server = http.createServer(handleRequest(config));
 	server.listen(2468);
-	console.log("Server is running on port 2468, ^C to stop.");
+	logger.log("Server is running on port 2468, ^C to stop.");
 }
 
 module.exports = { serve };

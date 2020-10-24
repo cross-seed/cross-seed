@@ -1,6 +1,7 @@
 const fs = require("fs");
 
 const chalk = require("chalk");
+const { getRuntimeConfig } = require("./runtimeConfig");
 const { stripExtension } = require("./utils");
 const {
 	loadTorrentDir,
@@ -11,16 +12,17 @@ const {
 const { filterTorrentFile, filterDupes } = require("./preFilter");
 const { assessResult } = require("./decide");
 const { makeJackettRequest, validateJackettApi } = require("./jackett");
+const logger = require("./logger");
 
-async function findOnOtherSites(info, hashesToExclude, config) {
+async function findOnOtherSites(info, hashesToExclude) {
 	const assessEach = (result) => assessResult(result, info, hashesToExclude);
 
 	const query = stripExtension(info.name);
 	let response;
 	try {
-		response = await makeJackettRequest(query, config);
+		response = await makeJackettRequest(query);
 	} catch (e) {
-		console.error(chalk.red`error querying Jackett for ${query}`);
+		logger.error(chalk.red`error querying Jackett for ${query}`);
 		return 0;
 	}
 	const results = response.data.Results;
@@ -31,64 +33,65 @@ async function findOnOtherSites(info, hashesToExclude, config) {
 	successful.forEach(({ tracker, tag, info: newInfo }) => {
 		const styledName = chalk.green.bold(newInfo.name);
 		const styledTracker = chalk.bold(tracker);
-		console.log(`Found ${styledName} on ${styledTracker}`);
-		saveTorrentFile(tracker, tag, newInfo, config.outputDir);
+		logger.log(`Found ${styledName} on ${styledTracker}`);
+		saveTorrentFile(tracker, tag, newInfo);
 	});
 
 	return successful.length;
 }
 
-async function findMatchesBatch(samples, hashesToExclude, config) {
-	let totalFound = 0;
+async function findMatchesBatch(samples, hashesToExclude) {
+	const { delay } = getRuntimeConfig();
 
+	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
-		const sleep = new Promise((r) => setTimeout(r, config.delay * 1000));
+		const sleep = new Promise((r) => setTimeout(r, delay * 1000));
 
 		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
 		const name = stripExtension(sample.name);
-		console.log(progress, chalk.dim("Searching for"), name);
+		logger.log(progress, chalk.dim("Searching for"), name);
 
-		let numFoundPromise = findOnOtherSites(sample, hashesToExclude, config);
+		let numFoundPromise = findOnOtherSites(sample, hashesToExclude);
 		const [numFound] = await Promise.all([numFoundPromise, sleep]);
 		totalFound += numFound;
 	}
 	return totalFound;
 }
 
-async function searchForSingleTorrentByName(name, config) {
-	const { torrentDir } = config;
-	const hashesToExclude = getInfoHashesToExclude(torrentDir);
-	const meta = getTorrentByName(torrentDir, name);
-	return findOnOtherSites(meta, hashesToExclude, config);
+async function searchForSingleTorrentByName(name) {
+	const hashesToExclude = getInfoHashesToExclude();
+	const meta = getTorrentByName(name);
+	if (!filterTorrentFile(meta)) return;
+	return findOnOtherSites(meta, hashesToExclude);
 }
 
-async function main(config) {
-	const { torrentDir, offset, outputDir, includeEpisodes } = config;
-	const parsedTorrents = loadTorrentDir(torrentDir);
+async function main() {
+	const { offset, outputDir } = getRuntimeConfig();
+	const parsedTorrents = loadTorrentDir();
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
 	const filteredTorrents = filterDupes(parsedTorrents).filter(
-		filterTorrentFile(includeEpisodes)
+		filterTorrentFile
 	);
 	const samples = filteredTorrents.slice(offset);
 
-	console.log(
+	logger.log(
 		"Found %d torrents, %d suitable to search for matches",
 		parsedTorrents.length,
 		filteredTorrents.length
 	);
 
 	try {
-		await validateJackettApi(config);
+		await validateJackettApi();
 	} catch (e) {
 		return;
 	}
 
-	if (offset > 0) console.log("Starting at", offset);
+	if (offset > 0) logger.log("Starting at", offset);
 
 	fs.mkdirSync(outputDir, { recursive: true });
-	let totalFound = await findMatchesBatch(samples, hashesToExclude, config);
+	let totalFound = await findMatchesBatch(samples, hashesToExclude);
 
-	console.log(
+	logger.log(
 		chalk.cyan("Done! Found %s cross seeds from %s original torrents"),
 		chalk.bold.white(totalFound),
 		chalk.bold.white(samples.length)
