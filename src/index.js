@@ -1,7 +1,7 @@
 const fs = require("fs");
 
 const chalk = require("chalk");
-const { getRuntimeConfig } = require("./configuration");
+const { getRuntimeConfig } = require("./runtimeConfig");
 const { stripExtension } = require("./utils");
 const {
 	loadTorrentDir,
@@ -61,6 +61,7 @@ async function findMatchesBatch(samples, hashesToExclude) {
 async function searchForSingleTorrentByName(name) {
 	const hashesToExclude = getInfoHashesToExclude();
 	const meta = getTorrentByName(name);
+	if (!filterTorrentFile(meta)) return;
 	return findOnOtherSites(meta, hashesToExclude);
 }
 

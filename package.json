@@ -4,7 +4,7 @@
 	"description": "Query Jackett for cross-seedable torrents",
 	"main": "src/index.js",
 	"scripts": {
-		"test": "echo \"Error: no test specified\""
+		"test": "jest"
 	},
 	"bin": {
 		"cross-seed": "src/cmd.js"
@@ -27,6 +27,7 @@
 	"devDependencies": {
 		"eslint": "^7.11.0",
 		"husky": "^4.3.0",
+		"jest": "^26.5.3",
 		"lint-staged": "^10.4.0",
 		"prettier": "^2.0.5"
 	},

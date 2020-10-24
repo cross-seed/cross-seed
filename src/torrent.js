@@ -4,7 +4,7 @@ const path = require("path");
 const parseTorrent = require("parse-torrent");
 const remote = util.promisify(parseTorrent.remote);
 const chalk = require("chalk");
-const { getRuntimeConfig } = require("./configuration");
+const { getRuntimeConfig } = require("./runtimeConfig");
 const { stripExtension } = require("./utils");
 const logger = require("./logger");
 

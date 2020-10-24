@@ -1,7 +1,7 @@
 const get = require("simple-get");
 const querystring = require("querystring");
 const chalk = require("chalk");
-const { getRuntimeConfig } = require("./configuration");
+const { getRuntimeConfig } = require("./runtimeConfig");
 const { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } = require("./constants");
 const logger = require("./logger");
 

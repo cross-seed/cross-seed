@@ -118,3 +118,5 @@ dist
 *.torrent
 torrents/
 config.js
+output/
+input/

@@ -4,17 +4,6 @@ const chalk = require("chalk");
 const packageDotJson = require("../package.json");
 const logger = require("./logger");
 
-let runtimeConfig = {
-	jackettServerUrl: undefined,
-	jackettApiKey: undefined,
-	delay: undefined,
-	trackers: undefined,
-	torrentDir: undefined,
-	outputDir: undefined,
-	includeEpisodes: undefined,
-	verbose: undefined,
-};
-
 function appDir() {
 	return (
 		process.env.CONFIG_DIR ||
@@ -44,20 +33,12 @@ function generateConfig({ force = false, docker = false }) {
 }
 
 function getFileConfig() {
-	const path = path.join(appDir(), "config.js");
+	const configPath = path.join(appDir(), "config.js");
 	let fileConfig = {};
-	if (fs.existsSync(path)) {
-		fileConfig = require(path);
+	if (fs.existsSync(configPath)) {
+		fileConfig = require(configPath);
 	}
 	return fileConfig;
-}
-
-function setRuntimeConfig(configObj) {
-	runtimeConfig = configObj;
-}
-
-function getRuntimeConfig() {
-	return runtimeConfig;
 }
 
 module.exports = {
@@ -65,6 +46,4 @@ module.exports = {
 	createAppDir,
 	generateConfig,
 	getFileConfig,
-	setRuntimeConfig,
-	getRuntimeConfig,
 };

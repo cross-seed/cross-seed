@@ -1,12 +1,13 @@
 const path = require("path");
-const { getRuntimeConfig } = require("./configuration");
+const { getRuntimeConfig } = require("./runtimeConfig");
 const { EP_REGEX, EXTENSIONS } = require("./constants");
 const logger = require("./logger");
+const { partial } = require("./utils");
 
 function filterTorrentFile(info) {
 	const { includeEpisodes } = getRuntimeConfig();
 	const { files, name } = info;
-	const logReason = logger.withPresetArgs(
+	const logReason = partial(
 		logger.verbose,
 		"[prefilter]",
 		`Torrent ${name} was not selected for searching because`
@@ -38,13 +39,21 @@ function filterTorrentFile(info) {
 	return true;
 }
 
-function filterDupes(metaFiles) {
-	return metaFiles.filter((info, index) => {
-		const firstOccurrence = metaFiles.findIndex(
-			(e) => e.name === info.name
+function filterDupes(metafiles) {
+	const filtered = metafiles.filter((meta, index) => {
+		const firstOccurrence = metafiles.findIndex(
+			(e) => e.name === meta.name
 		);
 		return index === firstOccurrence;
 	});
+	const numDupes = metafiles.length - filtered.length;
+	if (numDupes > 0) {
+		logger.verbose(
+			"[prefilter]",
+			`${numDupes} duplicates not selected for searching`
+		);
+	}
+	return filtered;
 }
 
 module.exports = { filterTorrentFile, filterDupes };

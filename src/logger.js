@@ -1,4 +1,4 @@
-const { getRuntimeConfig } = require("./configuration");
+const { getRuntimeConfig } = require("./runtimeConfig");
 
 function log(...args) {
 	console.log(...args);
@@ -19,8 +19,4 @@ function warn(...args) {
 	console.warn(...args);
 }
 
-const withPresetArgs = (loggerFn, ...presets) => (...args) => {
-	loggerFn(...presets, ...args);
-};
-
-module.exports = { log, verbose, error, warn, withPresetArgs };
+module.exports = { log, verbose, error, warn };
