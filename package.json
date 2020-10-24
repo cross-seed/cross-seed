@@ -4,8 +4,8 @@
 	"description": "Query Jackett for cross-seedable torrents",
 	"main": "src/index.js",
 	"scripts": {
-		"test": "jest"
-	},
+      "test": "echo \"Error: no test specified\""
+    },
 	"bin": {
 		"cross-seed": "src/cmd.js"
 	},
