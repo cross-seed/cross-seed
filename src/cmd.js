@@ -50,6 +50,11 @@ async function run() {
 				"Directory to save results in",
 				fileConfig.outputDir
 			)
+			.requiredOption(
+				"-a, --search-all",
+				"Search for all torrents regardless of their contents",
+				fallback(fileConfig.searchAll, false)
+			)
 			.requiredOption("-v, --verbose", "Log verbose output", false);
 	}
 

@@ -8,8 +8,8 @@ function stripExtension(filename) {
 	return filename;
 }
 
-const partial = (loggerFn, ...presets) => (...args) => {
-	loggerFn(...presets, ...args);
+const partial = (func, ...presets) => (...args) => {
+	func(...presets, ...args);
 };
 
 module.exports = { stripExtension, partial };
