@@ -36,7 +36,7 @@ function generateConfig({ force = false, docker = false }) {
 
 function printUpdateInstructions(missingKeys) {
 	const configPath = path.join(appDir(), "config.js");
-	console.error(chalk.red`
+	console.error(chalk.yellow`
  Error: Your configuration file is out of date.
  Missing options:\n\t${missingKeys.join("\n\t")}
  Please update at ${configPath}.
