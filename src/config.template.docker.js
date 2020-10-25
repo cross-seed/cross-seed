@@ -31,4 +31,8 @@ module.exports = {
 
 	// Whether to search for single episode torrents
 	includeEpisodes: false,
+
+	// search for all torrents, regardless of their contents
+	// this option overrides includeEpisodes.
+	searchAll: false,
 };

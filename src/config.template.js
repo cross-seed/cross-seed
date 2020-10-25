@@ -4,6 +4,8 @@
 // it here as a default.
 
 module.exports = {
+	configVersion: 1,
+
 	jackettServerUrl: "http://localhost:9117/jackett",
 	jackettApiKey: "YOUR_JACKETT_API_KEY_HERE",
 
@@ -27,4 +29,8 @@ module.exports = {
 
 	// Whether to search for single episode torrents
 	includeEpisodes: false,
+
+	// search for all torrents, regardless of their contents
+	// this option overrides includeEpisodes.
+	searchAll: false,
 };

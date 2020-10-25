@@ -5,7 +5,10 @@ const logger = require("./logger");
 const { partial } = require("./utils");
 
 function filterTorrentFile(info) {
-	const { includeEpisodes } = getRuntimeConfig();
+	const { includeEpisodes, searchAll } = getRuntimeConfig();
+
+	if (searchAll) return true;
+
 	const { files, name } = info;
 	const logReason = partial(
 		logger.verbose,

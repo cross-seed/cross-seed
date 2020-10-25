@@ -7,6 +7,7 @@ let runtimeConfig = {
 	outputDir: undefined,
 	includeEpisodes: undefined,
 	verbose: undefined,
+	searchAll: undefined,
 };
 
 function setRuntimeConfig(configObj) {
