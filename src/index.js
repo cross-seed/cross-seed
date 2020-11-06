@@ -41,13 +41,15 @@ async function findOnOtherSites(info, hashesToExclude) {
 }
 
 async function findMatchesBatch(samples, hashesToExclude) {
-	const { delay } = getRuntimeConfig();
+	const { delay, offset } = getRuntimeConfig();
 
 	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
 		const sleep = new Promise((r) => setTimeout(r, delay * 1000));
 
-		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
+		const progress = chalk.blue(
+			`[${i + 1 + offset}/${samples.length + offset}]`
+		);
 		const name = stripExtension(sample.name);
 		logger.log(progress, chalk.dim("Searching for"), name);
 
