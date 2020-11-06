@@ -1,9 +1,9 @@
 const fs = require("fs");
 const http = require("http");
-
 const { searchForSingleTorrentByName } = require("./index");
 const { validateJackettApi } = require("./jackett");
 const logger = require("./logger");
+const { getRuntimeConfig } = require("./runtimeConfig");
 
 function getData(req) {
 	return new Promise((resolve) => {
@@ -17,7 +17,7 @@ function getData(req) {
 	});
 }
 
-const handleRequest = (config) => async (req, res) => {
+async function handleRequest(req, res) {
 	if (req.method !== "POST") {
 		res.writeHead(405);
 		res.end();
@@ -33,23 +33,23 @@ const handleRequest = (config) => async (req, res) => {
 	res.end();
 	logger.log("Received name", name);
 	try {
-		const numFound = await searchForSingleTorrentByName(name, config);
+		const numFound = await searchForSingleTorrentByName(name);
 		logger.log(`Found ${numFound} torrents for ${name}`);
 	} catch (e) {
 		logger.error(e);
 	}
-};
+}
 
-async function serve(config) {
-	const { outputDir } = config;
+async function serve() {
+	const { outputDir } = getRuntimeConfig();
 	try {
-		await validateJackettApi(config);
+		await validateJackettApi();
 	} catch (e) {
 		return;
 	}
 
 	fs.mkdirSync(outputDir, { recursive: true });
-	const server = http.createServer(handleRequest(config));
+	const server = http.createServer(handleRequest);
 	server.listen(2468);
 	logger.log("Server is running on port 2468, ^C to stop.");
 }
