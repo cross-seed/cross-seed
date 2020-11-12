@@ -3,6 +3,7 @@ const { getRuntimeConfig } = require("./runtimeConfig");
 const { EP_REGEX, EXTENSIONS } = require("./constants");
 const logger = require("./logger");
 const { partial } = require("./utils");
+const { get, CACHE_PREFIX_TIMESTAMPS } = require("./cache");
 
 function filterTorrentFile(info) {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
@@ -59,4 +60,29 @@ function filterDupes(metafiles) {
 	return filtered;
 }
 
-module.exports = { filterTorrentFile, filterDupes };
+function filterTimestamps(options, info) {
+	const { excludeOlder, excludeRecentSearch } = options;
+	const cacheKey = CACHE_PREFIX_TIMESTAMPS + info.infoHash;
+	const timestampData = get(cacheKey);
+
+	if (!timestampData || (!excludeOlder && !excludeRecentSearch)) {
+		return true;
+	}
+
+	const tsOldCutoff = new Date().getTime() - excludeOlder * 60 * 1000;
+	const tsFirstSearched = new Date(timestampData.firstSearched).getTime();
+	if (tsFirstSearched < tsOldCutoff) {
+		return false;
+	}
+
+	const tsRecentCutoff =
+		new Date().getTime() - excludeRecentSearch * 60 * 1000;
+	const tsLastSearched = new Date(timestampData.lastSearched).getTime();
+	if (tsLastSearched > tsRecentCutoff) {
+		return false;
+	}
+
+	return true;
+}
+
+module.exports = { filterTorrentFile, filterDupes, filterTimestamps };

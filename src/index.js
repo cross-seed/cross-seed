@@ -9,10 +9,15 @@ const {
 	getInfoHashesToExclude,
 	getTorrentByName,
 } = require("./torrent");
-const { filterTorrentFile, filterDupes } = require("./preFilter");
+const {
+	filterTorrentFile,
+	filterDupes,
+	filterTimestamps,
+} = require("./preFilter");
 const { assessResult } = require("./decide");
 const { makeJackettRequest, validateJackettApi } = require("./jackett");
 const logger = require("./logger");
+const { get, save, CACHE_PREFIX_TIMESTAMPS } = require("./cache");
 
 async function findOnOtherSites(info, hashesToExclude) {
 	const assessEach = (result) => assessResult(result, info, hashesToExclude);
@@ -25,6 +30,7 @@ async function findOnOtherSites(info, hashesToExclude) {
 		logger.error(chalk.red`error querying Jackett for ${query}`);
 		return 0;
 	}
+	updateSearchTimestamps(info.infoHash);
 	const results = response.data.Results;
 
 	const loaded = await Promise.all(results.map(assessEach));
@@ -38,6 +44,16 @@ async function findOnOtherSites(info, hashesToExclude) {
 	});
 
 	return successful.length;
+}
+
+async function updateSearchTimestamps(infoHash) {
+	const cacheKey = CACHE_PREFIX_TIMESTAMPS + "|" + infoHash;
+	const existingTimestamps = get(cacheKey);
+	const firstSearched = existingTimestamps
+		? existingTimestamps.firstSeen
+		: new Date();
+	const lastSearched = new Date();
+	save(cacheKey, { firstSearched, lastSearched });
 }
 
 async function findMatchesBatch(samples, hashesToExclude) {
@@ -68,12 +84,22 @@ async function searchForSingleTorrentByName(name) {
 }
 
 async function main() {
-	const { offset, outputDir } = getRuntimeConfig();
+	const {
+		offset,
+		outputDir,
+		excludeOlder,
+		excludeRecentSearch,
+	} = getRuntimeConfig();
 	const parsedTorrents = loadTorrentDir();
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
-	const filteredTorrents = filterDupes(parsedTorrents).filter(
-		filterTorrentFile
-	);
+	const filteredTorrents = filterDupes(parsedTorrents)
+		.filter(filterTorrentFile)
+		.filter((info) => {
+			return filterTimestamps(
+				{ excludeOlder, excludeRecentSearch },
+				info
+			);
+		});
 	const samples = filteredTorrents.slice(offset);
 
 	logger.log(

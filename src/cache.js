@@ -1,8 +1,9 @@
 const path = require("path");
 const fs = require("fs");
 const { createAppDir, appDir } = require("./configuration");
+const CACHE_PREFIX_TIMESTAMPS = "searchTimestamps";
 
-let cache = [];
+let cache = {};
 let fileExists = false;
 
 function loadFromDisk() {
@@ -10,7 +11,19 @@ function loadFromDisk() {
 	if (fs.existsSync(fpath)) {
 		fileExists = true;
 		cache = require(fpath);
+		if (Array.isArray(cache)) {
+			cache = migrateV1Cache(cache);
+			write();
+		}
 	}
+}
+
+function migrateV1Cache(fileCache) {
+	const newCache = {};
+	fileCache.forEach((cacheEntry) => {
+		newCache[cacheEntry] = true;
+	});
+	return newCache;
 }
 
 function write() {
@@ -19,17 +32,25 @@ function write() {
 	fs.writeFileSync(fpath, JSON.stringify(cache));
 }
 
-function save(thing) {
-	cache.push(thing);
+function save(key, val = true) {
+	cache[key] = val;
 	write();
 }
 
+function get(key) {
+	try {
+		return cache[key];
+	} catch (e) {
+		return null;
+	}
+}
+
 function includes(thing) {
-	return cache.includes(thing);
+	return Object.keys(cache).includes(thing);
 }
 
 function clear() {
-	cache = [];
+	cache = {};
 	const fpath = path.join(appDir(), "cache.json");
 	if (fs.existsSync(fpath)) {
 		fileExists = true;
@@ -39,4 +60,4 @@ function clear() {
 
 loadFromDisk();
 
-module.exports = { save, includes, clear };
+module.exports = { save, includes, clear, get, CACHE_PREFIX_TIMESTAMPS };
