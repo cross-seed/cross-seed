@@ -3,7 +3,7 @@ const { getRuntimeConfig } = require("./runtimeConfig");
 const { EP_REGEX, EXTENSIONS } = require("./constants");
 const logger = require("./logger");
 const { partial, nMinutesAgo } = require("./utils");
-const { get, CACHE_PREFIX_TIMESTAMPS } = require("./cache");
+const { get, CACHE_NAMESPACE_TORRENTS } = require("./cache");
 
 function filterByContent(info) {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
@@ -62,8 +62,8 @@ function filterDupes(metafiles) {
 
 function filterTimestamps(info) {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-	const cacheKey = CACHE_PREFIX_TIMESTAMPS + info.infoHash;
-	const timestampData = get(cacheKey);
+	const cacheKey = info.infoHash;
+	const timestampData = get(CACHE_NAMESPACE_TORRENTS, cacheKey);
 
 	if (!timestampData || (!excludeOlder && !excludeRecentSearch)) {
 		return true;
@@ -73,7 +73,7 @@ function filterTimestamps(info) {
 	if (firstSearched < nMinutesAgo(excludeOlder)) {
 		logger.verbose(
 			"[prefilter]",
-			`first search timestamp ${firstSearched} is more than ${excludeOlder} minutes old`
+			`${info.name} - First search timestamp ${firstSearched} is more than ${excludeOlder} minutes old`
 		);
 		return false;
 	}
@@ -81,7 +81,7 @@ function filterTimestamps(info) {
 	if (lastSearched > nMinutesAgo(excludeRecentSearch)) {
 		logger.verbose(
 			"[prefilter]",
-			`Most recent search timestamp ${lastSearched} is less than ${excludeRecentSearch} minutes old`
+			`${info.name} - Most recent search timestamp ${lastSearched} is less than ${excludeRecentSearch} minutes old`
 		);
 		return false;
 	}

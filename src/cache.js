@@ -45,10 +45,6 @@ function get(namespace, key) {
 	return cache[namespace][key];
 }
 
-function includes(namespace, thing) {
-	return Object.prototype.hasOwnProperty.call(cache[namespace], thing);
-}
-
 function clear() {
 	cache = emptyCache;
 	const fpath = path.join(appDir(), "cache.json");
@@ -62,7 +58,6 @@ loadFromDisk();
 
 module.exports = {
 	save,
-	includes,
 	clear,
 	get,
 	CACHE_NAMESPACE_TORRENTS,

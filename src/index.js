@@ -17,7 +17,7 @@ const {
 const { assessResult } = require("./decide");
 const { makeJackettRequest, validateJackettApi } = require("./jackett");
 const logger = require("./logger");
-const { get, save, CACHE_PREFIX_TIMESTAMPS } = require("./cache");
+const { get, save, CACHE_NAMESPACE_TORRENTS } = require("./cache");
 
 async function findOnOtherSites(info, hashesToExclude) {
 	const assessEach = (result) => assessResult(result, info, hashesToExclude);
@@ -47,13 +47,13 @@ async function findOnOtherSites(info, hashesToExclude) {
 }
 
 async function updateSearchTimestamps(infoHash) {
-	const cacheKey = CACHE_PREFIX_TIMESTAMPS + infoHash;
-	const existingTimestamps = get(cacheKey);
+	const cacheKey = infoHash;
+	const existingTimestamps = get(CACHE_NAMESPACE_TORRENTS, cacheKey);
 	const firstSearched = existingTimestamps
 		? existingTimestamps.firstSearched
-		: new Date().getTime();
-	const lastSearched = new Date().getTime();
-	save(cacheKey, { firstSearched, lastSearched });
+		: Date.now();
+	const lastSearched = Date.now();
+	save(CACHE_NAMESPACE_TORRENTS, cacheKey, { firstSearched, lastSearched });
 }
 
 async function findMatchesBatch(samples, hashesToExclude) {
