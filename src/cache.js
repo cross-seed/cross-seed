@@ -1,9 +1,14 @@
 const path = require("path");
 const fs = require("fs");
 const { createAppDir, appDir } = require("./configuration");
-const CACHE_PREFIX_TIMESTAMPS = "searchTimestamps";
+const CACHE_NAMESPACE_TORRENTS = "torrents";
+const CACHE_NAMESPACE_REJECTIONS = "rejections";
 
-let cache = {};
+const emptyCache = {
+	[CACHE_NAMESPACE_TORRENTS]: {},
+	[CACHE_NAMESPACE_REJECTIONS]: {},
+};
+let cache = emptyCache;
 let fileExists = false;
 
 function loadFromDisk() {
@@ -13,15 +18,14 @@ function loadFromDisk() {
 		cache = require(fpath);
 		if (Array.isArray(cache)) {
 			cache = migrateV1Cache(cache);
-			write();
 		}
 	}
 }
 
 function migrateV1Cache(fileCache) {
-	const newCache = {};
+	const newCache = emptyCache;
 	fileCache.forEach((cacheEntry) => {
-		newCache[cacheEntry] = true;
+		newCache[CACHE_NAMESPACE_REJECTIONS][cacheEntry] = true;
 	});
 	return newCache;
 }
@@ -32,25 +36,21 @@ function write() {
 	fs.writeFileSync(fpath, JSON.stringify(cache));
 }
 
-function save(key, val = true) {
-	cache[key] = val;
+function save(namespace, key, val = true) {
+	cache[namespace][key] = val;
 	write();
 }
 
-function get(key) {
-	try {
-		return cache[key];
-	} catch (e) {
-		return null;
-	}
+function get(namespace, key) {
+	return cache[namespace][key];
 }
 
-function includes(thing) {
-	return Object.keys(cache).includes(thing);
+function includes(namespace, thing) {
+	return Object.prototype.hasOwnProperty.call(cache[namespace], thing);
 }
 
 function clear() {
-	cache = {};
+	cache = emptyCache;
 	const fpath = path.join(appDir(), "cache.json");
 	if (fs.existsSync(fpath)) {
 		fileExists = true;
@@ -60,4 +60,11 @@ function clear() {
 
 loadFromDisk();
 
-module.exports = { save, includes, clear, get, CACHE_PREFIX_TIMESTAMPS };
+module.exports = {
+	save,
+	includes,
+	clear,
+	get,
+	CACHE_NAMESPACE_TORRENTS,
+	CACHE_NAMESPACE_REJECTIONS,
+};

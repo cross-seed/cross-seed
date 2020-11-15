@@ -72,7 +72,7 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 function assessResultCaching(result, ogInfo, hashesToExclude) {
 	const { Guid, Title, TrackerId: tracker } = result;
 	const cacheKey = `${ogInfo.name}|${Guid}`;
-	if (cache.includes(cacheKey)) {
+	if (cache.includes(cache.CACHE_NAMESPACE_REJECTIONS, cacheKey)) {
 		const logReason = partial(
 			logger.verbose,
 			"[decide]",
@@ -82,7 +82,10 @@ function assessResultCaching(result, ogInfo, hashesToExclude) {
 		return null;
 	}
 	const assessPromise = assessResultHelper(result, ogInfo, hashesToExclude);
-	assessPromise.then((assessed) => !assessed && cache.save(cacheKey));
+	assessPromise.then(
+		(assessed) =>
+			!assessed && cache.save(cache.CACHE_NAMESPACE_REJECTIONS, cacheKey)
+	);
 	return assessPromise;
 }
 

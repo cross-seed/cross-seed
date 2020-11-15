@@ -2,10 +2,10 @@ const path = require("path");
 const { getRuntimeConfig } = require("./runtimeConfig");
 const { EP_REGEX, EXTENSIONS } = require("./constants");
 const logger = require("./logger");
-const { partial } = require("./utils");
+const { partial, nMinutesAgo } = require("./utils");
 const { get, CACHE_PREFIX_TIMESTAMPS } = require("./cache");
 
-function filterTorrentFile(info) {
+function filterByContent(info) {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
 
 	if (searchAll) return true;
@@ -60,29 +60,33 @@ function filterDupes(metafiles) {
 	return filtered;
 }
 
-function filterTimestamps(options, info) {
-	const { excludeOlder, excludeRecentSearch } = options;
+function filterTimestamps(info) {
+	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const cacheKey = CACHE_PREFIX_TIMESTAMPS + info.infoHash;
 	const timestampData = get(cacheKey);
 
 	if (!timestampData || (!excludeOlder && !excludeRecentSearch)) {
 		return true;
 	}
+	const { firstSearched, lastSearched } = timestampData;
 
-	const tsOldCutoff = new Date().getTime() - excludeOlder * 60 * 1000;
-	const tsFirstSearched = new Date(timestampData.firstSearched).getTime();
-	if (tsFirstSearched < tsOldCutoff) {
+	if (firstSearched < nMinutesAgo(excludeOlder)) {
+		logger.verbose(
+			"[prefilter]",
+			`first search timestamp ${firstSearched} is more than ${excludeOlder} minutes old`
+		);
 		return false;
 	}
 
-	const tsRecentCutoff =
-		new Date().getTime() - excludeRecentSearch * 60 * 1000;
-	const tsLastSearched = new Date(timestampData.lastSearched).getTime();
-	if (tsLastSearched > tsRecentCutoff) {
+	if (lastSearched > nMinutesAgo(excludeRecentSearch)) {
+		logger.verbose(
+			"[prefilter]",
+			`Most recent search timestamp ${lastSearched} is less than ${excludeRecentSearch} minutes old`
+		);
 		return false;
 	}
 
 	return true;
 }
 
-module.exports = { filterTorrentFile, filterDupes, filterTimestamps };
+module.exports = { filterByContent, filterDupes, filterTimestamps };

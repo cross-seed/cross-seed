@@ -12,4 +12,10 @@ const partial = (func, ...presets) => (...args) => {
 	func(...presets, ...args);
 };
 
-module.exports = { stripExtension, partial };
+function nMinutesAgo(n) {
+	const date = new Date();
+	date.setMinutes(date.getMinutes() - n);
+	return date.getTime();
+}
+
+module.exports = { stripExtension, partial, nMinutesAgo };

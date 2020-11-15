@@ -129,15 +129,13 @@ async function run() {
 		)
 		.option(
 			"-x, --exclude-older <cutoff>",
-			"Exclude torrents first seen more than x minutes ago. Default -1 (disabled)",
-			(n) => parseInt(n),
-			fallback(-1)
+			"Exclude torrents first seen more than x minutes ago.",
+			(n) => parseInt(n)
 		)
 		.option(
 			"-r, --exclude-recent-search <cutoff>",
-			"Exclude torrents which have been searched more recently than x minutes ago. Default -1 (disabled)",
-			(n) => parseInt(n),
-			fallback(-1)
+			"Exclude torrents which have been searched more recently than x minutes ago.",
+			(n) => parseInt(n)
 		)
 		.action(async (command) => {
 			const options = command.opts();

@@ -10,7 +10,7 @@ const {
 	getTorrentByName,
 } = require("./torrent");
 const {
-	filterTorrentFile,
+	filterByContent,
 	filterDupes,
 	filterTimestamps,
 } = require("./preFilter");
@@ -47,12 +47,12 @@ async function findOnOtherSites(info, hashesToExclude) {
 }
 
 async function updateSearchTimestamps(infoHash) {
-	const cacheKey = CACHE_PREFIX_TIMESTAMPS + "|" + infoHash;
+	const cacheKey = CACHE_PREFIX_TIMESTAMPS + infoHash;
 	const existingTimestamps = get(cacheKey);
 	const firstSearched = existingTimestamps
-		? existingTimestamps.firstSeen
-		: new Date();
-	const lastSearched = new Date();
+		? existingTimestamps.firstSearched
+		: new Date().getTime();
+	const lastSearched = new Date().getTime();
 	save(cacheKey, { firstSearched, lastSearched });
 }
 
@@ -79,27 +79,17 @@ async function findMatchesBatch(samples, hashesToExclude) {
 async function searchForSingleTorrentByName(name) {
 	const hashesToExclude = getInfoHashesToExclude();
 	const meta = getTorrentByName(name);
-	if (!filterTorrentFile(meta)) return;
+	if (!filterByContent(meta)) return;
 	return findOnOtherSites(meta, hashesToExclude);
 }
 
 async function main() {
-	const {
-		offset,
-		outputDir,
-		excludeOlder,
-		excludeRecentSearch,
-	} = getRuntimeConfig();
+	const { offset, outputDir } = getRuntimeConfig();
 	const parsedTorrents = loadTorrentDir();
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
 	const filteredTorrents = filterDupes(parsedTorrents)
-		.filter(filterTorrentFile)
-		.filter((info) => {
-			return filterTimestamps(
-				{ excludeOlder, excludeRecentSearch },
-				info
-			);
-		});
+		.filter(filterByContent)
+		.filter(filterTimestamps);
 	const samples = filteredTorrents.slice(offset);
 
 	logger.log(
