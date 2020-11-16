@@ -129,12 +129,12 @@ async function run() {
 		)
 		.option(
 			"-x, --exclude-older <cutoff>",
-			"Exclude torrents first seen more than x minutes ago.",
+			"Exclude torrents first seen more than x minutes ago. Overrides the -a flag.",
 			(n) => parseInt(n)
 		)
 		.option(
 			"-r, --exclude-recent-search <cutoff>",
-			"Exclude torrents which have been searched more recently than x minutes ago.",
+			"Exclude torrents which have been searched more recently than x minutes ago. Overrides the -a flag.",
 			(n) => parseInt(n)
 		)
 		.action(async (command) => {

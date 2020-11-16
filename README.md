@@ -46,17 +46,19 @@ Search for cross-seeds
 
 
 Options:
-  -u, --jackett-server-url <url>  Your Jackett server url
-  -k, --jackett-api-key <key>     Your Jackett API key
-  -t, --trackers <tracker>        Comma-separated list of Jackett tracker ids to search
-  -i, --torrent-dir <dir>         Directory with torrent files
-  -s, --output-dir <dir>          Directory to save results in
-  -a, --search-all                Search for all torrents regardless of their contents (default: false)
-  -v, --verbose                   Log verbose output (default: false)
-  -o, --offset <offset>           Offset to start from
-  -d, --delay <delay>             Pause duration (seconds) between searches (default: 10)
-  -e, --include-episodes          Include single-episode torrents in the search (default: false)
-  -h, --help                      display help for command
+  -u, --jackett-server-url <url>        Your Jackett server url
+  -k, --jackett-api-key <key>           Your Jackett API key
+  -t, --trackers <tracker>              Comma-separated list of Jackett tracker ids to search
+  -i, --torrent-dir <dir>               Directory with torrent files
+  -s, --output-dir <dir>                Directory to save results in
+  -a, --search-all                      Search for all torrents regardless of their contents (default: false)
+  -v, --verbose                         Log verbose output (default: false)
+  -o, --offset <offset>                 Offset to start from
+  -d, --delay <delay>                   Pause duration (seconds) between searches (default: 10)
+  -e, --include-episodes                Include single-episode torrents in the search (default: false)
+  -x, --exclude-older <cutoff>          Exclude torrents first seen more than x minutes ago. Overrides the -a flag.
+  -r, --exclude-recent-search <cutoff>  Exclude torrents which have been searched more recently than x minutes ago. Overrides the -a flag.
+  -h, --help                            display help for command
 ```
 
 ## Standalone installation

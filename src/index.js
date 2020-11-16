@@ -46,14 +46,13 @@ async function findOnOtherSites(info, hashesToExclude) {
 	return successful.length;
 }
 
-async function updateSearchTimestamps(infoHash) {
-	const cacheKey = infoHash;
-	const existingTimestamps = get(CACHE_NAMESPACE_TORRENTS, cacheKey);
+function updateSearchTimestamps(infoHash) {
+	const existingTimestamps = get(CACHE_NAMESPACE_TORRENTS, infoHash);
 	const firstSearched = existingTimestamps
 		? existingTimestamps.firstSearched
 		: Date.now();
 	const lastSearched = Date.now();
-	save(CACHE_NAMESPACE_TORRENTS, cacheKey, { firstSearched, lastSearched });
+	save(CACHE_NAMESPACE_TORRENTS, infoHash, { firstSearched, lastSearched });
 }
 
 async function findMatchesBatch(samples, hashesToExclude) {

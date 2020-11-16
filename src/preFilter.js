@@ -62,26 +62,29 @@ function filterDupes(metafiles) {
 
 function filterTimestamps(info) {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-	const cacheKey = info.infoHash;
-	const timestampData = get(CACHE_NAMESPACE_TORRENTS, cacheKey);
-
-	if (!timestampData || (!excludeOlder && !excludeRecentSearch)) {
-		return true;
-	}
+	const { infoHash, name } = info;
+	const timestampData = get(CACHE_NAMESPACE_TORRENTS, infoHash);
+	if (!timestampData) return true;
 	const { firstSearched, lastSearched } = timestampData;
+	const logReason = partial(
+		logger.verbose,
+		"[prefilter]",
+		`Torrent ${name} was not selected for searching because`
+	);
 
-	if (firstSearched < nMinutesAgo(excludeOlder)) {
-		logger.verbose(
-			"[prefilter]",
-			`${info.name} - First search timestamp ${firstSearched} is more than ${excludeOlder} minutes old`
+	if (excludeOlder && firstSearched < nMinutesAgo(excludeOlder)) {
+		logReason(
+			`its first search timestamp ${firstSearched} is older than ${excludeOlder} minutes ago`
 		);
 		return false;
 	}
 
-	if (lastSearched > nMinutesAgo(excludeRecentSearch)) {
-		logger.verbose(
-			"[prefilter]",
-			`${info.name} - Most recent search timestamp ${lastSearched} is less than ${excludeRecentSearch} minutes old`
+	if (
+		excludeRecentSearch &&
+		lastSearched > nMinutesAgo(excludeRecentSearch)
+	) {
+		logReason(
+			`its last search timestamp ${lastSearched} is newer than ${excludeRecentSearch} minutes ago`
 		);
 		return false;
 	}
