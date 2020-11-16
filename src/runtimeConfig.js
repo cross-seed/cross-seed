@@ -8,6 +8,8 @@ let runtimeConfig = {
 	includeEpisodes: undefined,
 	verbose: undefined,
 	searchAll: undefined,
+	excludeOlder: undefined,
+	excludeRecentSearch: undefined,
 };
 
 function setRuntimeConfig(configObj) {

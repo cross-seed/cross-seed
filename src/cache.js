@@ -1,8 +1,14 @@
 const path = require("path");
 const fs = require("fs");
 const { createAppDir, appDir } = require("./configuration");
+const CACHE_NAMESPACE_TORRENTS = "torrents";
+const CACHE_NAMESPACE_REJECTIONS = "rejections";
 
-let cache = [];
+const emptyCache = {
+	[CACHE_NAMESPACE_TORRENTS]: {},
+	[CACHE_NAMESPACE_REJECTIONS]: {},
+};
+let cache = emptyCache;
 let fileExists = false;
 
 function loadFromDisk() {
@@ -10,7 +16,18 @@ function loadFromDisk() {
 	if (fs.existsSync(fpath)) {
 		fileExists = true;
 		cache = require(fpath);
+		if (Array.isArray(cache)) {
+			cache = migrateV1Cache(cache);
+		}
 	}
+}
+
+function migrateV1Cache(fileCache) {
+	const newCache = emptyCache;
+	fileCache.forEach((cacheEntry) => {
+		newCache[CACHE_NAMESPACE_REJECTIONS][cacheEntry] = true;
+	});
+	return newCache;
 }
 
 function write() {
@@ -19,17 +36,17 @@ function write() {
 	fs.writeFileSync(fpath, JSON.stringify(cache));
 }
 
-function save(thing) {
-	cache.push(thing);
+function save(namespace, key, val = true) {
+	cache[namespace][key] = val;
 	write();
 }
 
-function includes(thing) {
-	return cache.includes(thing);
+function get(namespace, key) {
+	return cache[namespace][key];
 }
 
 function clear() {
-	cache = [];
+	cache = emptyCache;
 	const fpath = path.join(appDir(), "cache.json");
 	if (fs.existsSync(fpath)) {
 		fileExists = true;
@@ -39,4 +56,10 @@ function clear() {
 
 loadFromDisk();
 
-module.exports = { save, includes, clear };
+module.exports = {
+	save,
+	clear,
+	get,
+	CACHE_NAMESPACE_TORRENTS,
+	CACHE_NAMESPACE_REJECTIONS,
+};

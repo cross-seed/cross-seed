@@ -127,6 +127,16 @@ async function run() {
 			"Include single-episode torrents in the search",
 			fallback(fileConfig.includeEpisodes, false)
 		)
+		.option(
+			"-x, --exclude-older <cutoff>",
+			"Exclude torrents first seen more than x minutes ago.",
+			(n) => parseInt(n)
+		)
+		.option(
+			"-r, --exclude-recent-search <cutoff>",
+			"Exclude torrents which have been searched more recently than x minutes ago.",
+			(n) => parseInt(n)
+		)
 		.action(async (command) => {
 			const options = command.opts();
 			options.trackers = options.trackers
