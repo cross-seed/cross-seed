@@ -1,6 +1,6 @@
 {
 	"name": "cross-seed",
-	"version": "1.6.3",
+	"version": "1.7.0",
 	"description": "Query Jackett for cross-seedable torrents",
 	"main": "src/index.js",
 	"scripts": {
