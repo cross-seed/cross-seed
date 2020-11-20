@@ -1,8 +1,12 @@
 const fs = require("fs");
 const http = require("http");
+const qs = require("querystring");
+const chalk = require("chalk");
 const { searchForSingleTorrentByName } = require("./index");
 const { validateJackettApi } = require("./jackett");
 const logger = require("./logger");
+const { DAEMON_MODE_URL_HASH, README_URL } = require("./constants");
+const { withTempConfigOptions } = require("./runtimeConfig");
 const { getRuntimeConfig } = require("./runtimeConfig");
 
 function getData(req) {
@@ -17,6 +21,23 @@ function getData(req) {
 	});
 }
 
+function parseData(data) {
+	try {
+		return JSON.parse(data);
+	} catch (_) {
+		const parsed = qs.parse(data);
+		if ("name" in parsed) return parsed;
+		else {
+			logger.warn(
+				chalk.yellow(
+					`This request format is deprecated. Please refer to ${README_URL}${DAEMON_MODE_URL_HASH}`
+				)
+			);
+			return { name: data };
+		}
+	}
+}
+
 async function handleRequest(req, res) {
 	if (req.method !== "POST") {
 		res.writeHead(405);
@@ -28,12 +49,16 @@ async function handleRequest(req, res) {
 		res.end();
 		return;
 	}
-	const name = await getData(req);
+	const dataStr = await getData(req);
+	const { name, ...options } = parseData(dataStr);
+	console.log(dataStr);
 	res.writeHead(204);
 	res.end();
 	logger.log("Received name", name);
 	try {
-		const numFound = await searchForSingleTorrentByName(name);
+		const numFound = await withTempConfigOptions(options, () =>
+			searchForSingleTorrentByName(name)
+		);
 		logger.log(`Found ${numFound} torrents for ${name}`);
 	} catch (e) {
 		logger.error(e);

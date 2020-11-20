@@ -63,8 +63,11 @@ Options:
 
 ## Standalone installation
 
-You don't need to install this app, but if you really want to, or if your
-version of `npm` doesn't support `npx`, you can install it globally:
+You don't need to install this app, but if
+
+-   you plan on running `cross-seed` regularly
+-   you want to control when you receive updates
+-   your version of `npm` doesn't support `npx` you can install it globally:
 
 ```shell script
 npm install -g cross-seed
@@ -102,10 +105,20 @@ Then you can edit the file using your editor of choice.
 ## Daemon Mode (rtorrent only, Docker recommended)
 
 `cross-seed` has a new feature called daemon mode. It starts an HTTP server,
-listening on port 2468. It will respond to a POST request with a plaintext body
-containing the name of a torrent inside your torrent directory. As of right now
-it only works with rtorrent. I recommend using Docker if you plan to use
-cross-seed in daemon mode.
+listening on port 2468. It will respond to a POST request with an
+`application/x-www-form-urlencoded` or `application/json` body containing the
+following parameters:
+
+```json5
+{
+	name: "<torrent name here>",
+	outputDir: "/path/to/output/dir", // optional
+	trackers: ["oink", "tehconnection"], //optional
+}
+```
+
+As of right now it only works with rtorrent. I recommend using Docker if you
+plan to use cross-seed in daemon mode.
 
 ### Docker
 
@@ -117,12 +130,10 @@ services:
     cross-seed:
         image: mmgoodnow/cross-seed
         container_name: cross-seed
-        # not a bad idea to set this to a user that has read-only privileges
-        # to your rtorrent_sess folder and everything inside it
         user: 1000:1000
         volumes:
             - /path/to/config/folder:/config
-            - /path/to/rtorrent_sess:/torrents
+            - /path/to/rtorrent_sess:/torrents:ro
             - /path/to/output/folder:/output
         ports:
             - 2468:2468
@@ -132,8 +143,22 @@ services:
 While the daemon is running, you can trigger a search with an HTTP request:
 
 ```shell script
-curl -XPOST http://localhost:2468/api/webhook --data '<torrent name here>'
+curl -XPOST http://localhost:2468/api/webhook \
+  --data-urlencode 'name=<torrent name here>' \
+  --data-urlencode 'trackers=oink' \
+  --data-urlencode 'trackers=tehconnection' \
+  --data-urlencode 'outputDir=/path/to/output/dir'
 ```
+
+Alternatively, you can use JSON:
+
+```shell script
+curl -XPOST http://localhost:2468/api/webhook \
+  -H 'Content-Type: application/json' \
+  --data '{"name":"<torrent name here>",outputDir:"/path/to/output/dir",trackers:["oink","tehconnection"]}'
+```
+
+**_Don't expose this port to the internet._**
 
 If you are using rtorrent, you can adapt
 [these instructions](https://www.filebot.net/forums/viewtopic.php?p=5316#p5316)

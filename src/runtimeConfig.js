@@ -20,4 +20,12 @@ function getRuntimeConfig() {
 	return runtimeConfig;
 }
 
-module.exports = { getRuntimeConfig, setRuntimeConfig };
+async function withTempConfigOptions(tempOptions, func) {
+	const ogRuntimeConfig = runtimeConfig;
+	setRuntimeConfig({ ...ogRuntimeConfig, ...tempOptions });
+	const ret = await func();
+	setRuntimeConfig(ogRuntimeConfig);
+	return ret;
+}
+
+module.exports = { getRuntimeConfig, setRuntimeConfig, withTempConfigOptions };
