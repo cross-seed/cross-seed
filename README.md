@@ -104,12 +104,13 @@ Then you can edit the file using your editor of choice.
 
 ## Daemon Mode (rtorrent only, Docker recommended)
 
-`cross-seed` has a new feature called daemon mode. As of right now it only works
-with rtorrent, and I recommend using Docker.
+`cross-seed` has a new beta feature called daemon mode. As of right now it only
+works with rtorrent, and I recommend using Docker.
 
-It starts an HTTP server, listening on port 2468. It will respond to a POST
-request with an `application/x-www-form-urlencoded` or `application/json` body
-containing the following parameters:
+It starts an HTTP server, listening on port 2468. **_Don't expose this port to
+the internet._** It will respond to a POST request with an
+`application/x-www-form-urlencoded` or `application/json` body containing the
+following parameters:
 
 ```json5
 {
@@ -137,8 +138,6 @@ curl -XPOST http://localhost:2468/api/webhook \
   -H 'Content-Type: application/json' \
   --data '{"name":"<torrent name here>",outputDir:"/path/to/output/dir",trackers:["oink","tehconnection"]}'
 ```
-
-**_Don't expose this port to the internet._**
 
 If you are using rtorrent, you can adapt
 [these instructions](https://www.filebot.net/forums/viewtopic.php?p=5316#p5316)
