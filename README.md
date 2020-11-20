@@ -120,26 +120,6 @@ following parameters:
 As of right now it only works with rtorrent. I recommend using Docker if you
 plan to use cross-seed in daemon mode.
 
-### Docker
-
-Here's a sample docker-compose blurb:
-
-```yaml
-version: "2.1"
-services:
-    cross-seed:
-        image: mmgoodnow/cross-seed
-        container_name: cross-seed
-        user: 1000:1000
-        volumes:
-            - /path/to/config/folder:/config
-            - /path/to/rtorrent_sess:/torrents:ro
-            - /path/to/output/folder:/output
-        ports:
-            - 2468:2468
-        command: daemon
-```
-
 While the daemon is running, you can trigger a search with an HTTP request:
 
 ```shell script
@@ -163,6 +143,26 @@ curl -XPOST http://localhost:2468/api/webhook \
 If you are using rtorrent, you can adapt
 [these instructions](https://www.filebot.net/forums/viewtopic.php?p=5316#p5316)
 to run the `curl` command on finished download.
+
+### Docker
+
+Here's a sample docker-compose blurb:
+
+```yaml
+version: "2.1"
+services:
+    cross-seed:
+        image: mmgoodnow/cross-seed
+        container_name: cross-seed
+        user: 1000:1000
+        volumes:
+            - /path/to/config/folder:/config
+            - /path/to/rtorrent_sess:/torrents:ro
+            - /path/to/output/folder:/output
+        ports:
+            - 2468:2468
+        command: daemon
+```
 
 ### How to run the daemon without docker
 
