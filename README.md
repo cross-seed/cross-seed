@@ -104,10 +104,12 @@ Then you can edit the file using your editor of choice.
 
 ## Daemon Mode (rtorrent only, Docker recommended)
 
-`cross-seed` has a new feature called daemon mode. It starts an HTTP server,
-listening on port 2468. It will respond to a POST request with an
-`application/x-www-form-urlencoded` or `application/json` body containing the
-following parameters:
+`cross-seed` has a new feature called daemon mode. As of right now it only works
+with rtorrent, and I recommend using Docker.
+
+It starts an HTTP server, listening on port 2468. It will respond to a POST
+request with an `application/x-www-form-urlencoded` or `application/json` body
+containing the following parameters:
 
 ```json5
 {
@@ -117,10 +119,8 @@ following parameters:
 }
 ```
 
-As of right now it only works with rtorrent. I recommend using Docker if you
-plan to use cross-seed in daemon mode.
-
-While the daemon is running, you can trigger a search with an HTTP request:
+While the daemon is running (`cross-seed daemon`), you can trigger a search with
+an HTTP request:
 
 ```shell script
 curl -XPOST http://localhost:2468/api/webhook \
