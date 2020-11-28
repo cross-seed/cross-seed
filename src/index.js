@@ -78,7 +78,7 @@ async function findMatchesBatch(samples, hashesToExclude) {
 async function searchForSingleTorrentByName(name) {
 	const hashesToExclude = getInfoHashesToExclude();
 	const meta = getTorrentByName(name);
-	if (!filterByContent(meta)) return;
+	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude);
 }
 

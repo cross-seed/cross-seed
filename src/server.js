@@ -51,7 +51,6 @@ async function handleRequest(req, res) {
 	}
 	const dataStr = await getData(req);
 	const { name, ...options } = parseData(dataStr);
-	console.log(dataStr);
 	res.writeHead(204);
 	res.end();
 	logger.log("Received name", name);
@@ -59,7 +58,11 @@ async function handleRequest(req, res) {
 		const numFound = await withTempConfigOptions(options, () =>
 			searchForSingleTorrentByName(name)
 		);
-		logger.log(`Found ${numFound} torrents for ${name}`);
+		if (numFound === null) {
+			logger.log(`Did not search for ${name}`);
+		} else {
+			logger.log(`Found ${numFound} torrents for ${name}`);
+		}
 	} catch (e) {
 		logger.error(e);
 	}
