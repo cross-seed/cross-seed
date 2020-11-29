@@ -67,7 +67,9 @@ You don't need to install this app, but if
 
 -   you plan on running `cross-seed` regularly
 -   you want to control when you receive updates
--   your version of `npm` doesn't support `npx` you can install it globally:
+-   your version of `npm` doesn't support `npx`
+
+you can install it globally:
 
 ```shell script
 npm install -g cross-seed
