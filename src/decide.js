@@ -5,23 +5,18 @@ const logger = require("./logger");
 const { partial } = require("./utils");
 
 function compareFileTrees(a, b) {
-	if (a.length !== b.length) return false;
-	const sorter = (m, n) => (m.path < n.path ? -1 : m.path > n.path ? 1 : 0);
-	const sortedA = a.slice().sort(sorter);
-	const sortedB = b.slice().sort(sorter);
-
 	const cmp = (elOfA, elOfB) => {
 		const pathsAreEqual = elOfB.path === elOfA.path;
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		return pathsAreEqual && lengthsAreEqual;
 	};
-	return sortedA.every((elOfA, i) => cmp(elOfA, sortedB[i]));
+	return a.every(elOfA => b.some(elOfB => cmp(elOfA, elOfB) ));
 }
 
 function sizeDoesMatch(result, ogInfo) {
 	const { length } = ogInfo;
-	const lowerBound = length - 0.01 * length;
-	const upperBound = length + 0.01 * length;
+	const lowerBound = length - 0.02 * length;
+	const upperBound = length + 0.02 * length;
 	return result.Size >= lowerBound && result.Size <= upperBound;
 }
 
@@ -52,10 +47,6 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 	// if you got rate limited or some other failure
 	if (!info) return info;
 
-	if (info.length !== ogInfo.length) {
-		logReason("it has a different size");
-		return null;
-	}
 	if (hashesToExclude.includes(info.infoHash)) {
 		logReason("the info hash matches a torrent you already have");
 		return null;
