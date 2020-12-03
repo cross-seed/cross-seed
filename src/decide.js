@@ -10,7 +10,7 @@ function compareFileTrees(a, b) {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		return pathsAreEqual && lengthsAreEqual;
 	};
-	return a.every(elOfA => b.some(elOfB => cmp(elOfA, elOfB) ));
+	return a.every((elOfA) => b.some((elOfB) => cmp(elOfA, elOfB)));
 }
 
 function sizeDoesMatch(result, ogInfo) {
@@ -39,6 +39,11 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 	);
 	if (!sizeDoesMatch(result, ogInfo)) {
 		logReason("it has a different size");
+		return null;
+	}
+
+	if (Link === null) {
+		logReason("the torrent doesn't have a download link");
 		return null;
 	}
 
