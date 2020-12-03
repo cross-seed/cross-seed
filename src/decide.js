@@ -43,7 +43,7 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 	}
 
 	if (Link === null) {
-		logReason("the torrent doesn't have a download link");
+		logReason("it doesn't have a download link");
 		return null;
 	}
 
