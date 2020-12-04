@@ -1,5 +1,5 @@
-const EP_REGEX = /^(?<title>.+)[. ](?<season>S\d\d)(?<episode>E\d\d)/i;
-const SEASON_REGEX = /^(?<title>.+)[. ](?<season>S\d\d)(?!E\d\d)/i;
+const EP_REGEX = /^(?<title>.+)[. ](?<season>S\d+)(?<episode>E\d+)/i;
+const SEASON_REGEX = /^(?<title>.+)[. ](?<season>S\d+)(?!E\d+)(?<seasonmax>\s*\-\s*S?\d+)?/i;
 const MOVIE_REGEX = /^(?<title>.+)[. ](?<year>\d{4})/i;
 
 const EXTENSIONS = ["mkv", "mp4", "avi"];

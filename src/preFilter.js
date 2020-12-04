@@ -33,13 +33,6 @@ function filterByContent(info) {
 		return false;
 	}
 
-	const cb = (file) => file.path.split(path.sep).length <= 2;
-	const notNested = files.every(cb);
-	if (!notNested) {
-		logReason("the directory tree is more than 2 levels deep");
-		return false;
-	}
-
 	return true;
 }
 
