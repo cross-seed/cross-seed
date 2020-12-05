@@ -42,7 +42,7 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 		return null;
 	}
 
-	if (Link === null) {
+	if (!Link) {
 		logReason("it doesn't have a download link");
 		return null;
 	}
