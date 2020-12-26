@@ -16,7 +16,7 @@ function reformatTitleForSearching(name) {
 		: movieMatch
 		? movieMatch[0]
 		: name;
-	return fullMatch.replace(/\.)/g, " ").replace(/\(|\)/g, "").trim();
+	return fullMatch.replace(/\.|\(|\)|\[|\]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function fullJackettUrl(jackettServerUrl, params) {
