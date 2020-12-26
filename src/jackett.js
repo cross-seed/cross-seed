@@ -16,7 +16,7 @@ function reformatTitleForSearching(name) {
 		: movieMatch
 		? movieMatch[0]
 		: name;
-	return fullMatch.replace(/\./g, " ");
+	return fullMatch.replace(/[.()[\]]/g, " ").replace(/\s+/g, " ");
 }
 
 function fullJackettUrl(jackettServerUrl, params) {
@@ -57,6 +57,8 @@ function makeJackettRequest(name) {
 		url: fullJackettUrl(jackettServerUrl, params),
 		json: true,
 	};
+
+	logger.verbose(`[jackett] search query is "${params.Query}"`);
 
 	return new Promise((resolve, reject) => {
 		get.concat(opts, (err, res, data) => {
