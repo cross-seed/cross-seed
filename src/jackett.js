@@ -58,6 +58,8 @@ function makeJackettRequest(name) {
 		json: true,
 	};
 
+	logger.verbose(`[jackett] search query is "${params.Query}"`);
+
 	return new Promise((resolve, reject) => {
 		get.concat(opts, (err, res, data) => {
 			if (err) reject(err);
