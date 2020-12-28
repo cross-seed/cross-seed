@@ -33,8 +33,8 @@ async function run() {
 				fileConfig.jackettApiKey
 			)
 			.requiredOption(
-				"-t, --trackers <tracker>",
-				"Comma-separated list of Jackett tracker ids to search",
+				"-t, --trackers <tracker1>,<tracker2>",
+				"Comma-separated list of Jackett tracker ids to search  (Tracker ids can be found in their Torznab feed paths)",
 				fallback(
 					fileConfig.trackers && fileConfig.trackers.join(","),
 					""

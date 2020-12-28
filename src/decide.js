@@ -38,7 +38,9 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 		`${Title} from ${tracker} did not match ${ogInfo.name} because`
 	);
 	if (!sizeDoesMatch(result, ogInfo)) {
-		logReason("it has a different size");
+		logReason(
+			`its size, ${result.Size}, does not match the original torrent's size, ${ogInfo.length}`
+		);
 		return null;
 	}
 

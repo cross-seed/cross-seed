@@ -48,7 +48,7 @@ Search for cross-seeds
 Options:
   -u, --jackett-server-url <url>        Your Jackett server url
   -k, --jackett-api-key <key>           Your Jackett API key
-  -t, --trackers <tracker>              Comma-separated list of Jackett tracker ids to search
+  -t, --trackers <tracker1>,<tracker2>  Comma-separated list of Jackett tracker ids to search (Tracker ids can be found in their Torznab feed paths)
   -i, --torrent-dir <dir>               Directory with torrent files
   -s, --output-dir <dir>                Directory to save results in
   -a, --search-all                      Search for all torrents regardless of their contents (default: false)
