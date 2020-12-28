@@ -178,3 +178,10 @@ cross-seed daemon
 ```
 
 Then detach from the screen.
+
+## Troubleshooting
+
+First, check the [FAQ](https://github.com/mmgoodnow/cross-seed/wiki/FAQ). If you
+still can't figure it out, feel free to
+[open an issue](https://github.com/mmgoodnow/cross-seed/issues/new) or
+[start a discussion](https://github.com/mmgoodnow/cross-seed/discussions/new)
