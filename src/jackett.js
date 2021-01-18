@@ -66,7 +66,7 @@ function makeJackettRequest(name) {
 	return new Promise((resolve, reject) => {
 		get.concat(opts, (err, res, data) => {
 			if (err) reject(err);
-			resolve({ ...res, data });
+			else resolve({ ...res, data });
 		});
 	});
 }

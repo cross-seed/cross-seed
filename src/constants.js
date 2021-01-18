@@ -9,6 +9,11 @@ const CONFIG_TEMPLATE_URL =
 const README_URL = "https://github.com/mmgoodnow/cross-seed";
 const DAEMON_MODE_URL_HASH = "#daemon-mode-rtorrent-only-docker-recommended";
 
+const ACTIONS = {
+	SAVE: "SAVE",
+	INJECT: "INJECT",
+};
+
 // because I'm sick of intellij whining at me
 const _result = {
 	Link: undefined,
@@ -27,4 +32,5 @@ module.exports = {
 	CONFIG_TEMPLATE_URL,
 	README_URL,
 	DAEMON_MODE_URL_HASH,
+	ACTIONS,
 };
