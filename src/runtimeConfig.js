@@ -10,6 +10,8 @@ let runtimeConfig = {
 	searchAll: undefined,
 	excludeOlder: undefined,
 	excludeRecentSearch: undefined,
+	action: undefined,
+	rtorrentRpcUrl: undefined,
 };
 
 function setRuntimeConfig(configObj) {

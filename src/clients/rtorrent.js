@@ -46,22 +46,20 @@ async function saveWithLibtorrentResume(meta, savePath, dataDir) {
 }
 
 function getClient() {
-	const {
-		rtorrentRpcUrl,
-		rtorrentRpcUsername,
-		rtorrentRpcPassword,
-	} = getRuntimeConfig();
+	const { rtorrentRpcUrl } = getRuntimeConfig();
+
+	const { origin, username, password } = new URL(rtorrentRpcUrl);
 
 	const clientCreator = rtorrentRpcUrl.startsWith("https")
 		? xmlrpc.createSecureClient
 		: xmlrpc.createClient;
 
-	const shouldUseAuth = Boolean(rtorrentRpcPassword && rtorrentRpcUsername);
+	const shouldUseAuth = Boolean(username && password);
 
 	const client = clientCreator({
-		url: rtorrentRpcUrl,
+		url: origin,
 		basic_auth: shouldUseAuth
-			? { user: rtorrentRpcUsername, pass: rtorrentRpcPassword }
+			? { user: username, pass: password }
 			: undefined,
 	});
 

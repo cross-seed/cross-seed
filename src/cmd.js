@@ -10,16 +10,17 @@ const { clear: clearCache } = require("./cache");
 const { serve } = require("./server");
 const logger = require("./logger");
 require("./signalHandlers");
+const { ACTIONS } = require("./constants");
+
+function fallback(...args) {
+	for (const arg of args) {
+		if (arg !== undefined) return arg;
+	}
+	return undefined;
+}
 
 async function run() {
 	const fileConfig = getFileConfig();
-
-	function fallback(...args) {
-		for (const arg of args) {
-			if (arg !== undefined) return arg;
-		}
-		return undefined;
-	}
 
 	function addSharedOptions() {
 		return this.requiredOption(
@@ -55,7 +56,18 @@ async function run() {
 				"Search for all torrents regardless of their contents",
 				fallback(fileConfig.searchAll, false)
 			)
-			.requiredOption("-v, --verbose", "Log verbose output", false);
+
+			.requiredOption("-v, --verbose", "Log verbose output", false)
+			.requiredOption(
+				"-A, --action <action>",
+				"If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client.",
+				fallback(fileConfig.action, ACTIONS.SAVE)
+			)
+			.option(
+				"--rtorrent-rpc-url <url>",
+				"The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.",
+				fileConfig.rtorrentRpcUrl
+			);
 	}
 
 	// monkey patch Command with this addSharedOptions function
