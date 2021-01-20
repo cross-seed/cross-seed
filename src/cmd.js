@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { program, Command } = require("commander");
+const { program, Command, Option } = require("commander");
 const chalk = require("chalk");
 const packageDotJson = require("../package.json");
 const { main } = require("./index");
@@ -12,15 +12,26 @@ const logger = require("./logger");
 require("./signalHandlers");
 const { ACTIONS } = require("./constants");
 
-function fallback(...args) {
-	for (const arg of args) {
-		if (arg !== undefined) return arg;
-	}
-	return undefined;
-}
-
 async function run() {
 	const fileConfig = getFileConfig();
+
+	function fallback(...args) {
+		for (const arg of args) {
+			if (arg !== undefined) return arg;
+		}
+		return undefined;
+	}
+
+	function processOptions(options) {
+		options.trackers = options.trackers.split(",").filter((e) => e !== "");
+		if (options.action === "inject" && !options.rtorrentRpcUrl) {
+			logger.error(
+				"You need to specify --rtorrent-rpc-url when using '-A inject'."
+			);
+			process.exit(1);
+		}
+		return options;
+	}
 
 	function addSharedOptions() {
 		return this.requiredOption(
@@ -56,12 +67,15 @@ async function run() {
 				"Search for all torrents regardless of their contents",
 				fallback(fileConfig.searchAll, false)
 			)
-
 			.requiredOption("-v, --verbose", "Log verbose output", false)
-			.requiredOption(
-				"-A, --action <action>",
-				"If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client.",
-				fallback(fileConfig.action, ACTIONS.SAVE)
+			.addOption(
+				new Option(
+					"-A, --action <action>",
+					"If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client."
+				)
+					.default(fallback(fileConfig.action, ACTIONS.SAVE))
+					.choices(Object.values(ACTIONS))
+					.makeOptionMandatory()
 			)
 			.option(
 				"--rtorrent-rpc-url <url>",
@@ -102,12 +116,8 @@ async function run() {
 		.command("daemon")
 		.description("Start the cross-serve daemon")
 		.addSharedOptions()
-		.action(async (command) => {
-			const options = command.opts();
-			options.trackers = options.trackers
-				.split(",")
-				.filter((e) => e !== "");
-			setRuntimeConfig(options);
+		.action(async (options, _command) => {
+			setRuntimeConfig(processOptions(options));
 			try {
 				if (process.env.DOCKER_ENV === "true") {
 					generateConfig({ docker: true });
@@ -149,12 +159,8 @@ async function run() {
 			"Exclude torrents which have been searched more recently than x minutes ago. Overrides the -a flag.",
 			(n) => parseInt(n)
 		)
-		.action(async (command) => {
-			const options = command.opts();
-			options.trackers = options.trackers
-				.split(",")
-				.filter((e) => e !== "");
-			setRuntimeConfig(options);
+		.action(async (options, _command) => {
+			setRuntimeConfig(processOptions(options));
 			try {
 				await main();
 			} catch (e) {

@@ -10,8 +10,8 @@ const README_URL = "https://github.com/mmgoodnow/cross-seed";
 const DAEMON_MODE_URL_HASH = "#daemon-mode-rtorrent-only-docker-recommended";
 
 const ACTIONS = {
-	SAVE: "SAVE",
-	INJECT: "INJECT",
+	SAVE: "save",
+	INJECT: "inject",
 };
 
 // because I'm sick of intellij whining at me
