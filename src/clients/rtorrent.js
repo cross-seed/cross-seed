@@ -12,7 +12,9 @@ const { getRuntimeConfig } = require("../runtimeConfig");
 async function createLibtorrentResumeTree(meta, dataDir) {
 	async function getFileResumeData(file) {
 		const filePath = path.resolve(dataDir, file.path);
-		const fileStat = await fs.lstat(filePath);
+		const fileStat = await fs
+			.lstat(filePath)
+			.catch(() => ({ isFile: () => false }));
 		if (!fileStat.isFile() || fileStat.size !== file.length) {
 			logger.error(
 				chalk.red(
@@ -48,16 +50,17 @@ async function saveWithLibtorrentResume(meta, savePath, dataDir) {
 function getClient() {
 	const { rtorrentRpcUrl } = getRuntimeConfig();
 
-	const { origin, username, password } = new URL(rtorrentRpcUrl);
+	const { origin, username, password, protocol, pathname } = new URL(
+		rtorrentRpcUrl
+	);
 
-	const clientCreator = rtorrentRpcUrl.startsWith("https")
-		? xmlrpc.createSecureClient
-		: xmlrpc.createClient;
+	const clientCreator =
+		protocol === "https:" ? xmlrpc.createSecureClient : xmlrpc.createClient;
 
 	const shouldUseAuth = Boolean(username && password);
 
 	const client = clientCreator({
-		url: origin,
+		url: origin + pathname,
 		basic_auth: shouldUseAuth
 			? { user: username, pass: password }
 			: undefined,
@@ -74,6 +77,7 @@ async function checkForInfoHashInClient(infoHash) {
 }
 
 async function getDataDir(meta) {
+	const infoHash = meta.infoHash.toUpperCase();
 	const client = getClient();
 	const [[isMultiFileStr], [dir]] = await client.methodCallP(
 		"system.multicall",
@@ -81,11 +85,11 @@ async function getDataDir(meta) {
 			[
 				{
 					methodName: "d.is_multi_file",
-					params: [meta.infoHash],
+					params: [infoHash],
 				},
 				{
 					methodName: "d.directory",
-					params: [meta.infoHash],
+					params: [infoHash],
 				},
 			],
 		]
