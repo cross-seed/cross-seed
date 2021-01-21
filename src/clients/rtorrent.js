@@ -97,7 +97,7 @@ async function getDataDir(meta) {
 	return Number(isMultiFileStr) ? path.dirname(dir) : dir;
 }
 
-async function inject(meta, ogMeta) {
+exports.inject = async function inject(meta, ogMeta) {
 	const { outputDir } = getRuntimeConfig();
 
 	const client = getClient();
@@ -109,7 +109,7 @@ async function inject(meta, ogMeta) {
 	);
 	await saveWithLibtorrentResume(meta, savePath, dataDir);
 
-	await client.methodCallP("load.normal", [
+	await client.methodCallP("load.start", [
 		"",
 		savePath,
 		`d.directory.set="${dataDir}"`,
@@ -126,6 +126,4 @@ async function inject(meta, ogMeta) {
 	}
 	setTimeout(() => fs.unlink(savePath), 1000);
 	return false;
-}
-
-module.exports = { inject };
+};

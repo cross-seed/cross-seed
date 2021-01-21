@@ -46,9 +46,15 @@ async function findOnOtherSites(info, hashesToExclude) {
 		logger.log(`Found ${styledName} on ${styledTracker}`);
 		if (action === ACTIONS.INJECT) {
 			let injected = await inject(newInfo, info);
-			if (!injected) {
+			if (injected) {
+				logger.log(
+					`Injected ${styledName} from ${styledTracker} into rtorrent.`
+				);
+			} else {
 				logger.error(
-					`Failed to inject ${styledName} from ${styledTracker} into rtorrent. Saving instead.`
+					chalk.red(
+						`Failed to inject ${styledName} from ${styledTracker} into rtorrent. Saving instead.`
+					)
 				);
 				saveTorrentFile(tracker, tag, newInfo);
 			}
