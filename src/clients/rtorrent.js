@@ -73,7 +73,7 @@ function getClient() {
 async function checkForInfoHashInClient(infoHash) {
 	const client = getClient();
 	const downloadList = await client.methodCallP("download_list", []);
-	return downloadList.includes(infoHash);
+	return downloadList.includes(infoHash.toUpperCase());
 }
 
 async function getDataDir(meta) {
