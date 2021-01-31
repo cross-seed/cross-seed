@@ -1,9 +1,9 @@
 const get = require("simple-get");
 const querystring = require("querystring");
-const chalk = require("chalk");
 const { getRuntimeConfig } = require("./runtimeConfig");
 const { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } = require("./constants");
 const logger = require("./logger");
+const { CrossSeedError } = require("./errors");
 
 function reformatTitleForSearching(name) {
 	const seasonMatch = name.match(SEASON_REGEX);
@@ -32,7 +32,7 @@ async function validateJackettApi() {
 
 	if (/\/$/.test(jackettServerUrl)) {
 		const msg = "Warning: Jackett server url should not end with '/'";
-		logger.error(chalk.yellow(msg));
+		logger.warn(msg);
 	}
 
 	// search for gibberish so the results will be empty
@@ -41,9 +41,7 @@ async function validateJackettApi() {
 		await makeJackettRequest(gibberish);
 	} catch (e) {
 		const dummyUrl = fullJackettUrl(jackettServerUrl, { apikey });
-		logger.error(chalk.red`Could not reach Jackett at the following URL:`);
-		logger.error(dummyUrl);
-		throw e;
+		throw new CrossSeedError(`Could not reach Jackett at ${dummyUrl}`);
 	}
 }
 

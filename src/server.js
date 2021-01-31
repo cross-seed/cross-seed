@@ -1,7 +1,6 @@
 const fs = require("fs");
 const http = require("http");
 const qs = require("querystring");
-const chalk = require("chalk");
 const { searchForSingleTorrentByName } = require("./index");
 const { validateJackettApi } = require("./jackett");
 const logger = require("./logger");
@@ -25,14 +24,6 @@ function parseData(data) {
 	} catch (_) {
 		const parsed = qs.parse(data);
 		if ("name" in parsed) return parsed;
-		else {
-			logger.warn(
-				chalk.yellow(
-					`This request format is deprecated. Please refer to https://github.com/mmgoodnow/cross-seed/wiki/Daemon-Mode`
-				)
-			);
-			return { name: data };
-		}
 	}
 }
 

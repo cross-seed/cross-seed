@@ -4,9 +4,9 @@ const { promisify } = require("util");
 const xmlrpc = require("xmlrpc");
 const bencode = require("bencode");
 const parseTorrent = require("parse-torrent");
-const chalk = require("chalk");
 const { wait } = require("../utils");
 const logger = require("../logger");
+const { CrossSeedError } = require("../errors");
 const { getRuntimeConfig } = require("../runtimeConfig");
 
 async function createLibtorrentResumeTree(meta, dataDir) {
@@ -17,9 +17,7 @@ async function createLibtorrentResumeTree(meta, dataDir) {
 			.catch(() => ({ isFile: () => false }));
 		if (!fileStat.isFile() || fileStat.size !== file.length) {
 			logger.error(
-				chalk.red(
-					`File ${filePath} either doesn't exist or is the wrong size.`
-				)
+				`File ${filePath} either doesn't exist or is the wrong size.`
 			);
 			return {
 				completed: 0,
@@ -96,6 +94,21 @@ async function getDataDir(meta) {
 	);
 	return Number(isMultiFileStr) ? path.dirname(dir) : dir;
 }
+
+exports.validateRtorrentApi = async function validateRtorrentApi() {
+	const { rtorrentRpcUrl } = getRuntimeConfig();
+	// no validation to do
+	if (!rtorrentRpcUrl) return;
+
+	try {
+		const client = getClient();
+		await client.methodCallP("download_list", []);
+	} catch (e) {
+		throw new CrossSeedError(
+			`Failed to reach rTorrent at ${rtorrentRpcUrl}`
+		);
+	}
+};
 
 exports.inject = async function inject(meta, ogMeta) {
 	const { outputDir } = getRuntimeConfig();

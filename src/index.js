@@ -31,7 +31,7 @@ async function findOnOtherSites(info, hashesToExclude) {
 	try {
 		response = await makeJackettRequest(query);
 	} catch (e) {
-		logger.error(chalk.red`error querying Jackett for ${query}`);
+		logger.error(`error querying Jackett for ${query}`);
 		return 0;
 	}
 	updateSearchTimestamps(info.infoHash);
@@ -52,9 +52,7 @@ async function findOnOtherSites(info, hashesToExclude) {
 				);
 			} else {
 				logger.error(
-					chalk.red(
-						`Failed to inject ${styledName} from ${styledTracker} into rtorrent. Saving instead.`
-					)
+					`Failed to inject ${styledName} from ${styledTracker} into rtorrent. Saving instead.`
 				);
 				saveTorrentFile(tracker, tag, newInfo);
 			}

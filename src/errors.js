@@ -1,7 +1,12 @@
+const logger = require("./logger");
+
 exports.CrossSeedError = class CrossSeedError extends Error {
 	constructor(message) {
 		super(message);
 		delete this.stack;
-		process.exitCode = 1;
+	}
+
+	print() {
+		logger.error(this.message);
 	}
 };

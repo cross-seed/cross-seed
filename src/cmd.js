@@ -10,6 +10,7 @@ const { clear: clearCache } = require("./cache");
 const { serve } = require("./server");
 const logger = require("./logger");
 require("./signalHandlers");
+const { doStartupValidation } = require("./startup");
 const { CrossSeedError } = require("./errors");
 const { ACTIONS } = require("./constants");
 
@@ -117,14 +118,20 @@ async function run() {
 		.description("Start the cross-serve daemon")
 		.addSharedOptions()
 		.action(async (options, _command) => {
-			setRuntimeConfig(processOptions(options));
 			try {
+				setRuntimeConfig(processOptions(options));
 				if (process.env.DOCKER_ENV === "true") {
 					generateConfig({ docker: true });
 				}
+				await doStartupValidation();
 				await serve();
 			} catch (e) {
-				logger.error(chalk.bold.red(e.message));
+				if (e instanceof CrossSeedError) {
+					e.print();
+					process.exitCode = 1;
+					return;
+				}
+				throw e;
 			}
 		});
 
@@ -160,8 +167,18 @@ async function run() {
 			(n) => parseInt(n)
 		)
 		.action(async (options, _command) => {
-			setRuntimeConfig(processOptions(options));
-			await main();
+			try {
+				setRuntimeConfig(processOptions(options));
+				await doStartupValidation();
+				await main();
+			} catch (e) {
+				if (e instanceof CrossSeedError) {
+					e.print();
+					process.exitCode = 1;
+					return;
+				}
+				throw e;
+			}
 		});
 	await program.parseAsync();
 }
