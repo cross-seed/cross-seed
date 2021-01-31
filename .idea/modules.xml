@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/cross-seed.iml" filepath="$PROJECT_DIR$/.idea/cross-seed.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../cross-seed.wiki/wiki.iml" filepath="$PROJECT_DIR$/../cross-seed.wiki/wiki.iml" />
     </modules>
   </component>
 </project>

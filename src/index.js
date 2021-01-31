@@ -15,7 +15,7 @@ const {
 	filterTimestamps,
 } = require("./preFilter");
 const { assessResult } = require("./decide");
-const { makeJackettRequest, validateJackettApi } = require("./jackett");
+const { makeJackettRequest } = require("./jackett");
 const logger = require("./logger");
 const { inject } = require("./clients/rtorrent");
 const { ACTIONS } = require("./constants");
@@ -48,7 +48,7 @@ async function findOnOtherSites(info, hashesToExclude) {
 			let injected = await inject(newInfo, info);
 			if (injected) {
 				logger.log(
-					`Injected ${styledName} from ${styledTracker} into rtorrent.`
+					`Injected ${styledName} from ${styledTracker} into rTorrent.`
 				);
 			} else {
 				logger.error(
@@ -116,12 +116,6 @@ async function main() {
 		parsedTorrents.length,
 		filteredTorrents.length
 	);
-
-	try {
-		await validateJackettApi();
-	} catch (e) {
-		return;
-	}
 
 	if (offset > 0) logger.log("Starting at", offset);
 

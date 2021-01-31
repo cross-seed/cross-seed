@@ -10,6 +10,7 @@ const { clear: clearCache } = require("./cache");
 const { serve } = require("./server");
 const logger = require("./logger");
 require("./signalHandlers");
+const { CrossSeedError } = require("./errors");
 const { ACTIONS } = require("./constants");
 
 async function run() {
@@ -25,10 +26,9 @@ async function run() {
 	function processOptions(options) {
 		options.trackers = options.trackers.split(",").filter((e) => e !== "");
 		if (options.action === "inject" && !options.rtorrentRpcUrl) {
-			logger.error(
+			throw new CrossSeedError(
 				"You need to specify --rtorrent-rpc-url when using '-A inject'."
 			);
-			process.exit(1);
 		}
 		return options;
 	}
@@ -161,18 +161,14 @@ async function run() {
 		)
 		.action(async (options, _command) => {
 			setRuntimeConfig(processOptions(options));
-			try {
-				await main();
-			} catch (e) {
-				console.log(e);
-				logger.error(chalk.bold.red(e.message));
-			}
+			await main();
 		});
 	await program.parseAsync();
 }
+
 if (require.main === module) {
 	run().catch((e) => {
-		console.error(e);
+		logger.error(e);
 	});
 }
 

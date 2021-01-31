@@ -1,14 +1,14 @@
-# cross-seed
+# cross-seed: Fully-automatic cross-seeding
 
 `cross-seed` is an app designed to help you download torrents that you can cross
-seed based on your existing torrents. It will only find torrents whose file
-contents exactly match the file contents of the input torrents. This means that
-`.nfo` files have a high likelihood of causing a rejection.
+seed based on your existing torrents. It is designed to match conservatively to
+minimize manual intervention.
 
-`cross-seed` will download a bunch of torrent files to a folder you specify.
-After that, I recommend using
-[AutoTorrent](https://github.com/JohnDoee/autotorrent) to do the last-mile
-delivery into your client.
+If you use rTorrent, you're in luck! `cross-seed` can inject the torrents it
+finds directly into `rtorrent`. If you don't use rTorrent, `cross-seed` will
+download a bunch of torrent files to a folder you specify. After that, I
+recommend using [AutoTorrent](https://github.com/JohnDoee/autotorrent) to do the
+last-mile delivery into your client.
 
 ## Requirements
 
@@ -37,7 +37,7 @@ npx cross-seed search \
 ```
 
 You either need to give it a lot of command-line arguments or create a
-[configuration file](#configuration).
+[configuration file](https://github.com/mmgoodnow/cross-seed/wiki/Configuration-file).
 
 ```text
 Usage: cross-seed search [options]
@@ -87,97 +87,18 @@ To update,
 npm update -g cross-seed
 ```
 
-## Configuration
+## Daemon mode (beta, rTorrent only, Docker recommended)
 
-`cross-seed` will look for a configuration file at `~/.cross-seed/config.js`
-(`AppData\Local\cross-seed\config.js` on Windows). In the configuration file ,
-you can specify all of the same flags you specified on the command line, but
-after that, you won't have to specify them on the command line any more. If you
-would like to use a different directory than the default, you can set the
-`CONFIG_DIR` environment variable.
+`cross-seed` supports a daemon mode, wherein the app is always running, and you
+can trigger an HTTP request to search for cross-seeds of a specific torrent. See
+more info in the
+[wiki page](https://github.com/mmgoodnow/cross-seed/wiki/Daemon-Mode).
 
-To create a configuration file, run
+## Direct client injection (alpha, rTorrent only)
 
-```shell script
-cross-seed gen-config
-```
-
-Then you can edit the file using your editor of choice.
-
-## Daemon Mode (rtorrent only, Docker recommended)
-
-`cross-seed` has a new beta feature called daemon mode. As of right now it only
-works with rtorrent, and I recommend using Docker.
-
-It starts an HTTP server, listening on port 2468. **_Don't expose this port to
-the internet._** It will respond to a POST request with an
-`application/x-www-form-urlencoded` or `application/json` body containing the
-following parameters:
-
-```json5
-{
-	name: "<torrent name here>",
-	outputDir: "/path/to/output/dir", // optional
-	trackers: ["oink", "tehconnection"], //optional
-}
-```
-
-While the daemon is running (`cross-seed daemon`), you can trigger a search with
-an HTTP request:
-
-```shell script
-curl -XPOST http://localhost:2468/api/webhook \
-  --data-urlencode 'name=<torrent name here>' \
-  --data-urlencode 'trackers=oink' \
-  --data-urlencode 'trackers=tehconnection' \
-  --data-urlencode 'outputDir=/path/to/output/dir'
-```
-
-Alternatively, you can use JSON:
-
-```shell script
-curl -XPOST http://localhost:2468/api/webhook \
-  -H 'Content-Type: application/json' \
-  --data '{"name":"<torrent name here>",outputDir:"/path/to/output/dir",trackers:["oink","tehconnection"]}'
-```
-
-If you are using rtorrent, you can adapt
-[these instructions](https://www.filebot.net/forums/viewtopic.php?p=5316#p5316)
-to run the `curl` command on finished download.
-
-### Docker
-
-Here's a sample docker-compose blurb:
-
-```yaml
-version: "2.1"
-services:
-    cross-seed:
-        image: mmgoodnow/cross-seed
-        container_name: cross-seed
-        user: 1000:1000
-        volumes:
-            - /path/to/config/folder:/config
-            - /path/to/rtorrent_sess:/torrents:ro
-            - /path/to/output/folder:/output
-        ports:
-            - 2468:2468
-        command: daemon
-```
-
-### How to run the daemon without docker
-
-If you don't want to use Docker, you can run the `cross-seed` daemon as a
-systemd service, or inside a `screen` instance. If you choose to do this, you
-will probably want to [fully install the app](#standalone-installation).
-
-To start the daemon, issue the following command inside a `screen`:
-
-```shell script
-cross-seed daemon
-```
-
-Then detach from the screen.
+As mentioned above, `cross-seed` can inject the torrents it finds directly into
+your torrent client. See more info in the
+[wiki page](https://github.com/mmgoodnow/cross-seed/wiki/Injection).
 
 ## Troubleshooting
 

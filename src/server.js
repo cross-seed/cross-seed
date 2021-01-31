@@ -5,7 +5,6 @@ const chalk = require("chalk");
 const { searchForSingleTorrentByName } = require("./index");
 const { validateJackettApi } = require("./jackett");
 const logger = require("./logger");
-const { DAEMON_MODE_URL_HASH, README_URL } = require("./constants");
 const { getRuntimeConfig } = require("./runtimeConfig");
 
 function getData(req) {
@@ -29,7 +28,7 @@ function parseData(data) {
 		else {
 			logger.warn(
 				chalk.yellow(
-					`This request format is deprecated. Please refer to ${README_URL}${DAEMON_MODE_URL_HASH}`
+					`This request format is deprecated. Please refer to https://github.com/mmgoodnow/cross-seed/wiki/Daemon-Mode`
 				)
 			);
 			return { name: data };
