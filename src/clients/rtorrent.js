@@ -45,6 +45,12 @@ async function saveWithLibtorrentResume(meta, savePath, dataDir) {
 	await fs.writeFile(savePath, bencode.encode(rawMeta));
 }
 
+function methodCallP(method, args) {
+	const promisified = promisify(this.methodCall.bind(this));
+	logger.verbose("[rtorrent]", "Calling method", method, "with params", args);
+	return promisified(method, args);
+}
+
 function getClient() {
 	const { rtorrentRpcUrl } = getRuntimeConfig();
 
@@ -64,7 +70,7 @@ function getClient() {
 			: undefined,
 	});
 
-	client.methodCallP = promisify(client.methodCall.bind(client));
+	client.methodCallP = methodCallP;
 	return client;
 }
 
