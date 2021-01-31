@@ -33,4 +33,13 @@ module.exports = {
 	// search for all torrents, regardless of their contents
 	// this option overrides includeEpisodes.
 	searchAll: false,
+
+	// can be either "save" or "inject".
+	// With "inject" you need to specify the rtorrent rpc url.
+	action: "save",
+
+	// The url of your rtorrent XMLRPC interface.
+	// Only relevant with action: "inject".
+	// Could be something like "http://username:password@localhost:1234/RPC2
+	rtorrentRpcUrl: undefined,
 };

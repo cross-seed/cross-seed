@@ -27,7 +27,7 @@ module.exports = {
 	// where to put the torrent files that cross-seed finds for you.
 	// Don't change this for Docker.
 	// Instead set the volume mapping on your docker container.
-	outputDir: "/output",
+	outputDir: "/cross-seeds",
 
 	// Whether to search for single episode torrents
 	includeEpisodes: false,
@@ -35,4 +35,13 @@ module.exports = {
 	// search for all torrents, regardless of their contents
 	// this option overrides includeEpisodes.
 	searchAll: false,
+
+	// can be either "save" or "inject".
+	// With "inject" you need to specify the rtorrent rpc url.
+	action: "save",
+
+	// The url of your rtorrent XMLRPC interface.
+	// Only relevant with action: "inject".
+	// Could be something like "http://username:password@localhost:1234/RPC2
+	rtorrentRpcUrl: undefined,
 };

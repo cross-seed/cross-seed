@@ -18,4 +18,8 @@ function nMinutesAgo(n) {
 	return date.getTime();
 }
 
-module.exports = { stripExtension, partial, nMinutesAgo };
+function wait(n) {
+	return new Promise((resolve) => setTimeout(resolve, n));
+}
+
+module.exports = { stripExtension, partial, nMinutesAgo, wait };

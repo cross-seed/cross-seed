@@ -10,6 +10,8 @@ let runtimeConfig = {
 	searchAll: undefined,
 	excludeOlder: undefined,
 	excludeRecentSearch: undefined,
+	action: undefined,
+	rtorrentRpcUrl: undefined,
 };
 
 function setRuntimeConfig(configObj) {
@@ -20,12 +22,5 @@ function getRuntimeConfig() {
 	return runtimeConfig;
 }
 
-async function withTempConfigOptions(tempOptions, func) {
-	const ogRuntimeConfig = runtimeConfig;
-	setRuntimeConfig({ ...ogRuntimeConfig, ...tempOptions });
-	const ret = await func();
-	setRuntimeConfig(ogRuntimeConfig);
-	return ret;
-}
-
-module.exports = { getRuntimeConfig, setRuntimeConfig, withTempConfigOptions };
+exports.setRuntimeConfig = setRuntimeConfig;
+exports.getRuntimeConfig = getRuntimeConfig;

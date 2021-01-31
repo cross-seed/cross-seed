@@ -15,11 +15,15 @@ const {
 	filterTimestamps,
 } = require("./preFilter");
 const { assessResult } = require("./decide");
-const { makeJackettRequest, validateJackettApi } = require("./jackett");
+const { makeJackettRequest } = require("./jackett");
 const logger = require("./logger");
+const { inject } = require("./clients/rtorrent");
+const { ACTIONS } = require("./constants");
 const { get, save, CACHE_NAMESPACE_TORRENTS } = require("./cache");
 
 async function findOnOtherSites(info, hashesToExclude) {
+	const { action } = getRuntimeConfig();
+
 	const assessEach = (result) => assessResult(result, info, hashesToExclude);
 
 	const query = stripExtension(info.name);
@@ -27,7 +31,7 @@ async function findOnOtherSites(info, hashesToExclude) {
 	try {
 		response = await makeJackettRequest(query);
 	} catch (e) {
-		logger.error(chalk.red`error querying Jackett for ${query}`);
+		logger.error(`error querying Jackett for ${query}`);
 		return 0;
 	}
 	updateSearchTimestamps(info.infoHash);
@@ -36,12 +40,26 @@ async function findOnOtherSites(info, hashesToExclude) {
 	const loaded = await Promise.all(results.map(assessEach));
 	const successful = loaded.filter((e) => e !== null);
 
-	successful.forEach(({ tracker, tag, info: newInfo }) => {
+	for (const { tracker, tag, info: newInfo } of successful) {
 		const styledName = chalk.green.bold(newInfo.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.log(`Found ${styledName} on ${styledTracker}`);
-		saveTorrentFile(tracker, tag, newInfo);
-	});
+		if (action === ACTIONS.INJECT) {
+			let injected = await inject(newInfo, info);
+			if (injected) {
+				logger.log(
+					`Injected ${styledName} from ${styledTracker} into rTorrent.`
+				);
+			} else {
+				logger.error(
+					`Failed to inject ${styledName} from ${styledTracker} into rtorrent. Saving instead.`
+				);
+				saveTorrentFile(tracker, tag, newInfo);
+			}
+		} else {
+			saveTorrentFile(tracker, tag, newInfo);
+		}
+	}
 
 	return successful.length;
 }
@@ -96,12 +114,6 @@ async function main() {
 		parsedTorrents.length,
 		filteredTorrents.length
 	);
-
-	try {
-		await validateJackettApi();
-	} catch (e) {
-		return;
-	}
 
 	if (offset > 0) logger.log("Starting at", offset);
 

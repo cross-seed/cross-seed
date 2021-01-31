@@ -1,22 +1,21 @@
 const { getRuntimeConfig } = require("./runtimeConfig");
+const chalk = require("chalk");
 
-function log(...args) {
+exports.log = function log(...args) {
 	console.log(...args);
-}
+};
 
-function verbose(...args) {
+exports.verbose = function verbose(...args) {
 	const { verbose } = getRuntimeConfig();
 	if (verbose) {
 		console.log(...args);
 	}
-}
+};
 
-function error(...args) {
-	console.error(...args);
-}
+exports.error = function error(...args) {
+	console.error(...args.map((arg) => chalk.red(arg)));
+};
 
-function warn(...args) {
-	console.warn(...args);
-}
-
-module.exports = { log, verbose, error, warn };
+exports.warn = function warn(...args) {
+	console.warn(...args.map((arg) => chalk.yellow(arg)));
+};
