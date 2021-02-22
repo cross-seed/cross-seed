@@ -1,4 +1,4 @@
-# cross-seed: Fully-automatic cross-seeding
+# cross-seed: Fully-automatic, no false positives
 
 `cross-seed` is an app designed to help you download torrents that you can cross
 seed based on your existing torrents. It is designed to match conservatively to
