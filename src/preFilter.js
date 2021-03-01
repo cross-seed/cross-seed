@@ -5,7 +5,7 @@ const logger = require("./logger");
 const { partial, nMinutesAgo } = require("./utils");
 const { get, CACHE_NAMESPACE_TORRENTS } = require("./cache");
 
-function filterByContent(info) {
+exports.filterByContent = function filterByContent(info) {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
 
 	if (searchAll) return true;
@@ -34,9 +34,9 @@ function filterByContent(info) {
 	}
 
 	return true;
-}
+};
 
-function filterDupes(metafiles) {
+exports.filterDupes = function filterDupes(metafiles) {
 	const filtered = metafiles.filter((meta, index) => {
 		const firstOccurrence = metafiles.findIndex(
 			(e) => e.name === meta.name
@@ -51,9 +51,9 @@ function filterDupes(metafiles) {
 		);
 	}
 	return filtered;
-}
+};
 
-function filterTimestamps(info) {
+exports.filterTimestamps = function filterTimestamps(info) {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const { infoHash, name } = info;
 	const timestampData = get(CACHE_NAMESPACE_TORRENTS, infoHash);
@@ -83,6 +83,4 @@ function filterTimestamps(info) {
 	}
 
 	return true;
-}
-
-module.exports = { filterByContent, filterDupes, filterTimestamps };
+};
