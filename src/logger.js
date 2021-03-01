@@ -12,6 +12,13 @@ exports.verbose = function verbose(...args) {
 	}
 };
 
+exports.debug = function debug(...args) {
+	const { verbose } = getRuntimeConfig();
+	if (verbose) {
+		console.error(...args);
+	}
+};
+
 exports.error = function error(...args) {
 	console.error(...args.map((arg) => chalk.red(arg)));
 };
