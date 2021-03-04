@@ -1,6 +1,8 @@
 FROM node:12
 WORKDIR /usr/src/app
 COPY package*.json ./
+RUN git config --global url."https://github.com/".insteadOf git@github.com:
+RUN git config --global url."https://".insteadOf git://
 RUN npm ci --only=production
 ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
