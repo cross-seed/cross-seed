@@ -21,3 +21,9 @@ const _result = {
 	Size: undefined,
 	Guid: undefined,
 };
+
+exports.InjectionResult = {
+	SUCCESS: 1,
+	FAILURE: -1,
+	ALREADY_EXISTS: 0,
+};

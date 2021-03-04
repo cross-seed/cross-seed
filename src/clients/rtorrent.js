@@ -6,6 +6,7 @@ const bencode = require("bencode");
 const parseTorrent = require("parse-torrent");
 const { wait } = require("../utils");
 const logger = require("../logger");
+const { InjectionResult } = require("../constants");
 const { CrossSeedError } = require("../errors");
 const { getRuntimeConfig } = require("../runtimeConfig");
 
@@ -16,7 +17,7 @@ async function createLibtorrentResumeTree(meta, dataDir) {
 			.lstat(filePath)
 			.catch(() => ({ isFile: () => false }));
 		if (!fileStat.isFile() || fileStat.size !== file.length) {
-			logger.error(
+			logger.debug(
 				`File ${filePath} either doesn't exist or is the wrong size.`
 			);
 			return {
@@ -121,6 +122,10 @@ exports.inject = async function inject(meta, ogMeta) {
 
 	const client = getClient();
 
+	if (await checkForInfoHashInClient(meta.infoHash)) {
+		return InjectionResult.ALREADY_EXISTS;
+	}
+
 	const dataDir = await getDataDir(ogMeta);
 	const savePath = path.resolve(
 		outputDir,
@@ -140,9 +145,9 @@ exports.inject = async function inject(meta, ogMeta) {
 		await wait(100 * Math.pow(2, i));
 		if (await checkForInfoHashInClient(meta.infoHash)) {
 			setTimeout(() => fs.unlink(savePath), 1000);
-			return true;
+			return InjectionResult.SUCCESS;
 		}
 	}
 	setTimeout(() => fs.unlink(savePath), 1000);
-	return false;
+	return InjectionResult.FAILURE;
 };

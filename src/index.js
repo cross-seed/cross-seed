@@ -17,6 +17,7 @@ const {
 const { assessResult } = require("./decide");
 const { makeJackettRequest } = require("./jackett");
 const logger = require("./logger");
+const { InjectionResult } = require("./constants");
 const { inject } = require("./clients/rtorrent");
 const { ACTIONS } = require("./constants");
 const { get, save, CACHE_NAMESPACE_TORRENTS } = require("./cache");
@@ -45,16 +46,25 @@ async function findOnOtherSites(info, hashesToExclude) {
 		const styledTracker = chalk.bold(tracker);
 		logger.log(`Found ${styledName} on ${styledTracker}`);
 		if (action === ACTIONS.INJECT) {
-			let injected = await inject(newInfo, info);
-			if (injected) {
-				logger.log(
-					`Injected ${styledName} from ${styledTracker} into rTorrent.`
-				);
-			} else {
-				logger.error(
-					`Failed to inject ${styledName} from ${styledTracker} into rtorrent. Saving instead.`
-				);
-				saveTorrentFile(tracker, tag, newInfo);
+			let result = await inject(newInfo, info);
+			switch (result) {
+				case InjectionResult.SUCCESS:
+					logger.log(
+						`Injected ${styledName} from ${styledTracker} into rTorrent.`
+					);
+					break;
+				case InjectionResult.ALREADY_EXISTS:
+					logger.log(
+						`Did not inject ${styledName} because it already exists.`
+					);
+					break;
+				case InjectionResult.FAILURE:
+				default:
+					logger.error(
+						`Failed to inject ${styledName} from ${styledTracker} into rtorrent. Saving instead.`
+					);
+					saveTorrentFile(tracker, tag, newInfo);
+					break;
 			}
 		} else {
 			saveTorrentFile(tracker, tag, newInfo);
