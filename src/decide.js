@@ -6,9 +6,16 @@ const { partial } = require("./utils");
 
 function compareFileTrees(a, b) {
 	const cmp = (elOfA, elOfB) => {
-		const pathsAreEqual = elOfB.path === elOfA.path;
 		const lengthsAreEqual = elOfB.length === elOfA.length;
-		return pathsAreEqual && lengthsAreEqual;
+		const pathsAreEqual = elOfB.path === elOfA.path;
+
+		// https://github.com/mmgoodnow/cross-seed/issues/46
+		const noSneakyZeroLengthPathSegments =
+			elOfA.pathSegments.length === elOfB.pathSegments.length;
+
+		return (
+			lengthsAreEqual && pathsAreEqual && noSneakyZeroLengthPathSegments
+		);
 	};
 	return a.every((elOfA) => b.some((elOfB) => cmp(elOfA, elOfB)));
 }
