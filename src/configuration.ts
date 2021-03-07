@@ -1,12 +1,12 @@
-const fs = require("fs");
-const path = require("path");
-const chalk = require("chalk");
-const packageDotJson = require("../package.json");
-const logger = require("./logger");
-const configTemplate = require("./config.template");
-const { CONFIG_TEMPLATE_URL } = require("./constants");
+import { CONFIG_TEMPLATE_URL } from "./constants";
+import packageDotJson from "../package.json";
+import * as logger from "./logger";
+import configTemplate from "./config.template";
+import chalk from "chalk";
+import path from "path";
+import fs from "fs";
 
-function appDir() {
+export function appDir() {
 	return (
 		process.env.CONFIG_DIR ||
 		(process.platform === "win32"
@@ -15,11 +15,11 @@ function appDir() {
 	);
 }
 
-function createAppDir() {
+export function createAppDir() {
 	return fs.mkdirSync(appDir(), { recursive: true });
 }
 
-function generateConfig({ force = false, docker = false }) {
+export function generateConfig({ force = false, docker = false }) {
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
 	const templatePath = path.join(
@@ -45,13 +45,13 @@ function printUpdateInstructions(missingKeys) {
  `);
 }
 
-function getFileConfig() {
+export function getFileConfig() {
 	const configPath = path.join(appDir(), "config.js");
 	if (!fs.existsSync(configPath)) return {};
 
 	const fileConfig = require(configPath);
 	const { configVersion = 0 } = fileConfig;
-	if (configVersion < configTemplate.configVersion) {
+	if (configVersion < configVersion) {
 		const missingKeys = Object.keys(configTemplate).filter(
 			(k) => !(k in fileConfig)
 		);
@@ -59,10 +59,3 @@ function getFileConfig() {
 	}
 	return fileConfig;
 }
-
-module.exports = {
-	appDir,
-	createAppDir,
-	generateConfig,
-	getFileConfig,
-};

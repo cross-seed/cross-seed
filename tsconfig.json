@@ -4,7 +4,8 @@
 		"allowJs": true,
 		"target": "es2020",
 		"module": "CommonJS",
-		"esModuleInterop": true
+		"esModuleInterop": true,
+		"resolveJsonModule": true
 	},
 	"include": ["./src/**/*"]
 }
