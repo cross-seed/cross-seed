@@ -1,4 +1,4 @@
-import * as logger from './logger'
+import * as logger from "./logger";
 
 export class CrossSeedError extends Error {
 	constructor(message) {
@@ -9,4 +9,4 @@ export class CrossSeedError extends Error {
 	print() {
 		logger.error(this.message);
 	}
-};
+}

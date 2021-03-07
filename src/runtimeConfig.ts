@@ -14,13 +14,10 @@ let runtimeConfig = {
 	rtorrentRpcUrl: undefined,
 };
 
-function setRuntimeConfig(configObj) {
+export function setRuntimeConfig(configObj) {
 	runtimeConfig = configObj;
 }
 
-function getRuntimeConfig() {
+export function getRuntimeConfig() {
 	return runtimeConfig;
 }
-
-exports.setRuntimeConfig = setRuntimeConfig;
-exports.getRuntimeConfig = getRuntimeConfig;
