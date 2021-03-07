@@ -1,6 +1,6 @@
-const logger = require("./logger");
+import * as logger from './logger'
 
-exports.CrossSeedError = class CrossSeedError extends Error {
+export class CrossSeedError extends Error {
 	constructor(message) {
 		super(message);
 		delete this.stack;
