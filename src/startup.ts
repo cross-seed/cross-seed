@@ -1,9 +1,9 @@
-const { validateJackettApi } = require("./jackett");
-const { validateRtorrentApi } = require("./clients/rtorrent");
-const logger = require("./logger");
+import { validateJackettApi } from "./jackett";
+import { validateRtorrentApi } from "./clients/rtorrent";
+import * as logger from "./logger";
 
-exports.doStartupValidation = async function doStartupValidation() {
+export async function doStartupValidation() {
 	logger.log("Validating your configuration...");
 	await Promise.all([validateJackettApi(), validateRtorrentApi()]);
 	logger.log("Your configuration is valid!");
-};
+}
