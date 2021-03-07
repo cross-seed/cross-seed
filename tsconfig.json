@@ -1,8 +1,9 @@
 {
-  "compilerOptions": {
-    "outDir": "./dist",
-    "allowJs": true,
-    "target": "es2020"
-  },
-  "include": ["./src/**/*"]
+	"compilerOptions": {
+		"outDir": "./dist",
+		"allowJs": true,
+		"target": "es2020",
+		"module": "CommonJS"
+	},
+	"include": ["./src/**/*"]
 }
