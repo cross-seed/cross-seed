@@ -7,10 +7,10 @@
 		"test": "echo \"Error: no test specified\""
 	},
 	"bin": {
-		"cross-seed": "src/cmd.js"
+		"cross-seed": "dist/cmd.js"
 	},
 	"files": [
-		"src/"
+		"dist/"
 	],
 	"repository": {
 		"type": "git",
