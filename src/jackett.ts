@@ -1,11 +1,11 @@
-const get = require("simple-get");
-const querystring = require("querystring");
-const { getRuntimeConfig } = require("./runtimeConfig");
-const { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } = require("./constants");
-const logger = require("./logger");
-const { CrossSeedError } = require("./errors");
+import get from "simple-get";
+import querystring from "querystring";
+import { getRuntimeConfig } from "./runtimeConfig";
+import { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } from "./constants";
+import * as logger from "./logger";
+import { CrossSeedError } from "./errors";
 
-function reformatTitleForSearching(name) {
+function reformatTitleForSearching(name: string): string {
 	const seasonMatch = name.match(SEASON_REGEX);
 	const movieMatch = name.match(MOVIE_REGEX);
 	const episodeMatch = name.match(EP_REGEX);
@@ -22,12 +22,12 @@ function reformatTitleForSearching(name) {
 		.trim();
 }
 
-function fullJackettUrl(jackettServerUrl, params) {
+function fullJackettUrl(jackettServerUrl: string, params) {
 	const jackettPath = `/api/v2.0/indexers/all/results`;
 	return `${jackettServerUrl}${jackettPath}?${querystring.encode(params)}`;
 }
 
-async function validateJackettApi() {
+export async function validateJackettApi(): Promise<void> {
 	const { jackettServerUrl, jackettApiKey: apikey } = getRuntimeConfig();
 
 	if (/\/$/.test(jackettServerUrl)) {
@@ -45,7 +45,8 @@ async function validateJackettApi() {
 	}
 }
 
-function makeJackettRequest(name) {
+// TODO: type this
+export function makeJackettRequest(name: string): Promise<any> {
 	const { jackettApiKey, trackers, jackettServerUrl } = getRuntimeConfig();
 	const params = {
 		apikey: jackettApiKey,
@@ -68,5 +69,3 @@ function makeJackettRequest(name) {
 		});
 	});
 }
-
-module.exports = { makeJackettRequest, validateJackettApi };
