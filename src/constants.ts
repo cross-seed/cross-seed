@@ -22,8 +22,8 @@ const _result = {
 	Guid: undefined,
 };
 
-export const InjectionResult = {
-	SUCCESS: 1,
-	FAILURE: -1,
-	ALREADY_EXISTS: 0,
-};
+export enum InjectionResult {
+	SUCCESS = 1,
+	FAILURE = -1,
+	ALREADY_EXISTS = 0,
+}
