@@ -1,8 +1,8 @@
-const { parseTorrentFromURL } = require("./torrent");
-const cache = require("./cache");
-const { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } = require("./constants");
-const logger = require("./logger");
-const { partial } = require("./utils");
+import { parseTorrentFromURL } from "./torrent";
+import * as cache from "./cache";
+import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
+import * as logger from "./logger";
+import { partial } from "./utils";
 
 function compareFileTrees(a, b) {
 	const cmp = (elOfA, elOfB) => {
