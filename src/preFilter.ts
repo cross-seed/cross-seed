@@ -4,8 +4,9 @@ import { EP_REGEX, EXTENSIONS } from "./constants";
 import * as logger from "./logger";
 import { nMinutesAgo, partial } from "./utils";
 import { CACHE_NAMESPACE_TORRENTS, get } from "./cache";
+import { Metafile } from "./types";
 
-export function filterByContent(info) {
+export function filterByContent(info: Metafile): boolean {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
 
 	if (searchAll) return true;
@@ -36,7 +37,7 @@ export function filterByContent(info) {
 	return true;
 }
 
-export function filterDupes(metafiles) {
+export function filterDupes(metafiles: Metafile[]): Metafile[] {
 	const filtered = metafiles.filter((meta, index) => {
 		const firstOccurrence = metafiles.findIndex(
 			(e) => e.name === meta.name
@@ -53,7 +54,7 @@ export function filterDupes(metafiles) {
 	return filtered;
 }
 
-export function filterTimestamps(info) {
+export function filterTimestamps(info: Metafile): boolean {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const { infoHash, name } = info;
 	const timestampData = get(CACHE_NAMESPACE_TORRENTS, infoHash);
