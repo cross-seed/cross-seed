@@ -1,7 +1,7 @@
 const fs = require("fs");
 const http = require("http");
 const qs = require("querystring");
-const { searchForSingleTorrentByName } = require("./index");
+const { searchForSingleTorrentByName } = require("./pipeline");
 const { validateJackettApi } = require("./jackett");
 const logger = require("./logger");
 const { getRuntimeConfig } = require("./runtimeConfig");

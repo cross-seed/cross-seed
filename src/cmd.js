@@ -3,7 +3,7 @@
 const { program, Command, Option } = require("commander");
 const chalk = require("chalk");
 const packageDotJson = require("../package.json");
-const { main } = require("./index");
+const { main } = require("./pipeline");
 const { generateConfig, getFileConfig } = require("./configuration");
 const { setRuntimeConfig } = require("./runtimeConfig");
 const { clear: clearCache } = require("./cache");

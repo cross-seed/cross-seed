@@ -1,26 +1,20 @@
-const fs = require("fs");
-
-const chalk = require("chalk");
-const { getRuntimeConfig } = require("./runtimeConfig");
-const { stripExtension } = require("./utils");
-const {
-	loadTorrentDir,
-	saveTorrentFile,
+import chalk from "chalk";
+import fs from "fs";
+import { getRuntimeConfig } from "./runtimeConfig";
+import { stripExtension } from "./utils";
+import {
 	getInfoHashesToExclude,
 	getTorrentByName,
-} = require("./torrent");
-const {
-	filterByContent,
-	filterDupes,
-	filterTimestamps,
-} = require("./preFilter");
-const { assessResult } = require("./decide");
-const { makeJackettRequest } = require("./jackett");
-const logger = require("./logger");
-const { InjectionResult } = require("./constants");
-const { inject } = require("./clients/rtorrent");
-const { ACTIONS } = require("./constants");
-const { get, save, CACHE_NAMESPACE_TORRENTS } = require("./cache");
+	loadTorrentDir,
+	saveTorrentFile,
+} from "./torrent";
+import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
+import { assessResult } from "./decide";
+import { makeJackettRequest } from "./jackett";
+import * as logger from "./logger";
+import { ACTIONS, InjectionResult } from "./constants";
+import { inject } from "./clients/rtorrent";
+import { CACHE_NAMESPACE_TORRENTS, get, save } from "./cache";
 
 async function findOnOtherSites(info, hashesToExclude) {
 	const { action } = getRuntimeConfig();
@@ -36,6 +30,7 @@ async function findOnOtherSites(info, hashesToExclude) {
 		return 0;
 	}
 	updateSearchTimestamps(info.infoHash);
+	console.log(response);
 	const results = response.data.Results;
 
 	const loaded = await Promise.all(results.map(assessEach));
