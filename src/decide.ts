@@ -3,6 +3,7 @@ import * as cache from "./cache";
 import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
 import * as logger from "./logger";
 import { partial } from "./utils";
+import { JackettResult, Metafile, ResultAssessment } from "./types";
 
 function compareFileTrees(a, b) {
 	const cmp = (elOfA, elOfB) => {
@@ -37,7 +38,11 @@ function getTag(name) {
 		: "unknown";
 }
 
-async function assessResultHelper(result, ogInfo, hashesToExclude) {
+async function assessResultHelper(
+	result: JackettResult,
+	ogInfo: Metafile,
+	hashesToExclude: string[]
+): Promise<ResultAssessment> {
 	const { TrackerId: tracker, Link, Title } = result;
 	const logReason = partial(
 		logger.verbose,
@@ -56,10 +61,11 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 		return null;
 	}
 
-	const info = await parseTorrentFromURL(Link);
+	// TODO: remove as
+	const info = (await parseTorrentFromURL(Link)) as Metafile;
 
 	// if you got rate limited or some other failure
-	if (!info) return info;
+	if (!info) return null;
 
 	if (hashesToExclude.includes(info.infoHash)) {
 		logReason("the info hash matches a torrent you already have");
@@ -74,7 +80,11 @@ async function assessResultHelper(result, ogInfo, hashesToExclude) {
 	return { tracker, tag, info };
 }
 
-function assessResultCaching(result, ogInfo, hashesToExclude) {
+function assessResultCaching(
+	result: JackettResult,
+	ogInfo: Metafile,
+	hashesToExclude: string[]
+): Promise<ResultAssessment> {
 	const { Guid, Title, TrackerId: tracker } = result;
 	const cacheKey = `${ogInfo.name}|${Guid}`;
 	if (cache.get(cache.CACHE_NAMESPACE_REJECTIONS, cacheKey)) {
@@ -95,4 +105,4 @@ function assessResultCaching(result, ogInfo, hashesToExclude) {
 	return assessPromise;
 }
 
-module.exports = { assessResult: assessResultCaching };
+export { assessResultCaching as assessResult };

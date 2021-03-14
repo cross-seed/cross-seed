@@ -7,7 +7,7 @@
 		"test": "echo \"Error: no test specified\""
 	},
 	"bin": {
-		"cross-seed": "dist/cmd.js"
+		"cross-seed": "dist/src/cmd.js"
 	},
 	"files": [
 		"dist/"

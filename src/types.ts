@@ -1,30 +1,43 @@
-interface FileListing {
-	path: string;
-	pathSegments?: string[];
-	name: string;
-	length: number;
-	offset: number;
+import ParseTorrent from "parse-torrent";
+
+export type Metafile = ParseTorrent.Instance;
+
+export interface JackettResult {
+	Author: unknown;
+	BlackholeLink: string;
+	BookTitle: unknown;
+	Category: number[];
+	CategoryDesc: string;
+	Description: unknown;
+	Details: string;
+	DownloadVolumeFactor: number;
+	Files: number;
+	FirstSeen: string;
+	Gain: number;
+	Grabs: number;
+	Guid: string;
+	Imdb: unknown;
+	InfoHash: unknown;
+	Link: string;
+	MagnetUri: unknown;
+	MinimumRatio: number;
+	MinimumSeedTime: number;
+	Peers: number;
+	Poster: unknown;
+	PublishDate: string;
+	RageID: unknown;
+	Seeders: number;
+	Size: number;
+	TMDb: unknown;
+	TVDBId: unknown;
+	Title: string;
+	Tracker: string;
+	TrackerId: string;
+	UploadVolumeFactor: number;
 }
 
-export interface Metafile {
-	infoHash: string;
-	info: {
-		length: number;
-		name: Buffer;
-		"piece length": number;
-		pieces: Buffer;
-		private: 0 | 1;
-	};
-	infoBuffer: Buffer;
-	name: string;
-	private: boolean;
-	created: Date;
-	createdBy?: string;
-	comment?: string;
-	announce: string[];
-	files: FileListing[];
-	length: number;
-	pieceLength: number;
-	lastPieceLength: number;
-	pieces: string[];
+export interface ResultAssessment {
+	tracker: string;
+	tag: string;
+	info: Metafile;
 }
