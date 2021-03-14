@@ -3,7 +3,8 @@ import * as cache from "./cache";
 import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
 import * as logger from "./logger";
 import { partial } from "./utils";
-import { JackettResult, Metafile, ResultAssessment } from "./types";
+import { JackettResult, ResultAssessment } from "./types";
+import { Metafile } from "parse-torrent";
 
 function compareFileTrees(a, b) {
 	const cmp = (elOfA, elOfB) => {

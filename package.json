@@ -27,7 +27,6 @@
 		"xmlrpc": "^1.3.2"
 	},
 	"devDependencies": {
-		"@types/parse-torrent": "^5.8.3",
 		"@types/xmlrpc": "^1.3.6",
 		"@typescript-eslint/eslint-plugin": "^4.16.1",
 		"@typescript-eslint/parser": "^4.16.1",

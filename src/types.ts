@@ -1,6 +1,4 @@
-import ParseTorrent from "parse-torrent";
-
-export type Metafile = ParseTorrent.Instance;
+import { Metafile } from "parse-torrent";
 
 export interface JackettResult {
 	Author: unknown;

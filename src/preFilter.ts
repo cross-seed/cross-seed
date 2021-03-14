@@ -4,7 +4,7 @@ import { EP_REGEX, EXTENSIONS } from "./constants";
 import * as logger from "./logger";
 import { nMinutesAgo, partial } from "./utils";
 import { CACHE_NAMESPACE_TORRENTS, get } from "./cache";
-import { Metafile } from "./types";
+import { Metafile } from "parse-torrent";
 
 export function filterByContent(info: Metafile): boolean {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
