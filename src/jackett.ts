@@ -1,10 +1,56 @@
 import get from "simple-get";
 import querystring from "querystring";
 import { getRuntimeConfig } from "./runtimeConfig";
-import { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } from "./constants";
+import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
 import * as logger from "./logger";
 import { CrossSeedError } from "./errors";
-import { JackettResponse, JackettResult } from "./types";
+
+export interface JackettResult {
+	Author: unknown;
+	BlackholeLink: string;
+	BookTitle: unknown;
+	Category: number[];
+	CategoryDesc: string;
+	Description: unknown;
+	Details: string;
+	DownloadVolumeFactor: number;
+	Files: number;
+	FirstSeen: string;
+	Gain: number;
+	Grabs: number;
+	Guid: string;
+	Imdb: unknown;
+	InfoHash: unknown;
+	Link: string;
+	MagnetUri: unknown;
+	MinimumRatio: number;
+	MinimumSeedTime: number;
+	Peers: number;
+	Poster: unknown;
+	PublishDate: string;
+	RageID: unknown;
+	Seeders: number;
+	Size: number;
+	TMDb: unknown;
+	TVDBId: unknown;
+	Title: string;
+	Tracker: string;
+	TrackerId: string;
+	UploadVolumeFactor: number;
+}
+
+export interface JackettIndexer {
+	ID: string;
+	Name: string;
+	Status: number;
+	Results: number;
+	Error: string;
+}
+
+export interface JackettResponse {
+	Results: JackettResult[];
+	Indexers: JackettIndexer[];
+}
 
 function reformatTitleForSearching(name: string): string {
 	const seasonMatch = name.match(SEASON_REGEX);

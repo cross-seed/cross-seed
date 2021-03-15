@@ -9,13 +9,12 @@ import {
 	saveTorrentFile,
 } from "./torrent";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
-import { assessResult } from "./decide";
-import { makeJackettRequest } from "./jackett";
+import { assessResult, ResultAssessment } from "./decide";
+import { JackettResponse, makeJackettRequest } from "./jackett";
 import * as logger from "./logger";
 import { ACTIONS, InjectionResult } from "./constants";
 import { inject } from "./clients/rtorrent";
 import { CACHE_NAMESPACE_TORRENTS, get, save } from "./cache";
-import { JackettResponse, ResultAssessment } from "./types";
 import { Metafile } from "parse-torrent";
 
 async function findOnOtherSites(
