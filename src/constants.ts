@@ -7,10 +7,10 @@ export const EXTENSIONS = ["mkv", "mp4", "avi"];
 export const CONFIG_TEMPLATE_URL =
 	"https://github.com/mmgoodnow/cross-seed/blob/master/src/config.template.js";
 
-export const ACTIONS = {
-	SAVE: "save",
-	INJECT: "inject",
-};
+export enum Action {
+	SAVE = "save",
+	INJECT = "inject",
+}
 
 export enum InjectionResult {
 	SUCCESS = 1,

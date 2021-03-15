@@ -12,7 +12,7 @@ import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
 import { assessResult, ResultAssessment } from "./decide";
 import { JackettResponse, makeJackettRequest } from "./jackett";
 import * as logger from "./logger";
-import { ACTIONS, InjectionResult } from "./constants";
+import { Action, InjectionResult } from "./constants";
 import { inject } from "./clients/rtorrent";
 import { CACHE_NAMESPACE_TORRENTS, get, save } from "./cache";
 import { Metafile } from "parse-torrent";
@@ -43,7 +43,7 @@ async function findOnOtherSites(
 		const styledName = chalk.green.bold(newInfo.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.log(`Found ${styledName} on ${styledTracker}`);
-		if (action === ACTIONS.INJECT) {
+		if (action === Action.INJECT) {
 			const result = await inject(newInfo, info);
 			switch (result) {
 				case InjectionResult.SUCCESS:

@@ -1,24 +1,28 @@
-let runtimeConfig = {
-	offset: undefined,
-	jackettServerUrl: undefined,
-	jackettApiKey: undefined,
-	delay: undefined,
-	trackers: undefined,
-	torrentDir: undefined,
-	outputDir: undefined,
-	includeEpisodes: undefined,
-	verbose: undefined,
-	searchAll: undefined,
-	excludeOlder: undefined,
-	excludeRecentSearch: undefined,
-	action: undefined,
-	rtorrentRpcUrl: undefined,
-};
+import { Action } from "./constants";
 
-export function setRuntimeConfig(configObj) {
+interface RuntimeConfig {
+	offset: number;
+	jackettServerUrl: string;
+	jackettApiKey: string;
+	delay: number;
+	trackers: string[];
+	torrentDir: string;
+	outputDir: string;
+	includeEpisodes: boolean;
+	verbose: boolean;
+	searchAll: boolean;
+	excludeOlder: number;
+	excludeRecentSearch: number;
+	action: Action;
+	rtorrentRpcUrl: string;
+}
+
+let runtimeConfig: RuntimeConfig;
+
+export function setRuntimeConfig(configObj: RuntimeConfig): void {
 	runtimeConfig = configObj;
 }
 
-export function getRuntimeConfig() {
+export function getRuntimeConfig(): RuntimeConfig {
 	return runtimeConfig;
 }

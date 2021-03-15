@@ -12,7 +12,7 @@ const logger = require("./logger");
 require("./signalHandlers");
 const { doStartupValidation } = require("./startup");
 const { CrossSeedError } = require("./errors");
-const { ACTIONS } = require("./constants");
+const { Action } = require("./constants");
 
 async function run() {
 	const fileConfig = getFileConfig();
@@ -74,8 +74,8 @@ async function run() {
 					"-A, --action <action>",
 					"If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client."
 				)
-					.default(fallback(fileConfig.action, ACTIONS.SAVE))
-					.choices(Object.values(ACTIONS))
+					.default(fallback(fileConfig.action, Action.SAVE))
+					.choices(Object.values(Action))
 					.makeOptionMandatory()
 			)
 			.option(
