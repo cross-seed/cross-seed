@@ -4,7 +4,7 @@ import { getRuntimeConfig } from "./runtimeConfig";
 import { SEASON_REGEX, MOVIE_REGEX, EP_REGEX } from "./constants";
 import * as logger from "./logger";
 import { CrossSeedError } from "./errors";
-import { JackettResult } from "./types";
+import { JackettResponse, JackettResult } from "./types";
 
 function reformatTitleForSearching(name: string): string {
 	const seasonMatch = name.match(SEASON_REGEX);
@@ -46,7 +46,7 @@ export async function validateJackettApi(): Promise<void> {
 	}
 }
 
-export function makeJackettRequest(name: string): Promise<JackettResult> {
+export function makeJackettRequest(name: string): Promise<JackettResponse> {
 	const { jackettApiKey, trackers, jackettServerUrl } = getRuntimeConfig();
 	const params = {
 		apikey: jackettApiKey,
@@ -65,7 +65,7 @@ export function makeJackettRequest(name: string): Promise<JackettResult> {
 	return new Promise((resolve, reject) => {
 		get.concat(opts, (err, res, data) => {
 			if (err) reject(err);
-			else resolve({ ...res, data });
+			else resolve(data);
 		});
 	});
 }

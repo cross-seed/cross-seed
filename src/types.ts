@@ -34,6 +34,19 @@ export interface JackettResult {
 	UploadVolumeFactor: number;
 }
 
+export interface JackettIndexer {
+	ID: string;
+	Name: string;
+	Status: number;
+	Results: number;
+	Error: string;
+}
+
+export interface JackettResponse {
+	Results: JackettResult[];
+	Indexers: JackettIndexer[];
+}
+
 export interface ResultAssessment {
 	tracker: string;
 	tag: string;

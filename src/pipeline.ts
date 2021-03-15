@@ -15,14 +15,19 @@ import * as logger from "./logger";
 import { ACTIONS, InjectionResult } from "./constants";
 import { inject } from "./clients/rtorrent";
 import { CACHE_NAMESPACE_TORRENTS, get, save } from "./cache";
+import { JackettResponse, ResultAssessment } from "./types";
+import { Metafile } from "parse-torrent";
 
-async function findOnOtherSites(info, hashesToExclude) {
+async function findOnOtherSites(
+	info: Metafile,
+	hashesToExclude: string[]
+): Promise<number> {
 	const { action } = getRuntimeConfig();
 
 	const assessEach = (result) => assessResult(result, info, hashesToExclude);
 
 	const query = stripExtension(info.name);
-	let response;
+	let response: JackettResponse;
 	try {
 		response = await makeJackettRequest(query);
 	} catch (e) {
@@ -30,10 +35,9 @@ async function findOnOtherSites(info, hashesToExclude) {
 		return 0;
 	}
 	updateSearchTimestamps(info.infoHash);
-	console.log(response);
-	const results = response.data.Results;
+	const results = response.Results;
 
-	const loaded = await Promise.all(results.map(assessEach));
+	const loaded = await Promise.all<ResultAssessment>(results.map(assessEach));
 	const successful = loaded.filter((e) => e !== null);
 
 	for (const { tracker, tag, info: newInfo } of successful) {
@@ -41,7 +45,7 @@ async function findOnOtherSites(info, hashesToExclude) {
 		const styledTracker = chalk.bold(tracker);
 		logger.log(`Found ${styledName} on ${styledTracker}`);
 		if (action === ACTIONS.INJECT) {
-			let result = await inject(newInfo, info);
+			const result = await inject(newInfo, info);
 			switch (result) {
 				case InjectionResult.SUCCESS:
 					logger.log(
@@ -69,13 +73,16 @@ async function findOnOtherSites(info, hashesToExclude) {
 	return successful.length;
 }
 
-function updateSearchTimestamps(infoHash) {
+function updateSearchTimestamps(infoHash: string): void {
 	const existingTimestamps = get(CACHE_NAMESPACE_TORRENTS, infoHash);
 	const firstSearched = existingTimestamps
 		? existingTimestamps.firstSearched
 		: Date.now();
 	const lastSearched = Date.now();
-	save(CACHE_NAMESPACE_TORRENTS, infoHash, { firstSearched, lastSearched });
+	save(CACHE_NAMESPACE_TORRENTS, infoHash, {
+		firstSearched,
+		lastSearched,
+	} as any);
 }
 
 async function findMatchesBatch(samples, hashesToExclude) {
@@ -91,21 +98,23 @@ async function findMatchesBatch(samples, hashesToExclude) {
 		const name = stripExtension(sample.name);
 		logger.log(progress, chalk.dim("Searching for"), name);
 
-		let numFoundPromise = findOnOtherSites(sample, hashesToExclude);
+		const numFoundPromise = findOnOtherSites(sample, hashesToExclude);
 		const [numFound] = await Promise.all([numFoundPromise, sleep]);
 		totalFound += numFound;
 	}
 	return totalFound;
 }
 
-async function searchForSingleTorrentByName(name) {
+export async function searchForSingleTorrentByName(
+	name: string
+): Promise<number> {
 	const hashesToExclude = getInfoHashesToExclude();
 	const meta = getTorrentByName(name);
 	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude);
 }
 
-async function main() {
+export async function main(): Promise<void> {
 	const { offset, outputDir } = getRuntimeConfig();
 	const parsedTorrents = loadTorrentDir();
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
@@ -123,7 +132,7 @@ async function main() {
 	if (offset > 0) logger.log("Starting at", offset);
 
 	fs.mkdirSync(outputDir, { recursive: true });
-	let totalFound = await findMatchesBatch(samples, hashesToExclude);
+	const totalFound = await findMatchesBatch(samples, hashesToExclude);
 
 	logger.log(
 		chalk.cyan("Done! Found %s cross seeds from %s original torrents"),
@@ -131,5 +140,3 @@ async function main() {
 		chalk.bold.white(samples.length)
 	);
 }
-
-module.exports = { main, searchForSingleTorrentByName };

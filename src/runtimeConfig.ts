@@ -1,4 +1,5 @@
 let runtimeConfig = {
+	offset: undefined,
 	jackettServerUrl: undefined,
 	jackettApiKey: undefined,
 	delay: undefined,

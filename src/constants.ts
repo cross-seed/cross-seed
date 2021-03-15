@@ -12,16 +12,6 @@ export const ACTIONS = {
 	INJECT: "inject",
 };
 
-// because I'm sick of intellij whining at me
-const _result = {
-	Link: undefined,
-	TrackerId: undefined,
-	Results: undefined,
-	Title: undefined,
-	Size: undefined,
-	Guid: undefined,
-};
-
 export enum InjectionResult {
 	SUCCESS = 1,
 	FAILURE = -1,
