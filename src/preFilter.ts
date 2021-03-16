@@ -1,11 +1,12 @@
-const path = require("path");
-const { getRuntimeConfig } = require("./runtimeConfig");
-const { EP_REGEX, EXTENSIONS } = require("./constants");
-const logger = require("./logger");
-const { partial, nMinutesAgo } = require("./utils");
-const { get, CACHE_NAMESPACE_TORRENTS } = require("./cache");
+import { Metafile } from "parse-torrent";
+import path from "path";
+import { CACHE_NAMESPACE_TORRENTS, get, TorrentEntry } from "./cache";
+import { EP_REGEX, EXTENSIONS } from "./constants";
+import * as logger from "./logger";
+import { getRuntimeConfig } from "./runtimeConfig";
+import { nMinutesAgo, partial } from "./utils";
 
-exports.filterByContent = function filterByContent(info) {
+export function filterByContent(info: Metafile): boolean {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
 
 	if (searchAll) return true;
@@ -34,9 +35,9 @@ exports.filterByContent = function filterByContent(info) {
 	}
 
 	return true;
-};
+}
 
-exports.filterDupes = function filterDupes(metafiles) {
+export function filterDupes(metafiles: Metafile[]): Metafile[] {
 	const filtered = metafiles.filter((meta, index) => {
 		const firstOccurrence = metafiles.findIndex(
 			(e) => e.name === meta.name
@@ -51,12 +52,15 @@ exports.filterDupes = function filterDupes(metafiles) {
 		);
 	}
 	return filtered;
-};
+}
 
-exports.filterTimestamps = function filterTimestamps(info) {
+export function filterTimestamps(info: Metafile): boolean {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const { infoHash, name } = info;
-	const timestampData = get(CACHE_NAMESPACE_TORRENTS, infoHash);
+	const timestampData = get(
+		CACHE_NAMESPACE_TORRENTS,
+		infoHash
+	) as TorrentEntry;
 	if (!timestampData) return true;
 	const { firstSearched, lastSearched } = timestampData;
 	const logReason = partial(
@@ -83,4 +87,4 @@ exports.filterTimestamps = function filterTimestamps(info) {
 	}
 
 	return true;
-};
+}

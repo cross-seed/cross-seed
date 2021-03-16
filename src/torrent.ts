@@ -1,21 +1,21 @@
-const fs = require("fs");
-const path = require("path");
-const parseTorrent = require("parse-torrent");
-const { getRuntimeConfig } = require("./runtimeConfig");
-const { stripExtension } = require("./utils");
-const logger = require("./logger");
-const get = require("simple-get");
+import fs from "fs";
+import parseTorrent, { Metafile } from "parse-torrent";
+import path from "path";
+import { concat } from "simple-get";
+import * as logger from "./logger";
+import { getRuntimeConfig } from "./runtimeConfig";
+import { stripExtension } from "./utils";
 
-function parseTorrentFromFilename(filename) {
+export function parseTorrentFromFilename(filename: string): Metafile {
 	const data = fs.readFileSync(filename);
 	return parseTorrent(data);
 }
 
-async function parseTorrentFromURL(url) {
+export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 	let response;
 	try {
 		response = await new Promise((resolve, reject) => {
-			get.concat({ url, followRedirects: false }, (err, res, data) => {
+			concat({ url, followRedirects: false }, (err, res, data) => {
 				if (err) return reject(err);
 				res.data = data;
 				return resolve(res);
@@ -55,7 +55,11 @@ async function parseTorrentFromURL(url) {
 	}
 }
 
-function saveTorrentFile(tracker, tag = "", info) {
+export function saveTorrentFile(
+	tracker: string,
+	tag = "",
+	info: Metafile
+): void {
 	const { outputDir } = getRuntimeConfig();
 	const buf = parseTorrent.toTorrentFile(info);
 	const name = stripExtension(info.name);
@@ -63,7 +67,7 @@ function saveTorrentFile(tracker, tag = "", info) {
 	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });
 }
 
-function findAllTorrentFilesInDir(torrentDir) {
+export function findAllTorrentFilesInDir(torrentDir: string): string[] {
 	return fs
 		.readdirSync(torrentDir)
 		.filter((fn) => path.extname(fn) === ".torrent")
@@ -71,20 +75,20 @@ function findAllTorrentFilesInDir(torrentDir) {
 }
 
 // this is rtorrent specific
-function getInfoHashesToExclude() {
+export function getInfoHashesToExclude(): string[] {
 	const { torrentDir } = getRuntimeConfig();
 	return findAllTorrentFilesInDir(torrentDir).map((pathname) =>
 		path.basename(pathname, ".torrent").toLowerCase()
 	);
 }
 
-function loadTorrentDir() {
+export function loadTorrentDir(): Metafile[] {
 	const { torrentDir } = getRuntimeConfig();
 	const dirContents = findAllTorrentFilesInDir(torrentDir);
 	return dirContents.map(parseTorrentFromFilename);
 }
 
-function getTorrentByName(name) {
+export function getTorrentByName(name: string): Metafile {
 	const { torrentDir } = getRuntimeConfig();
 	const dirContents = findAllTorrentFilesInDir(torrentDir);
 	const findResult = dirContents.find((filename) => {
@@ -97,12 +101,3 @@ function getTorrentByName(name) {
 	}
 	return parseTorrentFromFilename(findResult);
 }
-
-module.exports = {
-	parseTorrentFromFilename,
-	parseTorrentFromURL,
-	saveTorrentFile,
-	loadTorrentDir,
-	getTorrentByName,
-	getInfoHashesToExclude,
-};

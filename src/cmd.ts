@@ -1,45 +1,49 @@
 #!/usr/bin/env node
+import chalk from "chalk";
+import { Option, program } from "commander";
+import packageDotJson from "../package.json";
+import { clear as clearCache } from "./cache";
+import { generateConfig, getFileConfig } from "./configuration";
+import { Action } from "./constants";
+import { CrossSeedError } from "./errors";
+import * as logger from "./logger";
+import { main } from "./pipeline";
+import { setRuntimeConfig } from "./runtimeConfig";
+import { serve } from "./server";
 
-const { program, Command, Option } = require("commander");
-const chalk = require("chalk");
-const packageDotJson = require("../package.json");
-const { main } = require("./index");
-const { generateConfig, getFileConfig } = require("./configuration");
-const { setRuntimeConfig } = require("./runtimeConfig");
-const { clear: clearCache } = require("./cache");
-const { serve } = require("./server");
-const logger = require("./logger");
-require("./signalHandlers");
-const { doStartupValidation } = require("./startup");
-const { CrossSeedError } = require("./errors");
-const { ACTIONS } = require("./constants");
+import "./signalHandlers";
+
+import { doStartupValidation } from "./startup";
+
+function fallback(...args) {
+	for (const arg of args) {
+		if (arg !== undefined) return arg;
+	}
+	return undefined;
+}
+
+function processOptions(options) {
+	options.trackers = options.trackers.split(",").filter((e) => e !== "");
+	if (options.action === "inject" && !options.rtorrentRpcUrl) {
+		throw new CrossSeedError(
+			"You need to specify --rtorrent-rpc-url when using '-A inject'."
+		);
+	}
+	return options;
+}
 
 async function run() {
 	const fileConfig = getFileConfig();
 
-	function fallback(...args) {
-		for (const arg of args) {
-			if (arg !== undefined) return arg;
-		}
-		return undefined;
-	}
-
-	function processOptions(options) {
-		options.trackers = options.trackers.split(",").filter((e) => e !== "");
-		if (options.action === "inject" && !options.rtorrentRpcUrl) {
-			throw new CrossSeedError(
-				"You need to specify --rtorrent-rpc-url when using '-A inject'."
-			);
-		}
-		return options;
-	}
-
-	function addSharedOptions() {
-		return this.requiredOption(
-			"-u, --jackett-server-url <url>",
-			"Your Jackett server url",
-			fileConfig.jackettServerUrl
-		)
+	function createCommandWithSharedOptions(name, description) {
+		return program
+			.command(name)
+			.description(description)
+			.requiredOption(
+				"-u, --jackett-server-url <url>",
+				"Your Jackett server url",
+				fileConfig.jackettServerUrl
+			)
 			.requiredOption(
 				"-k, --jackett-api-key <key>",
 				"Your Jackett API key",
@@ -74,8 +78,8 @@ async function run() {
 					"-A, --action <action>",
 					"If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client."
 				)
-					.default(fallback(fileConfig.action, ACTIONS.SAVE))
-					.choices(Object.values(ACTIONS))
+					.default(fallback(fileConfig.action, Action.SAVE))
+					.choices(Object.values(Action))
 					.makeOptionMandatory()
 			)
 			.option(
@@ -84,9 +88,6 @@ async function run() {
 				fileConfig.rtorrentRpcUrl
 			);
 	}
-
-	// monkey patch Command with this addSharedOptions function
-	Command.prototype.addSharedOptions = addSharedOptions;
 
 	program.name(packageDotJson.name);
 	program.description(chalk.yellow.bold("cross-seed"));
@@ -113,32 +114,28 @@ async function run() {
 		.description("Clear the cache of downloaded-and-rejected torrents")
 		.action(clearCache);
 
-	program
-		.command("daemon")
-		.description("Start the cross-serve daemon")
-		.addSharedOptions()
-		.action(async (options, _command) => {
-			try {
-				setRuntimeConfig(processOptions(options));
-				if (process.env.DOCKER_ENV === "true") {
-					generateConfig({ docker: true });
-				}
-				await doStartupValidation();
-				await serve();
-			} catch (e) {
-				if (e instanceof CrossSeedError) {
-					e.print();
-					process.exitCode = 1;
-					return;
-				}
-				throw e;
+	createCommandWithSharedOptions(
+		"daemon",
+		"Start the cross-seed daemon"
+	).action(async (options) => {
+		try {
+			setRuntimeConfig(processOptions(options));
+			if (process.env.DOCKER_ENV === "true") {
+				generateConfig({ docker: true });
 			}
-		});
+			await doStartupValidation();
+			await serve();
+		} catch (e) {
+			if (e instanceof CrossSeedError) {
+				e.print();
+				process.exitCode = 1;
+				return;
+			}
+			throw e;
+		}
+	});
 
-	program
-		.command("search")
-		.description("Search for cross-seeds\n")
-		.addSharedOptions()
+	createCommandWithSharedOptions("search", "Search for cross-seeds")
 		.requiredOption(
 			"-o, --offset <offset>",
 			"Offset to start from",
@@ -166,7 +163,7 @@ async function run() {
 			"Exclude torrents which have been searched more recently than x minutes ago. Overrides the -a flag.",
 			(n) => parseInt(n)
 		)
-		.action(async (options, _command) => {
+		.action(async (options) => {
 			try {
 				setRuntimeConfig(processOptions(options));
 				await doStartupValidation();
@@ -183,10 +180,6 @@ async function run() {
 	await program.parseAsync();
 }
 
-if (require.main === module) {
-	run().catch((e) => {
-		logger.error(e);
-	});
-}
-
-module.exports = { run };
+run().catch((e) => {
+	logger.error(e);
+});

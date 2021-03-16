@@ -1,10 +1,10 @@
-const fs = require("fs");
-const http = require("http");
-const qs = require("querystring");
-const { searchForSingleTorrentByName } = require("./index");
-const { validateJackettApi } = require("./jackett");
-const logger = require("./logger");
-const { getRuntimeConfig } = require("./runtimeConfig");
+import fs from "fs";
+import http from "http";
+import qs from "querystring";
+import { validateJackettApi } from "./jackett";
+import * as logger from "./logger";
+import { searchForSingleTorrentByName } from "./pipeline";
+import { getRuntimeConfig } from "./runtimeConfig";
 
 function getData(req) {
 	return new Promise((resolve) => {
@@ -55,7 +55,7 @@ async function handleRequest(req, res) {
 	}
 }
 
-async function serve() {
+export async function serve(): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
 	try {
 		await validateJackettApi();
@@ -68,5 +68,3 @@ async function serve() {
 	server.listen(2468);
 	logger.log("Server is running on port 2468, ^C to stop.");
 }
-
-module.exports = { serve };

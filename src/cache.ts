@@ -1,8 +1,14 @@
-const path = require("path");
-const fs = require("fs");
-const { createAppDir, appDir } = require("./configuration");
-const CACHE_NAMESPACE_TORRENTS = "torrents";
-const CACHE_NAMESPACE_REJECTIONS = "rejections";
+import fs from "fs";
+import path from "path";
+import { appDir, createAppDir } from "./configuration";
+
+export interface TorrentEntry {
+	firstSearched: number;
+	lastSearched: number;
+}
+
+export const CACHE_NAMESPACE_TORRENTS = "torrents";
+export const CACHE_NAMESPACE_REJECTIONS = "rejections";
 
 const emptyCache = {
 	[CACHE_NAMESPACE_TORRENTS]: {},
@@ -13,12 +19,15 @@ let fileExists = false;
 
 function loadFromDisk() {
 	const fpath = path.join(appDir(), "cache.json");
-	if (fs.existsSync(fpath)) {
-		fileExists = true;
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		cache = require(fpath);
+		fileExists = true;
 		if (Array.isArray(cache)) {
 			cache = migrateV1Cache(cache);
 		}
+	} catch (e) {
+		if (e.code !== "MODULE_NOT_FOUND") throw e;
 	}
 }
 
@@ -36,16 +45,20 @@ function write() {
 	fs.writeFileSync(fpath, JSON.stringify(cache));
 }
 
-function save(namespace, key, val = true) {
+export function save(
+	namespace: string,
+	key: string,
+	val: unknown = true
+): void {
 	cache[namespace][key] = val;
 	write();
 }
 
-function get(namespace, key) {
+export function get(namespace: string, key: string): unknown {
 	return cache[namespace][key];
 }
 
-function clear() {
+export function clear(): void {
 	cache = emptyCache;
 	const fpath = path.join(appDir(), "cache.json");
 	if (fs.existsSync(fpath)) {
@@ -55,11 +68,3 @@ function clear() {
 }
 
 loadFromDisk();
-
-module.exports = {
-	save,
-	clear,
-	get,
-	CACHE_NAMESPACE_TORRENTS,
-	CACHE_NAMESPACE_REJECTIONS,
-};
