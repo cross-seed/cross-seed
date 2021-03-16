@@ -1,21 +1,37 @@
-const fs = require("fs").promises;
-const path = require("path");
-const { promisify } = require("util");
-const xmlrpc = require("xmlrpc");
-const bencode = require("bencode");
-const parseTorrent = require("parse-torrent");
-const { wait } = require("../utils");
-const logger = require("../logger");
-const { InjectionResult } = require("../constants");
-const { CrossSeedError } = require("../errors");
-const { getRuntimeConfig } = require("../runtimeConfig");
+import { promises as fs, Stats } from "fs";
+import path from "path";
+import xmlrpc, { Client } from "xmlrpc";
+import bencode from "bencode";
+import parseTorrent, { FileListing, Metafile } from "parse-torrent";
+import { wait } from "../utils";
+import * as logger from "../logger";
+import { InjectionResult } from "../constants";
+import { CrossSeedError } from "../errors";
+import { getRuntimeConfig } from "../runtimeConfig";
+import { DownloadClient } from "./DownloadClient";
 
-async function createLibtorrentResumeTree(meta, dataDir) {
-	async function getFileResumeData(file) {
+interface LibTorrentResumeFileEntry {
+	completed: number;
+	mtime: number;
+	priority: number;
+}
+
+interface LibTorrentResume {
+	bitfield: number;
+	files: LibTorrentResumeFileEntry[];
+}
+
+async function createLibTorrentResumeTree(
+	meta: Metafile,
+	dataDir: string
+): Promise<LibTorrentResume> {
+	async function getFileResumeData(
+		file: FileListing
+	): Promise<LibTorrentResumeFileEntry> {
 		const filePath = path.resolve(dataDir, file.path);
 		const fileStat = await fs
 			.lstat(filePath)
-			.catch(() => ({ isFile: () => false }));
+			.catch(() => ({ isFile: () => false } as Stats));
 		if (!fileStat.isFile() || fileStat.size !== file.length) {
 			logger.debug(
 				`File ${filePath} either doesn't exist or is the wrong size.`
@@ -36,118 +52,136 @@ async function createLibtorrentResumeTree(meta, dataDir) {
 
 	return {
 		bitfield: Math.ceil(meta.length / meta.pieceLength),
-		files: await Promise.all(meta.files.map(getFileResumeData)),
+		files: await Promise.all<LibTorrentResumeFileEntry>(
+			meta.files.map(getFileResumeData)
+		),
 	};
 }
 
-async function saveWithLibtorrentResume(meta, savePath, dataDir) {
+async function saveWithLibTorrentResume(
+	meta: Metafile,
+	savePath: string,
+	dataDir: string
+): Promise<void> {
 	const rawMeta = bencode.decode(parseTorrent.toTorrentFile(meta));
-	rawMeta.libtorrent_resume = await createLibtorrentResumeTree(meta, dataDir);
+	rawMeta.libtorrent_resume = await createLibTorrentResumeTree(meta, dataDir);
 	await fs.writeFile(savePath, bencode.encode(rawMeta));
 }
 
-function methodCallP(method, args) {
-	const promisified = promisify(this.methodCall.bind(this));
-	logger.verbose("[rtorrent]", "Calling method", method, "with params", args);
-	return promisified(method, args);
-}
+export default class RTorrent implements DownloadClient {
+	client: Client;
 
-function getClient() {
-	const { rtorrentRpcUrl } = getRuntimeConfig();
+	constructor() {
+		const { rtorrentRpcUrl } = getRuntimeConfig();
 
-	const { origin, username, password, protocol, pathname } = new URL(
-		rtorrentRpcUrl
-	);
-
-	const clientCreator =
-		protocol === "https:" ? xmlrpc.createSecureClient : xmlrpc.createClient;
-
-	const shouldUseAuth = Boolean(username && password);
-
-	const client = clientCreator({
-		url: origin + pathname,
-		basic_auth: shouldUseAuth
-			? { user: username, pass: password }
-			: undefined,
-	});
-
-	client.methodCallP = methodCallP;
-	return client;
-}
-
-async function checkForInfoHashInClient(infoHash) {
-	const client = getClient();
-	const downloadList = await client.methodCallP("download_list", []);
-	return downloadList.includes(infoHash.toUpperCase());
-}
-
-async function getDataDir(meta) {
-	const infoHash = meta.infoHash.toUpperCase();
-	const client = getClient();
-	const [[isMultiFileStr], [dir]] = await client.methodCallP(
-		"system.multicall",
-		[
-			[
-				{
-					methodName: "d.is_multi_file",
-					params: [infoHash],
-				},
-				{
-					methodName: "d.directory",
-					params: [infoHash],
-				},
-			],
-		]
-	);
-	return Number(isMultiFileStr) ? path.dirname(dir) : dir;
-}
-
-exports.validateRtorrentApi = async function validateRtorrentApi() {
-	const { rtorrentRpcUrl } = getRuntimeConfig();
-	// no validation to do
-	if (!rtorrentRpcUrl) return;
-
-	try {
-		const client = getClient();
-		await client.methodCallP("download_list", []);
-	} catch (e) {
-		throw new CrossSeedError(
-			`Failed to reach rTorrent at ${rtorrentRpcUrl}`
+		const { origin, username, password, protocol, pathname } = new URL(
+			rtorrentRpcUrl
 		);
+
+		const clientCreator =
+			protocol === "https:"
+				? xmlrpc.createSecureClient
+				: xmlrpc.createClient;
+
+		const shouldUseAuth = Boolean(username && password);
+
+		this.client = clientCreator({
+			url: origin + pathname,
+			basic_auth: shouldUseAuth
+				? { user: username, pass: password }
+				: undefined,
+		});
 	}
-};
 
-exports.inject = async function inject(meta, ogMeta) {
-	const { outputDir } = getRuntimeConfig();
-
-	const client = getClient();
-
-	if (await checkForInfoHashInClient(meta.infoHash)) {
-		return InjectionResult.ALREADY_EXISTS;
+	private async methodCallP<R>(method: string, args): Promise<R> {
+		logger.verbose(
+			"[rtorrent]",
+			"Calling method",
+			method,
+			"with params",
+			args
+		);
+		return new Promise((resolve, reject) => {
+			this.client.methodCall(method, args, (err, data) => {
+				if (err) return reject(err);
+				return resolve(data);
+			});
+		});
 	}
 
-	const dataDir = await getDataDir(ogMeta);
-	const savePath = path.resolve(
-		outputDir,
-		`${meta.name}.tmp.${Date.now()}.torrent`
-	);
-	await saveWithLibtorrentResume(meta, savePath, dataDir);
+	async checkForInfoHashInClient(infoHash: string): Promise<boolean> {
+		const downloadList = await this.methodCallP<string[]>(
+			"download_list",
+			[]
+		);
+		return downloadList.includes(infoHash.toUpperCase());
+	}
 
-	await client.methodCallP("load.start", [
-		"",
-		savePath,
-		`d.directory.set="${dataDir}"`,
-		`d.custom1.set="cross-seed"`,
-		`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
-	]);
+	async getDataDir(meta: Metafile): Promise<string> {
+		const infoHash = meta.infoHash.toUpperCase();
+		type returnType = [["0" | "1"], [string]];
+		const [[isMultiFileStr], [dir]] = await this.methodCallP<returnType>(
+			"system.multicall",
+			[
+				[
+					{
+						methodName: "d.is_multi_file",
+						params: [infoHash],
+					},
+					{
+						methodName: "d.directory",
+						params: [infoHash],
+					},
+				],
+			]
+		);
+		return Number(isMultiFileStr) ? path.dirname(dir) : dir;
+	}
 
-	for (let i = 0; i < 5; i++) {
-		await wait(100 * Math.pow(2, i));
-		if (await checkForInfoHashInClient(meta.infoHash)) {
-			setTimeout(() => fs.unlink(savePath), 1000);
-			return InjectionResult.SUCCESS;
+	async validateConfig(): Promise<void> {
+		const { rtorrentRpcUrl } = getRuntimeConfig();
+		// no validation to do
+		if (!rtorrentRpcUrl) return;
+
+		try {
+			await this.methodCallP<string[]>("download_list", []);
+		} catch (e) {
+			throw new CrossSeedError(
+				`Failed to reach rTorrent at ${rtorrentRpcUrl}`
+			);
 		}
 	}
-	setTimeout(() => fs.unlink(savePath), 1000);
-	return InjectionResult.FAILURE;
-};
+
+	async inject(meta: Metafile, ogMeta: Metafile): Promise<InjectionResult> {
+		const { outputDir } = getRuntimeConfig();
+
+		if (await this.checkForInfoHashInClient(meta.infoHash)) {
+			return InjectionResult.ALREADY_EXISTS;
+		}
+
+		const dataDir = await this.getDataDir(ogMeta);
+		const savePath = path.resolve(
+			outputDir,
+			`${meta.name}.tmp.${Date.now()}.torrent`
+		);
+		await saveWithLibTorrentResume(meta, savePath, dataDir);
+
+		await this.methodCallP<void>("load.start", [
+			"",
+			savePath,
+			`d.directory.set="${dataDir}"`,
+			`d.custom1.set="cross-seed"`,
+			`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
+		]);
+
+		for (let i = 0; i < 5; i++) {
+			await wait(100 * Math.pow(2, i));
+			if (await this.checkForInfoHashInClient(meta.infoHash)) {
+				setTimeout(() => fs.unlink(savePath), 1000);
+				return InjectionResult.SUCCESS;
+			}
+		}
+		setTimeout(() => fs.unlink(savePath), 1000);
+		return InjectionResult.FAILURE;
+	}
+}
