@@ -12,20 +12,34 @@ export interface ResultAssessment {
 	info: Metafile;
 }
 
-function compareFileTrees(a, b) {
-	const cmp = (elOfA, elOfB) => {
+function getAllPathDepths(meta: Metafile): number[] {
+	if (!meta.info.files) return [0];
+	return meta.info.files.map((file) => {
+		const pathBufArray = file["path.utf-8"] || file.path;
+		return pathBufArray.length;
+	});
+}
+
+function compareFileTrees(candidate: Metafile, ogMeta: Metafile): boolean {
+	const allPathDepthsA = getAllPathDepths(candidate);
+	const allPathDepthsB = getAllPathDepths(ogMeta);
+
+	const cmp = (elOfA, elOfB, i, j) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		const pathsAreEqual = elOfB.path === elOfA.path;
 
 		// https://github.com/mmgoodnow/cross-seed/issues/46
 		const noSneakyZeroLengthPathSegments =
-			elOfA.pathSegments.length === elOfB.pathSegments.length;
+			allPathDepthsA[i] === allPathDepthsB[j];
 
 		return (
 			lengthsAreEqual && pathsAreEqual && noSneakyZeroLengthPathSegments
 		);
 	};
-	return a.every((elOfA) => b.some((elOfB) => cmp(elOfA, elOfB)));
+
+	return candidate.files.every((elOfA, i) =>
+		ogMeta.files.some((elOfB, j) => cmp(elOfA, elOfB, i, j))
+	);
 }
 
 function sizeDoesMatch(result, ogInfo) {
@@ -68,8 +82,7 @@ async function assessResultHelper(
 		return null;
 	}
 
-	// TODO: remove as
-	const info = (await parseTorrentFromURL(Link)) as Metafile;
+	const info = await parseTorrentFromURL(Link);
 
 	// if you got rate limited or some other failure
 	if (!info) return null;
@@ -78,7 +91,7 @@ async function assessResultHelper(
 		logReason("the info hash matches a torrent you already have");
 		return null;
 	}
-	if (!compareFileTrees(info.files, ogInfo.files)) {
+	if (!compareFileTrees(info, ogInfo)) {
 		logReason("it has a different file tree");
 		return null;
 	}
