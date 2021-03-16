@@ -1,10 +1,10 @@
-import { parseTorrentFromURL } from "./torrent";
+import { Metafile } from "parse-torrent";
 import * as cache from "./cache";
 import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
-import * as logger from "./logger";
-import { partial } from "./utils";
-import { Metafile } from "parse-torrent";
 import { JackettResult } from "./jackett";
+import * as logger from "./logger";
+import { parseTorrentFromURL } from "./torrent";
+import { partial } from "./utils";
 
 export interface ResultAssessment {
 	tracker: string;

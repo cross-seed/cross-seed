@@ -1,6 +1,6 @@
+import { getClient } from "./clients/TorrentClient";
 import { validateJackettApi } from "./jackett";
 import * as logger from "./logger";
-import { getClient } from "./clients/TorrentClient";
 
 export async function doStartupValidation(): Promise<void> {
 	logger.log("Validating your configuration...");

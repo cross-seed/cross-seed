@@ -1,5 +1,5 @@
-import { InjectionResult } from "../constants";
 import { Metafile } from "parse-torrent";
+import { InjectionResult } from "../constants";
 import { getRuntimeConfig } from "../runtimeConfig";
 import RTorrent from "./RTorrent";
 

@@ -1,10 +1,10 @@
+import { Metafile } from "parse-torrent";
 import path from "path";
-import { getRuntimeConfig } from "./runtimeConfig";
+import { CACHE_NAMESPACE_TORRENTS, get } from "./cache";
 import { EP_REGEX, EXTENSIONS } from "./constants";
 import * as logger from "./logger";
+import { getRuntimeConfig } from "./runtimeConfig";
 import { nMinutesAgo, partial } from "./utils";
-import { CACHE_NAMESPACE_TORRENTS, get } from "./cache";
-import { Metafile } from "parse-torrent";
 
 export function filterByContent(info: Metafile): boolean {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();

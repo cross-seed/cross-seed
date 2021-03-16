@@ -1,21 +1,21 @@
 import chalk from "chalk";
 import fs from "fs";
+import { Metafile } from "parse-torrent";
+import { CACHE_NAMESPACE_TORRENTS, get, save } from "./cache";
+import { getClient } from "./clients/TorrentClient";
+import { Action, InjectionResult } from "./constants";
+import { assessResult, ResultAssessment } from "./decide";
+import { JackettResponse, makeJackettRequest } from "./jackett";
+import * as logger from "./logger";
+import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
 import { getRuntimeConfig } from "./runtimeConfig";
-import { stripExtension } from "./utils";
 import {
 	getInfoHashesToExclude,
 	getTorrentByName,
 	loadTorrentDir,
 	saveTorrentFile,
 } from "./torrent";
-import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
-import { assessResult, ResultAssessment } from "./decide";
-import { JackettResponse, makeJackettRequest } from "./jackett";
-import * as logger from "./logger";
-import { Action, InjectionResult } from "./constants";
-import { CACHE_NAMESPACE_TORRENTS, get, save } from "./cache";
-import { Metafile } from "parse-torrent";
-import { getClient } from "./clients/TorrentClient";
+import { stripExtension } from "./utils";
 
 async function findOnOtherSites(
 	info: Metafile,

@@ -1,8 +1,8 @@
-import path from "path";
 import fs from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
-import * as logger from "./logger";
+import path from "path";
 import { concat } from "simple-get";
+import * as logger from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { stripExtension } from "./utils";
 

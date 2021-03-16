@@ -1,13 +1,13 @@
+import bencode from "bencode";
 import { promises as fs, Stats } from "fs";
+import parseTorrent, { FileListing, Metafile } from "parse-torrent";
 import path from "path";
 import xmlrpc, { Client } from "xmlrpc";
-import bencode from "bencode";
-import parseTorrent, { FileListing, Metafile } from "parse-torrent";
-import { wait } from "../utils";
-import * as logger from "../logger";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
+import * as logger from "../logger";
 import { getRuntimeConfig } from "../runtimeConfig";
+import { wait } from "../utils";
 import { TorrentClient } from "./TorrentClient";
 
 interface LibTorrentResumeFileEntry {

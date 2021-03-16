@@ -1,9 +1,9 @@
-import get from "simple-get";
 import querystring from "querystring";
-import { getRuntimeConfig } from "./runtimeConfig";
+import get from "simple-get";
 import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
-import * as logger from "./logger";
 import { CrossSeedError } from "./errors";
+import * as logger from "./logger";
+import { getRuntimeConfig } from "./runtimeConfig";
 
 export interface JackettResult {
 	Author: unknown;

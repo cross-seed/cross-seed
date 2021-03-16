@@ -1,18 +1,19 @@
 #!/usr/bin/env node
+import chalk from "chalk";
+import { Option, program } from "commander";
+import packageDotJson from "../package.json";
+import { clear as clearCache } from "./cache";
+import { generateConfig, getFileConfig } from "./configuration";
+import { Action } from "./constants";
+import { CrossSeedError } from "./errors";
+import * as logger from "./logger";
+import { main } from "./pipeline";
+import { setRuntimeConfig } from "./runtimeConfig";
+import { serve } from "./server";
+
 import "./signalHandlers";
 
-import { Option, program } from "commander";
-import chalk from "chalk";
-import packageDotJson from "../package.json";
-import { main } from "./pipeline";
-import { generateConfig, getFileConfig } from "./configuration";
-import { setRuntimeConfig } from "./runtimeConfig";
-import { clear as clearCache } from "./cache";
-import { serve } from "./server";
-import * as logger from "./logger";
 import { doStartupValidation } from "./startup";
-import { CrossSeedError } from "./errors";
-import { Action } from "./constants";
 
 function fallback(...args) {
 	for (const arg of args) {

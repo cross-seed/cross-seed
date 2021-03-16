@@ -1,12 +1,31 @@
-import { CONFIG_TEMPLATE_URL } from "./constants";
-import packageDotJson from "../package.json";
-import * as logger from "./logger";
-import configTemplate from "./config.template";
 import chalk from "chalk";
-import path from "path";
 import fs from "fs";
+import path from "path";
+import packageDotJson from "../package.json";
+import configTemplate from "./config.template";
+import { Action, CONFIG_TEMPLATE_URL } from "./constants";
+import * as logger from "./logger";
 
-export function appDir() {
+interface FileConfig {
+	action?: Action;
+	configVersion?: number;
+	delay?: number;
+	includeEpisodes?: boolean;
+	jackettApiKey?: string;
+	jackettServerUrl?: string;
+	outputDir?: string;
+	rtorrentRpcUrl?: string;
+	searchAll?: boolean;
+	torrentDir?: string;
+	trackers?: string[];
+}
+
+interface GenerateConfigParams {
+	force: boolean;
+	docker: boolean;
+}
+
+export function appDir(): string {
 	return (
 		process.env.CONFIG_DIR ||
 		(process.platform === "win32"
@@ -15,11 +34,14 @@ export function appDir() {
 	);
 }
 
-export function createAppDir() {
-	return fs.mkdirSync(appDir(), { recursive: true });
+export function createAppDir(): void {
+	fs.mkdirSync(appDir(), { recursive: true });
 }
 
-export function generateConfig({ force = false, docker = false }) {
+export function generateConfig({
+	force = false,
+	docker = false,
+}: GenerateConfigParams): void {
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
 	const templatePath = path.join(
@@ -45,10 +67,11 @@ function printUpdateInstructions(missingKeys) {
  `);
 }
 
-export function getFileConfig() {
+export function getFileConfig(): FileConfig {
 	const configPath = path.join(appDir(), "config.js");
 	if (!fs.existsSync(configPath)) return {};
 
+	// eslint-disable-next-line @typescript-eslint/no-var-requires
 	const fileConfig = require(configPath);
 	const { configVersion = 0 } = fileConfig;
 	if (configVersion < configVersion) {

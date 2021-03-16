@@ -1,10 +1,10 @@
-import qs from "querystring";
-import http from "http";
 import fs from "fs";
-import { getRuntimeConfig } from "./runtimeConfig";
-import * as logger from "./logger";
+import http from "http";
+import qs from "querystring";
 import { validateJackettApi } from "./jackett";
+import * as logger from "./logger";
 import { searchForSingleTorrentByName } from "./pipeline";
+import { getRuntimeConfig } from "./runtimeConfig";
 
 function getData(req) {
 	return new Promise((resolve) => {
