@@ -1,18 +1,18 @@
 #!/usr/bin/env node
+import "./signalHandlers";
 
-const { program, Command, Option } = require("commander");
-const chalk = require("chalk");
-const packageDotJson = require("../package.json");
-const { main } = require("./pipeline");
-const { generateConfig, getFileConfig } = require("./configuration");
-const { setRuntimeConfig } = require("./runtimeConfig");
-const { clear: clearCache } = require("./cache");
-const { serve } = require("./server");
-const logger = require("./logger");
-require("./signalHandlers");
-const { doStartupValidation } = require("./startup");
-const { CrossSeedError } = require("./errors");
-const { Action } = require("./constants");
+import { Command, Option, program } from "commander";
+import chalk from "chalk";
+import packageDotJson from "../package.json";
+import { main } from "./pipeline";
+import { generateConfig, getFileConfig } from "./configuration";
+import { setRuntimeConfig } from "./runtimeConfig";
+import { clear as clearCache } from "./cache";
+import { serve } from "./server";
+import logger from "./logger";
+import { doStartupValidation } from "./startup";
+import { CrossSeedError } from "./errors";
+import { Action } from "./constants";
 
 async function run() {
 	const fileConfig = getFileConfig();
