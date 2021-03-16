@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "./signalHandlers";
 
-import { Command, Option, program } from "commander";
+import { Option, program } from "commander";
 import chalk from "chalk";
 import packageDotJson from "../package.json";
 import { main } from "./pipeline";
@@ -9,37 +9,40 @@ import { generateConfig, getFileConfig } from "./configuration";
 import { setRuntimeConfig } from "./runtimeConfig";
 import { clear as clearCache } from "./cache";
 import { serve } from "./server";
-import logger from "./logger";
+import * as logger from "./logger";
 import { doStartupValidation } from "./startup";
 import { CrossSeedError } from "./errors";
 import { Action } from "./constants";
 
+function fallback(...args) {
+	for (const arg of args) {
+		if (arg !== undefined) return arg;
+	}
+	return undefined;
+}
+
+function processOptions(options) {
+	options.trackers = options.trackers.split(",").filter((e) => e !== "");
+	if (options.action === "inject" && !options.rtorrentRpcUrl) {
+		throw new CrossSeedError(
+			"You need to specify --rtorrent-rpc-url when using '-A inject'."
+		);
+	}
+	return options;
+}
+
 async function run() {
 	const fileConfig = getFileConfig();
 
-	function fallback(...args) {
-		for (const arg of args) {
-			if (arg !== undefined) return arg;
-		}
-		return undefined;
-	}
-
-	function processOptions(options) {
-		options.trackers = options.trackers.split(",").filter((e) => e !== "");
-		if (options.action === "inject" && !options.rtorrentRpcUrl) {
-			throw new CrossSeedError(
-				"You need to specify --rtorrent-rpc-url when using '-A inject'."
-			);
-		}
-		return options;
-	}
-
-	function addSharedOptions() {
-		return this.requiredOption(
-			"-u, --jackett-server-url <url>",
-			"Your Jackett server url",
-			fileConfig.jackettServerUrl
-		)
+	function createCommandWithSharedOptions(name, description) {
+		return program
+			.command(name)
+			.description(description)
+			.requiredOption(
+				"-u, --jackett-server-url <url>",
+				"Your Jackett server url",
+				fileConfig.jackettServerUrl
+			)
 			.requiredOption(
 				"-k, --jackett-api-key <key>",
 				"Your Jackett API key",
@@ -85,9 +88,6 @@ async function run() {
 			);
 	}
 
-	// monkey patch Command with this addSharedOptions function
-	Command.prototype.addSharedOptions = addSharedOptions;
-
 	program.name(packageDotJson.name);
 	program.description(chalk.yellow.bold("cross-seed"));
 	program.version(
@@ -113,32 +113,28 @@ async function run() {
 		.description("Clear the cache of downloaded-and-rejected torrents")
 		.action(clearCache);
 
-	program
-		.command("daemon")
-		.description("Start the cross-serve daemon")
-		.addSharedOptions()
-		.action(async (options, _command) => {
-			try {
-				setRuntimeConfig(processOptions(options));
-				if (process.env.DOCKER_ENV === "true") {
-					generateConfig({ docker: true });
-				}
-				await doStartupValidation();
-				await serve();
-			} catch (e) {
-				if (e instanceof CrossSeedError) {
-					e.print();
-					process.exitCode = 1;
-					return;
-				}
-				throw e;
+	createCommandWithSharedOptions(
+		"daemon",
+		"Start the cross-seed daemon"
+	).action(async (options) => {
+		try {
+			setRuntimeConfig(processOptions(options));
+			if (process.env.DOCKER_ENV === "true") {
+				generateConfig({ docker: true });
 			}
-		});
+			await doStartupValidation();
+			await serve();
+		} catch (e) {
+			if (e instanceof CrossSeedError) {
+				e.print();
+				process.exitCode = 1;
+				return;
+			}
+			throw e;
+		}
+	});
 
-	program
-		.command("search")
-		.description("Search for cross-seeds\n")
-		.addSharedOptions()
+	createCommandWithSharedOptions("search", "Search for cross-seeds")
 		.requiredOption(
 			"-o, --offset <offset>",
 			"Offset to start from",
@@ -166,7 +162,7 @@ async function run() {
 			"Exclude torrents which have been searched more recently than x minutes ago. Overrides the -a flag.",
 			(n) => parseInt(n)
 		)
-		.action(async (options, _command) => {
+		.action(async (options) => {
 			try {
 				setRuntimeConfig(processOptions(options));
 				await doStartupValidation();
@@ -183,10 +179,6 @@ async function run() {
 	await program.parseAsync();
 }
 
-if (require.main === module) {
-	run().catch((e) => {
-		logger.error(e);
-	});
-}
-
-module.exports = { run };
+run().catch((e) => {
+	logger.error(e);
+});
