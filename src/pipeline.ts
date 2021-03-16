@@ -13,9 +13,9 @@ import { assessResult, ResultAssessment } from "./decide";
 import { JackettResponse, makeJackettRequest } from "./jackett";
 import * as logger from "./logger";
 import { Action, InjectionResult } from "./constants";
-import { inject } from "./clients/rtorrent";
 import { CACHE_NAMESPACE_TORRENTS, get, save } from "./cache";
 import { Metafile } from "parse-torrent";
+import { getClient } from "./clients/TorrentClient";
 
 async function findOnOtherSites(
 	info: Metafile,
@@ -44,7 +44,7 @@ async function findOnOtherSites(
 		const styledTracker = chalk.bold(tracker);
 		logger.log(`Found ${styledName} on ${styledTracker}`);
 		if (action === Action.INJECT) {
-			const result = await inject(newInfo, info);
+			const result = await getClient().inject(newInfo, info);
 			switch (result) {
 				case InjectionResult.SUCCESS:
 					logger.log(

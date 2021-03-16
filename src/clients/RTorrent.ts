@@ -8,7 +8,7 @@ import * as logger from "../logger";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
 import { getRuntimeConfig } from "../runtimeConfig";
-import { DownloadClient } from "./DownloadClient";
+import { TorrentClient } from "./TorrentClient";
 
 interface LibTorrentResumeFileEntry {
 	completed: number;
@@ -68,7 +68,7 @@ async function saveWithLibTorrentResume(
 	await fs.writeFile(savePath, bencode.encode(rawMeta));
 }
 
-export default class RTorrent implements DownloadClient {
+export default class RTorrent implements TorrentClient {
 	client: Client;
 
 	constructor() {

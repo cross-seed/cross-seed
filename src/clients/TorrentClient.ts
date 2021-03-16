@@ -1,10 +1,11 @@
 import { InjectionResult } from "../constants";
 import { Metafile } from "parse-torrent";
 import { getRuntimeConfig } from "../runtimeConfig";
+import RTorrent from "./RTorrent";
 
-let activeClient: DownloadClient;
+let activeClient: TorrentClient;
 
-export interface DownloadClient {
+export interface TorrentClient {
 	inject: (
 		newTorrent: Metafile,
 		existingTorrent: Metafile
@@ -13,11 +14,15 @@ export interface DownloadClient {
 }
 
 function instantiateDownloadClient() {
-	const { action } = getRuntimeConfig();
+	const { rtorrentRpcUrl } = getRuntimeConfig();
+	if (rtorrentRpcUrl) {
+		activeClient = new RTorrent();
+	}
 }
 
-export function getDownloadClient() {
+export function getClient(): TorrentClient {
 	if (!activeClient) {
 		instantiateDownloadClient();
 	}
+	return activeClient;
 }
