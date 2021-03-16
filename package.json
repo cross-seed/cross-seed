@@ -55,7 +55,6 @@
 		"*.{js,json,ts,css,md}": "prettier --write"
 	},
 	"np": {
-		"yarn": false,
-		"contents": "dist"
+		"yarn": false
 	}
 }
