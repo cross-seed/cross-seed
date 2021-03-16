@@ -6,7 +6,7 @@ export class CrossSeedError extends Error {
 		delete this.stack;
 	}
 
-	print() {
+	print(): void {
 		logger.error(this.message);
 	}
 }
