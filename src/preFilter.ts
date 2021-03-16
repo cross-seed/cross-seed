@@ -1,6 +1,6 @@
 import { Metafile } from "parse-torrent";
 import path from "path";
-import { CACHE_NAMESPACE_TORRENTS, get } from "./cache";
+import { CACHE_NAMESPACE_TORRENTS, get, TorrentEntry } from "./cache";
 import { EP_REGEX, EXTENSIONS } from "./constants";
 import * as logger from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
@@ -57,7 +57,10 @@ export function filterDupes(metafiles: Metafile[]): Metafile[] {
 export function filterTimestamps(info: Metafile): boolean {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const { infoHash, name } = info;
-	const timestampData = get(CACHE_NAMESPACE_TORRENTS, infoHash);
+	const timestampData = get(
+		CACHE_NAMESPACE_TORRENTS,
+		infoHash
+	) as TorrentEntry;
 	if (!timestampData) return true;
 	const { firstSearched, lastSearched } = timestampData;
 	const logReason = partial(

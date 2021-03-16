@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import fs from "fs";
 import { Metafile } from "parse-torrent";
-import { CACHE_NAMESPACE_TORRENTS, get, save } from "./cache";
+import { CACHE_NAMESPACE_TORRENTS, get, save, TorrentEntry } from "./cache";
 import { getClient } from "./clients/TorrentClient";
 import { Action, InjectionResult } from "./constants";
 import { assessResult, ResultAssessment } from "./decide";
@@ -73,7 +73,10 @@ async function findOnOtherSites(
 }
 
 function updateSearchTimestamps(infoHash: string): void {
-	const existingTimestamps = get(CACHE_NAMESPACE_TORRENTS, infoHash);
+	const existingTimestamps = get(
+		CACHE_NAMESPACE_TORRENTS,
+		infoHash
+	) as TorrentEntry;
 	const firstSearched = existingTimestamps
 		? existingTimestamps.firstSearched
 		: Date.now();
@@ -81,7 +84,7 @@ function updateSearchTimestamps(infoHash: string): void {
 	save(CACHE_NAMESPACE_TORRENTS, infoHash, {
 		firstSearched,
 		lastSearched,
-	} as any);
+	} as TorrentEntry);
 }
 
 async function findMatchesBatch(samples, hashesToExclude) {
