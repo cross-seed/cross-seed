@@ -19,12 +19,15 @@ let fileExists = false;
 
 function loadFromDisk() {
 	const fpath = path.join(appDir(), "cache.json");
-	if (fs.existsSync(fpath)) {
-		fileExists = true;
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		cache = require(fpath);
+		fileExists = true;
 		if (Array.isArray(cache)) {
 			cache = migrateV1Cache(cache);
 		}
+	} catch (e) {
+		if (e.code !== "MODULE_NOT_FOUND") throw e;
 	}
 }
 

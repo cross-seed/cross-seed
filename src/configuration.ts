@@ -69,16 +69,20 @@ function printUpdateInstructions(missingKeys) {
 
 export function getFileConfig(): FileConfig {
 	const configPath = path.join(appDir(), "config.js");
-	if (!fs.existsSync(configPath)) return {};
 
-	// eslint-disable-next-line @typescript-eslint/no-var-requires
-	const fileConfig = require(configPath);
-	const { configVersion = 0 } = fileConfig;
-	if (configVersion < configVersion) {
-		const missingKeys = Object.keys(configTemplate).filter(
-			(k) => !(k in fileConfig)
-		);
-		printUpdateInstructions(missingKeys);
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-var-requires
+		const fileConfig = require(configPath);
+		const { configVersion = 0 } = fileConfig;
+		if (configVersion < configVersion) {
+			const missingKeys = Object.keys(configTemplate).filter(
+				(k) => !(k in fileConfig)
+			);
+			printUpdateInstructions(missingKeys);
+		}
+		return fileConfig;
+	} catch (e) {
+		if (e.code !== "MODULE_NOT_FOUND") throw e;
+		return {};
 	}
-	return fileConfig;
 }
