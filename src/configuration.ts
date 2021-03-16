@@ -21,8 +21,8 @@ interface FileConfig {
 }
 
 interface GenerateConfigParams {
-	force: boolean;
-	docker: boolean;
+	force?: boolean;
+	docker?: boolean;
 }
 
 export function appDir(): string {
