@@ -38,12 +38,3 @@ export const PermanentDecisions: Decision[] = [
 	Decision.NO_DOWNLOAD_LINK,
 	Decision.FILE_TREE_MISMATCH,
 ];
-
-// if the user has aggressive caching on, we will skip reassessment.
-// Useful for sites that rate limit because it allows you to spend
-// your scarce snatches on new torrents rather than the same 30 successes
-// Off by default because it makes runs mildly non-deterministic
-export const AggressiveCachingPermanentDecisions: Decision[] = [
-	Decision.INFO_HASH_ALREADY_EXISTS,
-	Decision.MATCH,
-];

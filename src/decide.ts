@@ -166,7 +166,6 @@ async function assessResultCaching(
 		.set([ogInfo.name, Guid, "lastSeen"], Date.now())
 		.value();
 
-	// TODO: add an aggressive caching flag
 	const shouldReassess =
 		!cacheEntry || !PermanentDecisions.includes(cacheEntry.decision);
 	let assessed: ResultAssessment;
