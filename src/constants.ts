@@ -28,7 +28,6 @@ export enum Decision {
 	DOWNLOAD_FAILED = "DOWNLOAD_FAILED",
 	INFO_HASH_ALREADY_EXISTS = "INFO_HASH_ALREADY_EXISTS",
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
-	UNKNOWN = "UNKNOWN",
 }
 
 export type FailureDecision = Exclude<Decision, Decision.MATCH>;

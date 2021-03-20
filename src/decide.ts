@@ -58,9 +58,6 @@ const createReasonLogger = (Title: string, tracker: string, name: string) => (
 		case Decision.FILE_TREE_MISMATCH:
 			reason = "it has a different file tree";
 			break;
-		case Decision.UNKNOWN:
-			reason = "of an unknown error";
-			break;
 	}
 	if (cached) logReason(reason, "(cached)");
 	else logReason(reason);
