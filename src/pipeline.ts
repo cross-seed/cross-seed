@@ -1,10 +1,14 @@
 import chalk from "chalk";
 import fs from "fs";
 import { Metafile } from "parse-torrent";
-import { CACHE_NAMESPACE_TORRENTS, get, save, TorrentEntry } from "./cache";
 import { getClient } from "./clients/TorrentClient";
-import { Action, InjectionResult } from "./constants";
-import { assessResult, ResultAssessment } from "./decide";
+import { Action, Decision, InjectionResult, TORRENTS } from "./constants";
+import db from "./db";
+import {
+	assessResult,
+	ResultAssessment,
+	SuccessfulResultAssessment,
+} from "./decide";
 import { JackettResponse, makeJackettRequest } from "./jackett";
 import * as logger from "./logger";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
@@ -37,7 +41,9 @@ async function findOnOtherSites(
 	const results = response.Results;
 
 	const loaded = await Promise.all<ResultAssessment>(results.map(assessEach));
-	const successful = loaded.filter((e) => e !== null);
+	const successful = loaded.filter(
+		(e) => e.decision === Decision.MATCH
+	) as SuccessfulResultAssessment[];
 
 	for (const { tracker, tag, info: newInfo } of successful) {
 		const styledName = chalk.green.bold(newInfo.name);
@@ -73,18 +79,14 @@ async function findOnOtherSites(
 }
 
 function updateSearchTimestamps(infoHash: string): void {
-	const existingTimestamps = get(
-		CACHE_NAMESPACE_TORRENTS,
-		infoHash
-	) as TorrentEntry;
-	const firstSearched = existingTimestamps
-		? existingTimestamps.firstSearched
-		: Date.now();
-	const lastSearched = Date.now();
-	save(CACHE_NAMESPACE_TORRENTS, infoHash, {
-		firstSearched,
-		lastSearched,
-	} as TorrentEntry);
+	db.get(TORRENTS)
+		.defaultsDeep({
+			[infoHash]: {
+				firstSearched: Date.now(),
+			},
+		})
+		.set([infoHash, "lastSearched"], Date.now())
+		.write();
 }
 
 async function findMatchesBatch(samples, hashesToExclude) {

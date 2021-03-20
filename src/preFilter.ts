@@ -1,7 +1,7 @@
 import { Metafile } from "parse-torrent";
 import path from "path";
-import { CACHE_NAMESPACE_TORRENTS, get, TorrentEntry } from "./cache";
-import { EP_REGEX, EXTENSIONS } from "./constants";
+import { EP_REGEX, EXTENSIONS, TORRENTS } from "./constants";
+import db from "./db";
 import * as logger from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { nMinutesAgo, partial } from "./utils";
@@ -54,19 +54,15 @@ export function filterDupes(metafiles: Metafile[]): Metafile[] {
 	return filtered;
 }
 
-export function filterTimestamps(info: Metafile): boolean {
+export function filterTimestamps(meta: Metafile): boolean {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-	const { infoHash, name } = info;
-	const timestampData = get(
-		CACHE_NAMESPACE_TORRENTS,
-		infoHash
-	) as TorrentEntry;
+	const timestampData = db.get([TORRENTS, meta.infoHash]).value();
 	if (!timestampData) return true;
 	const { firstSearched, lastSearched } = timestampData;
 	const logReason = partial(
 		logger.verbose,
 		"[prefilter]",
-		`Torrent ${name} was not selected for searching because`
+		`Torrent ${meta.name} was not selected for searching because`
 	);
 
 	if (excludeOlder && firstSearched < nMinutesAgo(excludeOlder)) {

@@ -2,9 +2,9 @@
 import chalk from "chalk";
 import { Option, program } from "commander";
 import packageDotJson from "../package.json";
-import { clear as clearCache } from "./cache";
 import { generateConfig, getFileConfig } from "./configuration";
 import { Action } from "./constants";
+import { dropDatabase } from "./db";
 import { CrossSeedError } from "./errors";
 import * as logger from "./logger";
 import { main } from "./pipeline";
@@ -112,7 +112,7 @@ async function run() {
 	program
 		.command("clear-cache")
 		.description("Clear the cache of downloaded-and-rejected torrents")
-		.action(clearCache);
+		.action(dropDatabase);
 
 	createCommandWithSharedOptions(
 		"daemon",

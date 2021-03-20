@@ -1,16 +1,70 @@
 import { Metafile } from "parse-torrent";
-import * as cache from "./cache";
-import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
+import {
+	Decision,
+	DECISIONS,
+	EP_REGEX,
+	FailureDecision,
+	MOVIE_REGEX,
+	PermanentDecisions,
+	SEASON_REGEX,
+} from "./constants";
+import db, { DecisionEntry } from "./db";
 import { JackettResult } from "./jackett";
 import * as logger from "./logger";
 import { parseTorrentFromURL } from "./torrent";
 import { partial } from "./utils";
 
-export interface ResultAssessment {
+export interface SuccessfulResultAssessment {
+	decision: Decision.MATCH;
 	tracker: string;
 	tag: string;
 	info: Metafile;
 }
+
+export type ResultAssessment =
+	| { decision: FailureDecision }
+	| SuccessfulResultAssessment;
+
+const createReasonLogger = (Title: string, tracker: string, name: string) => (
+	decision: Decision,
+	cached = false
+): void => {
+	const logReason = partial(
+		logger.verbose,
+		"[decide]",
+		name,
+		"- no match for",
+		tracker,
+		"torrent",
+		Title,
+		"-"
+	);
+	let reason;
+	switch (decision) {
+		case Decision.MATCH:
+			return;
+		case Decision.SIZE_MISMATCH:
+			reason = "its size does not match";
+			break;
+		case Decision.NO_DOWNLOAD_LINK:
+			reason = "it doesn't have a download link";
+			break;
+		case Decision.DOWNLOAD_FAILED:
+			reason = "the torrent file failed to download";
+			break;
+		case Decision.INFO_HASH_ALREADY_EXISTS:
+			reason = "the info hash matches a torrent you already have";
+			break;
+		case Decision.FILE_TREE_MISMATCH:
+			reason = "it has a different file tree";
+			break;
+		case Decision.UNKNOWN:
+			reason = "of an unknown error";
+			break;
+	}
+	if (cached) logReason(reason, "(cached)");
+	else logReason(reason);
+};
 
 function getAllPathDepths(meta: Metafile): number[] {
 	if (!meta.info.files) return [0];
@@ -64,65 +118,75 @@ async function assessResultHelper(
 	ogInfo: Metafile,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { TrackerId: tracker, Link, Title } = result;
-	const logReason = partial(
-		logger.verbose,
-		"[decide]",
-		`${Title} from ${tracker} did not match ${ogInfo.name} because`
-	);
+	const { TrackerId: tracker, Link } = result;
 	if (!sizeDoesMatch(result, ogInfo)) {
-		logReason(
-			`its size, ${result.Size}, does not match the original torrent's size, ${ogInfo.length}`
-		);
-		return null;
+		return { decision: Decision.SIZE_MISMATCH };
 	}
 
-	if (!Link) {
-		logReason("it doesn't have a download link");
-		return null;
-	}
+	if (!Link) return { decision: Decision.NO_DOWNLOAD_LINK };
 
 	const info = await parseTorrentFromURL(Link);
 
-	// if you got rate limited or some other failure
-	if (!info) return null;
+	if (!info) return { decision: Decision.DOWNLOAD_FAILED };
 
 	if (hashesToExclude.includes(info.infoHash)) {
-		logReason("the info hash matches a torrent you already have");
-		return null;
+		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
+
 	if (!compareFileTrees(info, ogInfo)) {
-		logReason("it has a different file tree");
-		return null;
+		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 
 	const tag = getTag(info.name);
-	return { tracker, tag, info };
+	return { decision: Decision.MATCH, tracker, tag, info };
 }
 
-function assessResultCaching(
+async function assessResultCaching(
 	result: JackettResult,
 	ogInfo: Metafile,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
 	const { Guid, Title, TrackerId: tracker } = result;
-	const cacheKey = `${ogInfo.name}|${Guid}`;
-	if (cache.get(cache.CACHE_NAMESPACE_REJECTIONS, cacheKey)) {
-		const logReason = partial(
-			logger.verbose,
-			"[decide]",
-			`${Title} from ${tracker} did not match ${ogInfo.name} because`
-		);
-		logReason("it has been seen and rejected before");
-		return null;
+	const logReason = createReasonLogger(Title, tracker, ogInfo.name);
+
+	const cacheEntry: DecisionEntry = db
+		.get([DECISIONS, ogInfo.name, Guid])
+		.clone()
+		.value();
+
+	// handles path creation
+	db.get(DECISIONS)
+		.defaultsDeep({
+			[ogInfo.name]: {
+				[Guid]: {
+					firstSeen: Date.now(),
+				},
+			},
+		})
+		.set([ogInfo.name, Guid, "lastSeen"], Date.now())
+		.value();
+
+	// TODO: add an aggressive caching flag
+	const shouldReassess =
+		!cacheEntry || !PermanentDecisions.includes(cacheEntry.decision);
+	let assessed: ResultAssessment;
+	if (shouldReassess) {
+		assessed = await assessResultHelper(result, ogInfo, hashesToExclude);
+		db.get([DECISIONS, ogInfo.name, Guid])
+			.defaults({ firstSeen: Date.now() })
+			.set("decision", assessed.decision)
+			.value();
+		logReason(assessed.decision, false);
+	} else {
+		// TODO: successes never go through this codepath, but when they do,
+		// figure out a way to store the torrents to cache the full return value
+		assessed = {
+			decision: cacheEntry.decision as FailureDecision,
+		};
+		logReason(assessed.decision, true);
 	}
-	const assessPromise = assessResultHelper(result, ogInfo, hashesToExclude);
-	assessPromise.then((assessed) => {
-		if (!assessed) {
-			cache.save(cache.CACHE_NAMESPACE_REJECTIONS, cacheKey);
-		}
-	});
-	return assessPromise;
+	db.write();
+	return assessed;
 }
 
 export { assessResultCaching as assessResult };
