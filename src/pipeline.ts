@@ -4,12 +4,8 @@ import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient";
 import { Action, Decision, InjectionResult, TORRENTS } from "./constants";
 import db from "./db";
-import {
-	assessResult,
-	ResultAssessment,
-	SuccessfulResultAssessment,
-} from "./decide";
-import { JackettResponse, makeJackettRequest } from "./jackett";
+import { assessResult, ResultAssessment } from "./decide";
+import { JackettResponse, JackettResult, makeJackettRequest } from "./jackett";
 import * as logger from "./logger";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
 import { getRuntimeConfig } from "./runtimeConfig";
@@ -19,7 +15,12 @@ import {
 	loadTorrentDir,
 	saveTorrentFile,
 } from "./torrent";
-import { stripExtension } from "./utils";
+import { getTag, stripExtension } from "./utils";
+
+interface AssessmentWithTracker {
+	assessment: ResultAssessment;
+	tracker: string;
+}
 
 async function findOnOtherSites(
 	info: Metafile,
@@ -27,8 +28,14 @@ async function findOnOtherSites(
 ): Promise<number> {
 	const { action } = getRuntimeConfig();
 
-	const assessEach = (result) => assessResult(result, info, hashesToExclude);
+	const assessEach = async (
+		result: JackettResult
+	): Promise<AssessmentWithTracker> => ({
+		assessment: await assessResult(result, info, hashesToExclude),
+		tracker: result.TrackerId,
+	});
 
+	const tag = getTag(info.name);
 	const query = stripExtension(info.name);
 	let response: JackettResponse;
 	try {
@@ -40,38 +47,43 @@ async function findOnOtherSites(
 	updateSearchTimestamps(info.infoHash);
 	const results = response.Results;
 
-	const loaded = await Promise.all<ResultAssessment>(results.map(assessEach));
+	const loaded = await Promise.all<AssessmentWithTracker>(
+		results.map(assessEach)
+	);
 	const successful = loaded.filter(
-		(e) => e.decision === Decision.MATCH
-	) as SuccessfulResultAssessment[];
+		(e) => e.assessment.decision === Decision.MATCH
+	);
 
-	for (const { tracker, tag, info: newInfo } of successful) {
+	for (const {
+		tracker,
+		assessment: { info: newInfo },
+	} of successful) {
 		const styledName = chalk.green.bold(newInfo.name);
 		const styledTracker = chalk.bold(tracker);
-		logger.log(`Found ${styledName} on ${styledTracker}`);
 		if (action === Action.INJECT) {
 			const result = await getClient().inject(newInfo, info);
 			switch (result) {
 				case InjectionResult.SUCCESS:
 					logger.log(
-						`Injected ${styledName} from ${styledTracker} into rTorrent.`
+						`Found ${styledName} on ${styledTracker} - injected`
 					);
 					break;
 				case InjectionResult.ALREADY_EXISTS:
 					logger.log(
-						`Did not inject ${styledName} because it already exists.`
+						`Found ${styledName} on ${styledTracker} - exists`
 					);
 					break;
 				case InjectionResult.FAILURE:
 				default:
 					logger.error(
-						`Failed to inject ${styledName} from ${styledTracker} into rtorrent. Saving instead.`
+						`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
 					);
 					saveTorrentFile(tracker, tag, newInfo);
 					break;
 			}
 		} else {
 			saveTorrentFile(tracker, tag, newInfo);
+			logger.log(`Found ${styledName} on ${styledTracker}`);
 		}
 	}
 

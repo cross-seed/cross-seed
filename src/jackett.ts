@@ -110,6 +110,7 @@ export function makeJackettRequest(name: string): Promise<JackettResponse> {
 
 	return new Promise((resolve, reject) => {
 		get.concat(opts, (err, res, data) => {
+			console.log("request came back");
 			if (err) reject(err);
 			else resolve(data);
 		});

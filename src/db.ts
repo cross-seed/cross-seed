@@ -17,6 +17,7 @@ export interface DecisionEntry {
 	decision: Decision;
 	firstSeen: number;
 	lastSeen: number;
+	infoHash?: string;
 }
 
 interface Schema {

@@ -10,6 +10,8 @@ export const CONFIG_TEMPLATE_URL =
 export const TORRENTS = "torrents";
 export const DECISIONS = "decisions";
 
+export const TORRENT_CACHE_FOLDER = "torrent_cache";
+
 export enum Action {
 	SAVE = "save",
 	INJECT = "inject",

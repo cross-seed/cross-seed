@@ -1,4 +1,4 @@
-import { EXTENSIONS } from "./constants";
+import { EP_REGEX, EXTENSIONS, MOVIE_REGEX, SEASON_REGEX } from "./constants";
 
 export function stripExtension(filename: string): string {
 	for (const ext of EXTENSIONS) {
@@ -20,4 +20,14 @@ export function nMinutesAgo(n: number): number {
 
 export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
+}
+
+export function getTag(name: string): string {
+	return EP_REGEX.test(name)
+		? "episode"
+		: SEASON_REGEX.test(name)
+		? "pack"
+		: MOVIE_REGEX.test(name)
+		? "movie"
+		: "unknown";
 }

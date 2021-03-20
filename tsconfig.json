@@ -5,7 +5,8 @@
 		"target": "es2020",
 		"module": "CommonJS",
 		"esModuleInterop": true,
-		"resolveJsonModule": true
+		"resolveJsonModule": true,
+		"sourceMap": true
 	},
 	"include": ["./src/**/*"]
 }

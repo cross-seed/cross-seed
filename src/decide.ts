@@ -1,33 +1,22 @@
-import { Metafile } from "parse-torrent";
-import {
-	Decision,
-	DECISIONS,
-	EP_REGEX,
-	FailureDecision,
-	MOVIE_REGEX,
-	PermanentDecisions,
-	SEASON_REGEX,
-} from "./constants";
+import { existsSync, writeFileSync } from "fs";
+import parseTorrent, { Metafile } from "parse-torrent";
+import path from "path";
+import { appDir } from "./configuration";
+import { Decision, DECISIONS, TORRENT_CACHE_FOLDER } from "./constants";
 import db, { DecisionEntry } from "./db";
 import { JackettResult } from "./jackett";
 import * as logger from "./logger";
-import { parseTorrentFromURL } from "./torrent";
+import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent";
 import { partial } from "./utils";
 
-export interface SuccessfulResultAssessment {
-	decision: Decision.MATCH;
-	tracker: string;
-	tag: string;
-	info: Metafile;
+export interface ResultAssessment {
+	decision: Decision;
+	info?: Metafile;
 }
-
-export type ResultAssessment =
-	| { decision: FailureDecision }
-	| SuccessfulResultAssessment;
 
 const createReasonLogger = (Title: string, tracker: string, name: string) => (
 	decision: Decision,
-	cached = false
+	cached
 ): void => {
 	const logReason = partial(
 		logger.verbose,
@@ -93,30 +82,19 @@ function compareFileTrees(candidate: Metafile, ogMeta: Metafile): boolean {
 	);
 }
 
-function sizeDoesMatch(result, ogInfo) {
+function sizeDoesMatch(resultSize, ogInfo) {
 	const { length } = ogInfo;
 	const lowerBound = length - 0.02 * length;
 	const upperBound = length + 0.02 * length;
-	return result.Size >= lowerBound && result.Size <= upperBound;
-}
-
-function getTag(name) {
-	return EP_REGEX.test(name)
-		? "episode"
-		: SEASON_REGEX.test(name)
-		? "pack"
-		: MOVIE_REGEX.test(name)
-		? "movie"
-		: "unknown";
+	return resultSize >= lowerBound && resultSize <= upperBound;
 }
 
 async function assessResultHelper(
-	result: JackettResult,
+	{ Link, Size }: JackettResult,
 	ogInfo: Metafile,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { TrackerId: tracker, Link } = result;
-	if (!sizeDoesMatch(result, ogInfo)) {
+	if (!sizeDoesMatch(Size, ogInfo)) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
 
@@ -134,8 +112,30 @@ async function assessResultHelper(
 		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 
-	const tag = getTag(info.name);
-	return { decision: Decision.MATCH, tracker, tag, info };
+	return { decision: Decision.MATCH, info };
+}
+
+function existsInCache(infoHash: string): boolean {
+	return existsSync(
+		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`)
+	);
+}
+
+function getCachedTorrentFile(infoHash: string): Metafile {
+	return parseTorrentFromFilename(
+		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`)
+	);
+}
+
+function cacheTorrentFile(meta: Metafile): void {
+	writeFileSync(
+		path.join(
+			appDir(),
+			TORRENT_CACHE_FOLDER,
+			`${meta.infoHash}.cached.torrent`
+		),
+		parseTorrent.toTorrentFile(meta)
+	);
 }
 
 async function assessResultCaching(
@@ -163,26 +163,30 @@ async function assessResultCaching(
 		.set([ogInfo.name, Guid, "lastSeen"], Date.now())
 		.value();
 
-	const shouldReassess =
-		!cacheEntry || !PermanentDecisions.includes(cacheEntry.decision);
-	let assessed: ResultAssessment;
-	if (shouldReassess) {
-		assessed = await assessResultHelper(result, ogInfo, hashesToExclude);
-		db.get([DECISIONS, ogInfo.name, Guid])
-			.defaults({ firstSeen: Date.now() })
-			.set("decision", assessed.decision)
-			.value();
-		logReason(assessed.decision, false);
-	} else {
-		// TODO: successes never go through this codepath, but when they do,
-		// figure out a way to store the torrents to cache the full return value
-		assessed = {
-			decision: cacheEntry.decision as FailureDecision,
+	let assessment: ResultAssessment;
+	if (cacheEntry && cacheEntry.decision !== Decision.MATCH) {
+		assessment = { decision: cacheEntry.decision };
+		logReason(cacheEntry.decision, true);
+	} else if (cacheEntry && existsInCache(cacheEntry.infoHash)) {
+		assessment = {
+			decision: cacheEntry.decision,
+			info: getCachedTorrentFile(cacheEntry.infoHash),
 		};
-		logReason(assessed.decision, true);
+	} else {
+		assessment = await assessResultHelper(result, ogInfo, hashesToExclude);
+		db.get([DECISIONS, ogInfo.name, Guid])
+			.assign({
+				infoHash: assessment.info.infoHash,
+				decision: assessment.decision,
+			})
+			.value();
+		if (assessment.decision === Decision.MATCH) {
+			cacheTorrentFile(assessment.info);
+		}
+		logReason(assessment.decision, false);
 	}
 	db.write();
-	return assessed;
+	return assessment;
 }
 
 export { assessResultCaching as assessResult };
