@@ -1,3 +1,4 @@
+import { sync as rimrafSync } from "rimraf";
 import lowdb from "lowdb";
 import FileSync from "lowdb/adapters/FileSync";
 import path from "path";
@@ -39,6 +40,7 @@ db.defaults(emptyDatabase).write();
 export function dropDatabase(): void {
 	db.setState(emptyDatabase).write();
 	unlinkSync(path.join(appDir(), "cache.json"));
+	rimrafSync(path.join(appDir(), "torrent_cache"));
 }
 
 export default db;

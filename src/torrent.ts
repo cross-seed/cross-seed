@@ -71,6 +71,7 @@ export function saveTorrentFile(
 export function findAllTorrentFilesInDir(torrentDir: string): string[] {
 	return fs
 		.readdirSync(torrentDir)
+		.sort()
 		.filter((fn) => path.extname(fn) === ".torrent")
 		.map((fn) => path.join(torrentDir, fn));
 }

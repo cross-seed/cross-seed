@@ -180,6 +180,4 @@ async function run() {
 	await program.parseAsync();
 }
 
-run().catch((e) => {
-	logger.error(e);
-});
+run();

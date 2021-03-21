@@ -32,8 +32,6 @@ export enum Decision {
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
 }
 
-export type FailureDecision = Exclude<Decision, Decision.MATCH>;
-
 export const PermanentDecisions: Decision[] = [
 	Decision.SIZE_MISMATCH,
 	Decision.NO_DOWNLOAD_LINK,

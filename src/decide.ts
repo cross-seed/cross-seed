@@ -174,13 +174,15 @@ async function assessResultCaching(
 		};
 	} else {
 		assessment = await assessResultHelper(result, ogInfo, hashesToExclude);
-		db.get([DECISIONS, ogInfo.name, Guid])
-			.assign({
-				infoHash: assessment.info.infoHash,
-				decision: assessment.decision,
-			})
-			.value();
+		db.set(
+			[DECISIONS, ogInfo.name, Guid, "decision"],
+			assessment.decision
+		).value();
 		if (assessment.decision === Decision.MATCH) {
+			db.set(
+				[DECISIONS, ogInfo.name, Guid, "infoHash"],
+				assessment.info.infoHash
+			).value();
 			cacheTorrentFile(assessment.info);
 		}
 		logReason(assessment.decision, false);
