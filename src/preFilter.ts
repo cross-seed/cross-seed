@@ -8,6 +8,8 @@ import { getRuntimeConfig } from "./runtimeConfig";
 import { Searchee } from "./searchee";
 import { nMinutesAgo, partial } from "./utils";
 
+const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
+
 export function filterByContent(searchee: Searchee): boolean {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
 
@@ -16,20 +18,21 @@ export function filterByContent(searchee: Searchee): boolean {
 	const logReason = partial(
 		logger.verbose,
 		"[prefilter]",
-		`Torrent ${name} was not selected for searching because`
+		`Torrent ${searchee.name} was not selected for searching because`
 	);
 	if (
 		!includeEpisodes &&
-		searchee.numFiles === 1 &&
-		EP_REGEX.test(Object.keys(searchee.fileTree)[0])
+		searchee.files.length === 1 &&
+		EP_REGEX.test(searchee.files[0].name)
 	) {
 		logReason("it is a single episode");
 		return false;
 	}
 
-	const allVideos = files.every((file) =>
-		EXTENSIONS.map((e) => `.${e}`).includes(path.extname(file.path))
+	const allVideos = searchee.files.every((file) =>
+		extensionsWithDots.includes(path.extname(file.name))
 	);
+
 	if (!allVideos) {
 		logReason("not all files are videos");
 		return false;
