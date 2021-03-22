@@ -18,7 +18,6 @@ declare module "parse-torrent" {
 			name: string;
 			offset: number;
 			path: string;
-			pathSegments: string[];
 		}
 
 		export interface Metafile {
@@ -30,6 +29,7 @@ declare module "parse-torrent" {
 				files: {
 					length: number;
 					path: Buffer[];
+					"path.utf-8"?: Buffer[];
 				}[];
 				name: Buffer;
 				"piece length": number;

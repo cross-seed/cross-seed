@@ -12,7 +12,6 @@ export function parseTorrentFromFilename(filename: string): Metafile {
 }
 
 export async function parseTorrentFromURL(url: string): Promise<Metafile> {
-	console.log(`parsing ${url}`);
 	let response;
 	try {
 		response = await new Promise((resolve, reject) => {

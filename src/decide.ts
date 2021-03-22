@@ -55,8 +55,8 @@ const createReasonLogger = (Title: string, tracker: string, name: string) => (
 function getAllPathDepths(meta: Metafile): number[] {
 	if (!meta.info.files) return [0];
 	return meta.info.files.map((file) => {
-		const pathBufArray = file["path.utf-8"] || file.path;
-		return pathBufArray.length;
+		const pathSegments: Buffer[] = file["path.utf-8"] || file.path;
+		return pathSegments.length;
 	});
 }
 
