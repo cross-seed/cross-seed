@@ -9,12 +9,15 @@ import { JackettResponse, JackettResult, makeJackettRequest } from "./jackett";
 import * as logger from "./logger";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
 import { getRuntimeConfig } from "./runtimeConfig";
+import { Searchee } from "./searchee";
 import {
 	getInfoHashesToExclude,
 	getTorrentByName,
 	loadTorrentDir,
+	loadTorrentDirLight,
 	saveTorrentFile,
 } from "./torrent";
+
 import { getTag, stripExtension } from "./utils";
 
 interface AssessmentWithTracker {
@@ -132,7 +135,7 @@ export async function searchForSingleTorrentByName(
 
 export async function main(): Promise<void> {
 	const { offset, outputDir } = getRuntimeConfig();
-	const parsedTorrents = loadTorrentDir();
+	const parsedTorrents: Searchee[] = loadTorrentDirLight();
 	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
 	const filteredTorrents = filterDupes(parsedTorrents)
 		.filter(filterByContent)

@@ -34,3 +34,4 @@ torrents/
 config.js
 output/
 input/
+*.heapsnapshot

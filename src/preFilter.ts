@@ -1,17 +1,18 @@
+import { uniqBy } from "lodash";
 import { Metafile } from "parse-torrent";
 import path from "path";
 import { EP_REGEX, EXTENSIONS, TORRENTS } from "./constants";
 import db from "./db";
 import * as logger from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
+import { Searchee } from "./searchee";
 import { nMinutesAgo, partial } from "./utils";
 
-export function filterByContent(info: Metafile): boolean {
+export function filterByContent(searchee: Searchee): boolean {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
 
 	if (searchAll) return true;
 
-	const { files, name } = info;
 	const logReason = partial(
 		logger.verbose,
 		"[prefilter]",
@@ -19,8 +20,8 @@ export function filterByContent(info: Metafile): boolean {
 	);
 	if (
 		!includeEpisodes &&
-		files.length === 1 &&
-		EP_REGEX.test(info.files[0].name)
+		searchee.numFiles === 1 &&
+		EP_REGEX.test(Object.keys(searchee.fileTree)[0])
 	) {
 		logReason("it is a single episode");
 		return false;
@@ -37,14 +38,9 @@ export function filterByContent(info: Metafile): boolean {
 	return true;
 }
 
-export function filterDupes(metafiles: Metafile[]): Metafile[] {
-	const filtered = metafiles.filter((meta, index) => {
-		const firstOccurrence = metafiles.findIndex(
-			(e) => e.name === meta.name
-		);
-		return index === firstOccurrence;
-	});
-	const numDupes = metafiles.length - filtered.length;
+export function filterDupes(searchees: Searchee[]): Searchee[] {
+	const filtered = uniqBy<Searchee>(searchees, "name");
+	const numDupes = searchees.length - filtered.length;
 	if (numDupes > 0) {
 		logger.verbose(
 			"[prefilter]",

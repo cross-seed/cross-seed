@@ -28,7 +28,7 @@ declare module "parse-torrent" {
 			info: {
 				files: {
 					length: number;
-					path: Buffer[];
+					path?: Buffer[];
 					"path.utf-8"?: Buffer[];
 				}[];
 				name: Buffer;
