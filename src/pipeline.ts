@@ -2,7 +2,7 @@ import chalk from "chalk";
 import fs from "fs";
 import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient";
-import { Action, Decision, InjectionResult, TORRENTS } from "./constants";
+import { Action, Decision, InjectionResult, SEARCHEES } from "./constants";
 import db from "./db";
 import { assessResult, ResultAssessment } from "./decide";
 import { JackettResponse, JackettResult, makeJackettRequest } from "./jackett";
@@ -47,7 +47,7 @@ async function findOnOtherSites(
 		logger.error(`error querying Jackett for ${query}`);
 		return 0;
 	}
-	updateSearchTimestamps(info.infoHash);
+	updateSearchTimestamps(info.name);
 	const results = response.Results;
 
 	const loaded = await Promise.all<AssessmentWithTracker>(
@@ -94,7 +94,7 @@ async function findOnOtherSites(
 }
 
 function updateSearchTimestamps(infoHash: string): void {
-	db.get(TORRENTS)
+	db.get(SEARCHEES)
 		.defaultsDeep({
 			[infoHash]: {
 				firstSearched: Date.now(),

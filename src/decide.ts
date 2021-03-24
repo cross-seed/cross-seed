@@ -147,7 +147,11 @@ async function assessResultCaching(
 	const logReason = createReasonLogger(Title, tracker, ogInfo.name);
 
 	const cacheEntry: DecisionEntry = db
-		.get([DECISIONS, ogInfo.name, Guid])
+		.get<typeof DECISIONS, typeof ogInfo.name, typeof Guid>([
+			DECISIONS,
+			ogInfo.name,
+			Guid,
+		])
 		.clone()
 		.value();
 
