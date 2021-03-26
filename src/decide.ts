@@ -125,7 +125,7 @@ function cacheTorrentFile(meta: Metafile): void {
 async function assessResultCaching(
 	result: JackettResult,
 	searchee: Searchee,
-	hashesToExclude: string[]
+	infoHashesToExclude: string[]
 ): Promise<ResultAssessment> {
 	const { Guid, Title, TrackerId: tracker } = result;
 	const logReason = createReasonLogger(Title, tracker, searchee.name);
@@ -156,15 +156,24 @@ async function assessResultCaching(
 		assessment = { decision: cacheEntry.decision };
 		logReason(cacheEntry.decision, true);
 	} else if (cacheEntry && existsInCache(cacheEntry.infoHash)) {
-		assessment = {
-			decision: cacheEntry.decision,
-			info: getCachedTorrentFile(cacheEntry.infoHash),
-		};
+		if (infoHashesToExclude.includes(cacheEntry.infoHash)) {
+			// has been added since the last run
+			assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
+			db.set(
+				[DECISIONS, searchee.name, Guid, "decision"],
+				assessment.decision
+			).value();
+		} else {
+			assessment = {
+				decision: cacheEntry.decision,
+				info: getCachedTorrentFile(cacheEntry.infoHash),
+			};
+		}
 	} else {
 		assessment = await assessResultHelper(
 			result,
 			searchee,
-			hashesToExclude
+			infoHashesToExclude
 		);
 		db.set(
 			[DECISIONS, searchee.name, Guid, "decision"],
