@@ -32,8 +32,14 @@ const db = lowdb(new FileSync<Schema>(path.join(appDir(), "cache.json")));
 const emptyDatabase = {
 	[SEARCHEES]: {},
 	[DECISIONS]: {},
-	dbVersion: 0,
+	dbVersion: 3,
 };
+
+const dbVersion = db.get("dbVersion").value();
+
+if (!dbVersion || dbVersion < emptyDatabase.dbVersion) {
+	db.setState(emptyDatabase);
+}
 
 db.defaults(emptyDatabase).write();
 
