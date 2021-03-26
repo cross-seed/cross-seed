@@ -39,7 +39,7 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 			// https://github.com/mmgoodnow/cross-seed/issues/46.
 			// path.join ignores zero-length path segments,
 			// which we do not want.
-			path: pathSegments.join(path.sep),
+			path: [meta.name, ...pathSegments].join(path.sep),
 		};
 	});
 
