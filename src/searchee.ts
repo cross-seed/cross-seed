@@ -12,6 +12,7 @@ interface File {
 
 export interface Searchee {
 	infoHash?: string;
+	path?: string;
 	files: File[];
 	name: string;
 	length: number;

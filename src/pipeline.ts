@@ -102,7 +102,10 @@ function updateSearchTimestamps(name: string): void {
 		.write();
 }
 
-async function findMatchesBatch(samples, hashesToExclude) {
+async function findMatchesBatch(
+	samples: Searchee[],
+	hashesToExclude: string[]
+) {
 	const { delay, offset } = getRuntimeConfig();
 
 	let totalFound = 0;
