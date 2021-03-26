@@ -5,7 +5,7 @@ import { concat } from "simple-get";
 import * as logger from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { stripExtension } from "./utils";
-import { createSearcheeFromTorrentFile } from "./searchee";
+import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
 
 export function parseTorrentFromFilename(filename: string): Metafile {
 	const data = fs.readFileSync(filename);
@@ -92,7 +92,7 @@ export function loadTorrentDir(): Metafile[] {
 
 export function loadTorrentDirLight(): Searchee[] {
 	const { torrentDir } = getRuntimeConfig();
-	const filenames = fs
+	return fs
 		.readdirSync(torrentDir)
 		.filter((fn) => path.extname(fn) === ".torrent")
 		.sort()

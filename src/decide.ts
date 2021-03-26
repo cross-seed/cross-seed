@@ -6,6 +6,7 @@ import { Decision, DECISIONS, TORRENT_CACHE_FOLDER } from "./constants";
 import db, { DecisionEntry } from "./db";
 import { JackettResult } from "./jackett";
 import * as logger from "./logger";
+import { Searchee } from "./searchee";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent";
 import { partial } from "./utils";
 
@@ -52,38 +53,21 @@ const createReasonLogger = (Title: string, tracker: string, name: string) => (
 	else logReason(reason);
 };
 
-function getAllPathDepths(meta: Metafile): number[] {
-	if (!meta.info.files) return [0];
-	return meta.info.files.map((file) => {
-		const pathSegments: Buffer[] = file["path.utf-8"] || file.path;
-		return pathSegments.length;
-	});
-}
-
-function compareFileTrees(candidate: Metafile, ogMeta: Metafile): boolean {
-	const allPathDepthsA = getAllPathDepths(candidate);
-	const allPathDepthsB = getAllPathDepths(ogMeta);
-
-	const cmp = (elOfA, elOfB, i, j) => {
+function compareFileTrees(candidate: Metafile, searchee: Searchee): boolean {
+	const cmp = (elOfA, elOfB) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		const pathsAreEqual = elOfB.path === elOfA.path;
 
-		// https://github.com/mmgoodnow/cross-seed/issues/46
-		const noSneakyZeroLengthPathSegments =
-			allPathDepthsA[i] === allPathDepthsB[j];
-
-		return (
-			lengthsAreEqual && pathsAreEqual && noSneakyZeroLengthPathSegments
-		);
+		return lengthsAreEqual && pathsAreEqual;
 	};
 
-	return candidate.files.every((elOfA, i) =>
-		ogMeta.files.some((elOfB, j) => cmp(elOfA, elOfB, i, j))
+	return candidate.files.every((elOfA) =>
+		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
 	);
 }
 
-function sizeDoesMatch(resultSize, ogInfo) {
-	const { length } = ogInfo;
+function sizeDoesMatch(resultSize, searchee) {
+	const { length } = searchee;
 	const lowerBound = length - 0.02 * length;
 	const upperBound = length + 0.02 * length;
 	return resultSize >= lowerBound && resultSize <= upperBound;
@@ -91,10 +75,10 @@ function sizeDoesMatch(resultSize, ogInfo) {
 
 async function assessResultHelper(
 	{ Link, Size }: JackettResult,
-	ogInfo: Metafile,
+	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	if (!sizeDoesMatch(Size, ogInfo)) {
+	if (!sizeDoesMatch(Size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
 
@@ -108,7 +92,7 @@ async function assessResultHelper(
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
 
-	if (!compareFileTrees(info, ogInfo)) {
+	if (!compareFileTrees(info, searchee)) {
 		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 
@@ -140,16 +124,16 @@ function cacheTorrentFile(meta: Metafile): void {
 
 async function assessResultCaching(
 	result: JackettResult,
-	ogInfo: Metafile,
+	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
 	const { Guid, Title, TrackerId: tracker } = result;
-	const logReason = createReasonLogger(Title, tracker, ogInfo.name);
+	const logReason = createReasonLogger(Title, tracker, searchee.name);
 
 	const cacheEntry: DecisionEntry = db
-		.get<typeof DECISIONS, typeof ogInfo.name, typeof Guid>([
+		.get<typeof DECISIONS, typeof searchee.name, typeof Guid>([
 			DECISIONS,
-			ogInfo.name,
+			searchee.name,
 			Guid,
 		])
 		.clone()
@@ -158,13 +142,13 @@ async function assessResultCaching(
 	// handles path creation
 	db.get(DECISIONS)
 		.defaultsDeep({
-			[ogInfo.name]: {
+			[searchee.name]: {
 				[Guid]: {
 					firstSeen: Date.now(),
 				},
 			},
 		})
-		.set([ogInfo.name, Guid, "lastSeen"], Date.now())
+		.set([searchee.name, Guid, "lastSeen"], Date.now())
 		.value();
 
 	let assessment: ResultAssessment;
@@ -177,14 +161,18 @@ async function assessResultCaching(
 			info: getCachedTorrentFile(cacheEntry.infoHash),
 		};
 	} else {
-		assessment = await assessResultHelper(result, ogInfo, hashesToExclude);
+		assessment = await assessResultHelper(
+			result,
+			searchee,
+			hashesToExclude
+		);
 		db.set(
-			[DECISIONS, ogInfo.name, Guid, "decision"],
+			[DECISIONS, searchee.name, Guid, "decision"],
 			assessment.decision
 		).value();
 		if (assessment.decision === Decision.MATCH) {
 			db.set(
-				[DECISIONS, ogInfo.name, Guid, "infoHash"],
+				[DECISIONS, searchee.name, Guid, "infoHash"],
 				assessment.info.infoHash
 			).value();
 			cacheTorrentFile(assessment.info);

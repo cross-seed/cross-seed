@@ -1,6 +1,5 @@
 import chalk from "chalk";
 import fs from "fs";
-import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient";
 import { Action, Decision, InjectionResult, SEARCHEES } from "./constants";
 import db from "./db";
@@ -13,7 +12,6 @@ import { Searchee } from "./searchee";
 import {
 	getInfoHashesToExclude,
 	getTorrentByName,
-	loadTorrentDir,
 	loadTorrentDirLight,
 	saveTorrentFile,
 } from "./torrent";
@@ -26,7 +24,7 @@ interface AssessmentWithTracker {
 }
 
 async function findOnOtherSites(
-	info: Metafile,
+	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<number> {
 	const { action } = getRuntimeConfig();
@@ -34,12 +32,12 @@ async function findOnOtherSites(
 	const assessEach = async (
 		result: JackettResult
 	): Promise<AssessmentWithTracker> => ({
-		assessment: await assessResult(result, info, hashesToExclude),
+		assessment: await assessResult(result, searchee, hashesToExclude),
 		tracker: result.TrackerId,
 	});
 
-	const tag = getTag(info.name);
-	const query = stripExtension(info.name);
+	const tag = getTag(searchee.name);
+	const query = stripExtension(searchee.name);
 	let response: JackettResponse;
 	try {
 		response = await makeJackettRequest(query);
@@ -47,7 +45,7 @@ async function findOnOtherSites(
 		logger.error(`error querying Jackett for ${query}`);
 		return 0;
 	}
-	updateSearchTimestamps(info.name);
+	updateSearchTimestamps(searchee.name);
 	const results = response.Results;
 
 	const loaded = await Promise.all<AssessmentWithTracker>(
@@ -64,7 +62,7 @@ async function findOnOtherSites(
 		const styledName = chalk.green.bold(newInfo.name);
 		const styledTracker = chalk.bold(tracker);
 		if (action === Action.INJECT) {
-			const result = await getClient().inject(newInfo, info);
+			const result = await getClient().inject(newInfo, searchee);
 			switch (result) {
 				case InjectionResult.SUCCESS:
 					logger.log(
@@ -93,14 +91,14 @@ async function findOnOtherSites(
 	return successful.length;
 }
 
-function updateSearchTimestamps(infoHash: string): void {
+function updateSearchTimestamps(name: string): void {
 	db.get(SEARCHEES)
 		.defaultsDeep({
-			[infoHash]: {
+			[name]: {
 				firstSearched: Date.now(),
 			},
 		})
-		.set([infoHash, "lastSearched"], Date.now())
+		.set([name, "lastSearched"], Date.now())
 		.write();
 }
 
@@ -133,10 +131,12 @@ export async function searchForSingleTorrentByName(
 	return findOnOtherSites(meta, hashesToExclude);
 }
 
-export async function main(): Promise<void> {
-	const { offset, outputDir } = getRuntimeConfig();
+function findSearchableTorrents() {
+	const { offset } = getRuntimeConfig();
 	const parsedTorrents: Searchee[] = loadTorrentDirLight();
-	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
+	const hashesToExclude = parsedTorrents
+		.map((t) => t.infoHash)
+		.filter(Boolean);
 	const filteredTorrents = filterDupes(parsedTorrents)
 		.filter(filterByContent)
 		.filter(filterTimestamps);
@@ -148,7 +148,14 @@ export async function main(): Promise<void> {
 		filteredTorrents.length
 	);
 
-	if (offset > 0) logger.log("Starting at", offset);
+	return { samples, hashesToExclude };
+}
+
+export async function main(): Promise<void> {
+	const { offset, outputDir } = getRuntimeConfig();
+	const { samples, hashesToExclude } = findSearchableTorrents();
+
+	if (offset > 0) logger.log("Starting at offset", offset);
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);
