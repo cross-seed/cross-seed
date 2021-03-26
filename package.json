@@ -6,7 +6,7 @@
 		"test": "true",
 		"build": "tsc",
 		"release": "np",
-		"prepare": "rm -rf dist && npm run build"
+		"prepare": "rimraf dist && npm run build"
 	},
 	"bin": {
 		"cross-seed": "dist/src/cmd.js"
