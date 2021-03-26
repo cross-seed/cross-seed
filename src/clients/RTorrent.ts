@@ -1,12 +1,13 @@
 import bencode from "bencode";
 import { promises as fs, Stats } from "fs";
 import parseTorrent, { FileListing, Metafile } from "parse-torrent";
-import path from "path";
+import { dirname, resolve } from "path";
 import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
 import * as logger from "../logger";
 import { getRuntimeConfig } from "../runtimeConfig";
+import { Searchee } from "../searchee";
 import { wait } from "../utils";
 import { TorrentClient } from "./TorrentClient";
 
@@ -28,7 +29,7 @@ async function createLibTorrentResumeTree(
 	async function getFileResumeData(
 		file: FileListing
 	): Promise<LibTorrentResumeFileEntry> {
-		const filePath = path.resolve(dataDir, file.path);
+		const filePath = resolve(dataDir, file.path);
 		const fileStat = await fs
 			.lstat(filePath)
 			.catch(() => ({ isFile: () => false } as Stats));
@@ -117,8 +118,9 @@ export default class RTorrent implements TorrentClient {
 		return downloadList.includes(infoHash.toUpperCase());
 	}
 
-	async getDataDir(meta: Metafile): Promise<string> {
-		const infoHash = meta.infoHash.toUpperCase();
+	async getDataDir(searchee: Searchee): Promise<string> {
+		if (searchee.path) return dirname(searchee.path);
+		const infoHash = searchee.infoHash.toUpperCase();
 		type returnType = [["0" | "1"], [string]];
 		const [[isMultiFileStr], [dir]] = await this.methodCallP<returnType>(
 			"system.multicall",
@@ -135,7 +137,7 @@ export default class RTorrent implements TorrentClient {
 				],
 			]
 		);
-		return Number(isMultiFileStr) ? path.dirname(dir) : dir;
+		return Number(isMultiFileStr) ? dirname(dir) : dir;
 	}
 
 	async validateConfig(): Promise<void> {
@@ -152,15 +154,15 @@ export default class RTorrent implements TorrentClient {
 		}
 	}
 
-	async inject(meta: Metafile, ogMeta: Metafile): Promise<InjectionResult> {
+	async inject(meta: Metafile, searchee: Searchee): Promise<InjectionResult> {
 		const { outputDir } = getRuntimeConfig();
 
 		if (await this.checkForInfoHashInClient(meta.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
 
-		const dataDir = await this.getDataDir(ogMeta);
-		const savePath = path.resolve(
+		const dataDir = await this.getDataDir(searchee);
+		const savePath = resolve(
 			outputDir,
 			`${meta.name}.tmp.${Date.now()}.torrent`
 		);

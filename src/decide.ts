@@ -1,128 +1,195 @@
-import { Metafile } from "parse-torrent";
-import * as cache from "./cache";
-import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
+import { existsSync, writeFileSync } from "fs";
+import parseTorrent, { Metafile } from "parse-torrent";
+import path from "path";
+import { appDir } from "./configuration";
+import { Decision, DECISIONS, TORRENT_CACHE_FOLDER } from "./constants";
+import db, { DecisionEntry } from "./db";
 import { JackettResult } from "./jackett";
 import * as logger from "./logger";
-import { parseTorrentFromURL } from "./torrent";
+import { Searchee } from "./searchee";
+import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent";
 import { partial } from "./utils";
 
 export interface ResultAssessment {
-	tracker: string;
-	tag: string;
-	info: Metafile;
+	decision: Decision;
+	info?: Metafile;
 }
 
-function getAllPathDepths(meta: Metafile): number[] {
-	if (!meta.info.files) return [0];
-	return meta.info.files.map((file) => {
-		const pathBufArray = file["path.utf-8"] || file.path;
-		return pathBufArray.length;
-	});
-}
-
-function compareFileTrees(candidate: Metafile, ogMeta: Metafile): boolean {
-	const allPathDepthsA = getAllPathDepths(candidate);
-	const allPathDepthsB = getAllPathDepths(ogMeta);
-
-	const cmp = (elOfA, elOfB, i, j) => {
-		const lengthsAreEqual = elOfB.length === elOfA.length;
-		const pathsAreEqual = elOfB.path === elOfA.path;
-
-		// https://github.com/mmgoodnow/cross-seed/issues/46
-		const noSneakyZeroLengthPathSegments =
-			allPathDepthsA[i] === allPathDepthsB[j];
-
-		return (
-			lengthsAreEqual && pathsAreEqual && noSneakyZeroLengthPathSegments
-		);
-	};
-
-	return candidate.files.every((elOfA, i) =>
-		ogMeta.files.some((elOfB, j) => cmp(elOfA, elOfB, i, j))
-	);
-}
-
-function sizeDoesMatch(result, ogInfo) {
-	const { length } = ogInfo;
-	const lowerBound = length - 0.02 * length;
-	const upperBound = length + 0.02 * length;
-	return result.Size >= lowerBound && result.Size <= upperBound;
-}
-
-function getTag(name) {
-	return EP_REGEX.test(name)
-		? "episode"
-		: SEASON_REGEX.test(name)
-		? "pack"
-		: MOVIE_REGEX.test(name)
-		? "movie"
-		: "unknown";
-}
-
-async function assessResultHelper(
-	result: JackettResult,
-	ogInfo: Metafile,
-	hashesToExclude: string[]
-): Promise<ResultAssessment> {
-	const { TrackerId: tracker, Link, Title } = result;
+const createReasonLogger = (Title: string, tracker: string, name: string) => (
+	decision: Decision,
+	cached
+): void => {
 	const logReason = partial(
 		logger.verbose,
 		"[decide]",
-		`${Title} from ${tracker} did not match ${ogInfo.name} because`
+		name,
+		"- no match for",
+		tracker,
+		"torrent",
+		Title,
+		"-"
 	);
-	if (!sizeDoesMatch(result, ogInfo)) {
-		logReason(
-			`its size, ${result.Size}, does not match the original torrent's size, ${ogInfo.length}`
-		);
-		return null;
+	let reason;
+	switch (decision) {
+		case Decision.MATCH:
+			return;
+		case Decision.SIZE_MISMATCH:
+			reason = "its size does not match";
+			break;
+		case Decision.NO_DOWNLOAD_LINK:
+			reason = "it doesn't have a download link";
+			break;
+		case Decision.DOWNLOAD_FAILED:
+			reason = "the torrent file failed to download";
+			break;
+		case Decision.INFO_HASH_ALREADY_EXISTS:
+			reason = "the info hash matches a torrent you already have";
+			break;
+		case Decision.FILE_TREE_MISMATCH:
+			reason = "it has a different file tree";
+			break;
+	}
+	if (cached) logReason(reason, "(cached)");
+	else logReason(reason);
+};
+
+function compareFileTrees(candidate: Metafile, searchee: Searchee): boolean {
+	const cmp = (elOfA, elOfB) => {
+		const lengthsAreEqual = elOfB.length === elOfA.length;
+		const pathsAreEqual = elOfB.path === elOfA.path;
+
+		return lengthsAreEqual && pathsAreEqual;
+	};
+
+	return candidate.files.every((elOfA) =>
+		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
+	);
+}
+
+function sizeDoesMatch(resultSize, searchee) {
+	const { length } = searchee;
+	const lowerBound = length - 0.02 * length;
+	const upperBound = length + 0.02 * length;
+	return resultSize >= lowerBound && resultSize <= upperBound;
+}
+
+async function assessResultHelper(
+	{ Link, Size }: JackettResult,
+	searchee: Searchee,
+	hashesToExclude: string[]
+): Promise<ResultAssessment> {
+	if (!sizeDoesMatch(Size, searchee)) {
+		return { decision: Decision.SIZE_MISMATCH };
 	}
 
-	if (!Link) {
-		logReason("it doesn't have a download link");
-		return null;
-	}
+	if (!Link) return { decision: Decision.NO_DOWNLOAD_LINK };
 
 	const info = await parseTorrentFromURL(Link);
 
-	// if you got rate limited or some other failure
-	if (!info) return null;
+	if (!info) return { decision: Decision.DOWNLOAD_FAILED };
 
 	if (hashesToExclude.includes(info.infoHash)) {
-		logReason("the info hash matches a torrent you already have");
-		return null;
-	}
-	if (!compareFileTrees(info, ogInfo)) {
-		logReason("it has a different file tree");
-		return null;
+		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
 
-	const tag = getTag(info.name);
-	return { tracker, tag, info };
+	if (!compareFileTrees(info, searchee)) {
+		return { decision: Decision.FILE_TREE_MISMATCH };
+	}
+
+	return { decision: Decision.MATCH, info };
 }
 
-function assessResultCaching(
+function existsInCache(infoHash: string): boolean {
+	return existsSync(
+		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`)
+	);
+}
+
+function getCachedTorrentFile(infoHash: string): Metafile {
+	return parseTorrentFromFilename(
+		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`)
+	);
+}
+
+function cacheTorrentFile(meta: Metafile): void {
+	writeFileSync(
+		path.join(
+			appDir(),
+			TORRENT_CACHE_FOLDER,
+			`${meta.infoHash}.cached.torrent`
+		),
+		parseTorrent.toTorrentFile(meta)
+	);
+}
+
+async function assessResultCaching(
 	result: JackettResult,
-	ogInfo: Metafile,
-	hashesToExclude: string[]
+	searchee: Searchee,
+	infoHashesToExclude: string[]
 ): Promise<ResultAssessment> {
 	const { Guid, Title, TrackerId: tracker } = result;
-	const cacheKey = `${ogInfo.name}|${Guid}`;
-	if (cache.get(cache.CACHE_NAMESPACE_REJECTIONS, cacheKey)) {
-		const logReason = partial(
-			logger.verbose,
-			"[decide]",
-			`${Title} from ${tracker} did not match ${ogInfo.name} because`
-		);
-		logReason("it has been seen and rejected before");
-		return null;
-	}
-	const assessPromise = assessResultHelper(result, ogInfo, hashesToExclude);
-	assessPromise.then((assessed) => {
-		if (!assessed) {
-			cache.save(cache.CACHE_NAMESPACE_REJECTIONS, cacheKey);
+	const logReason = createReasonLogger(Title, tracker, searchee.name);
+
+	const cacheEntry: DecisionEntry = db
+		.get<typeof DECISIONS, typeof searchee.name, typeof Guid>([
+			DECISIONS,
+			searchee.name,
+			Guid,
+		])
+		.clone()
+		.value();
+
+	// handles path creation
+	db.get(DECISIONS)
+		.defaultsDeep({
+			[searchee.name]: {
+				[Guid]: {
+					firstSeen: Date.now(),
+				},
+			},
+		})
+		.set([searchee.name, Guid, "lastSeen"], Date.now())
+		.value();
+
+	let assessment: ResultAssessment;
+	if (cacheEntry && cacheEntry.decision !== Decision.MATCH) {
+		assessment = { decision: cacheEntry.decision };
+		logReason(cacheEntry.decision, true);
+	} else if (cacheEntry && existsInCache(cacheEntry.infoHash)) {
+		if (infoHashesToExclude.includes(cacheEntry.infoHash)) {
+			// has been added since the last run
+			assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
+			db.set(
+				[DECISIONS, searchee.name, Guid, "decision"],
+				assessment.decision
+			).value();
+		} else {
+			assessment = {
+				decision: cacheEntry.decision,
+				info: getCachedTorrentFile(cacheEntry.infoHash),
+			};
 		}
-	});
-	return assessPromise;
+	} else {
+		assessment = await assessResultHelper(
+			result,
+			searchee,
+			infoHashesToExclude
+		);
+		db.set(
+			[DECISIONS, searchee.name, Guid, "decision"],
+			assessment.decision
+		).value();
+		if (assessment.decision === Decision.MATCH) {
+			db.set(
+				[DECISIONS, searchee.name, Guid, "infoHash"],
+				assessment.info.infoHash
+			).value();
+			cacheTorrentFile(assessment.info);
+		}
+		logReason(assessment.decision, false);
+	}
+	db.write();
+	return assessment;
 }
 
 export { assessResultCaching as assessResult };

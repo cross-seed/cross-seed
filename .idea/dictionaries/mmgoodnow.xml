@@ -4,6 +4,8 @@
       <w>bencode</w>
       <w>jackett</w>
       <w>rtorrent</w>
+      <w>searchee</w>
+      <w>searchees</w>
       <w>seedable</w>
       <w>xmlrpc</w>
     </words>

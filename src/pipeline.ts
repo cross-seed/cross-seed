@@ -1,31 +1,43 @@
 import chalk from "chalk";
 import fs from "fs";
-import { Metafile } from "parse-torrent";
-import { CACHE_NAMESPACE_TORRENTS, get, save, TorrentEntry } from "./cache";
 import { getClient } from "./clients/TorrentClient";
-import { Action, InjectionResult } from "./constants";
+import { Action, Decision, InjectionResult, SEARCHEES } from "./constants";
+import db from "./db";
 import { assessResult, ResultAssessment } from "./decide";
-import { JackettResponse, makeJackettRequest } from "./jackett";
+import { JackettResponse, JackettResult, makeJackettRequest } from "./jackett";
 import * as logger from "./logger";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
 import { getRuntimeConfig } from "./runtimeConfig";
+import { Searchee } from "./searchee";
 import {
 	getInfoHashesToExclude,
 	getTorrentByName,
-	loadTorrentDir,
+	loadTorrentDirLight,
 	saveTorrentFile,
 } from "./torrent";
-import { stripExtension } from "./utils";
+
+import { getTag, stripExtension } from "./utils";
+
+interface AssessmentWithTracker {
+	assessment: ResultAssessment;
+	tracker: string;
+}
 
 async function findOnOtherSites(
-	info: Metafile,
+	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<number> {
 	const { action } = getRuntimeConfig();
 
-	const assessEach = (result) => assessResult(result, info, hashesToExclude);
+	const assessEach = async (
+		result: JackettResult
+	): Promise<AssessmentWithTracker> => ({
+		assessment: await assessResult(result, searchee, hashesToExclude),
+		tracker: result.TrackerId,
+	});
 
-	const query = stripExtension(info.name);
+	const tag = getTag(searchee.name);
+	const query = stripExtension(searchee.name);
 	let response: JackettResponse;
 	try {
 		response = await makeJackettRequest(query);
@@ -33,61 +45,67 @@ async function findOnOtherSites(
 		logger.error(`error querying Jackett for ${query}`);
 		return 0;
 	}
-	updateSearchTimestamps(info.infoHash);
+	updateSearchTimestamps(searchee.name);
 	const results = response.Results;
 
-	const loaded = await Promise.all<ResultAssessment>(results.map(assessEach));
-	const successful = loaded.filter((e) => e !== null);
+	const loaded = await Promise.all<AssessmentWithTracker>(
+		results.map(assessEach)
+	);
+	const successful = loaded.filter(
+		(e) => e.assessment.decision === Decision.MATCH
+	);
 
-	for (const { tracker, tag, info: newInfo } of successful) {
+	for (const {
+		tracker,
+		assessment: { info: newInfo },
+	} of successful) {
 		const styledName = chalk.green.bold(newInfo.name);
 		const styledTracker = chalk.bold(tracker);
-		logger.log(`Found ${styledName} on ${styledTracker}`);
 		if (action === Action.INJECT) {
-			const result = await getClient().inject(newInfo, info);
+			const result = await getClient().inject(newInfo, searchee);
 			switch (result) {
 				case InjectionResult.SUCCESS:
 					logger.log(
-						`Injected ${styledName} from ${styledTracker} into rTorrent.`
+						`Found ${styledName} on ${styledTracker} - injected`
 					);
 					break;
 				case InjectionResult.ALREADY_EXISTS:
 					logger.log(
-						`Did not inject ${styledName} because it already exists.`
+						`Found ${styledName} on ${styledTracker} - exists`
 					);
 					break;
 				case InjectionResult.FAILURE:
 				default:
 					logger.error(
-						`Failed to inject ${styledName} from ${styledTracker} into rtorrent. Saving instead.`
+						`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
 					);
 					saveTorrentFile(tracker, tag, newInfo);
 					break;
 			}
 		} else {
 			saveTorrentFile(tracker, tag, newInfo);
+			logger.log(`Found ${styledName} on ${styledTracker}`);
 		}
 	}
 
 	return successful.length;
 }
 
-function updateSearchTimestamps(infoHash: string): void {
-	const existingTimestamps = get(
-		CACHE_NAMESPACE_TORRENTS,
-		infoHash
-	) as TorrentEntry;
-	const firstSearched = existingTimestamps
-		? existingTimestamps.firstSearched
-		: Date.now();
-	const lastSearched = Date.now();
-	save(CACHE_NAMESPACE_TORRENTS, infoHash, {
-		firstSearched,
-		lastSearched,
-	} as TorrentEntry);
+function updateSearchTimestamps(name: string): void {
+	db.get(SEARCHEES)
+		.defaultsDeep({
+			[name]: {
+				firstSearched: Date.now(),
+			},
+		})
+		.set([name, "lastSearched"], Date.now())
+		.write();
 }
 
-async function findMatchesBatch(samples, hashesToExclude) {
+async function findMatchesBatch(
+	samples: Searchee[],
+	hashesToExclude: string[]
+) {
 	const { delay, offset } = getRuntimeConfig();
 
 	let totalFound = 0;
@@ -116,10 +134,12 @@ export async function searchForSingleTorrentByName(
 	return findOnOtherSites(meta, hashesToExclude);
 }
 
-export async function main(): Promise<void> {
-	const { offset, outputDir } = getRuntimeConfig();
-	const parsedTorrents = loadTorrentDir();
-	const hashesToExclude = parsedTorrents.map((t) => t.infoHash);
+function findSearchableTorrents() {
+	const { offset } = getRuntimeConfig();
+	const parsedTorrents: Searchee[] = loadTorrentDirLight();
+	const hashesToExclude = parsedTorrents
+		.map((t) => t.infoHash)
+		.filter(Boolean);
 	const filteredTorrents = filterDupes(parsedTorrents)
 		.filter(filterByContent)
 		.filter(filterTimestamps);
@@ -131,7 +151,14 @@ export async function main(): Promise<void> {
 		filteredTorrents.length
 	);
 
-	if (offset > 0) logger.log("Starting at", offset);
+	return { samples, hashesToExclude };
+}
+
+export async function main(): Promise<void> {
+	const { offset, outputDir } = getRuntimeConfig();
+	const { samples, hashesToExclude } = findSearchableTorrents();
+
+	if (offset > 0) logger.log("Starting at offset", offset);
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);

@@ -1,34 +1,38 @@
+import { uniqBy } from "lodash";
 import { Metafile } from "parse-torrent";
 import path from "path";
-import { CACHE_NAMESPACE_TORRENTS, get, TorrentEntry } from "./cache";
-import { EP_REGEX, EXTENSIONS } from "./constants";
+import { EP_REGEX, EXTENSIONS, SEARCHEES } from "./constants";
+import db, { Schema } from "./db";
 import * as logger from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
+import { Searchee } from "./searchee";
 import { nMinutesAgo, partial } from "./utils";
 
-export function filterByContent(info: Metafile): boolean {
+const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
+
+export function filterByContent(searchee: Searchee): boolean {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
 
 	if (searchAll) return true;
 
-	const { files, name } = info;
 	const logReason = partial(
 		logger.verbose,
 		"[prefilter]",
-		`Torrent ${name} was not selected for searching because`
+		`Torrent ${searchee.name} was not selected for searching because`
 	);
 	if (
 		!includeEpisodes &&
-		files.length === 1 &&
-		EP_REGEX.test(info.files[0].name)
+		searchee.files.length === 1 &&
+		EP_REGEX.test(searchee.files[0].name)
 	) {
 		logReason("it is a single episode");
 		return false;
 	}
 
-	const allVideos = files.every((file) =>
-		EXTENSIONS.map((e) => `.${e}`).includes(path.extname(file.path))
+	const allVideos = searchee.files.every((file) =>
+		extensionsWithDots.includes(path.extname(file.name))
 	);
+
 	if (!allVideos) {
 		logReason("not all files are videos");
 		return false;
@@ -37,41 +41,41 @@ export function filterByContent(info: Metafile): boolean {
 	return true;
 }
 
-export function filterDupes(metafiles: Metafile[]): Metafile[] {
-	const filtered = metafiles.filter((meta, index) => {
-		const firstOccurrence = metafiles.findIndex(
-			(e) => e.name === meta.name
-		);
-		return index === firstOccurrence;
-	});
-	const numDupes = metafiles.length - filtered.length;
+export function filterDupes(searchees: Searchee[]): Searchee[] {
+	const filtered = uniqBy<Searchee>(searchees, "name");
+	const numDupes = searchees.length - filtered.length;
 	if (numDupes > 0) {
 		logger.verbose(
 			"[prefilter]",
-			`${numDupes} duplicates not selected for searching`
+			numDupes,
+			"duplicates not selected for searching"
 		);
 	}
 	return filtered;
 }
 
-export function filterTimestamps(info: Metafile): boolean {
+export function filterTimestamps(searchee: Searchee): boolean {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-	const { infoHash, name } = info;
-	const timestampData = get(
-		CACHE_NAMESPACE_TORRENTS,
-		infoHash
-	) as TorrentEntry;
+	const timestampData = db
+		.get<typeof SEARCHEES, typeof searchee.name>([SEARCHEES, searchee.name])
+		.value();
 	if (!timestampData) return true;
 	const { firstSearched, lastSearched } = timestampData;
 	const logReason = partial(
 		logger.verbose,
 		"[prefilter]",
-		`Torrent ${name} was not selected for searching because`
+		"Torrent",
+		searchee.name,
+		"was not selected for searching because"
 	);
 
 	if (excludeOlder && firstSearched < nMinutesAgo(excludeOlder)) {
 		logReason(
-			`its first search timestamp ${firstSearched} is older than ${excludeOlder} minutes ago`
+			"its first search timestamp",
+			firstSearched,
+			"is older than",
+			excludeOlder,
+			"minutes ago"
 		);
 		return false;
 	}
@@ -81,7 +85,11 @@ export function filterTimestamps(info: Metafile): boolean {
 		lastSearched > nMinutesAgo(excludeRecentSearch)
 	) {
 		logReason(
-			`its last search timestamp ${lastSearched} is newer than ${excludeRecentSearch} minutes ago`
+			"its last search timestamp",
+			lastSearched,
+			"is newer than",
+			excludeRecentSearch,
+			"minutes ago"
 		);
 		return false;
 	}

@@ -35,7 +35,7 @@ export function appDir(): string {
 }
 
 export function createAppDir(): void {
-	fs.mkdirSync(appDir(), { recursive: true });
+	fs.mkdirSync(path.join(appDir(), "torrent_cache"), { recursive: true });
 }
 
 export function generateConfig({

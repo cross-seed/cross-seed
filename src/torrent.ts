@@ -5,6 +5,7 @@ import { concat } from "simple-get";
 import * as logger from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { stripExtension } from "./utils";
+import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
 
 export function parseTorrentFromFilename(filename: string): Metafile {
 	const data = fs.readFileSync(filename);
@@ -70,6 +71,7 @@ export function saveTorrentFile(
 export function findAllTorrentFilesInDir(torrentDir: string): string[] {
 	return fs
 		.readdirSync(torrentDir)
+		.sort()
 		.filter((fn) => path.extname(fn) === ".torrent")
 		.map((fn) => path.join(torrentDir, fn));
 }
@@ -86,6 +88,15 @@ export function loadTorrentDir(): Metafile[] {
 	const { torrentDir } = getRuntimeConfig();
 	const dirContents = findAllTorrentFilesInDir(torrentDir);
 	return dirContents.map(parseTorrentFromFilename);
+}
+
+export function loadTorrentDirLight(): Searchee[] {
+	const { torrentDir } = getRuntimeConfig();
+	return fs
+		.readdirSync(torrentDir)
+		.filter((fn) => path.extname(fn) === ".torrent")
+		.sort()
+		.map(createSearcheeFromTorrentFile);
 }
 
 export function getTorrentByName(name: string): Metafile {
