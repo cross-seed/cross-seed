@@ -86,6 +86,10 @@ async function run() {
 				"--rtorrent-rpc-url <url>",
 				"The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.",
 				fileConfig.rtorrentRpcUrl
+			)
+			.option(
+				"--qbittorrent-url <url>",
+				"The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information."
 			);
 	}
 
@@ -119,7 +123,9 @@ async function run() {
 		"Start the cross-seed daemon"
 	).action(async (options) => {
 		try {
-			setRuntimeConfig(processOptions(options));
+			const runtimeConfig = processOptions(options);
+			setRuntimeConfig(runtimeConfig);
+			logger.verbose("[configdump]", runtimeConfig);
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
@@ -165,7 +171,9 @@ async function run() {
 		)
 		.action(async (options) => {
 			try {
-				setRuntimeConfig(processOptions(options));
+				const runtimeConfig = processOptions(options);
+				setRuntimeConfig(runtimeConfig);
+				logger.verbose("[configdump]", runtimeConfig);
 				await doStartupValidation();
 				await main();
 			} catch (e) {

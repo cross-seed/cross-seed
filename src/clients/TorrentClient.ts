@@ -2,6 +2,7 @@ import { Metafile } from "parse-torrent";
 import { InjectionResult } from "../constants";
 import { getRuntimeConfig } from "../runtimeConfig";
 import { Searchee } from "../searchee";
+import QBittorrent from "./QBittorrent";
 import RTorrent from "./RTorrent";
 
 let activeClient: TorrentClient;
@@ -15,9 +16,11 @@ export interface TorrentClient {
 }
 
 function instantiateDownloadClient() {
-	const { rtorrentRpcUrl } = getRuntimeConfig();
+	const { rtorrentRpcUrl, qbittorrentUrl } = getRuntimeConfig();
 	if (rtorrentRpcUrl) {
 		activeClient = new RTorrent();
+	} else if (qbittorrentUrl) {
+		activeClient = new QBittorrent();
 	}
 }
 
