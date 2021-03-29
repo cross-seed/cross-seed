@@ -1,10 +1,11 @@
+import fetch from "node-fetch";
 import { Metafile } from "parse-torrent";
+import querystring from "querystring";
 import { InjectionResult } from "../constants";
-import { log } from "../logger";
+import { CrossSeedError } from "../errors";
 import { getRuntimeConfig } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import { TorrentClient } from "./TorrentClient";
-import fetch from "node-fetch";
 
 export default class QBittorrent implements TorrentClient {
 	url: URL;
@@ -12,25 +13,40 @@ export default class QBittorrent implements TorrentClient {
 
 	constructor() {
 		const { qbittorrentUrl } = getRuntimeConfig();
-		this.url = new URL(`${qbittorrentUrl}/api`);
+		this.url = new URL(`${qbittorrentUrl}/api/v2`);
+	}
+
+	async login(): Promise<number> {
+		const { origin, pathname, username, password } = this.url;
+		const qs = querystring.encode({ username, password });
+		const response = await fetch(`${origin}${pathname}/auth/login?${qs}`);
+		const cookieArray = response.headers.raw()["set-cookie"];
+		if (cookieArray) this.cookie = cookieArray[0];
+		return response.status;
 	}
 
 	async validateConfig(): Promise<void> {
-		const { origin, pathname, username, password } = this.url;
-		const response = await fetch(`${origin}${pathname}/login`);
-		console.log(response.headers.get("Set-Cookie"));
+		let statusCode: number;
+		try {
+			statusCode = await this.login();
+			if (statusCode === 200) return;
+		} catch (e) {
+			// fall through
+		}
+		throw new CrossSeedError(
+			`qBittorrent login failed with code ${statusCode}`
+		);
 	}
 
-	private async request<T>(path: string, data: unknown): Promise<T> {
-		const { origin, pathname, username, password } = this.url;
-
-		const response = await fetch(origin + pathname + path, {
+	private async request<T>(
+		path: string,
+		data: Record<string, string>
+	): Promise<T> {
+		const { origin, pathname } = this.url;
+		const qs = querystring.encode(data);
+		const response = await fetch(`${origin}${pathname}${path}?${qs}`, {
 			method: "post",
-			body: JSON.stringify(data),
-			headers: {
-				"Content-Type": "application/json",
-				Cookie: this.cookie,
-			},
+			headers: { Cookie: this.cookie },
 		});
 		return response.json();
 	}
