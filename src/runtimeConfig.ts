@@ -15,6 +15,7 @@ interface RuntimeConfig {
 	excludeRecentSearch: number;
 	action: Action;
 	rtorrentRpcUrl: string;
+	qBittorrentUrl: string;
 }
 
 let runtimeConfig: RuntimeConfig;
