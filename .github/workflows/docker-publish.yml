@@ -1,4 +1,4 @@
-name: Publish Docker image
+name: Docker
 on:
   pull_request:
     branches: [ master ]
