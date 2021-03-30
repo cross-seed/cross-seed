@@ -1,4 +1,4 @@
-import fetch from "node-fetch";
+import fetch, { Response } from "node-fetch";
 import { Metafile } from "parse-torrent";
 import querystring from "querystring";
 import { InjectionResult } from "../constants";
@@ -16,26 +16,29 @@ export default class QBittorrent implements TorrentClient {
 		this.url = new URL(`${qbittorrentUrl}/api/v2`);
 	}
 
-	async login(): Promise<number> {
+	async validateConfig(): Promise<void> {
 		const { origin, pathname, username, password } = this.url;
 		const qs = querystring.encode({ username, password });
-		const response = await fetch(`${origin}${pathname}/auth/login?${qs}`);
-		const cookieArray = response.headers.raw()["set-cookie"];
-		if (cookieArray) this.cookie = cookieArray[0];
-		return response.status;
-	}
-
-	async validateConfig(): Promise<void> {
-		let statusCode: number;
+		let response: Response;
 		try {
-			statusCode = await this.login();
-			if (statusCode === 200) return;
+			response = await fetch(`${origin}${pathname}/auth/login?${qs}`);
 		} catch (e) {
-			// fall through
+			throw new CrossSeedError(`qBittorrent login failed: ${e.message}`);
 		}
-		throw new CrossSeedError(
-			`qBittorrent login failed with code ${statusCode}`
-		);
+
+		if (response.status !== 200) {
+			throw new CrossSeedError(
+				`qBittorrent login failed with code ${response.status}`
+			);
+		}
+		const cookieArray = response.headers.raw()["set-cookie"];
+		if (cookieArray) {
+			this.cookie = cookieArray[0];
+		} else {
+			throw new CrossSeedError(
+				`qBittorrent login failed: Invalid username or password`
+			);
+		}
 	}
 
 	private async request<T>(
