@@ -14,6 +14,6 @@ jobs:
         with:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          registry: ghcr.io
-          repository: mmgoodnow/cross-seed
+          registry: docker.pkg.github.com
+          repository: mmgoodnow/cross-seed/cross-seed
           tag_with_ref: true
