@@ -24,9 +24,12 @@ function fallback(...args) {
 
 function processOptions(options) {
 	options.trackers = options.trackers.split(",").filter((e) => e !== "");
-	if (options.action === "inject" && !options.rtorrentRpcUrl) {
+	if (
+		options.action === "inject" &&
+		!(options.rtorrentRpcUrl || options.qbittorrentUrl)
+	) {
 		throw new CrossSeedError(
-			"You need to specify --rtorrent-rpc-url when using '-A inject'."
+			"You need to specify --rtorrent-rpc-url or --qbittorrent-url when using '-A inject'."
 		);
 	}
 	return options;
