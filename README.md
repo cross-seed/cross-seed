@@ -4,19 +4,26 @@
 seed based on your existing torrents. It is designed to match conservatively to
 minimize manual intervention.
 
-If you use rTorrent, you're in luck! `cross-seed` can inject the torrents it
-finds directly into `rtorrent`. If you don't use rTorrent, `cross-seed` will
-download a bunch of torrent files to a folder you specify. After that, I
-recommend using [AutoTorrent](https://github.com/JohnDoee/autotorrent) to do the
-last-mile delivery into your client.
+`cross-seed` can inject the torrents it finds directly into your torrent client.
+Currently the supported clients are
+
+-   rTorrent
+-   qBittorrent
+
+[Request your client here.](https://github.com/mmgoodnow/cross-seed/issues/new)
+
+If your client isn't supported, `cross-seed` will download a bunch of torrent
+files to a folder you specify. After that, I recommend using
+[AutoTorrent](https://github.com/JohnDoee/autotorrent) to do the last-mile
+delivery into your client.
 
 ## Requirements
 
 -   [Node 12+](https://nodejs.org/en/download)
 -   [Jackett](https://github.com/Jackett/Jackett)
 
-It will work on Mac and on Linux; I haven't tested it on Windows but it may work
-there too.
+It will work on Mac and on Linux; I haven't tested it on Windows but it should
+work there too.
 
 ## Usage
 
@@ -53,6 +60,9 @@ Options:
   -s, --output-dir <dir>                Directory to save results in
   -a, --search-all                      Search for all torrents regardless of their contents (default: false)
   -v, --verbose                         Log verbose output (default: false)
+  -A, --action <action>                 If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client. (choices: "save", "inject", default: "save")
+  --rtorrent-rpc-url <url>              The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.
+  --qbittorrent-url <url>               The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.
   -o, --offset <offset>                 Offset to start from
   -d, --delay <delay>                   Pause duration (seconds) between searches (default: 10)
   -e, --include-episodes                Include single-episode torrents in the search (default: false)
@@ -84,7 +94,8 @@ cross-seed
 To update,
 
 ```shell script
-npm update -g cross-seed
+npm uninstall -g cross-seed
+npm install -g cross-seed
 ```
 
 ## Daemon mode (beta, rTorrent only, Docker recommended)
@@ -94,7 +105,7 @@ can trigger an HTTP request to search for cross-seeds of a specific torrent. See
 more info in the
 [wiki page](https://github.com/mmgoodnow/cross-seed/wiki/Daemon-Mode).
 
-## Direct client injection (alpha, rTorrent only)
+## Direct client injection (alpha, rTorrent and qBittorrent only)
 
 As mentioned above, `cross-seed` can inject the torrents it finds directly into
 your torrent client. See more info in the

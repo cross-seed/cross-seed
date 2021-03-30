@@ -1,5 +1,4 @@
 import { Action } from "./constants";
-
 interface RuntimeConfig {
 	offset: number;
 	jackettServerUrl: string;
@@ -15,6 +14,7 @@ interface RuntimeConfig {
 	excludeRecentSearch: number;
 	action: Action;
 	rtorrentRpcUrl: string;
+	qbittorrentUrl: string;
 }
 
 let runtimeConfig: RuntimeConfig;
