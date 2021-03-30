@@ -40,4 +40,10 @@ module.exports = {
 	// Only relevant with action: "inject".
 	// Could be something like "http://username:password@localhost:1234/RPC2
 	rtorrentRpcUrl: undefined,
+
+	// The url of your qBittorrent webui.
+	// Only relevant with action: "inject".
+	// Supply your username and password inside the url like so:
+	// "http://username:password@localhost:8080"
+	qbittorrentUrl: undefined,
 };
