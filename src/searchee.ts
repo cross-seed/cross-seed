@@ -3,7 +3,8 @@ import { Metafile } from "parse-torrent";
 import path, { join } from "path";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { parseTorrentFromFilename } from "./torrent";
-
+import { Result } from "./utils";
+import * as logger from "./logger";
 interface File {
 	length: number;
 	name: string;
@@ -46,14 +47,22 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 	return sortBy(unsortedFiles, "path");
 }
 
-export function createSearcheeFromTorrentFile(filename: string): Searchee {
+export function createSearcheeFromTorrentFile(
+	filename: string
+): Result<Searchee> {
 	const { torrentDir } = getRuntimeConfig();
 	const fullPath = join(torrentDir, filename);
-	const meta = parseTorrentFromFilename(fullPath);
-	return {
-		files: getFilesFromTorrent(meta),
-		infoHash: meta.infoHash,
-		name: meta.name,
-		length: meta.length,
-	};
+	try {
+		const meta = parseTorrentFromFilename(fullPath);
+		return {
+			files: getFilesFromTorrent(meta),
+			infoHash: meta.infoHash,
+			name: meta.name,
+			length: meta.length,
+		};
+	} catch (e) {
+		logger.error("Failed to parse", filename);
+		logger.debug(e);
+		return e;
+	}
 }

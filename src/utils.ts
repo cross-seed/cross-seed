@@ -31,3 +31,7 @@ export function getTag(name: string): string {
 		? "movie"
 		: "unknown";
 }
+
+export type Result<T> = T | Error;
+
+export const ok = <T>(r: Result<T>): r is T => !(r instanceof Error);
