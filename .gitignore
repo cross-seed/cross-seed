@@ -35,3 +35,4 @@ config.js
 output/
 input/
 *.heapsnapshot
+qbit/

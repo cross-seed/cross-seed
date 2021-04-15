@@ -3,7 +3,9 @@
     <words>
       <w>bencode</w>
       <w>jackett</w>
+      <w>qbittorrent</w>
       <w>rtorrent</w>
+      <w>savepath</w>
       <w>searchee</w>
       <w>searchees</w>
       <w>seedable</w>

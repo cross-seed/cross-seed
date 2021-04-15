@@ -74,6 +74,11 @@ async function findOnOtherSites(
 						`Found ${styledName} on ${styledTracker} - exists`
 					);
 					break;
+				case InjectionResult.TORRENT_NOT_COMPLETE:
+					logger.warn(
+						`Found ${styledName} on ${styledTracker} - skipping incomplete torrent`
+					);
+					break;
 				case InjectionResult.FAILURE:
 				default:
 					logger.error(

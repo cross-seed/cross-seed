@@ -18,6 +18,7 @@ interface FileConfig {
 	searchAll?: boolean;
 	torrentDir?: string;
 	trackers?: string[];
+	qbittorrentUrl?: string;
 }
 
 interface GenerateConfigParams {
