@@ -92,7 +92,8 @@ async function run() {
 			)
 			.option(
 				"--qbittorrent-url <url>",
-				"The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information."
+				"The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.",
+				fileConfig.qbittorrentUrl
 			);
 	}
 

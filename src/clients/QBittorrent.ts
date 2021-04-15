@@ -1,14 +1,14 @@
 import FormData from "form-data";
 import fetch, { BodyInit, Response } from "node-fetch";
 import parseTorrent, { Metafile } from "parse-torrent";
-import { dirname } from "path";
 import querystring from "querystring";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
+import * as logger from "../logger";
 import { getRuntimeConfig } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import { TorrentClient } from "./TorrentClient";
-import * as logger from "../logger";
+
 interface QTorrentListing {
 	save_path: string;
 }
@@ -90,20 +90,24 @@ export default class QBittorrent implements TorrentClient {
 		return responseText !== "Not Found";
 	}
 
-	async getDataDir(searchee: Searchee): Promise<string> {
-		if (searchee.path) return dirname(searchee.path);
-		const infoHash = searchee.infoHash;
+	async getTorrentConfiguration(
+		searchee: Searchee
+	): Promise<{ save_path: string; category: string; isComplete: boolean }> {
 		const responseText = await this.request(
-			"/torrents/properties",
-			`hash=${infoHash}`,
+			"/torrents/info",
+			`hashes=${searchee.infoHash}`,
 			X_WWW_FORM_URLENCODED
 		);
-		if (responseText === "Not Found") {
+		const searchResult = JSON.parse(responseText).find(
+			(e) => e.hash === searchee.infoHash
+		);
+		if (searchResult === undefined) {
 			throw new Error(
 				"Failed to retrieve data dir; torrent not found in client"
 			);
 		}
-		return JSON.parse(responseText).save_path;
+		const { save_path, category, progress } = searchResult;
+		return { save_path, category, isComplete: progress === 1 };
 	}
 
 	async inject(
@@ -115,14 +119,20 @@ export default class QBittorrent implements TorrentClient {
 		}
 		const buf = parseTorrent.toTorrentFile(newTorrent);
 		try {
-			const dataDir = await this.getDataDir(searchee);
+			const {
+				save_path,
+				category,
+				isComplete,
+			} = await this.getTorrentConfiguration(searchee);
+			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 			const formData = new FormData();
 			formData.append("torrents", buf, {
 				filename: `${newTorrent.name}.cross-seed.torrent`,
 				contentType: "application/x-bittorrent",
 			});
 			formData.append("skip_checking", "true");
-			formData.append("savepath", dataDir);
+			formData.append("savepath", save_path);
+			formData.append("category", category);
 			formData.append("tags", "cross-seed");
 			await this.request("/torrents/add", formData);
 			return InjectionResult.SUCCESS;

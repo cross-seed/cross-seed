@@ -18,9 +18,10 @@ export enum Action {
 }
 
 export enum InjectionResult {
-	SUCCESS = 1,
-	FAILURE = -1,
-	ALREADY_EXISTS = 0,
+	SUCCESS,
+	FAILURE,
+	ALREADY_EXISTS,
+	TORRENT_NOT_COMPLETE,
 }
 
 export enum Decision {
