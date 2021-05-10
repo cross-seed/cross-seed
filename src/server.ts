@@ -24,6 +24,7 @@ function parseData(data) {
 	} catch (_) {
 		const parsed = qs.parse(data);
 		if ("name" in parsed) return parsed;
+		throw new Error(`Unable to parse request body: "${data}"`);
 	}
 }
 
