@@ -132,8 +132,8 @@ export default class QBittorrent implements TorrentClient {
 			});
 			formData.append("skip_checking", "true");
 			formData.append("savepath", save_path);
-			formData.append("category", category);
 			formData.append("tags", "cross-seed");
+			formData.append("autoTMM", "false");
 			await this.request("/torrents/add", formData);
 			return InjectionResult.SUCCESS;
 		} catch (e) {
