@@ -45,7 +45,6 @@ async function findOnOtherSites(
 		logger.error(`error querying Jackett for ${query}`);
 		return 0;
 	}
-	updateSearchTimestamps(searchee.name);
 	const results = response.Results;
 
 	const loaded = await Promise.all<AssessmentWithTracker>(
@@ -54,6 +53,8 @@ async function findOnOtherSites(
 	const successful = loaded.filter(
 		(e) => e.assessment.decision === Decision.MATCH
 	);
+
+	let isTorrentIncomplete;
 
 	for (const {
 		tracker,
@@ -78,6 +79,7 @@ async function findOnOtherSites(
 					logger.warn(
 						`Found ${styledName} on ${styledTracker} - skipping incomplete torrent`
 					);
+					isTorrentIncomplete = true;
 					break;
 				case InjectionResult.FAILURE:
 				default:
@@ -91,6 +93,10 @@ async function findOnOtherSites(
 			saveTorrentFile(tracker, tag, newInfo);
 			logger.log(`Found ${styledName} on ${styledTracker}`);
 		}
+	}
+
+	if (!isTorrentIncomplete) {
+		updateSearchTimestamps(searchee.name);
 	}
 
 	return successful.length;
