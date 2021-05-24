@@ -33,7 +33,7 @@ module.exports = {
 	searchAll: false,
 
 	// can be either "save" or "inject".
-	// With "inject" you need to specify the rtorrent rpc url.
+	// With "inject" you need to set up one of the below clients.
 	action: "save",
 
 	// The url of your rtorrent XMLRPC interface.
