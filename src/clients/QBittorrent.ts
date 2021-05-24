@@ -87,7 +87,15 @@ export default class QBittorrent implements TorrentClient {
 			`hash=${infoHash}`,
 			X_WWW_FORM_URLENCODED
 		);
-		return responseText !== "Not Found";
+		if (responseText === "Not Found") {
+			return false;
+		} else {
+			logger.verbose(
+				`[qbittorrent] info hash ${infoHash} found in client:`,
+				responseText
+			);
+			return true;
+		}
 	}
 
 	async getTorrentConfiguration(
