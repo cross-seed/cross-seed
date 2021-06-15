@@ -112,8 +112,7 @@ async function run() {
 			"-d, --docker",
 			"Generate the docker config instead of the normal one"
 		)
-		.action((command) => {
-			const options = command.opts();
+		.action((options) => {
 			generateConfig(options);
 		});
 

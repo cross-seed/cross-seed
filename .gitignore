@@ -36,3 +36,4 @@ output/
 input/
 *.heapsnapshot
 qbit/
+cache.json
