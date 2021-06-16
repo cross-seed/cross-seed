@@ -6,7 +6,7 @@ import { generateConfig, getFileConfig } from "./configuration";
 import { Action } from "./constants";
 import { dropDatabase } from "./db";
 import { CrossSeedError } from "./errors";
-import * as logger from "./logger";
+import { logger } from "./logger";
 import { main } from "./pipeline";
 import { setRuntimeConfig } from "./runtimeConfig";
 import { serve } from "./server";

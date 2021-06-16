@@ -5,7 +5,7 @@ import { dirname, resolve } from "path";
 import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
-import * as logger from "../logger";
+import { logger } from "../logger";
 import { getRuntimeConfig } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import { wait } from "../utils";

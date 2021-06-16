@@ -2,7 +2,7 @@ import fs from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { concat } from "simple-get";
-import * as logger from "./logger";
+import { logger } from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { ok, stripExtension } from "./utils";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee";

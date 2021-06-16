@@ -4,7 +4,7 @@ import path, { join } from "path";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { parseTorrentFromFilename } from "./torrent";
 import { Result } from "./utils";
-import * as logger from "./logger";
+import { logger } from "./logger";
 interface File {
 	length: number;
 	name: string;

@@ -5,7 +5,7 @@ import { appDir } from "./configuration";
 import { Decision, DECISIONS, TORRENT_CACHE_FOLDER } from "./constants";
 import db, { DecisionEntry } from "./db";
 import { JackettResult } from "./jackett";
-import * as logger from "./logger";
+import { logger } from "./logger";
 import { Searchee } from "./searchee";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent";
 import { partial } from "./utils";

@@ -2,7 +2,7 @@ import querystring from "querystring";
 import get from "simple-get";
 import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
 import { CrossSeedError } from "./errors";
-import * as logger from "./logger";
+import { logger } from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 
 export interface JackettResult {

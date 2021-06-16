@@ -4,7 +4,7 @@ import parseTorrent, { Metafile } from "parse-torrent";
 import querystring from "querystring";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
-import * as logger from "../logger";
+import { logger } from "../logger";
 import { getRuntimeConfig } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import { TorrentClient } from "./TorrentClient";

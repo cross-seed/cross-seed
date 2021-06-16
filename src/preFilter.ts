@@ -3,7 +3,7 @@ import { Metafile } from "parse-torrent";
 import path from "path";
 import { EP_REGEX, EXTENSIONS, SEARCHEES } from "./constants";
 import db, { Schema } from "./db";
-import * as logger from "./logger";
+import { logger } from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { Searchee } from "./searchee";
 import { nMinutesAgo, partial } from "./utils";

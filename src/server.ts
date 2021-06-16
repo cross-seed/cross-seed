@@ -2,7 +2,7 @@ import fs from "fs";
 import http from "http";
 import qs from "querystring";
 import { validateJackettApi } from "./jackett";
-import * as logger from "./logger";
+import { logger } from "./logger";
 import { searchForSingleTorrentByName } from "./pipeline";
 import { getRuntimeConfig } from "./runtimeConfig";
 
@@ -43,13 +43,13 @@ async function handleRequest(req, res) {
 	const { name } = parseData(dataStr);
 	res.writeHead(204);
 	res.end();
-	logger.log("Received name", name);
+	logger.info("Received name", name);
 	try {
 		const numFound = await searchForSingleTorrentByName(name);
 		if (numFound === null) {
-			logger.log(`Did not search for ${name}`);
+			logger.info(`Did not search for ${name}`);
 		} else {
-			logger.log(`Found ${numFound} torrents for ${name}`);
+			logger.info(`Found ${numFound} torrents for ${name}`);
 		}
 	} catch (e) {
 		logger.error(e);
@@ -67,5 +67,5 @@ export async function serve(): Promise<void> {
 	fs.mkdirSync(outputDir, { recursive: true });
 	const server = http.createServer(handleRequest);
 	server.listen(2468);
-	logger.log("Server is running on port 2468, ^C to stop.");
+	logger.info("Server is running on port 2468, ^C to stop.");
 }

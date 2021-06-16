@@ -4,7 +4,7 @@ import path from "path";
 import packageDotJson from "../package.json";
 import configTemplate from "./config.template";
 import { Action, CONFIG_TEMPLATE_URL } from "./constants";
-import * as logger from "./logger";
+import { logger } from "./logger";
 
 interface FileConfig {
 	action?: Action;
@@ -50,11 +50,11 @@ export function generateConfig({
 		`config.template${docker ? ".docker" : ""}.js`
 	);
 	if (!force && fs.existsSync(dest)) {
-		logger.log("Configuration file already exists.");
+		logger.info("Configuration file already exists.");
 		return;
 	}
 	fs.copyFileSync(templatePath, dest);
-	logger.log("Configuration file created at", chalk.yellow.bold(dest));
+	logger.info("Configuration file created at", chalk.yellow.bold(dest));
 }
 
 function printUpdateInstructions(missingKeys) {
