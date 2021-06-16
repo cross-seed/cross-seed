@@ -26,7 +26,7 @@ export default class QBittorrent implements TorrentClient {
 		this.url = new URL(`${qbittorrentUrl}/api/v2`);
 	}
 
-	async validateConfig(): Promise<void> {
+	async login(): Promise<void> {
 		const { origin, pathname, username, password } = this.url;
 		const qs = querystring.encode({ username, password });
 		let response: Response;
@@ -49,13 +49,18 @@ export default class QBittorrent implements TorrentClient {
 				`qBittorrent login failed: Invalid username or password`
 			);
 		}
+	}
+
+	async validateConfig(): Promise<void> {
+		await this.login();
 		await this.createTag();
 	}
 
 	private async request(
 		path: string,
 		body: BodyInit,
-		headers: Record<string, string> = {}
+		headers: Record<string, string> = {},
+		retries = 1
 	): Promise<string> {
 		logger.verbose(
 			"[qbittorrent]",
@@ -70,6 +75,13 @@ export default class QBittorrent implements TorrentClient {
 			headers: { Cookie: this.cookie, ...headers },
 			body,
 		});
+		if (response.status === 403 && retries > 0) {
+			logger.verbose(
+				"[qbittorrent] received 403 from API. Logging in again and retrying"
+			);
+			await this.login();
+			return this.request(path, body, headers, retries - 1);
+		}
 		return response.text();
 	}
 
