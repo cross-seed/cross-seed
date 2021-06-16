@@ -93,20 +93,17 @@ export default class QBittorrent implements TorrentClient {
 		);
 	}
 
-	async checkForInfoHashInClient(infoHash: string): Promise<boolean> {
+	async isInfoHashInClient(infoHash: string): Promise<boolean> {
 		const responseText = await this.request(
 			"/torrents/properties",
 			`hash=${infoHash}`,
 			X_WWW_FORM_URLENCODED
 		);
-		if (responseText === "Not Found") {
+		try {
+			const properties = JSON.parse(responseText);
+			return properties && typeof properties === "object";
+		} catch (e) {
 			return false;
-		} else {
-			logger.verbose(
-				`[qbittorrent] info hash ${infoHash} found in client:`,
-				responseText
-			);
-			return true;
 		}
 	}
 
@@ -134,7 +131,7 @@ export default class QBittorrent implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee
 	): Promise<InjectionResult> {
-		if (await this.checkForInfoHashInClient(newTorrent.infoHash)) {
+		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
 		const buf = parseTorrent.toTorrentFile(newTorrent);
