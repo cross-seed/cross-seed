@@ -162,28 +162,35 @@ export default class RTorrent implements TorrentClient {
 		}
 
 		const dataDir = await this.getDataDir(searchee);
-		const savePath = resolve(
+		const torrentFilePath = resolve(
 			outputDir,
 			`${meta.name}.tmp.${Date.now()}.torrent`
 		);
-		await saveWithLibTorrentResume(meta, savePath, dataDir);
-
-		await this.methodCallP<void>("load.start", [
-			"",
-			savePath,
-			`d.directory.set="${dataDir}"`,
-			`d.custom1.set="cross-seed"`,
-			`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
-		]);
+		await saveWithLibTorrentResume(meta, torrentFilePath, dataDir);
 
 		for (let i = 0; i < 5; i++) {
-			await wait(100 * Math.pow(2, i));
-			if (await this.checkForInfoHashInClient(meta.infoHash)) {
-				setTimeout(() => fs.unlink(savePath), 1000);
-				return InjectionResult.SUCCESS;
+			try {
+				await this.methodCallP<void>("load.start", [
+					"",
+					torrentFilePath,
+					`d.directory.set="${dataDir}"`,
+					`d.custom1.set="cross-seed"`,
+					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
+				]);
+				break;
+			} catch (e) {
+				await wait(1000 * Math.pow(2, i));
 			}
 		}
-		setTimeout(() => fs.unlink(savePath), 1000);
+
+		for (let i = 0; i < 5; i++) {
+			if (await this.checkForInfoHashInClient(meta.infoHash)) {
+				setTimeout(() => fs.unlink(torrentFilePath), 1000);
+				return InjectionResult.SUCCESS;
+			}
+			await wait(100 * Math.pow(2, i));
+		}
+		setTimeout(() => fs.unlink(torrentFilePath), 1000);
 		return InjectionResult.FAILURE;
 	}
 }
