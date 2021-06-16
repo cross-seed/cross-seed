@@ -1,28 +1,28 @@
-import chalk from "chalk";
+import { createLogger, format, transports } from "winston";
 import { getRuntimeConfig } from "./runtimeConfig";
 
-export function log(...args: unknown[]): void {
-	console.log(...args);
-}
-
-export function verbose(...args: unknown[]): void {
-	const { verbose } = getRuntimeConfig();
-	if (verbose) {
-		console.log(...args);
-	}
-}
-
-export function debug(...args: unknown[]): void {
-	const { verbose } = getRuntimeConfig();
-	if (verbose) {
-		console.error(...args);
-	}
-}
-
-export function error(...args: string[]): void {
-	console.error(...args.map((arg) => chalk.red(arg)));
-}
-
-export function warn(...args: string[]): void {
-	console.warn(...args.map((arg) => chalk.yellow(arg)));
-}
+export const logger = createLogger({
+	level: "info",
+	format: format.combine(
+		format.timestamp({
+			format: "YYYY-MM-DD HH:mm:ss",
+		}),
+		format.errors({ stack: true }),
+		format.splat(),
+		format.json()
+	),
+	transports: [
+		new transports.File({
+			filename: "error.log",
+			level: "error",
+		}),
+		new transports.File({
+			filename: "info.log",
+		}),
+		new transports.File({ filename: "verbose.log", level: "silly" }),
+		new transports.Console({
+			level: getRuntimeConfig().verbose ? "silly" : "info",
+			format: format.combine(format.colorize(), format.simple()),
+		}),
+	],
+});
