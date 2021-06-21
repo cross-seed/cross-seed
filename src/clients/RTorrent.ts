@@ -5,7 +5,7 @@ import { dirname, resolve } from "path";
 import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
-import * as logger from "../logger";
+import { Label, logger } from "../logger";
 import { getRuntimeConfig } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import { wait } from "../utils";
@@ -34,9 +34,10 @@ async function createLibTorrentResumeTree(
 			.lstat(filePath)
 			.catch(() => ({ isFile: () => false } as Stats));
 		if (!fileStat.isFile() || fileStat.size !== file.length) {
-			logger.debug(
-				`File ${filePath} either doesn't exist or is the wrong size.`
-			);
+			logger.debug({
+				label: Label.RTORRENT,
+				message: `File ${filePath} either doesn't exist or is the wrong size.`,
+			});
 			return {
 				completed: 0,
 				mtime: 0,
@@ -95,13 +96,10 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	private async methodCallP<R>(method: string, args): Promise<R> {
-		logger.verbose(
-			"[rtorrent]",
-			"Calling method",
-			method,
-			"with params",
-			args
-		);
+		logger.verbose({
+			label: Label.RTORRENT,
+			message: `Calling method ${method} with params ${args}`,
+		});
 		return new Promise((resolve, reject) => {
 			this.client.methodCall(method, args, (err, data) => {
 				if (err) return reject(err);

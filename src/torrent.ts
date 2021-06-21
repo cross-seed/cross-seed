@@ -2,7 +2,7 @@ import fs from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { concat } from "simple-get";
-import * as logger from "./logger";
+import { logger } from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { ok, stripExtension } from "./utils";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
@@ -24,7 +24,7 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 		});
 	} catch (e) {
 		logger.error(`error: failed to access ${url}`);
-		logger.debug("reason", e);
+		logger.debug(e);
 		return null;
 	}
 
@@ -41,8 +41,8 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 			logger.error(
 				`error downloading torrent at ${url}: ${response.statusCode} ${response.statusMessage}`
 			);
-			logger.debug("response:", response.data);
-			logger.debug("headers:", response.headers);
+			logger.debug("response: %s", response.data);
+			logger.debug("headers: %s", response.headers);
 			return null;
 		}
 	}
@@ -51,7 +51,7 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 		return parseTorrent(response.data);
 	} catch (e) {
 		logger.error(`error: invalid torrent contents at ${url}`);
-		logger.debug("reason:", e);
+		logger.debug(e);
 		return null;
 	}
 }

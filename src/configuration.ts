@@ -4,7 +4,6 @@ import path from "path";
 import packageDotJson from "../package.json";
 import configTemplate from "./config.template";
 import { Action, CONFIG_TEMPLATE_URL } from "./constants";
-import * as logger from "./logger";
 
 interface FileConfig {
 	action?: Action;
@@ -37,6 +36,7 @@ export function appDir(): string {
 
 export function createAppDir(): void {
 	fs.mkdirSync(path.join(appDir(), "torrent_cache"), { recursive: true });
+	fs.mkdirSync(path.join(appDir(), "logs"), { recursive: true });
 }
 
 export function generateConfig({
@@ -50,11 +50,11 @@ export function generateConfig({
 		`config.template${docker ? ".docker" : ""}.js`
 	);
 	if (!force && fs.existsSync(dest)) {
-		logger.log("Configuration file already exists.");
+		console.log("Configuration file already exists.");
 		return;
 	}
 	fs.copyFileSync(templatePath, dest);
-	logger.log("Configuration file created at", chalk.yellow.bold(dest));
+	console.log("Configuration file created at", chalk.yellow.bold(dest));
 }
 
 function printUpdateInstructions(missingKeys) {

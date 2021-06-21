@@ -4,7 +4,7 @@ import parseTorrent, { Metafile } from "parse-torrent";
 import querystring from "querystring";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
-import * as logger from "../logger";
+import { Label, logger } from "../logger";
 import { getRuntimeConfig } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import { TorrentClient } from "./TorrentClient";
@@ -62,13 +62,10 @@ export default class QBittorrent implements TorrentClient {
 		headers: Record<string, string> = {},
 		retries = 1
 	): Promise<string> {
-		logger.verbose(
-			"[qbittorrent]",
-			"Making request to",
-			path,
-			"with body",
-			body.toString()
-		);
+		logger.verbose({
+			label: Label.QBITTORRENT,
+			message: `Making request to ${path} with body ${body.toString()}`,
+		});
 		const { origin, pathname } = this.url;
 		const response = await fetch(`${origin}${pathname}${path}`, {
 			method: "post",
@@ -76,9 +73,10 @@ export default class QBittorrent implements TorrentClient {
 			body,
 		});
 		if (response.status === 403 && retries > 0) {
-			logger.verbose(
-				"[qbittorrent] received 403 from API. Logging in again and retrying"
-			);
+			logger.verbose({
+				label: Label.QBITTORRENT,
+				message: "received 403 from API. Logging in again and retrying",
+			});
 			await this.login();
 			return this.request(path, body, headers, retries - 1);
 		}
@@ -154,7 +152,10 @@ export default class QBittorrent implements TorrentClient {
 			await this.request("/torrents/add", formData);
 			return InjectionResult.SUCCESS;
 		} catch (e) {
-			logger.debug("[qbittorrent]", "injection failed:", e.message);
+			logger.debug({
+				label: Label.QBITTORRENT,
+				message: `injection failed: ${e.message}`,
+			});
 			return InjectionResult.FAILURE;
 		}
 	}

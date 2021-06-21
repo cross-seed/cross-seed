@@ -5,7 +5,7 @@ import { appDir } from "./configuration";
 import { Decision, DECISIONS, TORRENT_CACHE_FOLDER } from "./constants";
 import db, { DecisionEntry } from "./db";
 import { JackettResult } from "./jackett";
-import * as logger from "./logger";
+import { Label, logger } from "./logger";
 import { Searchee } from "./searchee";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent";
 import { partial } from "./utils";
@@ -19,16 +19,12 @@ const createReasonLogger = (Title: string, tracker: string, name: string) => (
 	decision: Decision,
 	cached
 ): void => {
-	const logReason = partial(
-		logger.verbose,
-		"[decide]",
-		name,
-		"- no match for",
-		tracker,
-		"torrent",
-		Title,
-		"-"
-	);
+	function logReason(reason): void {
+		logger.verbose({
+			label: Label.DECIDE,
+			message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}`,
+		});
+	}
 	let reason;
 	switch (decision) {
 		case Decision.MATCH:
@@ -49,7 +45,7 @@ const createReasonLogger = (Title: string, tracker: string, name: string) => (
 			reason = "it has a different file tree";
 			break;
 	}
-	if (cached) logReason(reason, "(cached)");
+	if (cached) logReason(`${reason} (cached)`);
 	else logReason(reason);
 };
 

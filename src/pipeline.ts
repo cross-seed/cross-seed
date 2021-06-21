@@ -5,7 +5,7 @@ import { Action, Decision, InjectionResult, SEARCHEES } from "./constants";
 import db from "./db";
 import { assessResult, ResultAssessment } from "./decide";
 import { JackettResponse, JackettResult, makeJackettRequest } from "./jackett";
-import * as logger from "./logger";
+import { logger } from "./logger";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { Searchee } from "./searchee";
@@ -66,12 +66,12 @@ async function findOnOtherSites(
 			const result = await getClient().inject(newInfo, searchee);
 			switch (result) {
 				case InjectionResult.SUCCESS:
-					logger.log(
+					logger.info(
 						`Found ${styledName} on ${styledTracker} - injected`
 					);
 					break;
 				case InjectionResult.ALREADY_EXISTS:
-					logger.log(
+					logger.info(
 						`Found ${styledName} on ${styledTracker} - exists`
 					);
 					break;
@@ -91,7 +91,7 @@ async function findOnOtherSites(
 			}
 		} else {
 			saveTorrentFile(tracker, tag, newInfo);
-			logger.log(`Found ${styledName} on ${styledTracker}`);
+			logger.info(`Found ${styledName} on ${styledTracker}`);
 		}
 	}
 
@@ -127,7 +127,7 @@ async function findMatchesBatch(
 			`[${i + 1 + offset}/${samples.length + offset}]`
 		);
 		const name = stripExtension(sample.name);
-		logger.log(progress, chalk.dim("Searching for"), name);
+		logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
 		const numFoundPromise = findOnOtherSites(sample, hashesToExclude);
 		const [numFound] = await Promise.all([numFoundPromise, sleep]);
@@ -156,7 +156,7 @@ function findSearchableTorrents() {
 		.filter(filterTimestamps);
 	const samples = filteredTorrents.slice(offset);
 
-	logger.log(
+	logger.info(
 		"Found %d torrents, %d suitable to search for matches",
 		parsedTorrents.length,
 		filteredTorrents.length
@@ -169,12 +169,12 @@ export async function main(): Promise<void> {
 	const { offset, outputDir } = getRuntimeConfig();
 	const { samples, hashesToExclude } = findSearchableTorrents();
 
-	if (offset > 0) logger.log("Starting at offset", offset);
+	if (offset > 0) logger.info(`Starting at offset ${offset}`);
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);
 
-	logger.log(
+	logger.info(
 		chalk.cyan("Done! Found %s cross seeds from %s original torrents"),
 		chalk.bold.white(totalFound),
 		chalk.bold.white(samples.length)

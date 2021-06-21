@@ -2,7 +2,7 @@ import querystring from "querystring";
 import get from "simple-get";
 import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
 import { CrossSeedError } from "./errors";
-import * as logger from "./logger";
+import { Label, logger } from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 
 export interface JackettResult {
@@ -78,8 +78,7 @@ export async function validateJackettApi(): Promise<void> {
 	const { jackettServerUrl, jackettApiKey: apikey } = getRuntimeConfig();
 
 	if (/\/$/.test(jackettServerUrl)) {
-		const msg = "Warning: Jackett server url should not end with '/'";
-		logger.warn(msg);
+		logger.warn("Warning: Jackett server url should not end with '/'");
 	}
 
 	// search for gibberish so the results will be empty
@@ -106,7 +105,10 @@ export function makeJackettRequest(name: string): Promise<JackettResponse> {
 		json: true,
 	};
 
-	logger.verbose(`[jackett] making search with query "${params.Query}"`);
+	logger.verbose({
+		label: Label.JACKETT,
+		message: `making search with query "${params.Query}"`,
+	});
 
 	return new Promise((resolve, reject) => {
 		get.concat(opts, (err, res, data) => {

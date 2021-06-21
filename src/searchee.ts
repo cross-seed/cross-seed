@@ -4,7 +4,7 @@ import path, { join } from "path";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { parseTorrentFromFilename } from "./torrent";
 import { Result } from "./utils";
-import * as logger from "./logger";
+import { logger } from "./logger";
 interface File {
 	length: number;
 	name: string;
@@ -61,7 +61,7 @@ export function createSearcheeFromTorrentFile(
 			length: meta.length,
 		};
 	} catch (e) {
-		logger.error("Failed to parse", filename);
+		logger.error(`Failed to parse ${filename}`);
 		logger.debug(e);
 		return e;
 	}

@@ -6,11 +6,11 @@ import { generateConfig, getFileConfig } from "./configuration";
 import { Action } from "./constants";
 import { dropDatabase } from "./db";
 import { CrossSeedError } from "./errors";
-import * as logger from "./logger";
+import { initializeLogger, Label, logger } from "./logger";
 import { main } from "./pipeline";
 import { setRuntimeConfig } from "./runtimeConfig";
 import { serve } from "./server";
-
+import { inspect } from "util";
 import "./signalHandlers";
 
 import { doStartupValidation } from "./startup";
@@ -128,7 +128,11 @@ async function run() {
 		try {
 			const runtimeConfig = processOptions(options);
 			setRuntimeConfig(runtimeConfig);
-			logger.verbose("[configdump]", runtimeConfig);
+			initializeLogger();
+			logger.verbose({
+				label: Label.CONFIGDUMP,
+				message: inspect(runtimeConfig),
+			});
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
@@ -176,7 +180,11 @@ async function run() {
 			try {
 				const runtimeConfig = processOptions(options);
 				setRuntimeConfig(runtimeConfig);
-				logger.verbose("[configdump]", runtimeConfig);
+				initializeLogger();
+				logger.verbose({
+					label: Label.CONFIGDUMP,
+					message: inspect(runtimeConfig),
+				});
 				await doStartupValidation();
 				await main();
 			} catch (e) {
