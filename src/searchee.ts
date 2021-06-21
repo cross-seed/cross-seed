@@ -61,7 +61,7 @@ export function createSearcheeFromTorrentFile(
 			length: meta.length,
 		};
 	} catch (e) {
-		logger.error("Failed to parse", filename);
+		logger.error(`Failed to parse ${filename}`);
 		logger.debug(e);
 		return e;
 	}

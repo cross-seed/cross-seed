@@ -127,7 +127,7 @@ async function findMatchesBatch(
 			`[${i + 1 + offset}/${samples.length + offset}]`
 		);
 		const name = stripExtension(sample.name);
-		logger.info(progress, chalk.dim("Searching for"), name);
+		logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
 		const numFoundPromise = findOnOtherSites(sample, hashesToExclude);
 		const [numFound] = await Promise.all([numFoundPromise, sleep]);
@@ -169,7 +169,7 @@ export async function main(): Promise<void> {
 	const { offset, outputDir } = getRuntimeConfig();
 	const { samples, hashesToExclude } = findSearchableTorrents();
 
-	if (offset > 0) logger.info("Starting at offset", offset);
+	if (offset > 0) logger.info(`Starting at offset ${offset}`);
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);
