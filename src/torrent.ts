@@ -1,7 +1,8 @@
-import fs from "fs";
+import fs, { promises as fsPromises } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { concat } from "simple-get";
+import { CrossSeedError } from "./errors";
 import { logger } from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { ok, stripExtension } from "./utils";
@@ -82,6 +83,15 @@ export function getInfoHashesToExclude(): string[] {
 	return findAllTorrentFilesInDir(torrentDir).map((pathname) =>
 		path.basename(pathname, ".torrent").toLowerCase()
 	);
+}
+
+export async function validateTorrentDir(): Promise<void> {
+	const { torrentDir } = getRuntimeConfig();
+	try {
+		await fsPromises.readdir(torrentDir);
+	} catch (e) {
+		throw new CrossSeedError(`Torrent dir ${torrentDir} is invalid`);
+	}
 }
 
 export function loadTorrentDir(): Metafile[] {
