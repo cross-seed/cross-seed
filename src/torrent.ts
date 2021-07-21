@@ -94,12 +94,6 @@ export async function validateTorrentDir(): Promise<void> {
 	}
 }
 
-export function loadTorrentDir(): Metafile[] {
-	const { torrentDir } = getRuntimeConfig();
-	const dirContents = findAllTorrentFilesInDir(torrentDir);
-	return dirContents.map(parseTorrentFromFilename);
-}
-
 export function loadTorrentDirLight(): Searchee[] {
 	const { torrentDir } = getRuntimeConfig();
 	return fs
