@@ -2,21 +2,18 @@ import fs, { promises as fsPromises } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { concat } from "simple-get";
+import { INDEXED_TORRENTS } from "./constants";
+import db from "./db";
 import { CrossSeedError } from "./errors";
 import { logger } from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
-import { ok, stripExtension } from "./utils";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
+import { ok, stripExtension } from "./utils";
 
 export async function parseTorrentFromFilename(
 	filename: string
 ): Promise<Metafile> {
 	const data = await fsPromises.readFile(filename);
-	return parseTorrent(data);
-}
-
-export function parseTorrentFromFilenameSync(filename: string): Metafile {
-	const data = fs.readFileSync(filename);
 	return parseTorrent(data);
 }
 
@@ -76,30 +73,48 @@ export function saveTorrentFile(
 	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });
 }
 
-export function findAllTorrentFilesInDir(torrentDir: string): string[] {
-	return fs
-		.readdirSync(torrentDir)
-		.sort()
+export async function findAllTorrentFilesInDir(
+	torrentDir: string
+): Promise<string[]> {
+	return (await fsPromises.readdir(torrentDir))
 		.filter((fn) => path.extname(fn) === ".torrent")
+		.sort()
 		.map((fn) => path.join(torrentDir, fn));
 }
 
-export async function indexTorrents(): Promise<void> {
+export async function indexNewTorrents(): Promise<void> {
 	const { torrentDir } = getRuntimeConfig();
-	const contents = await fsPromises.readdir(torrentDir);
-	const searchees = contents
-		.filter((fn) => path.extname(fn) === ".torrent")
-		.sort()
-		.map(createSearcheeFromTorrentFile)
-		.filter(ok);
+	const dirContents = await findAllTorrentFilesInDir(torrentDir);
+
+	for (const filepath of dirContents) {
+		const doesAlreadyExist = db
+			.get(INDEXED_TORRENTS)
+			.find((indexEntry) => indexEntry.filepath === filepath)
+			.value();
+		if (!doesAlreadyExist) {
+			const meta = await parseTorrentFromFilename(filepath);
+			db.get(INDEXED_TORRENTS).value().push({
+				filepath,
+				infoHash: meta.infoHash,
+				name: meta.name,
+			});
+		}
+	}
+	db.set(
+		INDEXED_TORRENTS,
+		db
+			.get(INDEXED_TORRENTS)
+			.value()
+			.filter((e) => dirContents.includes(e.filepath))
+	).value();
+	db.write();
 }
 
-// this is rtorrent specific
 export function getInfoHashesToExclude(): string[] {
-	const { torrentDir } = getRuntimeConfig();
-	return findAllTorrentFilesInDir(torrentDir).map((pathname) =>
-		path.basename(pathname, ".torrent").toLowerCase()
-	);
+	return db
+		.get(INDEXED_TORRENTS)
+		.value()
+		.map((t) => t.infoHash);
 }
 
 export async function validateTorrentDir(): Promise<void> {
@@ -123,15 +138,14 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 }
 
 export async function getTorrentByName(name: string): Promise<Metafile> {
-	const { torrentDir } = getRuntimeConfig();
-	const dirContents = findAllTorrentFilesInDir(torrentDir);
-	const findResult = dirContents.find((filename) => {
-		const meta = parseTorrentFromFilenameSync(filename);
-		return meta.name === name;
-	});
+	await indexNewTorrents();
+	const findResult = db
+		.get(INDEXED_TORRENTS)
+		.value()
+		.find((e) => e.name === name);
 	if (findResult === undefined) {
 		const message = `could not find a torrent with the name ${name}`;
 		throw new Error(message);
 	}
-	return parseTorrentFromFilename(findResult);
+	return parseTorrentFromFilename(findResult.filepath);
 }
