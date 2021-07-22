@@ -47,13 +47,13 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 	return sortBy(unsortedFiles, "path");
 }
 
-export function createSearcheeFromTorrentFile(
+export async function createSearcheeFromTorrentFile(
 	filename: string
-): Result<Searchee> {
+): Promise<Result<Searchee>> {
 	const { torrentDir } = getRuntimeConfig();
 	const fullPath = join(torrentDir, filename);
 	try {
-		const meta = parseTorrentFromFilename(fullPath);
+		const meta = await parseTorrentFromFilename(fullPath);
 		return {
 			files: getFilesFromTorrent(meta),
 			infoHash: meta.infoHash,

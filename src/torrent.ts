@@ -8,7 +8,14 @@ import { getRuntimeConfig } from "./runtimeConfig";
 import { ok, stripExtension } from "./utils";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
 
-export function parseTorrentFromFilename(filename: string): Metafile {
+export async function parseTorrentFromFilename(
+	filename: string
+): Promise<Metafile> {
+	const data = await fsPromises.readFile(filename);
+	return parseTorrent(data);
+}
+
+export function parseTorrentFromFilenameSync(filename: string): Metafile {
 	const data = fs.readFileSync(filename);
 	return parseTorrent(data);
 }
@@ -77,6 +84,16 @@ export function findAllTorrentFilesInDir(torrentDir: string): string[] {
 		.map((fn) => path.join(torrentDir, fn));
 }
 
+export async function indexTorrents(): Promise<void> {
+	const { torrentDir } = getRuntimeConfig();
+	const contents = await fsPromises.readdir(torrentDir);
+	const searchees = contents
+		.filter((fn) => path.extname(fn) === ".torrent")
+		.sort()
+		.map(createSearcheeFromTorrentFile)
+		.filter(ok);
+}
+
 // this is rtorrent specific
 export function getInfoHashesToExclude(): string[] {
 	const { torrentDir } = getRuntimeConfig();
@@ -94,21 +111,22 @@ export async function validateTorrentDir(): Promise<void> {
 	}
 }
 
-export function loadTorrentDirLight(): Searchee[] {
+export async function loadTorrentDirLight(): Promise<Searchee[]> {
 	const { torrentDir } = getRuntimeConfig();
-	return fs
-		.readdirSync(torrentDir)
-		.filter((fn) => path.extname(fn) === ".torrent")
-		.sort()
-		.map(createSearcheeFromTorrentFile)
-		.filter(ok);
+	return Promise.all(
+		fs
+			.readdirSync(torrentDir)
+			.filter((fn) => path.extname(fn) === ".torrent")
+			.sort()
+			.map(createSearcheeFromTorrentFile)
+	).then((searcheeResults) => searcheeResults.filter(ok));
 }
 
-export function getTorrentByName(name: string): Metafile {
+export async function getTorrentByName(name: string): Promise<Metafile> {
 	const { torrentDir } = getRuntimeConfig();
 	const dirContents = findAllTorrentFilesInDir(torrentDir);
 	const findResult = dirContents.find((filename) => {
-		const meta = parseTorrentFromFilename(filename);
+		const meta = parseTorrentFromFilenameSync(filename);
 		return meta.name === name;
 	});
 	if (findResult === undefined) {
