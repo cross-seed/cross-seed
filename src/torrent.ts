@@ -79,7 +79,7 @@ export async function findAllTorrentFilesInDir(
 	return (await fsPromises.readdir(torrentDir))
 		.filter((fn) => path.extname(fn) === ".torrent")
 		.sort()
-		.map((fn) => path.join(torrentDir, fn));
+		.map((fn) => path.resolve(path.join(torrentDir, fn)));
 }
 
 export async function indexNewTorrents(): Promise<void> {
