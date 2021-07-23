@@ -92,7 +92,14 @@ export async function indexNewTorrents(): Promise<void> {
 			.find((indexEntry) => indexEntry.filepath === filepath)
 			.value();
 		if (!doesAlreadyExist) {
-			const meta = await parseTorrentFromFilename(filepath);
+			let meta;
+			try {
+				meta = await parseTorrentFromFilename(filepath);
+			} catch (e) {
+				logger.error(`Failed to parse ${filepath}`);
+				logger.debug(e);
+				continue;
+			}
 			db.get(INDEXED_TORRENTS).value().push({
 				filepath,
 				infoHash: meta.infoHash,

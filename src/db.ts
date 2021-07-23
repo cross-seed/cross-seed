@@ -33,15 +33,10 @@ export interface TorrentEntry {
 	name: string;
 }
 
-export interface IndexMetadata {
-	lastIndexed: number;
-}
-
 export interface Schema {
 	[SEARCHEES]: Record<string, SearcheeEntry>;
 	[DECISIONS]: Record<string, Record<string, DecisionEntry>>;
 	[INDEXED_TORRENTS]: TorrentEntry[];
-	[INDEX_METADATA]: IndexMetadata;
 	dbVersion: number;
 }
 
@@ -51,7 +46,6 @@ const emptyDatabase = {
 	[SEARCHEES]: {},
 	[DECISIONS]: {},
 	[INDEXED_TORRENTS]: [],
-	[INDEX_METADATA]: { lastIndexed: 0 },
 	dbVersion: 3,
 };
 

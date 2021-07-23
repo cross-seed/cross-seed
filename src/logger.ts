@@ -11,6 +11,7 @@ export enum Label {
 	CONFIGDUMP = "configdump",
 	JACKETT = "jackett",
 	SERVER = "server",
+	STARTUP = "startup",
 }
 
 export let logger: Logger;
