@@ -140,14 +140,14 @@ export async function searchForSingleTorrentByName(
 	name: string
 ): Promise<number> {
 	const hashesToExclude = getInfoHashesToExclude();
-	const meta = getTorrentByName(name);
+	const meta = await getTorrentByName(name);
 	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude);
 }
 
-function findSearchableTorrents() {
+async function findSearchableTorrents() {
 	const { offset } = getRuntimeConfig();
-	const parsedTorrents: Searchee[] = loadTorrentDirLight();
+	const parsedTorrents: Searchee[] = await loadTorrentDirLight();
 	const hashesToExclude = parsedTorrents
 		.map((t) => t.infoHash)
 		.filter(Boolean);
@@ -167,7 +167,7 @@ function findSearchableTorrents() {
 
 export async function main(): Promise<void> {
 	const { offset, outputDir } = getRuntimeConfig();
-	const { samples, hashesToExclude } = findSearchableTorrents();
+	const { samples, hashesToExclude } = await findSearchableTorrents();
 
 	if (offset > 0) logger.info(`Starting at offset ${offset}`);
 

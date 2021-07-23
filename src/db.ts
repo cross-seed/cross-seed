@@ -3,7 +3,13 @@ import lowdb from "lowdb";
 import FileSync from "lowdb/adapters/FileSync";
 import path from "path";
 import { appDir, createAppDir } from "./configuration";
-import { Decision, DECISIONS, SEARCHEES } from "./constants";
+import {
+	Decision,
+	DECISIONS,
+	INDEX_METADATA,
+	INDEXED_TORRENTS,
+	SEARCHEES,
+} from "./constants";
 import { unlinkSync } from "fs";
 
 createAppDir();
@@ -21,9 +27,16 @@ export interface DecisionEntry {
 	infoHash?: string;
 }
 
+export interface TorrentEntry {
+	filepath: string;
+	infoHash: string;
+	name: string;
+}
+
 export interface Schema {
 	[SEARCHEES]: Record<string, SearcheeEntry>;
 	[DECISIONS]: Record<string, Record<string, DecisionEntry>>;
+	[INDEXED_TORRENTS]: TorrentEntry[];
 	dbVersion: number;
 }
 
@@ -32,6 +45,7 @@ const db = lowdb(new FileSync<Schema>(path.join(appDir(), "cache.json")));
 const emptyDatabase = {
 	[SEARCHEES]: {},
 	[DECISIONS]: {},
+	[INDEXED_TORRENTS]: [],
 	dbVersion: 3,
 };
 

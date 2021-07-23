@@ -101,7 +101,7 @@ function existsInCache(infoHash: string): boolean {
 	);
 }
 
-function getCachedTorrentFile(infoHash: string): Metafile {
+async function getCachedTorrentFile(infoHash: string): Promise<Metafile> {
 	return parseTorrentFromFilename(
 		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`)
 	);
@@ -162,7 +162,7 @@ async function assessResultCaching(
 		} else {
 			assessment = {
 				decision: cacheEntry.decision,
-				info: getCachedTorrentFile(cacheEntry.infoHash),
+				info: await getCachedTorrentFile(cacheEntry.infoHash),
 			};
 		}
 	} else {

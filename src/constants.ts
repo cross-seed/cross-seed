@@ -9,6 +9,8 @@ export const CONFIG_TEMPLATE_URL =
 
 export const SEARCHEES = "searchees";
 export const DECISIONS = "decisions";
+export const INDEXED_TORRENTS = "indexedTorrents";
+export const INDEX_METADATA = "indexMetadata";
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 
