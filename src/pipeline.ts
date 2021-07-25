@@ -139,8 +139,8 @@ async function findMatchesBatch(
 export async function searchForSingleTorrentByName(
 	name: string
 ): Promise<number> {
-	const hashesToExclude = getInfoHashesToExclude();
 	const meta = await getTorrentByName(name);
+	const hashesToExclude = getInfoHashesToExclude();
 	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude);
 }
