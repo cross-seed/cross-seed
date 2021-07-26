@@ -9,10 +9,6 @@ import { getRuntimeConfig } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import { TorrentClient } from "./TorrentClient";
 
-interface QTorrentListing {
-	save_path: string;
-}
-
 const X_WWW_FORM_URLENCODED = {
 	"Content-Type": "application/x-www-form-urlencoded",
 };
@@ -23,12 +19,26 @@ export default class QBittorrent implements TorrentClient {
 
 	constructor() {
 		const { qbittorrentUrl } = getRuntimeConfig();
-		this.url = new URL(`${qbittorrentUrl}/api/v2`);
+		try {
+			this.url = new URL(`${qbittorrentUrl}/api/v2`);
+		} catch (e) {
+			throw new CrossSeedError("qBittorrent url must be percent-encoded");
+		}
 	}
 
 	async login(): Promise<void> {
 		const { origin, pathname, username, password } = this.url;
-		const qs = querystring.encode({ username, password });
+
+		let qs;
+		try {
+			qs = querystring.encode({
+				username: decodeURIComponent(username),
+				password: decodeURIComponent(password),
+			});
+		} catch (e) {
+			throw new CrossSeedError("qBittorrent url must be percent-encoded");
+		}
+
 		let response: Response;
 		try {
 			response = await fetch(`${origin}${pathname}/auth/login?${qs}`);
@@ -41,6 +51,7 @@ export default class QBittorrent implements TorrentClient {
 				`qBittorrent login failed with code ${response.status}`
 			);
 		}
+
 		const cookieArray = response.headers.raw()["set-cookie"];
 		if (cookieArray) {
 			this.cookie = cookieArray[0].split(";")[0];

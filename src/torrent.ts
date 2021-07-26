@@ -28,7 +28,7 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 			});
 		});
 	} catch (e) {
-		logger.error(`error: failed to access ${url}`);
+		logger.error(`failed to access ${url}`);
 		logger.debug(e);
 		return null;
 	}
@@ -55,7 +55,7 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 	try {
 		return parseTorrent(response.data);
 	} catch (e) {
-		logger.error(`error: invalid torrent contents at ${url}`);
+		logger.error(`invalid torrent contents at ${url}`);
 		logger.debug(e);
 		return null;
 	}

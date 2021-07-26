@@ -3,13 +3,7 @@ import lowdb from "lowdb";
 import FileSync from "lowdb/adapters/FileSync";
 import path from "path";
 import { appDir, createAppDir } from "./configuration";
-import {
-	Decision,
-	DECISIONS,
-	INDEX_METADATA,
-	INDEXED_TORRENTS,
-	SEARCHEES,
-} from "./constants";
+import { Decision, DECISIONS, INDEXED_TORRENTS, SEARCHEES } from "./constants";
 import { unlinkSync } from "fs";
 
 createAppDir();

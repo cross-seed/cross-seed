@@ -72,27 +72,33 @@ async function saveWithLibTorrentResume(
 
 export default class RTorrent implements TorrentClient {
 	client: Client;
-
 	constructor() {
 		const { rtorrentRpcUrl } = getRuntimeConfig();
 
-		const { origin, username, password, protocol, pathname } = new URL(
-			rtorrentRpcUrl
-		);
+		try {
+			const { origin, username, password, protocol, pathname } = new URL(
+				rtorrentRpcUrl
+			);
 
-		const clientCreator =
-			protocol === "https:"
-				? xmlrpc.createSecureClient
-				: xmlrpc.createClient;
+			const clientCreator =
+				protocol === "https:"
+					? xmlrpc.createSecureClient
+					: xmlrpc.createClient;
 
-		const shouldUseAuth = Boolean(username && password);
+			const shouldUseAuth = Boolean(username && password);
 
-		this.client = clientCreator({
-			url: origin + pathname,
-			basic_auth: shouldUseAuth
-				? { user: username, pass: password }
-				: undefined,
-		});
+			this.client = clientCreator({
+				url: origin + pathname,
+				basic_auth: shouldUseAuth
+					? {
+							user: decodeURIComponent(username),
+							pass: decodeURIComponent(password),
+					  }
+					: undefined,
+			});
+		} catch (e) {
+			throw new CrossSeedError("rTorrent url must be percent-encoded");
+		}
 	}
 
 	private async methodCallP<R>(method: string, args): Promise<R> {
