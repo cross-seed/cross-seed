@@ -3,10 +3,7 @@ import http from "http";
 import qs from "querystring";
 import { validateJackettApi } from "./jackett";
 import { Label, logger } from "./logger";
-import {
-	searchForSingleTorrentByName,
-	searchForSingleTorrentByHash,
-} from "./pipeline";
+import { searchForSingleTorrentByNameOrHash } from "./pipeline";
 import { getRuntimeConfig } from "./runtimeConfig";
 
 function getData(req) {
@@ -45,6 +42,16 @@ async function handleRequest(req, res) {
 	const dataStr = await getData(req);
 	const { name, hash } = parseData(dataStr);
 	const criteria = name ? name : hash;
+
+	if (!criteria) {
+		logger.error({
+			label: Label.SERVER,
+			message: "A name or info hash must be provided",
+		});
+		res.writeHead(422);
+		res.end();
+	}
+
 	const message = `Received ${name ? "name" : "hash"} ${criteria}`;
 	res.writeHead(204);
 	res.end();
@@ -54,12 +61,10 @@ async function handleRequest(req, res) {
 	try {
 		let numFound = null;
 		if (name) {
-			numFound = await searchForSingleTorrentByName(name);
-		}
-
-		// Just in case both name and hash are passed.
-		if (hash && !numFound) {
-			numFound = await searchForSingleTorrentByHash(hash);
+			numFound = await searchForSingleTorrentByNameOrHash({
+				name,
+				infoHash: hash,
+			});
 		}
 
 		if (numFound === null) {

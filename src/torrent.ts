@@ -10,6 +10,11 @@ import { getRuntimeConfig } from "./runtimeConfig";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
 import { ok, stripExtension } from "./utils";
 
+export interface TorrentInfo {
+	infoHash?: string;
+	name?: string;
+}
+
 export async function parseTorrentFromFilename(
 	filename: string
 ): Promise<Metafile> {
@@ -144,27 +149,22 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 	).then((searcheeResults) => searcheeResults.filter(ok));
 }
 
-export async function getTorrentByName(name: string): Promise<Metafile> {
+export async function getTorrentByNameOrHash(
+	torrentInfo: TorrentInfo
+): Promise<Metafile> {
 	await indexNewTorrents();
-	const findResult = db
-		.get(INDEXED_TORRENTS)
-		.value()
-		.find((e) => e.name === name);
-	if (findResult === undefined) {
-		const message = `could not find a torrent with the name ${name}`;
-		throw new Error(message);
-	}
-	return parseTorrentFromFilename(findResult.filepath);
-}
 
-export async function getTorrentByHash(hash: string): Promise<Metafile> {
-	await indexNewTorrents();
+	const criteria = torrentInfo?.infoHash
+		? torrentInfo?.infoHash
+		: torrentInfo?.name;
+	const property = torrentInfo?.infoHash ? "infoHash" : "name";
+
 	const findResult = db
 		.get(INDEXED_TORRENTS)
 		.value()
-		.find((e) => e.infoHash === hash);
+		.find((e) => e[property] === criteria);
 	if (findResult === undefined) {
-		const message = `could not find a torrent with the hash ${hash}`;
+		const message = `could not find a torrent with the name ${criteria}`;
 		throw new Error(message);
 	}
 	return parseTorrentFromFilename(findResult.filepath);
