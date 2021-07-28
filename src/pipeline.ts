@@ -12,6 +12,7 @@ import { Searchee } from "./searchee";
 import {
 	getInfoHashesToExclude,
 	getTorrentByName,
+	getTorrentByHash,
 	loadTorrentDirLight,
 	saveTorrentFile,
 } from "./torrent";
@@ -140,6 +141,15 @@ export async function searchForSingleTorrentByName(
 	name: string
 ): Promise<number> {
 	const meta = await getTorrentByName(name);
+	const hashesToExclude = getInfoHashesToExclude();
+	if (!filterByContent(meta)) return null;
+	return findOnOtherSites(meta, hashesToExclude);
+}
+
+export async function searchForSingleTorrentByHash(
+	hash: string
+): Promise<number> {
+	const meta = await getTorrentByHash(hash);
 	const hashesToExclude = getInfoHashesToExclude();
 	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude);

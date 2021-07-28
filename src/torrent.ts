@@ -156,3 +156,16 @@ export async function getTorrentByName(name: string): Promise<Metafile> {
 	}
 	return parseTorrentFromFilename(findResult.filepath);
 }
+
+export async function getTorrentByHash(hash: string): Promise<Metafile> {
+	await indexNewTorrents();
+	const findResult = db
+		.get(INDEXED_TORRENTS)
+		.value()
+		.find((e) => e.infoHash === hash);
+	if (findResult === undefined) {
+		const message = `could not find a torrent with the hash ${hash}`;
+		throw new Error(message);
+	}
+	return parseTorrentFromFilename(findResult.filepath);
+}

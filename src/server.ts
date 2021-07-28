@@ -3,7 +3,10 @@ import http from "http";
 import qs from "querystring";
 import { validateJackettApi } from "./jackett";
 import { Label, logger } from "./logger";
-import { searchForSingleTorrentByName } from "./pipeline";
+import {
+	searchForSingleTorrentByName,
+	searchForSingleTorrentByHash,
+} from "./pipeline";
 import { getRuntimeConfig } from "./runtimeConfig";
 
 function getData(req) {
@@ -23,7 +26,7 @@ function parseData(data) {
 		return JSON.parse(data);
 	} catch (_) {
 		const parsed = qs.parse(data);
-		if ("name" in parsed) return parsed;
+		if ("name" in parsed || "hash" in parsed) return parsed;
 		throw new Error(`Unable to parse request body: "${data}"`);
 	}
 }
@@ -40,21 +43,34 @@ async function handleRequest(req, res) {
 		return;
 	}
 	const dataStr = await getData(req);
-	const { name } = parseData(dataStr);
+	const { name, hash } = parseData(dataStr);
+	const criteria = name ? name : hash;
+	const message = `Received ${name ? "name" : "hash"} ${criteria}`;
 	res.writeHead(204);
 	res.end();
-	logger.info({ label: Label.SERVER, message: `Received name ${name}` });
+
+	logger.info({ label: Label.SERVER, message });
+
 	try {
-		const numFound = await searchForSingleTorrentByName(name);
+		let numFound = null;
+		if (name) {
+			numFound = await searchForSingleTorrentByName(name);
+		}
+
+		// Just in case both name and hash are passed.
+		if (hash && !numFound) {
+			numFound = await searchForSingleTorrentByHash(hash);
+		}
+
 		if (numFound === null) {
 			logger.info({
 				label: Label.SERVER,
-				message: `Did not search for ${name}`,
+				message: `Did not search for ${criteria}`,
 			});
 		} else {
 			logger.info({
 				label: Label.SERVER,
-				message: `Found ${numFound} torrents for ${name}`,
+				message: `Found ${numFound} torrents for ${criteria}`,
 			});
 		}
 	} catch (e) {
