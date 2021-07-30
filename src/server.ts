@@ -62,11 +62,10 @@ async function handleRequest(req, res) {
 
 	const criteriaStr = inspect({ ...criteria });
 
-	const message = `Received  ${criteriaStr}`;
 	res.writeHead(204);
 	res.end();
 
-	logger.info({ label: Label.SERVER, message });
+	logger.info({ label: Label.SERVER, message: `Received  ${criteriaStr}` });
 
 	try {
 		let numFound = null;
