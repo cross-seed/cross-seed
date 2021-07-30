@@ -2,6 +2,7 @@ import fs, { promises as fsPromises } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { concat } from "simple-get";
+import { inspect } from "util";
 import { INDEXED_TORRENTS } from "./constants";
 import db from "./db";
 import { CrossSeedError } from "./errors";
@@ -156,7 +157,9 @@ export async function getTorrentByCriteria(
 
 	const findResult = db.get(INDEXED_TORRENTS).find(criteria).value();
 	if (findResult === undefined) {
-		const message = `could not find a torrent with the criteria`;
+		const message = `could not find a torrent with the criteria ${inspect(
+			criteria
+		)}`;
 		throw new Error(message);
 	}
 	return parseTorrentFromFilename(findResult.filepath);

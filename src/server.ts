@@ -1,11 +1,12 @@
 import fs from "fs";
 import http from "http";
 import qs from "querystring";
+import { inspect } from "util";
 import { Label, logger } from "./logger";
 import { searchForLocalTorrentByCriteria } from "./pipeline";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { TorrentLocator } from "./torrent";
-import { inspect } from "util";
+
 function getData(req) {
 	return new Promise((resolve) => {
 		const chunks = [];
