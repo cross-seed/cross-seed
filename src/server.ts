@@ -1,11 +1,11 @@
 import fs from "fs";
 import http from "http";
 import qs from "querystring";
-import { validateJackettApi } from "./jackett";
 import { Label, logger } from "./logger";
-import { searchForSingleTorrentByNameOrHash } from "./pipeline";
+import { searchForLocalTorrentByCriteria } from "./pipeline";
 import { getRuntimeConfig } from "./runtimeConfig";
-
+import { TorrentLocator } from "./torrent";
+import { inspect } from "util";
 function getData(req) {
 	return new Promise((resolve) => {
 		const chunks = [];
@@ -19,13 +19,21 @@ function getData(req) {
 }
 
 function parseData(data) {
+	let parsed;
 	try {
-		return JSON.parse(data);
+		parsed = JSON.parse(data);
 	} catch (_) {
-		const parsed = qs.parse(data);
-		if ("name" in parsed || "hash" in parsed) return parsed;
-		throw new Error(`Unable to parse request body: "${data}"`);
+		parsed = qs.parse(data);
 	}
+
+	if ("infoHash" in parsed) {
+		parsed.infoHash = parsed.infoHash.toLowerCase();
+	}
+	if ("name" in parsed || "infoHash" in parsed) {
+		return parsed;
+	}
+
+	throw new Error(`Unable to parse request body: "${data}"`);
 }
 
 async function handleRequest(req, res) {
@@ -40,19 +48,20 @@ async function handleRequest(req, res) {
 		return;
 	}
 	const dataStr = await getData(req);
-	const { name, hash } = parseData(dataStr);
-	const criteria = name ? name : hash;
+	const criteria: TorrentLocator = parseData(dataStr);
 
 	if (!criteria) {
 		logger.error({
 			label: Label.SERVER,
 			message: "A name or info hash must be provided",
 		});
-		res.writeHead(422);
+		res.writeHead(400);
 		res.end();
 	}
 
-	const message = `Received ${name ? "name" : "hash"} ${criteria}`;
+	const criteriaStr = inspect({ ...criteria });
+
+	const message = `Received  ${criteriaStr}`;
 	res.writeHead(204);
 	res.end();
 
@@ -60,22 +69,19 @@ async function handleRequest(req, res) {
 
 	try {
 		let numFound = null;
-		if (name) {
-			numFound = await searchForSingleTorrentByNameOrHash({
-				name,
-				infoHash: hash,
-			});
+		if (criteria) {
+			numFound = await searchForLocalTorrentByCriteria(criteria);
 		}
 
 		if (numFound === null) {
 			logger.info({
 				label: Label.SERVER,
-				message: `Did not search for ${criteria}`,
+				message: `Did not search for ${criteriaStr}`,
 			});
 		} else {
 			logger.info({
 				label: Label.SERVER,
-				message: `Found ${numFound} torrents for ${criteria}`,
+				message: `Found ${numFound} torrents for ${criteriaStr}`,
 			});
 		}
 	} catch (e) {

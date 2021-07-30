@@ -10,7 +10,7 @@ import { getRuntimeConfig } from "./runtimeConfig";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
 import { ok, stripExtension } from "./utils";
 
-export interface TorrentInfo {
+export interface TorrentLocator {
 	infoHash?: string;
 	name?: string;
 }
@@ -149,22 +149,14 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 	).then((searcheeResults) => searcheeResults.filter(ok));
 }
 
-export async function getTorrentByNameOrHash(
-	torrentInfo: TorrentInfo
+export async function getTorrentByCriteria(
+	criteria: TorrentLocator
 ): Promise<Metafile> {
 	await indexNewTorrents();
 
-	const criteria = torrentInfo?.infoHash
-		? torrentInfo?.infoHash
-		: torrentInfo?.name;
-	const property = torrentInfo?.infoHash ? "infoHash" : "name";
-
-	const findResult = db
-		.get(INDEXED_TORRENTS)
-		.value()
-		.find((e) => e[property] === criteria);
+	const findResult = db.get(INDEXED_TORRENTS).find(criteria).value();
 	if (findResult === undefined) {
-		const message = `could not find a torrent with the name ${criteria}`;
+		const message = `could not find a torrent with the criteria`;
 		throw new Error(message);
 	}
 	return parseTorrentFromFilename(findResult.filepath);
