@@ -10,8 +10,9 @@ import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { Searchee } from "./searchee";
 import {
+	TorrentLocator,
 	getInfoHashesToExclude,
-	getTorrentByName,
+	getTorrentByCriteria,
 	loadTorrentDirLight,
 	saveTorrentFile,
 } from "./torrent";
@@ -136,10 +137,10 @@ async function findMatchesBatch(
 	return totalFound;
 }
 
-export async function searchForSingleTorrentByName(
-	name: string
+export async function searchForLocalTorrentByCriteria(
+	criteria: TorrentLocator
 ): Promise<number> {
-	const meta = await getTorrentByName(name);
+	const meta = await getTorrentByCriteria(criteria);
 	const hashesToExclude = getInfoHashesToExclude();
 	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude);

@@ -2,6 +2,7 @@ import fs, { promises as fsPromises } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { concat } from "simple-get";
+import { inspect } from "util";
 import { INDEXED_TORRENTS } from "./constants";
 import db from "./db";
 import { CrossSeedError } from "./errors";
@@ -9,6 +10,11 @@ import { logger } from "./logger";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
 import { ok, stripExtension } from "./utils";
+
+export interface TorrentLocator {
+	infoHash?: string;
+	name?: string;
+}
 
 export async function parseTorrentFromFilename(
 	filename: string
@@ -144,14 +150,16 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 	).then((searcheeResults) => searcheeResults.filter(ok));
 }
 
-export async function getTorrentByName(name: string): Promise<Metafile> {
+export async function getTorrentByCriteria(
+	criteria: TorrentLocator
+): Promise<Metafile> {
 	await indexNewTorrents();
-	const findResult = db
-		.get(INDEXED_TORRENTS)
-		.value()
-		.find((e) => e.name === name);
+
+	const findResult = db.get(INDEXED_TORRENTS).find(criteria).value();
 	if (findResult === undefined) {
-		const message = `could not find a torrent with the name ${name}`;
+		const message = `could not find a torrent with the criteria ${inspect(
+			criteria
+		)}`;
 		throw new Error(message);
 	}
 	return parseTorrentFromFilename(findResult.filepath);
