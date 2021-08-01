@@ -1,5 +1,7 @@
 name: ci
 
+environment: Docker Hub
+
 on:
   push:
     branches:
