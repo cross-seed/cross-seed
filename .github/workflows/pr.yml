@@ -27,4 +27,4 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/cross-seed:branch-${{ GITHUB_HEAD_REF }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/cross-seed:branch-${{ env.GITHUB_HEAD_REF }}
