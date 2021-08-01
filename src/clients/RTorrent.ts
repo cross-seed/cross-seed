@@ -122,26 +122,40 @@ export default class RTorrent implements TorrentClient {
 		return downloadList.includes(infoHash.toUpperCase());
 	}
 
-	async getDataDir(searchee: Searchee): Promise<string> {
-		if (searchee.path) return dirname(searchee.path);
+	async getTorrentConfiguration(
+		searchee: Searchee
+	): Promise<{ dataDir: string; isComplete: boolean }> {
+		if (!searchee.infoHash) {
+			throw new CrossSeedError(
+				"rTorrent direct injection not implemented for data-based searchees"
+			);
+		}
 		const infoHash = searchee.infoHash.toUpperCase();
-		type returnType = [["0" | "1"], [string]];
-		const [[isMultiFileStr], [dir]] = await this.methodCallP<returnType>(
-			"system.multicall",
+		type returnType = [["0" | "1"], [string], ["0" | "1"]];
+		const [
+			[isMultiFileStr],
+			[dir],
+			[isCompleteStr],
+		] = await this.methodCallP<returnType>("system.multicall", [
 			[
-				[
-					{
-						methodName: "d.is_multi_file",
-						params: [infoHash],
-					},
-					{
-						methodName: "d.directory",
-						params: [infoHash],
-					},
-				],
-			]
-		);
-		return Number(isMultiFileStr) ? dirname(dir) : dir;
+				{
+					methodName: "d.is_multi_file",
+					params: [infoHash],
+				},
+				{
+					methodName: "d.directory",
+					params: [infoHash],
+				},
+				{
+					methodName: "d.complete",
+					params: [infoHash],
+				},
+			],
+		]);
+		return {
+			dataDir: Number(isMultiFileStr) ? dirname(dir) : dir,
+			isComplete: Boolean(Number(isCompleteStr)),
+		};
 	}
 
 	async validateConfig(): Promise<void> {
@@ -165,7 +179,12 @@ export default class RTorrent implements TorrentClient {
 			return InjectionResult.ALREADY_EXISTS;
 		}
 
-		const dataDir = await this.getDataDir(searchee);
+		const { dataDir, isComplete } = await this.getTorrentConfiguration(
+			searchee
+		);
+
+		if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
+
 		const torrentFilePath = resolve(
 			outputDir,
 			`${meta.name}.tmp.${Date.now()}.torrent`

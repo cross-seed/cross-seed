@@ -12,8 +12,8 @@ interface File {
 }
 
 export interface Searchee {
-	infoHash?: string;
-	path?: string;
+	infoHash?: string; // if searchee is torrent based
+	path?: string; // if searchee is data based
 	files: File[];
 	name: string;
 	length: number;
