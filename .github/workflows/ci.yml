@@ -1,7 +1,5 @@
 name: ci
 
-environment: Docker Hub
-
 on:
   push:
     branches:
@@ -9,6 +7,7 @@ on:
 
 jobs:
   docker:
+    environment: Docker Hub
     runs-on: ubuntu-latest
     steps:
       -
