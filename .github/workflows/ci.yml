@@ -21,6 +21,13 @@ jobs:
         uses: docker/metadata-action@v3
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/cross-seed
+          tags: |
+            # tag event
+            type=semver,pattern=version-{{version}}
+            # branch event
+            type=ref,event=branch
+            # pull request event
+            type=ref,event=pr
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1          
