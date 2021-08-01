@@ -16,15 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      -
         name: Docker meta
         id: meta
         uses: docker/metadata-action@v3
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/cross-seed
-          
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1          
       -
         name: Login to DockerHub
         if: github.event_name != 'pull_request'
