@@ -23,7 +23,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/app
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/cross-seed
+          
       -
         name: Login to DockerHub
         if: github.event_name != 'pull_request'
