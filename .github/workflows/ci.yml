@@ -12,6 +12,7 @@ on:
 
 jobs:
   docker:
+    environment: Docker Hub
     runs-on: ubuntu-latest
     steps:
       -
