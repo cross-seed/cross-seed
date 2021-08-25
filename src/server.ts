@@ -6,6 +6,7 @@ import { Label, logger } from "./logger";
 import { searchForLocalTorrentByCriteria } from "./pipeline";
 import { getRuntimeConfig } from "./runtimeConfig";
 import { TorrentLocator } from "./torrent";
+import { pick } from "lodash";
 
 function getData(req) {
 	return new Promise((resolve) => {
@@ -49,7 +50,8 @@ async function handleRequest(req, res) {
 		return;
 	}
 	const dataStr = await getData(req);
-	const criteria: TorrentLocator = parseData(dataStr);
+	const data = parseData(dataStr);
+	const criteria: TorrentLocator = pick(data, ["infoHash", "name"]);
 
 	if (!criteria) {
 		logger.error({
@@ -60,7 +62,7 @@ async function handleRequest(req, res) {
 		res.end();
 	}
 
-	const criteriaStr = inspect({ ...criteria });
+	const criteriaStr = inspect(criteria);
 
 	res.writeHead(204);
 	res.end();
