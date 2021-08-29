@@ -1,10 +1,10 @@
 import fs from "fs";
 import http from "http";
-import qs from "querystring";
+import { parse as qsParse } from "querystring";
 import { inspect } from "util";
 import { Label, logger } from "./logger";
 import { searchForLocalTorrentByCriteria } from "./pipeline";
-import { getRuntimeConfig } from "./runtimeConfig";
+import { getRuntimeConfig, NonceOptions } from "./runtimeConfig";
 import { TorrentLocator } from "./torrent";
 import { pick } from "lodash";
 
@@ -25,12 +25,19 @@ function parseData(data) {
 	try {
 		parsed = JSON.parse(data);
 	} catch (_) {
-		parsed = qs.parse(data);
+		parsed = qsParse(data);
 	}
 
-	if ("infoHash" in parsed) {
-		parsed.infoHash = parsed.infoHash.toLowerCase();
+	// transformations
+	{
+		if ("infoHash" in parsed) {
+			parsed.infoHash = parsed.infoHash.toLowerCase();
+		}
+		if ("trackers" in parsed && !Array.isArray(parsed.trackers)) {
+			parsed.trackers = [parsed.trackers];
+		}
 	}
+
 	if ("name" in parsed || "infoHash" in parsed) {
 		return parsed;
 	}
@@ -52,6 +59,7 @@ async function handleRequest(req, res) {
 	const dataStr = await getData(req);
 	const data = parseData(dataStr);
 	const criteria: TorrentLocator = pick(data, ["infoHash", "name"]);
+	const nonceOptions: NonceOptions = pick(data, ["trackers", "outputDir"]);
 
 	if (!criteria) {
 		logger.error({
@@ -72,7 +80,10 @@ async function handleRequest(req, res) {
 	try {
 		let numFound = null;
 		if (criteria) {
-			numFound = await searchForLocalTorrentByCriteria(criteria);
+			numFound = await searchForLocalTorrentByCriteria(
+				criteria,
+				nonceOptions
+			);
 		}
 
 		if (numFound === null) {
@@ -92,8 +103,6 @@ async function handleRequest(req, res) {
 }
 
 export async function serve(): Promise<void> {
-	const { outputDir } = getRuntimeConfig();
-	fs.mkdirSync(outputDir, { recursive: true });
 	const server = http.createServer(handleRequest);
 	server.listen(2468);
 	logger.info({

@@ -7,7 +7,7 @@ import { INDEXED_TORRENTS } from "./constants";
 import db from "./db";
 import { CrossSeedError } from "./errors";
 import { logger } from "./logger";
-import { getRuntimeConfig } from "./runtimeConfig";
+import { getRuntimeConfig, NonceOptions } from "./runtimeConfig";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
 import { ok, stripExtension } from "./utils";
 
@@ -70,9 +70,11 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 export function saveTorrentFile(
 	tracker: string,
 	tag = "",
-	info: Metafile
+	info: Metafile,
+	nonceOptions: NonceOptions
 ): void {
-	const { outputDir } = getRuntimeConfig();
+	const { outputDir: runtimeConfigOutputDir } = getRuntimeConfig();
+	const { outputDir = runtimeConfigOutputDir } = nonceOptions;
 	const buf = parseTorrent.toTorrentFile(info);
 	const name = stripExtension(info.name);
 	const filename = `[${tag}][${tracker}]${name}.torrent`;

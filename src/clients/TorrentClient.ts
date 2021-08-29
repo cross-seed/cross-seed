@@ -1,6 +1,6 @@
 import { Metafile } from "parse-torrent";
 import { InjectionResult } from "../constants";
-import { getRuntimeConfig } from "../runtimeConfig";
+import { getRuntimeConfig, NonceOptions } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import QBittorrent from "./QBittorrent";
 import RTorrent from "./RTorrent";
@@ -10,7 +10,8 @@ let activeClient: TorrentClient;
 export interface TorrentClient {
 	inject: (
 		newTorrent: Metafile,
-		searchee: Searchee
+		searchee: Searchee,
+		nonceOptions: NonceOptions
 	) => Promise<InjectionResult>;
 	validateConfig: () => Promise<void>;
 }

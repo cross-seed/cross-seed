@@ -7,7 +7,11 @@ import { assessResult, ResultAssessment } from "./decide";
 import { JackettResponse, JackettResult, makeJackettRequest } from "./jackett";
 import { logger } from "./logger";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
-import { getRuntimeConfig } from "./runtimeConfig";
+import {
+	EmptyNonceOptions,
+	getRuntimeConfig,
+	NonceOptions,
+} from "./runtimeConfig";
 import { Searchee } from "./searchee";
 import {
 	TorrentLocator,
@@ -26,7 +30,8 @@ interface AssessmentWithTracker {
 
 async function findOnOtherSites(
 	searchee: Searchee,
-	hashesToExclude: string[]
+	hashesToExclude: string[],
+	nonceOptions: NonceOptions = EmptyNonceOptions
 ): Promise<number> {
 	const { action } = getRuntimeConfig();
 
@@ -41,7 +46,7 @@ async function findOnOtherSites(
 	const query = stripExtension(searchee.name);
 	let response: JackettResponse;
 	try {
-		response = await makeJackettRequest(query);
+		response = await makeJackettRequest(query, nonceOptions);
 	} catch (e) {
 		logger.error(`error querying Jackett for ${query}`);
 		return 0;
@@ -64,7 +69,11 @@ async function findOnOtherSites(
 		const styledName = chalk.green.bold(newInfo.name);
 		const styledTracker = chalk.bold(tracker);
 		if (action === Action.INJECT) {
-			const result = await getClient().inject(newInfo, searchee);
+			const result = await getClient().inject(
+				newInfo,
+				searchee,
+				nonceOptions
+			);
 			switch (result) {
 				case InjectionResult.SUCCESS:
 					logger.info(
@@ -87,11 +96,11 @@ async function findOnOtherSites(
 					logger.error(
 						`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
 					);
-					saveTorrentFile(tracker, tag, newInfo);
+					saveTorrentFile(tracker, tag, newInfo, nonceOptions);
 					break;
 			}
 		} else {
-			saveTorrentFile(tracker, tag, newInfo);
+			saveTorrentFile(tracker, tag, newInfo, nonceOptions);
 			logger.info(`Found ${styledName} on ${styledTracker}`);
 		}
 	}
@@ -138,12 +147,13 @@ async function findMatchesBatch(
 }
 
 export async function searchForLocalTorrentByCriteria(
-	criteria: TorrentLocator
+	criteria: TorrentLocator,
+	nonceOptions: NonceOptions
 ): Promise<number> {
 	const meta = await getTorrentByCriteria(criteria);
 	const hashesToExclude = getInfoHashesToExclude();
 	if (!filterByContent(meta)) return null;
-	return findOnOtherSites(meta, hashesToExclude);
+	return findOnOtherSites(meta, hashesToExclude, nonceOptions);
 }
 
 async function findSearchableTorrents() {

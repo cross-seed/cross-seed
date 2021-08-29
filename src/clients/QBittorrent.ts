@@ -5,7 +5,7 @@ import querystring from "querystring";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
 import { Label, logger } from "../logger";
-import { getRuntimeConfig } from "../runtimeConfig";
+import { getRuntimeConfig, NonceOptions } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import { TorrentClient } from "./TorrentClient";
 
@@ -138,7 +138,8 @@ export default class QBittorrent implements TorrentClient {
 
 	async inject(
 		newTorrent: Metafile,
-		searchee: Searchee
+		searchee: Searchee,
+		nonceOptions: NonceOptions
 	): Promise<InjectionResult> {
 		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;

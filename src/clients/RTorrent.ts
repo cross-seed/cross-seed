@@ -6,7 +6,7 @@ import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
 import { Label, logger } from "../logger";
-import { getRuntimeConfig } from "../runtimeConfig";
+import { getRuntimeConfig, NonceOptions } from "../runtimeConfig";
 import { Searchee } from "../searchee";
 import { wait } from "../utils";
 import { TorrentClient } from "./TorrentClient";
@@ -172,8 +172,13 @@ export default class RTorrent implements TorrentClient {
 		}
 	}
 
-	async inject(meta: Metafile, searchee: Searchee): Promise<InjectionResult> {
-		const { outputDir } = getRuntimeConfig();
+	async inject(
+		meta: Metafile,
+		searchee: Searchee,
+		nonceOptions: NonceOptions
+	): Promise<InjectionResult> {
+		const { outputDir: runtimeConfigOutputDir } = getRuntimeConfig();
+		const { outputDir = runtimeConfigOutputDir } = nonceOptions;
 
 		if (await this.checkForInfoHashInClient(meta.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;

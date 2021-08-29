@@ -17,6 +17,16 @@ interface RuntimeConfig {
 	qbittorrentUrl: string;
 }
 
+export interface NonceOptions {
+	trackers: string[];
+	outputDir: string;
+}
+
+export const EmptyNonceOptions = {
+	trackers: undefined,
+	outputDir: undefined,
+};
+
 let runtimeConfig: RuntimeConfig;
 
 export function setRuntimeConfig(configObj: RuntimeConfig): void {

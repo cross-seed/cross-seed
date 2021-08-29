@@ -3,7 +3,11 @@ import get from "simple-get";
 import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
 import { CrossSeedError } from "./errors";
 import { Label, logger } from "./logger";
-import { getRuntimeConfig } from "./runtimeConfig";
+import {
+	EmptyNonceOptions,
+	getRuntimeConfig,
+	NonceOptions,
+} from "./runtimeConfig";
 
 export interface JackettResult {
 	Author: unknown;
@@ -91,8 +95,16 @@ export async function validateJackettApi(): Promise<void> {
 	}
 }
 
-export function makeJackettRequest(name: string): Promise<JackettResponse> {
-	const { jackettApiKey, trackers, jackettServerUrl } = getRuntimeConfig();
+export function makeJackettRequest(
+	name: string,
+	nonceOptions: NonceOptions = EmptyNonceOptions
+): Promise<JackettResponse> {
+	const {
+		jackettApiKey,
+		trackers: runtimeConfigTrackers,
+		jackettServerUrl,
+	} = getRuntimeConfig();
+	const { trackers = runtimeConfigTrackers } = nonceOptions;
 	const params = {
 		apikey: jackettApiKey,
 		Query: reformatTitleForSearching(name),
