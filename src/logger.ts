@@ -16,6 +16,47 @@ export enum Label {
 
 export let logger: Logger;
 
+function redactUrlPassword(message, urlStr, redactionMsg) {
+	let url;
+	try {
+		url = new URL(urlStr);
+		const urlDecodedPassword = decodeURIComponent(url.password);
+		const urlEncodedPassword = encodeURIComponent(url.password);
+		message = message.split(url.password).join(redactionMsg);
+		message = message.split(urlDecodedPassword).join(redactionMsg);
+		message = message.split(urlEncodedPassword).join(redactionMsg);
+	} catch (e) {
+		// do nothing
+	}
+	return message;
+}
+
+function redactMessage(message) {
+	const {
+		jackettApiKey,
+		qbittorrentUrl,
+		rtorrentRpcUrl,
+	} = getRuntimeConfig();
+
+	message = message.split(jackettApiKey).join("[jackett api key]");
+
+	if (qbittorrentUrl) {
+		message = redactUrlPassword(
+			message,
+			qbittorrentUrl,
+			"[qbittorrent password]"
+		);
+	}
+	if (rtorrentRpcUrl) {
+		message = redactUrlPassword(
+			message,
+			rtorrentRpcUrl,
+			"[rtorrent password]"
+		);
+	}
+	return message;
+}
+
 export function initializeLogger(): void {
 	createAppDir();
 	logger = createLogger({
@@ -30,7 +71,7 @@ export function initializeLogger(): void {
 			format.printf(({ level, message, label, timestamp }) => {
 				return `${timestamp} ${level}: ${
 					label ? `[${label}] ` : ""
-				}${message}`;
+				}${redactMessage(message)}`;
 			})
 		),
 		transports: [
@@ -54,7 +95,7 @@ export function initializeLogger(): void {
 					format.printf(({ level, message, label }) => {
 						return `${level}: ${
 							label ? `[${label}] ` : ""
-						}${message}`;
+						}${redactMessage(message)}`;
 					})
 				),
 			}),
