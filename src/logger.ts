@@ -16,15 +16,19 @@ export enum Label {
 
 export let logger: Logger;
 
-function redactUrlPassword(message, urlStr, redactionMsg) {
+const redactionMsg = "[REDACTED]";
+
+function redactUrlPassword(message, urlStr) {
 	let url;
 	try {
 		url = new URL(urlStr);
-		const urlDecodedPassword = decodeURIComponent(url.password);
-		const urlEncodedPassword = encodeURIComponent(url.password);
-		message = message.split(url.password).join(redactionMsg);
-		message = message.split(urlDecodedPassword).join(redactionMsg);
-		message = message.split(urlEncodedPassword).join(redactionMsg);
+		if (url.password) {
+			const urlDecodedPassword = decodeURIComponent(url.password);
+			const urlEncodedPassword = encodeURIComponent(url.password);
+			message = message.split(url.password).join(redactionMsg);
+			message = message.split(urlDecodedPassword).join(redactionMsg);
+			message = message.split(urlEncodedPassword).join(redactionMsg);
+		}
 	} catch (e) {
 		// do nothing
 	}
@@ -32,28 +36,16 @@ function redactUrlPassword(message, urlStr, redactionMsg) {
 }
 
 function redactMessage(message) {
-	const {
-		jackettApiKey,
-		qbittorrentUrl,
-		rtorrentRpcUrl,
-	} = getRuntimeConfig();
+	const runtimeConfig = getRuntimeConfig();
 
-	message = message.split(jackettApiKey).join("[jackett api key]");
+	message = message.split(runtimeConfig.jackettApiKey).join(redactionMsg);
 
-	if (qbittorrentUrl) {
-		message = redactUrlPassword(
-			message,
-			qbittorrentUrl,
-			"[qbittorrent password]"
-		);
+	for (const [key, urlStr] of Object.entries(runtimeConfig)) {
+		if (key.endsWith("Url") && urlStr) {
+			message = redactUrlPassword(message, urlStr);
+		}
 	}
-	if (rtorrentRpcUrl) {
-		message = redactUrlPassword(
-			message,
-			rtorrentRpcUrl,
-			"[rtorrent password]"
-		);
-	}
+
 	return message;
 }
 
