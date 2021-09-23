@@ -36,6 +36,13 @@ module.exports = {
 	// this option overrides includeEpisodes.
 	searchAll: false,
 
+	// Exclude torrents first seen more than n minutes ago.
+	excludeOlder: undefined,
+
+	// Exclude torrents which have been searched
+	// more recently than n minutes ago.
+	excludeRecentSearch: undefined,
+
 	// can be either "save" or "inject".
 	// With "inject" you need to set up one of the below clients.
 	action: "save",
@@ -50,4 +57,9 @@ module.exports = {
 	// Supply your username and password inside the url like so:
 	// "http://username:password@localhost:8080"
 	qbittorrentUrl: undefined,
+
+	// cross-seed will send POST requests to this url
+	// with a JSON payload of { title, body }.
+	// Conforms to the caronc/apprise REST API.
+	notificationWebhookUrl: undefined,
 };
