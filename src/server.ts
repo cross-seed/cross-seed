@@ -108,10 +108,4 @@ export async function serve(): Promise<void> {
 		label: Label.SERVER,
 		message: "Server is running on port 2468, ^C to stop.",
 	});
-
-	const server2 = http.createServer(async (req, res) => {
-		const data = await getData(req);
-		console.log("data", data);
-	});
-	server2.listen(8080);
 }
