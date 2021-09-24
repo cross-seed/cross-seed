@@ -62,11 +62,14 @@ async function findOnOtherSites(
 	);
 
 	pushNotifier.notify({
-		// @ts-expect-error ListFormat totally exists in node 12
-		body: `Found ${searchee.name} on ${new Intl.ListFormat("en", {
-			style: "long",
-			type: "conjunction",
-		}).format(successful.map((s) => s.tracker))}`,
+		body: `Found ${searchee.name} on ${successful.length} trackers${
+			successful.length &&
+			// @ts-expect-error ListFormat totally exists in node 12
+			`: ${new Intl.ListFormat("en", {
+				style: "long",
+				type: "conjunction",
+			}).format(successful.map((s) => s.tracker))}`
+		}`,
 		extra: {
 			infoHashes: successful.map((s) => s.assessment.info.infoHash),
 			trackers: successful.map((s) => s.tracker),
