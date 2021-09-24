@@ -15,9 +15,12 @@ interface FileConfig {
 	outputDir?: string;
 	rtorrentRpcUrl?: string;
 	searchAll?: boolean;
+	excludeOlder?: number;
+	excludeRecentSearch?: number;
 	torrentDir?: string;
 	trackers?: string[];
 	qbittorrentUrl?: string;
+	notificationWebhookUrl?: string;
 }
 
 interface GenerateConfigParams {

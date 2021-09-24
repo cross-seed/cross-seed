@@ -7,6 +7,7 @@ import { assessResult, ResultAssessment } from "./decide";
 import { JackettResponse, JackettResult, makeJackettRequest } from "./jackett";
 import { logger } from "./logger";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
+import { pushNotifier } from "./pushNotifier";
 import {
 	EmptyNonceOptions,
 	getRuntimeConfig,
@@ -59,6 +60,18 @@ async function findOnOtherSites(
 	const successful = loaded.filter(
 		(e) => e.assessment.decision === Decision.MATCH
 	);
+
+	pushNotifier.notify({
+		// @ts-expect-error ListFormat totally exists in node 12
+		body: `Found ${searchee.name} on ${new Intl.ListFormat("en", {
+			style: "long",
+			type: "conjunction",
+		}).format(successful.map((s) => s.tracker))}`,
+		extra: {
+			infoHashes: successful.map((s) => s.assessment.info.infoHash),
+			trackers: successful.map((s) => s.tracker),
+		},
+	});
 
 	let isTorrentIncomplete;
 

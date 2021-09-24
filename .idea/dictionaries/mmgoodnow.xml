@@ -2,6 +2,7 @@
   <dictionary name="mmgoodnow">
     <words>
       <w>bencode</w>
+      <w>caronc</w>
       <w>jackett</w>
       <w>qbittorrent</w>
       <w>rtorrent</w>
