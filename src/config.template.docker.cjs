@@ -60,4 +60,8 @@ module.exports = {
 	// with a JSON payload of { title, body }.
 	// Conforms to the caronc/apprise REST API.
 	notificationWebhookUrl: undefined,
+
+	// fuzzy size match threshold
+	// decimal value (0.02 = 2%)
+	fuzzySizeThreshold: 0.02,
 };

@@ -4,7 +4,7 @@ import { Option, program } from "commander";
 import { createRequire } from "module";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
-import { Action } from "./constants.js";
+import { Action, FUZZY_SIZE_THRESHOLD } from "./constants.js";
 import { dropDatabase } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError } from "./errors.js";
@@ -108,8 +108,21 @@ function createCommandWithSharedOptions(name, description) {
 			"--notification-webhook-url <url>",
 			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
 			fileConfig.notificationWebhookUrl
-		);
-}
+		)
+			.addOption(
+				new Option(
+					"-f, --fuzzy-size <decimal>",
+					"The size difference allowed to be considered a match."
+				)
+					.default(
+						fallback(
+							fileConfig.fuzzySizeThreshold,
+							FUZZY_SIZE_THRESHOLD
+						)
+					)
+					.makeOptionMandatory()
+			);
+	}
 
 program.name(packageDotJson.name);
 program.description(chalk.yellow.bold("cross-seed"));

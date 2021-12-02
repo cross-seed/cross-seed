@@ -16,6 +16,7 @@ interface RuntimeConfig {
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
 	notificationWebhookUrl: string;
+	fuzzySizeThreshold: number;
 }
 
 export interface NonceOptions {

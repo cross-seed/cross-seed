@@ -23,6 +23,7 @@ interface FileConfig {
 	trackers?: string[];
 	qbittorrentUrl?: string;
 	notificationWebhookUrl?: string;
+	fuzzySizeThreshold?: number;
 }
 
 interface GenerateConfigParams {
