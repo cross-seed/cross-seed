@@ -5,6 +5,7 @@ import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
 import { dropDatabase } from "./db.js";
+import { diffCmd } from "./diff";
 import { CrossSeedError } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main } from "./pipeline.js";
@@ -132,6 +133,27 @@ async function run() {
 		.description("Clear the cache of downloaded-and-rejected torrents")
 		.action(dropDatabase);
 
+	program
+		.command("test-notification")
+		.description("Send a test notification")
+		.requiredOption(
+			"--notification-webhook-url <url>",
+			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
+			fileConfig.notificationWebhookUrl
+		)
+		.action((options) => {
+			const runtimeConfig = processOptions(options);
+			setRuntimeConfig(runtimeConfig);
+			initializeLogger();
+			initializePushNotifier();
+			sendTestNotification();
+		});
+
+	program
+		.command("diff")
+		.description("Analyze two torrent files for cross-seed compatibility")
+		.action(diffCmd);
+
 	createCommandWithSharedOptions(
 		"daemon",
 		"Start the cross-seed daemon"
@@ -159,22 +181,6 @@ async function run() {
 			throw e;
 		}
 	});
-
-	program
-		.command("test-notification")
-		.description("Send a test notification")
-		.requiredOption(
-			"--notification-webhook-url <url>",
-			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
-			fileConfig.notificationWebhookUrl
-		)
-		.action((options) => {
-			const runtimeConfig = processOptions(options);
-			setRuntimeConfig(runtimeConfig);
-			initializeLogger();
-			initializePushNotifier();
-			sendTestNotification();
-		});
 
 	createCommandWithSharedOptions("search", "Search for cross-seeds")
 		.requiredOption(
