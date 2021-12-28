@@ -1,10 +1,10 @@
 import { sortBy } from "lodash";
 import { Metafile } from "parse-torrent";
 import path, { join } from "path";
-import { getRuntimeConfig } from "./runtimeConfig";
-import { parseTorrentFromFilename } from "./torrent";
-import { Result } from "./utils";
-import { logger } from "./logger";
+import { getRuntimeConfig } from "./runtimeConfig.js";
+import { parseTorrentFromFilename } from "./torrent.js";
+import { Result } from "./utils.js";
+import { logger } from "./logger.js";
 interface File {
 	length: number;
 	name: string;

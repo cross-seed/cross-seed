@@ -2,24 +2,24 @@
 import chalk from "chalk";
 import { Option, program } from "commander";
 // @ts-expect-error json imports are experimental
-import packageDotJson from "../package.json";
-import { generateConfig, getFileConfig } from "./configuration";
-import { Action } from "./constants";
-import { dropDatabase } from "./db";
-import { CrossSeedError } from "./errors";
-import { initializeLogger, Label, logger } from "./logger";
-import { main } from "./pipeline";
+import packageDotJson from "../package.json.js";
+import { generateConfig, getFileConfig } from "./configuration.js";
+import { Action } from "./constants.js";
+import { dropDatabase } from "./db.js";
+import { CrossSeedError } from "./errors.js";
+import { initializeLogger, Label, logger } from "./logger.js";
+import { main } from "./pipeline.js";
 import {
 	initializePushNotifier,
 	pushNotifier,
 	sendTestNotification,
-} from "./pushNotifier";
-import { setRuntimeConfig } from "./runtimeConfig";
-import { serve } from "./server";
+} from "./pushNotifier.js";
+import { setRuntimeConfig } from "./runtimeConfig.js";
+import { serve } from "./server.js";
 import { inspect } from "util";
 import "./signalHandlers";
 
-import { doStartupValidation } from "./startup";
+import { doStartupValidation } from "./startup.js";
 
 function fallback(...args) {
 	for (const arg of args) {

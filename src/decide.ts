@@ -1,56 +1,55 @@
 import { existsSync, writeFileSync } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
-import { appDir } from "./configuration";
-import { Decision, DECISIONS, TORRENT_CACHE_FOLDER } from "./constants";
-import db, { DecisionEntry } from "./db";
-import { JackettResult } from "./jackett";
-import { Label, logger } from "./logger";
-import { Searchee } from "./searchee";
-import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent";
-import { partial } from "./utils";
+import { appDir } from "./configuration.js";
+import { Decision, DECISIONS, TORRENT_CACHE_FOLDER } from "./constants.js";
+import db, { DecisionEntry } from "./db.js";
+import { JackettResult } from "./jackett.js";
+import { Label, logger } from "./logger.js";
+import { Searchee } from "./searchee.js";
+import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
+import { partial } from "./utils.js";
 
 export interface ResultAssessment {
 	decision: Decision;
 	info?: Metafile;
 }
 
-const createReasonLogger = (Title: string, tracker: string, name: string) => (
-	decision: Decision,
-	cached
-): void => {
-	function logReason(reason): void {
-		logger.verbose({
-			label: Label.DECIDE,
-			message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}`,
-		});
-	}
-	let reason;
-	switch (decision) {
-		case Decision.MATCH:
-			return;
-		case Decision.SIZE_MISMATCH:
-			reason = "its size does not match";
-			break;
-		case Decision.NO_DOWNLOAD_LINK:
-			reason = "it doesn't have a download link";
-			break;
-		case Decision.DOWNLOAD_FAILED:
-			reason = "the torrent file failed to download";
-			break;
-		case Decision.INFO_HASH_ALREADY_EXISTS:
-			reason = "the info hash matches a torrent you already have";
-			break;
-		case Decision.FILE_TREE_MISMATCH:
-			reason = "it has a different file tree";
-			break;
-		default:
-			reason = decision;
-			break;
-	}
-	if (cached) logReason(`${reason} (cached)`);
-	else logReason(reason);
-};
+const createReasonLogger =
+	(Title: string, tracker: string, name: string) =>
+	(decision: Decision, cached): void => {
+		function logReason(reason): void {
+			logger.verbose({
+				label: Label.DECIDE,
+				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}`,
+			});
+		}
+		let reason;
+		switch (decision) {
+			case Decision.MATCH:
+				return;
+			case Decision.SIZE_MISMATCH:
+				reason = "its size does not match";
+				break;
+			case Decision.NO_DOWNLOAD_LINK:
+				reason = "it doesn't have a download link";
+				break;
+			case Decision.DOWNLOAD_FAILED:
+				reason = "the torrent file failed to download";
+				break;
+			case Decision.INFO_HASH_ALREADY_EXISTS:
+				reason = "the info hash matches a torrent you already have";
+				break;
+			case Decision.FILE_TREE_MISMATCH:
+				reason = "it has a different file tree";
+				break;
+			default:
+				reason = decision;
+				break;
+		}
+		if (cached) logReason(`${reason} (cached)`);
+		else logReason(reason);
+	};
 
 function compareFileTrees(candidate: Metafile, searchee: Searchee): boolean {
 	const cmp = (elOfA, elOfB) => {

@@ -1,12 +1,12 @@
 import { uniqBy } from "lodash";
 import { Metafile } from "parse-torrent";
 import path from "path";
-import { EP_REGEX, EXTENSIONS, SEARCHEES } from "./constants";
-import db, { Schema } from "./db";
-import { Label, logger } from "./logger";
-import { getRuntimeConfig } from "./runtimeConfig";
-import { Searchee } from "./searchee";
-import { nMinutesAgo, partial } from "./utils";
+import { EP_REGEX, EXTENSIONS, SEARCHEES } from "./constants.js";
+import db, { Schema } from "./db.js";
+import { Label, logger } from "./logger.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
+import { Searchee } from "./searchee.js";
+import { nMinutesAgo, partial } from "./utils.js";
 
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 

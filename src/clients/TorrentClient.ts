@@ -1,9 +1,9 @@
 import { Metafile } from "parse-torrent";
-import { InjectionResult } from "../constants";
-import { getRuntimeConfig, NonceOptions } from "../runtimeConfig";
-import { Searchee } from "../searchee";
-import QBittorrent from "./QBittorrent";
-import RTorrent from "./RTorrent";
+import { InjectionResult } from "../constants.js";
+import { getRuntimeConfig, NonceOptions } from "../runtimeConfig.js";
+import { Searchee } from "../searchee.js";
+import QBittorrent from "./QBittorrent.js";
+import RTorrent from "./RTorrent.js";
 
 let activeClient: TorrentClient;
 

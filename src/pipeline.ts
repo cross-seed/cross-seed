@@ -1,28 +1,32 @@
 import chalk from "chalk";
 import fs from "fs";
-import { getClient } from "./clients/TorrentClient";
-import { Action, Decision, InjectionResult, SEARCHEES } from "./constants";
-import db from "./db";
-import { assessResult, ResultAssessment } from "./decide";
-import { JackettResponse, JackettResult, makeJackettRequest } from "./jackett";
-import { logger } from "./logger";
-import { filterByContent, filterDupes, filterTimestamps } from "./preFilter";
-import { pushNotifier } from "./pushNotifier";
+import { getClient } from "./clients/TorrentClient.js";
+import { Action, Decision, InjectionResult, SEARCHEES } from "./constants.js";
+import db from "./db.js";
+import { assessResult, ResultAssessment } from "./decide.js";
+import {
+	JackettResponse,
+	JackettResult,
+	makeJackettRequest,
+} from "./jackett.js";
+import { logger } from "./logger.js";
+import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
+import { pushNotifier } from "./pushNotifier.js";
 import {
 	EmptyNonceOptions,
 	getRuntimeConfig,
 	NonceOptions,
-} from "./runtimeConfig";
-import { Searchee } from "./searchee";
+} from "./runtimeConfig.js";
+import { Searchee } from "./searchee.js";
 import {
 	TorrentLocator,
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
 	loadTorrentDirLight,
 	saveTorrentFile,
-} from "./torrent";
+} from "./torrent.js";
 
-import { getTag, stripExtension } from "./utils";
+import { getTag, stripExtension } from "./utils.js";
 
 interface AssessmentWithTracker {
 	assessment: ResultAssessment;

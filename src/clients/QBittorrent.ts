@@ -2,12 +2,12 @@ import FormData from "form-data";
 import fetch, { BodyInit, Response } from "node-fetch";
 import parseTorrent, { Metafile } from "parse-torrent";
 import querystring from "querystring";
-import { InjectionResult } from "../constants";
-import { CrossSeedError } from "../errors";
-import { Label, logger } from "../logger";
-import { getRuntimeConfig, NonceOptions } from "../runtimeConfig";
-import { Searchee } from "../searchee";
-import { TorrentClient } from "./TorrentClient";
+import { InjectionResult } from "../constants.js";
+import { CrossSeedError } from "../errors.js";
+import { Label, logger } from "../logger.js";
+import { getRuntimeConfig, NonceOptions } from "../runtimeConfig.js";
+import { Searchee } from "../searchee.js";
+import { TorrentClient } from "./TorrentClient.js";
 
 const X_WWW_FORM_URLENCODED = {
 	"Content-Type": "application/x-www-form-urlencoded",
@@ -146,11 +146,8 @@ export default class QBittorrent implements TorrentClient {
 		}
 		const buf = parseTorrent.toTorrentFile(newTorrent);
 		try {
-			const {
-				save_path,
-				category,
-				isComplete,
-			} = await this.getTorrentConfiguration(searchee);
+			const { save_path, category, isComplete } =
+				await this.getTorrentConfiguration(searchee);
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 			const formData = new FormData();
 			formData.append("torrents", buf, {

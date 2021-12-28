@@ -1,9 +1,9 @@
-import { getClient } from "./clients/TorrentClient";
-import { CrossSeedError } from "./errors";
-import { validateJackettApi } from "./jackett";
-import { logger } from "./logger";
-import { getRuntimeConfig } from "./runtimeConfig";
-import { validateTorrentDir } from "./torrent";
+import { getClient } from "./clients/TorrentClient.js";
+import { CrossSeedError } from "./errors.js";
+import { validateJackettApi } from "./jackett.js";
+import { logger } from "./logger.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
+import { validateTorrentDir } from "./torrent.js";
 
 function validateOptions() {
 	const { action, rtorrentRpcUrl, qbittorrentUrl } = getRuntimeConfig();

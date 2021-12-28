@@ -3,13 +3,13 @@ import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { concat } from "simple-get";
 import { inspect } from "util";
-import { INDEXED_TORRENTS } from "./constants";
-import db from "./db";
-import { CrossSeedError } from "./errors";
-import { logger } from "./logger";
-import { getRuntimeConfig, NonceOptions } from "./runtimeConfig";
-import { createSearcheeFromTorrentFile, Searchee } from "./searchee";
-import { ok, stripExtension } from "./utils";
+import { INDEXED_TORRENTS } from "./constants.js";
+import db from "./db.js";
+import { CrossSeedError } from "./errors.js";
+import { logger } from "./logger.js";
+import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
+import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
+import { ok, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;

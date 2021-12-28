@@ -4,13 +4,13 @@ import parseTorrent, { FileListing, Metafile } from "parse-torrent";
 import { dirname, resolve } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
-import { InjectionResult } from "../constants";
-import { CrossSeedError } from "../errors";
-import { Label, logger } from "../logger";
-import { getRuntimeConfig, NonceOptions } from "../runtimeConfig";
-import { Searchee } from "../searchee";
-import { wait } from "../utils";
-import { TorrentClient } from "./TorrentClient";
+import { InjectionResult } from "../constants.js";
+import { CrossSeedError } from "../errors.js";
+import { Label, logger } from "../logger.js";
+import { getRuntimeConfig, NonceOptions } from "../runtimeConfig.js";
+import { Searchee } from "../searchee.js";
+import { wait } from "../utils.js";
+import { TorrentClient } from "./TorrentClient.js";
 
 interface LibTorrentResumeFileEntry {
 	completed: number;

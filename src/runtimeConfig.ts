@@ -1,4 +1,4 @@
-import { Action } from "./constants";
+import { Action } from "./constants.js";
 interface RuntimeConfig {
 	offset: number;
 	jackettServerUrl: string;

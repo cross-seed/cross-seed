@@ -1,7 +1,7 @@
 import { join } from "path";
 import { createLogger, format, Logger, transports } from "winston";
-import { appDir, createAppDir } from "./configuration";
-import { getRuntimeConfig } from "./runtimeConfig";
+import { appDir, createAppDir } from "./configuration.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",

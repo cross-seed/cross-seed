@@ -2,8 +2,13 @@ import { sync as rimrafSync } from "rimraf";
 import lowdb from "lowdb";
 import FileSync from "lowdb/adapters/FileSync";
 import path from "path";
-import { appDir, createAppDir } from "./configuration";
-import { Decision, DECISIONS, INDEXED_TORRENTS, SEARCHEES } from "./constants";
+import { appDir, createAppDir } from "./configuration.js";
+import {
+	Decision,
+	DECISIONS,
+	INDEXED_TORRENTS,
+	SEARCHEES,
+} from "./constants.js";
 import { unlinkSync } from "fs";
 
 createAppDir();
