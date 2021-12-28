@@ -6,7 +6,7 @@
 		"test": "true",
 		"build": "tsc",
 		"release": "np",
-		"prepare": "rimraf dist && npm run build"
+		"prepare": "rimraf dist && npm run build && husky install"
 	},
 	"bin": {
 		"cross-seed": "dist/src/cmd.js"
@@ -42,7 +42,7 @@
 		"@typescript-eslint/eslint-plugin": "^4.16.1",
 		"@typescript-eslint/parser": "^4.16.1",
 		"eslint": "^7.11.0",
-		"husky": "^4.3.0",
+		"husky": "^7.0.0",
 		"lint-staged": "^10.4.0",
 		"np": "*",
 		"prettier": "^2.0.5",
@@ -52,11 +52,6 @@
 		"tabWidth": 4,
 		"useTabs": true,
 		"proseWrap": "always"
-	},
-	"husky": {
-		"hooks": {
-			"pre-commit": "npm run build && lint-staged"
-		}
 	},
 	"lint-staged": {
 		"*.{js,ts}": "eslint --cache",
