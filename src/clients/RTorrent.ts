@@ -133,11 +133,7 @@ export default class RTorrent implements TorrentClient {
 		}
 		const infoHash = searchee.infoHash.toUpperCase();
 		type returnType = [["0" | "1"], [string], ["0" | "1"]];
-		const [
-			[isMultiFileStr],
-			[dir],
-			[isCompleteStr],
-		] = await this.methodCallP<returnType>("system.multicall", [
+		const result = await this.methodCallP<returnType>("system.multicall", [
 			[
 				{
 					methodName: "d.is_multi_file",
@@ -153,10 +149,19 @@ export default class RTorrent implements TorrentClient {
 				},
 			],
 		]);
-		return {
-			dataDir: Number(isMultiFileStr) ? dirname(dir) : dir,
-			isComplete: Boolean(Number(isCompleteStr)),
-		};
+
+		// temp diag for #154
+		try {
+			const [[isMultiFileStr], [dir], [isCompleteStr]] = result;
+			return {
+				dataDir: Number(isMultiFileStr) ? dirname(dir) : dir,
+				isComplete: Boolean(Number(isCompleteStr)),
+			};
+		} catch (e) {
+			logger.error(e);
+			logger.debug("Failure caused by server response below:");
+			logger.debug(inspect(result));
+		}
 	}
 
 	async validateConfig(): Promise<void> {
