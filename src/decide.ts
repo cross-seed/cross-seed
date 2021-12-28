@@ -140,7 +140,6 @@ async function assessResultCaching(
 		if (infoHashesToExclude.includes(cacheEntry.infoHash)) {
 			// has been added since the last run
 			assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
-			db.data.decisions[searchee.name][Guid].lastSeen = Date.now();
 			db.data.decisions[searchee.name][Guid].decision =
 				assessment.decision;
 		} else {
@@ -170,6 +169,7 @@ async function assessResultCaching(
 		}
 		logReason(assessment.decision, false);
 	}
+	db.data.decisions[searchee.name][Guid].lastSeen = Date.now();
 	db.write();
 	return assessment;
 }
