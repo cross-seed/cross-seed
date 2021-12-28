@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
+// @ts-expect-error json imports are experimental
 import packageDotJson from "../package.json";
 import { generateConfig, getFileConfig } from "./configuration";
 import { Action } from "./constants";

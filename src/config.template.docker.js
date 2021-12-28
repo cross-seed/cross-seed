@@ -1,9 +1,8 @@
-// All of the configuration can be overridden with command-line flags,
-// and some are more useful as flags than permanent config (offset).
+// All of the configuration can be overridden with command-line flags.
 // If you find yourself always using the same command-line flag, you can set
 // it here as a default.
 
-module.exports = {
+export default {
 	jackettServerUrl: "http://jackett:9117/jackett",
 	jackettApiKey: "YOUR_JACKETT_API_KEY_HERE",
 

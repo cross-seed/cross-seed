@@ -1,7 +1,7 @@
 // If you find yourself always using the same command-line flag, you can set
 // it here as a default.
 
-module.exports = {
+export default {
 	configVersion: 1,
 
 	jackettServerUrl: "http://localhost:9117/jackett",

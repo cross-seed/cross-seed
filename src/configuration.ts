@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import fs from "fs";
 import path from "path";
+// @ts-ignore
 import packageDotJson from "../package.json";
 import configTemplate from "./config.template";
 import { Action, CONFIG_TEMPLATE_URL } from "./constants";
