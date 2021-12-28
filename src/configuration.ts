@@ -1,9 +1,10 @@
 import chalk from "chalk";
 import { copyFileSync, existsSync, mkdirSync } from "fs";
-import path from "path";
-import configTemplate from "./config.template.js";
-import { Action, CONFIG_TEMPLATE_URL } from "./constants.js";
 import { createRequire } from "module";
+import path from "path";
+import { inspect } from "util";
+import { Action } from "./constants.js";
+
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
@@ -51,43 +52,23 @@ export function generateConfig({
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
 	const templatePath = path.join(
-		__dirname,
-		`config.template${docker ? ".docker" : ""}.js`
+		`./config.template${docker ? ".docker" : ""}.cjs`
 	);
 	if (!force && existsSync(dest)) {
 		console.log("Configuration file already exists.");
 		return;
 	}
-	copyFileSync(templatePath, dest);
+	copyFileSync(new URL(templatePath, import.meta.url), dest);
 	console.log("Configuration file created at", chalk.yellow.bold(dest));
-}
-
-function printUpdateInstructions(missingKeys) {
-	const configPath = path.join(appDir(), "config.js");
-	console.error(chalk.yellow`
- Error: Your configuration file is out of date.
- Missing options:\n\t${missingKeys.join("\n\t")}
- Please update at ${configPath}.
- When you are done, set the configVersion to ${configTemplate.configVersion}.
- It may help to read the template, at ${CONFIG_TEMPLATE_URL}
- `);
 }
 
 export async function getFileConfig(): Promise<FileConfig> {
 	const configPath = path.join(appDir(), "config.js");
 
 	try {
-		const fileConfig = (await import(configPath)).default;
-		const { configVersion = 0 } = fileConfig;
-		if (configVersion < configVersion) {
-			const missingKeys = Object.keys(configTemplate).filter(
-				(k) => !(k in fileConfig)
-			);
-			printUpdateInstructions(missingKeys);
-		}
-		return fileConfig;
+		return (await import(configPath)).default;
 	} catch (e) {
-		if (e.code !== "MODULE_NOT_FOUND") throw e;
+		if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
 		return {};
 	}
 }

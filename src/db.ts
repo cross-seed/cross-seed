@@ -58,7 +58,7 @@ export function dropDatabase(): void {
 	db.data = emptyDatabase;
 	db.write();
 	unlinkSync(path.join(appDir(), "cache.json"));
-	rimraf.rimrafSync(path.join(appDir(), "torrent_cache"));
+	rimraf.sync(path.join(appDir(), "torrent_cache"));
 }
 
 export default db;

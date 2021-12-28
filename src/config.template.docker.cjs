@@ -1,10 +1,8 @@
 // If you find yourself always using the same command-line flag, you can set
 // it here as a default.
 
-export default {
-	configVersion: 1,
-
-	jackettServerUrl: "http://localhost:9117/jackett",
+module.exports = {
+	jackettServerUrl: "http://jackett:9117/jackett",
 	jackettApiKey: "YOUR_JACKETT_API_KEY_HERE",
 
 	// Pause at least this much in between each Jackett search. Higher is safer.
@@ -20,10 +18,14 @@ export default {
 	// For rtorrent, this is your session directory
 	// as configured in your .rtorrent.rc file.
 	// For deluge, this is ~/.config/deluge/state.
-	torrentDir: "/path/to/torrent/file/dir",
+	// Don't change this for Docker.
+	// Instead set the volume mapping on your docker container.
+	torrentDir: "/torrents",
 
 	// where to put the torrent files that cross-seed finds for you.
-	outputDir: ".",
+	// Don't change this for Docker.
+	// Instead set the volume mapping on your docker container.
+	outputDir: "/cross-seeds",
 
 	// Whether to search for single episode torrents
 	includeEpisodes: false,
