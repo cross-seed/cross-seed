@@ -1,15 +1,9 @@
-import { sync as rimrafSync } from "rimraf";
-import lowdb from "lowdb";
-import FileSync from "lowdb/adapters/FileSync";
-import path from "path";
-import { appDir, createAppDir } from "./configuration.js";
-import {
-	Decision,
-	DECISIONS,
-	INDEXED_TORRENTS,
-	SEARCHEES,
-} from "./constants.js";
 import { unlinkSync } from "fs";
+import { JSONFileSync, LowSync } from "lowdb";
+import path from "path";
+import { sync as rimrafSync } from "rimraf";
+import { appDir, createAppDir } from "./configuration.js";
+import { Decision } from "./constants.js";
 
 createAppDir();
 
@@ -33,31 +27,35 @@ export interface TorrentEntry {
 }
 
 export interface Schema {
-	[SEARCHEES]: Record<string, SearcheeEntry>;
-	[DECISIONS]: Record<string, Record<string, DecisionEntry>>;
-	[INDEXED_TORRENTS]: TorrentEntry[];
+	searchees: Record<string, SearcheeEntry>;
+	decisions: Record<string, Record<string, DecisionEntry>>;
+	indexedTorrents: TorrentEntry[];
 	dbVersion: number;
 }
 
-const db = lowdb(new FileSync<Schema>(path.join(appDir(), "cache.json")));
+const db = new LowSync<Schema>(
+	new JSONFileSync<Schema>(path.join(appDir(), "cache.json"))
+);
 
 const emptyDatabase = {
-	[SEARCHEES]: {},
-	[DECISIONS]: {},
-	[INDEXED_TORRENTS]: [],
+	searchees: {},
+	decisions: {},
+	indexedTorrents: [],
 	dbVersion: 3,
 };
 
-const dbVersion = db.get("dbVersion").value();
+const dbVersion = db.data.dbVersion;
 
 if (!dbVersion || dbVersion < emptyDatabase.dbVersion) {
-	db.setState(emptyDatabase);
+	db.data = emptyDatabase;
 }
 
-db.defaults(emptyDatabase).write();
+db.data ??= emptyDatabase;
+db.write();
 
 export function dropDatabase(): void {
-	db.setState(emptyDatabase).write();
+	db.data = emptyDatabase;
+	db.write();
 	unlinkSync(path.join(appDir(), "cache.json"));
 	rimrafSync(path.join(appDir(), "torrent_cache"));
 }

@@ -1,7 +1,7 @@
 import { uniqBy } from "lodash";
 import { Metafile } from "parse-torrent";
 import path from "path";
-import { EP_REGEX, EXTENSIONS, SEARCHEES } from "./constants.js";
+import { EP_REGEX, EXTENSIONS } from "./constants.js";
 import db, { Schema } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -57,9 +57,7 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 
 export function filterTimestamps(searchee: Searchee): boolean {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-	const timestampData = db
-		.get<typeof SEARCHEES, typeof searchee.name>([SEARCHEES, searchee.name])
-		.value();
+	const timestampData = db.data.searchees[searchee.name];
 	if (!timestampData) return true;
 	const { firstSearched, lastSearched } = timestampData;
 	function logReason(reason) {

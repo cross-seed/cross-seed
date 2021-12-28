@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import fs from "fs";
 import { getClient } from "./clients/TorrentClient.js";
-import { Action, Decision, InjectionResult, SEARCHEES } from "./constants.js";
+import { Action, Decision, InjectionResult } from "./constants.js";
 import db from "./db.js";
 import { assessResult, ResultAssessment } from "./decide.js";
 import {
@@ -133,14 +133,15 @@ async function findOnOtherSites(
 }
 
 function updateSearchTimestamps(name: string): void {
-	db.get(SEARCHEES)
-		.defaultsDeep({
-			[name]: {
-				firstSearched: Date.now(),
-			},
-		})
-		.set([name, "lastSearched"], Date.now())
-		.write();
+	if (db.data.searchees[name]) {
+		db.data.searchees[name].lastSearched = Date.now();
+	} else {
+		db.data.searchees[name] = {
+			firstSearched: Date.now(),
+			lastSearched: Date.now(),
+		};
+	}
+	db.write();
 }
 
 async function findMatchesBatch(
