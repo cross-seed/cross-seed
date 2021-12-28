@@ -43,8 +43,7 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 		if (
 			response.statusCode >= 300 &&
 			response.statusCode < 400 &&
-			response.headers.location &&
-			response.headers.location.startsWith("magnet:")
+			response.headers.location?.startsWith("magnet:")
 		) {
 			logger.error(`Unsupported: magnet link detected at ${url}`);
 			return null;

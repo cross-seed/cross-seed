@@ -28,8 +28,7 @@ function fallback(...args) {
 }
 
 function processOptions(options) {
-	options.trackers =
-		options.trackers && options.trackers.split(",").filter((e) => e !== "");
+	options.trackers = options.trackers?.split(",").filter((e) => e !== "");
 	return options;
 }
 
@@ -53,10 +52,7 @@ async function run() {
 			.requiredOption(
 				"-t, --trackers <tracker1>,<tracker2>",
 				"Comma-separated list of Jackett tracker ids to search  (Tracker ids can be found in their Torznab feed paths)",
-				fallback(
-					fileConfig.trackers && fileConfig.trackers.join(","),
-					""
-				)
+				fallback(fileConfig.trackers?.join(","), "")
 			)
 			.requiredOption(
 				"-i, --torrent-dir <dir>",

@@ -21,7 +21,7 @@ export async function doStartupValidation(): Promise<void> {
 	await Promise.all<void>(
 		[
 			validateJackettApi(),
-			downloadClient && downloadClient.validateConfig(),
+			downloadClient?.validateConfig(),
 			validateTorrentDir(),
 		].filter(Boolean)
 	);
