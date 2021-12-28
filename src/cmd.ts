@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
-// @ts-expect-error json imports are experimental
-import packageDotJson from "../package.json.js";
+import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
 import { dropDatabase } from "./db.js";
@@ -11,15 +10,15 @@ import { initializeLogger, Label, logger } from "./logger.js";
 import { main } from "./pipeline.js";
 import {
 	initializePushNotifier,
-	pushNotifier,
 	sendTestNotification,
 } from "./pushNotifier.js";
 import { setRuntimeConfig } from "./runtimeConfig.js";
 import { serve } from "./server.js";
-import { inspect } from "util";
-import "./signalHandlers";
-
+import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const packageDotJson = require("../package.json");
 
 function fallback(...args) {
 	for (const arg of args) {
@@ -34,7 +33,7 @@ function processOptions(options) {
 }
 
 async function run() {
-	const fileConfig = getFileConfig();
+	const fileConfig = await getFileConfig();
 
 	function createCommandWithSharedOptions(name, description) {
 		return program

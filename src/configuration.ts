@@ -1,10 +1,11 @@
 import chalk from "chalk";
-import fs from "fs";
+import { copyFileSync, existsSync, mkdirSync } from "fs";
 import path from "path";
-// @ts-ignore
-import packageDotJson from "../package.json.js";
 import configTemplate from "./config.template.js";
 import { Action, CONFIG_TEMPLATE_URL } from "./constants.js";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const packageDotJson = require("../package.json");
 
 interface FileConfig {
 	action?: Action;
@@ -39,8 +40,8 @@ export function appDir(): string {
 }
 
 export function createAppDir(): void {
-	fs.mkdirSync(path.join(appDir(), "torrent_cache"), { recursive: true });
-	fs.mkdirSync(path.join(appDir(), "logs"), { recursive: true });
+	mkdirSync(path.join(appDir(), "torrent_cache"), { recursive: true });
+	mkdirSync(path.join(appDir(), "logs"), { recursive: true });
 }
 
 export function generateConfig({
@@ -53,11 +54,11 @@ export function generateConfig({
 		__dirname,
 		`config.template${docker ? ".docker" : ""}.js`
 	);
-	if (!force && fs.existsSync(dest)) {
+	if (!force && existsSync(dest)) {
 		console.log("Configuration file already exists.");
 		return;
 	}
-	fs.copyFileSync(templatePath, dest);
+	copyFileSync(templatePath, dest);
 	console.log("Configuration file created at", chalk.yellow.bold(dest));
 }
 
@@ -72,12 +73,11 @@ function printUpdateInstructions(missingKeys) {
  `);
 }
 
-export function getFileConfig(): FileConfig {
+export async function getFileConfig(): Promise<FileConfig> {
 	const configPath = path.join(appDir(), "config.js");
 
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const fileConfig = require(configPath);
+		const fileConfig = (await import(configPath)).default;
 		const { configVersion = 0 } = fileConfig;
 		if (configVersion < configVersion) {
 			const missingKeys = Object.keys(configTemplate).filter(

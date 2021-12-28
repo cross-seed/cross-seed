@@ -1,4 +1,4 @@
-import { sortBy } from "lodash";
+import { sortBy } from "lodash-es";
 import { Metafile } from "parse-torrent";
 import path, { join } from "path";
 import { getRuntimeConfig } from "./runtimeConfig.js";

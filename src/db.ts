@@ -1,7 +1,7 @@
 import { unlinkSync } from "fs";
 import { JSONFileSync, LowSync } from "lowdb";
 import path from "path";
-import { sync as rimrafSync } from "rimraf";
+import rimraf from "rimraf";
 import { appDir, createAppDir } from "./configuration.js";
 import { Decision } from "./constants.js";
 
@@ -44,20 +44,21 @@ const emptyDatabase = {
 	dbVersion: 3,
 };
 
+db.data ??= emptyDatabase;
+
 const dbVersion = db.data.dbVersion;
 
 if (!dbVersion || dbVersion < emptyDatabase.dbVersion) {
 	db.data = emptyDatabase;
 }
 
-db.data ??= emptyDatabase;
 db.write();
 
 export function dropDatabase(): void {
 	db.data = emptyDatabase;
 	db.write();
 	unlinkSync(path.join(appDir(), "cache.json"));
-	rimrafSync(path.join(appDir(), "torrent_cache"));
+	rimraf.rimrafSync(path.join(appDir(), "torrent_cache"));
 }
 
 export default db;

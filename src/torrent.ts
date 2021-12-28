@@ -1,7 +1,7 @@
 import fs, { promises as fsPromises } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
-import { concat } from "simple-get";
+import simpleGet from "simple-get";
 import { inspect } from "util";
 import db from "./db.js";
 import { CrossSeedError } from "./errors.js";
@@ -26,11 +26,14 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 	let response;
 	try {
 		response = await new Promise((resolve, reject) => {
-			concat({ url, followRedirects: false }, (err, res, data) => {
-				if (err) return reject(err);
-				res.data = data;
-				return resolve(res);
-			});
+			simpleGet.concat(
+				{ url, followRedirects: false },
+				(err, res, data) => {
+					if (err) return reject(err);
+					res.data = data;
+					return resolve(res);
+				}
+			);
 		});
 	} catch (e) {
 		logger.error(`failed to access ${url}`);

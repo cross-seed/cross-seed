@@ -1,5 +1,5 @@
 import http from "http";
-import { pick } from "lodash";
+import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
 import { Label, logger } from "./logger.js";

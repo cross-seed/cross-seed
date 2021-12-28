@@ -1,4 +1,4 @@
-import { uniqBy } from "lodash";
+import { uniqBy } from "lodash-es";
 import { Metafile } from "parse-torrent";
 import path from "path";
 import { EP_REGEX, EXTENSIONS } from "./constants.js";
