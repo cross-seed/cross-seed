@@ -2,6 +2,7 @@ import bencode from "bencode";
 import { promises as fs, Stats } from "fs";
 import parseTorrent, { FileListing, Metafile } from "parse-torrent";
 import { dirname, resolve } from "path";
+import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants";
 import { CrossSeedError } from "../errors";
@@ -104,7 +105,7 @@ export default class RTorrent implements TorrentClient {
 	private async methodCallP<R>(method: string, args): Promise<R> {
 		logger.verbose({
 			label: Label.RTORRENT,
-			message: `Calling method ${method} with params ${args}`,
+			message: `Calling method ${method} with params ${inspect(args)}`,
 		});
 		return new Promise((resolve, reject) => {
 			this.client.methodCall(method, args, (err, data) => {
