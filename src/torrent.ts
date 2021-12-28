@@ -3,7 +3,6 @@ import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { concat } from "simple-get";
 import { inspect } from "util";
-import { INDEXED_TORRENTS } from "./constants.js";
 import db from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { logger } from "./logger.js";
@@ -93,11 +92,11 @@ export async function indexNewTorrents(): Promise<void> {
 	const { torrentDir } = getRuntimeConfig();
 	const dirContents = await findAllTorrentFilesInDir(torrentDir);
 
+	// index new torrents in the torrentDir
 	for (const filepath of dirContents) {
-		const doesAlreadyExist = db
-			.get(INDEXED_TORRENTS)
-			.find((indexEntry) => indexEntry.filepath === filepath)
-			.value();
+		const doesAlreadyExist = db.data.indexedTorrents.find(
+			(e) => e.filepath === filepath
+		);
 		if (!doesAlreadyExist) {
 			let meta;
 			try {
@@ -107,28 +106,22 @@ export async function indexNewTorrents(): Promise<void> {
 				logger.debug(e);
 				continue;
 			}
-			db.get(INDEXED_TORRENTS).value().push({
+			db.data.indexedTorrents.push({
 				filepath,
 				infoHash: meta.infoHash,
 				name: meta.name,
 			});
 		}
 	}
-	db.set(
-		INDEXED_TORRENTS,
-		db
-			.get(INDEXED_TORRENTS)
-			.value()
-			.filter((e) => dirContents.includes(e.filepath))
-	).value();
+	// clean up torrents that no longer exist in the torrentDir
+	db.data.indexedTorrents = db.data.indexedTorrents.filter((e) =>
+		dirContents.includes(e.filepath)
+	);
 	db.write();
 }
 
 export function getInfoHashesToExclude(): string[] {
-	return db
-		.get(INDEXED_TORRENTS)
-		.value()
-		.map((t) => t.infoHash);
+	return db.data.indexedTorrents.map((t) => t.infoHash);
 }
 
 export async function validateTorrentDir(): Promise<void> {
@@ -156,7 +149,11 @@ export async function getTorrentByCriteria(
 ): Promise<Metafile> {
 	await indexNewTorrents();
 
-	const findResult = db.get(INDEXED_TORRENTS).find(criteria).value();
+	const findResult = db.data.indexedTorrents.find(
+		(e) =>
+			(!criteria.infoHash || criteria.infoHash === e.infoHash) &&
+			(!criteria.name || criteria.name === e.name)
+	);
 	if (findResult === undefined) {
 		const message = `could not find a torrent with the criteria ${inspect(
 			criteria
