@@ -19,7 +19,7 @@ delivery into your client.
 
 ## Requirements
 
--   [Node 12+](https://nodejs.org/en/download)
+-   [Node 14+](https://nodejs.org/en/download)
 -   [Jackett](https://github.com/Jackett/Jackett)
 
 It will work on Mac and on Linux; I haven't tested it on Windows but it should
