@@ -1,12 +1,11 @@
 import { uniqBy } from "lodash-es";
-import { Metafile } from "parse-torrent";
 import path from "path";
 import { EP_REGEX, EXTENSIONS } from "./constants.js";
-import db, { Schema } from "./db.js";
+import db from "./db.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { nMinutesAgo, partial } from "./utils.js";
+import { nMinutesAgo } from "./utils.js";
 
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 
