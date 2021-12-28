@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
-import { logger } from "./logger";
-import { getRuntimeConfig } from "./runtimeConfig";
+import { logger } from "./logger.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export let pushNotifier: PushNotifier;
 

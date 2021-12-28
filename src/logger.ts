@@ -1,7 +1,7 @@
 import { join } from "path";
-import { createLogger, format, Logger, transports } from "winston";
-import { appDir, createAppDir } from "./configuration";
-import { getRuntimeConfig } from "./runtimeConfig";
+import winston from "winston";
+import { appDir, createAppDir } from "./configuration.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -14,7 +14,7 @@ export enum Label {
 	STARTUP = "startup",
 }
 
-export let logger: Logger;
+export let logger: winston.Logger;
 
 const redactionMsg = "[REDACTED]";
 
@@ -51,40 +51,40 @@ function redactMessage(message) {
 
 export function initializeLogger(): void {
 	createAppDir();
-	logger = createLogger({
+	logger = winston.createLogger({
 		level: "info",
-		format: format.combine(
-			format.timestamp({
+		format: winston.format.combine(
+			winston.format.timestamp({
 				format: "YYYY-MM-DD HH:mm:ss",
 			}),
-			format.errors({ stack: true }),
-			format.splat(),
-			format.colorize(),
-			format.printf(({ level, message, label, timestamp }) => {
+			winston.format.errors({ stack: true }),
+			winston.format.splat(),
+			winston.format.colorize(),
+			winston.format.printf(({ level, message, label, timestamp }) => {
 				return `${timestamp} ${level}: ${
 					label ? `[${label}] ` : ""
 				}${redactMessage(message)}`;
 			})
 		),
 		transports: [
-			new transports.File({
+			new winston.transports.File({
 				filename: join(appDir(), "logs", "error.log"),
 				level: "error",
 			}),
-			new transports.File({
+			new winston.transports.File({
 				filename: join(appDir(), "logs", "info.log"),
 			}),
-			new transports.File({
+			new winston.transports.File({
 				filename: join(appDir(), "logs", "verbose.log"),
 				level: "silly",
 			}),
-			new transports.Console({
+			new winston.transports.Console({
 				level: getRuntimeConfig().verbose ? "silly" : "info",
-				format: format.combine(
-					format.errors({ stack: true }),
-					format.splat(),
-					format.colorize(),
-					format.printf(({ level, message, label }) => {
+				format: winston.format.combine(
+					winston.format.errors({ stack: true }),
+					winston.format.splat(),
+					winston.format.colorize(),
+					winston.format.printf(({ level, message, label }) => {
 						return `${level}: ${
 							label ? `[${label}] ` : ""
 						}${redactMessage(message)}`;

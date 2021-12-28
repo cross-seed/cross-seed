@@ -1,12 +1,11 @@
-import { uniqBy } from "lodash";
-import { Metafile } from "parse-torrent";
+import { uniqBy } from "lodash-es";
 import path from "path";
-import { EP_REGEX, EXTENSIONS, SEARCHEES } from "./constants";
-import db, { Schema } from "./db";
-import { Label, logger } from "./logger";
-import { getRuntimeConfig } from "./runtimeConfig";
-import { Searchee } from "./searchee";
-import { nMinutesAgo, partial } from "./utils";
+import { EP_REGEX, EXTENSIONS } from "./constants.js";
+import db from "./db.js";
+import { Label, logger } from "./logger.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
+import { Searchee } from "./searchee.js";
+import { nMinutesAgo } from "./utils.js";
 
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 
@@ -57,9 +56,7 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 
 export function filterTimestamps(searchee: Searchee): boolean {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-	const timestampData = db
-		.get<typeof SEARCHEES, typeof searchee.name>([SEARCHEES, searchee.name])
-		.value();
+	const timestampData = db.data.searchees[searchee.name];
 	if (!timestampData) return true;
 	const { firstSearched, lastSearched } = timestampData;
 	function logReason(reason) {

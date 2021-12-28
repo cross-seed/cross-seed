@@ -2,8 +2,6 @@
 // it here as a default.
 
 module.exports = {
-	configVersion: 1,
-
 	jackettServerUrl: "http://localhost:9117/jackett",
 	jackettApiKey: "YOUR_JACKETT_API_KEY_HERE",
 

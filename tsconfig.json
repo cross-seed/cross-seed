@@ -3,7 +3,7 @@
 		"outDir": "./dist",
 		"allowJs": true,
 		"target": "es2019",
-		"module": "CommonJS",
+		"module": "nodenext",
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
 		"sourceMap": true

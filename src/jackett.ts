@@ -1,13 +1,13 @@
 import querystring from "querystring";
 import get from "simple-get";
-import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants";
-import { CrossSeedError } from "./errors";
-import { Label, logger } from "./logger";
+import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants.js";
+import { CrossSeedError } from "./errors.js";
+import { Label, logger } from "./logger.js";
 import {
 	EmptyNonceOptions,
 	getRuntimeConfig,
 	NonceOptions,
-} from "./runtimeConfig";
+} from "./runtimeConfig.js";
 
 export interface JackettResult {
 	Author: unknown;

@@ -1,9 +1,11 @@
 import chalk from "chalk";
-import fs from "fs";
+import { copyFileSync, existsSync, mkdirSync } from "fs";
+import { createRequire } from "module";
 import path from "path";
-import packageDotJson from "../package.json";
-import configTemplate from "./config.template";
-import { Action, CONFIG_TEMPLATE_URL } from "./constants";
+import { Action } from "./constants.js";
+
+const require = createRequire(import.meta.url);
+const packageDotJson = require("../package.json");
 
 interface FileConfig {
 	action?: Action;
@@ -38,8 +40,8 @@ export function appDir(): string {
 }
 
 export function createAppDir(): void {
-	fs.mkdirSync(path.join(appDir(), "torrent_cache"), { recursive: true });
-	fs.mkdirSync(path.join(appDir(), "logs"), { recursive: true });
+	mkdirSync(path.join(appDir(), "torrent_cache"), { recursive: true });
+	mkdirSync(path.join(appDir(), "logs"), { recursive: true });
 }
 
 export function generateConfig({
@@ -49,44 +51,23 @@ export function generateConfig({
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
 	const templatePath = path.join(
-		__dirname,
-		`config.template${docker ? ".docker" : ""}.js`
+		`./config.template${docker ? ".docker" : ""}.cjs`
 	);
-	if (!force && fs.existsSync(dest)) {
+	if (!force && existsSync(dest)) {
 		console.log("Configuration file already exists.");
 		return;
 	}
-	fs.copyFileSync(templatePath, dest);
+	copyFileSync(new URL(templatePath, import.meta.url), dest);
 	console.log("Configuration file created at", chalk.yellow.bold(dest));
 }
 
-function printUpdateInstructions(missingKeys) {
-	const configPath = path.join(appDir(), "config.js");
-	console.error(chalk.yellow`
- Error: Your configuration file is out of date.
- Missing options:\n\t${missingKeys.join("\n\t")}
- Please update at ${configPath}.
- When you are done, set the configVersion to ${configTemplate.configVersion}.
- It may help to read the template, at ${CONFIG_TEMPLATE_URL}
- `);
-}
-
-export function getFileConfig(): FileConfig {
+export async function getFileConfig(): Promise<FileConfig> {
 	const configPath = path.join(appDir(), "config.js");
 
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const fileConfig = require(configPath);
-		const { configVersion = 0 } = fileConfig;
-		if (configVersion < configVersion) {
-			const missingKeys = Object.keys(configTemplate).filter(
-				(k) => !(k in fileConfig)
-			);
-			printUpdateInstructions(missingKeys);
-		}
-		return fileConfig;
+		return (await import(configPath)).default;
 	} catch (e) {
-		if (e.code !== "MODULE_NOT_FOUND") throw e;
+		if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
 		return {};
 	}
 }

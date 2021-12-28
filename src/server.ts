@@ -1,11 +1,11 @@
 import http from "http";
-import { pick } from "lodash";
+import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
-import { Label, logger } from "./logger";
-import { searchForLocalTorrentByCriteria } from "./pipeline";
-import { NonceOptions } from "./runtimeConfig";
-import { TorrentLocator } from "./torrent";
+import { Label, logger } from "./logger.js";
+import { searchForLocalTorrentByCriteria } from "./pipeline.js";
+import { NonceOptions } from "./runtimeConfig.js";
+import { TorrentLocator } from "./torrent.js";
 
 function getData(req) {
 	return new Promise((resolve) => {
