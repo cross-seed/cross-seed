@@ -2,7 +2,6 @@ import chalk from "chalk";
 import { copyFileSync, existsSync, mkdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
-import { inspect } from "util";
 import { Action } from "./constants.js";
 
 const require = createRequire(import.meta.url);
