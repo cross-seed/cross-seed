@@ -72,6 +72,11 @@ function createCommandWithSharedOptions(name, description) {
 			"Search for all torrents regardless of their contents",
 			fallback(fileConfig.searchAll, false)
 		)
+		.requiredOption(
+			"--fuzzy-size-threshold <decimal>",
+			"The size difference allowed to be considered a match.",
+			fallback(fileConfig.fuzzySizeThreshold, 0.02)
+		)
 		.option(
 			"-x, --exclude-older <cutoff>",
 			"Exclude torrents first seen more than n minutes ago. Bypasses the -a flag.",
@@ -108,14 +113,6 @@ function createCommandWithSharedOptions(name, description) {
 			"--notification-webhook-url <url>",
 			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
 			fileConfig.notificationWebhookUrl
-		)
-		.addOption(
-			new Option(
-				"--fuzzy-size-threshold <decimal>",
-				"The size difference allowed to be considered a match."
-			)
-				.default(fallback(fileConfig.fuzzySizeThreshold, 0.02))
-				.makeOptionMandatory()
 		);
 }
 
