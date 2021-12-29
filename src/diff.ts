@@ -15,8 +15,8 @@ function diff(thing1, thing2) {
 export async function diffCmd(first: string, second: string): Promise<void> {
 	const firstMeta = await parseTorrentFromFilename(first);
 	const secondMeta = await parseTorrentFromFilename(second);
-	const firstSearchee = await createSearcheeFromMetafile(firstMeta);
-	const secondSearchee = await createSearcheeFromMetafile(secondMeta);
+	const firstSearchee = createSearcheeFromMetafile(firstMeta);
+	const secondSearchee = createSearcheeFromMetafile(secondMeta);
 	delete firstSearchee.infoHash;
 	delete secondSearchee.infoHash;
 	diff(firstSearchee, secondSearchee);

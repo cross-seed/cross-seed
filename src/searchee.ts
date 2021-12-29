@@ -47,9 +47,7 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 	return sortBy(unsortedFiles, "path");
 }
 
-export async function createSearcheeFromMetafile(
-	meta: Metafile
-): Promise<Searchee> {
+export function createSearcheeFromMetafile(meta: Metafile): Searchee {
 	return {
 		files: getFilesFromTorrent(meta),
 		infoHash: meta.infoHash,
