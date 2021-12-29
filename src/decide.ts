@@ -6,9 +6,9 @@ import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
 import db, { DecisionEntry } from "./db.js";
 import { JackettResult } from "./jackett.js";
 import { Label, logger } from "./logger.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -125,6 +125,32 @@ function cacheTorrentFile(meta: Metafile): void {
 	);
 }
 
+async function assessAndSaveResults(
+	result: JackettResult,
+	searchee: Searchee,
+	Guid: string,
+	infoHashesToExclude: string[]
+) {
+	const assessment = await assessResultHelper(
+		result,
+		searchee,
+		infoHashesToExclude
+	);
+
+	db.data.decisions[searchee.name][Guid] = {
+		decision: assessment.decision,
+		lastSeen: Date.now(),
+		firstSeen: Date.now(),
+	};
+
+	if (assessment.decision === Decision.MATCH) {
+		db.data.decisions[searchee.name][Guid].infoHash =
+			assessment.info.infoHash;
+		cacheTorrentFile(assessment.info);
+	}
+	return assessment;
+}
+
 async function assessResultCaching(
 	result: JackettResult,
 	searchee: Searchee,
@@ -137,43 +163,47 @@ async function assessResultCaching(
 	const cacheEntry: DecisionEntry = db.data.decisions[searchee.name][Guid];
 
 	let assessment: ResultAssessment;
-	if (cacheEntry && cacheEntry.decision !== Decision.MATCH) {
+
+	if (
+		!cacheEntry?.decision ||
+		cacheEntry.decision === Decision.DOWNLOAD_FAILED
+	) {
+		assessment = await assessAndSaveResults(
+			result,
+			searchee,
+			Guid,
+			infoHashesToExclude
+		);
+		logReason(assessment.decision, false);
+	} else if (
+		cacheEntry.decision === Decision.MATCH &&
+		infoHashesToExclude.includes(cacheEntry.infoHash)
+	) {
+		// has been added since the last run
+		assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
+		db.data.decisions[searchee.name][Guid].decision =
+			Decision.INFO_HASH_ALREADY_EXISTS;
+	} else if (
+		cacheEntry.decision === Decision.MATCH &&
+		existsInTorrentCache(cacheEntry.infoHash)
+	) {
+		// cached match
+		assessment = {
+			decision: cacheEntry.decision,
+			info: await getCachedTorrentFile(cacheEntry.infoHash),
+		};
+	} else if (cacheEntry.decision === Decision.MATCH) {
+		assessment = await assessAndSaveResults(
+			result,
+			searchee,
+			Guid,
+			infoHashesToExclude
+		);
+		logReason(assessment.decision, false);
+	} else {
 		// cached rejection
 		assessment = { decision: cacheEntry.decision };
 		logReason(cacheEntry.decision, true);
-	} else if (cacheEntry && existsInTorrentCache(cacheEntry.infoHash)) {
-		// cached match
-		if (infoHashesToExclude.includes(cacheEntry.infoHash)) {
-			// has been added since the last run
-			assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
-			db.data.decisions[searchee.name][Guid].decision =
-				assessment.decision;
-		} else {
-			assessment = {
-				decision: cacheEntry.decision,
-				info: await getCachedTorrentFile(cacheEntry.infoHash),
-			};
-		}
-	} else {
-		// uncached case, send it
-		assessment = await assessResultHelper(
-			result,
-			searchee,
-			infoHashesToExclude
-		);
-
-		db.data.decisions[searchee.name][Guid] = {
-			decision: assessment.decision,
-			lastSeen: Date.now(),
-			firstSeen: Date.now(),
-		};
-
-		if (assessment.decision === Decision.MATCH) {
-			db.data.decisions[searchee.name][Guid].infoHash =
-				assessment.info.infoHash;
-			cacheTorrentFile(assessment.info);
-		}
-		logReason(assessment.decision, false);
 	}
 	db.data.decisions[searchee.name][Guid].lastSeen = Date.now();
 	db.write();
