@@ -1,5 +1,3 @@
-import { Command } from "commander";
-import { logger } from "./logger.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { deepStrictEqual } from "assert";
@@ -7,21 +5,19 @@ import { deepStrictEqual } from "assert";
 function diff(thing1, thing2) {
 	try {
 		deepStrictEqual(thing1, thing2);
-		logger.info("Torrents are equal");
+		console.log(thing1);
+		console.log("Torrents are equal");
 	} catch (e) {
-		logger.info("Torrents do not match");
+		console.log(e);
 	}
 }
 
-export async function diffCmd(
-	options: Record<string, unknown>,
-	cmd: Command
-): Promise<void> {
-	const [first, second] = cmd.args;
-
+export async function diffCmd(first: string, second: string): Promise<void> {
 	const firstMeta = await parseTorrentFromFilename(first);
 	const secondMeta = await parseTorrentFromFilename(second);
 	const firstSearchee = await createSearcheeFromMetafile(firstMeta);
 	const secondSearchee = await createSearcheeFromMetafile(secondMeta);
+	delete firstSearchee.infoHash;
+	delete secondSearchee.infoHash;
 	diff(firstSearchee, secondSearchee);
 }

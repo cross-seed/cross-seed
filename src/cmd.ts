@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
+import { createRequire } from "module";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
 import { dropDatabase } from "./db.js";
-import { diffCmd } from "./diff";
+import { diffCmd } from "./diff.js";
 import { CrossSeedError } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main } from "./pipeline.js";
@@ -14,10 +15,12 @@ import {
 	sendTestNotification,
 } from "./pushNotifier.js";
 import { setRuntimeConfig } from "./runtimeConfig.js";
+import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
-import { createRequire } from "module";
+import { parseTorrentFromFilename } from "./torrent.js";
+
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
@@ -152,7 +155,21 @@ async function run() {
 	program
 		.command("diff")
 		.description("Analyze two torrent files for cross-seed compatibility")
+		.argument("searchee")
+		.argument("candidate")
 		.action(diffCmd);
+
+	program
+		.command("tree")
+		.description("Print a torrent's file tree")
+		.argument("torrent")
+		.action(async (fn) => {
+			console.log(
+				await createSearcheeFromMetafile(
+					await parseTorrentFromFilename(fn)
+				)
+			);
+		});
 
 	createCommandWithSharedOptions(
 		"daemon",

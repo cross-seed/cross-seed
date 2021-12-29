@@ -49,18 +49,13 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 
 export async function createSearcheeFromMetafile(
 	meta: Metafile
-): Promise<Result<Searchee>> {
-	try {
-		return {
-			files: getFilesFromTorrent(meta),
-			infoHash: meta.infoHash,
-			name: meta.name,
-			length: meta.length,
-		};
-	} catch (e) {
-		logger.debug(e);
-		return e;
-	}
+): Promise<Searchee> {
+	return {
+		files: getFilesFromTorrent(meta),
+		infoHash: meta.infoHash,
+		name: meta.name,
+		length: meta.length,
+	};
 }
 
 export async function createSearcheeFromTorrentFile(
@@ -70,12 +65,7 @@ export async function createSearcheeFromTorrentFile(
 	const fullPath = join(torrentDir, filename);
 	try {
 		const meta = await parseTorrentFromFilename(fullPath);
-		return {
-			files: getFilesFromTorrent(meta),
-			infoHash: meta.infoHash,
-			name: meta.name,
-			length: meta.length,
-		};
+		return createSearcheeFromMetafile(meta);
 	} catch (e) {
 		logger.error(`Failed to parse ${filename}`);
 		logger.debug(e);

@@ -50,7 +50,10 @@ const createReasonLogger =
 		else logReason(reason);
 	};
 
-function compareFileTrees(candidate: Metafile, searchee: Searchee): boolean {
+export function compareFileTrees(
+	candidate: Metafile,
+	searchee: Searchee
+): boolean {
 	const cmp = (elOfA, elOfB) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		const pathsAreEqual = elOfB.path === elOfA.path;
