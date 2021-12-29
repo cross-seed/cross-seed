@@ -37,5 +37,3 @@ export const PermanentDecisions: Decision[] = [
 	Decision.NO_DOWNLOAD_LINK,
 	Decision.FILE_TREE_MISMATCH,
 ];
-
-export const FUZZY_SIZE_THRESHOLD = 0.02;

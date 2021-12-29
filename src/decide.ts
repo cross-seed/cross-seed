@@ -8,7 +8,7 @@ import { JackettResult } from "./jackett.js";
 import { Label, logger } from "./logger.js";
 import { Searchee } from "./searchee.js";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
-import { getRuntimeConfig } from "./runtimeConfig";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -68,11 +68,11 @@ export function compareFileTrees(
 }
 
 function sizeDoesMatch(resultSize, searchee) {
-	const fileConfig = getRuntimeConfig();
+	const { fuzzySizeThreshold } = getRuntimeConfig();
 
 	const { length } = searchee;
-	const lowerBound = length - fileConfig.fuzzySizeThreshold * length;
-	const upperBound = length + fileConfig.fuzzySizeThreshold * length;
+	const lowerBound = length - fuzzySizeThreshold * length;
+	const upperBound = length + fuzzySizeThreshold * length;
 	return resultSize >= lowerBound && resultSize <= upperBound;
 }
 
