@@ -2,6 +2,7 @@ import { join } from "path";
 import winston from "winston";
 import { appDir, createAppDir } from "./configuration.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
+import DailyRotateFile from "winston-daily-rotate-file";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -67,15 +68,27 @@ export function initializeLogger(): void {
 			})
 		),
 		transports: [
-			new winston.transports.File({
-				filename: join(appDir(), "logs", "error.log"),
+			new DailyRotateFile({
+				filename: "error.%DATE%.log",
+				createSymlink: true,
+				symlinkName: "error.current.log",
+				dirname: join(appDir(), "logs"),
+				maxFiles: "14d",
 				level: "error",
 			}),
-			new winston.transports.File({
-				filename: join(appDir(), "logs", "info.log"),
+			new DailyRotateFile({
+				filename: "info.%DATE%.log",
+				createSymlink: true,
+				symlinkName: "info.current.log",
+				dirname: join(appDir(), "logs"),
+				maxFiles: "14d",
 			}),
-			new winston.transports.File({
-				filename: join(appDir(), "logs", "verbose.log"),
+			new DailyRotateFile({
+				filename: "verbose.%DATE%.log",
+				createSymlink: true,
+				symlinkName: "verbose.current.log",
+				dirname: join(appDir(), "logs"),
+				maxFiles: "14d",
 				level: "silly",
 			}),
 			new winston.transports.Console({
