@@ -10,13 +10,13 @@ interface RuntimeConfig {
 	includeEpisodes: boolean;
 	verbose: boolean;
 	searchAll: boolean;
+	fuzzySizeThreshold: number;
 	excludeOlder: number;
 	excludeRecentSearch: number;
 	action: Action;
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
 	notificationWebhookUrl: string;
-	fuzzySizeThreshold: number;
 }
 
 export interface NonceOptions {

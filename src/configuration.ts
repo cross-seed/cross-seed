@@ -17,13 +17,13 @@ interface FileConfig {
 	outputDir?: string;
 	rtorrentRpcUrl?: string;
 	searchAll?: boolean;
+	fuzzySizeThreshold?: number;
 	excludeOlder?: number;
 	excludeRecentSearch?: number;
 	torrentDir?: string;
 	trackers?: string[];
 	qbittorrentUrl?: string;
 	notificationWebhookUrl?: string;
-	fuzzySizeThreshold?: number;
 }
 
 interface GenerateConfigParams {
