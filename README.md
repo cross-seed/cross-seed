@@ -59,6 +59,7 @@ Options:
   -i, --torrent-dir <dir>               Directory with torrent files
   -s, --output-dir <dir>                Directory to save results in
   -a, --search-all                      Search for all torrents regardless of their contents (default: false)
+  --fuzzy-size-threshold <decimal>      The size difference allowed to be considered a match. (default: 0.02)
   -v, --verbose                         Log verbose output (default: false)
   -A, --action <action>                 If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client. (choices: "save", "inject", default: "save")
   --rtorrent-rpc-url <url>              The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.

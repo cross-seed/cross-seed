@@ -72,6 +72,11 @@ function createCommandWithSharedOptions(name, description) {
 			"Search for all torrents regardless of their contents",
 			fallback(fileConfig.searchAll, false)
 		)
+		.requiredOption(
+			"--fuzzy-size-threshold <decimal>",
+			"The size difference allowed to be considered a match.",
+			fallback(fileConfig.fuzzySizeThreshold, 0.02)
+		)
 		.option(
 			"-x, --exclude-older <cutoff>",
 			"Exclude torrents first seen more than n minutes ago. Bypasses the -a flag.",
