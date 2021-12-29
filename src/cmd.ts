@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
+import { createRequire } from "module";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
 import { dropDatabase } from "./db.js";
+import { diffCmd } from "./diff.js";
 import { CrossSeedError } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main } from "./pipeline.js";
@@ -13,10 +15,12 @@ import {
 	sendTestNotification,
 } from "./pushNotifier.js";
 import { setRuntimeConfig } from "./runtimeConfig.js";
+import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
-import { createRequire } from "module";
+import { parseTorrentFromFilename } from "./torrent.js";
+
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
@@ -32,110 +36,140 @@ function processOptions(options) {
 	return options;
 }
 
-async function run() {
-	const fileConfig = await getFileConfig();
+const fileConfig = await getFileConfig();
 
-	function createCommandWithSharedOptions(name, description) {
-		return program
-			.command(name)
-			.description(description)
-			.requiredOption(
-				"-u, --jackett-server-url <url>",
-				"Your Jackett server url",
-				fileConfig.jackettServerUrl
-			)
-			.requiredOption(
-				"-k, --jackett-api-key <key>",
-				"Your Jackett API key",
-				fileConfig.jackettApiKey
-			)
-			.requiredOption(
-				"-t, --trackers <tracker1>,<tracker2>",
-				"Comma-separated list of Jackett tracker ids to search  (Tracker ids can be found in their Torznab feed paths)",
-				fallback(fileConfig.trackers?.join(","), "")
-			)
-			.requiredOption(
-				"-i, --torrent-dir <dir>",
-				"Directory with torrent files",
-				fileConfig.torrentDir
-			)
-			.requiredOption(
-				"-s, --output-dir <dir>",
-				"Directory to save results in",
-				fileConfig.outputDir
-			)
-			.requiredOption(
-				"-a, --search-all",
-				"Search for all torrents regardless of their contents",
-				fallback(fileConfig.searchAll, false)
-			)
-			.option(
-				"-x, --exclude-older <cutoff>",
-				"Exclude torrents first seen more than n minutes ago. Bypasses the -a flag.",
-				(n) => parseInt(n),
-				fileConfig.excludeOlder
-			)
-			.option(
-				"-r, --exclude-recent-search <cutoff>",
-				"Exclude torrents which have been searched more recently than n minutes ago. Bypasses the -a flag.",
-				(n) => parseInt(n),
-				fileConfig.excludeRecentSearch
-			)
-			.requiredOption("-v, --verbose", "Log verbose output", false)
-			.addOption(
-				new Option(
-					"-A, --action <action>",
-					"If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client."
-				)
-					.default(fallback(fileConfig.action, Action.SAVE))
-					.choices(Object.values(Action))
-					.makeOptionMandatory()
-			)
-			.option(
-				"--rtorrent-rpc-url <url>",
-				"The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.",
-				fileConfig.rtorrentRpcUrl
-			)
-			.option(
-				"--qbittorrent-url <url>",
-				"The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.",
-				fileConfig.qbittorrentUrl
-			)
-			.option(
-				"--notification-webhook-url <url>",
-				"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
-				fileConfig.notificationWebhookUrl
-			);
-	}
-
-	program.name(packageDotJson.name);
-	program.description(chalk.yellow.bold("cross-seed"));
-	program.version(
-		packageDotJson.version,
-		"-V, --version",
-		"output the current version"
-	);
-
-	program
-		.command("gen-config")
-		.description("Generate a config file")
-		.option(
-			"-d, --docker",
-			"Generate the docker config instead of the normal one"
+function createCommandWithSharedOptions(name, description) {
+	return program
+		.command(name)
+		.description(description)
+		.requiredOption(
+			"-u, --jackett-server-url <url>",
+			"Your Jackett server url",
+			fileConfig.jackettServerUrl
 		)
-		.action((options) => {
-			generateConfig(options);
-		});
+		.requiredOption(
+			"-k, --jackett-api-key <key>",
+			"Your Jackett API key",
+			fileConfig.jackettApiKey
+		)
+		.requiredOption(
+			"-t, --trackers <tracker1>,<tracker2>",
+			"Comma-separated list of Jackett tracker ids to search  (Tracker ids can be found in their Torznab feed paths)",
+			fallback(fileConfig.trackers?.join(","), "")
+		)
+		.requiredOption(
+			"-i, --torrent-dir <dir>",
+			"Directory with torrent files",
+			fileConfig.torrentDir
+		)
+		.requiredOption(
+			"-s, --output-dir <dir>",
+			"Directory to save results in",
+			fileConfig.outputDir
+		)
+		.requiredOption(
+			"-a, --search-all",
+			"Search for all torrents regardless of their contents",
+			fallback(fileConfig.searchAll, false)
+		)
+		.option(
+			"-x, --exclude-older <cutoff>",
+			"Exclude torrents first seen more than n minutes ago. Bypasses the -a flag.",
+			(n) => parseInt(n),
+			fileConfig.excludeOlder
+		)
+		.option(
+			"-r, --exclude-recent-search <cutoff>",
+			"Exclude torrents which have been searched more recently than n minutes ago. Bypasses the -a flag.",
+			(n) => parseInt(n),
+			fileConfig.excludeRecentSearch
+		)
+		.requiredOption("-v, --verbose", "Log verbose output", false)
+		.addOption(
+			new Option(
+				"-A, --action <action>",
+				"If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client."
+			)
+				.default(fallback(fileConfig.action, Action.SAVE))
+				.choices(Object.values(Action))
+				.makeOptionMandatory()
+		)
+		.option(
+			"--rtorrent-rpc-url <url>",
+			"The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.",
+			fileConfig.rtorrentRpcUrl
+		)
+		.option(
+			"--qbittorrent-url <url>",
+			"The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.",
+			fileConfig.qbittorrentUrl
+		)
+		.option(
+			"--notification-webhook-url <url>",
+			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
+			fileConfig.notificationWebhookUrl
+		);
+}
 
-	program
-		.command("clear-cache")
-		.description("Clear the cache of downloaded-and-rejected torrents")
-		.action(dropDatabase);
+program.name(packageDotJson.name);
+program.description(chalk.yellow.bold("cross-seed"));
+program.version(
+	packageDotJson.version,
+	"-V, --version",
+	"output the current version"
+);
 
-	createCommandWithSharedOptions(
-		"daemon",
-		"Start the cross-seed daemon"
-	).action(async (options) => {
+program
+	.command("gen-config")
+	.description("Generate a config file")
+	.option(
+		"-d, --docker",
+		"Generate the docker config instead of the normal one"
+	)
+	.action((options) => {
+		generateConfig(options);
+	});
+
+program
+	.command("clear-cache")
+	.description("Clear the cache of downloaded-and-rejected torrents")
+	.action(dropDatabase);
+
+program
+	.command("test-notification")
+	.description("Send a test notification")
+	.requiredOption(
+		"--notification-webhook-url <url>",
+		"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
+		fileConfig.notificationWebhookUrl
+	)
+	.action((options) => {
+		const runtimeConfig = processOptions(options);
+		setRuntimeConfig(runtimeConfig);
+		initializeLogger();
+		initializePushNotifier();
+		sendTestNotification();
+	});
+
+program
+	.command("diff")
+	.description("Analyze two torrent files for cross-seed compatibility")
+	.argument("searchee")
+	.argument("candidate")
+	.action(diffCmd);
+
+program
+	.command("tree")
+	.description("Print a torrent's file tree")
+	.argument("torrent")
+	.action(async (fn) => {
+		console.log(
+			createSearcheeFromMetafile(await parseTorrentFromFilename(fn))
+		);
+	});
+
+createCommandWithSharedOptions("daemon", "Start the cross-seed daemon").action(
+	async (options) => {
 		try {
 			const runtimeConfig = processOptions(options);
 			setRuntimeConfig(runtimeConfig);
@@ -158,64 +192,47 @@ async function run() {
 			}
 			throw e;
 		}
-	});
+	}
+);
 
-	program
-		.command("test-notification")
-		.description("Send a test notification")
-		.requiredOption(
-			"--notification-webhook-url <url>",
-			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
-			fileConfig.notificationWebhookUrl
-		)
-		.action((options) => {
+createCommandWithSharedOptions("search", "Search for cross-seeds")
+	.requiredOption(
+		"-o, --offset <offset>",
+		"Offset to start from",
+		(n) => parseInt(n),
+		0
+	)
+	.requiredOption(
+		"-d, --delay <delay>",
+		"Pause duration (seconds) between searches",
+		parseFloat,
+		fallback(fileConfig.delay, 10)
+	)
+	.option(
+		"-e, --include-episodes",
+		"Include single-episode torrents in the search",
+		fallback(fileConfig.includeEpisodes, false)
+	)
+	.action(async (options) => {
+		try {
 			const runtimeConfig = processOptions(options);
 			setRuntimeConfig(runtimeConfig);
 			initializeLogger();
 			initializePushNotifier();
-			sendTestNotification();
-		});
-
-	createCommandWithSharedOptions("search", "Search for cross-seeds")
-		.requiredOption(
-			"-o, --offset <offset>",
-			"Offset to start from",
-			(n) => parseInt(n),
-			0
-		)
-		.requiredOption(
-			"-d, --delay <delay>",
-			"Pause duration (seconds) between searches",
-			parseFloat,
-			fallback(fileConfig.delay, 10)
-		)
-		.option(
-			"-e, --include-episodes",
-			"Include single-episode torrents in the search",
-			fallback(fileConfig.includeEpisodes, false)
-		)
-		.action(async (options) => {
-			try {
-				const runtimeConfig = processOptions(options);
-				setRuntimeConfig(runtimeConfig);
-				initializeLogger();
-				initializePushNotifier();
-				logger.verbose({
-					label: Label.CONFIGDUMP,
-					message: inspect(runtimeConfig),
-				});
-				await doStartupValidation();
-				await main();
-			} catch (e) {
-				if (e instanceof CrossSeedError) {
-					e.print();
-					process.exitCode = 1;
-					return;
-				}
-				throw e;
+			logger.verbose({
+				label: Label.CONFIGDUMP,
+				message: inspect(runtimeConfig),
+			});
+			await doStartupValidation();
+			await main();
+		} catch (e) {
+			if (e instanceof CrossSeedError) {
+				e.print();
+				process.exitCode = 1;
+				return;
 			}
-		});
-	await program.parseAsync();
-}
+			throw e;
+		}
+	});
 
-run();
+await program.parseAsync();

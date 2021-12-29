@@ -47,6 +47,15 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 	return sortBy(unsortedFiles, "path");
 }
 
+export function createSearcheeFromMetafile(meta: Metafile): Searchee {
+	return {
+		files: getFilesFromTorrent(meta),
+		infoHash: meta.infoHash,
+		name: meta.name,
+		length: meta.length,
+	};
+}
+
 export async function createSearcheeFromTorrentFile(
 	filename: string
 ): Promise<Result<Searchee>> {
@@ -54,12 +63,7 @@ export async function createSearcheeFromTorrentFile(
 	const fullPath = join(torrentDir, filename);
 	try {
 		const meta = await parseTorrentFromFilename(fullPath);
-		return {
-			files: getFilesFromTorrent(meta),
-			infoHash: meta.infoHash,
-			name: meta.name,
-			length: meta.length,
-		};
+		return createSearcheeFromMetafile(meta);
 	} catch (e) {
 		logger.error(`Failed to parse ${filename}`);
 		logger.debug(e);
