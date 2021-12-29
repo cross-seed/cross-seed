@@ -33,16 +33,18 @@ export interface Schema {
 	dbVersion: number;
 }
 
-const db = new LowSync<Schema>(
-	new JSONFileSync<Schema>(path.join(appDir(), "cache.json"))
-);
-
 const emptyDatabase = {
 	searchees: {},
 	decisions: {},
 	indexedTorrents: [],
 	dbVersion: 3,
 };
+
+const db = new LowSync<Schema>(
+	new JSONFileSync<Schema>(path.join(appDir(), "cache.json"))
+);
+
+db.read();
 
 db.data ??= emptyDatabase;
 
