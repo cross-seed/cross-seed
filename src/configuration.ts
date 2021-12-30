@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { copyFileSync, existsSync, mkdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
+import { pathToFileURL } from "url";
 import { Action } from "./constants.js";
 
 const require = createRequire(import.meta.url);
@@ -66,7 +67,7 @@ export async function getFileConfig(): Promise<FileConfig> {
 	const configPath = path.join(appDir(), "config.js");
 
 	try {
-		return (await import(configPath)).default;
+		return (await import(pathToFileURL(configPath).toString())).default;
 	} catch (e) {
 		if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
 		return {};
