@@ -105,7 +105,10 @@ export default class RTorrent implements TorrentClient {
 	private async methodCallP<R>(method: string, args): Promise<R> {
 		logger.verbose({
 			label: Label.RTORRENT,
-			message: `Calling method ${method} with params ${inspect(args)}`,
+			message: `Calling method ${method} with params ${inspect(args, {
+				depth: null,
+				compact: true,
+			})}`,
 		});
 		return new Promise((resolve, reject) => {
 			this.client.methodCall(method, args, (err, data) => {
