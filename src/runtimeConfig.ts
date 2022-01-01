@@ -5,6 +5,7 @@ interface RuntimeConfig {
 	jackettApiKey: string;
 	delay: number;
 	trackers: string[];
+	torznab: string[];
 	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;

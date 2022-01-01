@@ -4,6 +4,7 @@ import { validateJackettApi } from "./jackett.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { validateTorrentDir } from "./torrent.js";
+import { validateTorznabUrls } from "./torznab.js";
 
 function validateOptions() {
 	const { action, rtorrentRpcUrl, qbittorrentUrl } = getRuntimeConfig();
@@ -21,6 +22,7 @@ export async function doStartupValidation(): Promise<void> {
 	await Promise.all<void>(
 		[
 			validateJackettApi(),
+			validateTorznabUrls(),
 			downloadClient?.validateConfig(),
 			validateTorrentDir(),
 		].filter(Boolean)

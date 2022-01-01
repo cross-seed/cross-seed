@@ -44,18 +44,23 @@ function createCommandWithSharedOptions(name, description) {
 		.description(description)
 		.requiredOption(
 			"-u, --jackett-server-url <url>",
-			"Your Jackett server url",
+			"DEPRECATED: Your Jackett server url",
 			fileConfig.jackettServerUrl
 		)
 		.requiredOption(
 			"-k, --jackett-api-key <key>",
-			"Your Jackett API key",
+			"DEPRECATED: Your Jackett API key",
 			fileConfig.jackettApiKey
 		)
 		.requiredOption(
 			"-t, --trackers <tracker1>,<tracker2>",
-			"Comma-separated list of Jackett tracker ids to search  (Tracker ids can be found in their Torznab feed paths)",
+			"DEPRECATED: Comma-separated list of Jackett tracker ids to search  (Tracker ids can be found in their Torznab feed paths)",
 			fallback(fileConfig.trackers?.join(","), "")
+		)
+		.requiredOption(
+			"-T, --torznab <urls...>",
+			"Torznab urls with apikey included (separated by spaces)",
+			fallback(fileConfig.torznab)
 		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
@@ -149,8 +154,7 @@ program
 		fileConfig.notificationWebhookUrl
 	)
 	.action((options) => {
-		const runtimeConfig = processOptions(options);
-		setRuntimeConfig(runtimeConfig);
+		setRuntimeConfig(options);
 		initializeLogger();
 		initializePushNotifier();
 		sendTestNotification();
