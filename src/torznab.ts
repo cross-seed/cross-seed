@@ -1,6 +1,10 @@
+import { zip } from "lodash-es";
 import fetch from "node-fetch";
 import Parser from "rss-parser";
+import { inspect } from "util";
+import xml2js from "xml2js";
 import { CrossSeedError } from "./errors.js";
+import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
 interface CustomFeed {
@@ -41,7 +45,6 @@ export function assembleUrl(
 	}
 
 	url.search = searchParams.toString();
-	console.log(url.toString());
 	return url.toString();
 }
 
@@ -61,11 +64,27 @@ export async function validateTorznabUrls() {
 		}
 	}
 
-	const responses = await Promise.all(urls.map((url) => fetchCaps(url)));
-	console.log(responses);
+	const responses = await Promise.allSettled(
+		urls.map((url) => fetchCaps(url))
+	);
+	const zipped = zip(urls, responses);
+	const unsupported = zipped.filter(
+		([, response]) =>
+			response.value?.caps?.searching?.[0]?.search?.[0]?.$?.available !==
+			"yes"
+	);
+	unsupported
+		.map(
+			([url]) =>
+				`Disabling ${url} because it either is down or doesn't support searching`
+		)
+		.forEach(logger.warn);
+
 	throw new CrossSeedError("kill");
 }
 
-export async function fetchCaps(url: string | URL) {
-	return fetch(assembleUrl(url, { t: "caps" })).then((r) => r.text());
+export async function fetchCaps(url: string | URL): Promise<any> {
+	return fetch(assembleUrl(url, { t: "caps" }))
+		.then((r) => r.text())
+		.then(xml2js.parseStringPromise);
 }

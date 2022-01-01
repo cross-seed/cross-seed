@@ -6,7 +6,7 @@ import db from "./db.js";
 import { assessResult, ResultAssessment } from "./decide.js";
 import {
 	JackettResponse,
-	JackettResult,
+	SearchResult,
 	makeJackettRequest,
 } from "./jackett.js";
 import { logger } from "./logger.js";
@@ -28,6 +28,13 @@ import {
 
 import { getTag, stripExtension } from "./utils.js";
 
+export interface SearchResult {
+	guid: string;
+	link: string;
+	size: number;
+	title: string;
+}
+
 interface AssessmentWithTracker {
 	assessment: ResultAssessment;
 	tracker: string;
@@ -41,22 +48,22 @@ async function findOnOtherSites(
 	const { action } = getRuntimeConfig();
 
 	const assessEach = async (
-		result: JackettResult
+		result: SearchResult
 	): Promise<AssessmentWithTracker> => ({
 		assessment: await assessResult(result, searchee, hashesToExclude),
-		tracker: result.TrackerId,
+		tracker: result.trackerId,
 	});
 
 	const tag = getTag(searchee.name);
 	const query = stripExtension(searchee.name);
-	let response: JackettResponse;
+	let response: SearchResult[];
 	try {
 		response = await makeJackettRequest(query, nonceOptions);
 	} catch (e) {
 		logger.error(`error querying Jackett for ${query}`);
 		return 0;
 	}
-	const results = response.Results;
+	const results = response;
 
 	const loaded = await Promise.all<AssessmentWithTracker>(
 		results.map(assessEach)

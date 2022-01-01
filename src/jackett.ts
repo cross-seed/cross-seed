@@ -9,51 +9,23 @@ import {
 	NonceOptions,
 } from "./runtimeConfig.js";
 
-export interface JackettResult {
-	Author: unknown;
-	BlackholeLink: string;
-	BookTitle: unknown;
-	Category: number[];
-	CategoryDesc: string;
-	Description: unknown;
-	Details: string;
-	DownloadVolumeFactor: number;
-	Files: number;
-	FirstSeen: string;
-	Gain: number;
-	Grabs: number;
-	Guid: string;
-	Imdb: unknown;
-	InfoHash: unknown;
-	Link: string;
-	MagnetUri: unknown;
-	MinimumRatio: number;
-	MinimumSeedTime: number;
-	Peers: number;
-	Poster: unknown;
-	PublishDate: string;
-	RageID: unknown;
-	Seeders: number;
-	Size: number;
-	TMDb: unknown;
-	TVDBId: unknown;
-	Title: string;
-	Tracker: string;
-	TrackerId: string;
-	UploadVolumeFactor: number;
+export interface SearchResult {
+	guid: string;
+	link: string;
+	size: number;
+	title: string;
 }
 
-export interface JackettIndexer {
-	ID: string;
-	Name: string;
-	Status: number;
-	Results: number;
-	Error: string;
+export interface OgJackettResult {
+	Guid: string;
+	Link: string;
+	Size: number;
+	Title: string;
+	TrackerId: string;
 }
 
 export interface JackettResponse {
-	Results: JackettResult[];
-	Indexers: JackettIndexer[];
+	Results: OgJackettResult[];
 }
 
 function reformatTitleForSearching(name: string): string {
@@ -95,10 +67,19 @@ export async function validateJackettApi(): Promise<void> {
 	}
 }
 
+function parseResponse(response: JackettResponse): SearchResult[] {
+	return response.Results.map((result) => ({
+		guid: result.Guid,
+		link: result.Link,
+		size: result.Size,
+		title: result.Title,
+	}));
+}
+
 export function makeJackettRequest(
 	name: string,
 	nonceOptions: NonceOptions = EmptyNonceOptions
-): Promise<JackettResponse> {
+): Promise<SearchResult[]> {
 	const {
 		jackettApiKey,
 		trackers: runtimeConfigTrackers,
@@ -127,5 +108,5 @@ export function makeJackettRequest(
 			if (err) reject(err);
 			else resolve(data);
 		});
-	});
+	}).then(parseResponse);
 }
