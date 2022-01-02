@@ -21,7 +21,7 @@ import {
 	saveTorrentFile,
 	TorrentLocator,
 } from "./torrent.js";
-
+import { search } from "./torznab.js";
 import { getTag, stripExtension } from "./utils.js";
 
 export interface SearchResult {
@@ -55,6 +55,7 @@ async function findOnOtherSites(
 	const query = stripExtension(searchee.name);
 	let response: SearchResult[];
 	try {
+		await search(query, nonceOptions);
 		response = await makeJackettRequest(query, nonceOptions);
 	} catch (e) {
 		logger.error(`error querying Jackett for ${query}`);

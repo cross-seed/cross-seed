@@ -11,6 +11,7 @@ export enum Label {
 	PREFILTER = "prefilter",
 	CONFIGDUMP = "configdump",
 	JACKETT = "jackett",
+	TORZNAB = "torznab",
 	SERVER = "server",
 	STARTUP = "startup",
 }

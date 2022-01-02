@@ -1,6 +1,5 @@
 import querystring from "querystring";
 import get from "simple-get";
-import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { SearchResult } from "./pipeline.js";
@@ -9,6 +8,7 @@ import {
 	getRuntimeConfig,
 	NonceOptions,
 } from "./runtimeConfig.js";
+import { reformatTitleForSearching } from "./utils.js";
 
 export interface OgJackettResult {
 	Guid: string;
@@ -20,23 +20,6 @@ export interface OgJackettResult {
 
 export interface JackettResponse {
 	Results: OgJackettResult[];
-}
-
-function reformatTitleForSearching(name: string): string {
-	const seasonMatch = name.match(SEASON_REGEX);
-	const movieMatch = name.match(MOVIE_REGEX);
-	const episodeMatch = name.match(EP_REGEX);
-	const fullMatch = episodeMatch
-		? episodeMatch[0]
-		: seasonMatch
-		? seasonMatch[0]
-		: movieMatch
-		? movieMatch[0]
-		: name;
-	return fullMatch
-		.replace(/[.()[\]]/g, " ")
-		.replace(/\s+/g, " ")
-		.trim();
 }
 
 function fullJackettUrl(

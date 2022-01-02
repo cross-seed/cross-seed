@@ -36,3 +36,15 @@ export function getTag(name: string): string {
 export type Result<T> = T | Error;
 
 export const ok = <T>(r: Result<T>): r is T => !(r instanceof Error);
+
+export function reformatTitleForSearching(name: string): string {
+	const seasonMatch = name.match(SEASON_REGEX);
+	const movieMatch = name.match(MOVIE_REGEX);
+	const episodeMatch = name.match(EP_REGEX);
+	const fullMatch =
+		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? name;
+	return fullMatch
+		.replace(/[.()[\]]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
