@@ -1,11 +1,12 @@
 import chalk from "chalk";
 import fs from "fs";
+import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient.js";
 import { Action, Decision, InjectionResult } from "./constants.js";
 import db from "./db.js";
 import { assessResult, ResultAssessment } from "./decide.js";
-import { makeJackettRequest } from "./jackett.js";
-import { logger } from "./logger.js";
+import { searchJackett } from "./jackett.js";
+import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { pushNotifier } from "./pushNotifier.js";
 import {
@@ -21,7 +22,7 @@ import {
 	saveTorrentFile,
 	TorrentLocator,
 } from "./torrent.js";
-import { search } from "./torznab.js";
+import { searchTorznab } from "./torznab.js";
 import { getTag, stripExtension } from "./utils.js";
 
 export interface SearchResult {
@@ -37,13 +38,65 @@ interface AssessmentWithTracker {
 	tracker: string;
 }
 
+async function performAction(
+	meta: Metafile,
+	searchee: Searchee,
+	tracker: string,
+	nonceOptions: NonceOptions,
+	tag: string
+): Promise<{ isTorrentIncomplete: boolean }> {
+	const { action } = getRuntimeConfig();
+
+	let isTorrentIncomplete;
+	const styledName = chalk.green.bold(meta.name);
+	const styledTracker = chalk.bold(tracker);
+	if (action === Action.INJECT) {
+		const result = await getClient().inject(meta, searchee, nonceOptions);
+		switch (result) {
+			case InjectionResult.SUCCESS:
+				logger.info(
+					`Found ${styledName} on ${styledTracker} - injected`
+				);
+				break;
+			case InjectionResult.ALREADY_EXISTS:
+				logger.info(`Found ${styledName} on ${styledTracker} - exists`);
+				break;
+			case InjectionResult.TORRENT_NOT_COMPLETE:
+				logger.warn(
+					`Found ${styledName} on ${styledTracker} - skipping incomplete torrent`
+				);
+				isTorrentIncomplete = true;
+				break;
+			case InjectionResult.FAILURE:
+			default:
+				logger.error(
+					`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
+				);
+				saveTorrentFile(tracker, tag, meta, nonceOptions);
+				break;
+		}
+	} else {
+		saveTorrentFile(tracker, tag, meta, nonceOptions);
+		logger.info(`Found ${styledName} on ${styledTracker}`);
+	}
+	return { isTorrentIncomplete };
+}
+
+async function search(
+	name: string,
+	nonceOptions: NonceOptions
+): Promise<SearchResult[]> {
+	const { torznab } = getRuntimeConfig();
+	return torznab.length
+		? searchTorznab(name, nonceOptions)
+		: searchJackett(name, nonceOptions);
+}
+
 async function findOnOtherSites(
 	searchee: Searchee,
 	hashesToExclude: string[],
 	nonceOptions: NonceOptions = EmptyNonceOptions
 ): Promise<number> {
-	const { action } = getRuntimeConfig();
-
 	const assessEach = async (
 		result: SearchResult
 	): Promise<AssessmentWithTracker> => ({
@@ -55,8 +108,7 @@ async function findOnOtherSites(
 	const query = stripExtension(searchee.name);
 	let response: SearchResult[];
 	try {
-		await search(query, nonceOptions);
-		response = await makeJackettRequest(query, nonceOptions);
+		response = await search(query, nonceOptions);
 	} catch (e) {
 		logger.error(`error querying Jackett for ${query}`);
 		return 0;
@@ -85,55 +137,21 @@ async function findOnOtherSites(
 		},
 	});
 
-	let isTorrentIncomplete;
-
 	for (const {
 		tracker,
-		assessment: { info: newInfo },
+		assessment: { info: meta },
 	} of successful) {
-		const styledName = chalk.green.bold(newInfo.name);
-		const styledTracker = chalk.bold(tracker);
-		if (action === Action.INJECT) {
-			const result = await getClient().inject(
-				newInfo,
-				searchee,
-				nonceOptions
-			);
-			switch (result) {
-				case InjectionResult.SUCCESS:
-					logger.info(
-						`Found ${styledName} on ${styledTracker} - injected`
-					);
-					break;
-				case InjectionResult.ALREADY_EXISTS:
-					logger.info(
-						`Found ${styledName} on ${styledTracker} - exists`
-					);
-					break;
-				case InjectionResult.TORRENT_NOT_COMPLETE:
-					logger.warn(
-						`Found ${styledName} on ${styledTracker} - skipping incomplete torrent`
-					);
-					isTorrentIncomplete = true;
-					break;
-				case InjectionResult.FAILURE:
-				default:
-					logger.error(
-						`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
-					);
-					saveTorrentFile(tracker, tag, newInfo, nonceOptions);
-					break;
-			}
-		} else {
-			saveTorrentFile(tracker, tag, newInfo, nonceOptions);
-			logger.info(`Found ${styledName} on ${styledTracker}`);
-		}
+		const { isTorrentIncomplete } = await performAction(
+			meta,
+			searchee,
+			tracker,
+			nonceOptions,
+			tag
+		);
+		if (isTorrentIncomplete) return successful.length;
 	}
 
-	if (!isTorrentIncomplete) {
-		updateSearchTimestamps(searchee.name);
-	}
-
+	updateSearchTimestamps(searchee.name);
 	return successful.length;
 }
 

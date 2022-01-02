@@ -40,7 +40,7 @@ export async function validateJackettApi(): Promise<void> {
 	// search for gibberish so the results will be empty
 	const gibberish = "bscdjpstabgdspjdasmomdsenqciadsnocdpsikncaodsnimcdqsanc";
 	try {
-		await makeJackettRequest(gibberish);
+		await searchJackett(gibberish);
 	} catch (e) {
 		const dummyUrl = fullJackettUrl(jackettServerUrl, { apikey });
 		throw new CrossSeedError(`Could not reach Jackett at ${dummyUrl}`);
@@ -57,7 +57,7 @@ function parseResponse(response: JackettResponse): SearchResult[] {
 	}));
 }
 
-export function makeJackettRequest(
+export function searchJackett(
 	name: string,
 	nonceOptions: NonceOptions = EmptyNonceOptions
 ): Promise<SearchResult[]> {

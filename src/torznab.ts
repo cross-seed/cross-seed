@@ -107,7 +107,7 @@ function isFulfilled(
 	return outcome.status === "fulfilled";
 }
 
-export async function search(
+export async function searchTorznab(
 	name: string,
 	nonceOptions: NonceOptions
 ): Promise<SearchResult[]> {
@@ -118,7 +118,7 @@ export async function search(
 	searchUrls.forEach(
 		(message) => void logger.verbose({ label: Label.TORZNAB, message })
 	);
-	const outcomes = await Promise.allSettled(
+	const outcomes = await Promise.allSettled<SearchResult[]>(
 		searchUrls.map((url) =>
 			fetch(url)
 				.then((r) => r.text())
