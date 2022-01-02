@@ -5,7 +5,8 @@ import { inspect } from "util";
 import xml2js from "xml2js";
 import { CrossSeedError } from "./errors.js";
 import { logger } from "./logger.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { SearchResult } from "./pipeline.js";
+import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 
 interface CustomFeed {
 	foo: string;
@@ -80,11 +81,20 @@ export async function validateTorznabUrls() {
 		)
 		.forEach(logger.warn);
 
-	throw new CrossSeedError("kill");
+	if (unsupported.length > 0 && unsupported.length === responses.length) {
+		throw new CrossSeedError("no indexers enabled");
+	}
 }
 
 export async function fetchCaps(url: string | URL): Promise<any> {
 	return fetch(assembleUrl(url, { t: "caps" }))
 		.then((r) => r.text())
 		.then(xml2js.parseStringPromise);
+}
+
+export async function search(
+	name: string,
+	nonceOptions: NonceOptions
+): Promise<SearchResult[]> {
+	return [];
 }

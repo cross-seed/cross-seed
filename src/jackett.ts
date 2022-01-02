@@ -3,18 +3,12 @@ import get from "simple-get";
 import { EP_REGEX, MOVIE_REGEX, SEASON_REGEX } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
+import { SearchResult } from "./pipeline.js";
 import {
 	EmptyNonceOptions,
 	getRuntimeConfig,
 	NonceOptions,
 } from "./runtimeConfig.js";
-
-export interface SearchResult {
-	guid: string;
-	link: string;
-	size: number;
-	title: string;
-}
 
 export interface OgJackettResult {
 	Guid: string;
@@ -45,7 +39,10 @@ function reformatTitleForSearching(name: string): string {
 		.trim();
 }
 
-function fullJackettUrl(jackettServerUrl: string, params) {
+function fullJackettUrl(
+	jackettServerUrl: string,
+	params: Record<string, string | string[]>
+) {
 	const jackettPath = `/api/v2.0/indexers/all/results`;
 	return `${jackettServerUrl}${jackettPath}?${querystring.encode(params)}`;
 }
@@ -73,6 +70,7 @@ function parseResponse(response: JackettResponse): SearchResult[] {
 		link: result.Link,
 		size: result.Size,
 		title: result.Title,
+		tracker: result.TrackerId,
 	}));
 }
 

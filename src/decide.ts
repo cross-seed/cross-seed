@@ -4,7 +4,7 @@ import path from "path";
 import { appDir } from "./configuration.js";
 import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
 import db, { DecisionEntry } from "./db.js";
-import { SearchResult } from "./jackett.js";
+import { SearchResult } from "./pipeline.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
@@ -156,7 +156,7 @@ async function assessResultCaching(
 	searchee: Searchee,
 	infoHashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { guid, title, trackerId: tracker } = result;
+	const { guid, title, tracker } = result;
 	const logReason = createReasonLogger(title, tracker, searchee.name);
 
 	db.data.decisions[searchee.name] ??= {};

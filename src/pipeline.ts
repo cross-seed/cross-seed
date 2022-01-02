@@ -4,11 +4,7 @@ import { getClient } from "./clients/TorrentClient.js";
 import { Action, Decision, InjectionResult } from "./constants.js";
 import db from "./db.js";
 import { assessResult, ResultAssessment } from "./decide.js";
-import {
-	JackettResponse,
-	SearchResult,
-	makeJackettRequest,
-} from "./jackett.js";
+import { makeJackettRequest } from "./jackett.js";
 import { logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { pushNotifier } from "./pushNotifier.js";
@@ -19,11 +15,11 @@ import {
 } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import {
-	TorrentLocator,
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
 	loadTorrentDirLight,
 	saveTorrentFile,
+	TorrentLocator,
 } from "./torrent.js";
 
 import { getTag, stripExtension } from "./utils.js";
@@ -33,6 +29,7 @@ export interface SearchResult {
 	link: string;
 	size: number;
 	title: string;
+	tracker: string;
 }
 
 interface AssessmentWithTracker {
@@ -51,7 +48,7 @@ async function findOnOtherSites(
 		result: SearchResult
 	): Promise<AssessmentWithTracker> => ({
 		assessment: await assessResult(result, searchee, hashesToExclude),
-		tracker: result.trackerId,
+		tracker: result.tracker,
 	});
 
 	const tag = getTag(searchee.name);

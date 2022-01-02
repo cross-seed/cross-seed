@@ -22,11 +22,13 @@ interface RuntimeConfig {
 
 export interface NonceOptions {
 	trackers: string[];
+	torznab: string[];
 	outputDir: string;
 }
 
 export const EmptyNonceOptions = {
 	trackers: undefined,
+	torznab: undefined,
 	outputDir: undefined,
 };
 
