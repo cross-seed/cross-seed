@@ -82,7 +82,7 @@ async function performAction(
 	return { isTorrentIncomplete };
 }
 
-async function search(
+async function searchJackettOrTorznab(
 	name: string,
 	nonceOptions: NonceOptions
 ): Promise<SearchResult[]> {
@@ -108,7 +108,7 @@ async function findOnOtherSites(
 	const query = stripExtension(searchee.name);
 	let response: SearchResult[];
 	try {
-		response = await search(query, nonceOptions);
+		response = await searchJackettOrTorznab(query, nonceOptions);
 	} catch (e) {
 		logger.error(`error querying Jackett for ${query}`);
 		return 0;
