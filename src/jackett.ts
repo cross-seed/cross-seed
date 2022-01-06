@@ -31,10 +31,20 @@ function fullJackettUrl(
 }
 
 export async function validateJackettApi(): Promise<void> {
-	const { jackettServerUrl, jackettApiKey: apikey } = getRuntimeConfig();
+	const {
+		jackettServerUrl,
+		jackettApiKey: apikey,
+		torznab,
+	} = getRuntimeConfig();
+
+	if (torznab) return;
+
+	logger.warn(
+		"Jackett-only mode is deprecated and will be removed in a future release. Please specify your trackers using Torznab urls."
+	);
 
 	if (/\/$/.test(jackettServerUrl)) {
-		logger.warn("Warning: Jackett server url should not end with '/'");
+		logger.warn("Jackett server url should not end with '/'");
 	}
 
 	// search for gibberish so the results will be empty

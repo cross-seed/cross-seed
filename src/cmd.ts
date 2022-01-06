@@ -42,22 +42,22 @@ function createCommandWithSharedOptions(name, description) {
 	return program
 		.command(name)
 		.description(description)
-		.requiredOption(
+		.option(
 			"-u, --jackett-server-url <url>",
 			"DEPRECATED: Your Jackett server url",
 			fileConfig.jackettServerUrl
 		)
-		.requiredOption(
+		.option(
 			"-k, --jackett-api-key <key>",
 			"DEPRECATED: Your Jackett API key",
 			fileConfig.jackettApiKey
 		)
-		.requiredOption(
+		.option(
 			"-t, --trackers <tracker1>,<tracker2>",
 			"DEPRECATED: Comma-separated list of Jackett tracker ids to search  (Tracker ids can be found in their Torznab feed paths)",
 			fallback(fileConfig.trackers?.join(","), "")
 		)
-		.requiredOption(
+		.option(
 			"-T, --torznab <urls...>",
 			"Torznab urls with apikey included (separated by spaces)",
 			fallback(fileConfig.torznab)
