@@ -113,7 +113,10 @@ export async function searchTorznab(
 ): Promise<SearchResult[]> {
 	const { torznab } = getRuntimeConfig();
 	const searchUrls = torznab.map((url) =>
-		assembleUrl(url, { t: "search", q: reformatTitleForSearching(name) })
+		assembleUrl(url, {
+			t: "search",
+			q: encodeURIComponent(reformatTitleForSearching(name)),
+		})
 	);
 	searchUrls.forEach(
 		(message) => void logger.verbose({ label: Label.TORZNAB, message })
