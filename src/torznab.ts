@@ -115,7 +115,9 @@ export async function searchTorznab(
 	const searchUrls = torznab.map((url) =>
 		assembleUrl(url, {
 			t: "search",
-			q: encodeURIComponent(reformatTitleForSearching(name)),
+			q: encodeURIComponent(reformatTitleForSearching(name))
+				.split("%20")
+				.join(" "),
 		})
 	);
 	searchUrls.forEach(
