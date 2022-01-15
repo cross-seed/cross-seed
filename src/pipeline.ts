@@ -110,7 +110,7 @@ async function findOnOtherSites(
 	try {
 		response = await searchJackettOrTorznab(query, nonceOptions);
 	} catch (e) {
-		logger.error(`error querying Jackett for ${query}`);
+		logger.error(`error searching for ${query}`);
 		return 0;
 	}
 	const results = response;
