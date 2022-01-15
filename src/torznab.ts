@@ -7,14 +7,6 @@ import { SearchResult } from "./pipeline.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { reformatTitleForSearching } from "./utils.js";
 
-interface CustomFeed {
-	foo: string;
-}
-
-interface CustomItem {
-	size: number;
-}
-
 interface TorznabParams {
 	t: "caps" | "search";
 	q?: string;
@@ -43,6 +35,8 @@ export function assembleUrl(
 
 export async function validateTorznabUrls() {
 	const { torznab } = getRuntimeConfig();
+	if (!torznab) return;
+
 	const urls: URL[] = torznab.map((str) => new URL(str));
 	for (const url of urls) {
 		if (!url.pathname.endsWith("/api")) {
