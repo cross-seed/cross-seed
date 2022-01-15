@@ -87,7 +87,7 @@ async function searchJackettOrTorznab(
 	nonceOptions: NonceOptions
 ): Promise<SearchResult[]> {
 	const { torznab } = getRuntimeConfig();
-	return torznab.length
+	return torznab
 		? searchTorznab(name, nonceOptions)
 		: searchJackett(name, nonceOptions);
 }
