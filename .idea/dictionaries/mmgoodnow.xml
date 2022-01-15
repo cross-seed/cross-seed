@@ -4,12 +4,14 @@
       <w>bencode</w>
       <w>caronc</w>
       <w>jackett</w>
+      <w>jsified</w>
       <w>qbittorrent</w>
       <w>rtorrent</w>
       <w>savepath</w>
       <w>searchee</w>
       <w>searchees</w>
       <w>seedable</w>
+      <w>torznab</w>
       <w>xmlrpc</w>
     </words>
   </dictionary>

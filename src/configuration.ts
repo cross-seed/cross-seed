@@ -23,6 +23,7 @@ interface FileConfig {
 	excludeRecentSearch?: number;
 	torrentDir?: string;
 	trackers?: string[];
+	torznab?: string[];
 	qbittorrentUrl?: string;
 	notificationWebhookUrl?: string;
 }

@@ -5,6 +5,7 @@ interface RuntimeConfig {
 	jackettApiKey: string;
 	delay: number;
 	trackers: string[];
+	torznab: string[];
 	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;
@@ -21,11 +22,13 @@ interface RuntimeConfig {
 
 export interface NonceOptions {
 	trackers: string[];
+	torznab: string[];
 	outputDir: string;
 }
 
 export const EmptyNonceOptions = {
 	trackers: undefined,
+	torznab: undefined,
 	outputDir: undefined,
 };
 

@@ -4,7 +4,7 @@ import path from "path";
 import { appDir } from "./configuration.js";
 import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
 import db, { DecisionEntry } from "./db.js";
-import { JackettResult } from "./jackett.js";
+import { SearchResult } from "./pipeline.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
@@ -77,17 +77,17 @@ function sizeDoesMatch(resultSize, searchee) {
 }
 
 async function assessResultHelper(
-	{ Link, Size }: JackettResult,
+	{ link, size }: SearchResult,
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	if (!sizeDoesMatch(Size, searchee)) {
+	if (!sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
 
-	if (!Link) return { decision: Decision.NO_DOWNLOAD_LINK };
+	if (!link) return { decision: Decision.NO_DOWNLOAD_LINK };
 
-	const info = await parseTorrentFromURL(Link);
+	const info = await parseTorrentFromURL(link);
 
 	if (!info) return { decision: Decision.DOWNLOAD_FAILED };
 
@@ -126,7 +126,7 @@ function cacheTorrentFile(meta: Metafile): void {
 }
 
 async function assessAndSaveResults(
-	result: JackettResult,
+	result: SearchResult,
 	searchee: Searchee,
 	Guid: string,
 	infoHashesToExclude: string[]
@@ -152,15 +152,15 @@ async function assessAndSaveResults(
 }
 
 async function assessResultCaching(
-	result: JackettResult,
+	result: SearchResult,
 	searchee: Searchee,
 	infoHashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { Guid, Title, TrackerId: tracker } = result;
-	const logReason = createReasonLogger(Title, tracker, searchee.name);
+	const { guid, title, tracker } = result;
+	const logReason = createReasonLogger(title, tracker, searchee.name);
 
 	db.data.decisions[searchee.name] ??= {};
-	const cacheEntry: DecisionEntry = db.data.decisions[searchee.name][Guid];
+	const cacheEntry: DecisionEntry = db.data.decisions[searchee.name][guid];
 
 	let assessment: ResultAssessment;
 
@@ -171,7 +171,7 @@ async function assessResultCaching(
 		assessment = await assessAndSaveResults(
 			result,
 			searchee,
-			Guid,
+			guid,
 			infoHashesToExclude
 		);
 		logReason(assessment.decision, false);
@@ -181,7 +181,7 @@ async function assessResultCaching(
 	) {
 		// has been added since the last run
 		assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
-		db.data.decisions[searchee.name][Guid].decision =
+		db.data.decisions[searchee.name][guid].decision =
 			Decision.INFO_HASH_ALREADY_EXISTS;
 	} else if (
 		cacheEntry.decision === Decision.MATCH &&
@@ -196,7 +196,7 @@ async function assessResultCaching(
 		assessment = await assessAndSaveResults(
 			result,
 			searchee,
-			Guid,
+			guid,
 			infoHashesToExclude
 		);
 		logReason(assessment.decision, false);
@@ -205,7 +205,7 @@ async function assessResultCaching(
 		assessment = { decision: cacheEntry.decision };
 		logReason(cacheEntry.decision, true);
 	}
-	db.data.decisions[searchee.name][Guid].lastSeen = Date.now();
+	db.data.decisions[searchee.name][guid].lastSeen = Date.now();
 	db.write();
 	return assessment;
 }
