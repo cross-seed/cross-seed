@@ -77,6 +77,11 @@ function createCommandWithSharedOptions(name, description) {
 			"Search for all torrents regardless of their contents",
 			fallback(fileConfig.searchAll, false)
 		)
+		.option(
+			"-e, --include-episodes",
+			"Include single-episode torrents in the search",
+			fallback(fileConfig.includeEpisodes, false)
+		)
 		.requiredOption(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
@@ -216,11 +221,6 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 		"Pause duration (seconds) between searches",
 		parseFloat,
 		fallback(fileConfig.delay, 10)
-	)
-	.option(
-		"-e, --include-episodes",
-		"Include single-episode torrents in the search",
-		fallback(fileConfig.includeEpisodes, false)
 	)
 	.action(async (options) => {
 		try {

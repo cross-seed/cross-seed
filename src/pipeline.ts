@@ -6,7 +6,7 @@ import { Action, Decision, InjectionResult } from "./constants.js";
 import db from "./db.js";
 import { assessResult, ResultAssessment } from "./decide.js";
 import { searchJackett } from "./jackett.js";
-import { Label, logger } from "./logger.js";
+import { logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { pushNotifier } from "./pushNotifier.js";
 import {

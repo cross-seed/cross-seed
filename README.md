@@ -60,6 +60,7 @@ Options:
   -i, --torrent-dir <dir>               Directory with torrent files
   -s, --output-dir <dir>                Directory to save results in
   -a, --search-all                      Search for all torrents regardless of their contents (default: false)
+  -e, --include-episodes                Include single-episode torrents in the search (default: false)
   --fuzzy-size-threshold <decimal>      The size difference allowed to be considered a match. (default: 0.02)
   -v, --verbose                         Log verbose output (default: false)
   -A, --action <action>                 If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client. (choices: "save", "inject", default: "save")
@@ -67,7 +68,6 @@ Options:
   --qbittorrent-url <url>               The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.
   -o, --offset <offset>                 Offset to start from
   -d, --delay <delay>                   Pause duration (seconds) between searches (default: 10)
-  -e, --include-episodes                Include single-episode torrents in the search (default: false)
   -x, --exclude-older <cutoff>          Exclude torrents first seen more than x minutes ago. Overrides the -a flag.
   -r, --exclude-recent-search <cutoff>  Exclude torrents which have been searched more recently than x minutes ago. Overrides the -a flag.
   -h, --help                            display help for command
