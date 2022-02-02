@@ -37,3 +37,4 @@ input/
 *.heapsnapshot
 qbit/
 cache.json
+docker-compose.yml

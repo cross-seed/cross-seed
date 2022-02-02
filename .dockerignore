@@ -2,3 +2,5 @@ node_modules
 npm-debug.log
 output
 input
+config.js
+docker-compose.yml
