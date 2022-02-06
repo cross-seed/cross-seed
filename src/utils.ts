@@ -5,6 +5,13 @@ import {
 	SEASON_REGEX,
 } from "./constants.js";
 
+export enum MediaType {
+	EPISODE = "episode",
+	SEASON = "pack",
+	MOVIE = "movie",
+	OTHER = "unknown",
+}
+
 export function stripExtension(filename: string): string {
 	for (const ext of EXTENSIONS) {
 		const re = new RegExp(`\\.${ext}$`);
@@ -23,19 +30,26 @@ export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
 
-export function getTag(name: string): string {
+export function getTag(name: string): MediaType {
 	return EP_REGEX.test(name)
-		? "episode"
+		? MediaType.EPISODE
 		: SEASON_REGEX.test(name)
-		? "pack"
+		? MediaType.SEASON
 		: MOVIE_REGEX.test(name)
-		? "movie"
-		: "unknown";
+		? MediaType.MOVIE
+		: MediaType.OTHER;
 }
 
 export type Result<T> = T | Error;
 
 export const ok = <T>(r: Result<T>): r is T => !(r instanceof Error);
+
+export function cleanseSeparators(str: string): string {
+	return str
+		.replace(/[._()[\]]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
 
 export function reformatTitleForSearching(name: string): string {
 	const seasonMatch = name.match(SEASON_REGEX);
@@ -43,8 +57,5 @@ export function reformatTitleForSearching(name: string): string {
 	const episodeMatch = name.match(EP_REGEX);
 	const fullMatch =
 		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? name;
-	return fullMatch
-		.replace(/[._()[\]]/g, " ")
-		.replace(/\s+/g, " ")
-		.trim();
+	return cleanseSeparators(fullMatch);
 }
