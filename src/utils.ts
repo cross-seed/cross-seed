@@ -48,3 +48,7 @@ export function reformatTitleForSearching(name: string): string {
 		.replace(/\s+/g, " ")
 		.trim();
 }
+export const tapLog = (value) => {
+	console.log(value);
+	return value;
+};
