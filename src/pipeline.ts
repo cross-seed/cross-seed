@@ -22,7 +22,7 @@ import {
 	saveTorrentFile,
 	TorrentLocator,
 } from "./torrent.js";
-import { searchTorznab } from "./torznab.js";
+import { getTorznabManager } from "./torznab.js";
 import { getTag, stripExtension } from "./utils.js";
 
 export interface SearchResult {
@@ -88,7 +88,7 @@ async function searchJackettOrTorznab(
 ): Promise<SearchResult[]> {
 	const { torznab } = getRuntimeConfig();
 	return torznab
-		? searchTorznab(name, nonceOptions)
+		? getTorznabManager().searchTorznab(name, nonceOptions)
 		: searchJackett(name, nonceOptions);
 }
 
