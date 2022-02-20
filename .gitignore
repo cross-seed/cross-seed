@@ -38,3 +38,4 @@ input/
 qbit/
 cache.json
 docker-compose.yml
+utils.zsh
