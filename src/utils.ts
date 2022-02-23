@@ -59,3 +59,7 @@ export function reformatTitleForSearching(name: string): string {
 		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? name;
 	return cleanseSeparators(fullMatch);
 }
+export const tapLog = (value) => {
+	console.log(value);
+	return value;
+};

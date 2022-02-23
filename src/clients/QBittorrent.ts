@@ -1,7 +1,8 @@
-import FormData from "form-data";
+import { FormData } from "formdata-polyfill/esm.min.js";
 import fetch, { BodyInit, Response } from "node-fetch";
+import { File } from "fetch-blob/from.js";
 import parseTorrent, { Metafile } from "parse-torrent";
-import querystring from "querystring";
+import { dirname } from "path";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
@@ -29,9 +30,9 @@ export default class QBittorrent implements TorrentClient {
 	async login(): Promise<void> {
 		const { origin, pathname, username, password } = this.url;
 
-		let qs;
+		let searchParams;
 		try {
-			qs = querystring.encode({
+			searchParams = new URLSearchParams({
 				username: decodeURIComponent(username),
 				password: decodeURIComponent(password),
 			});
@@ -41,7 +42,9 @@ export default class QBittorrent implements TorrentClient {
 
 		let response: Response;
 		try {
-			response = await fetch(`${origin}${pathname}/auth/login?${qs}`);
+			response = await fetch(
+				`${origin}${pathname}/auth/login?${searchParams}`
+			);
 		} catch (e) {
 			throw new CrossSeedError(`qBittorrent login failed: ${e.message}`);
 		}
@@ -116,9 +119,10 @@ export default class QBittorrent implements TorrentClient {
 		}
 	}
 
-	async getTorrentConfiguration(
-		searchee: Searchee
-	): Promise<{ save_path: string; category: string; isComplete: boolean }> {
+	async getTorrentConfiguration(searchee: Searchee): Promise<{
+		save_path: string;
+		isComplete: boolean;
+	}> {
 		const responseText = await this.request(
 			"/torrents/info",
 			`hashes=${searchee.infoHash}`,
@@ -132,8 +136,13 @@ export default class QBittorrent implements TorrentClient {
 				"Failed to retrieve data dir; torrent not found in client"
 			);
 		}
-		const { save_path, category, progress } = searchResult;
-		return { save_path, category, isComplete: progress === 1 };
+		const { progress, content_path } = searchResult;
+		return {
+			// content layouts don't seem to stick, but we
+			// can encode them right into the save path
+			save_path: dirname(content_path),
+			isComplete: progress === 1,
+		};
 	}
 
 	async inject(
@@ -146,14 +155,16 @@ export default class QBittorrent implements TorrentClient {
 		}
 		const buf = parseTorrent.toTorrentFile(newTorrent);
 		try {
-			const { save_path, category, isComplete } =
+			const { save_path, isComplete } =
 				await this.getTorrentConfiguration(searchee);
+
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
-			const formData = new FormData();
-			formData.append("torrents", buf, {
-				filename: `${newTorrent.name}.cross-seed.torrent`,
-				contentType: "application/x-bittorrent",
+			const filename = `${newTorrent.name}.cross-seed.torrent`;
+			const file = new File([new Uint8Array(buf.buffer)], filename, {
+				type: "application/x-bittorrent",
 			});
+			const formData = new FormData();
+			formData.append("torrents", file, filename);
 			formData.append("skip_checking", "true");
 			formData.append("savepath", save_path);
 			formData.append("tags", "cross-seed");
