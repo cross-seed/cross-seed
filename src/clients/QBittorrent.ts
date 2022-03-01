@@ -136,13 +136,8 @@ export default class QBittorrent implements TorrentClient {
 				"Failed to retrieve data dir; torrent not found in client"
 			);
 		}
-		const { progress, content_path } = searchResult;
-		return {
-			// content layouts don't seem to stick, but we
-			// can encode them right into the save path
-			save_path: dirname(content_path),
-			isComplete: progress === 1,
-		};
+		const { progress, save_path } = searchResult;
+		return { save_path, isComplete: progress === 1 };
 	}
 
 	async inject(
