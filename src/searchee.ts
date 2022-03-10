@@ -1,6 +1,6 @@
 import { sortBy } from "lodash-es";
 import { Metafile } from "parse-torrent";
-import path, { join } from "path";
+import path, { join, basename } from "path";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { Result } from "./utils.js";
@@ -57,15 +57,13 @@ export function createSearcheeFromMetafile(meta: Metafile): Searchee {
 }
 
 export async function createSearcheeFromTorrentFile(
-	filename: string
+	filepath: string
 ): Promise<Result<Searchee>> {
-	const { torrentDir } = getRuntimeConfig();
-	const fullPath = join(torrentDir, filename);
 	try {
-		const meta = await parseTorrentFromFilename(fullPath);
+		const meta = await parseTorrentFromFilename(filepath);
 		return createSearcheeFromMetafile(meta);
 	} catch (e) {
-		logger.error(`Failed to parse ${filename}`);
+		logger.error(`Failed to parse ${basename(filepath)}`);
 		logger.debug(e);
 		return e;
 	}

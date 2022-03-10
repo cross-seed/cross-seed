@@ -3,8 +3,11 @@
     <words>
       <w>bencode</w>
       <w>caronc</w>
+      <w>dlspeed</w>
+      <w>infohash</w>
       <w>jackett</w>
       <w>jsified</w>
+      <w>leechs</w>
       <w>qbittorrent</w>
       <w>rtorrent</w>
       <w>savepath</w>
@@ -13,6 +16,7 @@
       <w>seedable</w>
       <w>torznab</w>
       <w>tvsearch</w>
+      <w>upspeed</w>
       <w>xmlrpc</w>
     </words>
   </dictionary>

@@ -18,6 +18,7 @@ interface RuntimeConfig {
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
 	notificationWebhookUrl: string;
+	torrents: string[];
 }
 
 export interface NonceOptions {

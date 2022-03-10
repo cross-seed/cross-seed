@@ -27,6 +27,8 @@
 		"bencode": "^2.0.1",
 		"chalk": "^5.0.0",
 		"commander": "^8.3.0",
+		"fetch-blob": "^3.1.4",
+		"formdata-polyfill": "^4.0.10",
 		"lodash-es": "^4.17.21",
 		"lowdb": "^3.0.0",
 		"node-fetch": "^3.2.0",
