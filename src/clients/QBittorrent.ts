@@ -4,7 +4,7 @@ import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
-import { dirname, join } from "path";
+import { dirname, join, posix } from "path";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
@@ -17,7 +17,7 @@ const X_WWW_FORM_URLENCODED = {
 	"Content-Type": "application/x-www-form-urlencoded",
 };
 
-interface SearchResult {
+interface TorrentInfo {
 	added_on: number;
 	amount_left: number;
 	auto_tmm: boolean;
@@ -67,6 +67,17 @@ interface SearchResult {
 	uploaded: number;
 	uploaded_session: number;
 	upspeed: number;
+}
+
+interface TorrentFiles {
+	availability: number;
+	index: number;
+	is_seed: boolean;
+	name: string;
+	piece_range: [number, number];
+	priority: number;
+	progress: number;
+	size: number;
 }
 
 export default class QBittorrent implements TorrentClient {
@@ -179,7 +190,6 @@ export default class QBittorrent implements TorrentClient {
 		isComplete: boolean;
 		autoTMM: boolean;
 		category: string;
-		content_path: string;
 	}> {
 		const responseText = await this.request(
 			"/torrents/info",
@@ -188,22 +198,32 @@ export default class QBittorrent implements TorrentClient {
 		);
 		const searchResult = JSON.parse(responseText).find(
 			(e) => e.hash === searchee.infoHash
-		) as SearchResult;
+		) as TorrentInfo;
 		if (searchResult === undefined) {
 			throw new Error(
 				"Failed to retrieve data dir; torrent not found in client"
 			);
 		}
 
-		const { progress, save_path, auto_tmm, category, content_path } =
-			searchResult;
+		const { progress, save_path, auto_tmm, category } = searchResult;
 		return {
 			save_path,
 			isComplete: progress === 1,
 			autoTMM: auto_tmm,
 			category,
-			content_path,
 		};
+	}
+
+	async isSubfolderContentLayout(searchee: Searchee): Promise<boolean> {
+		const response = await this.request(
+			"/torrents/files",
+			`hash=${searchee.infoHash}`,
+			X_WWW_FORM_URLENCODED
+		);
+
+		const files: TorrentFiles[] = JSON.parse(response);
+		const [{ name }] = files;
+		return files.length === 1 && name !== posix.basename(name);
 	}
 
 	async inject(
@@ -218,14 +238,14 @@ export default class QBittorrent implements TorrentClient {
 		const tempFilepath = join(tmpdir(), filename);
 		await writeFile(tempFilepath, buf, { mode: 0o644 });
 		try {
-			const { save_path, isComplete, autoTMM, category, content_path } =
+			const { save_path, isComplete, autoTMM, category } =
 				await this.getTorrentConfiguration(searchee);
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
 			const shouldManuallyEnforceContentLayout =
 				isSingleFileTorrent(newTorrent) &&
-				dirname(content_path) !== save_path;
+				(await this.isSubfolderContentLayout(searchee));
 
 			const file = await fileFrom(
 				tempFilepath,
