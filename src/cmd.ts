@@ -222,6 +222,12 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 		parseFloat,
 		fallback(fileConfig.delay, 10)
 	)
+	.addOption(
+		new Option(
+			"--torrents <torrents...>",
+			"torrent files separated by spaces. This is a debug option and may be removed without warning."
+		).hideHelp()
+	)
 	.action(async (options) => {
 		try {
 			const runtimeConfig = processOptions(options);

@@ -1,6 +1,6 @@
 import fs, { promises as fsPromises } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
-import path from "path";
+import path, { join } from "path";
 import simpleGet from "simple-get";
 import { inspect } from "util";
 import db from "./db.js";
@@ -143,6 +143,7 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 			.readdirSync(torrentDir)
 			.filter((fn) => path.extname(fn) === ".torrent")
 			.sort()
+			.map((filename) => join(getRuntimeConfig().torrentDir, filename))
 			.map(createSearcheeFromTorrentFile)
 	).then((searcheeResults) => searcheeResults.filter(ok));
 }
@@ -164,4 +165,8 @@ export async function getTorrentByCriteria(
 		throw new Error(message);
 	}
 	return parseTorrentFromFilename(findResult.filepath);
+}
+
+export function isSingleFileTorrent(meta: Metafile): boolean {
+	return !meta.info.files;
 }

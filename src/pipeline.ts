@@ -14,7 +14,7 @@ import {
 	getRuntimeConfig,
 	NonceOptions,
 } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
+import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
@@ -23,7 +23,7 @@ import {
 	TorrentLocator,
 } from "./torrent.js";
 import { getTorznabManager } from "./torznab.js";
-import { getTag, stripExtension } from "./utils.js";
+import { getTag, ok, stripExtension } from "./utils.js";
 
 export interface SearchResult {
 	guid: string;
@@ -201,8 +201,17 @@ export async function searchForLocalTorrentByCriteria(
 }
 
 async function findSearchableTorrents() {
-	const { offset } = getRuntimeConfig();
-	const parsedTorrents: Searchee[] = await loadTorrentDirLight();
+	const { offset, torrents } = getRuntimeConfig();
+	let parsedTorrents: Searchee[];
+	if (Array.isArray(torrents)) {
+		const searcheeResults = await Promise.all(
+			torrents.map(createSearcheeFromTorrentFile)
+		);
+		parsedTorrents = searcheeResults.filter(ok);
+	} else {
+		parsedTorrents = await loadTorrentDirLight();
+	}
+
 	const hashesToExclude = parsedTorrents
 		.map((t) => t.infoHash)
 		.filter(Boolean);
