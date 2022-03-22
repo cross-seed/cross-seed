@@ -4,7 +4,7 @@ import path from "path";
 import { appDir } from "./configuration.js";
 import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
 import db, { DecisionEntry } from "./db.js";
-import { SearchResult } from "./pipeline.js";
+import { Candidate } from "./pipeline.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
@@ -76,12 +76,12 @@ function sizeDoesMatch(resultSize, searchee) {
 	return resultSize >= lowerBound && resultSize <= upperBound;
 }
 
-async function assessResultHelper(
-	{ link, size }: SearchResult,
+async function assessCandidateHelper(
+	{ link, size }: Candidate,
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	if (!sizeDoesMatch(size, searchee)) {
+	if (size != null && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
 
@@ -126,12 +126,12 @@ function cacheTorrentFile(meta: Metafile): void {
 }
 
 async function assessAndSaveResults(
-	result: SearchResult,
+	result: Candidate,
 	searchee: Searchee,
 	Guid: string,
 	infoHashesToExclude: string[]
 ) {
-	const assessment = await assessResultHelper(
+	const assessment = await assessCandidateHelper(
 		result,
 		searchee,
 		infoHashesToExclude
@@ -151,13 +151,13 @@ async function assessAndSaveResults(
 	return assessment;
 }
 
-async function assessResultCaching(
-	result: SearchResult,
+async function assessCandidateCaching(
+	candidate: Candidate,
 	searchee: Searchee,
 	infoHashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { guid, title, tracker } = result;
-	const logReason = createReasonLogger(title, tracker, searchee.name);
+	const { guid, name, tracker } = candidate;
+	const logReason = createReasonLogger(name, tracker, searchee.name);
 
 	db.data.decisions[searchee.name] ??= {};
 	const cacheEntry: DecisionEntry = db.data.decisions[searchee.name][guid];
@@ -169,7 +169,7 @@ async function assessResultCaching(
 		cacheEntry.decision === Decision.DOWNLOAD_FAILED
 	) {
 		assessment = await assessAndSaveResults(
-			result,
+			candidate,
 			searchee,
 			guid,
 			infoHashesToExclude
@@ -194,7 +194,7 @@ async function assessResultCaching(
 		};
 	} else if (cacheEntry.decision === Decision.MATCH) {
 		assessment = await assessAndSaveResults(
-			result,
+			candidate,
 			searchee,
 			guid,
 			infoHashesToExclude
@@ -210,4 +210,4 @@ async function assessResultCaching(
 	return assessment;
 }
 
-export { assessResultCaching as assessResult };
+export { assessCandidateCaching as assessCandidate };

@@ -4,7 +4,7 @@ import xml2js from "xml2js";
 import { EP_REGEX, SEASON_REGEX } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
-import { SearchResult } from "./pipeline.js";
+import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import {
 	cleanseSeparators,
@@ -145,7 +145,7 @@ export class TorznabManager {
 		};
 	}
 
-	async parseResults(text: string): Promise<SearchResult[]> {
+	async parseResults(text: string): Promise<Candidate[]> {
 		const jsified = await xml2js.parseStringPromise(text);
 		const items = jsified?.rss?.channel?.[0]?.item;
 		if (!items || !Array.isArray(items)) {
@@ -154,7 +154,7 @@ export class TorznabManager {
 
 		return items.map((item) => ({
 			guid: item.guid[0],
-			title: item.title[0],
+			name: item.title[0],
 			tracker:
 				item?.prowlarrindexer?.[0]?._ ??
 				item?.jackettindexer?.[0]?._ ??
@@ -196,7 +196,7 @@ export class TorznabManager {
 	async searchTorznab(
 		name: string,
 		nonceOptions: NonceOptions
-	): Promise<SearchResult[]> {
+	): Promise<Candidate[]> {
 		const searchUrls = Array.from(this.capsMap).map(
 			([url, caps]: [URL, Caps]) => {
 				return this.assembleUrl(
@@ -208,7 +208,7 @@ export class TorznabManager {
 		searchUrls.forEach(
 			(message) => void logger.verbose({ label: Label.TORZNAB, message })
 		);
-		const outcomes = await Promise.allSettled<SearchResult[]>(
+		const outcomes = await Promise.allSettled<Candidate[]>(
 			searchUrls.map((url) =>
 				fetch(url)
 					.then((r) => r.text())
@@ -227,7 +227,7 @@ export class TorznabManager {
 
 		const fulfilled = outcomes
 			.filter(
-				(outcome): outcome is PromiseFulfilledResult<SearchResult[]> =>
+				(outcome): outcome is PromiseFulfilledResult<Candidate[]> =>
 					outcome.status === "fulfilled"
 			)
 			.map((outcome) => outcome.value);

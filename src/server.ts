@@ -1,13 +1,17 @@
-import http from "http";
+import http, { IncomingMessage, ServerResponse } from "http";
 import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
 import { Label, logger } from "./logger.js";
-import { searchForLocalTorrentByCriteria } from "./pipeline.js";
+import {
+	Candidate,
+	checkNewCandidateMatch,
+	searchForLocalTorrentByCriteria,
+} from "./pipeline.js";
 import { NonceOptions } from "./runtimeConfig.js";
 import { TorrentLocator } from "./torrent.js";
 
-function getData(req) {
+function getData(req): Promise<string> {
 	return new Promise((resolve) => {
 		const chunks = [];
 		req.on("data", (chunk) => {
@@ -28,44 +32,47 @@ function parseData(data) {
 	}
 
 	// transformations
-	{
+	try {
 		if ("infoHash" in parsed) {
 			parsed.infoHash = parsed.infoHash.toLowerCase();
 		}
 		if ("trackers" in parsed && !Array.isArray(parsed.trackers)) {
 			parsed.trackers = [parsed.trackers];
 		}
+		if ("size" in parsed && typeof parsed.size === "string") {
+			parsed.size = Number(parsed.size);
+		}
+	} catch (e) {
+		throw new Error(`Unable to parse request body: "${data}"`);
 	}
 
-	if ("name" in parsed || "infoHash" in parsed) {
-		return parsed;
-	}
-
-	throw new Error(`Unable to parse request body: "${data}"`);
+	return parsed;
 }
 
-async function handleRequest(req, res) {
-	if (req.method !== "POST") {
-		res.writeHead(405);
-		res.end();
-		return;
-	}
-	if (req.url !== "/api/webhook") {
-		res.writeHead(404);
-		res.end();
-		return;
-	}
+async function search(
+	req: IncomingMessage,
+	res: ServerResponse
+): Promise<void> {
 	const dataStr = await getData(req);
-	const data = parseData(dataStr);
+	let data;
+	try {
+		data = parseData(dataStr);
+	} catch (e) {
+		logger.error({
+			label: Label.SERVER,
+			message: e.message,
+		});
+		res.writeHead(400, e.message);
+		res.end();
+		return;
+	}
 	const criteria: TorrentLocator = pick(data, ["infoHash", "name"]);
 	const nonceOptions: NonceOptions = pick(data, ["trackers", "outputDir"]);
 
-	if (!criteria) {
-		logger.error({
-			label: Label.SERVER,
-			message: "A name or info hash must be provided",
-		});
-		res.writeHead(400);
+	if (!("infoHash" in criteria || "name" in criteria)) {
+		const message = "A name or info hash must be provided";
+		logger.error({ label: Label.SERVER, message });
+		res.writeHead(400, message);
 		res.end();
 	}
 
@@ -74,7 +81,10 @@ async function handleRequest(req, res) {
 	res.writeHead(204);
 	res.end();
 
-	logger.info({ label: Label.SERVER, message: `Received  ${criteriaStr}` });
+	logger.info({
+		label: Label.SERVER,
+		message: `Received search request: ${criteriaStr}`,
+	});
 
 	try {
 		let numFound = null;
@@ -98,6 +108,98 @@ async function handleRequest(req, res) {
 		}
 	} catch (e) {
 		logger.error(e);
+	}
+}
+
+async function announce(
+	req: IncomingMessage,
+	res: ServerResponse
+): Promise<void> {
+	const dataStr = await getData(req);
+	let data;
+	try {
+		data = parseData(dataStr);
+	} catch (e) {
+		logger.error({
+			label: Label.SERVER,
+			message: e.message,
+		});
+		res.writeHead(400, e.message);
+		res.end();
+		return;
+	}
+
+	if (
+		!(
+			"guid" in data &&
+			"name" in data &&
+			"link" in data &&
+			"tracker" in data
+		)
+	) {
+		const message = "Missing params: {guid, name, link, tracker} required";
+		logger.error({
+			label: Label.SERVER,
+			message,
+		});
+		res.writeHead(400, message);
+		res.end();
+		return;
+	}
+
+	res.writeHead(204);
+	res.end();
+
+	logger.verbose({
+		label: Label.SERVER,
+		message: `Received announce: ${data.name}`,
+	});
+
+	const candidate = data as Candidate;
+	try {
+		const result = await checkNewCandidateMatch(candidate);
+		if (result) {
+			logger.info({
+				label: Label.SERVER,
+				message: `Added announce from ${candidate.tracker}: ${candidate.name}`,
+			});
+		}
+	} catch (e) {
+		logger.error(e);
+	}
+}
+
+async function handleRequest(
+	req: IncomingMessage,
+	res: ServerResponse
+): Promise<void> {
+	if (req.method !== "POST") {
+		res.writeHead(405);
+		res.end();
+		return;
+	}
+
+	switch (req.url) {
+		case "/api/webhook": {
+			logger.verbose({
+				label: Label.SERVER,
+				message: "POST /api/webhook",
+			});
+			return search(req, res);
+		}
+
+		case "/api/announce": {
+			logger.verbose({
+				label: Label.SERVER,
+				message: "POST /api/announce",
+			});
+			return announce(req, res);
+		}
+		default: {
+			res.writeHead(404);
+			res.end();
+			return;
+		}
 	}
 }
 

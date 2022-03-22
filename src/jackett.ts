@@ -2,7 +2,7 @@ import querystring from "querystring";
 import get from "simple-get";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
-import { SearchResult } from "./pipeline.js";
+import { Candidate } from "./pipeline.js";
 import {
 	EmptyNonceOptions,
 	getRuntimeConfig,
@@ -57,12 +57,12 @@ export async function validateJackettApi(): Promise<void> {
 	}
 }
 
-function parseResponse(response: JackettResponse): SearchResult[] {
+function parseResponse(response: JackettResponse): Candidate[] {
 	return response.Results.map((result) => ({
 		guid: result.Guid,
 		link: result.Link,
 		size: result.Size,
-		title: result.Title,
+		name: result.Title,
 		tracker: result.TrackerId,
 	}));
 }
@@ -70,7 +70,7 @@ function parseResponse(response: JackettResponse): SearchResult[] {
 export function searchJackett(
 	name: string,
 	nonceOptions: NonceOptions = EmptyNonceOptions
-): Promise<SearchResult[]> {
+): Promise<Candidate[]> {
 	const {
 		jackettApiKey,
 		trackers: runtimeConfigTrackers,
