@@ -4,9 +4,9 @@ import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient.js";
 import { Action, Decision, InjectionResult } from "./constants.js";
 import db from "./db.js";
-import { assessResult, ResultAssessment } from "./decide.js";
+import { assessCandidate, ResultAssessment } from "./decide.js";
 import { searchJackett } from "./jackett.js";
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { pushNotifier } from "./pushNotifier.js";
 import {
@@ -14,7 +14,11 @@ import {
 	getRuntimeConfig,
 	NonceOptions,
 } from "./runtimeConfig.js";
-import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
+import {
+	createSearcheeFromMetafile,
+	createSearcheeFromTorrentFile,
+	Searchee,
+} from "./searchee.js";
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
@@ -25,11 +29,11 @@ import {
 import { getTorznabManager } from "./torznab.js";
 import { getTag, ok, stripExtension } from "./utils.js";
 
-export interface SearchResult {
+export interface Candidate {
 	guid: string;
 	link: string;
 	size: number;
-	title: string;
+	name: string;
 	tracker: string;
 }
 
@@ -85,7 +89,7 @@ async function performAction(
 async function searchJackettOrTorznab(
 	name: string,
 	nonceOptions: NonceOptions
-): Promise<SearchResult[]> {
+): Promise<Candidate[]> {
 	const { torznab } = getRuntimeConfig();
 	return torznab
 		? getTorznabManager().searchTorznab(name, nonceOptions)
@@ -98,15 +102,15 @@ async function findOnOtherSites(
 	nonceOptions: NonceOptions = EmptyNonceOptions
 ): Promise<number> {
 	const assessEach = async (
-		result: SearchResult
+		result: Candidate
 	): Promise<AssessmentWithTracker> => ({
-		assessment: await assessResult(result, searchee, hashesToExclude),
+		assessment: await assessCandidate(result, searchee, hashesToExclude),
 		tracker: result.tracker,
 	});
 
 	const tag = getTag(searchee.name);
 	const query = stripExtension(searchee.name);
-	let response: SearchResult[];
+	let response: Candidate[];
 	try {
 		response = await searchJackettOrTorznab(query, nonceOptions);
 	} catch (e) {
@@ -124,12 +128,13 @@ async function findOnOtherSites(
 
 	pushNotifier.notify({
 		body: `Found ${searchee.name} on ${successful.length} trackers${
-			successful.length &&
-			// @ts-expect-error ListFormat totally exists in node 12
-			`: ${new Intl.ListFormat("en", {
-				style: "long",
-				type: "conjunction",
-			}).format(successful.map((s) => s.tracker))}`
+			successful.length
+				? // @ts-expect-error ListFormat totally exists in node 12
+				  `: ${new Intl.ListFormat("en", {
+						style: "long",
+						type: "conjunction",
+				  }).format(successful.map((s) => s.tracker))}`
+				: ""
 		}`,
 		extra: {
 			infoHashes: successful.map((s) => s.assessment.info.infoHash),
@@ -137,12 +142,9 @@ async function findOnOtherSites(
 		},
 	});
 
-	for (const {
-		tracker,
-		assessment: { info: meta },
-	} of successful) {
+	for (const { tracker, assessment } of successful) {
 		const { isTorrentIncomplete } = await performAction(
-			meta,
+			assessment.info,
 			searchee,
 			tracker,
 			nonceOptions,
@@ -198,6 +200,40 @@ export async function searchForLocalTorrentByCriteria(
 	const hashesToExclude = getInfoHashesToExclude();
 	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude, nonceOptions);
+}
+
+export async function checkNewCandidateMatch(
+	candidate: Candidate
+): Promise<boolean> {
+	let meta;
+	try {
+		meta = await getTorrentByCriteria({ name: candidate.name });
+	} catch (e) {
+		logger.verbose({
+			label: Label.SERVER,
+			message: `Did not find an existing entry for ${candidate.name}`,
+		});
+		return false;
+	}
+	const hashesToExclude = getInfoHashesToExclude();
+	if (!filterByContent(meta)) return false;
+	const searchee = createSearcheeFromMetafile(meta);
+	const assessment: ResultAssessment = await assessCandidate(
+		candidate,
+		searchee,
+		hashesToExclude
+	);
+
+	if (assessment.decision !== Decision.MATCH) return false;
+
+	const { isTorrentIncomplete } = await performAction(
+		meta,
+		searchee,
+		candidate.tracker,
+		EmptyNonceOptions,
+		getTag(candidate.name)
+	);
+	return !isTorrentIncomplete;
 }
 
 async function findSearchableTorrents() {
