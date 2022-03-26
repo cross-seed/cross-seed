@@ -62,8 +62,8 @@ async function search(
 			label: Label.SERVER,
 			message: e.message,
 		});
-		res.writeHead(400, e.message);
-		res.end();
+		res.writeHead(400);
+		res.end(e.message);
 		return;
 	}
 	const criteria: TorrentLocator = pick(data, ["infoHash", "name"]);
@@ -72,8 +72,8 @@ async function search(
 	if (!("infoHash" in criteria || "name" in criteria)) {
 		const message = "A name or info hash must be provided";
 		logger.error({ label: Label.SERVER, message });
-		res.writeHead(400, message);
-		res.end();
+		res.writeHead(400);
+		res.end(message);
 	}
 
 	const criteriaStr = inspect(criteria);
@@ -124,8 +124,8 @@ async function announce(
 			label: Label.SERVER,
 			message: e.message,
 		});
-		res.writeHead(400, e.message);
-		res.end();
+		res.writeHead(400);
+		res.end(e.message);
 		return;
 	}
 
@@ -142,13 +142,10 @@ async function announce(
 			label: Label.SERVER,
 			message,
 		});
-		res.writeHead(400, message);
-		res.end();
+		res.writeHead(400);
+		res.end(message);
 		return;
 	}
-
-	res.writeHead(204);
-	res.end();
 
 	logger.verbose({
 		label: Label.SERVER,
@@ -164,8 +161,13 @@ async function announce(
 				message: `Added announce from ${candidate.tracker}: ${candidate.name}`,
 			});
 		}
+		res.setHeader("Content-Type", "application/json");
+		res.writeHead(200);
+		res.end(JSON.stringify(result));
 	} catch (e) {
 		logger.error(e);
+		res.writeHead(500);
+		res.end(e.message);
 	}
 }
 
@@ -175,7 +177,7 @@ async function handleRequest(
 ): Promise<void> {
 	if (req.method !== "POST") {
 		res.writeHead(405);
-		res.end();
+		res.end("Methods allowed: POST");
 		return;
 	}
 
@@ -197,7 +199,7 @@ async function handleRequest(
 		}
 		default: {
 			res.writeHead(404);
-			res.end();
+			res.end("Endpoint not found");
 			return;
 		}
 	}
