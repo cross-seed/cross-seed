@@ -103,6 +103,11 @@ module.exports = {
 	 * cross-seed will send POST requests to this url
 	 * with a JSON payload of { title, body }.
 	 * Conforms to the caronc/apprise REST API.
- 	 */
+	 */
 	notificationWebhookUrl: undefined,
+
+	/**
+	 * Listen on a custom port.
+	 */
+	port: 2468,
 };

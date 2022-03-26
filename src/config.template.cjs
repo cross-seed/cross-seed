@@ -78,7 +78,7 @@ module.exports = {
 	/**
 	 * can be either "save" or "inject".
 	 * With "inject" you need to set up one of the below clients.
- 	 */
+	 */
 	action: "save",
 
 	/**
@@ -102,4 +102,9 @@ module.exports = {
 	 * Conforms to the caronc/apprise REST API.
 	 */
 	notificationWebhookUrl: undefined,
+
+	/**
+	 * Listen on a custom port.
+	 */
+	port: 2468,
 };
