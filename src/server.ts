@@ -205,11 +205,11 @@ async function handleRequest(
 	}
 }
 
-export async function serve(): Promise<void> {
+export async function serve(port: number): Promise<void> {
 	const server = http.createServer(handleRequest);
-	server.listen(2468);
+	server.listen(port);
 	logger.info({
 		label: Label.SERVER,
-		message: "Server is running on port 2468, ^C to stop.",
+		message: `Server is running on port ${port}, ^C to stop.`,
 	});
 }

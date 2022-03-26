@@ -182,8 +182,14 @@ program
 		);
 	});
 
-createCommandWithSharedOptions("daemon", "Start the cross-seed daemon").action(
-	async (options) => {
+createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
+	.option(
+		"-p, --port <port>",
+		"Listen on a custom port",
+		(n) => parseInt(n),
+		fallback(fileConfig.port, 2468)
+	)
+	.action(async (options) => {
 		try {
 			const runtimeConfig = processOptions(options);
 			setRuntimeConfig(runtimeConfig);
@@ -197,7 +203,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon").action(
 				generateConfig({ docker: true });
 			}
 			await doStartupValidation();
-			await serve();
+			await serve(options.port);
 		} catch (e) {
 			if (e instanceof CrossSeedError) {
 				e.print();
@@ -206,8 +212,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon").action(
 			}
 			throw e;
 		}
-	}
-);
+	});
 
 createCommandWithSharedOptions("search", "Search for cross-seeds")
 	.requiredOption(

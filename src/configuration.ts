@@ -26,6 +26,7 @@ interface FileConfig {
 	torznab?: string[];
 	qbittorrentUrl?: string;
 	notificationWebhookUrl?: string;
+	port?: number;
 }
 
 interface GenerateConfigParams {
