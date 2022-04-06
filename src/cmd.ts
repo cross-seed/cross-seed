@@ -243,6 +243,9 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),
 			});
+			if (process.env.DOCKER_ENV === "true") {
+				generateConfig({ docker: true });
+			}
 			await doStartupValidation();
 			await main();
 		} catch (e) {
