@@ -21,9 +21,7 @@ export function stripExtension(filename: string): string {
 }
 
 export function nMinutesAgo(n: number): number {
-	const date = new Date();
-	date.setMinutes(date.getMinutes() - n);
-	return date.getTime();
+	return Date.now() - 1000 * 60 * n;
 }
 
 export function wait(n: number): Promise<void> {
@@ -63,3 +61,9 @@ export const tapLog = (value) => {
 	console.log(value);
 	return value;
 };
+
+export async function filterAsync(arr, predicate) {
+	const results = await Promise.all(arr.map(predicate));
+
+	return arr.filter((_, index) => results[index]);
+}

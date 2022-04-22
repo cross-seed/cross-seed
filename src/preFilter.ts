@@ -5,6 +5,7 @@ import db from "./db.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
+import { knex } from "./sqlite.js";
 import { nMinutesAgo } from "./utils.js";
 
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
@@ -54,11 +55,15 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 	return filtered;
 }
 
-export function filterTimestamps(searchee: Searchee): boolean {
+export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-	const timestampData = db.data.searchees[searchee.name];
-	if (!timestampData) return true;
-	const { firstSearched, lastSearched } = timestampData;
+
+	const timestampDataSql = await knex("searchee").first().where({
+		name: searchee.name,
+	});
+
+	if (!timestampDataSql) return true;
+	const { first_searched, last_searched } = timestampDataSql;
 	function logReason(reason) {
 		logger.verbose({
 			label: Label.PREFILTER,
@@ -66,19 +71,19 @@ export function filterTimestamps(searchee: Searchee): boolean {
 		});
 	}
 
-	if (excludeOlder && firstSearched < nMinutesAgo(excludeOlder)) {
+	if (excludeOlder && first_searched < nMinutesAgo(excludeOlder)) {
 		logReason(
-			`its first search timestamp ${firstSearched} is older than ${excludeOlder} minutes ago`
+			`its first search timestamp ${first_searched} is older than ${excludeOlder} minutes ago`
 		);
 		return false;
 	}
 
 	if (
 		excludeRecentSearch &&
-		lastSearched > nMinutesAgo(excludeRecentSearch)
+		last_searched > nMinutesAgo(excludeRecentSearch)
 	) {
 		logReason(
-			`its last search timestamp ${lastSearched} is newer than ${excludeRecentSearch} minutes ago`
+			`its last search timestamp ${last_searched} is newer than ${excludeRecentSearch} minutes ago`
 		);
 		return false;
 	}
