@@ -19,6 +19,7 @@ import {
 	createSearcheeFromTorrentFile,
 	Searchee,
 } from "./searchee.js";
+import { knex } from "./sqlite.js";
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
@@ -27,7 +28,7 @@ import {
 	TorrentLocator,
 } from "./torrent.js";
 import { getTorznabManager } from "./torznab.js";
-import { getTag, ok, stripExtension } from "./utils.js";
+import { filterAsync, getTag, ok, stripExtension } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -153,20 +154,22 @@ async function findOnOtherSites(
 		if (isTorrentIncomplete) return successful.length;
 	}
 
-	updateSearchTimestamps(searchee.name);
+	await updateSearchTimestamps(searchee.name);
 	return successful.length;
 }
 
-function updateSearchTimestamps(name: string): void {
-	if (db.data.searchees[name]) {
-		db.data.searchees[name].lastSearched = Date.now();
-	} else {
-		db.data.searchees[name] = {
-			firstSearched: Date.now(),
-			lastSearched: Date.now(),
-		};
-	}
-	db.write();
+async function updateSearchTimestamps(name: string): Promise<void> {
+	await knex.transaction(async (trx) => {
+		const now = Date.now();
+		await trx("searchee")
+			.insert({
+				name,
+				first_searched: now,
+				last_searched: now,
+			})
+			.onConflict("name")
+			.merge(["last_searched"]);
+	});
 }
 
 async function findMatchesBatch(
@@ -251,9 +254,11 @@ async function findSearchableTorrents() {
 	const hashesToExclude = parsedTorrents
 		.map((t) => t.infoHash)
 		.filter(Boolean);
-	const filteredTorrents = filterDupes(parsedTorrents)
-		.filter(filterByContent)
-		.filter(filterTimestamps);
+	const filteredTorrents = await filterAsync(
+		filterDupes(parsedTorrents).filter(filterByContent),
+		filterTimestamps
+	);
+
 	const samples = filteredTorrents.slice(offset);
 
 	logger.info(

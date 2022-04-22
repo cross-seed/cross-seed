@@ -18,6 +18,7 @@ import { setRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
+import { knex, SearcheeModel } from "./sqlite.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 
@@ -246,8 +247,11 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
+
+			await knex.migrate.latest();
 			await doStartupValidation();
 			await main();
+			await knex.destroy();
 		} catch (e) {
 			if (e instanceof CrossSeedError) {
 				e.print();
