@@ -5,7 +5,7 @@ import { createRequire } from "module";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
-import { dropDatabase } from "./db.js";
+import { clearCache } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
@@ -149,7 +149,7 @@ program
 program
 	.command("clear-cache")
 	.description("Clear the cache of downloaded-and-rejected torrents")
-	.action(dropDatabase);
+	.action(clearCache);
 
 program
 	.command("test-notification")

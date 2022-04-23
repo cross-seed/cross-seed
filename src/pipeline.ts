@@ -138,14 +138,14 @@ async function findOnOtherSites(
 				: ""
 		}`,
 		extra: {
-			infoHashes: successful.map((s) => s.assessment.info.infoHash),
+			infoHashes: successful.map((s) => s.assessment.metafile.infoHash),
 			trackers: successful.map((s) => s.tracker),
 		},
 	});
 
 	for (const { tracker, assessment } of successful) {
 		const { isTorrentIncomplete } = await performAction(
-			assessment.info,
+			assessment.metafile,
 			searchee,
 			tracker,
 			nonceOptions,
