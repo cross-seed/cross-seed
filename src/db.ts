@@ -56,7 +56,7 @@ if (!dbVersion || dbVersion < emptyDatabase.dbVersion) {
 
 db.write();
 
-export function dropDatabase(): void {
+export function clearCache(): void {
 	db.data = emptyDatabase;
 	db.write();
 	unlinkSync(path.join(appDir(), "cache.json"));

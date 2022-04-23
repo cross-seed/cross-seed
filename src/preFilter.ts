@@ -1,7 +1,6 @@
 import { uniqBy } from "lodash-es";
 import path from "path";
 import { EP_REGEX, EXTENSIONS } from "./constants.js";
-import db from "./db.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
@@ -58,9 +57,9 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 
-	const timestampDataSql = await knex("searchee").first().where({
-		name: searchee.name,
-	});
+	const timestampDataSql = await knex("searchee")
+		.where({ name: searchee.name })
+		.first();
 
 	if (!timestampDataSql) return true;
 	const { first_searched, last_searched } = timestampDataSql;

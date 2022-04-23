@@ -3,16 +3,16 @@ import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { appDir } from "./configuration.js";
 import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
-import db, { DecisionEntry } from "./db.js";
-import { Candidate } from "./pipeline.js";
 import { Label, logger } from "./logger.js";
+import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
+import { knex } from "./sqlite.js";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
 
 export interface ResultAssessment {
 	decision: Decision;
-	info?: Metafile;
+	metafile?: Metafile;
 }
 
 const createReasonLogger =
@@ -99,7 +99,7 @@ async function assessCandidateHelper(
 		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 
-	return { decision: Decision.MATCH, info };
+	return { decision: Decision.MATCH, metafile: info };
 }
 
 function existsInTorrentCache(infoHash: string): boolean {
@@ -128,7 +128,7 @@ function cacheTorrentFile(meta: Metafile): void {
 async function assessAndSaveResults(
 	result: Candidate,
 	searchee: Searchee,
-	Guid: string,
+	guid: string,
 	infoHashesToExclude: string[]
 ) {
 	const assessment = await assessCandidateHelper(
@@ -137,17 +137,28 @@ async function assessAndSaveResults(
 		infoHashesToExclude
 	);
 
-	db.data.decisions[searchee.name][Guid] = {
-		decision: assessment.decision,
-		lastSeen: Date.now(),
-		firstSeen: Date.now(),
-	};
-
 	if (assessment.decision === Decision.MATCH) {
-		db.data.decisions[searchee.name][Guid].infoHash =
-			assessment.info.infoHash;
-		cacheTorrentFile(assessment.info);
+		cacheTorrentFile(assessment.metafile);
 	}
+
+	await knex.transaction(async (trx) => {
+		const now = Date.now();
+		const { id } = await trx("searchee")
+			.select("id")
+			.where({ name: searchee.name })
+			.first();
+		await trx("decision").insert({
+			searchee_id: id,
+			guid: guid,
+			decision: assessment.decision,
+			info_hash:
+				assessment.decision === Decision.MATCH
+					? assessment.metafile.infoHash
+					: null,
+			last_seen: now,
+			first_seen: now,
+		});
+	});
 	return assessment;
 }
 
@@ -159,9 +170,13 @@ async function assessCandidateCaching(
 	const { guid, name, tracker } = candidate;
 	const logReason = createReasonLogger(name, tracker, searchee.name);
 
-	db.data.decisions[searchee.name] ??= {};
-	const cacheEntry: DecisionEntry = db.data.decisions[searchee.name][guid];
-
+	// db.data.decisions[searchee.name] ??= {};
+	// const cacheEntry: DecisionEntry = db.data.decisions[searchee.name][guid];
+	const cacheEntry = await knex("decision")
+		.select("decision.*")
+		.join("searchee", "decision.searchee_id", "searchee.id")
+		.where({ name: searchee.name, guid })
+		.first();
 	let assessment: ResultAssessment;
 
 	if (
@@ -181,16 +196,19 @@ async function assessCandidateCaching(
 	) {
 		// has been added since the last run
 		assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
-		db.data.decisions[searchee.name][guid].decision =
-			Decision.INFO_HASH_ALREADY_EXISTS;
+		await knex("decision")
+			.where({ id: cacheEntry.id })
+			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
+
+		// db.data.decisions[searchee.name][guid].decision = Decision.INFO_HASH_ALREADY_EXISTS;
 	} else if (
 		cacheEntry.decision === Decision.MATCH &&
-		existsInTorrentCache(cacheEntry.infoHash)
+		existsInTorrentCache(cacheEntry.info_hash)
 	) {
 		// cached match
 		assessment = {
 			decision: cacheEntry.decision,
-			info: await getCachedTorrentFile(cacheEntry.infoHash),
+			metafile: await getCachedTorrentFile(cacheEntry.info_hash),
 		};
 	} else if (cacheEntry.decision === Decision.MATCH) {
 		assessment = await assessAndSaveResults(
@@ -205,8 +223,14 @@ async function assessCandidateCaching(
 		assessment = { decision: cacheEntry.decision };
 		logReason(cacheEntry.decision, true);
 	}
-	db.data.decisions[searchee.name][guid].lastSeen = Date.now();
-	db.write();
+	// if previously known
+	if (cacheEntry) {
+		await knex("decision")
+			.where({ id: cacheEntry.id })
+			.update({ last_seen: Date.now() });
+	}
+	// db.data.decisions[searchee.name][guid].lastSeen = Date.now();
+	// db.write();
 	return assessment;
 }
 
