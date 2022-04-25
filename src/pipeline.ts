@@ -3,7 +3,6 @@ import fs from "fs";
 import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient.js";
 import { Action, Decision, InjectionResult } from "./constants.js";
-import db from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
 import { searchJackett } from "./jackett.js";
 import { Label, logger } from "./logger.js";
@@ -200,7 +199,7 @@ export async function searchForLocalTorrentByCriteria(
 	nonceOptions: NonceOptions
 ): Promise<number> {
 	const meta = await getTorrentByCriteria(criteria);
-	const hashesToExclude = getInfoHashesToExclude();
+	const hashesToExclude = await getInfoHashesToExclude();
 	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude, nonceOptions);
 }
@@ -218,7 +217,7 @@ export async function checkNewCandidateMatch(
 		});
 		return false;
 	}
-	const hashesToExclude = getInfoHashesToExclude();
+	const hashesToExclude = await getInfoHashesToExclude();
 	if (!filterByContent(meta)) return false;
 	const searchee = createSearcheeFromMetafile(meta);
 	const assessment: ResultAssessment = await assessCandidate(
