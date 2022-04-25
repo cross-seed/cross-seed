@@ -7,7 +7,7 @@ import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { knex } from "./sqlite.js";
+import { db } from "./db.js";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
 
 export interface ResultAssessment {
@@ -141,7 +141,7 @@ async function assessAndSaveResults(
 		cacheTorrentFile(assessment.metafile);
 	}
 
-	await knex.transaction(async (trx) => {
+	await db.transaction(async (trx) => {
 		const now = Date.now();
 		const { id } = await trx("searchee")
 			.select("id")
@@ -170,9 +170,7 @@ async function assessCandidateCaching(
 	const { guid, name, tracker } = candidate;
 	const logReason = createReasonLogger(name, tracker, searchee.name);
 
-	// db.data.decisions[searchee.name] ??= {};
-	// const cacheEntry: DecisionEntry = db.data.decisions[searchee.name][guid];
-	const cacheEntry = await knex("decision")
+	const cacheEntry = await db("decision")
 		.select("decision.*")
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.name, guid })
@@ -196,11 +194,9 @@ async function assessCandidateCaching(
 	) {
 		// has been added since the last run
 		assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
-		await knex("decision")
+		await db("decision")
 			.where({ id: cacheEntry.id })
 			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
-
-		// db.data.decisions[searchee.name][guid].decision = Decision.INFO_HASH_ALREADY_EXISTS;
 	} else if (
 		cacheEntry.decision === Decision.MATCH &&
 		existsInTorrentCache(cacheEntry.info_hash)
@@ -225,12 +221,10 @@ async function assessCandidateCaching(
 	}
 	// if previously known
 	if (cacheEntry) {
-		await knex("decision")
+		await db("decision")
 			.where({ id: cacheEntry.id })
 			.update({ last_seen: Date.now() });
 	}
-	// db.data.decisions[searchee.name][guid].lastSeen = Date.now();
-	// db.write();
 	return assessment;
 }
 

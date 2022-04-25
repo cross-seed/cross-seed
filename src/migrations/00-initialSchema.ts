@@ -1,5 +1,5 @@
 import Knex from "knex";
-import cache from "../cache.js";
+import { getCacheFileData, renameCacheFile } from "../cache.js";
 
 async function up(knex: Knex.Knex): Promise<void> {
 	await knex.schema.createTable("searchee", (table) => {
@@ -24,55 +24,51 @@ async function up(knex: Knex.Knex): Promise<void> {
 		table.string("file_path");
 	});
 
-	if (
-		cache.data.indexedTorrents.length > 0 ||
-		Object.keys(cache.data.decisions).length > 0 ||
-		Object.keys(cache.data.searchees).length > 0
-	)
-		await knex.transaction(async (trx) => {
-			await trx.batchInsert(
-				"searchee",
-				Object.entries(cache.data.searchees).map(
-					([name, { firstSearched, lastSearched }]) => ({
-						name,
-						first_searched: firstSearched,
-						last_searched: lastSearched,
-					})
-				)
-			);
+	const cacheData = await getCacheFileData();
+	if (!cacheData) return;
 
-			const dbSearchees = await trx.select("*").from("searchee");
-			const normalizedDecisions = Object.entries(cache.data.decisions)
-				.map(([searcheeName, results]) => {
-					return Object.entries(results).map(
-						([
-							guid,
-							{ decision, lastSeen, firstSeen, infoHash },
-						]) => {
-							return {
-								searchee_id: dbSearchees.find(
-									(searchee) => searchee.name === searcheeName
-								).id,
-								guid,
-								decision,
-								last_seen: lastSeen,
-								first_seen: firstSeen,
-								info_hash: infoHash,
-							};
-						}
-					);
+	await knex.transaction(async (trx) => {
+		await trx.batchInsert(
+			"searchee",
+			Object.entries(cacheData.searchees).map(
+				([name, { firstSearched, lastSearched }]) => ({
+					name,
+					first_searched: firstSearched,
+					last_searched: lastSearched,
 				})
-				.flat();
-			await trx.batchInsert("decision", normalizedDecisions);
-			await trx.batchInsert(
-				"torrent",
-				cache.data.indexedTorrents.map((e) => ({
-					info_hash: e.infoHash,
-					name: e.name,
-					file_path: e.filepath,
-				}))
-			);
-		});
+			)
+		);
+
+		const dbSearchees = await trx.select("*").from("searchee");
+		const normalizedDecisions = Object.entries(cacheData.decisions)
+			.map(([searcheeName, results]) => {
+				return Object.entries(results).map(
+					([guid, { decision, lastSeen, firstSeen, infoHash }]) => {
+						return {
+							searchee_id: dbSearchees.find(
+								(searchee) => searchee.name === searcheeName
+							).id,
+							guid,
+							decision,
+							last_seen: lastSeen,
+							first_seen: firstSeen,
+							info_hash: infoHash,
+						};
+					}
+				);
+			})
+			.flat();
+		await trx.batchInsert("decision", normalizedDecisions);
+		await trx.batchInsert(
+			"torrent",
+			cacheData.indexedTorrents.map((e) => ({
+				info_hash: e.infoHash,
+				name: e.name,
+				file_path: e.filepath,
+			}))
+		);
+	});
+	await renameCacheFile();
 }
 
 async function down(knex: Knex.Knex): Promise<void> {

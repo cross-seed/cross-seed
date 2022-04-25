@@ -5,7 +5,6 @@ import { createRequire } from "module";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
-import { clearCache } from "./cache.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
@@ -18,7 +17,7 @@ import { setRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
-import { knex } from "./sqlite.js";
+import { db } from "./db.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 
@@ -149,7 +148,9 @@ program
 program
 	.command("clear-cache")
 	.description("Clear the cache of downloaded-and-rejected torrents")
-	.action(clearCache);
+	.action(async () => {
+		await db("decision").del();
+	});
 
 program
 	.command("test-notification")
@@ -203,7 +204,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
-			await knex.migrate.latest();
+			await db.migrate.latest();
 			await doStartupValidation();
 			await serve(options.port);
 		} catch (e) {
@@ -249,10 +250,10 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 				generateConfig({ docker: true });
 			}
 
-			await knex.migrate.latest();
+			await db.migrate.latest();
 			await doStartupValidation();
 			await main();
-			await knex.destroy();
+			await db.destroy();
 		} catch (e) {
 			if (e instanceof CrossSeedError) {
 				e.print();
