@@ -18,7 +18,7 @@ import { setRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
-import { knex, SearcheeModel } from "./sqlite.js";
+import { knex } from "./sqlite.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 
@@ -203,6 +203,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
+			await knex.migrate.latest();
 			await doStartupValidation();
 			await serve(options.port);
 		} catch (e) {
