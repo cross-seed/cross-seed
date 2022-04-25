@@ -5,7 +5,7 @@ import { createRequire } from "module";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
-import { clearCache } from "./db.js";
+import { clearCache } from "./cache.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";

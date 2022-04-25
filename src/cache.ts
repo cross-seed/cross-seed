@@ -40,27 +40,27 @@ const emptyDatabase = {
 	dbVersion: 3,
 };
 
-const db = new LowSync<Schema>(
+const cache = new LowSync<Schema>(
 	new JSONFileSync<Schema>(path.join(appDir(), "cache.json"))
 );
 
-db.read();
+cache.read();
 
-db.data ??= emptyDatabase;
+cache.data ??= emptyDatabase;
 
-const dbVersion = db.data.dbVersion;
+const dbVersion = cache.data.dbVersion;
 
 if (!dbVersion || dbVersion < emptyDatabase.dbVersion) {
-	db.data = emptyDatabase;
+	cache.data = emptyDatabase;
 }
 
-db.write();
+cache.write();
 
 export function clearCache(): void {
-	db.data = emptyDatabase;
-	db.write();
+	cache.data = emptyDatabase;
+	cache.write();
 	unlinkSync(path.join(appDir(), "cache.json"));
 	rimraf.sync(path.join(appDir(), "torrent_cache"));
 }
 
-export default db;
+export default cache;
