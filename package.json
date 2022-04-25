@@ -52,7 +52,7 @@
 		"husky": "^7.0.0",
 		"lint-staged": "^12.1.4",
 		"prettier": "^2.0.5",
-		"typescript": "^4.7.0-dev.20220318"
+		"typescript": "^4.7.0-dev.20220425"
 	},
 	"prettier": {
 		"tabWidth": 4,
