@@ -1,7 +1,5 @@
-import { unlinkSync } from "fs";
-import { JSONFileSync, LowSync } from "lowdb";
+import { readFile, rename } from "fs/promises";
 import path from "path";
-import rimraf from "rimraf";
 import { appDir, createAppDir } from "./configuration.js";
 import { Decision } from "./constants.js";
 
@@ -33,34 +31,15 @@ export interface Schema {
 	dbVersion: number;
 }
 
-const emptyDatabase = {
-	searchees: {},
-	decisions: {},
-	indexedTorrents: [],
-	dbVersion: 3,
-};
-
-const cache = new LowSync<Schema>(
-	new JSONFileSync<Schema>(path.join(appDir(), "cache.json"))
-);
-
-cache.read();
-
-cache.data ??= emptyDatabase;
-
-const dbVersion = cache.data.dbVersion;
-
-if (!dbVersion || dbVersion < emptyDatabase.dbVersion) {
-	cache.data = emptyDatabase;
+export async function getCacheFileData(): Promise<Schema> {
+	return readFile(path.join(appDir(), "cache.json"))
+		.then((data) => JSON.parse(data.toString()))
+		.catch(() => undefined);
 }
 
-cache.write();
-
-export function clearCache(): void {
-	cache.data = emptyDatabase;
-	cache.write();
-	unlinkSync(path.join(appDir(), "cache.json"));
-	rimraf.sync(path.join(appDir(), "torrent_cache"));
+export async function renameCacheFile(): Promise<void> {
+	return rename(
+		path.join(appDir(), "cache.json"),
+		path.join(appDir(), "old-cache.json.bak")
+	);
 }
-
-export default cache;

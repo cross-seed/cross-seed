@@ -18,7 +18,7 @@ import {
 	createSearcheeFromTorrentFile,
 	Searchee,
 } from "./searchee.js";
-import { knex } from "./sqlite.js";
+import { db } from "./db.js";
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
@@ -158,7 +158,7 @@ async function findOnOtherSites(
 }
 
 async function updateSearchTimestamps(name: string): Promise<void> {
-	await knex.transaction(async (trx) => {
+	await db.transaction(async (trx) => {
 		const now = Date.now();
 		await trx("searchee")
 			.insert({

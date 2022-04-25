@@ -4,7 +4,7 @@ import { EP_REGEX, EXTENSIONS } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { knex } from "./sqlite.js";
+import { db } from "./db.js";
 import { nMinutesAgo } from "./utils.js";
 
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
@@ -57,7 +57,7 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 
-	const timestampDataSql = await knex("searchee")
+	const timestampDataSql = await db("searchee")
 		.where({ name: searchee.name })
 		.first();
 

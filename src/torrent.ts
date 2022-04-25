@@ -7,7 +7,7 @@ import { CrossSeedError } from "./errors.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { knex } from "./sqlite.js";
+import { db } from "./db.js";
 import { ok, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
@@ -97,13 +97,11 @@ export async function indexNewTorrents(): Promise<void> {
 
 	// index new torrents in the torrentDir
 	for (const filepath of dirContents) {
-		const doesAlreadyExist = await knex("torrent")
+		const doesAlreadyExist = await db("torrent")
 			.select("id")
 			.where({ file_path: filepath })
 			.first();
-		// const doesAlreadyExist = db.data.indexedTorrents.find(
-		// 	(e) => e.filepath === filepath
-		// );
+
 		if (!doesAlreadyExist) {
 			let meta;
 			try {
@@ -113,29 +111,20 @@ export async function indexNewTorrents(): Promise<void> {
 				logger.debug(e);
 				continue;
 			}
-			await knex("torrent").insert({
+			await db("torrent").insert({
 				file_path: filepath,
 				info_hash: meta.infoHash,
 				name: meta.name,
 			});
-			// db.data.indexedTorrents.push({
-			// 	filepath,
-			// 	infoHash: meta.infoHash,
-			// 	name: meta.name,
-			// });
 		}
 	}
 	// clean up torrents that no longer exist in the torrentDir
 	// this might be a slow query
-	await knex("torrent").whereNotIn("file_path", dirContents).del();
-	// db.data.indexedTorrents = db.data.indexedTorrents.filter((e) =>
-	// 	dirContents.includes(e.filepath)
-	// );
-	// db.write();
+	await db("torrent").whereNotIn("file_path", dirContents).del();
 }
 
 export async function getInfoHashesToExclude(): Promise<string[]> {
-	return (await knex("torrent").select("info_hash")).map((t) => t.info_hash);
+	return (await db("torrent").select("info_hash")).map((t) => t.info_hash);
 	// return db.data.indexedTorrents.map((t) => t.infoHash);
 }
 
@@ -165,7 +154,7 @@ export async function getTorrentByCriteria(
 ): Promise<Metafile> {
 	await indexNewTorrents();
 
-	const findResult = await knex("torrent")
+	const findResult = await db("torrent")
 		.where((b) => {
 			// there is always at least one criterion
 			if (criteria.infoHash) {
@@ -177,11 +166,7 @@ export async function getTorrentByCriteria(
 			return b;
 		})
 		.first();
-	// const findResult = db.data.indexedTorrents.find(
-	// 	(e) =>
-	// 		(!criteria.infoHash || criteria.infoHash === e.infoHash) &&
-	// 		(!criteria.name || criteria.name === e.name)
-	// );
+
 	if (findResult === undefined) {
 		const message = `could not find a torrent with the criteria ${inspect(
 			criteria
