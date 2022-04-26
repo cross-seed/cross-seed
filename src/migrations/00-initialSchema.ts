@@ -28,16 +28,15 @@ async function up(knex: Knex.Knex): Promise<void> {
 	if (!cacheData) return;
 
 	await knex.transaction(async (trx) => {
-		await trx.batchInsert(
-			"searchee",
-			Object.entries(cacheData.searchees).map(
-				([name, { firstSearched, lastSearched }]) => ({
-					name,
-					first_searched: firstSearched,
-					last_searched: lastSearched,
-				})
-			)
+		const chunkSize = 100;
+		const searcheeRows = Object.entries(cacheData.searchees).map(
+			([name, { firstSearched, lastSearched }]) => ({
+				name,
+				first_searched: firstSearched,
+				last_searched: lastSearched,
+			})
 		);
+		await trx.batchInsert("searchee", searcheeRows, chunkSize);
 
 		const dbSearchees = await trx.select("*").from("searchee");
 		const normalizedDecisions = Object.entries(cacheData.decisions)
@@ -58,15 +57,13 @@ async function up(knex: Knex.Knex): Promise<void> {
 				);
 			})
 			.flat();
-		await trx.batchInsert("decision", normalizedDecisions);
-		await trx.batchInsert(
-			"torrent",
-			cacheData.indexedTorrents.map((e) => ({
-				info_hash: e.infoHash,
-				name: e.name,
-				file_path: e.filepath,
-			}))
-		);
+		const torrentRows = cacheData.indexedTorrents.map((e) => ({
+			info_hash: e.infoHash,
+			name: e.name,
+			file_path: e.filepath,
+		}));
+		await trx.batchInsert("decision", normalizedDecisions, chunkSize);
+		await trx.batchInsert("torrent", torrentRows, chunkSize);
 	});
 	await renameCacheFile();
 }
