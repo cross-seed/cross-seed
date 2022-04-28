@@ -1,5 +1,5 @@
 import Knex from "knex";
-import { getCacheFileData, renameCacheFile } from "../cache.js";
+import { DecisionEntry, getCacheFileData, renameCacheFile } from "../cache.js";
 
 async function up(knex: Knex.Knex): Promise<void> {
 	await knex.schema.createTable("searchee", (table) => {
@@ -11,7 +11,7 @@ async function up(knex: Knex.Knex): Promise<void> {
 	await knex.schema.createTable("decision", (table) => {
 		table.increments("id").primary();
 		table.integer("searchee_id").references("id").inTable("searchee");
-		table.string("guid").unique();
+		table.string("guid");
 		table.string("info_hash");
 		table.string("decision");
 		table.integer("first_seen");
@@ -39,24 +39,28 @@ async function up(knex: Knex.Knex): Promise<void> {
 		await trx.batchInsert("searchee", searcheeRows, chunkSize);
 
 		const dbSearchees = await trx.select("*").from("searchee");
-		const normalizedDecisions = Object.entries(cacheData.decisions)
-			.map(([searcheeName, results]) => {
-				return Object.entries(results).map(
-					([guid, { decision, lastSeen, firstSeen, infoHash }]) => {
-						return {
-							searchee_id: dbSearchees.find(
-								(searchee) => searchee.name === searcheeName
-							).id,
-							guid,
-							decision,
-							last_seen: lastSeen,
-							first_seen: firstSeen,
-							info_hash: infoHash,
-						};
-					}
-				);
-			})
-			.flat();
+		const normalizedDecisions = Object.entries(cacheData.decisions).flatMap(
+			([searcheeName, results]) =>
+				Object.entries(results).flatMap(([guid, decisionEntry]) => {
+					// searchee may not exist if cache contains decisions
+					// from early versions of the cache
+					const searchee = dbSearchees.find(
+						(searchee) => searchee.name === searcheeName
+					);
+					return searchee
+						? [
+								{
+									searchee_id: searchee.id,
+									guid,
+									decision: decisionEntry.decision,
+									last_seen: decisionEntry.lastSeen,
+									first_seen: decisionEntry.firstSeen,
+									info_hash: decisionEntry.infoHash,
+								},
+						  ]
+						: [];
+				})
+		);
 		const torrentRows = cacheData.indexedTorrents.map((e) => ({
 			info_hash: e.infoHash,
 			name: e.name,

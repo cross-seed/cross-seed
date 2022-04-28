@@ -40,6 +40,6 @@ export async function getCacheFileData(): Promise<Schema> {
 export async function renameCacheFile(): Promise<void> {
 	return rename(
 		path.join(appDir(), "cache.json"),
-		path.join(appDir(), "old-cache.json.bak")
+		path.join(appDir(), "old-cache.bak.json")
 	);
 }
