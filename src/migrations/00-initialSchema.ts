@@ -1,5 +1,5 @@
 import Knex from "knex";
-import { DecisionEntry, getCacheFileData, renameCacheFile } from "../cache.js";
+import { getCacheFileData, renameCacheFile } from "../cache.js";
 
 async function up(knex: Knex.Knex): Promise<void> {
 	await knex.schema.createTable("searchee", (table) => {
