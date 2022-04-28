@@ -110,6 +110,13 @@ async function findOnOtherSites(
 
 	const tag = getTag(searchee.name);
 	const query = stripExtension(searchee.name);
+
+	// make sure searchee is in database
+	await db("searchee")
+		.insert({ name: searchee.name })
+		.onConflict("name")
+		.ignore();
+
 	let response: Candidate[];
 	try {
 		response = await searchJackettOrTorznab(query, nonceOptions);
@@ -160,14 +167,14 @@ async function findOnOtherSites(
 async function updateSearchTimestamps(name: string): Promise<void> {
 	await db.transaction(async (trx) => {
 		const now = Date.now();
+		const entry = await trx("searchee").where({ name }).first();
+
 		await trx("searchee")
-			.insert({
-				name,
-				first_searched: now,
+			.where({ name })
+			.update({
 				last_searched: now,
-			})
-			.onConflict("name")
-			.merge(["last_searched"]);
+				first_searched: entry ? undefined : now,
+			});
 	});
 }
 
