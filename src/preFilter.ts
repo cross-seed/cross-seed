@@ -70,7 +70,11 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		});
 	}
 
-	if (excludeOlder && first_searched < nMinutesAgo(excludeOlder)) {
+	if (
+		excludeOlder &&
+		first_searched &&
+		first_searched < nMinutesAgo(excludeOlder)
+	) {
 		logReason(
 			`its first search timestamp ${first_searched} is older than ${excludeOlder} minutes ago`
 		);
@@ -79,6 +83,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 
 	if (
 		excludeRecentSearch &&
+		last_searched &&
 		last_searched > nMinutesAgo(excludeRecentSearch)
 	) {
 		logReason(
