@@ -14,6 +14,7 @@ export enum Label {
 	TORZNAB = "torznab",
 	SERVER = "server",
 	STARTUP = "startup",
+	SCHEDULER = "scheduler",
 }
 
 export let logger: winston.Logger;

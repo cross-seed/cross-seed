@@ -1,6 +1,5 @@
 import { Action } from "./constants.js";
 interface RuntimeConfig {
-	offset: number;
 	jackettServerUrl: string;
 	jackettApiKey: string;
 	delay: number;
