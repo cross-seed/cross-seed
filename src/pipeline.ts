@@ -182,15 +182,13 @@ async function findMatchesBatch(
 	samples: Searchee[],
 	hashesToExclude: string[]
 ) {
-	const { delay, offset } = getRuntimeConfig();
+	const { delay } = getRuntimeConfig();
 
 	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
 		const sleep = new Promise((r) => setTimeout(r, delay * 1000));
 
-		const progress = chalk.blue(
-			`[${i + 1 + offset}/${samples.length + offset}]`
-		);
+		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
 		const name = stripExtension(sample.name);
 		logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
@@ -246,7 +244,7 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { offset, torrents } = getRuntimeConfig();
+	const { torrents } = getRuntimeConfig();
 	let parsedTorrents: Searchee[];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
@@ -265,22 +263,18 @@ async function findSearchableTorrents() {
 		filterTimestamps
 	);
 
-	const samples = filteredTorrents.slice(offset);
-
 	logger.info(
 		"Found %d torrents, %d suitable to search for matches",
 		parsedTorrents.length,
 		filteredTorrents.length
 	);
 
-	return { samples, hashesToExclude };
+	return { samples: filteredTorrents, hashesToExclude };
 }
 
 export async function main(): Promise<void> {
-	const { offset, outputDir } = getRuntimeConfig();
+	const { outputDir } = getRuntimeConfig();
 	const { samples, hashesToExclude } = await findSearchableTorrents();
-
-	if (offset > 0) logger.info(`Starting at offset ${offset}`);
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);

@@ -5,8 +5,9 @@ import { createRequire } from "module";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
+import { jobsLoop } from "./cron.js";
 import { diffCmd } from "./diff.js";
-import { CrossSeedError } from "./errors.js";
+import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main } from "./pipeline.js";
 import {
@@ -20,7 +21,6 @@ import "./signalHandlers.js";
 import { db } from "./db.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
-
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
@@ -123,6 +123,12 @@ function createCommandWithSharedOptions(name, description) {
 			"--notification-webhook-url <url>",
 			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
 			fileConfig.notificationWebhookUrl
+		)
+		.requiredOption(
+			"-d, --delay <delay>",
+			"Pause duration (seconds) between searches",
+			parseFloat,
+			fallback(fileConfig.delay, 10)
 		);
 }
 
@@ -206,7 +212,8 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			}
 			await db.migrate.latest();
 			await doStartupValidation();
-			await serve(options.port);
+			serve(options.port);
+			jobsLoop();
 		} catch (e) {
 			if (e instanceof CrossSeedError) {
 				e.print();
@@ -218,18 +225,6 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	});
 
 createCommandWithSharedOptions("search", "Search for cross-seeds")
-	.requiredOption(
-		"-o, --offset <offset>",
-		"Offset to start from",
-		(n) => parseInt(n),
-		0
-	)
-	.requiredOption(
-		"-d, --delay <delay>",
-		"Pause duration (seconds) between searches",
-		parseFloat,
-		fallback(fileConfig.delay, 10)
-	)
 	.addOption(
 		new Option(
 			"--torrents <torrents...>",
@@ -255,12 +250,7 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			await main();
 			await db.destroy();
 		} catch (e) {
-			if (e instanceof CrossSeedError) {
-				e.print();
-				process.exitCode = 1;
-				return;
-			}
-			throw e;
+			exitOnCrossSeedErrors(e);
 		}
 	});
 
