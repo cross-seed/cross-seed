@@ -35,10 +35,13 @@ function fallback(...args) {
 function processOptions(options): RuntimeConfig {
 	options.trackers = options.trackers?.split(",").filter((e) => e !== "");
 	if (options.rssCadence) {
-		options.rssCadence = ms(options.rssCadence);
+		options.rssCadence = Math.max(ms(options.rssCadence), ms("10 minutes"));
 	}
 	if (options.searchCadence) {
-		options.searchCadence = ms(options.searchCadence);
+		options.searchCadence = Math.max(
+			ms(options.searchCadence),
+			ms("1 day")
+		);
 	}
 	return options;
 }
