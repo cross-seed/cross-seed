@@ -2,6 +2,7 @@
 import chalk from "chalk";
 import { Option, program } from "commander";
 import { createRequire } from "module";
+import ms from "ms";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
@@ -14,7 +15,7 @@ import {
 	initializePushNotifier,
 	sendTestNotification,
 } from "./pushNotifier.js";
-import { setRuntimeConfig } from "./runtimeConfig.js";
+import { RuntimeConfig, setRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
@@ -31,8 +32,14 @@ function fallback(...args) {
 	return undefined;
 }
 
-function processOptions(options) {
+function processOptions(options): RuntimeConfig {
 	options.trackers = options.trackers?.split(",").filter((e) => e !== "");
+	if (options.rssCadence) {
+		options.rssCadence = ms(options.rssCadence);
+	}
+	if (options.searchCadence) {
+		options.searchCadence = ms(options.searchCadence);
+	}
 	return options;
 }
 
@@ -196,6 +203,16 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 		"Listen on a custom port",
 		(n) => parseInt(n),
 		fallback(fileConfig.port, 2468)
+	)
+	.option(
+		"--search-cadence <cadence>",
+		"Run searches on a schedule. Format: https://github.com/vercel/ms",
+		fallback(fileConfig.searchCadence, "10 minutes")
+	)
+	.option(
+		"--rss-cadence <cadence>",
+		"Run an rss scan on a schedule. Format: https://github.com/vercel/ms",
+		fallback(fileConfig.rssCadence, "10 minutes")
 	)
 	.action(async (options) => {
 		try {

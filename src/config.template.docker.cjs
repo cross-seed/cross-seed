@@ -110,4 +110,14 @@ module.exports = {
 	 * Listen on a custom port.
 	 */
 	port: 2468,
+
+	/**
+	 * Run an rss scan on a schedule. Format: https://github.com/vercel/ms
+	 */
+	rssCadence: "10 minutes",
+
+	/**
+	 * Run searches on a schedule. Format: https://github.com/vercel/ms
+	 */
+	searchCadence: "2 weeks",
 };
