@@ -36,9 +36,9 @@ class Job {
 const getJobs = () => {
 	const { rssCadence, searchCadence } = getRuntimeConfig();
 	return [
-		new Job("rss", rssCadence, scanRssFeeds),
-		new Job("search", searchCadence, main),
-	];
+		rssCadence && new Job("rss", rssCadence, scanRssFeeds),
+		searchCadence && new Job("search", searchCadence, main),
+	].filter(Boolean);
 };
 
 export async function jobsLoop() {
@@ -66,6 +66,6 @@ export async function jobsLoop() {
 					.catch((e) => void logger.error(e));
 			}
 		}
-	}, ms("1 second"));
+	}, ms("1 minute"));
 	return () => clearInterval(interval);
 }
