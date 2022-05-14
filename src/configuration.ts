@@ -27,6 +27,8 @@ interface FileConfig {
 	qbittorrentUrl?: string;
 	notificationWebhookUrl?: string;
 	port?: number;
+	searchCadence?: string;
+	rssCadence?: string;
 }
 
 interface GenerateConfigParams {

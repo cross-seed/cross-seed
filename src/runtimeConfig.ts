@@ -1,5 +1,5 @@
 import { Action } from "./constants.js";
-interface RuntimeConfig {
+export interface RuntimeConfig {
 	jackettServerUrl: string;
 	jackettApiKey: string;
 	delay: number;
@@ -19,6 +19,8 @@ interface RuntimeConfig {
 	notificationWebhookUrl: string;
 	torrents: string[];
 	port: number;
+	searchCadence: number;
+	rssCadence: number;
 }
 
 export interface NonceOptions {

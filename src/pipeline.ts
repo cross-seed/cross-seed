@@ -88,7 +88,7 @@ async function performAction(
 
 async function searchJackettOrTorznab(
 	name: string,
-	nonceOptions: NonceOptions
+	nonceOptions = EmptyNonceOptions
 ): Promise<Candidate[]> {
 	const { torznab } = getRuntimeConfig();
 	return torznab
@@ -284,4 +284,9 @@ export async function main(): Promise<void> {
 		chalk.bold.white(totalFound),
 		chalk.bold.white(samples.length)
 	);
+}
+
+export async function scanRssFeeds() {
+	const candidates = await searchJackettOrTorznab("");
+	console.log(candidates);
 }
