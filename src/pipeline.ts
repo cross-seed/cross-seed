@@ -263,11 +263,10 @@ async function findSearchableTorrents() {
 		filterTimestamps
 	);
 
-	logger.info(
-		"Found %d torrents, %d suitable to search for matches",
-		parsedTorrents.length,
-		filteredTorrents.length
-	);
+	logger.info({
+		label: Label.SEARCH,
+		message: `Found ${parsedTorrents.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
+	});
 
 	return { samples: filteredTorrents, hashesToExclude };
 }
@@ -279,14 +278,26 @@ export async function main(): Promise<void> {
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);
 
-	logger.info(
-		chalk.cyan("Done! Found %s cross seeds from %s original torrents"),
-		chalk.bold.white(totalFound),
-		chalk.bold.white(samples.length)
-	);
+	logger.info({
+		label: Label.SEARCH,
+		message: chalk.cyan(
+			`Found ${chalk.bold.white(
+				totalFound
+			)} cross seeds from ${chalk.bold.white(
+				samples.length
+			)} original torrents`
+		),
+	});
 }
 
 export async function scanRssFeeds() {
 	const candidates = await searchJackettOrTorznab("");
-	console.log(candidates);
+	logger.verbose({
+		label: Label.RSS,
+		message: `Scan returned ${candidates.length} results`,
+	});
+	for (const candidate of candidates) {
+		await checkNewCandidateMatch(candidate);
+	}
+	logger.info({ label: Label.RSS, message: "Scan complete" });
 }
