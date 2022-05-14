@@ -207,12 +207,12 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	.option(
 		"--search-cadence <cadence>",
 		"Run searches on a schedule. Format: https://github.com/vercel/ms",
-		fallback(fileConfig.searchCadence, "10 minutes")
+		fileConfig.searchCadence
 	)
 	.option(
 		"--rss-cadence <cadence>",
 		"Run an rss scan on a schedule. Format: https://github.com/vercel/ms",
-		fallback(fileConfig.rssCadence, "10 minutes")
+		fileConfig.rssCadence
 	)
 	.action(async (options) => {
 		try {
