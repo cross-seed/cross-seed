@@ -12,7 +12,7 @@ const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 export function filterByContent(searchee: Searchee): boolean {
 	const { includeEpisodes, searchAll } = getRuntimeConfig();
 
-	if (searchAll) return true;
+	if (searchAll && includeEpisodes) return true;
 
 	function logReason(reason): void {
 		logger.verbose({
@@ -29,6 +29,8 @@ export function filterByContent(searchee: Searchee): boolean {
 		logReason("it is a single episode");
 		return false;
 	}
+
+	if (searchAll) return true;
 
 	const allVideos = searchee.files.every((file) =>
 		extensionsWithDots.includes(path.extname(file.name))
