@@ -84,7 +84,7 @@ function createCommandWithSharedOptions(name, description) {
 		)
 		.requiredOption(
 			"-a, --search-all",
-			"Search for all torrents regardless of their contents",
+			"Search for all torrents regardless of their contents. Respects -e. To search everything except episodes, use -a. To search everything including episodes, use -ae",
 			fallback(fileConfig.searchAll, false)
 		)
 		.option(
