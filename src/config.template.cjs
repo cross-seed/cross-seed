@@ -54,7 +54,9 @@ module.exports = {
 
 	/**
 	 * search for all torrents, regardless of their contents
-	 * this option overrides includeEpisodes.
+	 * This option does not override includeEpisodes.
+	 * To search for everything except episodes, use (includeEpisodes: false, searchAll: true)
+	 * To search for everything including episodes, use (includeEpisodes: true, searchAll: true)
 	 */
 	searchAll: false,
 
