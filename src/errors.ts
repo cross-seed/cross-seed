@@ -10,3 +10,12 @@ export class CrossSeedError extends Error {
 		logger.error(this.message);
 	}
 }
+
+export function exitOnCrossSeedErrors(e) {
+	if (e instanceof CrossSeedError) {
+		e.print();
+		process.exitCode = 1;
+		return;
+	}
+	throw e;
+}

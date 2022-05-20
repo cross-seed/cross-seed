@@ -66,7 +66,6 @@ Options:
   -A, --action <action>                 If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client. (choices: "save", "inject", default: "save")
   --rtorrent-rpc-url <url>              The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.
   --qbittorrent-url <url>               The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.
-  -o, --offset <offset>                 Offset to start from
   -d, --delay <delay>                   Pause duration (seconds) between searches (default: 10)
   -x, --exclude-older <cutoff>          Exclude torrents first seen more than x minutes ago. Overrides the -a flag.
   -r, --exclude-recent-search <cutoff>  Exclude torrents which have been searched more recently than x minutes ago. Overrides the -a flag.

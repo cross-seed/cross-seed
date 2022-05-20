@@ -6,6 +6,7 @@ import { migrations } from "./migrations/migrations.js";
 export const db = Knex.knex({
 	client: "better-sqlite3",
 	connection: { filename: join(appDir(), "cross-seed.db") },
-	migrations: { migrationSource: migrations },
+	migrations: { migrationSource: migrations, disableTransactions: true },
 	useNullAsDefault: true,
+	acquireConnectionTimeout: 5000,
 });

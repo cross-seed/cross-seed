@@ -88,7 +88,7 @@ async function performAction(
 
 async function searchJackettOrTorznab(
 	name: string,
-	nonceOptions: NonceOptions
+	nonceOptions = EmptyNonceOptions
 ): Promise<Candidate[]> {
 	const { torznab } = getRuntimeConfig();
 	return torznab
@@ -182,15 +182,13 @@ async function findMatchesBatch(
 	samples: Searchee[],
 	hashesToExclude: string[]
 ) {
-	const { delay, offset } = getRuntimeConfig();
+	const { delay } = getRuntimeConfig();
 
 	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
 		const sleep = new Promise((r) => setTimeout(r, delay * 1000));
 
-		const progress = chalk.blue(
-			`[${i + 1 + offset}/${samples.length + offset}]`
-		);
+		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
 		const name = stripExtension(sample.name);
 		logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
@@ -246,7 +244,7 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { offset, torrents } = getRuntimeConfig();
+	const { torrents } = getRuntimeConfig();
 	let parsedTorrents: Searchee[];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
@@ -265,29 +263,41 @@ async function findSearchableTorrents() {
 		filterTimestamps
 	);
 
-	const samples = filteredTorrents.slice(offset);
+	logger.info({
+		label: Label.SEARCH,
+		message: `Found ${parsedTorrents.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
+	});
 
-	logger.info(
-		"Found %d torrents, %d suitable to search for matches",
-		parsedTorrents.length,
-		filteredTorrents.length
-	);
-
-	return { samples, hashesToExclude };
+	return { samples: filteredTorrents, hashesToExclude };
 }
 
 export async function main(): Promise<void> {
-	const { offset, outputDir } = getRuntimeConfig();
+	const { outputDir } = getRuntimeConfig();
 	const { samples, hashesToExclude } = await findSearchableTorrents();
-
-	if (offset > 0) logger.info(`Starting at offset ${offset}`);
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);
 
-	logger.info(
-		chalk.cyan("Done! Found %s cross seeds from %s original torrents"),
-		chalk.bold.white(totalFound),
-		chalk.bold.white(samples.length)
-	);
+	logger.info({
+		label: Label.SEARCH,
+		message: chalk.cyan(
+			`Found ${chalk.bold.white(
+				totalFound
+			)} cross seeds from ${chalk.bold.white(
+				samples.length
+			)} original torrents`
+		),
+	});
+}
+
+export async function scanRssFeeds() {
+	const candidates = await searchJackettOrTorznab("");
+	logger.verbose({
+		label: Label.RSS,
+		message: `Scan returned ${candidates.length} results`,
+	});
+	for (const candidate of candidates) {
+		await checkNewCandidateMatch(candidate);
+	}
+	logger.info({ label: Label.RSS, message: "Scan complete" });
 }

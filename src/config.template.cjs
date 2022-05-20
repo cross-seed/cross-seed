@@ -107,4 +107,25 @@ module.exports = {
 	 * Listen on a custom port.
 	 */
 	port: 2468,
+
+	/**
+	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms
+	 * Set to undefined or null to disable. Minimum of 10 minutes.
+	 * Examples:
+	 * "10min"
+	 * "2w"
+	 * "3 days"
+	 */
+	rssCadence: undefined,
+
+	/**
+	 * Run searches on a schedule. Format: https://github.com/vercel/ms
+	 * Set to undefined or null to disable. Minimum of 1 day.
+	 * If you have RSS enabled, you won't need this to run often (2+ weeks recommended)
+	 * Examples:
+	 * "10min"
+	 * "2w"
+	 * "3 days"
+	 */
+	searchCadence: undefined,
 };
