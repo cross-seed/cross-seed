@@ -5,7 +5,11 @@ import { EP_REGEX, SEASON_REGEX } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
-import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
+import {
+	EmptyNonceOptions,
+	getRuntimeConfig,
+	NonceOptions,
+} from "./runtimeConfig.js";
 import {
 	cleanseSeparators,
 	getTag,
@@ -195,7 +199,7 @@ export class TorznabManager {
 
 	async searchTorznab(
 		name: string,
-		nonceOptions: NonceOptions
+		nonceOptions = EmptyNonceOptions
 	): Promise<Candidate[]> {
 		const searchUrls = Array.from(this.capsMap).map(
 			([url, caps]: [URL, Caps]) => {
