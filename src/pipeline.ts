@@ -3,7 +3,6 @@ import fs from "fs";
 import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient.js";
 import { Action, Decision, InjectionResult } from "./constants.js";
-import db from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
 import { searchJackett } from "./jackett.js";
 import { Label, logger } from "./logger.js";
@@ -19,6 +18,7 @@ import {
 	createSearcheeFromTorrentFile,
 	Searchee,
 } from "./searchee.js";
+import { db } from "./db.js";
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
@@ -27,7 +27,7 @@ import {
 	TorrentLocator,
 } from "./torrent.js";
 import { getTorznabManager } from "./torznab.js";
-import { getTag, ok, stripExtension } from "./utils.js";
+import { filterAsync, getTag, ok, stripExtension } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -110,6 +110,13 @@ async function findOnOtherSites(
 
 	const tag = getTag(searchee.name);
 	const query = stripExtension(searchee.name);
+
+	// make sure searchee is in database
+	await db("searchee")
+		.insert({ name: searchee.name })
+		.onConflict("name")
+		.ignore();
+
 	let response: Candidate[];
 	try {
 		response = await searchJackettOrTorznab(query, nonceOptions);
@@ -137,14 +144,14 @@ async function findOnOtherSites(
 				: ""
 		}`,
 		extra: {
-			infoHashes: successful.map((s) => s.assessment.info.infoHash),
+			infoHashes: successful.map((s) => s.assessment.metafile.infoHash),
 			trackers: successful.map((s) => s.tracker),
 		},
 	});
 
 	for (const { tracker, assessment } of successful) {
 		const { isTorrentIncomplete } = await performAction(
-			assessment.info,
+			assessment.metafile,
 			searchee,
 			tracker,
 			nonceOptions,
@@ -153,20 +160,22 @@ async function findOnOtherSites(
 		if (isTorrentIncomplete) return successful.length;
 	}
 
-	updateSearchTimestamps(searchee.name);
+	await updateSearchTimestamps(searchee.name);
 	return successful.length;
 }
 
-function updateSearchTimestamps(name: string): void {
-	if (db.data.searchees[name]) {
-		db.data.searchees[name].lastSearched = Date.now();
-	} else {
-		db.data.searchees[name] = {
-			firstSearched: Date.now(),
-			lastSearched: Date.now(),
-		};
-	}
-	db.write();
+async function updateSearchTimestamps(name: string): Promise<void> {
+	await db.transaction(async (trx) => {
+		const now = Date.now();
+		const entry = await trx("searchee").where({ name }).first();
+
+		await trx("searchee")
+			.where({ name })
+			.update({
+				last_searched: now,
+				first_searched: entry ? undefined : now,
+			});
+	});
 }
 
 async function findMatchesBatch(
@@ -197,7 +206,7 @@ export async function searchForLocalTorrentByCriteria(
 	nonceOptions: NonceOptions
 ): Promise<number> {
 	const meta = await getTorrentByCriteria(criteria);
-	const hashesToExclude = getInfoHashesToExclude();
+	const hashesToExclude = await getInfoHashesToExclude();
 	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude, nonceOptions);
 }
@@ -215,7 +224,7 @@ export async function checkNewCandidateMatch(
 		});
 		return false;
 	}
-	const hashesToExclude = getInfoHashesToExclude();
+	const hashesToExclude = await getInfoHashesToExclude();
 	if (!filterByContent(meta)) return false;
 	const searchee = createSearcheeFromMetafile(meta);
 	const assessment: ResultAssessment = await assessCandidate(
@@ -251,9 +260,11 @@ async function findSearchableTorrents() {
 	const hashesToExclude = parsedTorrents
 		.map((t) => t.infoHash)
 		.filter(Boolean);
-	const filteredTorrents = filterDupes(parsedTorrents)
-		.filter(filterByContent)
-		.filter(filterTimestamps);
+	const filteredTorrents = await filterAsync(
+		filterDupes(parsedTorrents).filter(filterByContent),
+		filterTimestamps
+	);
+
 	const samples = filteredTorrents.slice(offset);
 
 	logger.info(

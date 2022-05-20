@@ -108,6 +108,7 @@ async function search(
 		}
 	} catch (e) {
 		logger.error(e);
+		logger.debug(e);
 	}
 }
 

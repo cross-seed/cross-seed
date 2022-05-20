@@ -3,11 +3,11 @@ import parseTorrent, { Metafile } from "parse-torrent";
 import path, { join } from "path";
 import simpleGet from "simple-get";
 import { inspect } from "util";
-import db from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
+import { db } from "./db.js";
 import { ok, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
@@ -97,9 +97,11 @@ export async function indexNewTorrents(): Promise<void> {
 
 	// index new torrents in the torrentDir
 	for (const filepath of dirContents) {
-		const doesAlreadyExist = db.data.indexedTorrents.find(
-			(e) => e.filepath === filepath
-		);
+		const doesAlreadyExist = await db("torrent")
+			.select("id")
+			.where({ file_path: filepath })
+			.first();
+
 		if (!doesAlreadyExist) {
 			let meta;
 			try {
@@ -109,22 +111,21 @@ export async function indexNewTorrents(): Promise<void> {
 				logger.debug(e);
 				continue;
 			}
-			db.data.indexedTorrents.push({
-				filepath,
-				infoHash: meta.infoHash,
+			await db("torrent").insert({
+				file_path: filepath,
+				info_hash: meta.infoHash,
 				name: meta.name,
 			});
 		}
 	}
 	// clean up torrents that no longer exist in the torrentDir
-	db.data.indexedTorrents = db.data.indexedTorrents.filter((e) =>
-		dirContents.includes(e.filepath)
-	);
-	db.write();
+	// this might be a slow query
+	await db("torrent").whereNotIn("file_path", dirContents).del();
 }
 
-export function getInfoHashesToExclude(): string[] {
-	return db.data.indexedTorrents.map((t) => t.infoHash);
+export async function getInfoHashesToExclude(): Promise<string[]> {
+	return (await db("torrent").select("info_hash")).map((t) => t.info_hash);
+	// return db.data.indexedTorrents.map((t) => t.infoHash);
 }
 
 export async function validateTorrentDir(): Promise<void> {
@@ -153,18 +154,26 @@ export async function getTorrentByCriteria(
 ): Promise<Metafile> {
 	await indexNewTorrents();
 
-	const findResult = db.data.indexedTorrents.find(
-		(e) =>
-			(!criteria.infoHash || criteria.infoHash === e.infoHash) &&
-			(!criteria.name || criteria.name === e.name)
-	);
+	const findResult = await db("torrent")
+		.where((b) => {
+			// there is always at least one criterion
+			if (criteria.infoHash) {
+				b = b.where({ info_hash: criteria.infoHash });
+			}
+			if (criteria.name) {
+				b = b.where({ name: criteria.name });
+			}
+			return b;
+		})
+		.first();
+
 	if (findResult === undefined) {
 		const message = `could not find a torrent with the criteria ${inspect(
 			criteria
 		)}`;
 		throw new Error(message);
 	}
-	return parseTorrentFromFilename(findResult.filepath);
+	return parseTorrentFromFilename(findResult.file_path);
 }
 
 export function isSingleFileTorrent(meta: Metafile): boolean {

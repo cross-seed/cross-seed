@@ -5,7 +5,6 @@ import { createRequire } from "module";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
-import { dropDatabase } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
@@ -18,6 +17,7 @@ import { setRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
+import { db } from "./db.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 
@@ -148,7 +148,9 @@ program
 program
 	.command("clear-cache")
 	.description("Clear the cache of downloaded-and-rejected torrents")
-	.action(dropDatabase);
+	.action(async () => {
+		await db("decision").del();
+	});
 
 program
 	.command("test-notification")
@@ -202,6 +204,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
+			await db.migrate.latest();
 			await doStartupValidation();
 			await serve(options.port);
 		} catch (e) {
@@ -246,8 +249,11 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
+
+			await db.migrate.latest();
 			await doStartupValidation();
 			await main();
+			await db.destroy();
 		} catch (e) {
 			if (e instanceof CrossSeedError) {
 				e.print();
