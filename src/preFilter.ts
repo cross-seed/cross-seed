@@ -10,9 +10,9 @@ import { nMinutesAgo } from "./utils.js";
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 
 export function filterByContent(searchee: Searchee): boolean {
-	const { includeEpisodes, searchAll } = getRuntimeConfig();
+	const { includeEpisodes, includeNonVideos } = getRuntimeConfig();
 
-	if (searchAll && includeEpisodes) return true;
+	if (includeNonVideos && includeEpisodes) return true;
 
 	function logReason(reason): void {
 		logger.verbose({
@@ -30,7 +30,7 @@ export function filterByContent(searchee: Searchee): boolean {
 		return false;
 	}
 
-	if (searchAll) return true;
+	if (includeNonVideos) return true;
 
 	const allVideos = searchee.files.every((file) =>
 		extensionsWithDots.includes(path.extname(file.name))

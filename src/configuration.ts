@@ -17,7 +17,7 @@ interface FileConfig {
 	jackettServerUrl?: string;
 	outputDir?: string;
 	rtorrentRpcUrl?: string;
-	searchAll?: boolean;
+	includeNonVideos?: boolean;
 	fuzzySizeThreshold?: number;
 	excludeOlder?: number;
 	excludeRecentSearch?: number;
