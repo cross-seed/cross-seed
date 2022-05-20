@@ -42,6 +42,7 @@ function redactUrlPassword(message, urlStr) {
 function redactMessage(message) {
 	const runtimeConfig = getRuntimeConfig();
 
+	// redact torznab api keys
 	message = message.replace(/apikey=[a-zA-Z0-9]+/g, `apikey=${redactionMsg}`);
 
 	for (const [key, urlStr] of Object.entries(runtimeConfig)) {
