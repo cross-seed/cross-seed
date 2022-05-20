@@ -10,7 +10,6 @@ export enum Label {
 	DECIDE = "decide",
 	PREFILTER = "prefilter",
 	CONFIGDUMP = "configdump",
-	JACKETT = "jackett",
 	TORZNAB = "torznab",
 	SERVER = "server",
 	STARTUP = "startup",
@@ -43,7 +42,6 @@ function redactUrlPassword(message, urlStr) {
 function redactMessage(message) {
 	const runtimeConfig = getRuntimeConfig();
 
-	message = message.split(runtimeConfig.jackettApiKey).join(redactionMsg);
 	message = message.replace(/apikey=[a-zA-Z0-9]+/g, `apikey=${redactionMsg}`);
 
 	for (const [key, urlStr] of Object.entries(runtimeConfig)) {
