@@ -2,34 +2,17 @@
 // it here as a default.
 
 module.exports = {
-	/**
-	 * @deprecated use torznab instead
-	 */
-	jackettServerUrl: "http://localhost:9117/jackett",
-
-	/**
-	 * @deprecated use torznab instead
-	 */
-	jackettApiKey: "YOUR_JACKETT_API_KEY_HERE",
-
-	/**
-	 * Pause at least this much in between each Jackett search. Higher is safer.
+	/*
+	 * Pause at least this much in between each search. Higher is safer.
 	 * 	It is not recommended to set this to less than 2 seconds.
 	 */
 	delay: 10,
 
 	/**
-	 * @deprecated use torznab instead
-	 * Trackers to search
-	 * Set to [] if you want to search all trackers.
-	 * Tracker ids can be found in their Torznab feed paths
-	 */
-	trackers: ["oink", "tehconnection"],
-
-	/**
-	 * List of Torznab urls.
+	 * List of Torznab URLs.
 	 * For Jackett, click "Copy RSS feed"
 	 * For Prowlarr, click (i) and copy the Torznab Url, then append "?apikey=YOUR_PROWLARR_API_KEY"
+	 * Wrap each URL in quotation marks, and separate them with commas.
 	 */
 	torznab: [],
 

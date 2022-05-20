@@ -4,7 +4,6 @@ import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient.js";
 import { Action, Decision, InjectionResult } from "./constants.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
-import { searchJackett } from "./jackett.js";
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { pushNotifier } from "./pushNotifier.js";
@@ -86,16 +85,6 @@ async function performAction(
 	return { isTorrentIncomplete };
 }
 
-async function searchJackettOrTorznab(
-	name: string,
-	nonceOptions = EmptyNonceOptions
-): Promise<Candidate[]> {
-	const { torznab } = getRuntimeConfig();
-	return torznab
-		? getTorznabManager().searchTorznab(name, nonceOptions)
-		: searchJackett(name, nonceOptions);
-}
-
 async function findOnOtherSites(
 	searchee: Searchee,
 	hashesToExclude: string[],
@@ -119,7 +108,7 @@ async function findOnOtherSites(
 
 	let response: Candidate[];
 	try {
-		response = await searchJackettOrTorznab(query, nonceOptions);
+		response = await getTorznabManager().searchTorznab(query, nonceOptions);
 	} catch (e) {
 		logger.error(`error searching for ${query}`);
 		return 0;

@@ -36,9 +36,6 @@ function parseData(data) {
 		if ("infoHash" in parsed) {
 			parsed.infoHash = parsed.infoHash.toLowerCase();
 		}
-		if ("trackers" in parsed && !Array.isArray(parsed.trackers)) {
-			parsed.trackers = [parsed.trackers];
-		}
 		if ("size" in parsed && typeof parsed.size === "string") {
 			parsed.size = Number(parsed.size);
 		}

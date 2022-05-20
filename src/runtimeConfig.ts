@@ -1,9 +1,7 @@
 import { Action } from "./constants.js";
 export interface RuntimeConfig {
-	jackettServerUrl: string;
-	jackettApiKey: string;
+	offset: number;
 	delay: number;
-	trackers: string[];
 	torznab: string[];
 	torrentDir: string;
 	outputDir: string;
@@ -24,13 +22,11 @@ export interface RuntimeConfig {
 }
 
 export interface NonceOptions {
-	trackers: string[];
 	torznab: string[];
 	outputDir: string;
 }
 
 export const EmptyNonceOptions = {
-	trackers: undefined,
 	torznab: undefined,
 	outputDir: undefined,
 };
