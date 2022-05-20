@@ -83,9 +83,9 @@ function createCommandWithSharedOptions(name, description) {
 			fileConfig.outputDir
 		)
 		.requiredOption(
-			"-a, --search-all",
-			"Search for all torrents regardless of their contents. Respects -e. To search everything except episodes, use -a. To search everything including episodes, use -ae",
-			fallback(fileConfig.searchAll, false)
+			"--include-non-videos",
+			"Include torrents which contain non-video files",
+			fallback(fileConfig.includeNonVideos, false)
 		)
 		.option(
 			"-e, --include-episodes",

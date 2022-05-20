@@ -9,7 +9,7 @@ export interface RuntimeConfig {
 	outputDir: string;
 	includeEpisodes: boolean;
 	verbose: boolean;
-	searchAll: boolean;
+	includeNonVideos: boolean;
 	fuzzySizeThreshold: number;
 	excludeOlder: number;
 	excludeRecentSearch: number;

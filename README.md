@@ -59,7 +59,7 @@ Options:
   -T, --torznab <urls...>               Torznab urls with apikey included (separated by spaces)
   -i, --torrent-dir <dir>               Directory with torrent files
   -s, --output-dir <dir>                Directory to save results in
-  -a, --search-all                      Search for all torrents regardless of their contents (default: false)
+  --include-non-videos                    Include torrents which contain non-video files (default: false)
   -e, --include-episodes                Include single-episode torrents in the search (default: false)
   --fuzzy-size-threshold <decimal>      The size difference allowed to be considered a match. (default: 0.02)
   -v, --verbose                         Log verbose output (default: false)

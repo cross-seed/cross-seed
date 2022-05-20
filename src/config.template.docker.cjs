@@ -56,12 +56,12 @@ module.exports = {
 	includeEpisodes: false,
 
 	/**
-	 * search for all torrents, regardless of their contents
+	 * Include torrents which contain non-video files
 	 * This option does not override includeEpisodes.
-	 * To search for everything except episodes, use (includeEpisodes: false, searchAll: true)
-	 * To search for everything including episodes, use (includeEpisodes: true, searchAll: true)
+	 * To search for everything except episodes, use (includeEpisodes: false, includeNonVideos: true)
+	 * To search for everything including episodes, use (includeEpisodes: true, includeNonVideos: true)
 	 */
-	searchAll: false,
+	includeNonVideos: false,
 
 	/**
 	 * fuzzy size match threshold
