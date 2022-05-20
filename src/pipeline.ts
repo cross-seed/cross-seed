@@ -280,7 +280,7 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const candidates = await searchJackettOrTorznab("");
+	const candidates = await getTorznabManager().searchTorznab("");
 	logger.verbose({
 		label: Label.RSS,
 		message: `Scan returned ${candidates.length} results`,

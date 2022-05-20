@@ -53,9 +53,6 @@ Search for cross-seeds
 
 
 Options:
-  -u, --jackett-server-url <url>        DEPRECATED: Your Jackett server url
-  -k, --jackett-api-key <key>           DEPRECATED: Your Jackett API key
-  -t, --trackers <tracker1>,<tracker2>  DEPRECATED: Comma-separated list of Jackett tracker ids to search (Tracker ids can be found in their Torznab feed paths)
   -T, --torznab <urls...>               Torznab urls with apikey included (separated by spaces)
   -i, --torrent-dir <dir>               Directory with torrent files
   -s, --output-dir <dir>                Directory to save results in

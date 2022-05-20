@@ -64,7 +64,7 @@ async function search(
 		return;
 	}
 	const criteria: TorrentLocator = pick(data, ["infoHash", "name"]);
-	const nonceOptions: NonceOptions = pick(data, ["trackers", "outputDir"]);
+	const nonceOptions: NonceOptions = pick(data, ["outputDir"]);
 
 	if (!("infoHash" in criteria || "name" in criteria)) {
 		const message = "A name or info hash must be provided";

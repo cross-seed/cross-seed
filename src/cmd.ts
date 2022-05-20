@@ -33,7 +33,6 @@ function fallback(...args) {
 }
 
 function processOptions(options): RuntimeConfig {
-	options.trackers = options.trackers?.split(",").filter((e) => e !== "");
 	if (options.rssCadence) {
 		options.rssCadence = Math.max(ms(options.rssCadence), ms("10 minutes"));
 	}
