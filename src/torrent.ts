@@ -138,14 +138,21 @@ export async function validateTorrentDir(): Promise<void> {
 
 export async function loadTorrentDirLight(): Promise<Searchee[]> {
 	const { torrentDir } = getRuntimeConfig();
-	return Promise.all(
-		fs
-			.readdirSync(torrentDir)
-			.filter((fn) => path.extname(fn) === ".torrent")
-			.sort()
-			.map((filename) => join(getRuntimeConfig().torrentDir, filename))
-			.map(createSearcheeFromTorrentFile)
-	).then((searcheeResults) => searcheeResults.filter(ok));
+	const torrentFilePaths = fs
+		.readdirSync(torrentDir)
+		.filter((fn) => path.extname(fn) === ".torrent")
+		.sort()
+		.map((filename) => join(getRuntimeConfig().torrentDir, filename));
+
+	const searchees: Searchee[] = [];
+	for (const torrentFilePath of torrentFilePaths) {
+		console.log("parsing", torrentFilePath);
+		const searcheeResult = await createSearcheeFromTorrentFile(
+			torrentFilePath
+		);
+		if (ok(searcheeResult)) searchees.push(searcheeResult);
+	}
+	return searchees;
 }
 
 export async function getTorrentByCriteria(
