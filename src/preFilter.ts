@@ -12,8 +12,6 @@ const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 export function filterByContent(searchee: Searchee): boolean {
 	const { includeEpisodes, includeNonVideos } = getRuntimeConfig();
 
-	if (includeNonVideos && includeEpisodes) return true;
-
 	function logReason(reason): void {
 		logger.verbose({
 			label: Label.PREFILTER,
@@ -21,22 +19,19 @@ export function filterByContent(searchee: Searchee): boolean {
 		});
 	}
 
-	if (
-		!includeEpisodes &&
-		searchee.files.length === 1 &&
-		EP_REGEX.test(searchee.files[0].name)
-	) {
+	const isSingleEpisodeTorrent =
+		searchee.files.length === 1 && EP_REGEX.test(searchee.files[0].name);
+
+	if (!includeEpisodes && isSingleEpisodeTorrent) {
 		logReason("it is a single episode");
 		return false;
 	}
 
-	if (includeNonVideos) return true;
-
-	const allVideos = searchee.files.every((file) =>
+	const allFilesAreVideos = searchee.files.every((file) =>
 		extensionsWithDots.includes(path.extname(file.name))
 	);
 
-	if (!allVideos) {
+	if (!includeNonVideos && !allFilesAreVideos) {
 		logReason("not all files are videos");
 		return false;
 	}
