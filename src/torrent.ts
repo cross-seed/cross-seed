@@ -15,6 +15,8 @@ export interface TorrentLocator {
 	name?: string;
 }
 
+const alreadyLoggedParseFailures = [];
+
 export async function parseTorrentFromFilename(
 	filename: string
 ): Promise<Metafile> {
@@ -105,8 +107,11 @@ export async function indexNewTorrents(): Promise<void> {
 			try {
 				meta = await parseTorrentFromFilename(filepath);
 			} catch (e) {
-				logger.error(`Failed to parse ${filepath}`);
-				logger.debug(e);
+				if (!alreadyLoggedParseFailures.includes(filepath)) {
+					alreadyLoggedParseFailures.push(filepath);
+					logger.error(`Failed to parse ${filepath}`);
+					logger.debug(e);
+				}
 				continue;
 			}
 			db.data.indexedTorrents.push({
