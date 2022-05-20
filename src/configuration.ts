@@ -19,8 +19,8 @@ interface FileConfig {
 	rtorrentRpcUrl?: string;
 	searchAll?: boolean;
 	fuzzySizeThreshold?: number;
-	excludeOlder?: number;
-	excludeRecentSearch?: number;
+	excludeOlder?: string;
+	excludeRecentSearch?: string;
 	torrentDir?: string;
 	trackers?: string[];
 	torznab?: string[];

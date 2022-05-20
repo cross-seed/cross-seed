@@ -68,13 +68,22 @@ module.exports = {
 	fuzzySizeThreshold: 0.02,
 
 	/**
-	 * Exclude torrents first seen more than n minutes ago.
+	 * Exclude torrents first seen more than this long ago.
+	 * Format: https://github.com/vercel/ms
+	 * Examples:
+	 * "10min"
+	 * "2w"
+	 * "3 days"
 	 */
 	excludeOlder: undefined,
 
 	/**
 	 * Exclude torrents which have been searched
-	 * more recently than n minutes ago.
+	 * more recently than this long ago.
+	 * Examples:
+	 * "10min"
+	 * "2w"
+	 * "3 days"
 	 */
 	excludeRecentSearch: undefined,
 

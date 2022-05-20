@@ -43,6 +43,14 @@ function processOptions(options): RuntimeConfig {
 			ms("1 day")
 		);
 	}
+
+	if (options.excludeOlder) {
+		console.log(options.excludeOlder);
+		options.excludeOlder = ms(options.excludeOlder);
+	}
+	if (options.excludeRecentSearch) {
+		options.excludeRecentSearch = ms(options.excludeRecentSearch);
+	}
 	return options;
 }
 
@@ -100,13 +108,11 @@ function createCommandWithSharedOptions(name, description) {
 		.option(
 			"-x, --exclude-older <cutoff>",
 			"Exclude torrents first seen more than n minutes ago. Bypasses the -a flag.",
-			(n) => parseInt(n),
 			fileConfig.excludeOlder
 		)
 		.option(
 			"-r, --exclude-recent-search <cutoff>",
 			"Exclude torrents which have been searched more recently than n minutes ago. Bypasses the -a flag.",
-			(n) => parseInt(n),
 			fileConfig.excludeRecentSearch
 		)
 		.requiredOption("-v, --verbose", "Log verbose output", false)
