@@ -15,6 +15,8 @@ export interface TorrentLocator {
 	name?: string;
 }
 
+const alreadyLoggedParseFailures = [];
+
 export async function parseTorrentFromFilename(
 	filename: string
 ): Promise<Metafile> {
@@ -105,8 +107,11 @@ export async function indexNewTorrents(): Promise<void> {
 			try {
 				meta = await parseTorrentFromFilename(filepath);
 			} catch (e) {
-				logger.error(`Failed to parse ${filepath}`);
-				logger.debug(e);
+				if (!alreadyLoggedParseFailures.includes(filepath)) {
+					alreadyLoggedParseFailures.push(filepath);
+					logger.error(`Failed to parse ${filepath}`);
+					logger.debug(e);
+				}
 				continue;
 			}
 			db.data.indexedTorrents.push({
@@ -138,14 +143,20 @@ export async function validateTorrentDir(): Promise<void> {
 
 export async function loadTorrentDirLight(): Promise<Searchee[]> {
 	const { torrentDir } = getRuntimeConfig();
-	return Promise.all(
-		fs
-			.readdirSync(torrentDir)
-			.filter((fn) => path.extname(fn) === ".torrent")
-			.sort()
-			.map((filename) => join(getRuntimeConfig().torrentDir, filename))
-			.map(createSearcheeFromTorrentFile)
-	).then((searcheeResults) => searcheeResults.filter(ok));
+	const torrentFilePaths = fs
+		.readdirSync(torrentDir)
+		.filter((fn) => path.extname(fn) === ".torrent")
+		.sort()
+		.map((filename) => join(getRuntimeConfig().torrentDir, filename));
+
+	const searchees: Searchee[] = [];
+	for (const torrentFilePath of torrentFilePaths) {
+		const searcheeResult = await createSearcheeFromTorrentFile(
+			torrentFilePath
+		);
+		if (ok(searcheeResult)) searchees.push(searcheeResult);
+	}
+	return searchees;
 }
 
 export async function getTorrentByCriteria(
