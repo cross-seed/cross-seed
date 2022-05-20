@@ -146,7 +146,6 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 
 	const searchees: Searchee[] = [];
 	for (const torrentFilePath of torrentFilePaths) {
-		console.log("parsing", torrentFilePath);
 		const searcheeResult = await createSearcheeFromTorrentFile(
 			torrentFilePath
 		);
