@@ -13,8 +13,6 @@ interface FileConfig {
 	configVersion?: number;
 	delay?: number;
 	includeEpisodes?: boolean;
-	jackettApiKey?: string;
-	jackettServerUrl?: string;
 	outputDir?: string;
 	rtorrentRpcUrl?: string;
 	includeNonVideos?: boolean;
@@ -22,7 +20,6 @@ interface FileConfig {
 	excludeOlder?: string;
 	excludeRecentSearch?: string;
 	torrentDir?: string;
-	trackers?: string[];
 	torznab?: string[];
 	qbittorrentUrl?: string;
 	notificationWebhookUrl?: string;
