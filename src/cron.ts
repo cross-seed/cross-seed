@@ -52,8 +52,20 @@ export async function jobsLoop() {
 					.where({ name: job.name })
 					.first()
 			)?.last_run;
+			const eligibilityTs = lastRun + job.cadence;
 
-			if (!lastRun || lastRun + job.cadence < now) {
+			const lastRunStr = lastRun
+				? "never"
+				: `${ms(Date.now() - lastRun)} ago`;
+
+			logger.verbose({
+				label: Label.SCHEDULER,
+				message: `${job.name}: last run ${lastRunStr}, next run in ${ms(
+					eligibilityTs - Date.now()
+				)}`,
+			});
+
+			if (!lastRun || now > eligibilityTs) {
 				job.run()
 					.then(async () => {
 						// upon success, update the log
