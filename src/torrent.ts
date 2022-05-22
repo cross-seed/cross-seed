@@ -10,7 +10,7 @@ import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { ok, stripExtension } from "./utils.js";
+import { duration, ok, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -97,8 +97,10 @@ export async function findAllTorrentFilesInDir(
 
 export async function indexNewTorrents(): Promise<void> {
 	const { torrentDir } = getRuntimeConfig();
+	const perf: Record<string, DOMHighResTimeStamp> = {};
+	perf.a = performance.now();
 	const dirContents = await findAllTorrentFilesInDir(torrentDir);
-
+	perf.b = performance.now();
 	// index new torrents in the torrentDir
 	for (const filepath of dirContents) {
 		const doesAlreadyExist = await db("torrent")
@@ -125,9 +127,18 @@ export async function indexNewTorrents(): Promise<void> {
 			});
 		}
 	}
+	perf.c = performance.now();
 	// clean up torrents that no longer exist in the torrentDir
 	// this might be a slow query
 	await db("torrent").whereNotIn("file_path", dirContents).del();
+	perf.d = performance.now();
+	logger.verbose({
+		label: Label.PERF,
+		message: `findAll: ${duration(perf.a, perf.b)} loop: ${duration(
+			perf.b,
+			perf.c
+		)} cleanup: ${duration(perf.c, perf.d)}`,
+	});
 }
 
 export async function getInfoHashesToExclude(): Promise<string[]> {
@@ -186,7 +197,7 @@ export async function getTorrentByCriteria(
 		label: Label.PERF,
 		message: `index: ${(perfB - perfA).toFixed(0)} ms db: ${(
 			perfC - perfB
-		).toFixed(0)} ms`,
+		).toFixed(0)}`,
 	});
 
 	if (findResult === undefined) {

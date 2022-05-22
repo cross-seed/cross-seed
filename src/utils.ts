@@ -12,6 +12,8 @@ export enum MediaType {
 	OTHER = "unknown",
 }
 
+export const duration = (perfA, perfB) => (perfB - perfA).toFixed(0);
+
 export function stripExtension(filename: string): string {
 	for (const ext of EXTENSIONS) {
 		const re = new RegExp(`\\.${ext}$`);
