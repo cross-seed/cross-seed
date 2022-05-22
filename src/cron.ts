@@ -43,7 +43,8 @@ const getJobs = () => {
 
 export async function jobsLoop() {
 	const jobs = getJobs();
-	const interval = setInterval(async () => {
+
+	async function loop() {
 		const now = Date.now();
 		for (const job of jobs) {
 			const lastRun = (
@@ -52,20 +53,17 @@ export async function jobsLoop() {
 					.where({ name: job.name })
 					.first()
 			)?.last_run;
-			const eligibilityTs = lastRun + job.cadence;
 
-			const lastRunStr = lastRun
-				? "never"
-				: `${ms(Date.now() - lastRun)} ago`;
-
+			// if it's never been run, you are eligible immediately
+			const eligibilityTs = lastRun ? lastRun + job.cadence : now;
+			const lastRunStr = lastRun ? `${ms(now - lastRun)} ago` : "never";
+			const nextRunStr = ms(eligibilityTs - now);
 			logger.verbose({
 				label: Label.SCHEDULER,
-				message: `${job.name}: last run ${lastRunStr}, next run in ${ms(
-					eligibilityTs - Date.now()
-				)}`,
+				message: `${job.name}: last run ${lastRunStr}, next run in ${nextRunStr}`,
 			});
 
-			if (!lastRun || now > eligibilityTs) {
+			if (now >= eligibilityTs) {
 				job.run()
 					.then(async () => {
 						// upon success, update the log
@@ -78,6 +76,9 @@ export async function jobsLoop() {
 					.catch((e) => void logger.error(e));
 			}
 		}
-	}, ms("1 minute"));
+	}
+
+	const interval = setInterval(loop, ms("1 minute"));
+	loop();
 	return () => clearInterval(interval);
 }

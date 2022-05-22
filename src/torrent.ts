@@ -1,13 +1,15 @@
 import fs, { promises as fsPromises } from "fs";
+import ms from "ms";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path, { join } from "path";
+import { performance } from "perf_hooks";
 import simpleGet from "simple-get";
 import { inspect } from "util";
+import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { db } from "./db.js";
 import { ok, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
@@ -163,9 +165,9 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 export async function getTorrentByCriteria(
 	criteria: TorrentLocator
 ): Promise<Metafile> {
-	performance.mark("beforeIndex");
+	const perfA = performance.now();
 	await indexNewTorrents();
-	performance.mark("beforeDbCall");
+	const perfB = performance.now();
 
 	const findResult = await db("torrent")
 		.where((b) => {
@@ -179,19 +181,12 @@ export async function getTorrentByCriteria(
 			return b;
 		})
 		.first();
-	performance.mark("afterDbCall");
-	const durations = {
-		index: performance.measure("index", "beforeIndex", "beforeDbCall")
-			.duration,
-		dbCall: performance.measure("dbCall", "beforeDbCall", "afterDbCall")
-			.duration,
-	};
+	const perfC = performance.now();
 	logger.verbose({
 		label: Label.PERF,
-		message: `index: ${durations.index} db: ${durations.dbCall}`,
+		message: `index: ${ms(perfB - perfA)} db: ${ms(perfC - perfB)}`,
 	});
-	performance.clearMarks();
-	performance.clearMeasures();
+
 	if (findResult === undefined) {
 		const message = `could not find a torrent with the criteria ${inspect(
 			criteria
