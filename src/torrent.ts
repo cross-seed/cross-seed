@@ -184,7 +184,9 @@ export async function getTorrentByCriteria(
 	const perfC = performance.now();
 	logger.verbose({
 		label: Label.PERF,
-		message: `index: ${ms(perfB - perfA)} db: ${ms(perfC - perfB)}`,
+		message: `index: ${(perfB - perfA).toFixed(0)} ms db: ${(
+			perfC - perfB
+		).toFixed(0)} ms`,
 	});
 
 	if (findResult === undefined) {
