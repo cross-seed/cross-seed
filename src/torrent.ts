@@ -4,7 +4,7 @@ import path, { join } from "path";
 import simpleGet from "simple-get";
 import { inspect } from "util";
 import { CrossSeedError } from "./errors.js";
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
 import { db } from "./db.js";
@@ -163,7 +163,9 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 export async function getTorrentByCriteria(
 	criteria: TorrentLocator
 ): Promise<Metafile> {
+	performance.mark("beforeIndex");
 	await indexNewTorrents();
+	performance.mark("beforeDbCall");
 
 	const findResult = await db("torrent")
 		.where((b) => {
@@ -177,7 +179,19 @@ export async function getTorrentByCriteria(
 			return b;
 		})
 		.first();
-
+	performance.mark("afterDbCall");
+	const durations = {
+		index: performance.measure("index", "beforeIndex", "beforeDbCall")
+			.duration,
+		dbCall: performance.measure("dbCall", "beforeDbCall", "afterDbCall")
+			.duration,
+	};
+	logger.verbose({
+		label: Label.PERF,
+		message: `index: ${durations.index} db: ${durations.dbCall}`,
+	});
+	performance.clearMarks();
+	performance.clearMeasures();
 	if (findResult === undefined) {
 		const message = `could not find a torrent with the criteria ${inspect(
 			criteria

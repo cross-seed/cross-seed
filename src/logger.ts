@@ -16,6 +16,7 @@ export enum Label {
 	SCHEDULER = "scheduler",
 	SEARCH = "search",
 	RSS = "rss",
+	PERF = "perf",
 }
 
 export let logger: winston.Logger;
