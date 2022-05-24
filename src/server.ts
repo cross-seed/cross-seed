@@ -9,7 +9,7 @@ import {
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
 import { NonceOptions } from "./runtimeConfig.js";
-import { TorrentLocator } from "./torrent.js";
+import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 
 function getData(req): Promise<string> {
 	return new Promise((resolve) => {
@@ -152,6 +152,7 @@ async function announce(
 
 	const candidate = data as Candidate;
 	try {
+		await indexNewTorrents();
 		const result = await checkNewCandidateMatch(candidate);
 		if (result) {
 			logger.info({

@@ -96,17 +96,14 @@ export async function findAllTorrentFilesInDir(
 
 export async function indexNewTorrents(): Promise<void> {
 	const { torrentDir } = getRuntimeConfig();
-	const perf: Record<string, number> = {};
-	perf.a = performance.now();
 	const dirContents = await findAllTorrentFilesInDir(torrentDir);
-	perf.b = performance.now();
 	// index new torrents in the torrentDir
 
-	const matchingTorrentIds = new Set(
-		await db("torrent").select("id").whereIn("file_path", dirContents)
-	);
 	for (const filepath of dirContents) {
-		const doesAlreadyExist = matchingTorrentIds.has(filepath);
+		const doesAlreadyExist = await db("torrent")
+			.select("id")
+			.whereIn("file_path", dirContents)
+			.first();
 
 		if (!doesAlreadyExist) {
 			let meta;
@@ -127,18 +124,9 @@ export async function indexNewTorrents(): Promise<void> {
 			});
 		}
 	}
-	perf.c = performance.now();
 	// clean up torrents that no longer exist in the torrentDir
 	// this might be a slow query
 	await db("torrent").whereNotIn("file_path", dirContents).del();
-	perf.d = performance.now();
-	logger.verbose({
-		label: Label.PERF,
-		message: `findAll: ${duration(perf.a, perf.b)} loop: ${duration(
-			perf.b,
-			perf.c
-		)} cleanup: ${duration(perf.c, perf.d)}`,
-	});
 }
 
 export async function getInfoHashesToExclude(): Promise<string[]> {
@@ -176,10 +164,6 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 export async function getTorrentByCriteria(
 	criteria: TorrentLocator
 ): Promise<Metafile> {
-	const perfA = performance.now();
-	await indexNewTorrents();
-	const perfB = performance.now();
-
 	const findResult = await db("torrent")
 		.where((b) => {
 			// there is always at least one criterion
@@ -192,13 +176,6 @@ export async function getTorrentByCriteria(
 			return b;
 		})
 		.first();
-	const perfC = performance.now();
-	logger.verbose({
-		label: Label.PERF,
-		message: `index: ${(perfB - perfA).toFixed(0)} ms db: ${(
-			perfC - perfB
-		).toFixed(0)}`,
-	});
 
 	if (findResult === undefined) {
 		const message = `could not find a torrent with the criteria ${inspect(

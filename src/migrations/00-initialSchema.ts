@@ -21,7 +21,7 @@ async function up(knex: Knex.Knex): Promise<void> {
 		table.increments("id").primary();
 		table.string("info_hash");
 		table.string("name");
-		table.string("file_path");
+		table.string("file_path").unique();
 	});
 
 	const cacheData = await getCacheFileData();

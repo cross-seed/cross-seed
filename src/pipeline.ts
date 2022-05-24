@@ -21,6 +21,7 @@ import { db } from "./db.js";
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
+	indexNewTorrents,
 	loadTorrentDirLight,
 	saveTorrentFile,
 	TorrentLocator,
@@ -285,6 +286,7 @@ export async function scanRssFeeds() {
 		label: Label.RSS,
 		message: `Scan returned ${candidates.length} results`,
 	});
+	await indexNewTorrents();
 	for (const candidate of candidates) {
 		await checkNewCandidateMatch(candidate);
 	}
