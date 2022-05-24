@@ -102,7 +102,7 @@ export async function indexNewTorrents(): Promise<void> {
 	for (const filepath of dirContents) {
 		const doesAlreadyExist = await db("torrent")
 			.select("id")
-			.whereIn("file_path", dirContents)
+			.where({ file_path: filepath })
 			.first();
 
 		if (!doesAlreadyExist) {
