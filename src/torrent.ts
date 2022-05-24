@@ -1,5 +1,4 @@
 import fs, { promises as fsPromises } from "fs";
-import ms from "ms";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path, { join } from "path";
 import { performance } from "perf_hooks";
@@ -10,7 +9,7 @@ import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { duration, ok, stripExtension } from "./utils.js";
+import { duration, ok, stripExtension, time } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -97,16 +96,17 @@ export async function findAllTorrentFilesInDir(
 
 export async function indexNewTorrents(): Promise<void> {
 	const { torrentDir } = getRuntimeConfig();
-	const perf: Record<string, DOMHighResTimeStamp> = {};
+	const perf: Record<string, number> = {};
 	perf.a = performance.now();
 	const dirContents = await findAllTorrentFilesInDir(torrentDir);
 	perf.b = performance.now();
 	// index new torrents in the torrentDir
+
+	const matchingTorrentIds = new Set(
+		await db("torrent").select("id").whereIn("file_path", dirContents)
+	);
 	for (const filepath of dirContents) {
-		const doesAlreadyExist = await db("torrent")
-			.select("id")
-			.where({ file_path: filepath })
-			.first();
+		const doesAlreadyExist = matchingTorrentIds.has(filepath);
 
 		if (!doesAlreadyExist) {
 			let meta;
