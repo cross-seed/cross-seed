@@ -286,8 +286,16 @@ export async function scanRssFeeds() {
 		label: Label.RSS,
 		message: `Scan returned ${candidates.length} results`,
 	});
+	logger.verbose({
+		label: Label.RSS,
+		message: "Indexing new torrents...",
+	});
 	await indexNewTorrents();
-	for (const candidate of candidates) {
+	for (const [i, candidate] of candidates.entries()) {
+		logger.verbose({
+			label: Label.RSS,
+			message: `Processing release ${i + 1}/${candidates.length}`,
+		});
 		await checkNewCandidateMatch(candidate);
 	}
 	logger.info({ label: Label.RSS, message: "Scan complete" });
