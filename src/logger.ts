@@ -17,6 +17,7 @@ export enum Label {
 	SEARCH = "search",
 	RSS = "rss",
 	PERF = "perf",
+	REVERSE_LOOKUP = "reverselookup",
 }
 
 export let logger: winston.Logger;

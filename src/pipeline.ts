@@ -207,7 +207,7 @@ export async function checkNewCandidateMatch(
 		meta = await getTorrentByCriteria({ name: candidate.name });
 	} catch (e) {
 		logger.verbose({
-			label: Label.SERVER,
+			label: Label.REVERSE_LOOKUP,
 			message: `Did not find an existing entry for ${candidate.name}`,
 		});
 		return false;
@@ -215,6 +215,13 @@ export async function checkNewCandidateMatch(
 	const hashesToExclude = await getInfoHashesToExclude();
 	if (!filterByContent(meta)) return false;
 	const searchee = createSearcheeFromMetafile(meta);
+
+	// make sure searchee is in database
+	await db("searchee")
+		.insert({ name: searchee.name })
+		.onConflict("name")
+		.ignore();
+
 	const assessment: ResultAssessment = await assessCandidate(
 		candidate,
 		searchee,
