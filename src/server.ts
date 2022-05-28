@@ -83,6 +83,8 @@ async function search(
 		message: `Received search request: ${criteriaStr}`,
 	});
 
+	await indexNewTorrents();
+
 	try {
 		let numFound = null;
 		if (criteria) {
