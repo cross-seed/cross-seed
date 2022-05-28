@@ -6,7 +6,7 @@ import ms from "ms";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
-import { jobsLoop } from "./cron.js";
+import { jobsLoop } from "./jobs.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
