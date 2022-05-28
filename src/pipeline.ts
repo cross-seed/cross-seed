@@ -127,21 +127,23 @@ async function findOnOtherSites(
 		(e) => e.assessment.decision === Decision.MATCH
 	);
 
-	pushNotifier.notify({
-		body: `Found ${searchee.name} on ${successful.length} trackers${
-			successful.length
-				? // @ts-expect-error ListFormat totally exists in node 12
-				  `: ${new Intl.ListFormat("en", {
-						style: "long",
-						type: "conjunction",
-				  }).format(successful.map((s) => s.tracker))}`
-				: ""
-		}`,
-		extra: {
-			infoHashes: successful.map((s) => s.assessment.metafile.infoHash),
-			trackers: successful.map((s) => s.tracker),
-		},
-	});
+	if (successful.length) {
+		const name = searchee.name;
+		const numTrackers = successful.length;
+		const infoHashes = successful.map(
+			(s) => s.assessment.metafile.infoHash
+		);
+		const trackers = successful.map((s) => s.tracker);
+		// @ts-expect-error Intl.ListFormat totally exists on node 12
+		const trackersListStr = new Intl.ListFormat("en", {
+			style: "long",
+			type: "conjunction",
+		}).format(successful.map((s) => s.tracker));
+		pushNotifier.notify({
+			body: `Found ${name} on ${numTrackers} trackers: ${trackersListStr}`,
+			extra: { infoHashes, trackers },
+		});
+	}
 
 	for (const { tracker, assessment } of successful) {
 		const { isTorrentIncomplete } = await performAction(
