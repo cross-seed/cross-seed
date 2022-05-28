@@ -43,7 +43,7 @@ interface AssessmentWithTracker {
 }
 
 async function performAction(
-	meta: Metafile,
+	newMeta: Metafile,
 	searchee: Searchee,
 	tracker: string,
 	nonceOptions: NonceOptions,
@@ -52,10 +52,14 @@ async function performAction(
 	const { action } = getRuntimeConfig();
 
 	let isTorrentIncomplete;
-	const styledName = chalk.green.bold(meta.name);
+	const styledName = chalk.green.bold(newMeta.name);
 	const styledTracker = chalk.bold(tracker);
 	if (action === Action.INJECT) {
-		const result = await getClient().inject(meta, searchee, nonceOptions);
+		const result = await getClient().inject(
+			newMeta,
+			searchee,
+			nonceOptions
+		);
 		switch (result) {
 			case InjectionResult.SUCCESS:
 				logger.info(
@@ -76,11 +80,11 @@ async function performAction(
 				logger.error(
 					`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
 				);
-				saveTorrentFile(tracker, tag, meta, nonceOptions);
+				saveTorrentFile(tracker, tag, newMeta, nonceOptions);
 				break;
 		}
 	} else {
-		saveTorrentFile(tracker, tag, meta, nonceOptions);
+		saveTorrentFile(tracker, tag, newMeta, nonceOptions);
 		logger.info(`Found ${styledName} on ${styledTracker}`);
 	}
 	return { isTorrentIncomplete };
@@ -231,7 +235,7 @@ export async function checkNewCandidateMatch(
 	if (assessment.decision !== Decision.MATCH) return false;
 
 	const { isTorrentIncomplete } = await performAction(
-		meta,
+		assessment.metafile,
 		searchee,
 		candidate.tracker,
 		EmptyNonceOptions,
