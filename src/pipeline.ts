@@ -138,7 +138,7 @@ async function findOnOtherSites(
 		const trackersListStr = new Intl.ListFormat("en", {
 			style: "long",
 			type: "conjunction",
-		}).format(successful.map((s) => s.tracker));
+		}).format(trackers);
 		pushNotifier.notify({
 			body: `Found ${name} on ${numTrackers} trackers: ${trackersListStr}`,
 			extra: { infoHashes, trackers },
