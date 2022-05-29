@@ -80,6 +80,11 @@ interface TorrentFiles {
 	size: number;
 }
 
+interface Category {
+	name: string;
+	savePath: string;
+}
+
 export default class QBittorrent implements TorrentClient {
 	url: URL;
 	cookie: string;
@@ -163,6 +168,33 @@ export default class QBittorrent implements TorrentClient {
 		return response.text();
 	}
 
+	async setUpCrossSeedCategory(ogCategoryName: string): Promise<string> {
+		if (!ogCategoryName) return "";
+
+		const categoriesStr = await this.request("/torrents/categories", "");
+		const categories: Record<string, Category> = JSON.parse(categoriesStr);
+		const ogCategory = categories[ogCategoryName];
+		const newCategoryName = `${ogCategoryName}.cross-seed`;
+		const maybeNewCategory = categories[newCategoryName];
+
+		if (maybeNewCategory?.savePath === ogCategory.savePath) {
+			// setup is already complete
+		} else if (maybeNewCategory) {
+			await this.request(
+				"/torrents/editCategory",
+				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
+				X_WWW_FORM_URLENCODED
+			);
+		} else {
+			await this.request(
+				"/torrents/createCategory",
+				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
+				X_WWW_FORM_URLENCODED
+			);
+		}
+		return newCategoryName;
+	}
+
 	async createTag(): Promise<void> {
 		await this.request(
 			"/torrents/createTags",
@@ -241,6 +273,7 @@ export default class QBittorrent implements TorrentClient {
 			const { save_path, isComplete, autoTMM, category } =
 				await this.getTorrentConfiguration(searchee);
 
+			const newCategoryName = await this.setUpCrossSeedCategory(category);
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
 			const shouldManuallyEnforceContentLayout =
@@ -254,7 +287,7 @@ export default class QBittorrent implements TorrentClient {
 			const formData = new FormData();
 			formData.append("torrents", file, filename);
 			formData.append("tags", "cross-seed");
-			formData.append("category", category);
+			formData.append("category", newCategoryName);
 			if (autoTMM) {
 				formData.append("autoTMM", "true");
 			} else {
