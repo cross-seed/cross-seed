@@ -5,7 +5,7 @@ import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { db } from "./db.js";
-import { nMinutesAgo } from "./utils.js";
+import { nMsAgo } from "./utils.js";
 
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 
@@ -70,7 +70,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	if (
 		excludeOlder &&
 		first_searched &&
-		first_searched < nMinutesAgo(excludeOlder)
+		first_searched < nMsAgo(excludeOlder)
 	) {
 		logReason(
 			`its first search timestamp ${first_searched} is older than ${excludeOlder} minutes ago`
@@ -81,7 +81,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	if (
 		excludeRecentSearch &&
 		last_searched &&
-		last_searched > nMinutesAgo(excludeRecentSearch)
+		last_searched > nMsAgo(excludeRecentSearch)
 	) {
 		logReason(
 			`its last search timestamp ${last_searched} is newer than ${excludeRecentSearch} minutes ago`

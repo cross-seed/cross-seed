@@ -22,8 +22,8 @@ export function stripExtension(filename: string): string {
 	return filename;
 }
 
-export function nMinutesAgo(n: number): number {
-	return Date.now() - 1000 * 60 * n;
+export function nMsAgo(n: number): number {
+	return Date.now() - n;
 }
 
 export function wait(n: number): Promise<void> {
