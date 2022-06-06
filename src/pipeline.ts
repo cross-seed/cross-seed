@@ -169,7 +169,7 @@ async function updateSearchTimestamps(name: string): Promise<void> {
 			.where({ name })
 			.update({
 				last_searched: now,
-				first_searched: entry ? undefined : now,
+				first_searched: entry?.first_searched ? undefined : now,
 			});
 	});
 }

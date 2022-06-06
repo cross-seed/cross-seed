@@ -44,7 +44,6 @@ function processOptions(options): RuntimeConfig {
 	}
 
 	if (options.excludeOlder) {
-		console.log(options.excludeOlder);
 		options.excludeOlder = ms(options.excludeOlder);
 	}
 	if (options.excludeRecentSearch) {
