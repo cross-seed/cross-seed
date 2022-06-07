@@ -1,16 +1,13 @@
 import { Action } from "./constants.js";
-interface RuntimeConfig {
+export interface RuntimeConfig {
 	offset: number;
-	jackettServerUrl: string;
-	jackettApiKey: string;
 	delay: number;
-	trackers: string[];
 	torznab: string[];
 	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;
 	verbose: boolean;
-	searchAll: boolean;
+	includeNonVideos: boolean;
 	fuzzySizeThreshold: number;
 	excludeOlder: number;
 	excludeRecentSearch: number;
@@ -20,16 +17,16 @@ interface RuntimeConfig {
 	notificationWebhookUrl: string;
 	torrents: string[];
 	port: number;
+	searchCadence: number;
+	rssCadence: number;
 }
 
 export interface NonceOptions {
-	trackers: string[];
 	torznab: string[];
 	outputDir: string;
 }
 
 export const EmptyNonceOptions = {
-	trackers: undefined,
 	torznab: undefined,
 	outputDir: undefined,
 };

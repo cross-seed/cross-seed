@@ -10,10 +10,14 @@ export enum Label {
 	DECIDE = "decide",
 	PREFILTER = "prefilter",
 	CONFIGDUMP = "configdump",
-	JACKETT = "jackett",
 	TORZNAB = "torznab",
 	SERVER = "server",
 	STARTUP = "startup",
+	SCHEDULER = "scheduler",
+	SEARCH = "search",
+	RSS = "rss",
+	PERF = "perf",
+	REVERSE_LOOKUP = "reverselookup",
 }
 
 export let logger: winston.Logger;
@@ -40,7 +44,7 @@ function redactUrlPassword(message, urlStr) {
 function redactMessage(message) {
 	const runtimeConfig = getRuntimeConfig();
 
-	message = message.split(runtimeConfig.jackettApiKey).join(redactionMsg);
+	// redact torznab api keys
 	message = message.replace(/apikey=[a-zA-Z0-9]+/g, `apikey=${redactionMsg}`);
 
 	for (const [key, urlStr] of Object.entries(runtimeConfig)) {

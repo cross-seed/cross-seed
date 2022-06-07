@@ -3,9 +3,7 @@ import fs from "fs";
 import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient.js";
 import { Action, Decision, InjectionResult } from "./constants.js";
-import db from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
-import { searchJackett } from "./jackett.js";
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { pushNotifier } from "./pushNotifier.js";
@@ -19,15 +17,17 @@ import {
 	createSearcheeFromTorrentFile,
 	Searchee,
 } from "./searchee.js";
+import { db } from "./db.js";
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
+	indexNewTorrents,
 	loadTorrentDirLight,
 	saveTorrentFile,
 	TorrentLocator,
 } from "./torrent.js";
 import { getTorznabManager } from "./torznab.js";
-import { getTag, ok, stripExtension } from "./utils.js";
+import { filterAsync, getTag, ok, stripExtension } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -43,7 +43,7 @@ interface AssessmentWithTracker {
 }
 
 async function performAction(
-	meta: Metafile,
+	newMeta: Metafile,
 	searchee: Searchee,
 	tracker: string,
 	nonceOptions: NonceOptions,
@@ -52,10 +52,14 @@ async function performAction(
 	const { action } = getRuntimeConfig();
 
 	let isTorrentIncomplete;
-	const styledName = chalk.green.bold(meta.name);
+	const styledName = chalk.green.bold(newMeta.name);
 	const styledTracker = chalk.bold(tracker);
 	if (action === Action.INJECT) {
-		const result = await getClient().inject(meta, searchee, nonceOptions);
+		const result = await getClient().inject(
+			newMeta,
+			searchee,
+			nonceOptions
+		);
 		switch (result) {
 			case InjectionResult.SUCCESS:
 				logger.info(
@@ -76,24 +80,14 @@ async function performAction(
 				logger.error(
 					`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
 				);
-				saveTorrentFile(tracker, tag, meta, nonceOptions);
+				saveTorrentFile(tracker, tag, newMeta, nonceOptions);
 				break;
 		}
 	} else {
-		saveTorrentFile(tracker, tag, meta, nonceOptions);
+		saveTorrentFile(tracker, tag, newMeta, nonceOptions);
 		logger.info(`Found ${styledName} on ${styledTracker}`);
 	}
 	return { isTorrentIncomplete };
-}
-
-async function searchJackettOrTorznab(
-	name: string,
-	nonceOptions: NonceOptions
-): Promise<Candidate[]> {
-	const { torznab } = getRuntimeConfig();
-	return torznab
-		? getTorznabManager().searchTorznab(name, nonceOptions)
-		: searchJackett(name, nonceOptions);
 }
 
 async function findOnOtherSites(
@@ -110,9 +104,16 @@ async function findOnOtherSites(
 
 	const tag = getTag(searchee.name);
 	const query = stripExtension(searchee.name);
+
+	// make sure searchee is in database
+	await db("searchee")
+		.insert({ name: searchee.name })
+		.onConflict("name")
+		.ignore();
+
 	let response: Candidate[];
 	try {
-		response = await searchJackettOrTorznab(query, nonceOptions);
+		response = await getTorznabManager().searchTorznab(query, nonceOptions);
 	} catch (e) {
 		logger.error(`error searching for ${query}`);
 		return 0;
@@ -126,25 +127,27 @@ async function findOnOtherSites(
 		(e) => e.assessment.decision === Decision.MATCH
 	);
 
-	pushNotifier.notify({
-		body: `Found ${searchee.name} on ${successful.length} trackers${
-			successful.length
-				? // @ts-expect-error ListFormat totally exists in node 12
-				  `: ${new Intl.ListFormat("en", {
-						style: "long",
-						type: "conjunction",
-				  }).format(successful.map((s) => s.tracker))}`
-				: ""
-		}`,
-		extra: {
-			infoHashes: successful.map((s) => s.assessment.info.infoHash),
-			trackers: successful.map((s) => s.tracker),
-		},
-	});
+	if (successful.length) {
+		const name = searchee.name;
+		const numTrackers = successful.length;
+		const infoHashes = successful.map(
+			(s) => s.assessment.metafile.infoHash
+		);
+		const trackers = successful.map((s) => s.tracker);
+		// @ts-expect-error Intl.ListFormat totally exists on node 12
+		const trackersListStr = new Intl.ListFormat("en", {
+			style: "long",
+			type: "conjunction",
+		}).format(trackers);
+		pushNotifier.notify({
+			body: `Found ${name} on ${numTrackers} trackers: ${trackersListStr}`,
+			extra: { infoHashes, trackers },
+		});
+	}
 
 	for (const { tracker, assessment } of successful) {
 		const { isTorrentIncomplete } = await performAction(
-			assessment.info,
+			assessment.metafile,
 			searchee,
 			tracker,
 			nonceOptions,
@@ -153,35 +156,35 @@ async function findOnOtherSites(
 		if (isTorrentIncomplete) return successful.length;
 	}
 
-	updateSearchTimestamps(searchee.name);
+	await updateSearchTimestamps(searchee.name);
 	return successful.length;
 }
 
-function updateSearchTimestamps(name: string): void {
-	if (db.data.searchees[name]) {
-		db.data.searchees[name].lastSearched = Date.now();
-	} else {
-		db.data.searchees[name] = {
-			firstSearched: Date.now(),
-			lastSearched: Date.now(),
-		};
-	}
-	db.write();
+async function updateSearchTimestamps(name: string): Promise<void> {
+	await db.transaction(async (trx) => {
+		const now = Date.now();
+		const entry = await trx("searchee").where({ name }).first();
+
+		await trx("searchee")
+			.where({ name })
+			.update({
+				last_searched: now,
+				first_searched: entry?.first_searched ? undefined : now,
+			});
+	});
 }
 
 async function findMatchesBatch(
 	samples: Searchee[],
 	hashesToExclude: string[]
 ) {
-	const { delay, offset } = getRuntimeConfig();
+	const { delay } = getRuntimeConfig();
 
 	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
 		const sleep = new Promise((r) => setTimeout(r, delay * 1000));
 
-		const progress = chalk.blue(
-			`[${i + 1 + offset}/${samples.length + offset}]`
-		);
+		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
 		const name = stripExtension(sample.name);
 		logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
@@ -197,7 +200,7 @@ export async function searchForLocalTorrentByCriteria(
 	nonceOptions: NonceOptions
 ): Promise<number> {
 	const meta = await getTorrentByCriteria(criteria);
-	const hashesToExclude = getInfoHashesToExclude();
+	const hashesToExclude = await getInfoHashesToExclude();
 	if (!filterByContent(meta)) return null;
 	return findOnOtherSites(meta, hashesToExclude, nonceOptions);
 }
@@ -210,14 +213,21 @@ export async function checkNewCandidateMatch(
 		meta = await getTorrentByCriteria({ name: candidate.name });
 	} catch (e) {
 		logger.verbose({
-			label: Label.SERVER,
+			label: Label.REVERSE_LOOKUP,
 			message: `Did not find an existing entry for ${candidate.name}`,
 		});
 		return false;
 	}
-	const hashesToExclude = getInfoHashesToExclude();
+	const hashesToExclude = await getInfoHashesToExclude();
 	if (!filterByContent(meta)) return false;
 	const searchee = createSearcheeFromMetafile(meta);
+
+	// make sure searchee is in database
+	await db("searchee")
+		.insert({ name: searchee.name })
+		.onConflict("name")
+		.ignore();
+
 	const assessment: ResultAssessment = await assessCandidate(
 		candidate,
 		searchee,
@@ -227,7 +237,7 @@ export async function checkNewCandidateMatch(
 	if (assessment.decision !== Decision.MATCH) return false;
 
 	const { isTorrentIncomplete } = await performAction(
-		meta,
+		assessment.metafile,
 		searchee,
 		candidate.tracker,
 		EmptyNonceOptions,
@@ -237,7 +247,7 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { offset, torrents } = getRuntimeConfig();
+	const { torrents } = getRuntimeConfig();
 	let parsedTorrents: Searchee[];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
@@ -251,32 +261,55 @@ async function findSearchableTorrents() {
 	const hashesToExclude = parsedTorrents
 		.map((t) => t.infoHash)
 		.filter(Boolean);
-	const filteredTorrents = filterDupes(parsedTorrents)
-		.filter(filterByContent)
-		.filter(filterTimestamps);
-	const samples = filteredTorrents.slice(offset);
-
-	logger.info(
-		"Found %d torrents, %d suitable to search for matches",
-		parsedTorrents.length,
-		filteredTorrents.length
+	const filteredTorrents = await filterAsync(
+		filterDupes(parsedTorrents).filter(filterByContent),
+		filterTimestamps
 	);
 
-	return { samples, hashesToExclude };
+	logger.info({
+		label: Label.SEARCH,
+		message: `Found ${parsedTorrents.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
+	});
+
+	return { samples: filteredTorrents, hashesToExclude };
 }
 
 export async function main(): Promise<void> {
-	const { offset, outputDir } = getRuntimeConfig();
+	const { outputDir } = getRuntimeConfig();
 	const { samples, hashesToExclude } = await findSearchableTorrents();
-
-	if (offset > 0) logger.info(`Starting at offset ${offset}`);
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);
 
-	logger.info(
-		chalk.cyan("Done! Found %s cross seeds from %s original torrents"),
-		chalk.bold.white(totalFound),
-		chalk.bold.white(samples.length)
-	);
+	logger.info({
+		label: Label.SEARCH,
+		message: chalk.cyan(
+			`Found ${chalk.bold.white(
+				totalFound
+			)} cross seeds from ${chalk.bold.white(
+				samples.length
+			)} original torrents`
+		),
+	});
+}
+
+export async function scanRssFeeds() {
+	const candidates = await getTorznabManager().searchTorznab("");
+	logger.verbose({
+		label: Label.RSS,
+		message: `Scan returned ${candidates.length} results`,
+	});
+	logger.verbose({
+		label: Label.RSS,
+		message: "Indexing new torrents...",
+	});
+	await indexNewTorrents();
+	for (const [i, candidate] of candidates.entries()) {
+		logger.verbose({
+			label: Label.RSS,
+			message: `Processing release ${i + 1}/${candidates.length}`,
+		});
+		await checkNewCandidateMatch(candidate);
+	}
+	logger.info({ label: Label.RSS, message: "Scan complete" });
 }

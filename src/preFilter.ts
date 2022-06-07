@@ -1,18 +1,16 @@
 import { uniqBy } from "lodash-es";
 import path from "path";
 import { EP_REGEX, EXTENSIONS } from "./constants.js";
-import db from "./db.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { nMinutesAgo } from "./utils.js";
+import { db } from "./db.js";
+import { nMsAgo } from "./utils.js";
 
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 
 export function filterByContent(searchee: Searchee): boolean {
-	const { includeEpisodes, searchAll } = getRuntimeConfig();
-
-	if (searchAll) return true;
+	const { includeEpisodes, includeNonVideos } = getRuntimeConfig();
 
 	function logReason(reason): void {
 		logger.verbose({
@@ -21,20 +19,19 @@ export function filterByContent(searchee: Searchee): boolean {
 		});
 	}
 
-	if (
-		!includeEpisodes &&
-		searchee.files.length === 1 &&
-		EP_REGEX.test(searchee.files[0].name)
-	) {
+	const isSingleEpisodeTorrent =
+		searchee.files.length === 1 && EP_REGEX.test(searchee.files[0].name);
+
+	if (!includeEpisodes && isSingleEpisodeTorrent) {
 		logReason("it is a single episode");
 		return false;
 	}
 
-	const allVideos = searchee.files.every((file) =>
+	const allFilesAreVideos = searchee.files.every((file) =>
 		extensionsWithDots.includes(path.extname(file.name))
 	);
 
-	if (!allVideos) {
+	if (!includeNonVideos && !allFilesAreVideos) {
 		logReason("not all files are videos");
 		return false;
 	}
@@ -54,11 +51,15 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 	return filtered;
 }
 
-export function filterTimestamps(searchee: Searchee): boolean {
+export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-	const timestampData = db.data.searchees[searchee.name];
-	if (!timestampData) return true;
-	const { firstSearched, lastSearched } = timestampData;
+
+	const timestampDataSql = await db("searchee")
+		.where({ name: searchee.name })
+		.first();
+
+	if (!timestampDataSql) return true;
+	const { first_searched, last_searched } = timestampDataSql;
 	function logReason(reason) {
 		logger.verbose({
 			label: Label.PREFILTER,
@@ -66,19 +67,24 @@ export function filterTimestamps(searchee: Searchee): boolean {
 		});
 	}
 
-	if (excludeOlder && firstSearched < nMinutesAgo(excludeOlder)) {
+	if (
+		excludeOlder &&
+		first_searched &&
+		first_searched < nMsAgo(excludeOlder)
+	) {
 		logReason(
-			`its first search timestamp ${firstSearched} is older than ${excludeOlder} minutes ago`
+			`its first search timestamp ${first_searched} is older than ${excludeOlder} minutes ago`
 		);
 		return false;
 	}
 
 	if (
 		excludeRecentSearch &&
-		lastSearched > nMinutesAgo(excludeRecentSearch)
+		last_searched &&
+		last_searched > nMsAgo(excludeRecentSearch)
 	) {
 		logReason(
-			`its last search timestamp ${lastSearched} is newer than ${excludeRecentSearch} minutes ago`
+			`its last search timestamp ${last_searched} is newer than ${excludeRecentSearch} minutes ago`
 		);
 		return false;
 	}

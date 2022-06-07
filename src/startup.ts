@@ -1,6 +1,5 @@
 import { getClient } from "./clients/TorrentClient.js";
 import { CrossSeedError } from "./errors.js";
-import { validateJackettApi } from "./jackett.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { validateTorrentDir } from "./torrent.js";
@@ -22,7 +21,6 @@ export async function doStartupValidation(): Promise<void> {
 	const torznabManager = getTorznabManager();
 	await Promise.all<void>(
 		[
-			validateJackettApi(),
 			torznabManager.validateTorznabUrls(),
 			downloadClient?.validateConfig(),
 			validateTorrentDir(),

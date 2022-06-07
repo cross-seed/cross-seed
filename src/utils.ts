@@ -12,6 +12,8 @@ export enum MediaType {
 	OTHER = "unknown",
 }
 
+export const duration = (perfA, perfB) => (perfB - perfA).toFixed(0);
+
 export function stripExtension(filename: string): string {
 	for (const ext of EXTENSIONS) {
 		const re = new RegExp(`\\.${ext}$`);
@@ -20,10 +22,8 @@ export function stripExtension(filename: string): string {
 	return filename;
 }
 
-export function nMinutesAgo(n: number): number {
-	const date = new Date();
-	date.setMinutes(date.getMinutes() - n);
-	return date.getTime();
+export function nMsAgo(n: number): number {
+	return Date.now() - n;
 }
 
 export function wait(n: number): Promise<void> {
@@ -44,6 +44,15 @@ export type Result<T> = T | Error;
 
 export const ok = <T>(r: Result<T>): r is T => !(r instanceof Error);
 
+export async function time<R>(cb: () => R, times: number[]) {
+	const before = performance.now();
+	try {
+		return await cb();
+	} finally {
+		times.push(performance.now() - before);
+	}
+}
+
 export function cleanseSeparators(str: string): string {
 	return str
 		.replace(/[._()[\]]/g, " ")
@@ -63,3 +72,9 @@ export const tapLog = (value) => {
 	console.log(value);
 	return value;
 };
+
+export async function filterAsync(arr, predicate) {
+	const results = await Promise.all(arr.map(predicate));
+
+	return arr.filter((_, index) => results[index]);
+}

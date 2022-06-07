@@ -9,7 +9,7 @@ import {
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
 import { NonceOptions } from "./runtimeConfig.js";
-import { TorrentLocator } from "./torrent.js";
+import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 
 function getData(req): Promise<string> {
 	return new Promise((resolve) => {
@@ -35,9 +35,6 @@ function parseData(data) {
 	try {
 		if ("infoHash" in parsed) {
 			parsed.infoHash = parsed.infoHash.toLowerCase();
-		}
-		if ("trackers" in parsed && !Array.isArray(parsed.trackers)) {
-			parsed.trackers = [parsed.trackers];
 		}
 		if ("size" in parsed && typeof parsed.size === "string") {
 			parsed.size = Number(parsed.size);
@@ -67,7 +64,7 @@ async function search(
 		return;
 	}
 	const criteria: TorrentLocator = pick(data, ["infoHash", "name"]);
-	const nonceOptions: NonceOptions = pick(data, ["trackers", "outputDir"]);
+	const nonceOptions: NonceOptions = pick(data, ["outputDir"]);
 
 	if (!("infoHash" in criteria || "name" in criteria)) {
 		const message = "A name or info hash must be provided";
@@ -85,6 +82,8 @@ async function search(
 		label: Label.SERVER,
 		message: `Received search request: ${criteriaStr}`,
 	});
+
+	await indexNewTorrents();
 
 	try {
 		let numFound = null;
@@ -108,6 +107,7 @@ async function search(
 		}
 	} catch (e) {
 		logger.error(e);
+		logger.debug(e);
 	}
 }
 
@@ -154,6 +154,7 @@ async function announce(
 
 	const candidate = data as Candidate;
 	try {
+		await indexNewTorrents();
 		const result = await checkNewCandidateMatch(candidate);
 		if (result) {
 			logger.info({

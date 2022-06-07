@@ -3,29 +3,10 @@
 
 module.exports = {
 	/**
-	 * @deprecated use torznab instead
-	 */
-	jackettServerUrl: "http://localhost:9117/jackett",
-
-	/**
-	 * @deprecated use torznab instead
-	 */
-	jackettApiKey: "YOUR_JACKETT_API_KEY_HERE",
-
-	/**
 	 * Pause at least this much in between each Jackett search. Higher is safer.
 	 * 	It is not recommended to set this to less than 2 seconds.
 	 */
 	delay: 10,
-
-	/**
-	 * @deprecated use torznab instead
-	 * Trackers to search
-	 * Set to [] if you want to search all trackers.
-	 * Tracker ids can be found in their Torznab feed paths
-	 */
-	trackers: ["oink", "tehconnection"],
-
 	/**
 	 * List of Torznab urls.
 	 * The path should end in /api
@@ -53,10 +34,12 @@ module.exports = {
 	includeEpisodes: false,
 
 	/**
-	 * search for all torrents, regardless of their contents
-	 * this option overrides includeEpisodes.
+	 * Include torrents which contain non-video files
+	 * This option does not override includeEpisodes.
+	 * To search for everything except episodes, use (includeEpisodes: false, includeNonVideos: true)
+	 * To search for everything including episodes, use (includeEpisodes: true, includeNonVideos: true)
 	 */
-	searchAll: false,
+	includeNonVideos: false,
 
 	/**
 	 * fuzzy size match threshold
@@ -65,13 +48,22 @@ module.exports = {
 	fuzzySizeThreshold: 0.02,
 
 	/**
-	 * Exclude torrents first seen more than n minutes ago.
+	 * Exclude torrents first seen more than this long ago.
+	 * Format: https://github.com/vercel/ms
+	 * Examples:
+	 * "10min"
+	 * "2w"
+	 * "3 days"
 	 */
 	excludeOlder: undefined,
 
 	/**
 	 * Exclude torrents which have been searched
-	 * more recently than n minutes ago.
+	 * more recently than this long ago.
+	 * Examples:
+	 * "10min"
+	 * "2w"
+	 * "3 days"
 	 */
 	excludeRecentSearch: undefined,
 
@@ -107,4 +99,25 @@ module.exports = {
 	 * Listen on a custom port.
 	 */
 	port: 2468,
+
+	/**
+	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms
+	 * Set to undefined or null to disable. Minimum of 10 minutes.
+	 * Examples:
+	 * "10min"
+	 * "2w"
+	 * "3 days"
+	 */
+	rssCadence: undefined,
+
+	/**
+	 * Run searches on a schedule. Format: https://github.com/vercel/ms
+	 * Set to undefined or null to disable. Minimum of 1 day.
+	 * If you have RSS enabled, you won't need this to run often (2+ weeks recommended)
+	 * Examples:
+	 * "10min"
+	 * "2w"
+	 * "3 days"
+	 */
+	searchCadence: undefined,
 };

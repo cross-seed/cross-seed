@@ -3,7 +3,6 @@
   <component name="JavaScriptLibraryMappings">
     <file url="file://$PROJECT_DIR$" libraries="{cross-seed/node_modules}" />
     <file url="PROJECT" libraries="{cross-seed/node_modules}" />
-    <includedPredefinedLibrary name="Node.js Core" />
     <excludedPredefinedLibrary name="HTML" />
   </component>
 </project>

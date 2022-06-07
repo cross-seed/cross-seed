@@ -2,25 +2,26 @@
 import chalk from "chalk";
 import { Option, program } from "commander";
 import { createRequire } from "module";
+import ms from "ms";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
-import { dropDatabase } from "./db.js";
+import { jobsLoop } from "./jobs.js";
 import { diffCmd } from "./diff.js";
-import { CrossSeedError } from "./errors.js";
+import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main } from "./pipeline.js";
 import {
 	initializePushNotifier,
 	sendTestNotification,
 } from "./pushNotifier.js";
-import { setRuntimeConfig } from "./runtimeConfig.js";
+import { RuntimeConfig, setRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
+import { db } from "./db.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
-
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
@@ -31,8 +32,23 @@ function fallback(...args) {
 	return undefined;
 }
 
-function processOptions(options) {
-	options.trackers = options.trackers?.split(",").filter((e) => e !== "");
+function processOptions(options): RuntimeConfig {
+	if (options.rssCadence) {
+		options.rssCadence = Math.max(ms(options.rssCadence), ms("10 minutes"));
+	}
+	if (options.searchCadence) {
+		options.searchCadence = Math.max(
+			ms(options.searchCadence),
+			ms("1 day")
+		);
+	}
+
+	if (options.excludeOlder) {
+		options.excludeOlder = ms(options.excludeOlder);
+	}
+	if (options.excludeRecentSearch) {
+		options.excludeRecentSearch = ms(options.excludeRecentSearch);
+	}
 	return options;
 }
 
@@ -42,21 +58,6 @@ function createCommandWithSharedOptions(name, description) {
 	return program
 		.command(name)
 		.description(description)
-		.option(
-			"-u, --jackett-server-url <url>",
-			"DEPRECATED: Your Jackett server url",
-			fileConfig.jackettServerUrl
-		)
-		.option(
-			"-k, --jackett-api-key <key>",
-			"DEPRECATED: Your Jackett API key",
-			fileConfig.jackettApiKey
-		)
-		.option(
-			"-t, --trackers <tracker1>,<tracker2>",
-			"DEPRECATED: Comma-separated list of Jackett tracker ids to search  (Tracker ids can be found in their Torznab feed paths)",
-			fallback(fileConfig.trackers?.join(","), "")
-		)
 		.option(
 			"-T, --torznab <urls...>",
 			"Torznab urls with apikey included (separated by spaces)",
@@ -73,9 +74,9 @@ function createCommandWithSharedOptions(name, description) {
 			fileConfig.outputDir
 		)
 		.requiredOption(
-			"-a, --search-all",
-			"Search for all torrents regardless of their contents",
-			fallback(fileConfig.searchAll, false)
+			"--include-non-videos",
+			"Include torrents which contain non-video files",
+			fallback(fileConfig.includeNonVideos, false)
 		)
 		.option(
 			"-e, --include-episodes",
@@ -90,13 +91,11 @@ function createCommandWithSharedOptions(name, description) {
 		.option(
 			"-x, --exclude-older <cutoff>",
 			"Exclude torrents first seen more than n minutes ago. Bypasses the -a flag.",
-			(n) => parseInt(n),
 			fileConfig.excludeOlder
 		)
 		.option(
 			"-r, --exclude-recent-search <cutoff>",
 			"Exclude torrents which have been searched more recently than n minutes ago. Bypasses the -a flag.",
-			(n) => parseInt(n),
 			fileConfig.excludeRecentSearch
 		)
 		.requiredOption("-v, --verbose", "Log verbose output", false)
@@ -123,6 +122,12 @@ function createCommandWithSharedOptions(name, description) {
 			"--notification-webhook-url <url>",
 			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
 			fileConfig.notificationWebhookUrl
+		)
+		.requiredOption(
+			"-d, --delay <delay>",
+			"Pause duration (seconds) between searches",
+			parseFloat,
+			fallback(fileConfig.delay, 10)
 		);
 }
 
@@ -148,7 +153,9 @@ program
 program
 	.command("clear-cache")
 	.description("Clear the cache of downloaded-and-rejected torrents")
-	.action(dropDatabase);
+	.action(async () => {
+		await db("decision").del();
+	});
 
 program
 	.command("test-notification")
@@ -189,6 +196,16 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 		(n) => parseInt(n),
 		fallback(fileConfig.port, 2468)
 	)
+	.option(
+		"--search-cadence <cadence>",
+		"Run searches on a schedule. Format: https://github.com/vercel/ms",
+		fileConfig.searchCadence
+	)
+	.option(
+		"--rss-cadence <cadence>",
+		"Run an rss scan on a schedule. Format: https://github.com/vercel/ms",
+		fileConfig.rssCadence
+	)
 	.action(async (options) => {
 		try {
 			const runtimeConfig = processOptions(options);
@@ -202,8 +219,10 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
+			await db.migrate.latest();
 			await doStartupValidation();
-			await serve(options.port);
+			serve(options.port);
+			jobsLoop();
 		} catch (e) {
 			if (e instanceof CrossSeedError) {
 				e.print();
@@ -215,18 +234,6 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	});
 
 createCommandWithSharedOptions("search", "Search for cross-seeds")
-	.requiredOption(
-		"-o, --offset <offset>",
-		"Offset to start from",
-		(n) => parseInt(n),
-		0
-	)
-	.requiredOption(
-		"-d, --delay <delay>",
-		"Pause duration (seconds) between searches",
-		parseFloat,
-		fallback(fileConfig.delay, 10)
-	)
 	.addOption(
 		new Option(
 			"--torrents <torrents...>",
@@ -246,15 +253,13 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			if (process.env.DOCKER_ENV === "true") {
 				generateConfig({ docker: true });
 			}
+
+			await db.migrate.latest();
 			await doStartupValidation();
 			await main();
+			await db.destroy();
 		} catch (e) {
-			if (e instanceof CrossSeedError) {
-				e.print();
-				process.exitCode = 1;
-				return;
-			}
-			throw e;
+			exitOnCrossSeedErrors(e);
 		}
 	});
 

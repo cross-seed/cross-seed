@@ -25,12 +25,14 @@
 	"license": "Apache-2.0",
 	"dependencies": {
 		"bencode": "^2.0.1",
+		"better-sqlite3": "^7.5.0",
 		"chalk": "^5.0.0",
 		"commander": "^8.3.0",
 		"fetch-blob": "^3.1.4",
 		"formdata-polyfill": "^4.0.10",
+		"knex": "^1.0.4",
 		"lodash-es": "^4.17.21",
-		"lowdb": "^3.0.0",
+		"ms": "^2.1.3",
 		"node-fetch": "^3.2.0",
 		"parse-torrent": "^9.1.3",
 		"rimraf": "^3.0.2",
@@ -51,7 +53,7 @@
 		"husky": "^7.0.0",
 		"lint-staged": "^12.1.4",
 		"prettier": "^2.0.5",
-		"typescript": "^4.6.0-dev.20211227"
+		"typescript": "^4.7.0-dev.20220425"
 	},
 	"prettier": {
 		"tabWidth": 4,
