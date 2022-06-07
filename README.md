@@ -17,11 +17,10 @@ files to a folder you specify. After that, I recommend using
 [AutoTorrent](https://github.com/JohnDoee/autotorrent) to do the last-mile
 delivery into your client.
 
-## Breaking changes in cross-seed v4
+## 🚨🚨🚨 Breaking changes in cross-seed v4 🚨🚨🚨
 
-Head on over to
-https://github.com/mmgoodnow/cross-seed/pull/246#issue-1242541211 to see the
-changes.
+Head on over to https://github.com/mmgoodnow/cross-seed/wiki/v4-Migration-Guide
+to see the steps required for migration.
 
 ## Requirements
 
