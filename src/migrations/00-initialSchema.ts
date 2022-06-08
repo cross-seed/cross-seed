@@ -1,3 +1,4 @@
+import { uniqBy } from "lodash-es";
 import Knex from "knex";
 import { getCacheFileData, renameCacheFile } from "../cache.js";
 
@@ -61,11 +62,13 @@ async function up(knex: Knex.Knex): Promise<void> {
 						: [];
 				})
 		);
-		const torrentRows = cacheData.indexedTorrents.map((e) => ({
-			info_hash: e.infoHash,
-			name: e.name,
-			file_path: e.filepath,
-		}));
+		const torrentRows = uniqBy(cacheData.indexedTorrents, "file_path").map(
+			(e) => ({
+				info_hash: e.infoHash,
+				name: e.name,
+				file_path: e.filepath,
+			})
+		);
 		await trx.batchInsert("decision", normalizedDecisions, chunkSize);
 		await trx.batchInsert("torrent", torrentRows, chunkSize);
 	});
