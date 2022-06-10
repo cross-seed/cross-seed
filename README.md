@@ -14,7 +14,7 @@ Currently the supported clients are
 
 If your client isn't supported, `cross-seed` will download a bunch of torrent
 files to a folder you specify. After that, I recommend using
-[AutoTorrent](https://github.com/JohnDoee/autotorrent) to do the last-mile
+[AutoTorrent2](https://github.com/JohnDoee/autotorrent2) to do the last-mile
 delivery into your client.
 
 ## 🚨🚨🚨 Breaking changes in cross-seed v4 🚨🚨🚨
