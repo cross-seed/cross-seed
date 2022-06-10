@@ -119,6 +119,11 @@ function createCommandWithSharedOptions(name, description) {
 			fileConfig.qbittorrentUrl
 		)
 		.option(
+			"--duplicate-categories",
+			"Create and inject using categories with the same save paths as your normal categories",
+			fileConfig.duplicateCategories
+		)
+		.option(
 			"--notification-webhook-url <url>",
 			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
 			fileConfig.notificationWebhookUrl

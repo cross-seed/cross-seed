@@ -14,6 +14,7 @@ export interface RuntimeConfig {
 	action: Action;
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
+	duplicateCategories: boolean;
 	notificationWebhookUrl: string;
 	torrents: string[];
 	port: number;

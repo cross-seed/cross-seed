@@ -263,6 +263,7 @@ export default class QBittorrent implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee
 	): Promise<InjectionResult> {
+		const { duplicateCategories } = getRuntimeConfig();
 		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
@@ -274,7 +275,10 @@ export default class QBittorrent implements TorrentClient {
 			const { save_path, isComplete, autoTMM, category } =
 				await this.getTorrentConfiguration(searchee);
 
-			const newCategoryName = await this.setUpCrossSeedCategory(category);
+			const newCategoryName = duplicateCategories
+				? await this.setUpCrossSeedCategory(category)
+				: category;
+
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
 			const shouldManuallyEnforceContentLayout =
