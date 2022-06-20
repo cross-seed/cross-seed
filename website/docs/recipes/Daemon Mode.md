@@ -1,3 +1,8 @@
+---
+id: daemon
+title: Daemon Mode
+---
+
 `cross-seed` has a beta feature called daemon mode. I recommend using
 [[Docker]].
 

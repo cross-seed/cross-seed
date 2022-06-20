@@ -1,5 +1,7 @@
-**A basic install guide for Unraid.** To install in Unraid the easiest set up
-will be to use the Community Applications App found
+# Unraid
+
+To install in Unraid the easiest set up will be to use the Community
+Applications App found
 [here](https://forums.unraid.net/topic/38582-plug-in-community-applications/).
 Once the app is installed go to the app tab and search cross-seed, hit enter and
 you should get no results then hit the Click Here To Get More Results From

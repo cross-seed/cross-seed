@@ -1,3 +1,8 @@
+---
+id: injection
+title: Injection
+---
+
 If you use rTorrent or qBittorrent, `cross-seed` can inject the torrents it
 finds directly into your torrent client. All you have to do is pass two command
 line flags:

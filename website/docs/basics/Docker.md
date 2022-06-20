@@ -1,3 +1,8 @@
+---
+id: docker
+title: Docker
+---
+
 `cross-seed` is a pretty standard Node command-line app, so it's pretty
 straightforward to run it with Docker.
 

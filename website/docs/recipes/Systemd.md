@@ -1,3 +1,8 @@
+---
+id: systemd
+title: systemd
+---
+
 ```
 [Unit]
 Description=Cross Seed Search Daemon

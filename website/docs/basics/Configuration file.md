@@ -1,4 +1,6 @@
 ---
+id: config
+title: Configuration File
 ---
 
 `cross-seed` will look for a configuration file at `~/.cross-seed/config.js`
