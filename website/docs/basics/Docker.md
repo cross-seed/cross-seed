@@ -32,12 +32,3 @@ services:
 The first time you run `cross-seed` in a Docker container, it will automatically
 create a configuration file at `/config/config.js`. To modify it, map the
 `/config` directory and open the file in the editor of your choice.
-
-## Running periodically
-
-I don't really recommend running `cross-seed search` on a schedule as it makes
-quite a lot of requests to trackers through Jackett. I recommend using Daemon
-Mode instead. If you can't use Daemon mode because you use a different client
-than rTorrent, feel free to
-[open an issue](https://github.com/mmgoodnow/cross-seed/issues/new) or a pull
-request and I'll take a look.

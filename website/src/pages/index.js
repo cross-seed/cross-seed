@@ -16,7 +16,7 @@ function HomepageHeader() {
 				<div className={styles.buttons}>
 					<Link
 						className="button button--secondary button--lg"
-						to="/docs/basics/installation"
+						to="/docs/basics/getting-started"
 					>
 						cross-seed Tutorial - 5 minutes ⏱️
 					</Link>
