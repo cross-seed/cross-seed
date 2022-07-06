@@ -3,6 +3,9 @@ id: options
 title: Options
 ---
 
+[pr]:
+	https://github.com/mmgoodnow/cross-seed/tree/master/website/docs/basics/options.md
+
 `cross-seed` has several program options, which can either be specified on the
 command line or in a configuration file. The priority is shown below.
 
@@ -135,49 +138,120 @@ cross-seed daemon -d 5
 delay: 20,
 ```
 
-### `torznab`
+### `torznab`\*
 
-| Config file name | CLI short form | CLI Long form       | Format             | Default |
-| ---------------- | -------------- | ------------------- | ------------------ | ------- |
-| `torznab`        | `-d <value>`   | `--torznab <value>` | `number` (seconds) | `10`    |
+| Config file name | CLI short form | CLI Long form         | Format     | Default           |
+| ---------------- | -------------- | --------------------- | ---------- | ----------------- |
+| `torznab`        | `-T <urls...>` | `--torznab <urls...>` | `string[]` | `[]` (empty list) |
 
-When running a search with `cross-seed search` or using `searchCadence` in
-daemon mode, the `torznab` option lets you set how long you want `cross-seed` to
-sleep in between searching for each torrent. If you set it higher, it will
-smooth out load on your indexers, but if you set it lower, `cross-seed` will run
-faster. I don't recommend setting this lower than 2, as it could garner you
-unwanted attention from tracker staff.
+List of Torznab URLs. You can use Jackett, Prowlarr, or indexer built-in Torznab
+implementations.
+
+:::caution
+
+```
+http://localhost:9117/p/a/t/h?query=string
+└────────host───────┘└─path─┘└───query───┘
+```
+
+The **path** of each URL should end in `/api`.
+
+:::
+
+#### Finding your Torznab URLs
+
+For [Prowlarr](https://github.com/Prowlarr/Prowlarr), click **(i)** and copy the
+**Torznab Url**, then append `?apikey=YOUR_PROWLARR_API_KEY`.
+
+For [Jackett](https://github.com/Jackett/Jackett), click **Copy RSS feed**.
+
+:::note
+
+This works because in Torznab, "RSS feeds" are just a search for the first page
+of unfiltered (no search query) results from the indexer.
+
+:::
 
 #### `torznab` Examples (CLI)
 
 ```shell
-cross-seed search -d 10
-cross-seed search --torznab 3
-cross-seed daemon -d 5
+cross-seed search --torznab https://localhost/prowlarr/1/api?apikey=12345
+cross-seed search -T http://prowlarr:9696/1/api?apikey=12345 http://prowlarr:9696/2/api?apikey=12345
+cross-seed search -T http://jackett:9117/api/v2.0/indexers/oink/results/torznab/api?apikey=12345
 ```
 
 #### `torznab` Examples (Config file)
 
 ```js
-torznab: 20,
+torznab: ["https://localhost/prowlarr/1/api?apikey=12345"],
+
+torznab: [
+	"http://prowlarr:9696/1/api?apikey=12345",
+    "http://prowlarr:9696/2/api?apikey=12345"
+],
+
+torznab: ["http://jackett:9117/api/v2.0/indexers/oink/results/torznab/api?apikey=12345"],
 ```
 
-### Table
+### `torrentDir`\*
 
-| option                   | short form | type                                                               | default | description                                                                                                                                                                                               |
-| ------------------------ | ---------- | ------------------------------------------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `torznab`                | `-T`       | `string[]`                                                         |         | List of Torznab urls. The **path** part should end in `/api`. For Jackett, click **Copy RSS feed**. For Prowlarr, click **(i)** and copy the **Torznab Url**, then append `?apikey=YOUR_PROWLARR_API_KEY` |
-| `torrentDir`             | `-i`       | `string`                                                           |         | directory containing torrent files. For rtorrent, this is your session directory as configured in your .rtorrent.rc file. For deluge, this is ~/.config/deluge/state.                                     |
-| `outputDir`              | `-o`       | `string`                                                           |         | directory to put the torrent files that cross-seed finds for you                                                                                                                                          |
-| `includeEpisodes`        | `-e`       | `boolean`                                                          |         | Set this to `true` to include single episode torrents in the search (which are ignored by default)                                                                                                        |
-| `includeNonVideos`       |            | `boolean`                                                          |         | Include torrents which contain non-video files                                                                                                                                                            |
-| `fuzzySizeThreshold`     |            | `number` from 0 to 1                                               | `0.02`  | Increase this number to reject fewer torrents based on size.                                                                                                                                              |
-| `excludeOlder`           | `-x`       | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Exclude torrents first searched more than this long ago.                                                                                                                                                  |
-| `excludeRecentSearch`    | `-r`       | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Exclude torrents which have been searched more recently than this long ago.                                                                                                                               |
-| `action`                 | `-A`       | `save` or `inject`                                                 | `save`  | `cross-seed` can either save the found cross-seeds, or inject them into your client. If you use `inject`, you need to set up one of the below clients.                                                    |
-| `rtorrentRpcUrl`         |            | `string`                                                           |         | The url of your rtorrent XMLRPC interface. Only relevant with `action: "inject"`. Often ends in `/RPC2`. Credentials format: `http://username:password@localhost/rutorrent/RPC2`                          |
-| `qbittorrentUrl`         |            | `string`                                                           |         | The url of your qBittorrent webui. Only relevant with `action: "inject"`. Credentials format: `http://username:password@localhost:8080`                                                                   |
-| `notificationWebhookUrl` |            | `string`                                                           |         | `cross-seed` will send POST requests to this url with a JSON payload of `{ title, body }`. Conforms to the `caronc/apprise` REST API.                                                                     |
-| `port`                   | `-p`       | `number`                                                           | `2468`  | Listen on a custom port.                                                                                                                                                                                  |
-| `rssCadence`             |            | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Run rss scans on a schedule. Set to undefined or null to disable. Minimum of 10 minutes.                                                                                                                  |
-| `searchCadence`          |            | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Run searches on a schedule. Set to undefined or null to disable. Minimum of 1 day. If you have RSS enabled, you won't need to run this often (2+ weeks recommended)                                       |
+| Config file name | CLI short form | CLI Long form         | Format   | Default |
+| ---------------- | -------------- | --------------------- | -------- | ------- |
+| `torrentDir`     | `-i <dir>`     | `--torrent-dir <dir>` | `string` |         |
+
+Point this at a directory containing torrent files. If you don't know where your
+torrent client stores its files, the table below might help.
+
+:::caution Docker users
+
+Leave the `torrentDir` as `/torrents` and use Docker to map your directory to
+`/torrents`.
+
+:::
+
+| Client           | Linux                                                | Windows                                              | Mac                                                  |
+| ---------------- | ---------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- |
+| **rTorrent**     | your session directory as configured in .rtorrent.rc | your session directory as configured in .rtorrent.rc | your session directory as configured in .rtorrent.rc |
+| **Deluge**       | `/home/<username>/.config/deluge/state`              | Unknown (please submit a [PR][pr]!)                  | Unknown (please submit a [PR][pr]!)                  |
+| **Transmission** | `/home/<username>/.config/transmission/torrents`     | Unknown (please submit a [PR][pr]!)                  | Unknown (please submit a [PR][pr]!)                  |
+| **qBittorrent**  | `/home/<username>/.local/share/data/qBittorrent`     | `C:\Users\<username>\AppData\Local\qBittorrent`      | `~/Library/Application Support/qBittorrent`          |
+
+#### `torznab` Examples (CLI)
+
+```shell
+cross-seed search --torznab https://localhost/prowlarr/1/api?apikey=12345
+cross-seed search -T http://prowlarr:9696/1/api?apikey=12345 http://prowlarr:9696/2/api?apikey=12345
+cross-seed search -T http://jackett:9117/api/v2.0/indexers/oink/results/torznab/api?apikey=12345
+```
+
+#### `torznab` Examples (Config file)
+
+```js
+torznab: ["https://localhost/prowlarr/1/api?apikey=12345"],
+
+torznab: [
+	"http://prowlarr:9696/1/api?apikey=12345",
+    "http://prowlarr:9696/2/api?apikey=12345"
+],
+
+torznab: ["http://jackett:9117/api/v2.0/indexers/oink/results/torznab/api?apikey=12345"],
+```
+
+## Table
+
+| option                   | short form | type                                                               | default | description                                                                                                                                                                      |
+| ------------------------ | ---------- | ------------------------------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `torrentDir`             | `-i`       | `string`                                                           |         | directory containing torrent files. For rtorrent, this is your session directory as configured in your .rtorrent.rc file. For deluge, this is ~/.config/deluge/state.            |
+| `outputDir`              | `-o`       | `string`                                                           |         | directory to put the torrent files that cross-seed finds for you                                                                                                                 |
+| `includeEpisodes`        | `-e`       | `boolean`                                                          |         | Set this to `true` to include single episode torrents in the search (which are ignored by default)                                                                               |
+| `includeNonVideos`       |            | `boolean`                                                          |         | Include torrents which contain non-video files                                                                                                                                   |
+| `fuzzySizeThreshold`     |            | `number` from 0 to 1                                               | `0.02`  | Increase this number to reject fewer torrents based on size.                                                                                                                     |
+| `excludeOlder`           | `-x`       | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Exclude torrents first searched more than this long ago.                                                                                                                         |
+| `excludeRecentSearch`    | `-r`       | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Exclude torrents which have been searched more recently than this long ago.                                                                                                      |
+| `action`                 | `-A`       | `save` or `inject`                                                 | `save`  | `cross-seed` can either save the found cross-seeds, or inject them into your client. If you use `inject`, you need to set up one of the below clients.                           |
+| `rtorrentRpcUrl`         |            | `string`                                                           |         | The url of your rtorrent XMLRPC interface. Only relevant with `action: "inject"`. Often ends in `/RPC2`. Credentials format: `http://username:password@localhost/rutorrent/RPC2` |
+| `qbittorrentUrl`         |            | `string`                                                           |         | The url of your qBittorrent webui. Only relevant with `action: "inject"`. Credentials format: `http://username:password@localhost:8080`                                          |
+| `notificationWebhookUrl` |            | `string`                                                           |         | `cross-seed` will send POST requests to this url with a JSON payload of `{ title, body }`. Conforms to the `caronc/apprise` REST API.                                            |
+| `port`                   | `-p`       | `number`                                                           | `2468`  | Listen on a custom port.                                                                                                                                                         |
+| `rssCadence`             |            | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Run rss scans on a schedule. Set to undefined or null to disable. Minimum of 10 minutes.                                                                                         |
+| `searchCadence`          |            | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Run searches on a schedule. Set to undefined or null to disable. Minimum of 1 day. If you have RSS enabled, you won't need to run this often (2+ weeks recommended)              |
