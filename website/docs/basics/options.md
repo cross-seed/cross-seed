@@ -316,12 +316,76 @@ includeNonVideos: true,
 includeNonVideos: false,
 ```
 
+### `fuzzySizeThreshold` (experimental)
+
+| Config file name     | CLI short form | CLI Long form                    | Format                         | Default |
+| -------------------- | -------------- | -------------------------------- | ------------------------------ | ------- |
+| `fuzzySizeThreshold` |                | `--fuzzy-size-threshold <value>` | `number` (decimal from 0 to 1) | `0.02`  |
+
+Increase this number to reject fewer torrents based on size. There is no
+guarantee that it will increase your match rate.
+
+https://github.com/mmgoodnow/cross-seed/blob/port-docs-from-wiki/src/decide.ts#L70-L87
+
+:::caution
+
+This option has very limited utility and under normal operation, does not need
+to be modified.
+
+:::
+
+#### `fuzzySizeThreshold` Examples (CLI)
+
+```shell
+cross-seed search -d 10
+cross-seed search --fuzzy-size-threshold 3
+cross-seed daemon -d 5
+```
+
+#### `fuzzySizeThreshold` Examples (Config file)
+
+```js
+fuzzySizeThreshold: 20,
+```
+
+### `excludeOlder`
+
+| Config file name | CLI short form | CLI Long form             | Format                                                              | Default |
+| ---------------- | -------------- | ------------------------- | ------------------------------------------------------------------- | ------- |
+| `excludeOlder`   | `-x`           | `--exclude-older <value>` | `string` in the [ms](https://github.com/vercel/ms#examples) format) |         |
+
+When running a search of your `torrentDir`, exclude torrents first searched more
+than this long ago. This option is only relevant in `search` mode or in `daemon`
+mode with [`searchCadence`](#searchcadence) turned on.
+
+:::note
+
+excludeOlder will never exclude torrents that are completely new.
+
+:::
+
+#### `excludeOlder` Examples (CLI)
+
+```shell
+cross-seed search -x 10h # only search for torrents whose first search was less than 10 hours ago or never
+cross-seed search --exclude-older "3 days" # only search for torrents whose first search was less than 3 days ago or never
+cross-seed search -x 0s # only search for each torrent once ever
+```
+
+#### `excludeOlder` Examples (Config file)
+
+```js
+excludeOlder: "10 hours",
+
+excludeOlder: "3days",
+
+excludeOlder: "0s",
+```
+
 ## Table
 
 | option                   | short form | type                                                               | default | description                                                                                                                                                                      |
 | ------------------------ | ---------- | ------------------------------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fuzzySizeThreshold`     |            | `number` from 0 to 1                                               | `0.02`  | Increase this number to reject fewer torrents based on size.                                                                                                                     |
-| `excludeOlder`           | `-x`       | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Exclude torrents first searched more than this long ago.                                                                                                                         |
 | `excludeRecentSearch`    | `-r`       | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Exclude torrents which have been searched more recently than this long ago.                                                                                                      |
 | `action`                 | `-A`       | `save` or `inject`                                                 | `save`  | `cross-seed` can either save the found cross-seeds, or inject them into your client. If you use `inject`, you need to set up one of the below clients.                           |
 | `rtorrentRpcUrl`         |            | `string`                                                           |         | The url of your rtorrent XMLRPC interface. Only relevant with `action: "inject"`. Often ends in `/RPC2`. Credentials format: `http://username:password@localhost/rutorrent/RPC2` |
