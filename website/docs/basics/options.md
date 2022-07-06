@@ -209,39 +209,32 @@ Leave the `torrentDir` as `/torrents` and use Docker to map your directory to
 
 :::
 
-| Client           | Linux                                                | Windows                                              | Mac                                                  |
-| ---------------- | ---------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- |
-| **rTorrent**     | your session directory as configured in .rtorrent.rc | your session directory as configured in .rtorrent.rc | your session directory as configured in .rtorrent.rc |
-| **Deluge**       | `/home/<username>/.config/deluge/state`              | Unknown (please submit a [PR][pr]!)                  | Unknown (please submit a [PR][pr]!)                  |
-| **Transmission** | `/home/<username>/.config/transmission/torrents`     | Unknown (please submit a [PR][pr]!)                  | Unknown (please submit a [PR][pr]!)                  |
-| **qBittorrent**  | `/home/<username>/.local/share/data/qBittorrent`     | `C:\Users\<username>\AppData\Local\qBittorrent`      | `~/Library/Application Support/qBittorrent`          |
+| Client           | Linux                                                      | Windows                                                   | Mac                                                   |
+| ---------------- | ---------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------- |
+| **rTorrent**     | your session directory as configured in .rtorrent.rc       | your session directory as configured in .rtorrent.rc      | your session directory as configured in .rtorrent.rc  |
+| **Deluge**       | `/home/<username>/.config/deluge/state`                    | Unknown (please submit a [PR][pr]!)                       | Unknown (please submit a [PR][pr]!)                   |
+| **Transmission** | `/home/<username>/.config/transmission/torrents`           | Unknown (please submit a [PR][pr]!)                       | Unknown (please submit a [PR][pr]!)                   |
+| **qBittorrent**  | `/home/<username>/.local/share/data/qBittorrent/BT_backup` | `C:\Users\<username>\AppData\Local\qBittorrent\BT_backup` | `~/Library/Application Support/qBittorrent/BT_backup` |
 
-#### `torznab` Examples (CLI)
+#### `torrentDir` Examples (CLI)
 
 ```shell
-cross-seed search --torznab https://localhost/prowlarr/1/api?apikey=12345
-cross-seed search -T http://prowlarr:9696/1/api?apikey=12345 http://prowlarr:9696/2/api?apikey=12345
-cross-seed search -T http://jackett:9117/api/v2.0/indexers/oink/results/torznab/api?apikey=12345
+cross-seed search --torrent-dir ~/.config/deluge/state
+cross-seed search -i ~/.config/transmission/torrents
 ```
 
-#### `torznab` Examples (Config file)
+#### `torrentDir` Examples (Config file)
 
 ```js
-torznab: ["https://localhost/prowlarr/1/api?apikey=12345"],
+torrentDir: "/home/<username>/.config/deluge/state",
 
-torznab: [
-	"http://prowlarr:9696/1/api?apikey=12345",
-    "http://prowlarr:9696/2/api?apikey=12345"
-],
-
-torznab: ["http://jackett:9117/api/v2.0/indexers/oink/results/torznab/api?apikey=12345"],
+torrentDir: "/torrents",
 ```
 
 ## Table
 
 | option                   | short form | type                                                               | default | description                                                                                                                                                                      |
 | ------------------------ | ---------- | ------------------------------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `torrentDir`             | `-i`       | `string`                                                           |         | directory containing torrent files. For rtorrent, this is your session directory as configured in your .rtorrent.rc file. For deluge, this is ~/.config/deluge/state.            |
 | `outputDir`              | `-o`       | `string`                                                           |         | directory to put the torrent files that cross-seed finds for you                                                                                                                 |
 | `includeEpisodes`        | `-e`       | `boolean`                                                          |         | Set this to `true` to include single episode torrents in the search (which are ignored by default)                                                                               |
 | `includeNonVideos`       |            | `boolean`                                                          |         | Include torrents which contain non-video files                                                                                                                                   |
