@@ -360,7 +360,7 @@ mode with [`searchCadence`](#searchcadence) turned on.
 
 :::note
 
-excludeOlder will never exclude torrents that are completely new.
+`excludeOlder` will never exclude torrents that are completely new.
 
 :::
 
@@ -380,6 +380,32 @@ excludeOlder: "10 hours",
 excludeOlder: "3days",
 
 excludeOlder: "0s",
+```
+
+### `excludeRecentSearch`
+
+| Config file name      | CLI short form | CLI Long form                     | Format                                                              | Default |
+| --------------------- | -------------- | --------------------------------- | ------------------------------------------------------------------- | ------- |
+| `excludeRecentSearch` | `-r`           | `--exclude-recent-search <value>` | `string` in the [ms](https://github.com/vercel/ms#examples) format) |         |
+
+When running a search of your `torrentDir`, exclude torrents which have been
+searched more recently than this long ago. This option is only relevant in
+`search` mode or in `daemon` mode with [`searchCadence`](#searchcadence) turned
+on.
+
+#### `excludeRecentSearch` Examples (CLI)
+
+```shell
+cross-seed search -r 1day # only search for torrents that haven't been searched in the past day
+cross-seed search --exclude-recent-search "2 weeks" # only search for torrents that haven't been searched in the past 2 weeks
+```
+
+#### `excludeRecentSearch` Examples (Config file)
+
+```js
+excludeRecentSearch: "1 day",
+
+excludeRecentSearch: "2 weeks",
 ```
 
 ## Table
