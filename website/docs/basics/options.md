@@ -231,11 +231,44 @@ torrentDir: "/home/<username>/.config/deluge/state",
 torrentDir: "/torrents",
 ```
 
+### `outputDir`\*
+
+| Config file name | CLI short form | CLI Long form        | Format   | Default |
+| ---------------- | -------------- | -------------------- | -------- | ------- |
+| `outputDir`      | `-o <dir>`     | `--output-dir <dir>` | `string` |         |
+
+`cross-seed` will store the torrent files it finds in this directory. If you use
+[Injection](../recipes/injection) with **rTorrent**, you'll need to make sure
+rTorrent has access to this path also.
+
+:::caution Docker users
+
+Leave the `outputDir` as `/output` and use Docker to map your directory to
+`/output`.
+
+:::
+
+#### `outputDir` Examples (CLI)
+
+```shell
+cross-seed search -o .
+cross-seed search --output-dir /tmp/output
+```
+
+#### `outputDir` Examples (Config file)
+
+```js
+outputDir: "/output",
+
+outputDir: "/tmp/output",
+
+outputDir: ".",
+```
+
 ## Table
 
 | option                   | short form | type                                                               | default | description                                                                                                                                                                      |
 | ------------------------ | ---------- | ------------------------------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `outputDir`              | `-o`       | `string`                                                           |         | directory to put the torrent files that cross-seed finds for you                                                                                                                 |
 | `includeEpisodes`        | `-e`       | `boolean`                                                          |         | Set this to `true` to include single episode torrents in the search (which are ignored by default)                                                                               |
 | `includeNonVideos`       |            | `boolean`                                                          |         | Include torrents which contain non-video files                                                                                                                                   |
 | `fuzzySizeThreshold`     |            | `number` from 0 to 1                                               | `0.02`  | Increase this number to reject fewer torrents based on size.                                                                                                                     |
