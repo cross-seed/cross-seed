@@ -265,6 +265,58 @@ outputDir: "/tmp/output",
 outputDir: ".",
 ```
 
+### `includeEpisodes`
+
+| Config file name  | CLI short form | CLI Long form        | Format    | Default |
+| ----------------- | -------------- | -------------------- | --------- | ------- |
+| `includeEpisodes` | `-e`           | `--include-episodes` | `boolean` | `false` |
+
+Set this to `true` to include single episode torrents in the search (which are
+ignored by default).
+
+#### `includeEpisodes` Examples (CLI)
+
+```shell
+cross-seed search -e # will include episodes
+cross-seed search --include-episodes # will include episodes
+cross-seed search --no-include-episodes # will not include episodes
+cross-seed search # will not include episodes
+```
+
+#### `includeEpisodes` Examples (Config file)
+
+```js
+includeEpisodes: true,
+
+includeEpisodes: false,
+```
+
+### `includeEpisodes`
+
+| Config file name  | CLI short form | CLI Long form        | Format    | Default |
+| ----------------- | -------------- | -------------------- | --------- | ------- |
+| `includeEpisodes` | `-e`           | `--include-episodes` | `boolean` | `false` |
+
+Set this to `true` to include single episode torrents in the search (which are
+ignored by default).
+
+#### `includeEpisodes` Examples (CLI)
+
+```shell
+cross-seed search -e # will include episodes
+cross-seed search --include-episodes # will include episodes
+cross-seed search --no-include-episodes # will not include episodes
+cross-seed search # will not include episodes
+```
+
+#### `includeEpisodes` Examples (Config file)
+
+```js
+includeEpisodes: true,
+
+includeEpisodes: false,
+```
+
 ## Table
 
 | option                   | short form | type                                                               | default | description                                                                                                                                                                      |
