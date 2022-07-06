@@ -318,7 +318,7 @@ includeNonVideos: false,
 
 ### `fuzzySizeThreshold` (experimental)
 
-| Config file name     | CLI short form | CLI Long form                    | Format                         | Default |
+| Config file name     | CLI short form | CLI long form                    | Format                         | Default |
 | -------------------- | -------------- | -------------------------------- | ------------------------------ | ------- |
 | `fuzzySizeThreshold` |                | `--fuzzy-size-threshold <value>` | `number` (decimal from 0 to 1) | `0.02`  |
 
@@ -350,7 +350,7 @@ fuzzySizeThreshold: 20,
 
 ### `excludeOlder`
 
-| Config file name | CLI short form | CLI Long form             | Format                                                              | Default |
+| Config file name | CLI short form | CLI long form             | Format                                                              | Default |
 | ---------------- | -------------- | ------------------------- | ------------------------------------------------------------------- | ------- |
 | `excludeOlder`   | `-x`           | `--exclude-older <value>` | `string` in the [ms](https://github.com/vercel/ms#examples) format) |         |
 
@@ -384,7 +384,7 @@ excludeOlder: "0s",
 
 ### `excludeRecentSearch`
 
-| Config file name      | CLI short form | CLI Long form                     | Format                                                              | Default |
+| Config file name      | CLI short form | CLI long form                     | Format                                                              | Default |
 | --------------------- | -------------- | --------------------------------- | ------------------------------------------------------------------- | ------- |
 | `excludeRecentSearch` | `-r`           | `--exclude-recent-search <value>` | `string` in the [ms](https://github.com/vercel/ms#examples) format) |         |
 
@@ -408,12 +408,35 @@ excludeRecentSearch: "1 day",
 excludeRecentSearch: "2 weeks",
 ```
 
+### `action`
+
+| Config file name | CLI short form | CLI long form            | Format          | Default |
+| ---------------- | -------------- | ------------------------ | --------------- | ------- |
+| `action`         | `-A`           | `--action <save/inject>` | `save`/`inject` | `save`  |
+
+`cross-seed` can either save the found cross-seeds, or inject them into your
+client. If you use `inject`, you will need to set up your client. Read more in
+the [Injection tutorial](../recipes/injection).
+
+#### `action` Examples (CLI)
+
+```shell
+cross-seed search -A inject
+cross-seed search --action save
+```
+
+#### `action` Examples (Config file)
+
+```js
+action: "save",
+
+action: "inject",
+```
+
 ## Table
 
 | option                   | short form | type                                                               | default | description                                                                                                                                                                      |
 | ------------------------ | ---------- | ------------------------------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `excludeRecentSearch`    | `-r`       | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Exclude torrents which have been searched more recently than this long ago.                                                                                                      |
-| `action`                 | `-A`       | `save` or `inject`                                                 | `save`  | `cross-seed` can either save the found cross-seeds, or inject them into your client. If you use `inject`, you need to set up one of the below clients.                           |
 | `rtorrentRpcUrl`         |            | `string`                                                           |         | The url of your rtorrent XMLRPC interface. Only relevant with `action: "inject"`. Often ends in `/RPC2`. Credentials format: `http://username:password@localhost/rutorrent/RPC2` |
 | `qbittorrentUrl`         |            | `string`                                                           |         | The url of your qBittorrent webui. Only relevant with `action: "inject"`. Credentials format: `http://username:password@localhost:8080`                                          |
 | `notificationWebhookUrl` |            | `string`                                                           |         | `cross-seed` will send POST requests to this url with a JSON payload of `{ title, body }`. Conforms to the `caronc/apprise` REST API.                                            |
