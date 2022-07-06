@@ -195,7 +195,7 @@ torznab: ["http://jackett:9117/api/v2.0/indexers/oink/results/torznab/api?apikey
 
 ### `torrentDir`\*
 
-| Config file name | CLI short form | CLI Long form         | Format   | Default |
+| Config file name | CLI short form | CLI long form         | Format   | Default |
 | ---------------- | -------------- | --------------------- | -------- | ------- |
 | `torrentDir`     | `-i <dir>`     | `--torrent-dir <dir>` | `string` |         |
 
@@ -233,7 +233,7 @@ torrentDir: "/torrents",
 
 ### `outputDir`\*
 
-| Config file name | CLI short form | CLI Long form        | Format   | Default |
+| Config file name | CLI short form | CLI long form        | Format   | Default |
 | ---------------- | -------------- | -------------------- | -------- | ------- |
 | `outputDir`      | `-o <dir>`     | `--output-dir <dir>` | `string` |         |
 
@@ -267,7 +267,7 @@ outputDir: ".",
 
 ### `includeEpisodes`
 
-| Config file name  | CLI short form | CLI Long form        | Format    | Default |
+| Config file name  | CLI short form | CLI long form        | Format    | Default |
 | ----------------- | -------------- | -------------------- | --------- | ------- |
 | `includeEpisodes` | `-e`           | `--include-episodes` | `boolean` | `false` |
 
@@ -291,38 +291,35 @@ includeEpisodes: true,
 includeEpisodes: false,
 ```
 
-### `includeEpisodes`
+### `includeNonVideos`
 
-| Config file name  | CLI short form | CLI Long form        | Format    | Default |
-| ----------------- | -------------- | -------------------- | --------- | ------- |
-| `includeEpisodes` | `-e`           | `--include-episodes` | `boolean` | `false` |
+| Config file name   | CLI short form | CLI long form          | Format    | Default |
+| ------------------ | -------------- | ---------------------- | --------- | ------- |
+| `includeNonVideos` |                | `--include-non-videos` | `boolean` | `false` |
 
-Set this to `true` to include single episode torrents in the search (which are
-ignored by default).
+Set this to `true` to include torrents which contain non-video files (`.mp4`,
+`.avi`, `.mkv`) in the search (which are ignored by default).
 
-#### `includeEpisodes` Examples (CLI)
+#### `includeNonVideos` Examples (CLI)
 
 ```shell
-cross-seed search -e # will include episodes
-cross-seed search --include-episodes # will include episodes
-cross-seed search --no-include-episodes # will not include episodes
-cross-seed search # will not include episodes
+cross-seed search --include-non-videos # will include non-videos
+cross-seed search --no-include-non-videos # will not include non-videos
+cross-seed search # will not include non-videos
 ```
 
-#### `includeEpisodes` Examples (Config file)
+#### `includeNonVideos` Examples (Config file)
 
 ```js
-includeEpisodes: true,
+includeNonVideos: true,
 
-includeEpisodes: false,
+includeNonVideos: false,
 ```
 
 ## Table
 
 | option                   | short form | type                                                               | default | description                                                                                                                                                                      |
 | ------------------------ | ---------- | ------------------------------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `includeEpisodes`        | `-e`       | `boolean`                                                          |         | Set this to `true` to include single episode torrents in the search (which are ignored by default)                                                                               |
-| `includeNonVideos`       |            | `boolean`                                                          |         | Include torrents which contain non-video files                                                                                                                                   |
 | `fuzzySizeThreshold`     |            | `number` from 0 to 1                                               | `0.02`  | Increase this number to reject fewer torrents based on size.                                                                                                                     |
 | `excludeOlder`           | `-x`       | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Exclude torrents first searched more than this long ago.                                                                                                                         |
 | `excludeRecentSearch`    | `-r`       | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Exclude torrents which have been searched more recently than this long ago.                                                                                                      |
