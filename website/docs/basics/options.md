@@ -433,6 +433,41 @@ action: "save",
 action: "inject",
 ```
 
+### `rtorrentRpcUrl`
+
+| Config file name | CLI short form | CLI long form              | Format | Default |
+| ---------------- | -------------- | -------------------------- | ------ | ------- |
+| `rtorrentRpcUrl` |                | `--rtorrent-rpc-url <url>` | URL    |         |
+
+The url of your rtorrent XMLRPC interface. Only relevant with
+[Injection](../recipes/injection). Often ends in `/RPC2`.
+
+if you use **Sonarr** or **Radarr**, cross-seed is configured the same way.
+**ruTorrent** installations come with this endpoint configured but naked
+**rTorrent** does not provide this wrapper. If you don't use **ruTorrent**,
+you'll have to
+[set up the endpoint yourself](https://github.com/linuxserver/docker-rutorrent/issues/122#issuecomment-769009432)
+with a webserver.
+
+If you use HTTP Digest Auth on this endpoint (recommended), then you can provide
+credentials in the following format:
+`http://username:password@localhost/rutorrent/RPC2`
+
+#### `rtorrentRpcUrl` Examples (CLI)
+
+```shell
+cross-seed search --rtorrent-rpc-url http://rutorrent/rutorrent/RPC2
+cross-seed search --rtorrent-rpc-url http://user:pass@localhost:8080/RPC2
+```
+
+#### `rtorrentRpcUrl` Examples (Config file)
+
+```js
+rtorrentRpcUrl: "http://rutorrent/rutorrent/RPC2",
+
+rtorrentRpcUrl: "http://user:pass@localhost:8080/RPC2",
+```
+
 ## Table
 
 | option                   | short form | type                                                               | default | description                                                                                                                                                                      |
