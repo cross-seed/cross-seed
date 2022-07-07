@@ -5,6 +5,7 @@ title: Options
 
 [pr]:
 	https://github.com/mmgoodnow/cross-seed/tree/master/website/docs/basics/options.md
+[ms]: https://github.com/vercel/ms#examples
 
 `cross-seed` has several program options, which can either be specified on the
 command line or in a configuration file. The priority is shown below.
@@ -350,9 +351,9 @@ fuzzySizeThreshold: 20,
 
 ### `excludeOlder`
 
-| Config file name | CLI short form | CLI long form             | Format                                                              | Default |
-| ---------------- | -------------- | ------------------------- | ------------------------------------------------------------------- | ------- |
-| `excludeOlder`   | `-x`           | `--exclude-older <value>` | `string` in the [ms](https://github.com/vercel/ms#examples) format) |         |
+| Config file name | CLI short form | CLI long form             | Format                           | Default |
+| ---------------- | -------------- | ------------------------- | -------------------------------- | ------- |
+| `excludeOlder`   | `-x <value>`   | `--exclude-older <value>` | `string` in the [ms][ms] format) |         |
 
 When running a search of your `torrentDir`, exclude torrents first searched more
 than this long ago. This option is only relevant in `search` mode or in `daemon`
@@ -384,9 +385,9 @@ excludeOlder: "0s",
 
 ### `excludeRecentSearch`
 
-| Config file name      | CLI short form | CLI long form                     | Format                                                              | Default |
-| --------------------- | -------------- | --------------------------------- | ------------------------------------------------------------------- | ------- |
-| `excludeRecentSearch` | `-r`           | `--exclude-recent-search <value>` | `string` in the [ms](https://github.com/vercel/ms#examples) format) |         |
+| Config file name      | CLI short form | CLI long form                     | Format                           | Default |
+| --------------------- | -------------- | --------------------------------- | -------------------------------- | ------- |
+| `excludeRecentSearch` | `-r <value>`   | `--exclude-recent-search <value>` | `string` in the [ms][ms] format) |         |
 
 When running a search of your `torrentDir`, exclude torrents which have been
 searched more recently than this long ago. This option is only relevant in
@@ -410,9 +411,9 @@ excludeRecentSearch: "2 weeks",
 
 ### `action`
 
-| Config file name | CLI short form | CLI long form            | Format          | Default |
-| ---------------- | -------------- | ------------------------ | --------------- | ------- |
-| `action`         | `-A`           | `--action <save/inject>` | `save`/`inject` | `save`  |
+| Config file name | CLI short form     | CLI long form            | Format          | Default |
+| ---------------- | ------------------ | ------------------------ | --------------- | ------- |
+| `action`         | `-A <save/inject>` | `--action <save/inject>` | `save`/`inject` | `save`  |
 
 `cross-seed` can either save the found cross-seeds, or inject them into your
 client. If you use `inject`, you will need to set up your client. Read more in
@@ -496,13 +497,77 @@ qbittorrentUrl: "http://qbittorrent:8080/qbittorrent",
 qbittorrentUrl: "http://user:pass@localhost:8080",
 ```
 
+### `notificationWebhookUrl`
+
+| Config file name         | CLI short form | CLI long form                      | Format | Default |
+| ------------------------ | -------------- | ---------------------------------- | ------ | ------- |
+| `notificationWebhookUrl` |                | `--notification-webhook-url <url>` | URL    |         |
+
+`cross-seed` will send a POST request to this URL with an `application/json`
+payload of `{ title, body }`. This conforms to the wonderful
+[**apprise**](https://github.com/caronc/apprise-api) REST API.
+
+#### `notificationWebhookUrl` Examples (CLI)
+
+```shell
+cross-seed daemon --notification-webhook-url http://qbittorrent:8080/qbittorrent
+```
+
+#### `notificationWebhookUrl` Examples (Config file)
+
+```js
+notificationWebhookUrl: "http://apprise:8000/notify",
+```
+
+### `port`
+
+| Config file name | CLI short form | CLI long form   | Format   | Default |
+| ---------------- | -------------- | --------------- | -------- | ------- |
+| `port`           | `-p <port>`    | `--port <port>` | `number` | `2468`  |
+
+In [Daemon Mode](../recipes/daemon), cross-seed runs a webserver listening for a
+few types of HTTP requests. You can use this option to change the port it
+listens on.
+
+#### `port` Examples (CLI)
+
+```shell
+cross-seed daemon --port 3000
+cross-seed daemon -p 3000
+```
+
+#### `port` Examples (Config file)
+
+```js
+port: 3000,
+```
+
+### `rssCadence`
+
+| Config file name | CLI short form | CLI long form             | Format                          | Default |
+| ---------------- | -------------- | ------------------------- | ------------------------------- | ------- |
+| `rssCadence`     |                | `--rss-cadence <cadence>` | `string` in the [ms][ms] format |         |
+
+In [Daemon Mode](../recipes/daemon), with this option enabled, `cross-seed` will
+run periodic RSS searches on your configured indexers to check if any new
+uploads match torrents you already own.
+
+#### `port` Examples (CLI)
+
+```shell
+cross-seed daemon --port 3000
+cross-seed daemon -p 3000
+```
+
+#### `port` Examples (Config file)
+
+```js
+port: 3000,
+```
+
 ## Table
 
-| option                   | short form | type                                                               | default | description                                                                                                                                                                      |
-| ------------------------ | ---------- | ------------------------------------------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rtorrentRpcUrl`         |            | `string`                                                           |         | The url of your rtorrent XMLRPC interface. Only relevant with `action: "inject"`. Often ends in `/RPC2`. Credentials format: `http://username:password@localhost/rutorrent/RPC2` |
-| `qbittorrentUrl`         |            | `string`                                                           |         | The url of your qBittorrent webui. Only relevant with `action: "inject"`. Credentials format: `http://username:password@localhost:8080`                                          |
-| `notificationWebhookUrl` |            | `string`                                                           |         | `cross-seed` will send POST requests to this url with a JSON payload of `{ title, body }`. Conforms to the `caronc/apprise` REST API.                                            |
-| `port`                   | `-p`       | `number`                                                           | `2468`  | Listen on a custom port.                                                                                                                                                         |
-| `rssCadence`             |            | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Run rss scans on a schedule. Set to undefined or null to disable. Minimum of 10 minutes.                                                                                         |
-| `searchCadence`          |            | `string` in the [ms](https://github.com/vercel/ms#examples) format |         | Run searches on a schedule. Set to undefined or null to disable. Minimum of 1 day. If you have RSS enabled, you won't need to run this often (2+ weeks recommended)              |
+| option          | short form | type                            | default | description                                                                                                                                                         |
+| --------------- | ---------- | ------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rssCadence`    |            | `string` in the [ms][ms] format |         | Run rss scans on a schedule. Set to undefined or null to disable. Minimum of 10 minutes.                                                                            |
+| `searchCadence` |            | `string` in the [ms][ms] format |         | Run searches on a schedule. Set to undefined or null to disable. Minimum of 1 day. If you have RSS enabled, you won't need to run this often (2+ weeks recommended) |
