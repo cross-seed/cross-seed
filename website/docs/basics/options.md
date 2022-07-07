@@ -77,17 +77,17 @@ The configuration file uses JavaScript syntax, which means:
 | --------------------------------------------------- | ------------ |
 | [`delay`](#delay)                                   |              |
 | [`torznab`](#torznab)                               | **Required** |
-| [`torrentDir`](#torrentDir)                         | **Required** |
-| [`outputDir`](#outputDir)                           | **Required** |
-| [`includeEpisodes`](#includeEpisodes)               |              |
-| [`includeNonVideos`](#includeNonVideos)             |              |
-| [`fuzzySizeThreshold`](#fuzzySizeThreshold)         |              |
-| [`excludeOlder`](#excludeOlder)                     |              |
-| [`excludeRecentSearch`](#excludeRecentSearch)       |              |
+| [`torrentDir`](#torrentdir)                         | **Required** |
+| [`outputDir`](#outputdir)                           | **Required** |
+| [`includeEpisodes`](#includeepisodes)               |              |
+| [`includeNonVideos`](#includenonvideos)             |              |
+| [`fuzzySizeThreshold`](#fuzzysizethreshold)         |              |
+| [`excludeOlder`](#excludeolder)                     |              |
+| [`excludeRecentSearch`](#excluderecentsearch)       |              |
 | [`action`](#action)                                 |              |
-| [`rtorrentRpcUrl`](#rtorrentRpcUrl)                 |              |
-| [`qbittorrentUrl`](#qbittorrentUrl)                 |              |
-| [`notificationWebhookUrl`](#notificationWebhookUrl) |              |
+| [`rtorrentRpcUrl`](#rtorrentrpcurl)                 |              |
+| [`qbittorrentUrl`](#qbittorrenturl)                 |              |
+| [`notificationWebhookUrl`](#notificationwebhookurl) |              |
 
 ## Options used in `cross-seed daemon`
 
@@ -550,24 +550,66 @@ port: 3000,
 
 In [Daemon Mode](../recipes/daemon), with this option enabled, `cross-seed` will
 run periodic RSS searches on your configured indexers to check if any new
-uploads match torrents you already own.
+uploads match torrents you already own. Setting this option to `null`, or not
+specifying it at all, will disable the feature.
 
-#### `port` Examples (CLI)
+:::note
+
+There is a minimum cadence of `10 minutes`. I recommend keeping it at a
+relatively low number (10-30 mins) because if an indexer has a high frequency of
+new uploads, keeping the number low will make sure `cross-seed` gets a chance to
+see each new upload.
+
+:::
+
+#### `rssCadence` Examples (CLI)
 
 ```shell
-cross-seed daemon --port 3000
-cross-seed daemon -p 3000
+cross-seed daemon --rss-cadence 10min
 ```
 
-#### `port` Examples (Config file)
+#### `rssCadence` Examples (Config file)
 
 ```js
-port: 3000,
+rssCadence: null, // disable the RSS feature
+
+rssCadence: "10 minutes",
+
+rssCadence: "20min",
 ```
 
-## Table
+### `searchCadence`
 
-| option          | short form | type                            | default | description                                                                                                                                                         |
-| --------------- | ---------- | ------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rssCadence`    |            | `string` in the [ms][ms] format |         | Run rss scans on a schedule. Set to undefined or null to disable. Minimum of 10 minutes.                                                                            |
-| `searchCadence` |            | `string` in the [ms][ms] format |         | Run searches on a schedule. Set to undefined or null to disable. Minimum of 1 day. If you have RSS enabled, you won't need to run this often (2+ weeks recommended) |
+| Config file name | CLI short form | CLI long form                | Format                          | Default |
+| ---------------- | -------------- | ---------------------------- | ------------------------------- | ------- |
+| `searchCadence`  |                | `--search-cadence <cadence>` | `string` in the [ms][ms] format |         |
+
+In [Daemon Mode](../recipes/daemon), with this option enabled, `cross-seed` will
+run periodic searches of your torrents (respecting your `includeEpisodes`,
+`includeNonVideos`, `excludeOlder`, and `excludeRecentSearch` settings).
+
+:::tip
+
+If you have RSS and on-finished-download searches set up, you can run these
+**very infrequently** - on the order of dozens of weeks. There is a minimum of
+**1 day**.
+
+:::
+
+#### `rssCadence` Examples (CLI)
+
+```shell
+cross-seed daemon --search-cadence "2 weeks"
+cross-seed daemon --search-cadence "2w"
+
+```
+
+#### `rssCadence` Examples (Config file)
+
+```js
+searchCadence: null, // disable the periodic search feature
+
+searchCadence: "2w",
+
+searchCadence: "4 weeks",
+```
