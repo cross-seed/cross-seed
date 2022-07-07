@@ -439,10 +439,10 @@ action: "inject",
 | ---------------- | -------------- | -------------------------- | ------ | ------- |
 | `rtorrentRpcUrl` |                | `--rtorrent-rpc-url <url>` | URL    |         |
 
-The url of your rtorrent XMLRPC interface. Only relevant with
+The url of your **rTorrent** XMLRPC interface. Only relevant with
 [Injection](../recipes/injection). Often ends in `/RPC2`.
 
-if you use **Sonarr** or **Radarr**, cross-seed is configured the same way.
+If you use **Sonarr** or **Radarr**, cross-seed is configured the same way.
 **ruTorrent** installations come with this endpoint configured but naked
 **rTorrent** does not provide this wrapper. If you don't use **ruTorrent**,
 you'll have to
@@ -466,6 +466,34 @@ cross-seed search --rtorrent-rpc-url http://user:pass@localhost:8080/RPC2
 rtorrentRpcUrl: "http://rutorrent/rutorrent/RPC2",
 
 rtorrentRpcUrl: "http://user:pass@localhost:8080/RPC2",
+```
+
+### `qbittorrentUrl`
+
+| Config file name | CLI short form | CLI long form             | Format | Default |
+| ---------------- | -------------- | ------------------------- | ------ | ------- |
+| `qbittorrentUrl` |                | `--qbittorrent-url <url>` | URL    |         |
+
+The url of your **qBittorrent** Web UI. Only relevant with
+[Injection](../recipes/injection).
+
+**qBittorrent** doesn't use HTTP Basic/Digest Auth, but you can provide your
+**qBittorrent** credentials at the beginning of the URL like so:
+`http://username:password@localhost:8080/qbittorrent`
+
+#### `qbittorrentUrl` Examples (CLI)
+
+```shell
+cross-seed search --qbittorrent-url http://qbittorrent:8080/qbittorrent
+cross-seed search --qbittorrent-url http://user:pass@localhost:8080
+```
+
+#### `qbittorrentUrl` Examples (Config file)
+
+```js
+qbittorrentUrl: "http://qbittorrent:8080/qbittorrent",
+
+qbittorrentUrl: "http://user:pass@localhost:8080",
 ```
 
 ## Table
