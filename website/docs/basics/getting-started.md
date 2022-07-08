@@ -99,10 +99,10 @@ strings in "quotation marks".
 
 :::
 
-The only **required** options are [`torznab`](options#torznab),
-[`torrentDir`](options#torrentdir), and [`outputDir`](options#outputdir) (see
-links for details). Once you've configured those, you can try running the app
-with
+The only **required** options are [`torznab`](../reference/options.md#torznab),
+[`torrentDir`](../reference/options.md#torrentdir), and
+[`outputDir`](../reference/options.md#outputdir) (see links for details). Once
+you've configured those, you can try running the app with
 
 ```shell
 cross-seed search
@@ -144,9 +144,9 @@ services:
 When you run the container the first time, it will create a config file at
 `/config/config.js`. Open this file in your favorite editor. Since you've
 already configured your volume mappings, the only required config option is
-[`torznab`](options#torznab). Once you've got that set up, you can run your
-Docker container and it should get started running through a full scan of your
-torrent directory!
+[`torznab`](../reference/options.md#torznab). Once you've got that set up, you
+can run your Docker container and it should get started running through a full
+scan of your torrent directory!
 
 ## Next Steps
 
@@ -161,5 +161,7 @@ torrent directory!
 If you're satisfied by just running `cross-seed search` every once in a while,
 and then using [`autotorrent2`][at2] to inject these into your client, then
 you're done!
+
+If you want to learn more about fully-automatic cross-seeding, keep reading.
 
 [at2]: https://github.com/JohnDoee/autotorrent2
