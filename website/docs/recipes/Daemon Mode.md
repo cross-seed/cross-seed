@@ -156,6 +156,37 @@ Once attached, you can detach with `ctrl-A, D`.
 
 ## Set up automatic searches for finished downloads
 
+The most powerful feature of Daemon Mode is the ability to search for
+cross-seeds as soon as a torrent finishes downloading. However, it requires some
+manual setup.
+
+### rTorrent
+
+For rTorrent, you'll have to edit your `.rtorrent.rc` file.
+
+1.  `cd` to the directory where `.rtorrent.rc` lives.
+2.  Create a file called `rtorrent-cross-seed.sh`. It should contain the
+    following contents:
+
+    ```shell
+    #!/bin/sh
+    curl -XPOST http://localhost:2468/api/webhook --data-urlencode 'name=$1'
+    ```
+
+3.  Run the following command (this will give rTorrent permission to execute
+    your script):
+
+    ```shell
+    chmod +x rtorrent-cross-seed.sh
+    ```
+
+4.  Run the following command (this will tell rTorrent to execute your script :
+    ```shell
+    echo 'method.set_key=event.download.finished,cross_seed,"execute={'`pwd`/rtorrent-cross-seed.sh',$d.name=}"' >> .rtorrent.rc
+    ```
+
+### qBittorrent
+
 ## How it works
 
 It starts an HTTP server, listening on port 2468. **_Don't expose this port to
