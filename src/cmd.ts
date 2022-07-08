@@ -263,4 +263,6 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 		}
 	});
 
+program.showHelpAfterError("(add --help for additional information)");
+
 await program.parseAsync();

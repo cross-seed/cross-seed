@@ -125,6 +125,9 @@ Docker container.
 -   `/output` - people sometimes use this as a watch folder. If you use
     [autotorrent2][at2] you can set it up to read from this folder.
 
+Create or open your existing `docker-compose.yml` file and add the `cross-seed`
+service:
+
 ```yaml
 version: "2.1"
 services:
