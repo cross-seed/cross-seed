@@ -3,10 +3,6 @@ id: options
 title: Options
 ---
 
-[pr]:
-	https://github.com/mmgoodnow/cross-seed/tree/master/website/docs/basics/options.md
-[ms]: https://github.com/vercel/ms#examples
-
 `cross-seed` has several program options, which can either be specified on the
 command line or in a configuration file. The priority is shown below.
 
@@ -613,3 +609,7 @@ searchCadence: "2w",
 
 searchCadence: "4 weeks",
 ```
+
+[pr]:
+	https://github.com/mmgoodnow/cross-seed/tree/master/website/docs/basics/options.md
+[ms]: https://github.com/vercel/ms#examples

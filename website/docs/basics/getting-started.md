@@ -49,16 +49,16 @@ To get started, we'll use the following command:
 
 ```shell
 # one liner
-cross-seed search -o . --torrents myTorrentFile.torrent --torznab https://localhost/prowlarr/1/api?apikey=12345
+cross-seed search --torrent-dir /path/to/dir/with/torrent/files --output-dir . --torznab https://localhost/prowlarr/1/api?apikey=12345
 # readable
 cross-seed search \
-  -o . \ # any directory
-  --torrents myTorrentFile.torrent \ # separated by spaces
+  --torrent-dir /path/to/dir/with/torrent/files \
+  -o . \ # any directory, cross-seed will put its output torrents here
   --torznab https://localhost/prowlarr/1/api?apikey=12345 # any valid torznab link, separated by spaces
 ```
 
 If you were lucky, you've already got your first cross-seed in your current
-directory! If not, don't worry, as we'll do the next run in bulk.
+directory!
 
 :::caution
 
@@ -99,6 +99,18 @@ strings in "quotation marks".
 
 :::
 
+The only **required** options are [`torznab`](options#torznab),
+[`torrentDir`](options#torrentdir), and [`outputDir`](options#outputdir) (see
+links for details). Once you've configured those, you can try running the app
+with
+
+```shell
+cross-seed search
+```
+
+With that command, `cross-seed` should get started running through a full scan
+of your torrent directory!
+
 ### with Docker
 
 #### Set up your container
@@ -111,7 +123,7 @@ Docker container.
 -   `/torrents` - your torrent input dir (usually set to your rtorrent session
     dir, or your qBittorrent BT_backup dir)
 -   `/output` - people sometimes use this as a watch folder. If you use
-    autotorrent2
+    [autotorrent2][at2] you can set it up to read from this folder.
 
 ```yaml
 version: "2.1"
@@ -122,21 +134,32 @@ services:
         user: 1000:1000 # optional but recommended
         volumes:
             - /path/to/config/folder:/config
-            - /path/to/rtorrent_sess:/torrents:ro
+            - /path/to/rtorrent_sess:/torrents:ro # note that this volume can and should be mounted read-only
             - /path/to/output/folder:/output
         command: search
 ```
 
 #### Create a config file
 
-For Docker, the config file
+When you run the container the first time, it will create a config file at
+`/config/config.js`. Open this file in your favorite editor. Since you've
+already configured your volume mappings, the only required config option is
+[`torznab`](options#torznab). Once you've got that set up, you can run your
+Docker container and it should get started running through a full scan of your
+torrent directory!
 
 ## Next Steps
 
 `cross-seed` has two subcommands: `search` and `daemon`.
 
-`search` (used above) will scan each torrent you provide and look for
-cross-seeds, then exit.
+-   `search` (used above) will scan each torrent you provide and look for
+    cross-seeds, then exit.
 
-`daemon` will run forever, and can be configured to run searches periodically,
-watch RSS, and search for newly finished downloads.
+-   `daemon` will run forever, and can be configured to run searches
+    periodically, watch RSS, and search for newly finished downloads.
+
+If you're satisfied by just running `cross-seed search` every once in a while,
+and then using [`autotorrent2`][at2] to inject these into your client, then
+you're done!
+
+[at2]: https://github.com/JohnDoee/autotorrent2
