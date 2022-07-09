@@ -173,6 +173,13 @@ For rTorrent, you'll have to edit your `.rtorrent.rc` file.
     curl -XPOST http://localhost:2468/api/webhook --data-urlencode 'name=$1'
     ```
 
+:::tip Docker users
+
+You can use `http://cross-seed:2468` instead of `http://localhost:2468` with
+Docker networks.
+
+:::
+
 3.  Run the following command (this will give rTorrent permission to execute
     your script):
 
@@ -186,6 +193,24 @@ For rTorrent, you'll have to edit your `.rtorrent.rc` file.
     ```
 
 ### qBittorrent
+
+1. In the **qBittorrent** Web UI, navigate to Tools > Options > Downloads.
+2. Check the **Run external program on torrent completion** box and enter the
+   following in the box:
+    ```shell
+    curl -XPOST http://localhost:2468/api/webhook --data-urlencode "name=%N"
+    ```
+
+:::tip
+
+If you are already using the **Run external program on torrent completion** box,
+you can separate the two commands with a semicolon:
+
+```shell
+    oldcommand %N; curl -XPOST http://localhost:2468/api/webhook --data-urlencode "name=%N"
+```
+
+:::
 
 ## How it works
 
