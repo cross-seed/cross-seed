@@ -235,7 +235,7 @@ torrentDir: "/torrents",
 | `outputDir`      | `-o <dir>`     | `--output-dir <dir>` | `string` |         |
 
 `cross-seed` will store the torrent files it finds in this directory. If you use
-[Injection](../recipes/injection) with **rTorrent**, you'll need to make sure
+[Injection](../tutorials/injection) with **rTorrent**, you'll need to make sure
 rTorrent has access to this path also.
 
 :::caution Docker users
@@ -413,7 +413,7 @@ excludeRecentSearch: "2 weeks",
 
 `cross-seed` can either save the found cross-seeds, or inject them into your
 client. If you use `inject`, you will need to set up your client. Read more in
-the [Injection tutorial](../recipes/injection).
+the [Injection tutorial](../tutorials/injection).
 
 #### `action` Examples (CLI)
 
@@ -437,7 +437,7 @@ action: "inject",
 | `rtorrentRpcUrl` |                | `--rtorrent-rpc-url <url>` | URL    |         |
 
 The url of your **rTorrent** XMLRPC interface. Only relevant with
-[Injection](../recipes/injection). Often ends in `/RPC2`.
+[Injection](../tutorials/injection). Often ends in `/RPC2`.
 
 If you use **Sonarr** or **Radarr**, cross-seed is configured the same way.
 **ruTorrent** installations come with this endpoint configured but naked
@@ -472,7 +472,7 @@ rtorrentRpcUrl: "http://user:pass@localhost:8080/RPC2",
 | `qbittorrentUrl` |                | `--qbittorrent-url <url>` | URL    |         |
 
 The url of your **qBittorrent** Web UI. Only relevant with
-[Injection](../recipes/injection).
+[Injection](../tutorials/injection).
 
 **qBittorrent** doesn't use HTTP Basic/Digest Auth, but you can provide your
 **qBittorrent** credentials at the beginning of the URL like so:
@@ -521,8 +521,8 @@ notificationWebhookUrl: "http://apprise:8000/notify",
 | ---------------- | -------------- | --------------- | -------- | ------- |
 | `port`           | `-p <port>`    | `--port <port>` | `number` | `2468`  |
 
-In [Daemon Mode](../recipes/daemon), cross-seed runs a webserver listening for a
-few types of HTTP requests. You can use this option to change the port it
+In [Daemon Mode](../tutorials/daemon), cross-seed runs a webserver listening for
+a few types of HTTP requests. You can use this option to change the port it
 listens on.
 
 #### `port` Examples (CLI)
@@ -544,8 +544,8 @@ port: 3000,
 | ---------------- | -------------- | ------------------------- | ------------------------------- | ------- |
 | `rssCadence`     |                | `--rss-cadence <cadence>` | `string` in the [ms][ms] format |         |
 
-In [Daemon Mode](../recipes/daemon), with this option enabled, `cross-seed` will
-run periodic RSS searches on your configured indexers to check if any new
+In [Daemon Mode](../tutorials/daemon), with this option enabled, `cross-seed`
+will run periodic RSS searches on your configured indexers to check if any new
 uploads match torrents you already own. Setting this option to `null`, or not
 specifying it at all, will disable the feature.
 
@@ -580,8 +580,8 @@ rssCadence: "20min",
 | ---------------- | -------------- | ---------------------------- | ------------------------------- | ------- |
 | `searchCadence`  |                | `--search-cadence <cadence>` | `string` in the [ms][ms] format |         |
 
-In [Daemon Mode](../recipes/daemon), with this option enabled, `cross-seed` will
-run periodic searches of your torrents (respecting your `includeEpisodes`,
+In [Daemon Mode](../tutorials/daemon), with this option enabled, `cross-seed`
+will run periodic searches of your torrents (respecting your `includeEpisodes`,
 `includeNonVideos`, `excludeOlder`, and `excludeRecentSearch` settings).
 
 :::tip

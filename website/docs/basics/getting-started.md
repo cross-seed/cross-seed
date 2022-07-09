@@ -35,7 +35,7 @@ cross-seed --version
 ### with Unraid
 
 In Unraid, you can install `cross-seed` from Docker Hub with the Community
-Applications app. Check out the [Unraid guide](../recipes/Unraid) for details.
+Applications app. Check out the [Unraid guide](../tutorials/Unraid) for details.
 
 ## Running your first search
 

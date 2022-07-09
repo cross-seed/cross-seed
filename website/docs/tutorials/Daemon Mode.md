@@ -212,6 +212,33 @@ you can separate the two commands with a semicolon:
 
 :::
 
+## Set up RSS
+
+Setting up RSS is very easy. Just open your config file, and set the
+[`rssCadence`](../reference/options#rsscadence) option. I recommend 10 minutes:
+
+```js
+rssCadence: "10 minutes",
+```
+
+## Set up periodic searches
+
+Setting up periodic searches is very easy. Just open your config file, and set
+the [`searchCadence`](../reference/options#searchcadence) option. I recommend 26
+weeks (biannual):
+
+```js
+searchCadence: "26 weeks",
+```
+
+You can also combine `searchCadence` with `excludeRecentSearch` and run it more
+frequently for a smoother load:
+
+```js
+searchCadence: "1 week",
+excludeRecentSearch: "26 weeks",
+```
+
 ## How it works
 
 It starts an HTTP server, listening on port 2468. **_Don't expose this port to
@@ -247,26 +274,3 @@ curl -XPOST http://localhost:2468/api/webhook \
   -H 'Content-Type: application/json' \
   --data '{"name":"<torrent name here>",outputDir:"/path/to/output/dir",trackers:["oink","tehconnection"]}'
 ```
-
-If you are using rTorrent, you can adapt
-[these instructions](https://www.filebot.net/forums/viewtopic.php?p=5316#p5316)
-to run the `curl` command on finished download.
-
-If you are using qBittorrent, you can use a similar setup with the "Run script
-on torrent completion" setting.
-
-### How to run the daemon without docker
-
-If you don't want to use Docker, you can run the `cross-seed` daemon as a
-systemd service, or inside a `screen`/`tmux` instance. If you choose to do this,
-you will probably want to
-[fully install the app](https://github.com/mmgoodnow/cross-seed#standalone-installation).
-
-To start the daemon with `screen`, issue the following command inside a
-`screen`:
-
-```shell script
-cross-seed daemon
-```
-
-Then detach from the screen.
