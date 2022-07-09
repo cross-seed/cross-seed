@@ -1,3 +1,5 @@
+# FAQ and Troubleshooting
+
 ## What can I do about `error parsing torrent at http://…`?
 
 This means that the jacket download link didn't resolve to a torrent file. It's
