@@ -1,42 +1,66 @@
 ---
 id: injection
-title: Injection
+sidebar_position: 1
+title: Direct Client Injection
 ---
 
-If you use rTorrent or qBittorrent, `cross-seed` can inject the torrents it
-finds directly into your torrent client. All you have to do is pass two command
-line flags:
+If you use **rTorrent** or **qBittorrent**, `cross-seed` can inject the torrents
+it finds directly into your torrent client. This satisfies most simple use
+cases. For more complex cases,
+[**autotorrent2**](https://github.com/JohnDoee/autotorrent2) or
+[**qbit_manage**](https://github.com/StuffAnThings/qbit_manage) is recommended.
 
-```shell script
-cross-seed search -A inject --rtorrent-rpc-url http://user:pass@localhost/RPC2
-# or
-cross-seed search -A inject --qbittorrent-url http://user:pass@localhost:8080
-```
+## `rTorrent` setup
 
-It will load the torrent into your client with the label set to `cross-seed` and
-start it, fully automatically.
+`cross-seed` will inject torrents into **rTorrent** with a `cross-seed` label.
 
-> If you use rTorrent and Docker, you'll need to make sure that your
-> `cross-seed` container has read access to the data directories of your
-> torrents, mapped to the same path as rTorrent. In order for `cross-seed` to
-> prove to rTorrent that a torrent is completed, it must check the modification
-> timestamps of all the torrent's files.
+1. Make sure **rTorrent** has access to your `outputDir` (if Docker, make sure
+   they're mapped to the same path).
+2. Edit your config file:
+    1. Set your [`action`](../reference/options#action) option to `inject`.
+    2. Set your [`rtorrentRpcUrl`](../reference/options#rtorrentrpcurl) option.
+       It should look like an `http` url that looks like
+       `http://user:pass@localhost:8080/rutorrent/RPC2` (if you have ruTorrent
+       installed). See the [reference](../reference/options#rtorrentrpcurl) for
+       more details.
+3. Start or restart `cross-seed`. The logs at startup will tell you if
+   `cross-seed` was able to connect to rTorrent.
 
-## How do I find my rTorrent RPC url?
+:::tip Docker users
 
-If you use ruTorrent, you likely have an rtorrent RPC url at
-`http://host:port/path/to/rutorrent/RPC2`. If you don't use ruTorrent then it's
-likely you'll have to
-[set up the endpoint yourself with a web server](https://github.com/linuxserver/docker-rutorrent/issues/122#issuecomment-769009432).
+In order for `cross-seed` to prove to **rTorrent** that a torrent is completed,
+it must check the modification timestamps of all the torrent's files.
 
-## Can `cross-seed` connect to rTorrent over an SCGI port or unix socket?
+Make sure that your `cross-seed` container has **read** access to the **data
+directories** of your torrents, mapped to the same path as **rTorrent**.
 
-As of right now, no. Feel free to
-[open an issue](https://github.com/mmgoodnow/cross-seed/issues/new) or a pull
-request and I'll take a look.
+:::
 
-## Can I customize the label per-torrent?
+## `qBittorrent` setup
 
-Not at the moment. Feel free to
-[open an issue](https://github.com/mmgoodnow/cross-seed/issues/new) or a pull
-request and I'll take a look.
+:::caution
+
+Injection will work best if you use the `Original` content layout.
+
+:::
+
+2. Edit your config file:
+    1. Set your [`action`](../reference/options#action) option to `inject`.
+    2. Set your [`qbittorrentUrl`](../reference/options#qbittorrenturl) option.
+       It should look like an `http` url that looks like
+       `http://user:pass@localhost:8080(/qbittorrent)` See the
+       [reference](../reference/options#qbittorrenturl) for more details.
+
+:::caution Sonarr users
+
+There is a bad interaction with `cross-seed`, **qBittorrent**, and **Sonarr**,
+where new cross-seeds will be added with the Sonarr category, and then get stuck
+in Sonarr's import queue. There is a
+[fix in progress](https://github.com/mmgoodnow/cross-seed/pull/257), which will
+work if:
+
+-   you don't use separate **pre/post import categories** in Sonarr
+-   Sonarr's **pre/post import categories** have the same **save path** in
+    qBittorrent.
+
+:::

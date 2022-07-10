@@ -1,4 +1,4 @@
-# FAQ and Troubleshooting
+# FAQ & Troubleshooting
 
 ## What can I do about `error parsing torrent at http://…`?
 

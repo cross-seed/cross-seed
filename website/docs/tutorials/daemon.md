@@ -1,5 +1,6 @@
 ---
 id: daemon
+sidebar_position: 0
 title: Daemon Mode
 ---
 
