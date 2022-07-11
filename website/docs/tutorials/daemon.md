@@ -28,6 +28,13 @@ In this doc, we'll go through strategies to run the daemon continuously and
 start automatically on reboot, ways to trigger searches for torrents that just
 finished downloading, and ways to watch for new releases.
 
+:::danger
+
+`cross-seed` does _not_ have API auth. **Do not expose its port to the
+internet.**
+
+:::
+
 ## Running the daemon continuously
 
 The easiest way to run the daemon is just to leave a terminal open after running
@@ -238,40 +245,4 @@ frequently for a smoother load:
 ```js
 searchCadence: "1 week",
 excludeRecentSearch: "26 weeks",
-```
-
-## How it works
-
-It starts an HTTP server, listening on port 2468. **_Don't expose this port to
-the internet._** It will respond to a POST request with an
-`application/x-www-form-urlencoded` or `application/json` body containing the
-following parameters:
-
-```json5
-{
-	// one of { name, infoHash } is required
-	name: "<torrent name here>",
-	infoHash: "<infoHash of torrent>",
-	outputDir: "/path/to/output/dir", // optional
-	trackers: ["oink", "tehconnection"], //optional
-}
-```
-
-While the daemon is running (`cross-seed daemon`), you can trigger a search with
-an HTTP request. Note how the `trackers` parameter can take multiple values:
-
-```shell script
-curl -XPOST http://localhost:2468/api/webhook \
-  --data-urlencode 'name=<torrent name here>' \
-  --data-urlencode 'trackers=oink' \
-  --data-urlencode 'trackers=tehconnection' \
-  --data-urlencode 'outputDir=/path/to/output/dir'
-```
-
-Alternatively, you can use JSON:
-
-```shell script
-curl -XPOST http://localhost:2468/api/webhook \
-  -H 'Content-Type: application/json' \
-  --data '{"name":"<torrent name here>",outputDir:"/path/to/output/dir",trackers:["oink","tehconnection"]}'
 ```
