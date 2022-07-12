@@ -19,7 +19,8 @@ delivery into your client.
 
 ## 🚨🚨🚨 Breaking changes in cross-seed v4 🚨🚨🚨
 
-Head on over to https://github.com/mmgoodnow/cross-seed/wiki/v4-Migration-Guide
+Head on over to the
+[v4 migration guide](https://www.cross-seed.org/docs/tutorials/v4-migration-guide)
 to see the steps required for migration.
 
 ## Requirements
