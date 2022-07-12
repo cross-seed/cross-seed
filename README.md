@@ -28,91 +28,10 @@ to see the steps required for migration.
 -   Any number of indexers that support Torznab (use Jackett or Prowlarr to
     help)
 
-It will work on Mac and on Linux; I haven't tested it on Windows but it should
-work there too.
+## Tutorial
 
-## Usage
-
-Invoking `cross-seed` is _almost_ as simple as:
-
-```shell script
-npx cross-seed
-```
-
-Here's an example invocation:
-
-```shell script
-npx cross-seed search \
-  --torznab http://localhost:9696/prowlarr/1/api?apikey=a1b2c3d4e5f6 \
-  --torrent-dir /home/rtorrent/.session \
-  --output-dir /tmp/torrents
-```
-
-You either need to give it a few command-line arguments or create a
-[configuration file](https://github.com/mmgoodnow/cross-seed/wiki/Configuration-file).
-
-```text
-Usage: cross-seed search [options]
-
-Search for cross-seeds
-
-
-Options:
-  -T, --torznab <urls...>               Torznab urls with apikey included (separated by spaces)
-  -i, --torrent-dir <dir>               Directory with torrent files
-  -s, --output-dir <dir>                Directory to save results in
-  --include-non-videos                    Include torrents which contain non-video files (default: false)
-  -e, --include-episodes                Include single-episode torrents in the search (default: false)
-  --fuzzy-size-threshold <decimal>      The size difference allowed to be considered a match. (default: 0.02)
-  -v, --verbose                         Log verbose output (default: false)
-  -A, --action <action>                 If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client. (choices: "save", "inject", default: "save")
-  --rtorrent-rpc-url <url>              The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.
-  --qbittorrent-url <url>               The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.
-  -d, --delay <delay>                   Pause duration (seconds) between searches (default: 10)
-  -x, --exclude-older <cutoff>          Exclude torrents first seen more than x minutes ago. Overrides the -a flag.
-  -r, --exclude-recent-search <cutoff>  Exclude torrents which have been searched more recently than x minutes ago. Overrides the -a flag.
-  -h, --help                            display help for command
-```
-
-## Standalone installation
-
-You don't need to install this app, but if
-
--   you plan on running `cross-seed` regularly
--   you want to control when you receive updates
--   your version of `npm` doesn't support `npx`
-
-you can install it globally:
-
-```shell script
-npm install -g cross-seed
-```
-
-Then you can run the app with:
-
-```shell script
-cross-seed
-```
-
-To update,
-
-```shell script
-npm uninstall -g cross-seed
-npm install -g cross-seed
-```
-
-## Daemon mode (Docker recommended)
-
-`cross-seed` supports a daemon mode, wherein the app is always running, and you
-can trigger an HTTP request to search for cross-seeds of a specific torrent. See
-more info in the
-[wiki page](https://github.com/mmgoodnow/cross-seed/wiki/Daemon-Mode).
-
-## Direct client injection
-
-As mentioned above, `cross-seed` can inject the torrents it finds directly into
-your torrent client. See more info in the
-[wiki page](https://github.com/mmgoodnow/cross-seed/wiki/Injection).
+Head on over to
+[cross-seed.org](https://www.cross-seed.org/docs/basics/getting-started)
 
 ## Troubleshooting
 
