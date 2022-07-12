@@ -58,10 +58,10 @@ const config = {
 		({
 			navbar: {
 				title: "cross-seed",
-				logo: {
-					alt: "cross-seed logo",
-					src: "img/logo.svg",
-				},
+				// logo: {
+				// 	alt: "cross-seed logo",
+				// 	src: "img/logo.svg",
+				// },
 				items: [
 					{
 						type: "doc",
