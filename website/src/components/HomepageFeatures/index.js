@@ -7,28 +7,35 @@ const FeatureList = [
 		title: "Easy to Use",
 		description: (
 			<>
-				Docusaurus was designed from the ground up to be easily
-				installed and used to get your website up and running quickly.
+				It's very easy to get set up with <code>cross-seed</code> if you
+				have Docker or Node installed.
 			</>
 		),
 	},
 	{
-		title: "Focus on What Matters",
+		title: "No false positives",
 		description: (
 			<>
-				Docusaurus lets you focus on your docs, and we&apos;ll do the
-				chores. Go ahead and move your docs into the <code>docs</code>{" "}
-				directory.
+				<code>cross-seed</code> was designed from the ground up to be as
+				low-maintenance as possible; it will never output false
+				positives.
 			</>
 		),
 	},
 	{
-		title: "Powered by React",
+		title: "Daemon Mode",
 		description: (
 			<>
-				Extend or customize your website layout by reusing React.
-				Docusaurus can be extended while reusing the same header and
-				footer.
+				Run <code>cross-seed</code> 24/7 to:
+				<ul>
+					<li>
+						Search for cross-seeds as soon as new torrents are
+						finished downloading
+					</li>
+					<li>
+						Race starting at 100% before the uploader even joins.
+					</li>
+				</ul>
 			</>
 		),
 	},
