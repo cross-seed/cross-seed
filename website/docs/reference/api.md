@@ -1,8 +1,8 @@
 # HTTP API
 
-`cross-seed` has an HTTP API as part of [Daemon Mode](../tutorials/daemon.md).
-When you run `cross-seed daemon`, the app starts an HTTP server, listening on
-port 2468 (configurable with the [`port`](options#port) option).
+`cross-seed` has an HTTP API as part of [Daemon Mode](../basics/daemon.md). When
+you run `cross-seed daemon`, the app starts an HTTP server, listening on port
+2468 (configurable with the [`port`](options#port) option).
 
 :::danger
 

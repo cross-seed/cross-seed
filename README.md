@@ -35,7 +35,7 @@ Head on over to
 
 ## Troubleshooting
 
-First, check the [FAQ](https://github.com/mmgoodnow/cross-seed/wiki/FAQ). If you
-still can't figure it out, feel free to
-[open an issue](https://github.com/mmgoodnow/cross-seed/issues/new) or
-[start a discussion](https://github.com/mmgoodnow/cross-seed/discussions/new)
+Feel free to
+[start a discussion](https://github.com/mmgoodnow/cross-seed/discussions/new) or
+[open an issue](https://github.com/mmgoodnow/cross-seed/issues/new), or reach
+out on [Discord](https://discord.gg/jpbUFzS5Wb).

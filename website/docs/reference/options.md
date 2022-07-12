@@ -521,7 +521,7 @@ notificationWebhookUrl: "http://apprise:8000/notify",
 | ---------------- | -------------- | --------------- | -------- | ------- |
 | `port`           | `-p <port>`    | `--port <port>` | `number` | `2468`  |
 
-In [Daemon Mode](../tutorials/daemon), cross-seed runs a webserver listening for
+In [Daemon Mode](../basics/daemon.md), cross-seed runs a webserver listening for
 a few types of HTTP requests. You can use this option to change the port it
 listens on.
 
@@ -544,7 +544,7 @@ port: 3000,
 | ---------------- | -------------- | ------------------------- | ------------------------------- | ------- |
 | `rssCadence`     |                | `--rss-cadence <cadence>` | `string` in the [ms][ms] format |         |
 
-In [Daemon Mode](../tutorials/daemon), with this option enabled, `cross-seed`
+In [Daemon Mode](../basics/daemon.md), with this option enabled, `cross-seed`
 will run periodic RSS searches on your configured indexers to check if any new
 uploads match torrents you already own. Setting this option to `null`, or not
 specifying it at all, will disable the feature.
@@ -580,7 +580,7 @@ rssCadence: "20min",
 | ---------------- | -------------- | ---------------------------- | ------------------------------- | ------- |
 | `searchCadence`  |                | `--search-cadence <cadence>` | `string` in the [ms][ms] format |         |
 
-In [Daemon Mode](../tutorials/daemon), with this option enabled, `cross-seed`
+In [Daemon Mode](../basics/daemon.md), with this option enabled, `cross-seed`
 will run periodic searches of your torrents (respecting your `includeEpisodes`,
 `includeNonVideos`, `excludeOlder`, and `excludeRecentSearch` settings).
 
