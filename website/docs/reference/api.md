@@ -26,7 +26,7 @@ it has received your request successfully.
 | `application/json`                  | ✅        |
 | `application/x-www-form-urlencoded` | ✅        |
 
-### Payload
+### Request Payload
 
 ```js
 POST /api/webhook
@@ -52,4 +52,38 @@ curl -XPOST http://localhost:2468/api/webhook \
   --data '{"name":"<torrent name here>"}'
 ```
 
-## `/api/announce`
+## POST `/api/announce` (experimental)
+
+Use this endpoint to feed announces into cross-seed. For each announce,
+cross-seed will check if the given torrent name matches any torrents you already
+have. If found, it will run the matching algorithm to verify that the torrents
+do match, and download/inject the announced torrent.
+
+:::tip
+
+This is a real-time alternative to scanning RSS feeds. Consider turning RSS scan
+off if you set up this feature.
+
+:::
+
+This endpoint returns 200 if your request was received.
+
+### Supported formats
+
+| `Content-Type`                      | Supported |
+| ----------------------------------- | --------- |
+| `application/json`                  | ✅        |
+| `application/x-www-form-urlencoded` | ✅        |
+
+### Request Payload
+
+```js
+POST /api/announce
+{
+	"name": "string", // torrent name
+	"guid": "string", // ideally the torrent's comments/listing url, would be for caching purposes
+	"link": "string", // download link
+	"size": "number", // in bytes
+	"tracker": "string" // this is for logging purposes
+}
+```
