@@ -237,7 +237,7 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 	.addOption(
 		new Option(
 			"--torrents <torrents...>",
-			"torrent files separated by spaces. This is a debug option and may be removed without warning."
+			"torrent files separated by spaces"
 		).hideHelp()
 	)
 	.action(async (options) => {
@@ -262,5 +262,7 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			exitOnCrossSeedErrors(e);
 		}
 	});
+
+program.showHelpAfterError("(add --help for additional information)");
 
 await program.parseAsync();

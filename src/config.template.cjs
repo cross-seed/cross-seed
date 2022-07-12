@@ -3,7 +3,7 @@
 
 module.exports = {
 	/**
-	 * Pause at least this much in between each Jackett search. Higher is safer.
+	 * Pause at least this much in between each search. Higher is safer.
 	 * 	It is not recommended to set this to less than 2 seconds.
 	 */
 	delay: 10,
