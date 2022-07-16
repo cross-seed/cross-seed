@@ -89,7 +89,7 @@ async function findOnOtherSites(
 			matches.map((m) => m.tracker),
 			actionResults
 		);
-		sendResultsNotification(searchee, zipped);
+		sendResultsNotification(searchee, zipped, Label.SEARCH);
 		await updateSearchTimestamps(searchee.name);
 	}
 	return matches.length;
@@ -177,9 +177,11 @@ export async function checkNewCandidateMatch(
 		candidate.tracker,
 		EmptyNonceOptions
 	);
-	await sendResultsNotification(searchee, [
-		[assessment, candidate.tracker, result],
-	]);
+	await sendResultsNotification(
+		searchee,
+		[[assessment, candidate.tracker, result]],
+		Label.REVERSE_LOOKUP
+	);
 	return result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
 }
 

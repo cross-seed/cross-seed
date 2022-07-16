@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 import { ActionResult, InjectionResult, SaveResult } from "./constants.js";
 import { ResultAssessment } from "./decide.js";
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 
@@ -44,7 +44,8 @@ function formatTrackersAsList(trackers: TrackerName[]) {
 
 export function sendResultsNotification(
 	searchee: Searchee,
-	results: [ResultAssessment, TrackerName, ActionResult][]
+	results: [ResultAssessment, TrackerName, ActionResult][],
+	source: Label
 ) {
 	const name = searchee.name;
 	const notableSuccesses = results.filter(
@@ -64,7 +65,7 @@ export function sendResultsNotification(
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
 		const trackersListStr = formatTrackersAsList(trackers);
 		pushNotifier.notify({
-			body: `Injected ${name} from ${numTrackers} trackers: ${trackersListStr}`,
+			body: `${source}: Injected ${name} from ${numTrackers} trackers: ${trackersListStr}`,
 			extra: { infoHashes, trackers },
 		});
 	}
