@@ -20,6 +20,12 @@ export enum InjectionResult {
 	TORRENT_NOT_COMPLETE,
 }
 
+export enum SaveResult {
+	SAVED,
+}
+
+export type ActionResult = InjectionResult | SaveResult;
+
 export enum Decision {
 	MATCH = "MATCH",
 	SIZE_MISMATCH = "SIZE_MISMATCH",

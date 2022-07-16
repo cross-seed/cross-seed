@@ -1,12 +1,18 @@
 import chalk from "chalk";
 import fs from "fs";
-import { Metafile } from "parse-torrent";
-import { getClient } from "./clients/TorrentClient.js";
-import { Action, Decision, InjectionResult } from "./constants.js";
+import { zip } from "lodash-es";
+import { performAction, performActions } from "./action.js";
+import {
+	ActionResult,
+	Decision,
+	InjectionResult,
+	SaveResult,
+} from "./constants.js";
+import { db } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
-import { pushNotifier } from "./pushNotifier.js";
+import { sendResultsNotification } from "./pushNotifier.js";
 import {
 	EmptyNonceOptions,
 	getRuntimeConfig,
@@ -17,17 +23,15 @@ import {
 	createSearcheeFromTorrentFile,
 	Searchee,
 } from "./searchee.js";
-import { db } from "./db.js";
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
 	indexNewTorrents,
 	loadTorrentDirLight,
-	saveTorrentFile,
 	TorrentLocator,
 } from "./torrent.js";
 import { getTorznabManager } from "./torznab.js";
-import { filterAsync, getTag, ok, stripExtension } from "./utils.js";
+import { filterAsync, ok, stripExtension } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -42,54 +46,6 @@ interface AssessmentWithTracker {
 	tracker: string;
 }
 
-async function performAction(
-	newMeta: Metafile,
-	searchee: Searchee,
-	tracker: string,
-	nonceOptions: NonceOptions,
-	tag: string
-): Promise<{ isTorrentIncomplete: boolean }> {
-	const { action } = getRuntimeConfig();
-
-	let isTorrentIncomplete;
-	const styledName = chalk.green.bold(newMeta.name);
-	const styledTracker = chalk.bold(tracker);
-	if (action === Action.INJECT) {
-		const result = await getClient().inject(
-			newMeta,
-			searchee,
-			nonceOptions
-		);
-		switch (result) {
-			case InjectionResult.SUCCESS:
-				logger.info(
-					`Found ${styledName} on ${styledTracker} - injected`
-				);
-				break;
-			case InjectionResult.ALREADY_EXISTS:
-				logger.info(`Found ${styledName} on ${styledTracker} - exists`);
-				break;
-			case InjectionResult.TORRENT_NOT_COMPLETE:
-				logger.warn(
-					`Found ${styledName} on ${styledTracker} - skipping incomplete torrent`
-				);
-				isTorrentIncomplete = true;
-				break;
-			case InjectionResult.FAILURE:
-			default:
-				logger.error(
-					`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
-				);
-				saveTorrentFile(tracker, tag, newMeta, nonceOptions);
-				break;
-		}
-	} else {
-		saveTorrentFile(tracker, tag, newMeta, nonceOptions);
-		logger.info(`Found ${styledName} on ${styledTracker}`);
-	}
-	return { isTorrentIncomplete };
-}
-
 async function findOnOtherSites(
 	searchee: Searchee,
 	hashesToExclude: string[],
@@ -102,7 +58,6 @@ async function findOnOtherSites(
 		tracker: result.tracker,
 	});
 
-	const tag = getTag(searchee.name);
 	const query = stripExtension(searchee.name);
 
 	// make sure searchee is in database
@@ -123,41 +78,21 @@ async function findOnOtherSites(
 	const loaded = await Promise.all<AssessmentWithTracker>(
 		results.map(assessEach)
 	);
-	const successful = loaded.filter(
+	const matches = loaded.filter(
 		(e) => e.assessment.decision === Decision.MATCH
 	);
+	const actionResults = await performActions(searchee, matches, nonceOptions);
 
-	if (successful.length) {
-		const name = searchee.name;
-		const numTrackers = successful.length;
-		const infoHashes = successful.map(
-			(s) => s.assessment.metafile.infoHash
+	if (!actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
+		const zipped: [ResultAssessment, string, ActionResult][] = zip(
+			matches.map((m) => m.assessment),
+			matches.map((m) => m.tracker),
+			actionResults
 		);
-		const trackers = successful.map((s) => s.tracker);
-		// @ts-expect-error Intl.ListFormat totally exists on node 12
-		const trackersListStr = new Intl.ListFormat("en", {
-			style: "long",
-			type: "conjunction",
-		}).format(trackers);
-		pushNotifier.notify({
-			body: `Found ${name} on ${numTrackers} trackers: ${trackersListStr}`,
-			extra: { infoHashes, trackers },
-		});
+		sendResultsNotification(searchee, zipped);
+		await updateSearchTimestamps(searchee.name);
 	}
-
-	for (const { tracker, assessment } of successful) {
-		const { isTorrentIncomplete } = await performAction(
-			assessment.metafile,
-			searchee,
-			tracker,
-			nonceOptions,
-			tag
-		);
-		if (isTorrentIncomplete) return successful.length;
-	}
-
-	await updateSearchTimestamps(searchee.name);
-	return successful.length;
+	return matches.length;
 }
 
 async function updateSearchTimestamps(name: string): Promise<void> {
@@ -236,14 +171,16 @@ export async function checkNewCandidateMatch(
 
 	if (assessment.decision !== Decision.MATCH) return false;
 
-	const { isTorrentIncomplete } = await performAction(
+	const result = await performAction(
 		assessment.metafile,
 		searchee,
 		candidate.tracker,
-		EmptyNonceOptions,
-		getTag(candidate.name)
+		EmptyNonceOptions
 	);
-	return !isTorrentIncomplete;
+	await sendResultsNotification(searchee, [
+		[assessment, candidate.tracker, result],
+	]);
+	return result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
 }
 
 async function findSearchableTorrents() {
