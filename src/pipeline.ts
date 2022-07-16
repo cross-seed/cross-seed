@@ -26,6 +26,7 @@ import {
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
+	getTorrentByFuzzyName,
 	indexNewTorrents,
 	loadTorrentDirLight,
 	TorrentLocator,
@@ -143,16 +144,15 @@ export async function searchForLocalTorrentByCriteria(
 export async function checkNewCandidateMatch(
 	candidate: Candidate
 ): Promise<boolean> {
-	let meta;
-	try {
-		meta = await getTorrentByCriteria({ name: candidate.name });
-	} catch (e) {
+	const meta = await getTorrentByFuzzyName(candidate.name);
+	if (meta === null) {
 		logger.verbose({
 			label: Label.REVERSE_LOOKUP,
 			message: `Did not find an existing entry for ${candidate.name}`,
 		});
 		return false;
 	}
+
 	const hashesToExclude = await getInfoHashesToExclude();
 	if (!filterByContent(meta)) return false;
 	const searchee = createSearcheeFromMetafile(meta);

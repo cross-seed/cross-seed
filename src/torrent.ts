@@ -1,15 +1,15 @@
 import fs, { promises as fsPromises } from "fs";
+import Fuse from "fuse.js";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path, { join } from "path";
-import { performance } from "perf_hooks";
 import simpleGet from "simple-get";
 import { inspect } from "util";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
-import { Label, logger } from "./logger.js";
+import { logger } from "./logger.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { duration, ok, stripExtension, time } from "./utils.js";
+import { ok, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -159,6 +159,22 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 		if (ok(searcheeResult)) searchees.push(searcheeResult);
 	}
 	return searchees;
+}
+
+export async function getTorrentByFuzzyName(
+	name: string
+): Promise<null | Metafile> {
+	const allNames = await db("torrent").select("name", "file_path");
+	// @ts-expect-error fuse types are confused
+	const potentialMatches = new Fuse(allNames, {
+		keys: ["name"],
+		distance: 6,
+		threshold: 0.25,
+	}).search(name);
+
+	if (potentialMatches.length === 0) return null;
+	const [firstMatch] = potentialMatches;
+	return parseTorrentFromFilename(firstMatch.item.file_path);
 }
 
 export async function getTorrentByCriteria(
