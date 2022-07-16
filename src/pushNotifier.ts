@@ -57,15 +57,18 @@ export function sendResultsNotification(
 		([, , actionResult]) => actionResult === InjectionResult.FAILURE
 	);
 	if (notableSuccesses.length) {
-		const name = searchee.name;
 		const numTrackers = notableSuccesses.length;
 		const infoHashes = notableSuccesses.map(
 			([assessment]) => assessment.metafile.infoHash
 		);
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
 		const trackersListStr = formatTrackersAsList(trackers);
+		const performedAction =
+			notableSuccesses[0][2] === InjectionResult.SUCCESS
+				? "Injected"
+				: "Saved";
 		pushNotifier.notify({
-			body: `${source}: Injected ${name} from ${numTrackers} trackers: ${trackersListStr}`,
+			body: `${source}: ${performedAction} ${name} from ${numTrackers} trackers: ${trackersListStr}`,
 			extra: { infoHashes, trackers },
 		});
 	}
