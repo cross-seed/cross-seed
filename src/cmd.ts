@@ -10,7 +10,7 @@ import { jobsLoop } from "./jobs.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
-import { main } from "./pipeline.js";
+import { main, scanRssFeeds } from "./pipeline.js";
 import {
 	initializePushNotifier,
 	sendTestNotification,
@@ -232,6 +232,31 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			throw e;
 		}
 	});
+
+createCommandWithSharedOptions("rss", "Run an rss scan").action(
+	async (options) => {
+		try {
+			const runtimeConfig = processOptions(options);
+			setRuntimeConfig(runtimeConfig);
+			initializeLogger();
+			initializePushNotifier();
+			logger.verbose({
+				label: Label.CONFIGDUMP,
+				message: inspect(runtimeConfig),
+			});
+			if (process.env.DOCKER_ENV === "true") {
+				generateConfig({ docker: true });
+			}
+
+			await db.migrate.latest();
+			await doStartupValidation();
+			await scanRssFeeds();
+			await db.destroy();
+		} catch (e) {
+			exitOnCrossSeedErrors(e);
+		}
+	}
+);
 
 createCommandWithSharedOptions("search", "Search for cross-seeds")
 	.addOption(
