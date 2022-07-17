@@ -89,6 +89,14 @@ module.exports = {
 	qbittorrentUrl: undefined,
 
 	/**
+	 * qBittorrent-specific
+	 * Whether to inject using categories with the same save paths as your normal categories.
+	 * Example: if you have a category called "Movies",
+	 * this will automatically inject cross-seeds to "Movies.cross-seed"
+	 */
+	duplicateCategories: false,
+
+	/**
 	 * cross-seed will send POST requests to this url
 	 * with a JSON payload of { title, body }.
 	 * Conforms to the caronc/apprise REST API.

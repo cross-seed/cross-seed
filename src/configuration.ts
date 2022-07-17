@@ -22,6 +22,7 @@ interface FileConfig {
 	torrentDir?: string;
 	torznab?: string[];
 	qbittorrentUrl?: string;
+	duplicateCategories?: boolean;
 	notificationWebhookUrl?: string;
 	port?: number;
 	searchCadence?: string;
