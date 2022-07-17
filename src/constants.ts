@@ -14,14 +14,14 @@ export enum Action {
 }
 
 export enum InjectionResult {
-	SUCCESS,
-	FAILURE,
-	ALREADY_EXISTS,
-	TORRENT_NOT_COMPLETE,
+	SUCCESS = "SUCCESS",
+	FAILURE = "FAILURE",
+	ALREADY_EXISTS = "ALREADY_EXISTS",
+	TORRENT_NOT_COMPLETE = "TORRENT_NOT_COMPLETE",
 }
 
 export enum SaveResult {
-	SAVED,
+	SAVED = "SAVED",
 }
 
 export type ActionResult = InjectionResult | SaveResult;
