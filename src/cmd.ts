@@ -229,12 +229,8 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			serve(options.port);
 			jobsLoop();
 		} catch (e) {
-			if (e instanceof CrossSeedError) {
-				e.print();
-				process.exitCode = 1;
-				return;
-			}
-			throw e;
+			exitOnCrossSeedErrors(e);
+			await db.destroy();
 		}
 	});
 
@@ -259,6 +255,7 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 			await db.destroy();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
+			await db.destroy();
 		}
 	}
 );
@@ -290,6 +287,7 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			await db.destroy();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
+			await db.destroy();
 		}
 	});
 
