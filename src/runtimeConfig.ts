@@ -17,7 +17,7 @@ export interface RuntimeConfig {
 	duplicateCategories: boolean;
 	notificationWebhookUrl: string;
 	torrents: string[];
-	port: number;
+	port: number | false | null;
 	searchCadence: number;
 	rssCadence: number;
 }

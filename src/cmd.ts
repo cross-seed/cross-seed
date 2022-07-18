@@ -201,6 +201,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 		(n) => parseInt(n),
 		fallback(fileConfig.port, 2468)
 	)
+	.option("--no-port", "Do not listen on any port")
 	.option(
 		"--search-cadence <cadence>",
 		"Run searches on a schedule. Format: https://github.com/vercel/ms",

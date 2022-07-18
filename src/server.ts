@@ -207,10 +207,12 @@ async function handleRequest(
 }
 
 export async function serve(port: number): Promise<void> {
-	const server = http.createServer(handleRequest);
-	server.listen(port);
-	logger.info({
-		label: Label.SERVER,
-		message: `Server is running on port ${port}, ^C to stop.`,
-	});
+	if (port) {
+		const server = http.createServer(handleRequest);
+		server.listen(port);
+		logger.info({
+			label: Label.SERVER,
+			message: `Server is running on port ${port}, ^C to stop.`,
+		});
+	}
 }
