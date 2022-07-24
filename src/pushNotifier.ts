@@ -6,7 +6,9 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 
 export let pushNotifier: PushNotifier;
-
+enum Event {
+	RESULTS = "RESULTS",
+}
 type TrackerName = string;
 
 interface PushNotification {
@@ -45,7 +47,7 @@ function formatTrackersAsList(trackers: TrackerName[]) {
 export function sendResultsNotification(
 	searchee: Searchee,
 	results: [ResultAssessment, TrackerName, ActionResult][],
-	source: Label
+	source: Label.REVERSE_LOOKUP | Label.SEARCH
 ) {
 	const name = searchee.name;
 	const notableSuccesses = results.filter(
@@ -70,6 +72,7 @@ export function sendResultsNotification(
 		pushNotifier.notify({
 			body: `${source}: ${performedAction} ${name} from ${numTrackers} trackers: ${trackersListStr}`,
 			extra: {
+				event: Event.RESULTS,
 				name,
 				infoHashes,
 				trackers,
@@ -89,6 +92,7 @@ export function sendResultsNotification(
 		pushNotifier.notify({
 			body: `Failed to inject ${name} from ${numTrackers} trackers: ${trackersListStr}`,
 			extra: {
+				event: Event.RESULTS,
 				name,
 				infoHashes,
 				trackers,

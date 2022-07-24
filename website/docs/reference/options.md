@@ -499,14 +499,35 @@ qbittorrentUrl: "http://user:pass@localhost:8080",
 | ------------------------ | -------------- | ---------------------------------- | ------ | ------- |
 | `notificationWebhookUrl` |                | `--notification-webhook-url <url>` | URL    |         |
 
-`cross-seed` will send a POST request to this URL with an `application/json`
-payload of `{ title, body }`. This conforms to the wonderful
-[**apprise**](https://github.com/caronc/apprise-api) REST API.
+`cross-seed` will send a POST request to this URL with the following payload:
+
+```http
+POST notificationWebhookUrl
+Content-Type: application/json
+
+{
+  "title": "string",
+  "body": "string",
+  "extra": {
+    "event": "RESULTS",
+    "name": "string",
+    "infoHashes": "string[]",
+    "trackers": "string[]",
+    "source": "reverselookup | search",
+    "result": "SAVED | INJECTED | FAILURE"
+  }
+}
+```
+
+Currently, cross-seed only sends the "RESULTS" event. In the future it may send
+more. This payload supports both
+[**apprise**](https://github.com/caronc/apprise-api) and
+[**Notifiarr**](https://github.com/Notifiarr/Notifiarr).
 
 #### `notificationWebhookUrl` Examples (CLI)
 
 ```shell
-cross-seed daemon --notification-webhook-url http://qbittorrent:8080/qbittorrent
+cross-seed daemon --notification-webhook-url http://apprise:8000/notify
 ```
 
 #### `notificationWebhookUrl` Examples (Config file)
