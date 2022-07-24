@@ -14,7 +14,7 @@ export enum Action {
 }
 
 export enum InjectionResult {
-	SUCCESS = "SUCCESS",
+	SUCCESS = "INJECTED",
 	FAILURE = "FAILURE",
 	ALREADY_EXISTS = "ALREADY_EXISTS",
 	TORRENT_NOT_COMPLETE = "TORRENT_NOT_COMPLETE",

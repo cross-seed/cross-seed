@@ -69,7 +69,13 @@ export function sendResultsNotification(
 				: "Saved";
 		pushNotifier.notify({
 			body: `${source}: ${performedAction} ${name} from ${numTrackers} trackers: ${trackersListStr}`,
-			extra: { infoHashes, trackers },
+			extra: {
+				name,
+				infoHashes,
+				trackers,
+				source,
+				result: notableSuccesses[0][2],
+			},
 		});
 	}
 
@@ -82,7 +88,13 @@ export function sendResultsNotification(
 		const trackersListStr = formatTrackersAsList(trackers);
 		pushNotifier.notify({
 			body: `Failed to inject ${name} from ${numTrackers} trackers: ${trackersListStr}`,
-			extra: { infoHashes, trackers },
+			extra: {
+				name,
+				infoHashes,
+				trackers,
+				source,
+				result: failures[0][2],
+			},
 		});
 	}
 }
