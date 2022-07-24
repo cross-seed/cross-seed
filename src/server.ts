@@ -156,12 +156,15 @@ async function announce(
 	try {
 		await indexNewTorrents();
 		const result = await checkNewCandidateMatch(candidate);
-		if (result) {
-			logger.info({
-				label: Label.SERVER,
-				message: `Added announce from ${candidate.tracker}: ${candidate.name}`,
-			});
+		if (!result) {
+			res.writeHead(204);
+			res.end();
+			return;
 		}
+		logger.info({
+			label: Label.SERVER,
+			message: `Added announce from ${candidate.tracker}: ${candidate.name}`,
+		});
 		res.setHeader("Content-Type", "application/json");
 		res.writeHead(200);
 		res.end(JSON.stringify(result));

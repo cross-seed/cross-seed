@@ -66,7 +66,8 @@ off if you set up this feature.
 
 :::
 
-This endpoint returns 200 if your request was received.
+This endpoint returns 200 if your request was received and a match was found. If
+no match it responds with 204 No Content.
 
 ### Supported formats
 
