@@ -1,8 +1,6 @@
 import Knex from "knex";
 import { join } from "path";
 import { appDir } from "../configuration.js";
-import { getRuntimeConfig } from "../runtimeConfig.js";
-import { uniq } from "lodash-es";
 import { getTorznabManager } from "../torznab.js";
 async function up(knex: Knex.Knex): Promise<void> {
 	const connection = await knex.client.acquireConnection();
@@ -11,12 +9,12 @@ async function up(knex: Knex.Knex): Promise<void> {
 	);
 	await knex.client.releaseConnection(connection);
 
-	await knex.schema.createTable("indexer", (table) => {
+	await knex.schema.createTableIfNotExists("indexer", (table) => {
 		table.increments("id").primary();
 		table.string("url").unique();
 	});
 
-	await knex.schema.createTable("timestamp", (table) => {
+	await knex.schema.createTableIfNotExists("timestamp", (table) => {
 		table.integer("searchee_id").references("id").inTable("searchee");
 		table.integer("indexer_id").references("id").inTable("indexer");
 		table.integer("first_searched");
@@ -39,12 +37,19 @@ async function up(knex: Knex.Knex): Promise<void> {
 			.from("searchee")
 			.crossJoin(knex.raw("indexer"));
 		await trx.batchInsert("timestamp", timestampRows, 100);
+		await trx.schema.alterTable("searchee", (table) => {
+			table.dropColumns("first_searched", "last_searched");
+		});
 	});
 }
 
 async function down(knex: Knex.Knex): Promise<void> {
-	await knex.schema.dropTable("timestamp");
-	await knex.schema.dropTable("indexer");
+	await knex.schema.alterTable("searchee", (table) => {
+		table.integer("first_searched");
+		table.integer("last_searched");
+	});
+	await knex.schema.dropTableIfExists("timestamp");
+	await knex.schema.dropTableIfExists("indexer");
 }
 
 export default { name: "02-timestamps", up, down };
