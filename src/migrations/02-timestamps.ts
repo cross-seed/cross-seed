@@ -9,12 +9,13 @@ async function up(knex: Knex.Knex): Promise<void> {
 	);
 	await knex.client.releaseConnection(connection);
 
-	await knex.schema.createTableIfNotExists("indexer", (table) => {
+	await knex.schema.createTable("indexer", (table) => {
 		table.increments("id").primary();
 		table.string("url").unique();
+		table.boolean("active");
 	});
 
-	await knex.schema.createTableIfNotExists("timestamp", (table) => {
+	await knex.schema.createTable("timestamp", (table) => {
 		table.integer("searchee_id").references("id").inTable("searchee");
 		table.integer("indexer_id").references("id").inTable("indexer");
 		table.integer("first_searched");
@@ -37,19 +38,12 @@ async function up(knex: Knex.Knex): Promise<void> {
 			.from("searchee")
 			.crossJoin(knex.raw("indexer"));
 		await trx.batchInsert("timestamp", timestampRows, 100);
-		await trx.schema.alterTable("searchee", (table) => {
-			table.dropColumns("first_searched", "last_searched");
-		});
 	});
 }
 
 async function down(knex: Knex.Knex): Promise<void> {
-	await knex.schema.alterTable("searchee", (table) => {
-		table.integer("first_searched");
-		table.integer("last_searched");
-	});
-	await knex.schema.dropTableIfExists("timestamp");
-	await knex.schema.dropTableIfExists("indexer");
+	await knex.schema.dropTable("timestamp");
+	await knex.schema.dropTable("indexer");
 }
 
 export default { name: "02-timestamps", up, down };

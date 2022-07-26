@@ -148,19 +148,28 @@ export class TorznabManager {
 
 		// keep api keys out of the database
 		const workingIndexersSanitized = workingIndexers.map(sanitizeUrl);
-		const dbIndexers: { url: string }[] = await db("indexer").select("url");
-		const dbIndexerStrings = dbIndexers.map((i) => i.url);
+		const dbIndexers: string[] = await db("indexer")
+			.where({ active: true })
+			.pluck("url");
 
 		const inMemoryButNotInDb = workingIndexersSanitized.filter(
-			(i) => !dbIndexerStrings.includes(i)
+			(i) => !dbIndexers.includes(i)
 		);
 
-		// what do we do with inDbButNotInMemory? save them in case indexer comes back later
-		await db.batchInsert(
-			"indexer",
-			inMemoryButNotInDb.map((url) => ({ url })),
-			100
+		const inDbButNotInMemory = dbIndexers.filter(
+			(i) => !workingIndexersSanitized.includes(i)
 		);
+
+		console.log({ inDbButNotInMemory, inMemoryButNotInDb });
+
+		await db("indexer")
+			.whereIn("url", inDbButNotInMemory)
+			.update({ active: false });
+
+		await db("indexer")
+			.insert(inMemoryButNotInDb.map((url) => ({ url, active: true })))
+			.onConflict("url")
+			.merge(["active"]);
 	}
 
 	async fetchCaps(url: string | URL): Promise<Caps> {
