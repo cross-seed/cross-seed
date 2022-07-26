@@ -3,6 +3,7 @@ import { join } from "path";
 import { appDir } from "../configuration.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { uniq } from "lodash-es";
+import { getTorznabManager } from "../torznab.js";
 async function up(knex: Knex.Knex): Promise<void> {
 	const connection = await knex.client.acquireConnection();
 	await connection.backup(
@@ -23,11 +24,9 @@ async function up(knex: Knex.Knex): Promise<void> {
 		table.primary(["searchee_id", "indexer_id"]);
 	});
 
-	const chunkSize = 100;
-	const { torznab } = getRuntimeConfig();
-	const torznabUniques: typeof torznab = uniq(torznab);
-	const indexerRows = torznabUniques.map((url) => ({ url }));
-	await knex.batchInsert("indexer", indexerRows, chunkSize);
+	// this is a bit of a shortcut but since db migrations run once, a
+	// little double-logging in an error case isn't too bad
+	await getTorznabManager().validateTorznabUrls();
 
 	await knex.transaction(async (trx) => {
 		const timestampRows = await trx
@@ -39,7 +38,7 @@ async function up(knex: Knex.Knex): Promise<void> {
 			)
 			.from("searchee")
 			.crossJoin(knex.raw("indexer"));
-		await trx.batchInsert("timestamp", timestampRows, chunkSize);
+		await trx.batchInsert("timestamp", timestampRows, 100);
 	});
 }
 

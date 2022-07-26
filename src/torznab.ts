@@ -2,6 +2,7 @@ import { zip } from "lodash-es";
 import fetch from "node-fetch";
 import xml2js from "xml2js";
 import { EP_REGEX, SEASON_REGEX } from "./constants.js";
+import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
@@ -31,8 +32,13 @@ interface Caps {
 
 let activeTorznabManager: TorznabManager;
 
+function sanitizeUrl(url: string | URL): string {
+	url = new URL(url);
+	return url.origin + url.pathname;
+}
+
 export class TorznabManager {
-	capsMap = new Map<URL, Caps>();
+	capsMap = new Map<string, Caps>();
 
 	/**
 	 * Generates a Torznab query URL, given the srcUrl (user config)
@@ -119,12 +125,42 @@ export class TorznabManager {
 		);
 
 		for (const [url, caps] of trackersWithSearchingCaps) {
-			this.capsMap.set(url, caps);
+			this.capsMap.set(url.toString(), caps);
 		}
 
 		if (trackersWithSearchingCaps.length === 0) {
 			throw new CrossSeedError("no working indexers available");
 		}
+		await this.syncWithDb();
+	}
+
+	async syncWithDb() {
+		if (this.capsMap.size === 0) {
+			logger.error({
+				label: Label.TORZNAB,
+				message:
+					"cross-seed tried to sync with the DB before capsMap was ready",
+			});
+		}
+		const workingIndexers = Array.from(this.capsMap.entries())
+			.filter(([, caps]) => caps.search)
+			.map(([url]) => url);
+
+		// keep api keys out of the database
+		const workingIndexersSanitized = workingIndexers.map(sanitizeUrl);
+		const dbIndexers: { url: string }[] = await db("indexer").select("url");
+		const dbIndexerStrings = dbIndexers.map((i) => i.url);
+
+		const inMemoryButNotInDb = workingIndexersSanitized.filter(
+			(i) => !dbIndexerStrings.includes(i)
+		);
+
+		// what do we do with inDbButNotInMemory? save them in case indexer comes back later
+		await db.batchInsert(
+			"indexer",
+			inMemoryButNotInDb.map((url) => ({ url })),
+			100
+		);
 	}
 
 	async fetchCaps(url: string | URL): Promise<Caps> {
@@ -197,7 +233,7 @@ export class TorznabManager {
 		nonceOptions = EmptyNonceOptions
 	): Promise<Candidate[]> {
 		const searchUrls = Array.from(this.capsMap).map(
-			([url, caps]: [URL, Caps]) => {
+			([url, caps]: [string, Caps]) => {
 				return this.assembleUrl(
 					url,
 					this.getBestSearchTechnique(name, caps)

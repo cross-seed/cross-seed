@@ -24,7 +24,7 @@ import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
-import timestamps from "./migrations/02-timestamps.js";
+
 function fallback(...args) {
 	for (const arg of args) {
 		if (arg !== undefined) return arg;
