@@ -56,7 +56,7 @@ Injection will work best if you use the `Original` content layout.
 There is a bad interaction with `cross-seed`, **qBittorrent**, and **Sonarr**,
 where new cross-seeds will be added with the Sonarr category, and then get stuck
 in Sonarr's import queue. There is a
-[fix in progress](https://github.com/mmgoodnow/cross-seed/pull/257), which will
+[fix in progress](https://github.com/cross-seed/cross-seed/pull/257), which will
 work if:
 
 -   you don't use separate **pre/post import categories** in Sonarr

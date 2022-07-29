@@ -37,7 +37,7 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 			name: pathSegments[pathSegments.length - 1],
 			length: file.length,
 			// Note that we don't use path.join here because of
-			// https://github.com/mmgoodnow/cross-seed/issues/46.
+			// https://github.com/cross-seed/cross-seed/issues/46.
 			// path.join ignores zero-length path segments,
 			// which we do not want.
 			path: [meta.name, ...pathSegments].join(path.sep),
