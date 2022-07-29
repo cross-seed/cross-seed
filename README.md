@@ -10,7 +10,7 @@ Currently the supported clients are
 -   rTorrent
 -   qBittorrent
 
-[Request your client here.](https://github.com/mmgoodnow/cross-seed/issues/new)
+[Request your client here.](https://github.com/cross-seed/cross-seed/issues/new)
 
 If your client isn't supported, `cross-seed` will download a bunch of torrent
 files to a folder you specify. After that, I recommend using
@@ -37,6 +37,6 @@ Head on over to
 ## Troubleshooting
 
 Feel free to
-[start a discussion](https://github.com/mmgoodnow/cross-seed/discussions/new) or
-[open an issue](https://github.com/mmgoodnow/cross-seed/issues/new), or reach
-out on [Discord](https://discord.gg/jpbUFzS5Wb).
+[start a discussion](https://github.com/cross-seed/cross-seed/discussions/new)
+or [open an issue](https://github.com/cross-seed/cross-seed/issues/new), or
+reach out on [Discord](https://discord.gg/jpbUFzS5Wb).

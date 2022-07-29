@@ -322,7 +322,7 @@ includeNonVideos: false,
 Increase this number to reject fewer torrents based on size. There is no
 guarantee that it will increase your match rate.
 
-https://github.com/mmgoodnow/cross-seed/blob/port-docs-from-wiki/src/decide.ts#L70-L87
+https://github.com/cross-seed/cross-seed/blob/port-docs-from-wiki/src/decide.ts#L70-L87
 
 :::caution
 
@@ -632,5 +632,5 @@ searchCadence: "4 weeks",
 ```
 
 [pr]:
-	https://github.com/mmgoodnow/cross-seed/tree/master/website/docs/basics/options.md
+	https://github.com/cross-seed/cross-seed/tree/master/website/docs/basics/options.md
 [ms]: https://github.com/vercel/ms#examples

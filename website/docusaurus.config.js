@@ -37,14 +37,14 @@ const config = {
 					// Please change this to your repo.
 					// Remove this to remove the "edit this page" links.
 					editUrl:
-						"https://github.com/mmgoodnow/cross-seed/tree/master/website",
+						"https://github.com/cross-seed/cross-seed/tree/master/website",
 				},
 				// blog: {
 				// 	showReadingTime: true,
 				// 	// Please change this to your repo.
 				// 	// Remove this to remove the "edit this page" links.
 				// 	editUrl:
-				// 		"https://github.com/mmgoodnow/cross-seed/tree/master/website",
+				// 		"https://github.com/cross-seed/cross-seed/tree/master/website",
 				// },
 				theme: {
 					customCss: require.resolve("./src/css/custom.css"),
@@ -70,7 +70,7 @@ const config = {
 						label: "Tutorial",
 					},
 					{
-						href: "https://github.com/mmgoodnow/cross-seed",
+						href: "https://github.com/cross-seed/cross-seed",
 						label: "GitHub",
 						position: "right",
 					},
@@ -102,7 +102,7 @@ const config = {
 						items: [
 							{
 								label: "GitHub",
-								href: "https://github.com/mmgoodnow/cross-seed",
+								href: "https://github.com/cross-seed/cross-seed",
 							},
 						],
 					},

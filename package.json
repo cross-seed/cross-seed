@@ -19,7 +19,7 @@
 	"type": "module",
 	"repository": {
 		"type": "git",
-		"url": "git://github.com/mmgoodnow/cross-seed.git"
+		"url": "git://github.com/cross-seed/cross-seed.git"
 	},
 	"author": "Michael Goodnow",
 	"license": "Apache-2.0",
