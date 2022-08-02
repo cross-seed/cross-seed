@@ -10,6 +10,10 @@ on:
     branches:
       - 'master'
 
+permissions:
+  packages: write
+  contents: read
+
 jobs:
   docker:
     environment: Docker Hub
@@ -30,7 +34,6 @@ jobs:
         uses: docker/setup-buildx-action@v1          
       -
         name: Login to DockerHub
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -40,6 +43,5 @@ jobs:
         name: Build and push
         uses: docker/build-push-action@v2
         with:
-          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
