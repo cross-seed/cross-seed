@@ -32,6 +32,9 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
       -
+        name: Set up QEMU dependency
+        uses: docker/setup-qemu-action@v1
+      -
         name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1          
