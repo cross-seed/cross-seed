@@ -1,12 +1,12 @@
 import { sortBy } from "lodash-es";
 import fs, { fstatSync } from "fs";
 import { Metafile } from "parse-torrent";
-import path, { join, basename } from "path";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { basename, sep as osSpecificPathSeparator } from "path";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { Result } from "./utils.js";
 import { logger } from "./logger.js";
-interface File {
+
+export interface File {
 	length: number;
 	name: string;
 	path: string;
@@ -79,7 +79,7 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 			// https://github.com/cross-seed/cross-seed/issues/46.
 			// path.join ignores zero-length path segments,
 			// which we do not want.
-			path: [meta.name, ...pathSegments].join(path.sep),
+			path: [meta.name, ...pathSegments].join(osSpecificPathSeparator),
 		};
 	});
 
