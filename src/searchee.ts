@@ -1,4 +1,5 @@
 import { sortBy } from "lodash-es";
+import fs, { fstatSync } from "fs";
 import { Metafile } from "parse-torrent";
 import path, { join, basename } from "path";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -18,6 +19,29 @@ export interface Searchee {
 	name: string;
 	length: number;
 }
+
+function getDirectorySize(filepath: string): number {
+	const files : string[] = getDirectoryFiles(filepath, []);
+	var totalSize : number = 0;
+	files.forEach(file => totalSize += fs.statSync(file).size);
+	return totalSize;
+}
+
+function getDirectoryFiles(dirPath, arrayOfFiles): string[] {
+	const files = fs.readdirSync(dirPath)
+  
+	arrayOfFiles = arrayOfFiles || []
+  
+	files.forEach(function(file) {
+	  if (fs.statSync(dirPath + "/" + file).isDirectory()) {
+		arrayOfFiles = getDirectoryFiles(dirPath + "/" + file, arrayOfFiles)
+	  } else {
+		arrayOfFiles.push(path.join(dirPath, file))
+	  }
+	})
+  
+	return arrayOfFiles
+  }
 
 function getFilesFromTorrent(meta: Metafile): File[] {
 	if (!meta.info.files) {
@@ -68,3 +92,34 @@ export async function createSearcheeFromTorrentFile(
 		return e;
 	}
 }
+
+export async function createSearcheeFromPath(
+	filepath: string
+): Promise<Result<Searchee>> {
+		//const rawPathSegments: Buffer[] = filepath["path.utf-8"] || filepath;
+		//const pathSegments = rawPathSegments.map((s) => s.toString());
+
+		const fileName : string = filepath.split(path.sep)[filepath.split(path.sep).length-1];
+		const length : number = fs.statSync(filepath).isDirectory() ? getDirectorySize(filepath) : fs.statSync(filepath).size;
+		if (fs.statSync(filepath).isDirectory()){
+			const files = getDirectoryFiles(filepath, [])
+		}
+		
+
+		return {
+			files:  [{
+				name: fileName,
+				path: fileName,
+				length: length,
+			}],
+			path: filepath,
+			name: fileName,
+			length: length,
+		};
+	// } catch (e) {
+	// 	logger.error(`Failed to parse ${basename(filepath)}`);
+	// 	logger.debug(e);
+	// 	return e;
+	// }
+} // file obj is just name, path, length
+
