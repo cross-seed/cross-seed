@@ -63,9 +63,9 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const timestampDataSql = await db("searchee")
 		.join("timestamp", "searchee.id", "timestamp.searchee_id")
 		.join("indexer", "timestamp.indexer_id", "indexer.id")
+		.where({ name: searchee.name })
 		.max({ first_searched_all: "timestamp.first_searched" })
 		.min({ last_searched_all: "timestamp.last_searched" })
-		.where({ name: searchee.name })
 		.first();
 
 	if (!timestampDataSql) return true;

@@ -162,14 +162,20 @@ export class TorznabManager {
 
 		console.log({ inDbButNotInMemory, inMemoryButNotInDb });
 
-		await db("indexer")
-			.whereIn("url", inDbButNotInMemory)
-			.update({ active: false });
+		if (inDbButNotInMemory.length > 0) {
+			await db("indexer")
+				.whereIn("url", inDbButNotInMemory)
+				.update({ active: false });
+		}
 
-		await db("indexer")
-			.insert(inMemoryButNotInDb.map((url) => ({ url, active: true })))
-			.onConflict("url")
-			.merge(["active"]);
+		if (inMemoryButNotInDb.length > 0) {
+			await db("indexer")
+				.insert(
+					inMemoryButNotInDb.map((url) => ({ url, active: true }))
+				)
+				.onConflict("url")
+				.merge(["active"]);
+		}
 	}
 
 	async fetchCaps(url: string | URL): Promise<Caps> {
@@ -241,17 +247,37 @@ export class TorznabManager {
 		name: string,
 		nonceOptions = EmptyNonceOptions
 	): Promise<Candidate[]> {
-		const searchUrls = Array.from(this.capsMap).map(
-			([url, caps]: [string, Caps]) => {
+		const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
+		const timestampDataSql = await db("searchee")
+			.join("timestamp", "searchee.id", "timestamp.searchee_id")
+			.join("indexer", "timestamp.indexer_id", "indexer.id")
+			.where({ name })
+			.select({
+				name: "searchee.name",
+				url: "indexer.url",
+				firstSearched: "timestamp.first_searched",
+				lastSearched: "timestamp.last_searched",
+			});
+		const searchUrls = Array.from(this.capsMap)
+			.filter(([url]) => {
+				const entry = timestampDataSql.find(
+					(entry) => entry.url === sanitizeUrl(url)
+				);
+				return entry
+					? entry.firstSearched > excludeOlder &&
+							entry.lastSearched < excludeRecentSearch
+					: true;
+			})
+			.map(([url, caps]: [string, Caps]) => {
 				return this.assembleUrl(
 					url,
 					this.getBestSearchTechnique(name, caps)
 				);
-			}
-		);
+			});
 		searchUrls.forEach(
 			(message) => void logger.verbose({ label: Label.TORZNAB, message })
 		);
+
 		const outcomes = await Promise.allSettled<Candidate[]>(
 			searchUrls.map((url) =>
 				fetch(url)
