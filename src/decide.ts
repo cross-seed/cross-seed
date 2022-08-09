@@ -1,5 +1,5 @@
 import { existsSync, writeFileSync } from "fs";
-import parseTorrent, { Metafile } from "parse-torrent";
+import parseTorrent, { FileListing, Metafile } from "parse-torrent";
 import path from "path";
 import { appDir } from "./configuration.js";
 import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
@@ -9,7 +9,7 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { db } from "./db.js";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
-
+import { File } from "./searchee";
 export interface ResultAssessment {
 	decision: Decision;
 	metafile?: Metafile;
@@ -55,7 +55,7 @@ export function compareFileTrees(
 	candidate: Metafile,
 	searchee: Searchee
 ): boolean {
-	const cmp = (elOfA, elOfB) => {
+	const cmp = (elOfA: FileListing, elOfB: File) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		const pathsAreEqual = elOfB.path === elOfA.path;
 
