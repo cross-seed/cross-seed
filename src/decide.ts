@@ -9,7 +9,7 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { db } from "./db.js";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
-import { File } from "./searchee";
+import { File } from "./searchee.js";
 export interface ResultAssessment {
 	decision: Decision;
 	metafile?: Metafile;
