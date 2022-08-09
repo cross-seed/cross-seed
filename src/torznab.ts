@@ -243,6 +243,32 @@ export class TorznabManager {
 		}
 	}
 
+	async updateSearchTimestamps(name: string, indexers: string[]) {
+		for (const indexer of indexers) {
+			await db.transaction(async (trx) => {
+				const now = Date.now();
+				const searchee_id: number = await trx("searchee")
+					.where({ name })
+					.pluck("id")
+					.first();
+				const indexer_id: number = await trx("indexer")
+					.where({ url: sanitizeUrl(indexer) })
+					.pluck("id")
+					.first();
+
+				await trx("timestamp")
+					.insert({
+						searchee_id,
+						indexer_id,
+						last_searched: now,
+						first_searched: now,
+					})
+					.onConflict(["searchee_id", "indexer_id"])
+					.merge("last_searched");
+			});
+		}
+	}
+
 	async searchTorznab(
 		name: string,
 		nonceOptions = EmptyNonceOptions
@@ -258,22 +284,21 @@ export class TorznabManager {
 				firstSearched: "timestamp.first_searched",
 				lastSearched: "timestamp.last_searched",
 			});
-		const searchUrls = Array.from(this.capsMap)
-			.filter(([url]) => {
-				const entry = timestampDataSql.find(
-					(entry) => entry.url === sanitizeUrl(url)
-				);
-				return entry
-					? entry.firstSearched > excludeOlder &&
-							entry.lastSearched < excludeRecentSearch
-					: true;
-			})
-			.map(([url, caps]: [string, Caps]) => {
-				return this.assembleUrl(
-					url,
-					this.getBestSearchTechnique(name, caps)
-				);
-			});
+		const indexersToUse = Array.from(this.capsMap).filter(([url]) => {
+			const entry = timestampDataSql.find(
+				(entry) => entry.url === sanitizeUrl(url)
+			);
+			return entry
+				? entry.firstSearched > excludeOlder &&
+						entry.lastSearched < excludeRecentSearch
+				: true;
+		});
+		const searchUrls = indexersToUse.map(([url, caps]: [string, Caps]) => {
+			return this.assembleUrl(
+				url,
+				this.getBestSearchTechnique(name, caps)
+			);
+		});
 		searchUrls.forEach(
 			(message) => void logger.verbose({ label: Label.TORZNAB, message })
 		);
@@ -281,11 +306,18 @@ export class TorznabManager {
 		const outcomes = await Promise.allSettled<Candidate[]>(
 			searchUrls.map((url) =>
 				fetch(url)
+					.then((response) => {
+						if (!response.ok)
+							throw new Error(
+								`Querying "${url}" failed with code: ${response.status}`
+							);
+						return response;
+					})
 					.then((r) => r.text())
 					.then(this.parseResults)
 			)
 		);
-		const rejected = zip(Array.from(this.capsMap.keys()), outcomes).filter(
+		const rejected = zip(indexersToUse, outcomes).filter(
 			([, outcome]) => outcome.status === "rejected"
 		);
 		rejected
@@ -295,13 +327,18 @@ export class TorznabManager {
 			)
 			.forEach(logger.warn);
 
-		const fulfilled = outcomes
-			.filter(
-				(outcome): outcome is PromiseFulfilledResult<Candidate[]> =>
-					outcome.status === "fulfilled"
-			)
-			.map((outcome) => outcome.value);
-		return [].concat(...fulfilled);
+		const fulfilled: [string, PromiseFulfilledResult<Candidate[]>][] = zip(
+			indexersToUse,
+			outcomes
+		).filter(
+			(outcome): outcome is PromiseFulfilledResult<Candidate[]> =>
+				outcome.status === "fulfilled"
+		);
+		await this.updateSearchTimestamps(
+			name,
+			fulfilled.map(([url]) => url)
+		);
+		return fulfilled.flatMap(([, outcome]) => outcome.value);
 	}
 }
 

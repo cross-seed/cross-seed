@@ -70,7 +70,6 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 
 	if (!timestampDataSql) return true;
 	const { first_searched_all, last_searched_all } = timestampDataSql;
-	console.log({ first_searched_all, last_searched_all });
 	function logReason(reason) {
 		logger.verbose({
 			label: Label.PREFILTER,
