@@ -188,13 +188,16 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents(useData : boolean) {
-	const { torrents  } = getRuntimeConfig(); //find how to get datadir in
-	const dataDir : string = "A:/Downloads/";
+	const { torrents, dataDir } = getRuntimeConfig(); //find how to get datadir in
 	useData=true;
 	let parsedTorrents: Searchee[];
 	if (useData) {
 		const fullPaths = [];
-		fs.readdirSync(dataDir).forEach(file => fullPaths.push(path.join(dataDir, file)));
+		if (fs.statSync(dataDir).isDirectory()) {
+			fs.readdirSync(dataDir).forEach(file => fullPaths.push(path.join(dataDir, file)));
+		} else {
+			fullPaths.push(dataDir);
+		}
 		const searcheeResults = await Promise.all(fullPaths.map(createSearcheeFromPath))
 		parsedTorrents = searcheeResults.filter(ok);
 	} else {
