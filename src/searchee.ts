@@ -29,8 +29,8 @@ function getFilesFromPath(dirPath): File[] {
 	var torrentFiles: File[] = [];
 	files.forEach(file => torrentFiles.push(
 		{
-			path : path.relative(path.join(dirPath, ".."), path.join(dirPath, file)),
-			name : file,
+			path: path.relative(path.join(dirPath, ".."), file),
+        	name: path.basename(file),
 			length : fs.statSync(file).size
 		})
 	)
