@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import fs from "fs";
 import { zip } from "lodash-es";
+import path from "path";
 import { performAction, performActions } from "./action.js";
 import {
 	ActionResult,
@@ -21,6 +22,7 @@ import {
 import {
 	createSearcheeFromMetafile,
 	createSearcheeFromTorrentFile,
+	createSearcheeFromPath,
 	Searchee,
 } from "./searchee.js";
 import {
@@ -185,16 +187,25 @@ export async function checkNewCandidateMatch(
 	return result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
 }
 
-async function findSearchableTorrents() {
-	const { torrents } = getRuntimeConfig();
+async function findSearchableTorrents(useData : boolean) {
+	const { torrents  } = getRuntimeConfig(); //find how to get datadir in
+	const dataDir : string = "A:/Downloads/";
+	useData=true;
 	let parsedTorrents: Searchee[];
-	if (Array.isArray(torrents)) {
-		const searcheeResults = await Promise.all(
-			torrents.map(createSearcheeFromTorrentFile)
-		);
+	if (useData) {
+		const fullPaths = [];
+		fs.readdirSync(dataDir).forEach(file => fullPaths.push(path.join(dataDir, file)));
+		const searcheeResults = await Promise.all(fullPaths.map(createSearcheeFromPath))
 		parsedTorrents = searcheeResults.filter(ok);
 	} else {
-		parsedTorrents = await loadTorrentDirLight();
+		if (Array.isArray(torrents)) {
+			const searcheeResults = await Promise.all(
+				torrents.map(createSearcheeFromTorrentFile) //also create searchee from path
+			);
+			parsedTorrents = searcheeResults.filter(ok);
+		} else {
+			parsedTorrents = await loadTorrentDirLight();
+		}
 	}
 
 	const hashesToExclude = parsedTorrents
@@ -213,9 +224,13 @@ async function findSearchableTorrents() {
 	return { samples: filteredTorrents, hashesToExclude };
 }
 
+
+
 export async function main(): Promise<void> {
-	const { outputDir } = getRuntimeConfig();
-	const { samples, hashesToExclude } = await findSearchableTorrents();
+	const { outputDir, dataDir } = getRuntimeConfig();
+	const useData : boolean = true;
+	const { samples, hashesToExclude } =  await findSearchableTorrents(useData);
+
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);

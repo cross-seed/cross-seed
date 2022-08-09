@@ -16,6 +16,11 @@ module.exports = {
 	torznab: [],
 
 	/**
+	 * comment
+	 */
+	dataDir: "/path/to/data/dir",
+
+	/**
 	 * directory containing torrent files.
 	 * For rtorrent, this is your session directory
 	 * as configured in your .rtorrent.rc file.

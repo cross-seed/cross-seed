@@ -3,6 +3,7 @@ export interface RuntimeConfig {
 	offset: number;
 	delay: number;
 	torznab: string[];
+	dataDir: string;
 	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;

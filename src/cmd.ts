@@ -63,6 +63,11 @@ function createCommandWithSharedOptions(name, description) {
 			"Torznab urls with apikey included (separated by spaces)",
 			fallback(fileConfig.torznab)
 		)
+		.option(
+			"-d, --data-dir <dir>",
+			"Directory to use if searching by data instead of torrents.",
+			fallback(fileConfig.dataDir)
+		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
 			"Directory with torrent files",
