@@ -188,8 +188,7 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents(useData : boolean) {
-	const { torrents, dataDir } = getRuntimeConfig(); //find how to get datadir in
-	useData=true;
+	const { torrents, dataDir } = getRuntimeConfig();
 	let parsedTorrents: Searchee[];
 	if (useData) {
 		const fullPaths = [];
@@ -231,8 +230,7 @@ async function findSearchableTorrents(useData : boolean) {
 
 export async function main(): Promise<void> {
 	const { outputDir, dataDir } = getRuntimeConfig();
-	const useData : boolean = true;
-	const { samples, hashesToExclude } =  await findSearchableTorrents(useData);
+	const { samples, hashesToExclude } =  await findSearchableTorrents(typeof dataDir !== 'undefined');
 
 
 	fs.mkdirSync(outputDir, { recursive: true });

@@ -58,7 +58,6 @@ export function compareFileTrees(
 	const cmp = (elOfA, elOfB) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		const pathsAreEqual = elOfB.path === elOfA.path;
-
 		return lengthsAreEqual && pathsAreEqual;
 	};
 

@@ -110,7 +110,7 @@ export async function createSearcheeFromPath(
 		//const pathSegments = rawPathSegments.map((s) => s.toString());
 
 		const fileName : string = path.basename(filepath);
-		var fileList : File[] = getFilesFromPath(filepath, filepath, []);
+		var fileList : File[] = getFilesFromPath(filepath);
 		var totalLength = 0;
 		fileList.forEach(file => totalLength += file.length);
 
