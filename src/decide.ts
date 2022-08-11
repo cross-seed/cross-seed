@@ -60,7 +60,6 @@ export function compareFileTrees(
 		const pathsAreEqual = elOfB.path === elOfA.path;
 		return lengthsAreEqual && pathsAreEqual;
 	};
-
 	return candidate.files.every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
 	);
