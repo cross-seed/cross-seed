@@ -20,23 +20,6 @@ export interface Searchee {
 	length: number;
 }
 
-function getFilesFromPath(dirPath): File[] {
-	if (fs.statSync(dirPath).isDirectory()) {
-		var files: string[] = getFilePathsFromPath(dirPath, []);
-	} else {
-		var files: string[] = [dirPath];
-	}
-	var torrentFiles: File[] = [];
-	files.forEach(file => torrentFiles.push(
-		{
-			path: path.relative(path.join(dirPath, ".."), file),
-        	name: path.basename(file),
-			length : fs.statSync(file).size
-		})
-	)
-	return torrentFiles
-  }
-
 function getFilePathsFromPath(dirPath, arrayOfFiles) {
 	var files = fs.readdirSync(dirPath)
 
@@ -52,6 +35,23 @@ function getFilePathsFromPath(dirPath, arrayOfFiles) {
 
 	return arrayOfFiles
 }
+
+function getFilesFromDataRoot(rootPath): File[] {
+	if (fs.statSync(rootPath).isDirectory()) {
+		var files: string[] = getFilePathsFromPath(rootPath, []);
+	} else {
+		var files: string[] = [rootPath];
+	}
+	var torrentFiles: File[] = [];
+	files.forEach(file => torrentFiles.push(
+		{
+			path: path.relative(path.join(rootPath, ".."), file),
+        	name: path.basename(file),
+			length : fs.statSync(file).size
+		})
+	)
+	return torrentFiles
+  }
 
 function getFilesFromTorrent(meta: Metafile): File[] {
 	if (!meta.info.files) {
@@ -110,9 +110,8 @@ export async function createSearcheeFromPath(
 		//const pathSegments = rawPathSegments.map((s) => s.toString());
 
 		const fileName : string = path.basename(filepath);
-		var fileList : File[] = getFilesFromPath(filepath);
-		var totalLength = 0;
-		fileList.forEach(file => totalLength += file.length);
+		const fileList : File[] = getFilesFromDataRoot(filepath);
+		var totalLength = fileList.reduce<number>((runningTotal, file) => runningTotal + file.length, 0);
 
 		return {
 			files:  fileList,
