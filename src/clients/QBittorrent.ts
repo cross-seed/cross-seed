@@ -1,5 +1,6 @@
 import { fileFrom } from "fetch-blob/from.js";
 import { FormData } from "formdata-polyfill/esm.min.js";
+import { statSync } from "fs";
 import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
@@ -224,6 +225,14 @@ export default class QBittorrent implements TorrentClient {
 		autoTMM: boolean;
 		category: string;
 	}> {
+		const { dataDir } = getRuntimeConfig();
+		if (typeof dataDir != 'undefined') {
+			const save_path: string = searchee.path;
+			const isComplete: boolean = true;
+			const autoTMM: boolean = false;
+			const category: string = " ";
+			return {save_path, isComplete, autoTMM, category}
+		}
 		const responseText = await this.request(
 			"/torrents/info",
 			`hashes=${searchee.infoHash}`,
@@ -248,6 +257,10 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async isSubfolderContentLayout(searchee: Searchee): Promise<boolean> {
+		const { dataDir } = getRuntimeConfig();
+		if (typeof dataDir != 'undefined') {
+			return statSync(searchee.path).isDirectory();
+		}
 		const response = await this.request(
 			"/torrents/files",
 			`hash=${searchee.infoHash}`,
@@ -263,7 +276,7 @@ export default class QBittorrent implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee
 	): Promise<InjectionResult> {
-		const { duplicateCategories } = getRuntimeConfig();
+		const { dataDir, duplicateCategories } = getRuntimeConfig();
 		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
@@ -274,10 +287,12 @@ export default class QBittorrent implements TorrentClient {
 		try {
 			const { save_path, isComplete, autoTMM, category } =
 				await this.getTorrentConfiguration(searchee);
-
-			const newCategoryName = duplicateCategories
+			
+			const newCategoryName = typeof dataDir == 'undefined' ? 
+			(duplicateCategories
 				? await this.setUpCrossSeedCategory(category)
-				: category;
+				: category) 
+				: "cross-seed-data";
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
