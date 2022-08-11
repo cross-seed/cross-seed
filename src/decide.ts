@@ -58,8 +58,10 @@ export function compareFileTrees(
 	const cmp = (elOfA, elOfB) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		const pathsAreEqual = elOfB.path === elOfA.path;
+
 		return lengthsAreEqual && pathsAreEqual;
 	};
+
 	return candidate.files.every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
 	);
@@ -67,6 +69,7 @@ export function compareFileTrees(
 
 function sizeDoesMatch(resultSize, searchee) {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
+	
 	const { length } = searchee;
 	const lowerBound = length - fuzzySizeThreshold * length;
 	const upperBound = length + fuzzySizeThreshold * length;
