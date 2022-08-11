@@ -69,7 +69,7 @@ export function compareFileTrees(
 
 function sizeDoesMatch(resultSize, searchee) {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
-	
+
 	const { length } = searchee;
 	const lowerBound = length - fuzzySizeThreshold * length;
 	const upperBound = length + fuzzySizeThreshold * length;
