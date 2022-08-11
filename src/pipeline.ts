@@ -188,15 +188,16 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents(useData : boolean) {
-	const { torrents, dataDir } = getRuntimeConfig();
+	const { torrents, dataDirs } = getRuntimeConfig();
 	let parsedTorrents: Searchee[];
 	if (useData) {
 		const fullPaths = [];
-		if (fs.statSync(dataDir).isDirectory()) {
-			fs.readdirSync(dataDir).forEach(file => fullPaths.push(path.join(dataDir, file)));
-		} else {
-			fullPaths.push(dataDir);
-		}
+		dataDirs.forEach(dataDir => {
+			if (fs.statSync(dataDir).isDirectory()) {
+				fs.readdirSync(dataDir).forEach(file => fullPaths.push(path.join(dataDir, file)));
+			} else {
+				fullPaths.push(dataDir);
+		}})
 		const searcheeResults = await Promise.all(fullPaths.map(createSearcheeFromPath))
 		parsedTorrents = searcheeResults.filter(ok);
 	} else {
@@ -229,8 +230,8 @@ async function findSearchableTorrents(useData : boolean) {
 
 
 export async function main(): Promise<void> {
-	const { outputDir, dataDir } = getRuntimeConfig();
-	const { samples, hashesToExclude } =  await findSearchableTorrents(typeof dataDir !== 'undefined');
+	const { outputDir, dataDirs } = getRuntimeConfig();
+	const { samples, hashesToExclude } =  await findSearchableTorrents(dataDirs.length > 0);
 
 
 	fs.mkdirSync(outputDir, { recursive: true });

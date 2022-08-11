@@ -64,9 +64,9 @@ function createCommandWithSharedOptions(name, description) {
 			fallback(fileConfig.torznab)
 		)
 		.option(
-			"-d, --data-dir <dir>",
-			"Directory to use if searching by data instead of torrents.",
-			fallback(fileConfig.dataDir)
+			"-d, --data-dirs <dirs...>",
+			"Directories to use if searching by data instead of torrents (separated by spaces)",
+			fallback(fileConfig.dataDirs)
 		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",

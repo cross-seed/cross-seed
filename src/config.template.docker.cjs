@@ -17,9 +17,10 @@ module.exports = {
 	torznab: [],
 
 	/**
-	 * comment
+	 * To search with downloaded data, you can pass in directories to your downloaded torrent data
+	 * to find matches rather using the torrent files themselves for matching. 
 	 */
-	dataDir: "/data",
+	dataDirs: [],
 	/**
 	 * directory containing torrent files.
 	 * For rtorrent, this is your session directory

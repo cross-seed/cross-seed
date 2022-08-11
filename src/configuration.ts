@@ -19,7 +19,7 @@ interface FileConfig {
 	fuzzySizeThreshold?: number;
 	excludeOlder?: string;
 	excludeRecentSearch?: string;
-	dataDir?: string;
+	dataDirs?: string[];
 	torrentDir?: string;
 	torznab?: string[];
 	qbittorrentUrl?: string;

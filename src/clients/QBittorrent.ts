@@ -225,8 +225,8 @@ export default class QBittorrent implements TorrentClient {
 		autoTMM: boolean;
 		category: string;
 	}> {
-		const { dataDir } = getRuntimeConfig();
-		if (typeof dataDir != 'undefined') {
+		const { dataDirs } = getRuntimeConfig();
+		if (dataDirs.length > 0) {
 			const save_path: string = searchee.path;
 			const isComplete: boolean = true;
 			const autoTMM: boolean = false;
@@ -257,8 +257,8 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async isSubfolderContentLayout(searchee: Searchee): Promise<boolean> {
-		const { dataDir } = getRuntimeConfig();
-		if (typeof dataDir != 'undefined') {
+		const { dataDirs } = getRuntimeConfig();
+		if (dataDirs.length > 0) {
 			return statSync(searchee.path).isDirectory();
 		}
 		const response = await this.request(
@@ -276,7 +276,7 @@ export default class QBittorrent implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee
 	): Promise<InjectionResult> {
-		const { dataDir, duplicateCategories } = getRuntimeConfig();
+		const { dataDirs, duplicateCategories } = getRuntimeConfig();
 		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
@@ -288,7 +288,7 @@ export default class QBittorrent implements TorrentClient {
 			const { save_path, isComplete, autoTMM, category } =
 				await this.getTorrentConfiguration(searchee);
 			
-			const newCategoryName = typeof dataDir == 'undefined' ? 
+			const newCategoryName = dataDirs.length > 0 ? 
 			(duplicateCategories
 				? await this.setUpCrossSeedCategory(category)
 				: category) 
