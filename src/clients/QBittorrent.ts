@@ -226,8 +226,8 @@ export default class QBittorrent implements TorrentClient {
 		category: string;
 	}> {
 		const { dataDirs } = getRuntimeConfig();
-		if (dataDirs.length > 0) {
-			const save_path: string = join(searchee.path, "/..");
+		if (searchee.path) {
+			const save_path: string = dirname(searchee.path);
 			const isComplete: boolean = true;
 			const autoTMM: boolean = false;
 			const category: string = " ";
@@ -288,7 +288,7 @@ export default class QBittorrent implements TorrentClient {
 			const { save_path, isComplete, autoTMM, category } =
 				await this.getTorrentConfiguration(searchee);
 			
-			const newCategoryName = dataDirs.length == 0 ? 
+			const newCategoryName = searchee.infoHash ? 
 			(duplicateCategories
 				? await this.setUpCrossSeedCategory(category)
 				: category) 

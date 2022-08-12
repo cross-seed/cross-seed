@@ -106,23 +106,14 @@ export async function createSearcheeFromTorrentFile(
 export async function createSearcheeFromPath(
 	filepath: string
 ): Promise<Result<Searchee>> {
-		//const rawPathSegments: Buffer[] = filepath["path.utf-8"] || filepath;
-		//const pathSegments = rawPathSegments.map((s) => s.toString());
-
 		const fileName : string = path.basename(filepath);
 		const fileList : File[] = getFilesFromDataRoot(filepath);
 		var totalLength = fileList.reduce<number>((runningTotal, file) => runningTotal + file.length, 0);
-
 		return {
 			files:  fileList,
 			path: filepath,
 			name: fileName,
 			length: totalLength,
 		};
-	// } catch (e) {
-	// 	logger.error(`Failed to parse ${basename(filepath)}`);
-	// 	logger.debug(e);
-	// 	return e;
-	// }
 } 
 

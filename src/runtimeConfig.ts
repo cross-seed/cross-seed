@@ -25,13 +25,11 @@ export interface RuntimeConfig {
 
 export interface NonceOptions {
 	torznab: string[];
-	dataDirs: string[];
 	outputDir: string;
 }
 
 export const EmptyNonceOptions = {
 	torznab: undefined,
-	dataDirs: undefined,
 	outputDir: undefined,
 };
 
