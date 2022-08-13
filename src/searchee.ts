@@ -20,7 +20,7 @@ export interface Searchee {
 	length: number;
 }
 
-function getFilePathsFromPath(dirPath, arrayOfFiles) {
+export function getFilePathsFromPath(dirPath, arrayOfFiles) {
 	var files = fs.readdirSync(dirPath)
 
 	arrayOfFiles = arrayOfFiles || []
