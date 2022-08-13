@@ -366,7 +366,7 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("hash", torrent.infoHash);
 				var oldPath = torrent.files[0].path.split(path.sep)[0]
 				formData.append("oldPath", oldPath);
-				var newPath = path.basename(path.join(searchee.path, "/.."));
+				var newPath = path.dirname(searchee.path);
 				formData.append("newPath", newPath)
 				formData.append("foo", "bar");
 				await this.request("/torrents/renameFolder", formData);
