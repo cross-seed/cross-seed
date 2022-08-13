@@ -67,6 +67,21 @@ export function compareFileTrees(
 	);
 }
 
+export function compareFileTreesIgnoringParentDir(
+	candidate: Metafile,
+	searchee: Searchee): boolean {
+		const cmp = (candidate, searchee, searcheeTopLevel, candidateTopLevel) => {
+			const lengthsAreEqual = searchee.length === candidate.length;
+			const pathsAreEqual = searchee.path === path.relative(candidateTopLevel, candidate.path);
+
+			return lengthsAreEqual && pathsAreEqual;
+		};
+
+		return candidate.files.every((elOfA) =>
+		searchee.files.some((elOfB) => cmp(elOfA, elOfB, path.basename(searchee.path), candidate.files[0].path.split(path.sep)[0]))
+	);
+	}
+
 function sizeDoesMatch(resultSize, searchee) {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 
@@ -94,12 +109,16 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(info.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
-
-	if (!compareFileTrees(info, searchee)) {
-		return { decision: Decision.FILE_TREE_MISMATCH };
+	var dataMode = "media";
+	const perfectMatch = compareFileTrees(info, searchee);
+	if (perfectMatch) {
+		return { decision: Decision.MATCH, metafile: info};
 	}
-
-	return { decision: Decision.MATCH, metafile: info };
+	if (dataMode == "media" && compareFileTreesIgnoringParentDir(info, searchee)) {
+		return { decision: Decision.MATCH_EXCEPT_PARENT_DIR, metafile: info};
+	}
+	return { decision: Decision.FILE_TREE_MISMATCH };
+	
 }
 
 function existsInTorrentCache(infoHash: string): boolean {
@@ -141,6 +160,18 @@ async function assessAndSaveResults(
 		cacheTorrentFile(assessment.metafile);
 	}
 
+	if (assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR) {
+		// const topLevel = path.basename(searchee.path);
+		// assessment.metafile.files.forEach(
+		// 	(file) => file.path = path.join(
+		// 		topLevel, path.relative(
+		// 			file.path.split("/")[0], file.path)
+		// 		)
+		// 	);
+		// assessment.decision = Decision.MATCH;
+		cacheTorrentFile(assessment.metafile);
+	}
+
 	await db.transaction(async (trx) => {
 		const now = Date.now();
 		const { id } = await trx("searchee")
@@ -152,7 +183,7 @@ async function assessAndSaveResults(
 			guid: guid,
 			decision: assessment.decision,
 			info_hash:
-				assessment.decision === Decision.MATCH
+				assessment.decision === Decision.MATCH || assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR
 					? assessment.metafile.infoHash
 					: null,
 			last_seen: now,
@@ -189,7 +220,8 @@ async function assessCandidateCaching(
 		);
 		logReason(assessment.decision, false);
 	} else if (
-		cacheEntry.decision === Decision.MATCH &&
+		cacheEntry.decision === Decision.MATCH || 
+		cacheEntry.decision === Decision.MATCH_EXCEPT_PARENT_DIR &&
 		infoHashesToExclude.includes(cacheEntry.infoHash)
 	) {
 		// has been added since the last run
@@ -198,7 +230,8 @@ async function assessCandidateCaching(
 			.where({ id: cacheEntry.id })
 			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
 	} else if (
-		cacheEntry.decision === Decision.MATCH &&
+		cacheEntry.decision === Decision.MATCH || 
+		cacheEntry.decision === Decision.MATCH_EXCEPT_PARENT_DIR &&
 		existsInTorrentCache(cacheEntry.info_hash)
 	) {
 		// cached match
@@ -206,7 +239,9 @@ async function assessCandidateCaching(
 			decision: cacheEntry.decision,
 			metafile: await getCachedTorrentFile(cacheEntry.info_hash),
 		};
-	} else if (cacheEntry.decision === Decision.MATCH) {
+	} else if (
+		cacheEntry.decision === Decision.MATCH || 
+		cacheEntry.decision === Decision.MATCH_EXCEPT_PARENT_DIR) {
 		assessment = await assessAndSaveResults(
 			candidate,
 			searchee,

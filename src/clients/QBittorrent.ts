@@ -5,8 +5,8 @@ import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
-import { dirname, join, posix } from "path";
-import { InjectionResult } from "../constants.js";
+import path, { dirname, join, posix } from "path";
+import { InjectionResult, RenameResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
@@ -225,9 +225,11 @@ export default class QBittorrent implements TorrentClient {
 		autoTMM: boolean;
 		category: string;
 	}> {
-		const { dataDirs } = getRuntimeConfig();
+		const { dataDirs, dataMode } = getRuntimeConfig();
 		if (searchee.path) {
-			const save_path: string = dirname(searchee.path);
+			const save_path: string = dataMode == "media" ?
+				dirname(dirname(searchee.path)) : 
+				dirname(searchee.path);
 			const isComplete: boolean = true;
 			const autoTMM: boolean = false;
 			const category: string = " ";
@@ -355,4 +357,39 @@ export default class QBittorrent implements TorrentClient {
 			return InjectionResult.FAILURE;
 		}
 	}
+	async rename(
+		torrent: Metafile,
+		searchee: Searchee,
+		tracker: string): Promise<RenameResult> {
+			try {
+				const formData = new FormData();
+				formData.append("hash", torrent.infoHash);
+				var oldPath = torrent.files[0].path.split(path.sep)[0]
+				formData.append("oldPath", oldPath);
+				var newPath = path.basename(path.join(searchee.path, "/.."));
+				formData.append("newPath", newPath)
+				formData.append("foo", "bar");
+				await this.request("/torrents/renameFolder", formData);
+				await this.request(               // for some reason, this pause, recheck, resume loop is required to get the torrents 
+					"/torrents/pause",            // to not just say "missing files." I hope there's a workaround for this,
+					`hashes=${torrent.infoHash}`, // because the recheck time would be immense when scanned on a large library.
+					X_WWW_FORM_URLENCODED
+				);
+				await this.request(
+					"/torrents/recheck", 
+					`hashes=${torrent.infoHash}`,
+					X_WWW_FORM_URLENCODED);
+				await this.request(
+					"/torrents/resume", 
+					`hashes=${torrent.infoHash}`,
+					X_WWW_FORM_URLENCODED);
+				return RenameResult.SUCCESS;
+			} catch (e) {
+				logger.debug({
+					label: Label.QBITTORRENT,
+					message: `Rename failed: ${e.message}`,
+				});
+				return RenameResult.FAILURE;
+			}
+		}
 }

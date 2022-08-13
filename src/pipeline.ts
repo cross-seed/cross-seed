@@ -20,6 +20,7 @@ import {
 	NonceOptions,
 } from "./runtimeConfig.js";
 import {
+	getFilePathsFromPath,
 	createSearcheeFromMetafile,
 	createSearcheeFromTorrentFile,
 	createSearcheeFromPath,
@@ -82,7 +83,8 @@ async function findOnOtherSites(
 		results.map(assessEach)
 	);
 	const matches = loaded.filter(
-		(e) => e.assessment.decision === Decision.MATCH
+		(e) => (e.assessment.decision === Decision.MATCH || 
+			    e.assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR)
 	);
 	const actionResults = await performActions(searchee, matches, nonceOptions);
 
@@ -171,10 +173,11 @@ export async function checkNewCandidateMatch(
 		hashesToExclude
 	);
 
-	if (assessment.decision !== Decision.MATCH) return false;
+	if (assessment.decision !== Decision.MATCH && assessment.decision !== Decision.MATCH_EXCEPT_PARENT_DIR) return false;
 
 	const result = await performAction(
 		assessment.metafile,
+		assessment.decision,
 		searchee,
 		candidate.tracker,
 		EmptyNonceOptions
@@ -189,6 +192,7 @@ export async function checkNewCandidateMatch(
 
 async function findSearchableTorrents() {
 	const { torrents, dataDirs } = getRuntimeConfig();
+	var dataMode = "media";
 	let parsedTorrents: Searchee[];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
@@ -196,13 +200,18 @@ async function findSearchableTorrents() {
 		);
 		parsedTorrents = searcheeResults.filter(ok);
 	} else if (dataDirs.length > 0) {
-		const fullPaths = [];
-		dataDirs.forEach(dataDir => {
-			if (fs.statSync(dataDir).isDirectory()) {
-				fs.readdirSync(dataDir).forEach(file => fullPaths.push(path.join(dataDir, file)));
-			} else {
-				fullPaths.push(dataDir);
-		}})
+		var fullPaths: string[] = [];
+		if (dataMode == "media") {
+			dataDirs.forEach(dataDir => {
+				const allPaths = getFilePathsFromPath(dataDir, []);
+				fullPaths = fullPaths.concat(allPaths.filter(file => !fs.statSync(file).isDirectory() && fs.statSync(file).size > 100000000)); //100 MB to start
+			})
+		} else {
+			dataDirs.forEach(dataDir => {
+				if (fs.statSync(dataDir).isDirectory()) {
+					fs.readdirSync(dataDir).forEach(file => fullPaths.push(path.join(dataDir, file)));
+				}})
+			}
 		const searcheeResults = await Promise.all(fullPaths.map(createSearcheeFromPath))
 		parsedTorrents = searcheeResults.filter(ok);
 	} else {

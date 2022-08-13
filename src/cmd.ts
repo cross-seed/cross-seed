@@ -68,6 +68,11 @@ function createCommandWithSharedOptions(name, description) {
 			"Directories to use if searching by data instead of torrents (separated by spaces)",
 			fallback(fileConfig.dataDirs)
 		)
+		.option(
+			"-dm, --data-mode <media, downloads>",
+			"Determines directory structure of data target.",
+			fallback(fileConfig.dataMode)
+		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
 			"Directory with torrent files",

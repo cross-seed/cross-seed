@@ -20,6 +20,7 @@ interface FileConfig {
 	excludeOlder?: string;
 	excludeRecentSearch?: string;
 	dataDirs?: string[];
+	dataMode?: string;
 	torrentDir?: string;
 	torznab?: string[];
 	qbittorrentUrl?: string;
