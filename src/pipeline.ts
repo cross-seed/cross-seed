@@ -191,8 +191,7 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { torrents, dataDirs } = getRuntimeConfig();
-	var dataMode = "media";
+	const { torrents, dataDirs, dataMode } = getRuntimeConfig();
 	let parsedTorrents: Searchee[];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(

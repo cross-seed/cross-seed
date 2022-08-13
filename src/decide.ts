@@ -109,7 +109,7 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(info.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
-	var dataMode = "media";
+	const { dataMode } = getRuntimeConfig();
 	const perfectMatch = compareFileTrees(info, searchee);
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: info};
@@ -156,19 +156,8 @@ async function assessAndSaveResults(
 		infoHashesToExclude
 	);
 
-	if (assessment.decision === Decision.MATCH) {
-		cacheTorrentFile(assessment.metafile);
-	}
-
-	if (assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR) {
-		// const topLevel = path.basename(searchee.path);
-		// assessment.metafile.files.forEach(
-		// 	(file) => file.path = path.join(
-		// 		topLevel, path.relative(
-		// 			file.path.split("/")[0], file.path)
-		// 		)
-		// 	);
-		// assessment.decision = Decision.MATCH;
+	if (assessment.decision === Decision.MATCH ||
+		assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR) {
 		cacheTorrentFile(assessment.metafile);
 	}
 
