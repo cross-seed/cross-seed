@@ -370,19 +370,16 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("newPath", newPath)
 				formData.append("foo", "bar");
 				await this.request("/torrents/renameFolder", formData);
-				await this.request(               // for some reason, this pause, recheck, resume loop is required to get the torrents 
-					"/torrents/pause",            // to not just say "missing files." I hope there's a workaround for this,
-					`hashes=${torrent.infoHash}`, // because the recheck time would be immense when scanned on a large library.
+				await this.request(               // I had to start these paused and recheck due to them starting downloading for some reason
+					"/torrents/pause",            // Some weirdness with the API I think
+					`hashes=${torrent.infoHash}`, 
 					X_WWW_FORM_URLENCODED
 				);
 				await this.request(
 					"/torrents/recheck", 
 					`hashes=${torrent.infoHash}`,
 					X_WWW_FORM_URLENCODED);
-				await this.request(
-					"/torrents/resume", 
-					`hashes=${torrent.infoHash}`,
-					X_WWW_FORM_URLENCODED);
+				
 				return RenameResult.SUCCESS;
 			} catch (e) {
 				logger.debug({
