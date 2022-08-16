@@ -20,17 +20,22 @@ export interface Searchee {
 	length: number;
 }
 
-export function getFilePathsFromPath(dirPath, arrayOfFiles) {
+export function getFilePathsFromPath(dirPath, arrayOfFiles, depth, depthLimit) {
 	var files = fs.readdirSync(dirPath)
 
 	arrayOfFiles = arrayOfFiles || []
 
 	files.forEach(function(file) {
-		if (fs.statSync(dirPath + "/" + file).isDirectory()) {
-		arrayOfFiles = getFilePathsFromPath(dirPath + "/" + file, arrayOfFiles)
-		} else {
 		arrayOfFiles.push(path.join(dirPath, file))
-		}
+		if (fs.statSync(dirPath + "/" + file).isDirectory() && depth < depthLimit) {
+			arrayOfFiles = getFilePathsFromPath(
+				dirPath + "/" + file, 
+				arrayOfFiles, 
+				depth + 1, 
+				depthLimit
+			)
+		} 
+		
 	})
 
 	return arrayOfFiles
@@ -38,8 +43,8 @@ export function getFilePathsFromPath(dirPath, arrayOfFiles) {
 
 function getFilesFromDataRoot(rootPath): File[] {
 	if (fs.statSync(rootPath).isDirectory()) {
-		var files: string[] = getFilePathsFromPath(rootPath, []);
-	} else {
+		var files: string[] = getFilePathsFromPath(rootPath, [], 0, 100); // This doesn't produce multiple searchees, so it can go
+	} else { 															  // as deep as it needs.
 		var files: string[] = [rootPath];
 	}
 	var torrentFiles: File[] = [];

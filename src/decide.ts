@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from "fs";
+import { existsSync, fstat, statSync, writeFileSync } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { appDir } from "./configuration.js";
@@ -67,14 +67,13 @@ export function compareFileTrees(
 	);
 }
 
-export function compareFileTreesIgnoringParentDir(
+export function compareFileTreesIgnoringNames(
 	candidate: Metafile,
 	searchee: Searchee): boolean {
 		const cmp = (candidate, searchee, searcheeTopLevel, candidateTopLevel) => {
 			const lengthsAreEqual = searchee.length === candidate.length;
 			const pathsAreEqual = searchee.path === path.relative(candidateTopLevel, candidate.path);
-
-			return lengthsAreEqual && pathsAreEqual;
+			return lengthsAreEqual ;
 		};
 
 		return candidate.files.every((elOfA) =>
@@ -114,7 +113,7 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: info};
 	}
-	if (dataMode == "media" && compareFileTreesIgnoringParentDir(info, searchee)) {
+	if (!statSync(searchee.path).isDirectory() && compareFileTreesIgnoringNames(info, searchee)) {
 		return { decision: Decision.MATCH_EXCEPT_PARENT_DIR, metafile: info};
 	}
 	return { decision: Decision.FILE_TREE_MISMATCH };
