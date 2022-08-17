@@ -5,7 +5,7 @@ import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
-import path, { basename, dirname, join, posix } from "path";
+import { basename, dirname, join, posix, sep } from "path";
 import { dataMode } from "../config.template.cjs";
 import { InjectionResult, RenameResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
@@ -262,7 +262,7 @@ export default class QBittorrent implements TorrentClient {
 		// Path being a directory implies we got a perfect match at the directory level.
 		// Thus we don't need to rename since it's a perfect match.
 		if (!statSync(searchee.path).isDirectory()) {
-			if (newTorrent.files[0].path.split(path.sep).length > 1) {
+			if (newTorrent.files[0].path.split(sep).length > 1) {
 				return dirname(save_path);
 			}
 		}
@@ -380,12 +380,12 @@ export default class QBittorrent implements TorrentClient {
 			try {
 				const fileFormData = new FormData();
 				const file = torrent.files[0];
-				const isNestedFile = file.path.split(path.sep).length > 1;
+				const isNestedFile = file.path.split(sep).length > 1;
 				fileFormData.append("hash", torrent.infoHash);
 				const oldFilePath = file.path;
 				fileFormData.append("oldPath", oldFilePath);
 				const newFilePath = isNestedFile ?
-					path.join(dirname(file.path), basename(searchee.path)) :
+					join(dirname(file.path), basename(searchee.path)) :
 					basename(searchee.path);
 				fileFormData.append("newPath", newFilePath);
 				fileFormData.append("foo", "bar");
@@ -393,7 +393,7 @@ export default class QBittorrent implements TorrentClient {
 				if (isNestedFile) {
 					const folderFormData = new FormData();
 					const newFolderPath = basename(dirname(searchee.path));
-					const oldFolderPath = file.path.split(path.sep)[0];
+					const oldFolderPath = file.path.split(sep)[0];
 					folderFormData.append("hash", torrent.infoHash);
 					folderFormData.append("oldPath", oldFolderPath);
 					folderFormData.append("newPath", newFolderPath);
