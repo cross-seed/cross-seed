@@ -59,8 +59,6 @@ async function findOnOtherSites(
 		tracker: result.tracker,
 	});
 
-	const query = stripExtension(searchee.name);
-
 	// make sure searchee is in database
 	await db("searchee")
 		.insert({ name: searchee.name })
@@ -69,9 +67,13 @@ async function findOnOtherSites(
 
 	let response: Candidate[];
 	try {
-		response = await getTorznabManager().searchTorznab(query, nonceOptions);
+		response = await getTorznabManager().searchTorznab(
+			searchee.name,
+			nonceOptions
+		);
 	} catch (e) {
-		logger.error(`error searching for ${query}`);
+		logger.error(`error searching for ${searchee.name}`);
+		logger.debug(e);
 		return 0;
 	}
 	const results = response;

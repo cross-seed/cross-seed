@@ -12,6 +12,7 @@ import {
 	getTag,
 	MediaType,
 	reformatTitleForSearching,
+	stripExtension,
 } from "./utils.js";
 
 interface TorznabParams {
@@ -217,11 +218,12 @@ export class TorznabManager {
 	}
 
 	getBestSearchTechnique(name: string, caps: Caps): TorznabParams {
+		const nameWithoutExtension = stripExtension(name);
 		const extractNumber = (str: string): number =>
 			parseInt(str.match(/\d+/)[0]);
-		const mediaType = getTag(name);
+		const mediaType = getTag(nameWithoutExtension);
 		if (mediaType === MediaType.EPISODE && caps.tvSearch) {
-			const match = name.match(EP_REGEX);
+			const match = nameWithoutExtension.match(EP_REGEX);
 			return {
 				t: "tvsearch",
 				q: cleanseSeparators(match.groups.title),
@@ -229,7 +231,7 @@ export class TorznabManager {
 				ep: extractNumber(match.groups.episode),
 			};
 		} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
-			const match = name.match(SEASON_REGEX);
+			const match = nameWithoutExtension.match(SEASON_REGEX);
 			return {
 				t: "tvsearch",
 				q: cleanseSeparators(match.groups.title),
@@ -238,7 +240,7 @@ export class TorznabManager {
 		} else {
 			return {
 				t: "search",
-				q: reformatTitleForSearching(name),
+				q: reformatTitleForSearching(nameWithoutExtension),
 			};
 		}
 	}
@@ -247,13 +249,13 @@ export class TorznabManager {
 		for (const indexer of indexers) {
 			await db.transaction(async (trx) => {
 				const now = Date.now();
-				const searchee_id: number = await trx("searchee")
+				const { id: searchee_id } = await trx("searchee")
 					.where({ name })
-					.pluck("id")
+					.select("id")
 					.first();
-				const indexer_id: number = await trx("indexer")
+				const { id: indexer_id } = await trx("indexer")
 					.where({ url: sanitizeUrl(indexer) })
-					.pluck("id")
+					.select("id")
 					.first();
 
 				await trx("timestamp")
@@ -307,19 +309,34 @@ export class TorznabManager {
 			searchUrls.map((url) =>
 				fetch(url)
 					.then((response) => {
-						if (!response.ok)
+						if (!response.ok) {
 							throw new Error(
 								`Querying "${url}" failed with code: ${response.status}`
 							);
+						}
 						return response;
 					})
 					.then((r) => r.text())
 					.then(this.parseResults)
 			)
 		);
-		const rejected = zip(indexersToUse, outcomes).filter(
-			([, outcome]) => outcome.status === "rejected"
+
+		const { rejected, fulfilled } = outcomes.reduce<{
+			rejected: [string, PromiseRejectedResult][];
+			fulfilled: [string, PromiseFulfilledResult<Candidate[]>][];
+		}>(
+			({ rejected, fulfilled }, cur, idx) => {
+				const [url] = indexersToUse[idx];
+				if (cur.status === "rejected") {
+					rejected.push([url, cur]);
+				} else {
+					fulfilled.push([url, cur]);
+				}
+				return { rejected, fulfilled };
+			},
+			{ rejected: [], fulfilled: [] }
 		);
+
 		rejected
 			.map(
 				([url, outcome]) =>
@@ -327,13 +344,6 @@ export class TorznabManager {
 			)
 			.forEach(logger.warn);
 
-		const fulfilled: [string, PromiseFulfilledResult<Candidate[]>][] = zip(
-			indexersToUse,
-			outcomes
-		).filter(
-			(outcome): outcome is PromiseFulfilledResult<Candidate[]> =>
-				outcome.status === "fulfilled"
-		);
 		await this.updateSearchTimestamps(
 			name,
 			fulfilled.map(([url]) => url)
