@@ -70,14 +70,12 @@ export function compareFileTrees(
 export function compareFileTreesIgnoringNames(
 	candidate: Metafile,
 	searchee: Searchee): boolean {
-		const cmp = (candidate, searchee, searcheeTopLevel, candidateTopLevel) => {
-			const lengthsAreEqual = searchee.length === candidate.length;
-			const pathsAreEqual = searchee.path === path.relative(candidateTopLevel, candidate.path);
-			return lengthsAreEqual ;
+		const cmp = (candidate, searchee) => {
+			return searchee.length === candidate.length;
 		};
 
 		return candidate.files.every((elOfA) =>
-		searchee.files.some((elOfB) => cmp(elOfA, elOfB, path.basename(searchee.path), candidate.files[0].path.split(path.sep)[0]))
+		searchee.files.some((elOfB) => cmp(elOfA, elOfB,))
 	);
 	}
 
@@ -113,7 +111,9 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: info};
 	}
-	if (!statSync(searchee.path).isDirectory() && compareFileTreesIgnoringNames(info, searchee)) {
+	if (!statSync(searchee.path).isDirectory() && 
+		compareFileTreesIgnoringNames(info, searchee) &&
+		dataMode == "risky") {
 		return { decision: Decision.MATCH_EXCEPT_PARENT_DIR, metafile: info};
 	}
 	return { decision: Decision.FILE_TREE_MISMATCH };
