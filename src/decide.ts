@@ -77,7 +77,7 @@ export function compareFileTreesIgnoringNames(
 	return candidate.files.every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB,))
 	);
-	}
+}
 
 function sizeDoesMatch(resultSize, searchee) {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
@@ -110,9 +110,6 @@ async function assessCandidateHelper(
 	const perfectMatch = compareFileTrees(info, searchee);
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: info};
-	}
-	if (dataDirs.length == 0) {
-		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 	if (!statSync(searchee.path).isDirectory() && 
 		compareFileTreesIgnoringNames(info, searchee) &&
