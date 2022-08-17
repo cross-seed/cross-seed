@@ -106,10 +106,13 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(info.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
-	const { dataMode } = getRuntimeConfig();
+	const { dataDirs, dataMode } = getRuntimeConfig();
 	const perfectMatch = compareFileTrees(info, searchee);
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: info};
+	}
+	if (dataDirs.length == 0) {
+		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 	if (!statSync(searchee.path).isDirectory() && 
 		compareFileTreesIgnoringNames(info, searchee) &&
