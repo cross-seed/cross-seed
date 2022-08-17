@@ -226,7 +226,6 @@ export default class QBittorrent implements TorrentClient {
 		autoTMM: boolean;
 		category: string;
 	}> {
-		const { dataDirs, dataMode } = getRuntimeConfig();
 		if (searchee.path) {
 			const save_path: string = dirname(searchee.path);
 			const isComplete: boolean = true;
@@ -258,7 +257,6 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async correct_path(newTorrent: Metafile, searchee: Searchee, save_path: string): Promise<string> {
-		const { dataMode } = getRuntimeConfig();
 		// Path being a directory implies we got a perfect match at the directory level.
 		// Thus we don't need to rename since it's a perfect match.
 		if (!statSync(searchee.path).isDirectory()) {
@@ -289,7 +287,7 @@ export default class QBittorrent implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee
 	): Promise<InjectionResult> {
-		const { dataDirs, duplicateCategories } = getRuntimeConfig();
+		const { duplicateCategories } = getRuntimeConfig();
 		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
