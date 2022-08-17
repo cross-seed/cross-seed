@@ -70,11 +70,11 @@ export function compareFileTrees(
 export function compareFileTreesIgnoringNames(
 	candidate: Metafile,
 	searchee: Searchee): boolean {
-		const cmp = (candidate, searchee) => {
-			return searchee.length === candidate.length;
-		};
+	const cmp = (candidate, searchee) => {
+		return searchee.length === candidate.length;
+	};
 
-		return candidate.files.every((elOfA) =>
+	return candidate.files.every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB,))
 	);
 	}

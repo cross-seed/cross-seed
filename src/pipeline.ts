@@ -191,7 +191,7 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { torrents, dataDirs, dataMode } = getRuntimeConfig();
+	const { torrents, dataDirs } = getRuntimeConfig();
 	let parsedTorrents: Searchee[];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
@@ -210,7 +210,7 @@ async function findSearchableTorrents() {
 		const searcheeResults = await Promise.all(fullPaths.map(createSearcheeFromPath))
 		parsedTorrents = searcheeResults.filter(ok);
 	} else {
-			parsedTorrents = await loadTorrentDirLight();
+		parsedTorrents = await loadTorrentDirLight();
 	}
 	const hashesToExclude = parsedTorrents
 		.map((t) => t.infoHash)
@@ -228,10 +228,8 @@ async function findSearchableTorrents() {
 	return { samples: filteredTorrents, hashesToExclude };
 }
 
-
-
 export async function main(): Promise<void> {
-	const { outputDir, dataDirs } = getRuntimeConfig();
+	const { outputDir } = getRuntimeConfig();
 	const { samples, hashesToExclude } =  await findSearchableTorrents();
 
 

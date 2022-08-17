@@ -1,7 +1,7 @@
 import { sortBy } from "lodash-es";
 import fs, { fstatSync } from "fs";
 import { Metafile } from "parse-torrent";
-import { basename, sep as osSpecificPathSeparator } from "path";
+import { join, relative, basename, sep as osSpecificPathSeparator } from "path";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { Result } from "./utils.js";
 import { logger } from "./logger.js";
@@ -26,7 +26,7 @@ export function getFilePathsFromPath(dirPath, arrayOfFiles, depth, depthLimit) {
 	arrayOfFiles = arrayOfFiles || []
 
 	files.forEach(function(file) {
-		arrayOfFiles.push(path.join(dirPath, file))
+		arrayOfFiles.push(join(dirPath, file))
 		if (fs.statSync(dirPath + "/" + file).isDirectory() && depth < depthLimit) {
 			arrayOfFiles = getFilePathsFromPath(
 				dirPath + "/" + file, 
@@ -50,8 +50,8 @@ function getFilesFromDataRoot(rootPath): File[] {
 	var torrentFiles: File[] = [];
 	files.forEach(file => torrentFiles.push(
 		{
-			path: path.relative(path.join(rootPath, ".."), file),
-        	name: path.basename(file),
+			path: relative(join(rootPath, ".."), file),
+        	name: basename(file),
 			length : fs.statSync(file).size
 		})
 	)
@@ -111,7 +111,7 @@ export async function createSearcheeFromTorrentFile(
 export async function createSearcheeFromPath(
 	filepath: string
 ): Promise<Result<Searchee>> {
-		const fileName : string = path.basename(filepath);
+		const fileName : string = basename(filepath);
 		const fileList : File[] = getFilesFromDataRoot(filepath);
 		var totalLength = fileList.reduce<number>((runningTotal, file) => runningTotal + file.length, 0);
 		return {
