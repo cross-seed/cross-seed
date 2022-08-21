@@ -11,6 +11,7 @@ import {
 	cleanseSeparators,
 	getTag,
 	MediaType,
+	nMsAgo,
 	reformatTitleForSearching,
 	stripExtension,
 } from "./utils.js";
@@ -266,7 +267,7 @@ export class TorznabManager {
 						first_searched: now,
 					})
 					.onConflict(["searchee_id", "indexer_id"])
-					.merge("last_searched");
+					.merge(["searchee_id", "indexer_id", "last_searched"]);
 			});
 		}
 	}
@@ -281,7 +282,6 @@ export class TorznabManager {
 			.join("indexer", "timestamp.indexer_id", "indexer.id")
 			.where({ name })
 			.select({
-				name: "searchee.name",
 				url: "indexer.url",
 				firstSearched: "timestamp.first_searched",
 				lastSearched: "timestamp.last_searched",
@@ -290,10 +290,13 @@ export class TorznabManager {
 			const entry = timestampDataSql.find(
 				(entry) => entry.url === sanitizeUrl(url)
 			);
-			return entry
-				? entry.firstSearched > excludeOlder &&
-						entry.lastSearched < excludeRecentSearch
-				: true;
+			return (
+				!entry ||
+				((!excludeOlder ||
+					entry.firstSearched > nMsAgo(excludeOlder)) &&
+					(!excludeRecentSearch ||
+						entry.lastSearched < nMsAgo(excludeRecentSearch)))
+			);
 		});
 		const searchUrls = indexersToUse.map(([url, caps]: [string, Caps]) => {
 			return this.assembleUrl(
