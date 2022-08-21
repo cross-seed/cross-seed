@@ -162,8 +162,6 @@ export class TorznabManager {
 			(i) => !workingIndexersSanitized.includes(i)
 		);
 
-		console.log({ inDbButNotInMemory, inMemoryButNotInDb });
-
 		if (inDbButNotInMemory.length > 0) {
 			await db("indexer")
 				.whereIn("url", inDbButNotInMemory)
