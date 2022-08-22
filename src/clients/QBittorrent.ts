@@ -302,7 +302,7 @@ export default class QBittorrent implements TorrentClient {
 			// As there's no way to know here if we matched perfectly or with a renamed top directory
 			// without the MATCH_EXCEPT_PARENT_DIR result, we have to manually check the new torrent's
 			// structure to see which directory is the correct parent.
-			const corrected_save_path = dataDirs.length > 1 ? 
+			const corrected_save_path = dataDirs.length > 0 ? 
 				await this.correct_path(newTorrent, searchee, save_path) : 
 				save_path;
 			
