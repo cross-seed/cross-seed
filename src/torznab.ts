@@ -14,6 +14,7 @@ import {
 	nMsAgo,
 	reformatTitleForSearching,
 	stripExtension,
+	wait,
 } from "./utils.js";
 
 interface TorznabParams {
@@ -308,11 +309,18 @@ export class TorznabManager {
 
 		const outcomes = await Promise.allSettled<Candidate[]>(
 			searchUrls.map((url) =>
-				fetch(url)
+				Promise.race([
+					fetch(url),
+					wait(5000).then(() =>
+						Promise.reject(
+							new Error("indexer took too long to respond")
+						)
+					),
+				])
 					.then((response) => {
 						if (!response.ok) {
 							throw new Error(
-								`Querying "${url}" failed with code: ${response.status}`
+								`request failed with code: ${response.status}`
 							);
 						}
 						return response;
