@@ -5,11 +5,7 @@ import { EP_REGEX, SEASON_REGEX } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
-import {
-	EmptyNonceOptions,
-	getRuntimeConfig,
-	NonceOptions,
-} from "./runtimeConfig.js";
+import { EmptyNonceOptions, getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	cleanseSeparators,
 	getTag,
@@ -172,13 +168,12 @@ export class TorznabManager {
 	getBestSearchTechnique(name: string, caps: Caps): TorznabParams {
 		const extractNumber = (str: string): number =>
 			parseInt(str.match(/\d+/)[0]);
-		const encode = (str) => encodeURIComponent(str).split("%20").join(" ");
 		const mediaType = getTag(name);
 		if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 			const match = name.match(EP_REGEX);
 			return {
 				t: "tvsearch",
-				q: encode(cleanseSeparators(match.groups.title)),
+				q: cleanseSeparators(match.groups.title),
 				season: extractNumber(match.groups.season),
 				ep: extractNumber(match.groups.episode),
 			};
@@ -186,13 +181,13 @@ export class TorznabManager {
 			const match = name.match(SEASON_REGEX);
 			return {
 				t: "tvsearch",
-				q: encode(cleanseSeparators(match.groups.title)),
+				q: cleanseSeparators(match.groups.title),
 				season: extractNumber(match.groups.season),
 			};
 		} else {
 			return {
 				t: "search",
-				q: encode(reformatTitleForSearching(name)),
+				q: reformatTitleForSearching(name),
 			};
 		}
 	}
