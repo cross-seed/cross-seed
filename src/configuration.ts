@@ -66,6 +66,10 @@ export function generateConfig({
 }
 
 export async function getFileConfig(): Promise<FileConfig> {
+	if (process.env.DOCKER_ENV === "true") {
+		generateConfig({ docker: true });
+	}
+
 	const configPath = path.join(appDir(), "config.js");
 
 	try {
