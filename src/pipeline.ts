@@ -235,7 +235,7 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const candidates = await getTorznabManager().searchTorznab("");
+	const candidates = await getTorznabManager().queryRssFeeds();
 	logger.verbose({
 		label: Label.RSS,
 		message: `Scan returned ${candidates.length} results`,

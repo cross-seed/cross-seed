@@ -271,6 +271,15 @@ export class TorznabManager {
 		}
 	}
 
+	async queryRssFeeds() {
+		const indexersToUse = Array.from(this.capsMap.keys());
+		const searchUrls = indexersToUse.map((url) =>
+			this.assembleUrl(url, { t: "search", q: "" })
+		);
+		const candidatesByUrl = await this.makeRequests("", searchUrls);
+		return candidatesByUrl.flatMap((e) => e.candidates);
+	}
+
 	async searchTorznab(
 		name: string,
 		nonceOptions = EmptyNonceOptions
@@ -303,6 +312,16 @@ export class TorznabManager {
 				this.getBestSearchTechnique(name, caps)
 			);
 		});
+		const candidatesByUrl = await this.makeRequests(name, searchUrls);
+
+		await this.updateSearchTimestamps(
+			name,
+			candidatesByUrl.map((e) => e.url)
+		);
+		return candidatesByUrl.flatMap((e) => e.candidates);
+	}
+
+	private async makeRequests(name: string, searchUrls: string[]) {
 		searchUrls.forEach(
 			(message) => void logger.verbose({ label: Label.TORZNAB, message })
 		);
@@ -310,8 +329,8 @@ export class TorznabManager {
 		const outcomes = await Promise.allSettled<Candidate[]>(
 			searchUrls.map((url) =>
 				Promise.race([
-					fetch(url),
-					wait(5000).then(() =>
+					fetch(url, { headers: { "User-Agent": "cross-seed" } }),
+					wait(10000).then(() =>
 						Promise.reject(
 							new Error("indexer took too long to respond")
 						)
@@ -335,11 +354,11 @@ export class TorznabManager {
 			fulfilled: [string, PromiseFulfilledResult<Candidate[]>][];
 		}>(
 			({ rejected, fulfilled }, cur, idx) => {
-				const [url] = indexersToUse[idx];
+				const sanitizedUrl = sanitizeUrl(searchUrls[idx]);
 				if (cur.status === "rejected") {
-					rejected.push([url, cur]);
+					rejected.push([sanitizedUrl, cur]);
 				} else {
-					fulfilled.push([url, cur]);
+					fulfilled.push([sanitizedUrl, cur]);
 				}
 				return { rejected, fulfilled };
 			},
@@ -349,15 +368,13 @@ export class TorznabManager {
 		rejected
 			.map(
 				([url, outcome]) =>
-					`Failed searching ${url} for ${name} with reason: ${outcome.reason}`
+					`Failed searching ${url} for "${name}" with reason: ${outcome.reason}`
 			)
 			.forEach(logger.warn);
-
-		await this.updateSearchTimestamps(
-			name,
-			fulfilled.map(([url]) => url)
-		);
-		return fulfilled.flatMap(([, outcome]) => outcome.value);
+		return fulfilled.map(([url, result]) => ({
+			url,
+			candidates: result.value,
+		}));
 	}
 }
 
