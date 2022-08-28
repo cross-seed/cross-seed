@@ -114,7 +114,8 @@ export default class QBittorrent implements TorrentClient {
 		let response: Response;
 		try {
 			response = await fetch(
-				`${origin}${pathname}/auth/login?${searchParams}`
+				`${origin}${pathname}/auth/login?${searchParams}`,
+				{ method: "POST" }
 			);
 		} catch (e) {
 			throw new CrossSeedError(`qBittorrent login failed: ${e.message}`);
