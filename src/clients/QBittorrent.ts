@@ -11,6 +11,7 @@ import { Label, logger, logOnce } from "../logger.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { isSingleFileTorrent } from "../torrent.js";
+import { tapLog } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const X_WWW_FORM_URLENCODED = {
@@ -288,7 +289,7 @@ export default class QBittorrent implements TorrentClient {
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
-			const shouldManuallyEnforceContentLayout =
+			const shouldSetSubfolderContentLayout =
 				isSingleFileTorrent(newTorrent) &&
 				(await this.isSubfolderContentLayout(searchee));
 
@@ -300,39 +301,26 @@ export default class QBittorrent implements TorrentClient {
 			formData.append("torrents", file, filename);
 			formData.append("tags", "cross-seed");
 			formData.append("category", newCategoryName);
+
 			if (autoTMM) {
 				formData.append("autoTMM", "true");
 			} else {
 				formData.append("autoTMM", "false");
 				formData.append("savepath", save_path);
 			}
-			if (shouldManuallyEnforceContentLayout) {
+
+			if (shouldSetSubfolderContentLayout) {
 				formData.append("contentLayout", "Subfolder");
-				formData.append("skip_checking", "false");
-				formData.append("paused", "true");
-			} else {
-				formData.append("skip_checking", "true");
-				formData.append("paused", "false");
 			}
+
+			formData.append("skip_checking", "true");
+			formData.append("paused", "false");
 
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
 
 			await this.request("/torrents/add", formData);
-
-			if (shouldManuallyEnforceContentLayout) {
-				await this.request(
-					"/torrents/recheck",
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED
-				);
-				await this.request(
-					"/torrents/resume",
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED
-				);
-			}
 
 			unlink(tempFilepath).catch((error) => {
 				logger.debug(error);
