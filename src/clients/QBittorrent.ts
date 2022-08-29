@@ -288,9 +288,11 @@ export default class QBittorrent implements TorrentClient {
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
-			const shouldSetSubfolderContentLayout =
+			const contentLayout =
 				isSingleFileTorrent(newTorrent) &&
-				(await this.isSubfolderContentLayout(searchee));
+				(await this.isSubfolderContentLayout(searchee))
+					? "Subfolder"
+					: "Original";
 
 			const file = await fileFrom(
 				tempFilepath,
@@ -307,11 +309,7 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("autoTMM", "false");
 				formData.append("savepath", save_path);
 			}
-
-			if (shouldSetSubfolderContentLayout) {
-				formData.append("contentLayout", "Subfolder");
-			}
-
+			formData.append("contentLayout", contentLayout);
 			formData.append("skip_checking", "true");
 			formData.append("paused", "false");
 
