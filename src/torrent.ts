@@ -6,7 +6,7 @@ import simpleGet from "simple-get";
 import { inspect } from "util";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
-import { logger } from "./logger.js";
+import { logger, logOnce } from "./logger.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
 import { ok, stripExtension } from "./utils.js";
@@ -15,8 +15,6 @@ export interface TorrentLocator {
 	infoHash?: string;
 	name?: string;
 }
-
-const alreadyLoggedParseFailures = [];
 
 export async function parseTorrentFromFilename(
 	filename: string
@@ -110,11 +108,10 @@ export async function indexNewTorrents(): Promise<void> {
 			try {
 				meta = await parseTorrentFromFilename(filepath);
 			} catch (e) {
-				if (!alreadyLoggedParseFailures.includes(filepath)) {
-					alreadyLoggedParseFailures.push(filepath);
+				logOnce(`Failed to parse ${filepath}`, () => {
 					logger.error(`Failed to parse ${filepath}`);
 					logger.debug(e);
-				}
+				});
 				continue;
 			}
 			await db("torrent").insert({
