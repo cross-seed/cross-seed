@@ -4,10 +4,10 @@ import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
-import { dirname, join, posix } from "path";
+import { join, posix } from "path";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
-import { Label, logger } from "../logger.js";
+import { Label, logger, logOnce } from "../logger.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { isSingleFileTorrent } from "../torrent.js";
@@ -178,6 +178,12 @@ export default class QBittorrent implements TorrentClient {
 		const ogCategory = categories[ogCategoryName];
 		const newCategoryName = `${ogCategoryName}.cross-seed`;
 		const maybeNewCategory = categories[newCategoryName];
+
+		logOnce(`qbit/cat/no-save-path/${ogCategoryName}`, () => {
+			logger.warn(
+				`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`
+			);
+		});
 
 		if (maybeNewCategory?.savePath === ogCategory.savePath) {
 			// setup is already complete

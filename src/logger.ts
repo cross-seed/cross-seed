@@ -56,6 +56,14 @@ function redactMessage(message) {
 	return message;
 }
 
+const logOnceCache: string[] = [];
+export function logOnce(cacheKey: string, cb: () => void) {
+	if (!logOnceCache.includes(cacheKey)) {
+		logOnceCache.push(cacheKey);
+		cb();
+	}
+}
+
 export function initializeLogger(): void {
 	createAppDir();
 	logger = winston.createLogger({
