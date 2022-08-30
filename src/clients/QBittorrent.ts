@@ -1,11 +1,10 @@
-import { posix as posixPath } from "path";
 import { fileFrom } from "fetch-blob/from.js";
 import { FormData } from "formdata-polyfill/esm.min.js";
 import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
-import { dirname, join, posix } from "path";
+import { join, posix } from "path";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
