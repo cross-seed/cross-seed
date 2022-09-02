@@ -179,11 +179,13 @@ export default class QBittorrent implements TorrentClient {
 		const newCategoryName = `${ogCategoryName}.cross-seed`;
 		const maybeNewCategory = categories[newCategoryName];
 
-		logOnce(`qbit/cat/no-save-path/${ogCategoryName}`, () => {
-			logger.warn(
-				`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`
-			);
-		});
+		if (!ogCategory.savePath) {
+			logOnce(`qbit/cat/no-save-path/${ogCategoryName}`, () => {
+				logger.warn(
+					`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`
+				);
+			});
+		}
 
 		if (maybeNewCategory?.savePath === ogCategory.savePath) {
 			// setup is already complete
