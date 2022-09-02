@@ -288,9 +288,11 @@ export default class QBittorrent implements TorrentClient {
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
-			const shouldManuallyEnforceContentLayout =
+			const contentLayout =
 				isSingleFileTorrent(newTorrent) &&
-				(await this.isSubfolderContentLayout(searchee));
+				(await this.isSubfolderContentLayout(searchee))
+					? "Subfolder"
+					: "Original";
 
 			const file = await fileFrom(
 				tempFilepath,
@@ -300,39 +302,22 @@ export default class QBittorrent implements TorrentClient {
 			formData.append("torrents", file, filename);
 			formData.append("tags", "cross-seed");
 			formData.append("category", newCategoryName);
+
 			if (autoTMM) {
 				formData.append("autoTMM", "true");
 			} else {
 				formData.append("autoTMM", "false");
 				formData.append("savepath", save_path);
 			}
-			if (shouldManuallyEnforceContentLayout) {
-				formData.append("contentLayout", "Subfolder");
-				formData.append("skip_checking", "false");
-				formData.append("paused", "true");
-			} else {
-				formData.append("skip_checking", "true");
-				formData.append("paused", "false");
-			}
+			formData.append("contentLayout", contentLayout);
+			formData.append("skip_checking", "true");
+			formData.append("paused", "false");
 
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
 
 			await this.request("/torrents/add", formData);
-
-			if (shouldManuallyEnforceContentLayout) {
-				await this.request(
-					"/torrents/recheck",
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED
-				);
-				await this.request(
-					"/torrents/resume",
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED
-				);
-			}
 
 			unlink(tempFilepath).catch((error) => {
 				logger.debug(error);
