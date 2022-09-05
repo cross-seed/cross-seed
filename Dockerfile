@@ -9,4 +9,4 @@ COPY src src
 RUN npm run build
 RUN npm link
 EXPOSE 2468
-ENTRYPOINT ["cross-seed"]
+ENTRYPOINT ["node --prof dist/cmd.js"]
