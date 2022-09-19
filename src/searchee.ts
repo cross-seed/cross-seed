@@ -26,10 +26,12 @@ export function getFilePathsFromPath(dirPath, arrayOfFiles, depth, depthLimit) {
 	arrayOfFiles = arrayOfFiles || []
 
 	files.forEach(function(file) {
-		arrayOfFiles.push(join(dirPath, file))
-		if (fs.statSync(dirPath + "/" + file).isDirectory() && depth < depthLimit) {
+		if (!fs.statSync(dirPath + osSpecificPathSeparator + file).isDirectory() || fs.readdirSync(dirPath + osSpecificPathSeparator + file).length > 1) {
+			arrayOfFiles.push(join(dirPath, file))
+		}
+		if (fs.statSync(dirPath + osSpecificPathSeparator + file).isDirectory() && depth < depthLimit) {
 			arrayOfFiles = getFilePathsFromPath(
-				dirPath + "/" + file, 
+				dirPath + osSpecificPathSeparator + file, 
 				arrayOfFiles, 
 				depth + 1, 
 				depthLimit
