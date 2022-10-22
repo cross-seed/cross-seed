@@ -71,7 +71,7 @@ function createCommandWithSharedOptions(name, description) {
 		.option(
 			"-dm, --data-mode <safe, risky>",
 			"Safe will only download torrents with perfect matches. Risky will allow for renames and more matches, but might cause false positives",
-			fallback(fileConfig.dataMode)
+			fallback(fileConfig.dataMode, "safe")
 		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",

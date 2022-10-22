@@ -13,6 +13,7 @@ import { Label, logger } from "../logger.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { isSingleFileTorrent } from "../torrent.js";
+import { wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const X_WWW_FORM_URLENCODED = {
@@ -115,9 +116,10 @@ export default class QBittorrent implements TorrentClient {
 
 		let response: Response;
 		try {
-			response = await fetch(
-				`${origin}${pathname}/auth/login?${searchParams}`
-			);
+			response = await fetch(`${origin}${pathname}/auth/login`, {
+				method: "POST",
+				body: searchParams,
+			});
 		} catch (e) {
 			throw new CrossSeedError(`qBittorrent login failed: ${e.message}`);
 		}
@@ -332,8 +334,10 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("autoTMM", "false");
 				formData.append("savepath", corrected_save_path);
 			}
-			if (shouldManuallyEnforceContentLayout) {
-				formData.append("contentLayout", "Subfolder");
+			if (shouldManuallyEnforceContentLayout || dataDirs.length > 0) {
+				if (shouldManuallyEnforceContentLayout) {
+					formData.append("contentLayout", "Subfolder");
+				}
 				formData.append("skip_checking", "false");
 				formData.append("paused", "true");
 			} else {
@@ -358,6 +362,43 @@ export default class QBittorrent implements TorrentClient {
 					`hashes=${newTorrent.infoHash}`,
 					X_WWW_FORM_URLENCODED
 				);
+			} else if (dataDirs.length > 0) {
+				const fileFormData = new FormData();
+				const file = newTorrent.files[0];
+				const isNestedFile = file.path.split(sep).length > 1;
+				fileFormData.append("hash", newTorrent.infoHash);
+				const oldFilePath = file.path;
+				fileFormData.append("oldPath", oldFilePath);
+				const newFilePath = isNestedFile ?
+					join(dirname(file.path), basename(searchee.path)) :
+					basename(searchee.path);
+				fileFormData.append("newPath", newFilePath);
+				fileFormData.append("foo", "bar");
+				if (newFilePath != oldFilePath) {
+					await this.request("/torrents/renameFile", fileFormData); 
+				}
+				if (isNestedFile) {
+					const folderFormData = new FormData();
+					const newFolderPath = basename(dirname(searchee.path));
+					const oldFolderPath = file.path.split(sep)[0];
+					folderFormData.append("hash", newTorrent.infoHash);
+					folderFormData.append("oldPath", oldFolderPath);
+					folderFormData.append("newPath", newFolderPath);
+					folderFormData.append("foo", "bar");
+					if (newFolderPath != oldFolderPath){
+						await this.request("/torrents/renameFolder", folderFormData);
+					}
+				}
+				await new Promise(resolve => setTimeout(resolve, 500));
+				await this.request(
+					"/torrents/recheck", 
+					`hashes=${newTorrent.infoHash}`,
+					X_WWW_FORM_URLENCODED);
+				await new Promise(resolve => setTimeout(resolve, 500));
+				await this.request(
+					"/torrents/resume", 
+					`hashes=${newTorrent.infoHash}`,
+					X_WWW_FORM_URLENCODED);
 			}
 
 			unlink(tempFilepath).catch((error) => {
@@ -378,28 +419,7 @@ export default class QBittorrent implements TorrentClient {
 		searchee: Searchee,
 		tracker: string): Promise<RenameResult> {
 			try {
-				const fileFormData = new FormData();
-				const file = torrent.files[0];
-				const isNestedFile = file.path.split(sep).length > 1;
-				fileFormData.append("hash", torrent.infoHash);
-				const oldFilePath = file.path;
-				fileFormData.append("oldPath", oldFilePath);
-				const newFilePath = isNestedFile ?
-					join(dirname(file.path), basename(searchee.path)) :
-					basename(searchee.path);
-				fileFormData.append("newPath", newFilePath);
-				fileFormData.append("foo", "bar");
-				await this.request("/torrents/renameFile", fileFormData); 
-				if (isNestedFile) {
-					const folderFormData = new FormData();
-					const newFolderPath = basename(dirname(searchee.path));
-					const oldFolderPath = file.path.split(sep)[0];
-					folderFormData.append("hash", torrent.infoHash);
-					folderFormData.append("oldPath", oldFolderPath);
-					folderFormData.append("newPath", newFolderPath);
-					folderFormData.append("foo", "bar");
-					await this.request("/torrents/renameFolder", folderFormData);
-				}
+				
 				await this.request(               // for some reason, this pause, recheck, resume loop is required to get the torrents 
 					"/torrents/pause",            // to not just say "missing files." I hope there's a workaround for this,
 					`hashes=${torrent.infoHash}`, // because the recheck time would be immense when scanned on a large library.

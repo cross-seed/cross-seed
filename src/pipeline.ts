@@ -5,6 +5,7 @@ import path from "path";
 import { performAction, performActions } from "./action.js";
 import {
 	ActionResult,
+	DATA_EXTENSIONS,
 	Decision,
 	InjectionResult,
 	SaveResult,
@@ -204,8 +205,8 @@ async function findSearchableTorrents() {
             const allPaths = getFilePathsFromPath(dataDir, [], 0, 4);
             fullPaths = fullPaths.concat(allPaths.filter(file => 
                 fs.statSync(file).isDirectory() || 
-                ([".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"].includes(path.extname(file))  // try to avoid searching for a RARed pieces
-                && fs.statSync(file).size > 100000000))); //100 MB to start)
+                (DATA_EXTENSIONS.includes(path.extname(file))  // try to avoid searching for a RARed pieces
+                && fs.statSync(file).size > 100000000))); // 100 MB to start
         });
 		const searcheeResults = await Promise.all(fullPaths.map(createSearcheeFromPath))
 		parsedTorrents = searcheeResults.filter(ok);
