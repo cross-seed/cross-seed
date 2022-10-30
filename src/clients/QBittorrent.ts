@@ -374,7 +374,8 @@ export default class QBittorrent implements TorrentClient {
 					basename(searchee.path);
 				fileFormData.append("newPath", newFilePath);
 				fileFormData.append("foo", "bar");
-				if (newFilePath != oldFilePath) {
+				if (newFilePath != oldFilePath) {	
+				    await new Promise(resolve => setTimeout(resolve, 100));
 					await this.request("/torrents/renameFile", fileFormData); 
 				}
 				if (isNestedFile) {
@@ -386,17 +387,13 @@ export default class QBittorrent implements TorrentClient {
 					folderFormData.append("newPath", newFolderPath);
 					folderFormData.append("foo", "bar");
 					if (newFolderPath != oldFolderPath){
+						await new Promise(resolve => setTimeout(resolve, 100));
 						await this.request("/torrents/renameFolder", folderFormData);
 					}
 				}
-				await new Promise(resolve => setTimeout(resolve, 500));
+				await new Promise(resolve => setTimeout(resolve, 100));
 				await this.request(
 					"/torrents/recheck", 
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED);
-				await new Promise(resolve => setTimeout(resolve, 500));
-				await this.request(
-					"/torrents/resume", 
 					`hashes=${newTorrent.infoHash}`,
 					X_WWW_FORM_URLENCODED);
 			}
