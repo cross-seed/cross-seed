@@ -8,5 +8,4 @@ export const db = Knex.knex({
 	connection: { filename: join(appDir(), "cross-seed.db") },
 	migrations: { migrationSource: migrations, disableTransactions: true },
 	useNullAsDefault: true,
-	acquireConnectionTimeout: 5000,
 });
