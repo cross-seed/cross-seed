@@ -58,7 +58,7 @@ export async function jobsLoop() {
 			const eligibilityTs = lastRun ? lastRun + job.cadence : now;
 			const lastRunStr = lastRun ? `${ms(now - lastRun)} ago` : "never";
 			const nextRunStr = ms(eligibilityTs - now);
-			logger.verbose({
+			logger.info({
 				label: Label.SCHEDULER,
 				message: `${job.name}: last run ${lastRunStr}, next run in ${nextRunStr}`,
 			});

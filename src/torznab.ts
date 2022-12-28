@@ -2,6 +2,7 @@ import { zip } from "lodash-es";
 import fetch from "node-fetch";
 import xml2js from "xml2js";
 import { EP_REGEX, SEASON_REGEX } from "./constants.js";
+import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
@@ -10,7 +11,10 @@ import {
 	cleanseSeparators,
 	getTag,
 	MediaType,
+	nMsAgo,
 	reformatTitleForSearching,
+	stripExtension,
+	wait,
 } from "./utils.js";
 
 interface TorznabParams {
@@ -31,8 +35,13 @@ interface Caps {
 
 let activeTorznabManager: TorznabManager;
 
+function sanitizeUrl(url: string | URL): string {
+	url = new URL(url);
+	return url.origin + url.pathname;
+}
+
 export class TorznabManager {
-	capsMap = new Map<URL, Caps>();
+	capsMap = new Map<string, Caps>();
 
 	/**
 	 * Generates a Torznab query URL, given the srcUrl (user config)
@@ -119,11 +128,54 @@ export class TorznabManager {
 		);
 
 		for (const [url, caps] of trackersWithSearchingCaps) {
-			this.capsMap.set(url, caps);
+			this.capsMap.set(url.toString(), caps);
 		}
 
 		if (trackersWithSearchingCaps.length === 0) {
 			throw new CrossSeedError("no working indexers available");
+		}
+		await this.syncWithDb();
+	}
+
+	async syncWithDb() {
+		if (this.capsMap.size === 0) {
+			logger.error({
+				label: Label.TORZNAB,
+				message:
+					"cross-seed tried to sync with the DB before capsMap was ready",
+			});
+		}
+		const workingIndexers = Array.from(this.capsMap.entries())
+			.filter(([, caps]) => caps.search)
+			.map(([url]) => url);
+
+		// keep api keys out of the database
+		const workingIndexersSanitized = workingIndexers.map(sanitizeUrl);
+		const dbIndexers: string[] = await db("indexer")
+			.where({ active: true })
+			.pluck("url");
+
+		const inMemoryButNotInDb = workingIndexersSanitized.filter(
+			(i) => !dbIndexers.includes(i)
+		);
+
+		const inDbButNotInMemory = dbIndexers.filter(
+			(i) => !workingIndexersSanitized.includes(i)
+		);
+
+		if (inDbButNotInMemory.length > 0) {
+			await db("indexer")
+				.whereIn("url", inDbButNotInMemory)
+				.update({ active: false });
+		}
+
+		if (inMemoryButNotInDb.length > 0) {
+			await db("indexer")
+				.insert(
+					inMemoryButNotInDb.map((url) => ({ url, active: true }))
+				)
+				.onConflict("url")
+				.merge(["active"]);
 		}
 	}
 
@@ -166,11 +218,12 @@ export class TorznabManager {
 	}
 
 	getBestSearchTechnique(name: string, caps: Caps): TorznabParams {
+		const nameWithoutExtension = stripExtension(name);
 		const extractNumber = (str: string): number =>
 			parseInt(str.match(/\d+/)[0]);
-		const mediaType = getTag(name);
+		const mediaType = getTag(nameWithoutExtension);
 		if (mediaType === MediaType.EPISODE && caps.tvSearch) {
-			const match = name.match(EP_REGEX);
+			const match = nameWithoutExtension.match(EP_REGEX);
 			return {
 				t: "tvsearch",
 				q: cleanseSeparators(match.groups.title),
@@ -178,7 +231,7 @@ export class TorznabManager {
 				ep: extractNumber(match.groups.episode),
 			};
 		} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
-			const match = name.match(SEASON_REGEX);
+			const match = nameWithoutExtension.match(SEASON_REGEX);
 			return {
 				t: "tvsearch",
 				q: cleanseSeparators(match.groups.title),
@@ -187,50 +240,141 @@ export class TorznabManager {
 		} else {
 			return {
 				t: "search",
-				q: reformatTitleForSearching(name),
+				q: reformatTitleForSearching(nameWithoutExtension),
 			};
 		}
+	}
+
+	async updateSearchTimestamps(name: string, indexers: string[]) {
+		for (const indexer of indexers) {
+			await db.transaction(async (trx) => {
+				const now = Date.now();
+				const { id: searchee_id } = await trx("searchee")
+					.where({ name })
+					.select("id")
+					.first();
+				const { id: indexer_id } = await trx("indexer")
+					.where({ url: sanitizeUrl(indexer) })
+					.select("id")
+					.first();
+
+				await trx("timestamp")
+					.insert({
+						searchee_id,
+						indexer_id,
+						last_searched: now,
+						first_searched: now,
+					})
+					.onConflict(["searchee_id", "indexer_id"])
+					.merge(["searchee_id", "indexer_id", "last_searched"]);
+			});
+		}
+	}
+
+	async queryRssFeeds() {
+		const indexersToUse = Array.from(this.capsMap.keys());
+		const searchUrls = indexersToUse.map((url) =>
+			this.assembleUrl(url, { t: "search", q: "" })
+		);
+		const candidatesByUrl = await this.makeRequests("", searchUrls);
+		return candidatesByUrl.flatMap((e) => e.candidates);
 	}
 
 	async searchTorznab(
 		name: string,
 		nonceOptions = EmptyNonceOptions
 	): Promise<Candidate[]> {
-		const searchUrls = Array.from(this.capsMap).map(
-			([url, caps]: [URL, Caps]) => {
-				return this.assembleUrl(
-					url,
-					this.getBestSearchTechnique(name, caps)
-				);
-			}
+		const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
+		const timestampDataSql = await db("searchee")
+			.join("timestamp", "searchee.id", "timestamp.searchee_id")
+			.join("indexer", "timestamp.indexer_id", "indexer.id")
+			.where({ name })
+			.select({
+				url: "indexer.url",
+				firstSearched: "timestamp.first_searched",
+				lastSearched: "timestamp.last_searched",
+			});
+		const indexersToUse = Array.from(this.capsMap).filter(([url]) => {
+			const entry = timestampDataSql.find(
+				(entry) => entry.url === sanitizeUrl(url)
+			);
+			return (
+				!entry ||
+				((!excludeOlder ||
+					entry.firstSearched > nMsAgo(excludeOlder)) &&
+					(!excludeRecentSearch ||
+						entry.lastSearched < nMsAgo(excludeRecentSearch)))
+			);
+		});
+		const searchUrls = indexersToUse.map(([url, caps]: [string, Caps]) => {
+			return this.assembleUrl(
+				url,
+				this.getBestSearchTechnique(name, caps)
+			);
+		});
+		const candidatesByUrl = await this.makeRequests(name, searchUrls);
+
+		await this.updateSearchTimestamps(
+			name,
+			candidatesByUrl.map((e) => e.url)
 		);
+		return candidatesByUrl.flatMap((e) => e.candidates);
+	}
+
+	private async makeRequests(name: string, searchUrls: string[]) {
 		searchUrls.forEach(
 			(message) => void logger.verbose({ label: Label.TORZNAB, message })
 		);
+
 		const outcomes = await Promise.allSettled<Candidate[]>(
 			searchUrls.map((url) =>
-				fetch(url)
+				Promise.race([
+					fetch(url, { headers: { "User-Agent": "cross-seed" } }),
+					wait(10000).then(() =>
+						Promise.reject(
+							new Error("indexer took too long to respond")
+						)
+					),
+				])
+					.then((response) => {
+						if (!response.ok) {
+							throw new Error(
+								`request failed with code: ${response.status}`
+							);
+						}
+						return response;
+					})
 					.then((r) => r.text())
 					.then(this.parseResults)
 			)
 		);
-		const rejected = zip(Array.from(this.capsMap.keys()), outcomes).filter(
-			([, outcome]) => outcome.status === "rejected"
+
+		const { rejected, fulfilled } = outcomes.reduce<{
+			rejected: [string, PromiseRejectedResult][];
+			fulfilled: [string, PromiseFulfilledResult<Candidate[]>][];
+		}>(
+			({ rejected, fulfilled }, cur, idx) => {
+				const sanitizedUrl = sanitizeUrl(searchUrls[idx]);
+				if (cur.status === "rejected") {
+					rejected.push([sanitizedUrl, cur]);
+				} else {
+					fulfilled.push([sanitizedUrl, cur]);
+				}
+				return { rejected, fulfilled };
+			},
+			{ rejected: [], fulfilled: [] }
 		);
+
 		rejected
 			.map(
 				([url, outcome]) =>
-					`Failed searching ${url} for ${name} with reason: ${outcome.reason}`
+					`Failed searching ${url} for "${name}" with reason: ${outcome.reason}`
 			)
 			.forEach(logger.warn);
-
-		const fulfilled = outcomes
-			.filter(
-				(outcome): outcome is PromiseFulfilledResult<Candidate[]> =>
-					outcome.status === "fulfilled"
-			)
-			.map((outcome) => outcome.value);
-		return [].concat(...fulfilled);
+		return fulfilled.map(([url, result]) => ({
+			url,
+			candidates: result.value,
+		}));
 	}
 }
 

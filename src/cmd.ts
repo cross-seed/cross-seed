@@ -8,7 +8,7 @@ import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
 import { jobsLoop } from "./jobs.js";
 import { diffCmd } from "./diff.js";
-import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
+import { exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
 import {
@@ -272,7 +272,6 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),
 			});
-
 			await db.migrate.latest();
 			await doStartupValidation();
 			await main();
