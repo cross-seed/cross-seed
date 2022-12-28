@@ -19,7 +19,7 @@ export interface Searchee {
 	length: number;
 }
 
-function getFilesFromTorrent(meta: Metafile): File[] {
+export function getFiles(meta: Metafile): File[] {
 	if (!meta.info.files) {
 		return [
 			{
@@ -49,7 +49,7 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 
 export function createSearcheeFromMetafile(meta: Metafile): Searchee {
 	return {
-		files: getFilesFromTorrent(meta),
+		files: getFiles(meta),
 		infoHash: meta.infoHash,
 		name: meta.name,
 		length: meta.length,

@@ -6,7 +6,7 @@ import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
+import { getFiles, Searchee } from "./searchee.js";
 import { db } from "./db.js";
 import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
 import { File } from "./searchee.js";
@@ -55,14 +55,14 @@ export function compareFileTrees(
 	candidate: Metafile,
 	searchee: Searchee
 ): boolean {
-	const cmp = (elOfA: FileListing, elOfB: File) => {
+	const cmp = (elOfA: File, elOfB: File) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		const pathsAreEqual = elOfB.path === elOfA.path;
 
 		return lengthsAreEqual && pathsAreEqual;
 	};
 
-	return candidate.files.every((elOfA) =>
+	return getFiles(candidate).every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
 	);
 }
