@@ -6,10 +6,14 @@ import { validateTorrentDir } from "./torrent.js";
 import { getTorznabManager, TorznabManager } from "./torznab.js";
 
 function validateOptions() {
-	const { action, rtorrentRpcUrl, qbittorrentUrl } = getRuntimeConfig();
-	if (action === "inject" && !(rtorrentRpcUrl || qbittorrentUrl)) {
+	const { action, rtorrentRpcUrl, qbittorrentUrl, transmissionUrl } =
+		getRuntimeConfig();
+	if (
+		action === "inject" &&
+		!(rtorrentRpcUrl || qbittorrentUrl || transmissionUrl)
+	) {
 		throw new CrossSeedError(
-			"You need to specify --rtorrent-rpc-url or --qbittorrent-url when using '-A inject'."
+			"You need to specify --rtorrent-rpc-url, --transmission-url, or --qbittorrent-url when using '-A inject'."
 		);
 	}
 }
