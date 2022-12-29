@@ -43,10 +43,10 @@ export default class Transmission implements TorrentClient {
 		args: unknown = {},
 		retries = 1
 	): Promise<T> {
-		const { transmissionUrl } = getRuntimeConfig();
+		const { transmissionRpcUrl } = getRuntimeConfig();
 
 		const { username, password, origin, pathname } = new URL(
-			transmissionUrl
+			transmissionRpcUrl
 		);
 
 		const headers = [["Content-Type", "application/json"]];
@@ -105,9 +105,9 @@ export default class Transmission implements TorrentClient {
 		try {
 			await this.request("session-get");
 		} catch (e) {
-			const { transmissionUrl } = getRuntimeConfig();
+			const { transmissionRpcUrl } = getRuntimeConfig();
 			throw new CrossSeedError(
-				`Failed to reach Transmission at ${transmissionUrl}`
+				`Failed to reach Transmission at ${transmissionRpcUrl}`
 			);
 		}
 	}

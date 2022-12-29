@@ -119,9 +119,9 @@ function createCommandWithSharedOptions(name, description) {
 			fileConfig.qbittorrentUrl
 		)
 		.option(
-			"--transmission-url <url>",
+			"--transmission-rpc-url <url>",
 			"The url of your Transmission RPC interface. Requires '-A inject'. See the docs for more information.",
-			fileConfig.transmissionUrl
+			fileConfig.transmissionRpcUrl
 		)
 		.option(
 			"--duplicate-categories",

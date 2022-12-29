@@ -18,13 +18,13 @@ export interface TorrentClient {
 }
 
 function instantiateDownloadClient() {
-	const { rtorrentRpcUrl, qbittorrentUrl, transmissionUrl } =
+	const { rtorrentRpcUrl, qbittorrentUrl, transmissionRpcUrl } =
 		getRuntimeConfig();
 	if (rtorrentRpcUrl) {
 		activeClient = new RTorrent();
 	} else if (qbittorrentUrl) {
 		activeClient = new QBittorrent();
-	} else if (transmissionUrl) {
+	} else if (transmissionRpcUrl) {
 		activeClient = new Transmission();
 	}
 }
