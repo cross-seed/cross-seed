@@ -40,14 +40,12 @@ export default class Transmission implements TorrentClient {
 			);
 			headers.push(["Authorization", `Basic ${credentials}`]);
 		}
-		console.log(headers);
 		const response = await fetch(origin + pathname, {
 			method: "POST",
 			body: JSON.stringify({ method, arguments: args }),
 			headers: Object.fromEntries(headers),
 		});
 		if (response.status === 409) {
-			console.log("setting csrf token");
 			this.xTransmissionSessionId = response.headers.get(
 				XTransmissionSessionId
 			);
