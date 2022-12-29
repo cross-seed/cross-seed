@@ -7,6 +7,7 @@ import DailyRotateFile from "winston-daily-rotate-file";
 export enum Label {
 	QBITTORRENT = "qbittorrent",
 	RTORRENT = "rtorrent",
+	TRANSMISSION = "transmission",
 	DECIDE = "decide",
 	PREFILTER = "prefilter",
 	CONFIGDUMP = "configdump",

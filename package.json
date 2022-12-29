@@ -5,6 +5,7 @@
 	"scripts": {
 		"test": "true",
 		"build": "tsc",
+		"watch": "tsc --watch",
 		"prepare": "rimraf dist && npm run build && husky install"
 	},
 	"bin": {
