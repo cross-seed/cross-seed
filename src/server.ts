@@ -213,7 +213,6 @@ async function handleRequest(
 export function serve(port: number, host: string | undefined): void {
 	if (port) {
 		const server = http.createServer(handleRequest);
-		console.log(port, host);
 		server.listen(port, host);
 		logger.info({
 			label: Label.SERVER,
