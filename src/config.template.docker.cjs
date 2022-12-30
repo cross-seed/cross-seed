@@ -94,6 +94,15 @@ module.exports = {
 	qbittorrentUrl: undefined,
 
 	/**
+	 * The url of your Transmission RPC interface.
+	 * Usually ends with "/transmission/rpc".
+	 * Only relevant with action: "inject".
+	 * Supply your username and password inside the url like so:
+	 * "http://username:password@localhost:9091/transmission/rpc"
+	 */
+	transmissionRpcUrl: undefined,
+
+	/**
 	 * qBittorrent-specific
 	 * Whether to inject using categories with the same save paths as your normal categories.
 	 * Example: if you have a category called "Movies",
