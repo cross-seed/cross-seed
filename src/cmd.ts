@@ -83,6 +83,11 @@ function createCommandWithSharedOptions(name, description) {
 			"Include single-episode torrents in the search",
 			fallback(fileConfig.includeEpisodes, false)
 		)
+		.option(
+			"--no-include-non-videos",
+			"Don't include torrents which contain non-videos"
+		)
+		.option("--no-include-episodes", "Don't include episode torrents")
 		.requiredOption(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
