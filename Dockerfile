@@ -7,6 +7,5 @@ ENV DOCKER_ENV=true
 COPY tsconfig.json tsconfig.json
 COPY src src
 RUN npm run build
-RUN npm link
 EXPOSE 2468
-ENTRYPOINT ["cross-seed"]
+ENTRYPOINT ["node", "dist/cmd.js"]
