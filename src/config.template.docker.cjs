@@ -101,7 +101,6 @@ module.exports = {
 	 */
 	duplicateCategories: false,
 
-
 	/**
 	 * cross-seed will send POST requests to this url
 	 * with a JSON payload of { title, body }.
@@ -113,6 +112,12 @@ module.exports = {
 	 * Listen on a custom port.
 	 */
 	port: 2468,
+
+	/**
+	 * Bind to a specific host address.
+	 * Example: "127.0.0.1"
+	 */
+	host: undefined,
 
 	/**
 	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms
@@ -134,5 +139,4 @@ module.exports = {
 	 * "3 days"
 	 */
 	searchCadence: undefined,
-
 };

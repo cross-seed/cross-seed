@@ -26,6 +26,7 @@ interface FileConfig {
 	duplicateCategories?: boolean;
 	notificationWebhookUrl?: string;
 	port?: number;
+	host?: string;
 	searchCadence?: string;
 	rssCadence?: string;
 }

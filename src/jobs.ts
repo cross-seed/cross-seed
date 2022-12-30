@@ -41,7 +41,7 @@ const getJobs = () => {
 	].filter(Boolean);
 };
 
-export async function jobsLoop() {
+export function jobsLoop() {
 	const jobs = getJobs();
 
 	async function loop() {

@@ -109,6 +109,12 @@ module.exports = {
 	port: 2468,
 
 	/**
+	 * Bind to a specific host address.
+	 * Example: "127.0.0.1"
+	 */
+	host: undefined,
+
+	/**
 	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms
 	 * Set to undefined or null to disable. Minimum of 10 minutes.
 	 * Examples:
