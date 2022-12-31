@@ -1,6 +1,7 @@
-FROM node:14
+FROM node:18-alpine
 WORKDIR /usr/src/cross-seed
 RUN npm i -g npm@9
+RUN npm --version
 COPY package*.json ./
 RUN npm ci
 ENV CONFIG_DIR=/config
