@@ -1,4 +1,5 @@
 FROM node:14
+USER abc
 WORKDIR /usr/src/cross-seed
 COPY package*.json ./
 RUN npm ci
