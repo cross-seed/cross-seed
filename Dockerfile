@@ -1,9 +1,8 @@
 FROM node:16
-WORKDIR /usr/src/cross-seed
+WORKDIR /usr/src/app
 RUN npm install -g npm@9
 COPY package*.json ./
-RUN npm ci --ignore-scripts
-RUN npm rebuild
+RUN npm ci
 ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
 COPY tsconfig.json tsconfig.json
