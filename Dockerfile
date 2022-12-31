@@ -10,4 +10,5 @@ COPY src src
 RUN npm run build
 RUN npm link
 EXPOSE 2468
-ENTRYPOINT ["node", "--prof", "dist/cmd.js"]
+WORKDIR /config
+ENTRYPOINT ["node", "--prof", "/usr/src/cross-seed/dist/cmd.js"]
