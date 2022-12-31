@@ -6,6 +6,8 @@ export const MOVIE_REGEX =
 
 export const EXTENSIONS = ["mkv", "mp4", "avi"];
 
+export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
+
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 
 export enum Action {
@@ -19,6 +21,10 @@ export enum InjectionResult {
 	ALREADY_EXISTS = "ALREADY_EXISTS",
 	TORRENT_NOT_COMPLETE = "TORRENT_NOT_COMPLETE",
 }
+export enum RenameResult {
+	SUCCESS = "SUCESS",
+	FAILURE = "FAILURE",
+}
 
 export enum SaveResult {
 	SAVED = "SAVED",
@@ -28,6 +34,7 @@ export type ActionResult = InjectionResult | SaveResult;
 
 export enum Decision {
 	MATCH = "MATCH",
+	MATCH_EXCEPT_PARENT_DIR = "MATCH_EXCEPT_PARENT_DIR",
 	SIZE_MISMATCH = "SIZE_MISMATCH",
 	NO_DOWNLOAD_LINK = "NO_DOWNLOAD_LINK",
 	DOWNLOAD_FAILED = "DOWNLOAD_FAILED",

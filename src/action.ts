@@ -4,6 +4,7 @@ import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
 	ActionResult,
+	Decision,
 	InjectionResult,
 	SaveResult,
 } from "./constants.js";
@@ -15,6 +16,7 @@ import { getTag } from "./utils.js";
 
 export async function performAction(
 	newMeta: Metafile,
+	decision: Decision,
 	searchee: Searchee,
 	tracker: string,
 	nonceOptions: NonceOptions
@@ -56,6 +58,14 @@ export async function performAction(
 				);
 				break;
 		}
+		// f (result === InjectionResult.SUCCESS && decision === Decision.MATCH_EXCEPT_PARENT_DIR) {
+		// 	const renameResult = await getClient().rename(
+		// 		newMeta,
+		// 		searchee,
+		// 		tracker,
+		// 		nonceOptions,
+		// 	)
+		// 
 		return result;
 	} else {
 		saveTorrentFile(tracker, getTag(searchee.name), newMeta, nonceOptions);
@@ -69,6 +79,7 @@ export async function performActions(searchee, matches, nonceOptions) {
 	for (const { tracker, assessment } of matches) {
 		const result = await performAction(
 			assessment.metafile,
+			assessment.decision,
 			searchee,
 			tracker,
 			nonceOptions

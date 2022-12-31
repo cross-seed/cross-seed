@@ -1,16 +1,19 @@
 import { fileFrom } from "fetch-blob/from.js";
 import { FormData } from "formdata-polyfill/esm.min.js";
+import { statSync } from "fs";
 import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
-import { join, posix } from "path";
-import { InjectionResult } from "../constants.js";
+import { basename, dirname, join, posix, sep } from "path";
+import { dataMode } from "../config.template.cjs";
+import { InjectionResult, RenameResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { isSingleFileTorrent } from "../torrent.js";
+import { wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const X_WWW_FORM_URLENCODED = {
@@ -233,6 +236,13 @@ export default class QBittorrent implements TorrentClient {
 		autoTMM: boolean;
 		category: string;
 	}> {
+		if (searchee.path) {
+			const save_path: string = dirname(searchee.path);
+			const isComplete: boolean = true;
+			const autoTMM: boolean = false;
+			const category: string = " ";
+			return {save_path, isComplete, autoTMM, category}
+		}
 		const responseText = await this.request(
 			"/torrents/info",
 			`hashes=${searchee.infoHash}`,
@@ -256,7 +266,22 @@ export default class QBittorrent implements TorrentClient {
 		};
 	}
 
+	async correct_path(newTorrent: Metafile, searchee: Searchee, save_path: string): Promise<string> {
+		// Path being a directory implies we got a perfect match at the directory level.
+		// Thus we don't need to rename since it's a perfect match.
+		if (!statSync(searchee.path).isDirectory()) {
+			if (newTorrent.files[0].path.split(sep).length > 1) {
+				return dirname(save_path);
+			}
+		}
+		return save_path;
+	}
+
 	async isSubfolderContentLayout(searchee: Searchee): Promise<boolean> {
+		const { dataDirs } = getRuntimeConfig();
+		if (dataDirs.length > 0) {
+			return statSync(searchee.path).isDirectory();
+		}
 		const response = await this.request(
 			"/torrents/files",
 			`hash=${searchee.infoHash}`,
@@ -272,7 +297,7 @@ export default class QBittorrent implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee
 	): Promise<InjectionResult> {
-		const { duplicateCategories } = getRuntimeConfig();
+		const { duplicateCategories, dataDirs } = getRuntimeConfig();
 		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
@@ -284,9 +309,18 @@ export default class QBittorrent implements TorrentClient {
 			const { save_path, isComplete, autoTMM, category } =
 				await this.getTorrentConfiguration(searchee);
 
-			const newCategoryName = duplicateCategories
+			// As there's no way to know here if we matched perfectly or with a renamed top directory
+			// without the MATCH_EXCEPT_PARENT_DIR result, we have to manually check the new torrent's
+			// structure to see which directory is the correct parent.
+			const corrected_save_path = dataDirs.length > 0 ? 
+				await this.correct_path(newTorrent, searchee, save_path) : 
+				save_path;
+			
+			const newCategoryName = searchee.infoHash ? 
+			(duplicateCategories
 				? await this.setUpCrossSeedCategory(category)
-				: category;
+				: category) 
+				: "cross-seed-data";
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
@@ -309,17 +343,71 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("autoTMM", "true");
 			} else {
 				formData.append("autoTMM", "false");
-				formData.append("savepath", save_path);
+				formData.append("savepath", corrected_save_path);
 			}
-			formData.append("contentLayout", contentLayout);
-			formData.append("skip_checking", "true");
-			formData.append("paused", "false");
+			if (shouldManuallyEnforceContentLayout || dataDirs.length > 0) {
+				if (shouldManuallyEnforceContentLayout) {
+					formData.append("contentLayout", "Subfolder");
+				}
+				formData.append("skip_checking", "false");
+				formData.append("paused", "true");
+			} else {
+				formData.append("skip_checking", "true");
+				formData.append("paused", "false");
+			}
 
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
 
 			await this.request("/torrents/add", formData);
+
+			if (shouldManuallyEnforceContentLayout) {
+				await this.request(
+					"/torrents/recheck",
+					`hashes=${newTorrent.infoHash}`,
+					X_WWW_FORM_URLENCODED
+				);
+				await this.request(
+					"/torrents/resume",
+					`hashes=${newTorrent.infoHash}`,
+					X_WWW_FORM_URLENCODED
+				);
+			} else if (dataDirs.length > 0) {
+				const fileFormData = new FormData();
+				const file = newTorrent.files[0];
+				const isNestedFile = file.path.split(sep).length > 1;
+				fileFormData.append("hash", newTorrent.infoHash);
+				const oldFilePath = file.path;
+				fileFormData.append("oldPath", oldFilePath);
+				const newFilePath = isNestedFile ?
+					join(dirname(file.path), basename(searchee.path)) :
+					basename(searchee.path);
+				fileFormData.append("newPath", newFilePath);
+				fileFormData.append("foo", "bar");
+				if (newFilePath != oldFilePath) {	
+				    await new Promise(resolve => setTimeout(resolve, 100));
+					await this.request("/torrents/renameFile", fileFormData); 
+				}
+				if (isNestedFile) {
+					const folderFormData = new FormData();
+					const newFolderPath = basename(dirname(searchee.path));
+					const oldFolderPath = file.path.split(sep)[0];
+					folderFormData.append("hash", newTorrent.infoHash);
+					folderFormData.append("oldPath", oldFolderPath);
+					folderFormData.append("newPath", newFolderPath);
+					folderFormData.append("foo", "bar");
+					if (newFolderPath != oldFolderPath){
+						await new Promise(resolve => setTimeout(resolve, 100));
+						await this.request("/torrents/renameFolder", folderFormData);
+					}
+				}
+				await new Promise(resolve => setTimeout(resolve, 100));
+				await this.request(
+					"/torrents/recheck", 
+					`hashes=${newTorrent.infoHash}`,
+					X_WWW_FORM_URLENCODED);
+			}
 
 			unlink(tempFilepath).catch((error) => {
 				logger.debug(error);
@@ -334,4 +422,32 @@ export default class QBittorrent implements TorrentClient {
 			return InjectionResult.FAILURE;
 		}
 	}
+	async rename(
+		torrent: Metafile,
+		searchee: Searchee,
+		tracker: string): Promise<RenameResult> {
+			try {
+				
+				await this.request(               // for some reason, this pause, recheck, resume loop is required to get the torrents 
+					"/torrents/pause",            // to not just say "missing files." I hope there's a workaround for this,
+					`hashes=${torrent.infoHash}`, // because the recheck time would be immense when scanned on a large library.
+					X_WWW_FORM_URLENCODED
+				);
+				await this.request(
+					"/torrents/recheck", 
+					`hashes=${torrent.infoHash}`,
+					X_WWW_FORM_URLENCODED);
+				//await this.request(
+				//	"/torrents/resume", 
+				//	`hashes=${torrent.infoHash}`,
+				//	X_WWW_FORM_URLENCODED);
+				return RenameResult.SUCCESS;
+			} catch (e) {
+				logger.debug({
+					label: Label.QBITTORRENT,
+					message: `Rename failed: ${e.message}`,
+				});
+				return RenameResult.FAILURE;
+			}
+		}
 }

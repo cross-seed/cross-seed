@@ -1,9 +1,11 @@
 import chalk from "chalk";
 import fs from "fs";
 import { zip } from "lodash-es";
+import path from "path";
 import { performAction, performActions } from "./action.js";
 import {
 	ActionResult,
+	DATA_EXTENSIONS,
 	Decision,
 	InjectionResult,
 	SaveResult,
@@ -19,8 +21,10 @@ import {
 	NonceOptions,
 } from "./runtimeConfig.js";
 import {
+	getFilePathsFromPath,
 	createSearcheeFromMetafile,
 	createSearcheeFromTorrentFile,
+	createSearcheeFromPath,
 	Searchee,
 } from "./searchee.js";
 import {
@@ -80,7 +84,8 @@ async function findOnOtherSites(
 		results.map(assessEach)
 	);
 	const matches = loaded.filter(
-		(e) => e.assessment.decision === Decision.MATCH
+		(e) => (e.assessment.decision === Decision.MATCH || 
+			    e.assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR)
 	);
 	const actionResults = await performActions(searchee, matches, nonceOptions);
 
@@ -169,10 +174,11 @@ export async function checkNewCandidateMatch(
 		hashesToExclude
 	);
 
-	if (assessment.decision !== Decision.MATCH) return false;
+	if (assessment.decision !== Decision.MATCH && assessment.decision !== Decision.MATCH_EXCEPT_PARENT_DIR) return false;
 
 	const result = await performAction(
 		assessment.metafile,
+		assessment.decision,
 		searchee,
 		candidate.tracker,
 		EmptyNonceOptions
@@ -186,17 +192,27 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { torrents } = getRuntimeConfig();
+	const { torrents, dataDirs } = getRuntimeConfig();
 	let parsedTorrents: Searchee[];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
-			torrents.map(createSearcheeFromTorrentFile)
+			torrents.map(createSearcheeFromTorrentFile) //also create searchee from path
 		);
+		parsedTorrents = searcheeResults.filter(ok);
+	} else if (dataDirs.length > 0) {
+		var fullPaths: string[] = [];
+		dataDirs.forEach(dataDir => {
+            const allPaths = getFilePathsFromPath(dataDir, [], 0, 4);
+            fullPaths = fullPaths.concat(allPaths.filter(file => 
+                fs.statSync(file).isDirectory() || 
+                (DATA_EXTENSIONS.includes(path.extname(file))  // try to avoid searching for a RARed pieces
+                && fs.statSync(file).size > 100000000))); // 100 MB to start
+        });
+		const searcheeResults = await Promise.all(fullPaths.map(createSearcheeFromPath))
 		parsedTorrents = searcheeResults.filter(ok);
 	} else {
 		parsedTorrents = await loadTorrentDirLight();
 	}
-
 	const hashesToExclude = parsedTorrents
 		.map((t) => t.infoHash)
 		.filter(Boolean);
@@ -215,7 +231,8 @@ async function findSearchableTorrents() {
 
 export async function main(): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
-	const { samples, hashesToExclude } = await findSearchableTorrents();
+	const { samples, hashesToExclude } =  await findSearchableTorrents();
+
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);

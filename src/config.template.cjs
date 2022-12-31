@@ -16,6 +16,19 @@ module.exports = {
 	torznab: [],
 
 	/**
+	 * To search with downloaded data, you can pass in directories to your downloaded torrent data
+	 * to find matches rather using the torrent files themselves for matching. 
+	 */
+	dataDirs: [],
+
+	/**
+	 * Determines directory structure of data target. Media is an organized directory like that produced by Radarr. 
+	 * Downloads is an unstructured downloads folder like those produced by torrent clients.
+	 */
+
+	dataMode: [],
+
+	/**
 	 * directory containing torrent files.
 	 * For rtorrent, this is your session directory
 	 * as configured in your .rtorrent.rc file.
