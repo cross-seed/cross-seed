@@ -345,13 +345,11 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("autoTMM", "false");
 				formData.append("savepath", corrected_save_path);
 			}
-			if (shouldManuallyEnforceContentLayout || dataDirs.length > 0) {
-				if (shouldManuallyEnforceContentLayout) {
-					formData.append("contentLayout", "Subfolder");
-				}
+			if (dataDirs.length > 0) {
 				formData.append("skip_checking", "false");
 				formData.append("paused", "true");
 			} else {
+				formData.append("contentLayout", contentLayout);
 				formData.append("skip_checking", "true");
 				formData.append("paused", "false");
 			}
@@ -362,7 +360,7 @@ export default class QBittorrent implements TorrentClient {
 
 			await this.request("/torrents/add", formData);
 
-			if (shouldManuallyEnforceContentLayout) {
+			if (contentLayout) {
 				await this.request(
 					"/torrents/recheck",
 					`hashes=${newTorrent.infoHash}`,
