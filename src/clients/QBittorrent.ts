@@ -9,7 +9,7 @@ import { basename, dirname, join, posix, sep } from "path";
 import { dataMode } from "../config.template.cjs";
 import { InjectionResult, RenameResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
-import { Label, logger } from "../logger.js";
+import { Label, logger, logOnce } from "../logger.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { isSingleFileTorrent } from "../torrent.js";
@@ -182,6 +182,14 @@ export default class QBittorrent implements TorrentClient {
 		const newCategoryName = `${ogCategoryName}.cross-seed`;
 		const maybeNewCategory = categories[newCategoryName];
 
+		if (!ogCategory.savePath) {
+			logOnce(`qbit/cat/no-save-path/${ogCategoryName}`, () => {
+				logger.warn(
+					`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`
+				);
+			});
+		}
+
 		if (maybeNewCategory?.savePath === ogCategory.savePath) {
 			// setup is already complete
 		} else if (maybeNewCategory) {
@@ -316,9 +324,11 @@ export default class QBittorrent implements TorrentClient {
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
-			const shouldManuallyEnforceContentLayout =
+			const contentLayout =
 				isSingleFileTorrent(newTorrent) &&
-				(await this.isSubfolderContentLayout(searchee));
+				(await this.isSubfolderContentLayout(searchee))
+					? "Subfolder"
+					: "Original";
 
 			const file = await fileFrom(
 				tempFilepath,
@@ -328,6 +338,7 @@ export default class QBittorrent implements TorrentClient {
 			formData.append("torrents", file, filename);
 			formData.append("tags", "cross-seed");
 			formData.append("category", newCategoryName);
+
 			if (autoTMM) {
 				formData.append("autoTMM", "true");
 			} else {

@@ -232,9 +232,6 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),
 			});
-			if (process.env.DOCKER_ENV === "true") {
-				generateConfig({ docker: true });
-			}
 			await db.migrate.latest();
 			await doStartupValidation();
 			serve(options.port);
@@ -256,9 +253,6 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),
 			});
-			if (process.env.DOCKER_ENV === "true") {
-				generateConfig({ docker: true });
-			}
 
 			await db.migrate.latest();
 			await doStartupValidation();
@@ -288,9 +282,6 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),
 			});
-			if (process.env.DOCKER_ENV === "true") {
-				generateConfig({ docker: true });
-			}
 
 			await db.migrate.latest();
 			await doStartupValidation();
