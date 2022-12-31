@@ -1,6 +1,6 @@
 FROM node:18
 WORKDIR /usr/src/cross-seed
-RUN npm --version
+RUN npm install -g npm@9
 COPY package*.json ./
 RUN npm ci --ignore-scripts
 ENV CONFIG_DIR=/config
