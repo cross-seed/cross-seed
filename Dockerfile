@@ -1,9 +1,7 @@
-FROM node:18-alpine
+FROM node:14
 WORKDIR /usr/src/cross-seed
-RUN npm i -g npm@9
-RUN npm --version
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
 COPY tsconfig.json tsconfig.json
