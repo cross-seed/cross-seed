@@ -1,5 +1,5 @@
 FROM node:16
-WORKDIR /usr/src/app
+WORKDIR /usr/src/cross-seed
 RUN npm install -g npm@9
 COPY package*.json ./
 RUN npm ci
