@@ -1,4 +1,4 @@
-FROM node:18
+FROM node:16
 WORKDIR /usr/src/cross-seed
 RUN npm install -g npm@9
 COPY package*.json ./
