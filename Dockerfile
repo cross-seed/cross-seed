@@ -3,6 +3,7 @@ WORKDIR /usr/src/cross-seed
 RUN npm install -g npm@9
 COPY package*.json ./
 RUN npm ci --ignore-scripts
+RUN npm rebuild
 ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
 COPY tsconfig.json tsconfig.json
