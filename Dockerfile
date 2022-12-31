@@ -1,5 +1,5 @@
 FROM node:18
-WORKDIR /usr/src/cross-seed
+WORKDIR /usr/src/app
 RUN npm install -g npm@9
 COPY package*.json ./
 RUN npm ci --ignore-scripts
