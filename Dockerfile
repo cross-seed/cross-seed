@@ -1,5 +1,5 @@
-FROM node:14
-WORKDIR /usr/src/app
+FROM node:16
+WORKDIR /usr/src/cross-seed
 COPY package*.json ./
 RUN npm ci
 ENV CONFIG_DIR=/config
