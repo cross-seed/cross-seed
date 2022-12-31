@@ -25,7 +25,12 @@ async function up(knex: Knex.Knex): Promise<void> {
 
 	// this is a bit of a shortcut but since db migrations run once, a
 	// little double-logging in an error case isn't too bad
-	await getTorznabManager().validateTorznabUrls();
+	try {
+		// populate capsMap and sync with db
+		await getTorznabManager().validateTorznabUrls();
+	} catch (e) {
+		// can fail in the case of no indexers. we don't want that to crash the migration!
+	}
 
 	await knex.transaction(async (trx) => {
 		const timestampRows = await trx
