@@ -360,18 +360,7 @@ export default class QBittorrent implements TorrentClient {
 
 			await this.request("/torrents/add", formData);
 
-			if (contentLayout) {
-				await this.request(
-					"/torrents/recheck",
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED
-				);
-				await this.request(
-					"/torrents/resume",
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED
-				);
-			} else if (dataDirs.length > 0) {
+			if (dataDirs.length > 0) {
 				const fileFormData = new FormData();
 				const file = newTorrent.files[0];
 				const isNestedFile = file.path.split(sep).length > 1;
