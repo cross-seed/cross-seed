@@ -40,6 +40,7 @@ export interface Candidate {
 	size: number;
 	name: string;
 	tracker: string;
+	pubDate: number;
 }
 
 interface AssessmentWithTracker {
@@ -236,19 +237,31 @@ export async function main(): Promise<void> {
 
 export async function scanRssFeeds() {
 	const candidates = await getTorznabManager().queryRssFeeds();
+	const lastRun =
+		(await db("job_log").select("last_run").where({ name: "rss" }).first())
+			?.last_run ?? 0;
+	const candidatesSinceLastTime = candidates.filter(
+		(c) => c.pubDate > lastRun
+	);
 	logger.verbose({
 		label: Label.RSS,
-		message: `Scan returned ${candidates.length} results`,
+		message: `Scan returned ${
+			candidatesSinceLastTime.length
+		} new results, ignoring ${
+			candidates.length - candidatesSinceLastTime.length
+		} already seen`,
 	});
 	logger.verbose({
 		label: Label.RSS,
 		message: "Indexing new torrents...",
 	});
 	await indexNewTorrents();
-	for (const [i, candidate] of candidates.entries()) {
+	for (const [i, candidate] of candidatesSinceLastTime.entries()) {
 		logger.verbose({
 			label: Label.RSS,
-			message: `Processing release ${i + 1}/${candidates.length}`,
+			message: `Processing release ${i + 1}/${
+				candidatesSinceLastTime.length
+			}`,
 		});
 		await checkNewCandidateMatch(candidate);
 	}

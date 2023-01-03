@@ -214,6 +214,7 @@ export class TorznabManager {
 				"Unknown tracker",
 			link: item.link[0],
 			size: Number(item.size[0]),
+			pubDate: new Date(item.pubDate[0]).getTime(),
 		}));
 	}
 
