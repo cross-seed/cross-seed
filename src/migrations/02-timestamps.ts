@@ -1,14 +1,7 @@
 import Knex from "knex";
-import { join } from "path";
-import { appDir } from "../configuration.js";
 import { getTorznabManager } from "../torznab.js";
-async function up(knex: Knex.Knex): Promise<void> {
-	const connection = await knex.client.acquireConnection();
-	await connection.backup(
-		join(appDir(), "cross-seed.pre-timestamps.backup.db")
-	);
-	await knex.client.releaseConnection(connection);
 
+async function up(knex: Knex.Knex): Promise<void> {
 	await knex.schema.createTable("indexer", (table) => {
 		table.increments("id").primary();
 		table.string("url").unique();
