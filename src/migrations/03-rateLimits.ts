@@ -5,9 +5,9 @@ async function up(knex: Knex.Knex): Promise<void> {
 		table.string("apikey");
 		table.string("status");
 		table.integer("status_updated_at");
-		table.boolean("search_cap");
-		table.boolean("tv_search_cap");
-		table.boolean("movie_search_cap");
+		table.boolean("search_cap").nullable();
+		table.boolean("tv_search_cap").nullable();
+		table.boolean("movie_search_cap").nullable();
 	});
 }
 

@@ -31,7 +31,7 @@ import {
 	loadTorrentDirLight,
 	TorrentLocator,
 } from "./torrent.js";
-import { getTorznabManager } from "./torznab.js";
+import { queryRssFeeds, searchTorznab } from "./torznab.js";
 import { filterAsync, ok, stripExtension } from "./utils.js";
 
 export interface Candidate {
@@ -68,10 +68,7 @@ async function findOnOtherSites(
 
 	let response: Candidate[];
 	try {
-		response = await getTorznabManager().searchTorznab(
-			searchee.name,
-			nonceOptions
-		);
+		response = await searchTorznab(searchee.name, nonceOptions);
 	} catch (e) {
 		logger.error(`error searching for ${searchee.name}`);
 		logger.debug(e);
@@ -236,7 +233,7 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const candidates = await getTorznabManager().queryRssFeeds();
+	const candidates = await queryRssFeeds();
 	const lastRun =
 		(await db("job_log").select("last_run").where({ name: "rss" }).first())
 			?.last_run ?? 0;

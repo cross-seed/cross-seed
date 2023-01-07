@@ -1,8 +1,5 @@
-import { parse } from "@typescript-eslint/parser";
-import { zip } from "lodash-es";
 import fetch from "node-fetch";
 import xml2js from "xml2js";
-import { parseNumbers } from "xml2js/lib/processors.js";
 import { EP_REGEX, SEASON_REGEX } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
@@ -17,6 +14,18 @@ import {
 	reformatTitleForSearching,
 	stripExtension,
 } from "./utils.js";
+
+interface Indexer {
+	id: number;
+	url: string;
+	apikey: string;
+	active: boolean;
+	status: "healthy";
+	statusUpdatedAt: number;
+	searchCap: boolean;
+	tvSearchCap: boolean;
+	movieSearchCap: boolean;
+}
 
 interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
@@ -61,8 +70,6 @@ interface TorznabResult {
 
 type TorznabResults = { rss?: { channel?: [] | [{ item?: TorznabResult[] }] } };
 
-let activeTorznabManager: TorznabManager;
-
 function sanitizeUrl(url: string | URL): string {
 	url = new URL(url);
 	return url.origin + url.pathname;
@@ -70,21 +77,6 @@ function sanitizeUrl(url: string | URL): string {
 
 function getApikey(url: string) {
 	return new URL(url).searchParams.get("apikey");
-}
-
-async function getEnabledIndexers() {
-	const { torznab } = getRuntimeConfig();
-	const indexers = await db("indexer")
-		.whereIn("url", torznab.map(sanitizeUrl))
-		.select("*");
-	if (indexers.length === torznab.length) return indexers;
-
-	syncWithDb();
-}
-
-export function fetchWithClientTimeout(url, init = {}, timeout = 10000) {
-	const abortController = new AbortController();
-	return fetch(url, { ...init, signal: abortController.signal });
 }
 
 function parseTorznabResults(xml: TorznabResults): Candidate[] {
@@ -112,13 +104,13 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	const isAvailable = (searchTechnique) =>
 		searchTechnique?.[0]?.$?.available === "yes";
 	return {
-		search: isAvailable(capsSection?.search),
-		tvSearch: isAvailable(capsSection?.["tv-search"]),
-		movieSearch: isAvailable(capsSection?.["movie-search"]),
+		search: Boolean(isAvailable(capsSection?.search)),
+		tvSearch: Boolean(isAvailable(capsSection?.["tv-search"])),
+		movieSearch: Boolean(isAvailable(capsSection?.["movie-search"])),
 	};
 }
 
-function createTorznabQuery(name: string, caps: Caps) {
+function createTorznabSearchQuery(name: string, caps: Caps) {
 	const nameWithoutExtension = stripExtension(name);
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)[0]);
@@ -130,19 +122,19 @@ function createTorznabQuery(name: string, caps: Caps) {
 			q: cleanseSeparators(match.groups.title),
 			season: extractNumber(match.groups.season),
 			ep: extractNumber(match.groups.episode),
-		};
+		} as const;
 	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
 		return {
 			t: "tvsearch",
 			q: cleanseSeparators(match.groups.title),
 			season: extractNumber(match.groups.season),
-		};
+		} as const;
 	} else {
 		return {
 			t: "search",
 			q: reformatTitleForSearching(nameWithoutExtension),
-		};
+		} as const;
 	}
 }
 
@@ -155,16 +147,11 @@ async function updateSearchTimestamps(name: string, indexerIds: number[]) {
 				.where({ name })
 				.select("id")
 				.first();
-			// here
-			const { id: indexer_id } = await trx("indexer")
-				.where({ id: indexerId })
-				.select("id")
-				.first();
 
 			await trx("timestamp")
 				.insert({
 					searchee_id,
-					indexer_id,
+					indexer_id: indexerId,
 					last_searched: now,
 					first_searched: now,
 				})
@@ -174,13 +161,77 @@ async function updateSearchTimestamps(name: string, indexerIds: number[]) {
 	}
 }
 
-function queryRssFeeds() {}
+export async function queryRssFeeds(): Promise<Candidate[]> {
+	const candidatesByUrl = await makeRequests(
+		"",
+		await getEnabledIndexers(),
+		() => ({ t: "search", q: "" })
+	);
+	return candidatesByUrl.flatMap((e) => e.candidates);
+}
 
-function searchTorznab() {}
+async function getEnabledIndexers() {
+	return db("indexer").where({ active: true, search_cap: true }).select({
+		id: "id",
+		url: "url",
+		apikey: "apikey",
+		active: "active",
+		status: "status",
+		statusUpdatedAt: "status_updated_at",
+		searchCap: "search_cap",
+		tvSearchCap: "tv_search_cap",
+		movieSearchCap: "movie_search_cap",
+	});
+}
 
-function validateTorznabUrls() {}
+export async function searchTorznab(
+	name: string,
+	nonceOptions = EmptyNonceOptions
+): Promise<Candidate[]> {
+	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
 
-async function syncWithDb() {
+	// search history for name across all indexers
+	const timestampDataSql = await db("searchee")
+		.join("timestamp", "searchee.id", "timestamp.searchee_id")
+		.join("indexer", "timestamp.indexer_id", "indexer.id")
+		.where({ name })
+		.select({
+			indexerId: "indexer.id",
+			firstSearched: "timestamp.first_searched",
+			lastSearched: "timestamp.last_searched",
+		});
+	const enabledIndexers = await getEnabledIndexers();
+	const indexersToUse = enabledIndexers.filter((indexer) => {
+		const entry = timestampDataSql.find(
+			(entry) => entry.indexerId === indexer.id
+		);
+		return (
+			!entry ||
+			((!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
+				(!excludeRecentSearch ||
+					entry.lastSearched < nMsAgo(excludeRecentSearch)))
+		);
+	});
+
+	const candidatesByIndexerId = await makeRequests(
+		name,
+		indexersToUse,
+		(indexer) =>
+			createTorznabSearchQuery(name, {
+				search: indexer.searchCap,
+				tvSearch: indexer.tvSearchCap,
+				movieSearch: indexer.movieSearchCap,
+			})
+	);
+
+	await updateSearchTimestamps(
+		name,
+		candidatesByIndexerId.map((e) => e.indexerId)
+	);
+	return candidatesByIndexerId.flatMap((e) => e.candidates);
+}
+
+export async function syncWithDb() {
 	const { torznab } = getRuntimeConfig();
 
 	const dbIndexers = await db("indexer").where({ active: true }).select({
@@ -209,15 +260,24 @@ async function syncWithDb() {
 			)
 	);
 
-	const dbIndexersWithStaleApikeys = dbIndexers.reduce((acc, dbIndexer) => {
-		const configIndexer = torznab.find(
-			(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url
-		);
-		if (configIndexer && dbIndexer.apikey !== getApikey(configIndexer)) {
-			acc.push({ ...dbIndexer, apikey: getApikey(configIndexer) });
-		}
-		return acc;
-	}, []);
+	const apikeyUpdates = dbIndexers.reduce<{ id: number; apikey: string }[]>(
+		(acc, dbIndexer) => {
+			const configIndexer = torznab.find(
+				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url
+			);
+			if (
+				configIndexer &&
+				dbIndexer.apikey !== getApikey(configIndexer)
+			) {
+				acc.push({
+					id: dbIndexer.id,
+					apikey: getApikey(configIndexer),
+				});
+			}
+			return acc;
+		},
+		[]
+	);
 
 	if (inDbButNotInMemory.length > 0) {
 		await db("indexer")
@@ -242,23 +302,20 @@ async function syncWithDb() {
 	}
 
 	await db.transaction(async (trx) => {
-		for (const dbIndexer of dbIndexersWithStaleApikeys) {
+		for (const apikeyUpdate of apikeyUpdates) {
 			await trx("indexer")
-				.where({ id: dbIndexer.id })
-				.update({ apikey: dbIndexer.apikey });
+				.where({ id: apikeyUpdate.id })
+				.update({ apikey: apikeyUpdate.apikey });
 		}
 	});
 }
 
-/**
- * Generates a Torznab query URL, given the srcUrl (user config)
- * and the torznab param configuration.
- * @param srcUrl
- * @param params
- */
-function assembleUrl(srcUrl: string | URL, params: TorznabParams): string {
-	const url = new URL(srcUrl);
-	const apikey = url.searchParams.get("apikey");
+function assembleUrl(
+	urlStr: string,
+	apikey: string,
+	params: TorznabParams
+): string {
+	const url = new URL(urlStr);
 	const searchParams = new URLSearchParams();
 
 	searchParams.set("apikey", apikey);
@@ -271,214 +328,158 @@ function assembleUrl(srcUrl: string | URL, params: TorznabParams): string {
 	return url.toString();
 }
 
-function fetchCaps(url: string | URL): Promise<Caps> {
-	return fetch(assembleUrl(url, { t: "caps" }))
+function fetchCaps(indexer: {
+	id: number;
+	url: string;
+	apikey: string;
+}): Promise<Caps> {
+	return fetch(assembleUrl(indexer.url, indexer.apikey, { t: "caps" }))
 		.then((r) => r.text())
 		.then(xml2js.parseStringPromise)
 		.then(parseTorznabCaps);
 }
 
-export class TorznabManager {
-	capsMap = new Map<string, Caps>();
-
-	async validateTorznabUrls() {
-		const { torznab } = getRuntimeConfig();
-		if (!torznab) return;
-
-		const urls: URL[] = torznab.map((str) => new URL(str));
-		for (const url of urls) {
-			if (!url.pathname.endsWith("/api")) {
-				throw new CrossSeedError(
-					`Torznab url ${url} must have a path ending in /api`
-				);
+function collateOutcomes<Correlator, SuccessReturnType>(
+	correlators: Correlator[],
+	outcomes: PromiseSettledResult<SuccessReturnType>[]
+): {
+	rejected: [Correlator, PromiseRejectedResult["reason"]][];
+	fulfilled: [Correlator, SuccessReturnType][];
+} {
+	return outcomes.reduce<{
+		rejected: [Correlator, PromiseRejectedResult["reason"]][];
+		fulfilled: [Correlator, SuccessReturnType][];
+	}>(
+		({ rejected, fulfilled }, cur, idx) => {
+			if (cur.status === "rejected") {
+				rejected.push([correlators[idx], cur.reason]);
+			} else {
+				fulfilled.push([correlators[idx], cur.value]);
 			}
-			if (!url.searchParams.has("apikey")) {
-				throw new CrossSeedError(
-					`Torznab url ${url} does not specify an apikey`
-				);
-			}
-		}
+			return { rejected, fulfilled };
+		},
+		{ rejected: [], fulfilled: [] }
+	);
+}
 
-		const outcomes = await Promise.allSettled(
-			urls.map((url) => this.fetchCaps(url))
+async function updateCaps(
+	indexers: { id: number; url: string; apikey: string }[]
+): Promise<void> {
+	const outcomes = await Promise.allSettled<Caps>(
+		indexers.map((indexer) => fetchCaps(indexer))
+	);
+	const { fulfilled, rejected } = collateOutcomes<number, Caps>(
+		indexers.map((i) => i.id),
+		outcomes
+	);
+	for (const [indexerId, reason] of rejected) {
+		logger.warn(
+			`Failed to reach ${indexers.find((i) => i.id === indexerId).url}`
 		);
-
-		const zipped: [URL, PromiseSettledResult<Caps>][] = zip(urls, outcomes);
-
-		// handle promise rejections
-		const rejected: [URL, PromiseRejectedResult][] = zipped.filter(
-			(bundle): bundle is [URL, PromiseRejectedResult] =>
-				bundle[1].status === "rejected"
-		);
-
-		for (const [url, outcome] of rejected) {
-			logger.warn(`Failed to reach ${url}`);
-			logger.debug(outcome.reason);
-		}
-
-		const fulfilled = zipped
-			.filter(
-				(bundle): bundle is [URL, PromiseFulfilledResult<Caps>] =>
-					bundle[1].status === "fulfilled"
-			)
-			.map(
-				([url, outcome]: [URL, PromiseFulfilledResult<Caps>]): [
-					URL,
-					Caps
-				] => [url, outcome.value]
-			);
-
-		// handle trackers that can't search
-		const trackersWithoutSearchingCaps = fulfilled.filter(
-			([, caps]) => !caps.search
-		);
-		trackersWithoutSearchingCaps
-			.map(
-				([url]) =>
-					`Ignoring indexer that doesn't support searching: ${url}`
-			)
-			.forEach(logger.warn);
-
-		// store caps of usable trackers
-		const trackersWithSearchingCaps = fulfilled.filter(
-			([, caps]) => caps.search
-		);
-
-		for (const [url, caps] of trackersWithSearchingCaps) {
-			this.capsMap.set(url.toString(), caps);
-		}
-
-		if (trackersWithSearchingCaps.length === 0) {
-			throw new CrossSeedError("no working indexers available");
-		}
-		await this.syncWithDb();
+		logger.debug(reason);
 	}
 
-	async syncWithDb() {
-		if (this.capsMap.size === 0) {
-			logger.error({
-				label: Label.TORZNAB,
-				message:
-					"cross-seed tried to sync with the DB before capsMap was ready",
-			});
-		}
-		const workingIndexers = Array.from(this.capsMap.entries())
-			.filter(([, caps]) => caps.search)
-			.map(([url]) => url);
-	}
-
-	async updateSearchTimestamps(name: string, indexers: string[]) {}
-
-	async queryRssFeeds() {
-		const indexersToUse = Array.from(this.capsMap.keys());
-		const searchUrls = indexersToUse.map((url) =>
-			assembleUrl(url, { t: "search", q: "" })
-		);
-		const candidatesByUrl = await this.makeRequests("", searchUrls);
-		return candidatesByUrl.flatMap((e) => e.candidates);
-	}
-
-	async searchTorznab(
-		name: string,
-		nonceOptions = EmptyNonceOptions
-	): Promise<Candidate[]> {
-		const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
-		const timestampDataSql = await db("searchee")
-			.join("timestamp", "searchee.id", "timestamp.searchee_id")
-			.join("indexer", "timestamp.indexer_id", "indexer.id")
-			.where({ name })
-			.select({
-				url: "indexer.url",
-				firstSearched: "timestamp.first_searched",
-				lastSearched: "timestamp.last_searched",
-			});
-		const indexersToUse = Array.from(this.capsMap).filter(([url]) => {
-			const entry = timestampDataSql.find(
-				(entry) => entry.url === sanitizeUrl(url)
-			);
-			return (
-				!entry ||
-				((!excludeOlder ||
-					entry.firstSearched > nMsAgo(excludeOlder)) &&
-					(!excludeRecentSearch ||
-						entry.lastSearched < nMsAgo(excludeRecentSearch)))
-			);
+	for (const [indexerId, caps] of fulfilled) {
+		await db("indexer").where({ id: indexerId }).update({
+			search_cap: caps.search,
+			tv_search_cap: caps.tvSearch,
+			movie_search_cap: caps.movieSearch,
 		});
-		const searchUrls = indexersToUse.map(([url, caps]: [string, Caps]) => {
-			return assembleUrl(url, this.getBestSearchTechnique(name, caps));
-		});
-		const candidatesByUrl = await this.makeRequests(name, searchUrls);
+	}
+}
 
-		await this.updateSearchTimestamps(
-			name,
-			candidatesByUrl.map((e) => e.url)
+export async function validateTorznabUrls() {
+	const { torznab } = getRuntimeConfig();
+	if (!torznab) return;
+
+	const urls: URL[] = torznab.map((str) => new URL(str));
+	for (const url of urls) {
+		if (!url.pathname.endsWith("/api")) {
+			throw new CrossSeedError(
+				`Torznab url ${url} must have a path ending in /api`
+			);
+		}
+		if (!url.searchParams.has("apikey")) {
+			throw new CrossSeedError(
+				`Torznab url ${url} does not specify an apikey`
+			);
+		}
+	}
+	await syncWithDb();
+	const enabledIndexersWithoutCaps = await db("indexer")
+		.where({
+			active: true,
+			search_cap: null,
+			tv_search_cap: null,
+			movie_cap: null,
+		})
+		.select({ id: "id", url: "url", apikey: "apikey" });
+	await updateCaps(enabledIndexersWithoutCaps);
+
+	const indexersWithoutSearch = await db("indexer")
+		.where({ search_cap: false, active: true })
+		.select({ id: "id", url: "url" });
+
+	for (const indexer of indexersWithoutSearch) {
+		logger.warn(
+			`Ignoring indexer that doesn't support searching: ${indexer.url}`
 		);
-		return candidatesByUrl.flatMap((e) => e.candidates);
 	}
 
-	private async makeRequests(name: string, searchUrls: string[]) {
-		const abortController = new AbortController();
-		setTimeout(() => void abortController.abort(), 10000);
+	const indexersWithSearch = await getEnabledIndexers();
 
-		searchUrls.forEach(
-			(message) => void logger.verbose({ label: Label.TORZNAB, message })
-		);
+	if (indexersWithSearch.length === 0) {
+		throw new CrossSeedError("no working indexers available");
+	}
+}
 
-		const outcomes = await Promise.allSettled<Candidate[]>(
-			searchUrls.map((url) =>
-				fetch(url, {
-					headers: { "User-Agent": "cross-seed" },
-					signal: abortController.signal,
+async function makeRequests(
+	name: string,
+	indexers: Indexer[],
+	getQuery: (indexer: Indexer) => TorznabParams
+): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+	const searchUrls = indexers.map((indexer: Indexer) =>
+		assembleUrl(indexer.url, indexer.apikey, getQuery(indexer))
+	);
+	searchUrls.forEach(
+		(message) => void logger.verbose({ label: Label.TORZNAB, message })
+	);
+	const abortController = new AbortController();
+	setTimeout(() => void abortController.abort(), 10000);
+	const outcomes = await Promise.allSettled<Candidate[]>(
+		searchUrls.map((url) =>
+			fetch(url, {
+				headers: { "User-Agent": "cross-seed" },
+				signal: abortController.signal,
+			})
+				.then((response) => {
+					if (!response.ok) {
+						throw new Error(
+							`request failed with code: ${response.status}`
+						);
+					}
+					return response;
 				})
-					.then((response) => {
-						if (!response.ok) {
-							throw new Error(
-								`request failed with code: ${response.status}`
-							);
-						}
-						return response;
-					})
-					.then((r) => r.text())
-					.then(this.parseResults)
-			)
+				.then((r) => r.text())
+				.then(xml2js.parseStringPromise)
+				.then(parseTorznabResults)
+		)
+	);
+
+	const { rejected, fulfilled } = collateOutcomes<number, Candidate[]>(
+		indexers.map((indexer) => indexer.id),
+		outcomes
+	);
+
+	for (const [indexerId, reason] of rejected) {
+		logger.warn(
+			`Failed to reach ${indexers.find((i) => i.id === indexerId).url}`
 		);
-
-		const { rejected, fulfilled } = outcomes.reduce<{
-			rejected: [string, PromiseRejectedResult][];
-			fulfilled: [string, PromiseFulfilledResult<Candidate[]>][];
-		}>(
-			({ rejected, fulfilled }, cur, idx) => {
-				const sanitizedUrl = sanitizeUrl(searchUrls[idx]);
-				if (cur.status === "rejected") {
-					rejected.push([sanitizedUrl, cur]);
-				} else {
-					fulfilled.push([sanitizedUrl, cur]);
-				}
-				return { rejected, fulfilled };
-			},
-			{ rejected: [], fulfilled: [] }
-		);
-
-		rejected
-			.map(
-				([url, outcome]) =>
-					`Failed searching ${url} for "${name}" with reason: ${outcome.reason}`
-			)
-			.forEach(logger.warn);
-		return fulfilled.map(([url, result]) => ({
-			url,
-			candidates: result.value,
-		}));
+		logger.debug(reason);
 	}
-}
 
-function instantiateTorznabManager() {
-	activeTorznabManager = new TorznabManager();
-}
-
-export function getTorznabManager(): TorznabManager {
-	if (!activeTorznabManager) {
-		instantiateTorznabManager();
-	}
-	return activeTorznabManager;
+	return fulfilled.map(([indexerId, results]) => ({
+		indexerId,
+		candidates: results,
+	}));
 }

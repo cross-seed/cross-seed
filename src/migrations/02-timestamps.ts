@@ -1,5 +1,5 @@
 import Knex from "knex";
-import { getTorznabManager } from "../torznab.js";
+import { syncWithDb } from "../torznab.js";
 
 async function up(knex: Knex.Knex): Promise<void> {
 	await knex.schema.createTable("indexer", (table) => {
@@ -16,14 +16,7 @@ async function up(knex: Knex.Knex): Promise<void> {
 		table.primary(["searchee_id", "indexer_id"]);
 	});
 
-	// this is a bit of a shortcut but since db migrations run once, a
-	// little double-logging in an error case isn't too bad
-	try {
-		// populate capsMap and sync with db
-		await getTorznabManager().validateTorznabUrls();
-	} catch (e) {
-		// can fail in the case of no indexers. we don't want that to crash the migration!
-	}
+	await syncWithDb();
 
 	await knex.transaction(async (trx) => {
 		const timestampRows = await trx

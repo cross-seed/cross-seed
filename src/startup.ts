@@ -3,7 +3,7 @@ import { CrossSeedError } from "./errors.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { validateTorrentDir } from "./torrent.js";
-import { getTorznabManager, TorznabManager } from "./torznab.js";
+import { validateTorznabUrls } from "./torznab.js";
 
 function validateOptions() {
 	const { action, rtorrentRpcUrl, qbittorrentUrl, transmissionRpcUrl } =
@@ -22,10 +22,9 @@ export async function doStartupValidation(): Promise<void> {
 	logger.info("Validating your configuration...");
 	validateOptions();
 	const downloadClient = getClient();
-	const torznabManager = getTorznabManager();
 	await Promise.all<void>(
 		[
-			torznabManager.validateTorznabUrls(),
+			validateTorznabUrls(),
 			downloadClient?.validateConfig(),
 			validateTorrentDir(),
 		].filter(Boolean)
