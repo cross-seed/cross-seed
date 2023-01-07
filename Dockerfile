@@ -11,4 +11,4 @@ RUN npm run build
 RUN npm link
 EXPOSE 2468
 WORKDIR /config
-ENTRYPOINT ["node", "--prof", "/usr/src/cross-seed/dist/cmd.js"]
+ENTRYPOINT ["cross-seed"]
