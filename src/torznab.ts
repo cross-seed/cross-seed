@@ -184,10 +184,7 @@ async function getEnabledIndexers() {
 	});
 }
 
-export async function searchTorznab(
-	name: string,
-	nonceOptions = EmptyNonceOptions
-): Promise<Candidate[]> {
+export async function searchTorznab(name: string): Promise<Candidate[]> {
 	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
 
 	// search history for name across all indexers
@@ -246,17 +243,17 @@ export async function syncWithDb() {
 		movieSearchCap: "movie_search_cap",
 	});
 
-	const inMemoryButNotInDb = torznab.filter(
+	const inConfigButNotInDb = torznab.filter(
 		(configIndexer) =>
 			!dbIndexers.some(
 				(dbIndexer) => dbIndexer.url === sanitizeUrl(configIndexer)
 			)
 	);
 
-	const inDbButNotInMemory = dbIndexers.filter(
+	const inDbButNotInConfig = dbIndexers.filter(
 		(dbIndexer) =>
 			!torznab.some(
-				(configIndexer) => getApikey(configIndexer) === dbIndexer.url
+				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url
 			)
 	);
 
@@ -279,26 +276,26 @@ export async function syncWithDb() {
 		[]
 	);
 
-	if (inDbButNotInMemory.length > 0) {
+	if (inDbButNotInConfig.length > 0) {
 		await db("indexer")
 			.whereIn(
 				"url",
-				inDbButNotInMemory.map((indexer) => indexer.url)
+				inDbButNotInConfig.map((indexer) => indexer.url)
 			)
 			.update({ active: false });
 	}
 
-	if (inMemoryButNotInDb.length > 0) {
+	if (inConfigButNotInDb.length > 0) {
 		await db("indexer")
 			.insert(
-				inMemoryButNotInDb.map((url) => ({
+				inConfigButNotInDb.map((url) => ({
 					url: sanitizeUrl(url),
 					apikey: getApikey(url),
 					active: true,
 				}))
 			)
 			.onConflict("url")
-			.merge(["active"]);
+			.merge(["active", "apikey"]);
 	}
 
 	await db.transaction(async (trx) => {
@@ -411,7 +408,7 @@ export async function validateTorznabUrls() {
 			active: true,
 			search_cap: null,
 			tv_search_cap: null,
-			movie_cap: null,
+			movie_search_cap: null,
 		})
 		.select({ id: "id", url: "url", apikey: "apikey" });
 	await updateCaps(enabledIndexersWithoutCaps);

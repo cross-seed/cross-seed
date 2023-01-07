@@ -68,7 +68,7 @@ async function findOnOtherSites(
 
 	let response: Candidate[];
 	try {
-		response = await searchTorznab(searchee.name, nonceOptions);
+		response = await searchTorznab(searchee.name);
 	} catch (e) {
 		logger.error(`error searching for ${searchee.name}`);
 		logger.debug(e);

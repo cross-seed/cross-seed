@@ -34,7 +34,7 @@ function fallback(...args) {
 
 function processOptions(options): RuntimeConfig {
 	if (options.rssCadence) {
-		options.rssCadence = Math.max(ms(options.rssCadence), ms("10 minutes"));
+		options.rssCadence = Math.max(ms(options.rssCadence), ms("1 minutes"));
 	}
 	if (options.searchCadence) {
 		options.searchCadence = Math.max(
@@ -258,6 +258,7 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 			await db.migrate.latest();
 			await doStartupValidation();
 			await scanRssFeeds();
+			console.log("done scanning");
 			await db.destroy();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
