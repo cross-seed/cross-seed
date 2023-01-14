@@ -29,6 +29,13 @@ module.exports = {
 	dataMode: [],
 
 	/**
+	 * If this is enabled, cross-seed will create hardlinks to scanned files in the specified directory.
+	 * It will create a different link for every changed file name or directory structure.
+	 */
+
+	hardlinkDir: undefined,
+
+	/**
 	 * directory containing torrent files.
 	 * For rtorrent, this is your session directory
 	 * as configured in your .rtorrent.rc file.

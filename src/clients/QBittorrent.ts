@@ -6,7 +6,7 @@ import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
 import { basename, dirname, join, posix, sep } from "path";
-import { dataMode } from "../config.template.cjs";
+import { dataMode, hardlinkDir } from "../config.template.cjs";
 import { InjectionResult, RenameResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
@@ -297,7 +297,7 @@ export default class QBittorrent implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee
 	): Promise<InjectionResult> {
-		const { duplicateCategories, dataDirs } = getRuntimeConfig();
+		const { duplicateCategories, dataDirs, hardlinkDir } = getRuntimeConfig();
 		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
@@ -346,7 +346,7 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("savepath", corrected_save_path);
 			}
 			if (dataDirs.length > 0) {
-				formData.append("skip_checking", "false");
+				formData.append("skip_checking", hardlinkDir ? "true" : "false");
 				formData.append("paused", "true");
 			} else {
 				formData.append("contentLayout", contentLayout);

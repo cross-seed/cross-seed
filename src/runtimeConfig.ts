@@ -5,6 +5,7 @@ export interface RuntimeConfig {
 	torznab: string[];
 	dataDirs: string[];
 	dataMode: string;
+	hardlinkDir: string;
 	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;
