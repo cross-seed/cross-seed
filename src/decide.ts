@@ -1,4 +1,4 @@
-import { existsSync, link as fsLink, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
+import { existsSync, linkSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
 import parseTorrent, { FileListing, Metafile } from "parse-torrent";
 import path, { basename, dirname, join, sep } from "path";
 import { appDir } from "./configuration.js";
@@ -109,7 +109,8 @@ async function assessCandidateHelper(
 	const { dataDirs, dataMode, hardlinkDir } = getRuntimeConfig();
 	const perfectMatch = compareFileTrees(info, searchee);
 	if (perfectMatch) {
-		searchee.path = await hardlinkExact(hardlinkDir, searchee);
+		await hardlinkExact(searchee.path, hardlinkDir);
+		searchee.path = join(hardlinkDir, basename(searchee.path));
 		return { decision: Decision.MATCH, metafile: info};
 	}
 	if (dataDirs.length == 0) {
@@ -122,30 +123,36 @@ async function assessCandidateHelper(
 				const candidateParentDir = dirname(info.files[0].path);
 				var correctedHardlinkDir = hardlinkDir;
 				if (candidateParentDir != ".") {
-					mkdirSync(join(hardlinkDir, candidateParentDir));
+					if (!existsSync(join(hardlinkDir, candidateParentDir))) {
+						mkdirSync(join(hardlinkDir, candidateParentDir));
+					}
 					correctedHardlinkDir = join(hardlinkDir, candidateParentDir);
 				}
-				hardlinkFile(correctedHardlinkDir, basename(searchee.files[0].path), basename(info.files[0].path));
-				searchee.path = correctedHardlinkDir;
+				hardlinkFile(dirname(searchee.path), correctedHardlinkDir, basename(searchee.path), basename(info.files[0].path));
+				searchee.path = join(correctedHardlinkDir, basename(info.files[0].path));
 			}
 			return { decision: Decision.MATCH_EXCEPT_PARENT_DIR, metafile: info};
 		}
 	return { decision: Decision.FILE_TREE_MISMATCH };	
 }
 
-async function hardlinkExact(path: string, searchee: Searchee): Promise<string> {
-	if (!path) {
-		return searchee.path;
+function hardlinkExact(oldPath: string, newPath: string) {
+	if (!newPath) {
+		return;
 	}
-	if (statSync(path).isFile) {
-		hardlinkFile(dirname(path), basename(path), basename(path));
+	if (statSync(oldPath).isFile) {
+		hardlinkFile(dirname(oldPath), newPath, basename(oldPath), basename(oldPath));
+		return;
 	}
-	mkdirSync(join(path, searchee.files[0].path.split(sep)[0]));
-	readdirSync(path).forEach(file => {hardlinkExact(file, searchee)});
+	mkdirSync(join(newPath, basename(oldPath)));
+	readdirSync(oldPath).forEach(file => {hardlinkExact(file, join(newPath, basename(file)))});
 }
 
-function hardlinkFile(path: string, oldName: string, newName: string) {
-	fsLink(join(path, oldName), join(path, newName), undefined);
+function hardlinkFile(oldPath:string, newPath: string, oldName: string, newName: string) {
+	if (existsSync(join(newPath, newName))) {
+        return;
+    }
+	linkSync(join(oldPath, oldName), join(newPath, newName));
 }
 
 function existsInTorrentCache(infoHash: string): boolean {

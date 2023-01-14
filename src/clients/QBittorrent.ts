@@ -390,10 +390,10 @@ export default class QBittorrent implements TorrentClient {
 					}
 				}
 				await new Promise(resolve => setTimeout(resolve, 100));
-				await this.request(
-					"/torrents/recheck", 
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED);
+				// await this.request(
+				// 	"/torrents/recheck", 
+				// 	`hashes=${newTorrent.infoHash}`,
+				// 	X_WWW_FORM_URLENCODED);
 			}
 
 			unlink(tempFilepath).catch((error) => {
