@@ -269,6 +269,10 @@ export default class QBittorrent implements TorrentClient {
 	async correct_path(newTorrent: Metafile, searchee: Searchee, save_path: string): Promise<string> {
 		// Path being a directory implies we got a perfect match at the directory level.
 		// Thus we don't need to rename since it's a perfect match.
+		const { hardlinkDir } = getRuntimeConfig();
+		if (hardlinkDir) {
+			return hardlinkDir;
+		}
 		if (!statSync(searchee.path).isDirectory()) {
 			if (newTorrent.files[0].path.split(sep).length > 1) {
 				return dirname(save_path);
@@ -360,7 +364,7 @@ export default class QBittorrent implements TorrentClient {
 
 			await this.request("/torrents/add", formData);
 
-			if (dataDirs.length > 0) {
+			if (dataDirs.length > 0 && !hardlinkDir) {
 				const fileFormData = new FormData();
 				const file = newTorrent.files[0];
 				const isNestedFile = file.path.split(sep).length > 1;
@@ -390,10 +394,12 @@ export default class QBittorrent implements TorrentClient {
 					}
 				}
 				await new Promise(resolve => setTimeout(resolve, 100));
-				// await this.request(
-				// 	"/torrents/recheck", 
-				// 	`hashes=${newTorrent.infoHash}`,
-				// 	X_WWW_FORM_URLENCODED);
+				if (!hardlinkDir) {
+					await this.request(
+						"/torrents/recheck", 
+						`hashes=${newTorrent.infoHash}`,
+						X_WWW_FORM_URLENCODED);
+				}
 			}
 
 			unlink(tempFilepath).catch((error) => {

@@ -1,6 +1,6 @@
 import { existsSync, linkSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
 import parseTorrent, { FileListing, Metafile } from "parse-torrent";
-import path, { basename, dirname, join, sep } from "path";
+import path, { basename, dirname, join, relative, sep } from "path";
 import { appDir } from "./configuration.js";
 import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
 import { Label, logger } from "./logger.js";
@@ -110,7 +110,6 @@ async function assessCandidateHelper(
 	const perfectMatch = compareFileTrees(info, searchee);
 	if (perfectMatch) {
 		await hardlinkExact(searchee.path, hardlinkDir);
-		searchee.path = join(hardlinkDir, basename(searchee.path));
 		return { decision: Decision.MATCH, metafile: info};
 	}
 	if (dataDirs.length == 0) {
@@ -129,7 +128,6 @@ async function assessCandidateHelper(
 					correctedHardlinkDir = join(hardlinkDir, candidateParentDir);
 				}
 				hardlinkFile(dirname(searchee.path), correctedHardlinkDir, basename(searchee.path), basename(info.files[0].path));
-				searchee.path = join(correctedHardlinkDir, basename(info.files[0].path));
 			}
 			return { decision: Decision.MATCH_EXCEPT_PARENT_DIR, metafile: info};
 		}
@@ -140,12 +138,16 @@ function hardlinkExact(oldPath: string, newPath: string) {
 	if (!newPath) {
 		return;
 	}
-	if (statSync(oldPath).isFile) {
-		hardlinkFile(dirname(oldPath), newPath, basename(oldPath), basename(oldPath));
+	if (statSync(oldPath).isFile()) {
+		if (!existsSync(join(newPath, basename(oldPath)))) {
+			hardlinkFile(dirname(oldPath), newPath, basename(oldPath), basename(oldPath));
+		}
 		return;
 	}
-	mkdirSync(join(newPath, basename(oldPath)));
-	readdirSync(oldPath).forEach(file => {hardlinkExact(file, join(newPath, basename(file)))});
+	if (!existsSync(join(newPath, basename(oldPath)))) {
+		mkdirSync(join(newPath, basename(oldPath)));
+	}
+	readdirSync(oldPath).forEach(file => {hardlinkExact(join(oldPath, file), join(newPath, basename(oldPath)))});
 }
 
 function hardlinkFile(oldPath:string, newPath: string, oldName: string, newName: string) {
