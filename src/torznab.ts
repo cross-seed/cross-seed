@@ -5,7 +5,7 @@ import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
-import { EmptyNonceOptions, getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	cleanseSeparators,
 	getTag,

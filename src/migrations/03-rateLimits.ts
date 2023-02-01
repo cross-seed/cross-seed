@@ -2,7 +2,6 @@ import Knex from "knex";
 
 async function up(knex: Knex.Knex): Promise<void> {
 	await knex.schema.alterTable("indexer", (table) => {
-		table.string("apikey");
 		table.string("status");
 		table.integer("status_updated_at");
 		table.boolean("search_cap").nullable();
