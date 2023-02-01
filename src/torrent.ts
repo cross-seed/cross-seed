@@ -1,11 +1,13 @@
 import fs, { promises as fsPromises } from "fs";
 import Fuse from "fuse.js";
+import ms from "ms";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path, { join } from "path";
 import simpleGet from "simple-get";
 import { inspect } from "util";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
+import { IndexerStatus, updateIndexerStatusOnResponse } from "./indexers.js";
 import { logger, logOnce } from "./logger.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
@@ -51,6 +53,13 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 			logger.error(`Unsupported: magnet link detected at ${url}`);
 			return null;
 		} else {
+			if (response.statusCode === 429) {
+				await updateIndexerStatusOnResponse(
+					IndexerStatus.RATE_LIMITED,
+					Date.now() + ms("1 hour"),
+					indexers[i].id
+				);
+			}
 			logger.error(
 				`error downloading torrent at ${url}: ${response.statusCode} ${response.statusMessage}`
 			);

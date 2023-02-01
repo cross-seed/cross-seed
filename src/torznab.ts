@@ -1,8 +1,15 @@
+import ms from "ms";
 import fetch from "node-fetch";
 import xml2js from "xml2js";
 import { EP_REGEX, SEASON_REGEX } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
+import {
+	getEnabledIndexers,
+	Indexer,
+	IndexerStatus,
+	updateIndexerStatusOnResponse,
+} from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -14,18 +21,6 @@ import {
 	reformatTitleForSearching,
 	stripExtension,
 } from "./utils.js";
-
-interface Indexer {
-	id: number;
-	url: string;
-	apikey: string;
-	active: boolean;
-	status: "healthy";
-	statusUpdatedAt: number;
-	searchCap: boolean;
-	tvSearchCap: boolean;
-	movieSearchCap: boolean;
-}
 
 interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
@@ -138,7 +133,6 @@ function createTorznabSearchQuery(name: string, caps: Caps) {
 	}
 }
 
-// convert to indexer ids
 async function updateSearchTimestamps(name: string, indexerIds: number[]) {
 	for (const indexerId of indexerIds) {
 		await db.transaction(async (trx) => {
@@ -168,20 +162,6 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 		() => ({ t: "search", q: "" })
 	);
 	return candidatesByUrl.flatMap((e) => e.candidates);
-}
-
-async function getEnabledIndexers() {
-	return db("indexer").where({ active: true, search_cap: true }).select({
-		id: "id",
-		url: "url",
-		apikey: "apikey",
-		active: "active",
-		status: "status",
-		statusUpdatedAt: "status_updated_at",
-		searchCap: "search_cap",
-		tvSearchCap: "tv_search_cap",
-		movieSearchCap: "movie_search_cap",
-	});
 }
 
 export async function searchTorznab(name: string): Promise<Candidate[]> {
@@ -444,13 +424,26 @@ async function makeRequests(
 	const abortController = new AbortController();
 	setTimeout(() => void abortController.abort(), 10000);
 	const outcomes = await Promise.allSettled<Candidate[]>(
-		searchUrls.map((url) =>
+		searchUrls.map((url, i) =>
 			fetch(url, {
 				headers: { "User-Agent": "cross-seed" },
 				signal: abortController.signal,
 			})
 				.then((response) => {
 					if (!response.ok) {
+						if (response.status === 429) {
+							updateIndexerStatusOnResponse(
+								IndexerStatus.RATE_LIMITED,
+								Date.now() + ms("1 hour"),
+								indexers[i].id
+							);
+						} else {
+							updateIndexerStatusOnResponse(
+								IndexerStatus.UNKNOWN_ERROR,
+								Date.now() + ms("1 hour"),
+								indexers[i].id
+							);
+						}
 						throw new Error(
 							`request failed with code: ${response.status}`
 						);

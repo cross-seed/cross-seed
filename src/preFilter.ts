@@ -1,17 +1,12 @@
-import ms from "ms";
 import { uniqBy } from "lodash-es";
+import ms from "ms";
 import path from "path";
 import { EP_REGEX, EXTENSIONS } from "./constants.js";
+import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { db } from "./db.js";
-import { nMsAgo } from "./utils.js";
-
-function humanReadable(timestamp: number): string {
-	// swedish conventions roughly follow the iso format!
-	return new Date(timestamp).toLocaleString("sv");
-}
+import { humanReadable, nMsAgo } from "./utils.js";
 
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 

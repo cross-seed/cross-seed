@@ -78,3 +78,8 @@ export async function filterAsync(arr, predicate) {
 
 	return arr.filter((_, index) => results[index]);
 }
+
+export function humanReadable(timestamp: number): string {
+	// swedish conventions roughly follow the iso format!
+	return new Date(timestamp).toLocaleString("sv");
+}
