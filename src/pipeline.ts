@@ -10,6 +10,7 @@ import {
 } from "./constants.js";
 import { db } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
+import { updateSearchTimestamps } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
@@ -41,6 +42,7 @@ export interface Candidate {
 	name: string;
 	tracker: string;
 	pubDate: number;
+	indexerId?: number;
 }
 
 interface AssessmentWithTracker {
@@ -66,7 +68,7 @@ async function findOnOtherSites(
 		.onConflict("name")
 		.ignore();
 
-	let response: Candidate[];
+	let response: { indexerId: number; candidates: Candidate[] }[];
 	try {
 		response = await searchTorznab(searchee.name);
 	} catch (e) {
@@ -74,12 +76,33 @@ async function findOnOtherSites(
 		logger.debug(e);
 		return 0;
 	}
-	const results = response;
 
-	const loaded = await Promise.all<AssessmentWithTracker>(
+	const results = response.flatMap((e) =>
+		e.candidates.map((candidate) => ({
+			...candidate,
+			indexerId: e.indexerId,
+		}))
+	);
+
+	const assessed = await Promise.all<AssessmentWithTracker>(
 		results.map(assessEach)
 	);
-	const matches = loaded.filter(
+
+	const allIndexerIds = response.map((i) => i.indexerId);
+
+	const indexerIdsNotRateLimited = assessed.reduce((acc, cur, idx) => {
+		const candidate = results[idx];
+		if (cur.assessment.decision == Decision.RATE_LIMITED) {
+			acc.delete(candidate.indexerId);
+		}
+		return acc;
+	}, new Set(allIndexerIds));
+
+	await updateSearchTimestamps(
+		searchee.name,
+		Array.from(indexerIdsNotRateLimited)
+	);
+	const matches = assessed.filter(
 		(e) => e.assessment.decision === Decision.MATCH
 	);
 	const actionResults = await performActions(searchee, matches, nonceOptions);
@@ -91,23 +114,8 @@ async function findOnOtherSites(
 			actionResults
 		);
 		sendResultsNotification(searchee, zipped, Label.SEARCH);
-		await updateSearchTimestamps(searchee.name);
 	}
 	return matches.length;
-}
-
-async function updateSearchTimestamps(name: string): Promise<void> {
-	await db.transaction(async (trx) => {
-		const now = Date.now();
-		const entry = await trx("searchee").where({ name }).first();
-
-		await trx("searchee")
-			.where({ name })
-			.update({
-				last_searched: now,
-				first_searched: entry?.first_searched ? undefined : now,
-			});
-	});
 }
 
 async function findMatchesBatch(

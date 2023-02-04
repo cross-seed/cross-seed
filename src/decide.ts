@@ -179,7 +179,8 @@ async function assessCandidateCaching(
 
 	if (
 		!cacheEntry?.decision ||
-		cacheEntry.decision === Decision.DOWNLOAD_FAILED
+		cacheEntry.decision === Decision.DOWNLOAD_FAILED ||
+		cacheEntry.decision === Decision.RATE_LIMITED
 	) {
 		assessment = await assessAndSaveResults(
 			candidate,

@@ -61,3 +61,28 @@ export async function updateIndexerStatusOnResponse(
 		status,
 	});
 }
+
+export async function updateSearchTimestamps(
+	name: string,
+	indexerIds: number[]
+) {
+	for (const indexerId of indexerIds) {
+		await db.transaction(async (trx) => {
+			const now = Date.now();
+			const { id: searchee_id } = await trx("searchee")
+				.where({ name })
+				.select("id")
+				.first();
+
+			await trx("timestamp")
+				.insert({
+					searchee_id,
+					indexer_id: indexerId,
+					last_searched: now,
+					first_searched: now,
+				})
+				.onConflict(["searchee_id", "indexer_id"])
+				.merge(["searchee_id", "indexer_id", "last_searched"]);
+		});
+	}
+}

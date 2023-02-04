@@ -25,7 +25,9 @@ export async function parseTorrentFromFilename(
 	return parseTorrent(data);
 }
 
-export async function parseTorrentFromURL(url: string): Promise<Metafile> {
+export async function parseTorrentFromURL(
+	url: string
+): Promise<Metafile | null> {
 	let response;
 	try {
 		response = await new Promise((resolve, reject) => {
@@ -59,12 +61,14 @@ export async function parseTorrentFromURL(url: string): Promise<Metafile> {
 					Date.now() + ms("1 hour"),
 					indexers[i].id
 				);
+				return null;
+			} else {
+				logger.error(
+					`error downloading torrent at ${url}: ${response.statusCode} ${response.statusMessage}`
+				);
+				logger.debug("response: %s", response.data);
+				logger.debug("headers: %s", response.headers);
 			}
-			logger.error(
-				`error downloading torrent at ${url}: ${response.statusCode} ${response.statusMessage}`
-			);
-			logger.debug("response: %s", response.data);
-			logger.debug("headers: %s", response.headers);
 			return null;
 		}
 	}

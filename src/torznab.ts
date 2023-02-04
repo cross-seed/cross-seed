@@ -133,28 +133,6 @@ function createTorznabSearchQuery(name: string, caps: Caps) {
 	}
 }
 
-async function updateSearchTimestamps(name: string, indexerIds: number[]) {
-	for (const indexerId of indexerIds) {
-		await db.transaction(async (trx) => {
-			const now = Date.now();
-			const { id: searchee_id } = await trx("searchee")
-				.where({ name })
-				.select("id")
-				.first();
-
-			await trx("timestamp")
-				.insert({
-					searchee_id,
-					indexer_id: indexerId,
-					last_searched: now,
-					first_searched: now,
-				})
-				.onConflict(["searchee_id", "indexer_id"])
-				.merge(["searchee_id", "indexer_id", "last_searched"]);
-		});
-	}
-}
-
 export async function queryRssFeeds(): Promise<Candidate[]> {
 	const candidatesByUrl = await makeRequests(
 		"",
@@ -164,7 +142,9 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 	return candidatesByUrl.flatMap((e) => e.candidates);
 }
 
-export async function searchTorznab(name: string): Promise<Candidate[]> {
+export async function searchTorznab(
+	name: string
+): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
 	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
 
 	// search history for name across all indexers
@@ -190,22 +170,13 @@ export async function searchTorznab(name: string): Promise<Candidate[]> {
 		);
 	});
 
-	const candidatesByIndexerId = await makeRequests(
-		name,
-		indexersToUse,
-		(indexer) =>
-			createTorznabSearchQuery(name, {
-				search: indexer.searchCap,
-				tvSearch: indexer.tvSearchCap,
-				movieSearch: indexer.movieSearchCap,
-			})
+	return makeRequests(name, indexersToUse, (indexer) =>
+		createTorznabSearchQuery(name, {
+			search: indexer.searchCap,
+			tvSearch: indexer.tvSearchCap,
+			movieSearch: indexer.movieSearchCap,
+		})
 	);
-
-	await updateSearchTimestamps(
-		name,
-		candidatesByIndexerId.map((e) => e.indexerId)
-	);
-	return candidatesByIndexerId.flatMap((e) => e.candidates);
 }
 
 export async function syncWithDb() {
