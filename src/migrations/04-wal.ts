@@ -10,4 +10,4 @@ async function down(): Promise<void> {
 	// the only way is forward
 }
 
-export default { name: "04-wal", up, down };
+export default { name: "04-wal", up, down, config: { transaction: false } };

@@ -1,15 +1,19 @@
 import { existsSync, writeFileSync } from "fs";
-import parseTorrent, { FileListing, Metafile } from "parse-torrent";
+import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { appDir } from "./configuration.js";
 import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
+import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { getFiles, Searchee } from "./searchee.js";
-import { db } from "./db.js";
-import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
-import { File } from "./searchee.js";
+import { File, getFiles, Searchee } from "./searchee.js";
+import {
+	parseTorrentFromFilename,
+	parseTorrentFromURL,
+	SnatchError,
+} from "./torrent.js";
+
 export interface ResultAssessment {
 	decision: Decision;
 	metafile?: Metafile;
@@ -33,6 +37,9 @@ const createReasonLogger =
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
+				break;
+			case Decision.RATE_LIMITED:
+				reason = "cross-seed has reached this tracker's rate limit";
 				break;
 			case Decision.DOWNLOAD_FAILED:
 				reason = "the torrent file failed to download";
@@ -87,19 +94,25 @@ async function assessCandidateHelper(
 
 	if (!link) return { decision: Decision.NO_DOWNLOAD_LINK };
 
-	const info = await parseTorrentFromURL(link);
+	const result = await parseTorrentFromURL(link);
 
-	if (!info) return { decision: Decision.DOWNLOAD_FAILED };
+	if (result.isErr()) {
+		return result.unwrapErrOrThrow() === SnatchError.RATE_LIMITED
+			? { decision: Decision.RATE_LIMITED }
+			: { decision: Decision.DOWNLOAD_FAILED };
+	}
 
-	if (hashesToExclude.includes(info.infoHash)) {
+	const candidateMeta = result.unwrapOrThrow();
+
+	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
 
-	if (!compareFileTrees(info, searchee)) {
+	if (!compareFileTrees(candidateMeta, searchee)) {
 		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 
-	return { decision: Decision.MATCH, metafile: info };
+	return { decision: Decision.MATCH, metafile: candidateMeta };
 }
 
 function existsInTorrentCache(infoHash: string): boolean {

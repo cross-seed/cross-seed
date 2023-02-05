@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import fs from "fs";
 import { zip } from "lodash-es";
+import ms from "ms";
 import { performAction, performActions } from "./action.js";
 import {
 	ActionResult,
@@ -10,7 +11,11 @@ import {
 } from "./constants.js";
 import { db } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
-import { updateSearchTimestamps } from "./indexers.js";
+import {
+	IndexerStatus,
+	updateIndexerStatus,
+	updateSearchTimestamps,
+} from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
@@ -33,7 +38,7 @@ import {
 	TorrentLocator,
 } from "./torrent.js";
 import { queryRssFeeds, searchTorznab } from "./torznab.js";
-import { filterAsync, ok, stripExtension } from "./utils.js";
+import { filterAsync, stripExtension } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -90,18 +95,29 @@ async function findOnOtherSites(
 
 	const allIndexerIds = response.map((i) => i.indexerId);
 
-	const indexerIdsNotRateLimited = assessed.reduce((acc, cur, idx) => {
-		const candidate = results[idx];
-		if (cur.assessment.decision == Decision.RATE_LIMITED) {
-			acc.delete(candidate.indexerId);
+	const { rateLimited, notRateLimited } = assessed.reduce(
+		(acc, cur, idx) => {
+			const candidate = results[idx];
+			if (cur.assessment.decision == Decision.RATE_LIMITED) {
+				acc.rateLimited.add(candidate.indexerId);
+				acc.notRateLimited.delete(candidate.indexerId);
+			}
+			return acc;
+		},
+		{
+			rateLimited: new Set<number>(),
+			notRateLimited: new Set(allIndexerIds),
 		}
-		return acc;
-	}, new Set(allIndexerIds));
-
-	await updateSearchTimestamps(
-		searchee.name,
-		Array.from(indexerIdsNotRateLimited)
 	);
+
+	await updateSearchTimestamps(searchee.name, Array.from(notRateLimited));
+
+	await updateIndexerStatus(
+		IndexerStatus.RATE_LIMITED,
+		Date.now() + ms("1 hour"),
+		Array.from(rateLimited)
+	);
+
 	const matches = assessed.filter(
 		(e) => e.assessment.decision === Decision.MATCH
 	);
@@ -200,7 +216,9 @@ async function findSearchableTorrents() {
 		const searcheeResults = await Promise.all(
 			torrents.map(createSearcheeFromTorrentFile)
 		);
-		parsedTorrents = searcheeResults.filter(ok);
+		parsedTorrents = searcheeResults
+			.filter((t) => t.isOk())
+			.map((t) => t.unwrapOrThrow());
 	} else {
 		parsedTorrents = await loadTorrentDirLight();
 	}

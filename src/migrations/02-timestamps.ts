@@ -1,5 +1,4 @@
 import Knex from "knex";
-import { db } from "../db.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 
 function sanitizeUrl(url: string | URL): string {
@@ -14,7 +13,7 @@ function getApikey(url: string) {
 async function backfill(knex: Knex.Knex) {
 	const { torznab } = getRuntimeConfig();
 
-	await db("indexer")
+	await knex("indexer")
 		.insert(
 			torznab.map((url) => ({
 				url: sanitizeUrl(url),
@@ -25,24 +24,23 @@ async function backfill(knex: Knex.Knex) {
 		.onConflict("url")
 		.merge(["active", "apikey"]);
 
-	await knex.transaction(async (trx) => {
-		const timestampRows = await trx
-			.select(
-				"searchee.id as searchee_id",
-				"indexer.id as indexer_id",
-				"searchee.first_searched as first_searched",
-				"searchee.last_searched as last_searched"
-			)
-			.from("searchee")
-			.crossJoin(knex.raw("indexer"));
-		await trx.batchInsert("timestamp", timestampRows, 100);
-	});
+	const timestampRows = await knex
+		.select(
+			"searchee.id as searchee_id",
+			"indexer.id as indexer_id",
+			"searchee.first_searched as first_searched",
+			"searchee.last_searched as last_searched"
+		)
+		.from("searchee")
+		.crossJoin(knex.raw("indexer"));
+	await knex.batchInsert("timestamp", timestampRows, 100);
 }
 
 async function up(knex: Knex.Knex): Promise<void> {
 	await knex.schema.createTable("indexer", (table) => {
 		table.increments("id").primary();
 		table.string("url").unique();
+		table.string("apikey");
 		table.boolean("active");
 	});
 

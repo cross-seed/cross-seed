@@ -1,21 +1,28 @@
 import fs, { promises as fsPromises } from "fs";
 import Fuse from "fuse.js";
-import ms from "ms";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path, { join } from "path";
-import simpleGet from "simple-get";
 import { inspect } from "util";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
-import { IndexerStatus, updateIndexerStatusOnResponse } from "./indexers.js";
 import { logger, logOnce } from "./logger.js";
+import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { ok, stripExtension } from "./utils.js";
+import { stripExtension } from "./utils.js";
+import fetch, { Response } from "node-fetch";
 
 export interface TorrentLocator {
 	infoHash?: string;
 	name?: string;
+}
+
+export enum SnatchError {
+	ABORTED = "ABORTED",
+	RATE_LIMITED = "RATE_LIMITED",
+	MAGNET_LINK = "MAGNET_LINK",
+	INVALID_CONTENTS = "INVALID_CONTENTS",
+	UNKNOWN_ERROR = "UNKNOWN_ERROR",
 }
 
 export async function parseTorrentFromFilename(
@@ -27,58 +34,67 @@ export async function parseTorrentFromFilename(
 
 export async function parseTorrentFromURL(
 	url: string
-): Promise<Metafile | null> {
-	let response;
+): Promise<Result<Metafile, SnatchError>> {
+	const abortController = new AbortController();
+	setTimeout(() => void abortController.abort(), 10000);
+
+	let response: Response;
 	try {
-		response = await new Promise((resolve, reject) => {
-			simpleGet.concat(
-				{ url, followRedirects: false },
-				(err, res, data) => {
-					if (err) return reject(err);
-					res.data = data;
-					return resolve(res);
-				}
-			);
+		response = await fetch(url, {
+			headers: { "User-Agent": "cross-seed" },
+			signal: abortController.signal,
+			redirect: "manual",
 		});
 	} catch (e) {
+		if (e.name === "AbortError") {
+			logger.error(`snatching ${url} timed out`);
+			return resultOfErr(SnatchError.ABORTED);
+		}
 		logger.error(`failed to access ${url}`);
 		logger.debug(e);
-		return null;
+		return resultOfErr(SnatchError.UNKNOWN_ERROR);
 	}
 
-	if (response.statusCode < 200 || response.statusCode >= 300) {
-		if (
-			response.statusCode >= 300 &&
-			response.statusCode < 400 &&
-			response.headers.location?.startsWith("magnet:")
-		) {
-			logger.error(`Unsupported: magnet link detected at ${url}`);
-			return null;
-		} else {
-			if (response.statusCode === 429) {
-				await updateIndexerStatusOnResponse(
-					IndexerStatus.RATE_LIMITED,
-					Date.now() + ms("1 hour"),
-					indexers[i].id
-				);
-				return null;
-			} else {
-				logger.error(
-					`error downloading torrent at ${url}: ${response.statusCode} ${response.statusMessage}`
-				);
-				logger.debug("response: %s", response.data);
-				logger.debug("headers: %s", response.headers);
-			}
-			return null;
+	if (
+		response.status.toString().startsWith("3") &&
+		response.headers.get("location")?.startsWith("magnet:")
+	) {
+		logger.error(`Unsupported: magnet link detected at ${url}`);
+		return resultOfErr(SnatchError.MAGNET_LINK);
+	} else if (response.status === 429) {
+		return resultOfErr(SnatchError.RATE_LIMITED);
+	} else if (!response.ok) {
+		logger.error(
+			`error downloading torrent at ${url}: ${response.status} ${response.statusText}`
+		);
+		logger.debug("response: %s", await response.text());
+		return resultOfErr(SnatchError.UNKNOWN_ERROR);
+	} else if (response.headers.get("Content-Type") === "application/rss+xml") {
+		const responseText = await response.clone().text();
+		if (responseText.includes("429")) {
+			return resultOfErr(SnatchError.RATE_LIMITED);
 		}
+		logger.error(`invalid torrent contents at ${url}`);
+		logger.debug(
+			`contents: "${responseText.slice(0, 100)}${
+				responseText.length > 100 ? "..." : ""
+			}"`
+		);
+		return resultOfErr(SnatchError.INVALID_CONTENTS);
 	}
-
 	try {
-		return parseTorrent(response.data);
+		return resultOf(
+			parseTorrent(
+				Buffer.from(new Uint8Array(await response.arrayBuffer()))
+			)
+		);
 	} catch (e) {
 		logger.error(`invalid torrent contents at ${url}`);
-		logger.debug(e);
-		return null;
+		const contentType = response.headers.get("Content-Type");
+		const contentLength = response.headers.get("Content-Length");
+		logger.debug(`Content-Type: ${contentType}`);
+		logger.debug(`Content-Length: ${contentLength}`);
+		return resultOfErr(SnatchError.INVALID_CONTENTS);
 	}
 }
 
@@ -165,7 +181,9 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 		const searcheeResult = await createSearcheeFromTorrentFile(
 			torrentFilePath
 		);
-		if (ok(searcheeResult)) searchees.push(searcheeResult);
+		if (searcheeResult.isOk()) {
+			searchees.push(searcheeResult.unwrapOrThrow());
+		}
 	}
 	return searchees;
 }

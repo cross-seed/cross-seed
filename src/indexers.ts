@@ -45,21 +45,24 @@ export async function getEnabledIndexers() {
 		});
 }
 
-export async function updateIndexerStatusOnResponse(
+export async function updateIndexerStatus(
 	status: IndexerStatus,
 	retryAfter: number,
-	indexerId: number
+	indexerIds: number[]
 ) {
-	logger.verbose({
-		label: Label.TORZNAB,
-		message: `Snoozing indexer ${indexerId} with ${status} until ${humanReadable(
-			retryAfter
-		)}`,
-	});
-	await db("indexer").where({ id: indexerId }).update({
-		retry_after: retryAfter,
-		status,
-	});
+	if (indexerIds.length > 0) {
+		logger.verbose({
+			label: Label.TORZNAB,
+			message: `Snoozing indexers ${indexerIds} with ${status} until ${humanReadable(
+				retryAfter
+			)}`,
+		});
+
+		await db("indexer").whereIn("id", indexerIds).update({
+			retry_after: retryAfter,
+			status,
+		});
+	}
 }
 
 export async function updateSearchTimestamps(

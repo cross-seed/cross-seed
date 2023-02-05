@@ -14,9 +14,4 @@ function down(): void {
 	// no new tables created
 }
 
-export default {
-	name: "03-rateLimits",
-	up,
-	down,
-	config: { transaction: true },
-};
+export default { name: "03-rateLimits", up, down };

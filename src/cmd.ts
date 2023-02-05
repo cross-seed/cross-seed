@@ -170,6 +170,7 @@ program
 	.description("Clear the cache of downloaded-and-rejected torrents")
 	.action(async () => {
 		await db("decision").del();
+		await db.destroy();
 	});
 
 program

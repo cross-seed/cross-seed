@@ -40,10 +40,6 @@ export function getTag(name: string): MediaType {
 		: MediaType.OTHER;
 }
 
-export type Result<T> = T | Error;
-
-export const ok = <T>(r: Result<T>): r is T => !(r instanceof Error);
-
 export async function time<R>(cb: () => R, times: number[]) {
 	const before = performance.now();
 	try {

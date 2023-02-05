@@ -8,7 +8,7 @@ import {
 	getEnabledIndexers,
 	Indexer,
 	IndexerStatus,
-	updateIndexerStatusOnResponse,
+	updateIndexerStatus,
 } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
@@ -182,17 +182,19 @@ export async function searchTorznab(
 export async function syncWithDb() {
 	const { torznab } = getRuntimeConfig();
 
-	const dbIndexers = await db("indexer").where({ active: true }).select({
-		id: "id",
-		url: "url",
-		apikey: "apikey",
-		active: "active",
-		status: "status",
-		statusUpdatedAt: "status_updated_at",
-		searchCap: "search_cap",
-		tvSearchCap: "tv_search_cap",
-		movieSearchCap: "movie_search_cap",
-	});
+	const dbIndexers = await db<Indexer>("indexer")
+		.where({ active: true })
+		.select({
+			id: "id",
+			url: "url",
+			apikey: "apikey",
+			active: "active",
+			status: "status",
+			retryAfter: "retry_after",
+			searchCap: "search_cap",
+			tvSearchCap: "tv_search_cap",
+			movieSearchCap: "movie_search_cap",
+		});
 
 	const inConfigButNotInDb = torznab.filter(
 		(configIndexer) =>
@@ -392,27 +394,35 @@ async function makeRequests(
 	searchUrls.forEach(
 		(message) => void logger.verbose({ label: Label.TORZNAB, message })
 	);
-	const abortController = new AbortController();
-	setTimeout(() => void abortController.abort(), 10000);
+	const abortControllers = Array.from(
+		new Array(20),
+		() => new AbortController()
+	);
+
+	setTimeout(() => {
+		for (const abortController of abortControllers) {
+			abortController.abort();
+		}
+	}, 10000);
 	const outcomes = await Promise.allSettled<Candidate[]>(
 		searchUrls.map((url, i) =>
 			fetch(url, {
 				headers: { "User-Agent": "cross-seed" },
-				signal: abortController.signal,
+				signal: abortControllers[i].signal,
 			})
 				.then((response) => {
 					if (!response.ok) {
 						if (response.status === 429) {
-							updateIndexerStatusOnResponse(
+							updateIndexerStatus(
 								IndexerStatus.RATE_LIMITED,
 								Date.now() + ms("1 hour"),
-								indexers[i].id
+								[indexers[i].id]
 							);
 						} else {
-							updateIndexerStatusOnResponse(
+							updateIndexerStatus(
 								IndexerStatus.UNKNOWN_ERROR,
 								Date.now() + ms("1 hour"),
-								indexers[i].id
+								[indexers[i].id]
 							);
 						}
 						throw new Error(
