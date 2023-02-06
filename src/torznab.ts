@@ -142,9 +142,7 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 	return candidatesByUrl.flatMap((e) => e.candidates);
 }
 
-export async function searchTorznab(
-	name: string
-): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+export async function searchTorznab(name: string): Promise<Candidate[]> {
 	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
 
 	// search history for name across all indexers
@@ -170,12 +168,18 @@ export async function searchTorznab(
 		);
 	});
 
-	return makeRequests(name, indexersToUse, (indexer) =>
+	const responses = await makeRequests(name, indexersToUse, (indexer) =>
 		createTorznabSearchQuery(name, {
 			search: indexer.searchCap,
 			tvSearch: indexer.tvSearchCap,
 			movieSearch: indexer.movieSearchCap,
 		})
+	);
+	return responses.flatMap((e) =>
+		e.candidates.map((candidate) => ({
+			...candidate,
+			indexerId: e.indexerId,
+		}))
 	);
 }
 

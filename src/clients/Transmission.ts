@@ -1,4 +1,4 @@
-import fetch from "node-fetch";
+import fetch, { Response as FetchResponse } from "node-fetch";
 import parseTorrent, { Metafile } from "parse-torrent";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
@@ -49,21 +49,22 @@ export default class Transmission implements TorrentClient {
 			transmissionRpcUrl
 		);
 
-		const headers = [["Content-Type", "application/json"]];
+		const headers = new Headers();
+		headers.set("Content-Type", "application/json");
 		if (this.xTransmissionSessionId) {
-			headers.push([XTransmissionSessionId, this.xTransmissionSessionId]);
+			headers.set(XTransmissionSessionId, this.xTransmissionSessionId);
 		}
 		if (username && password) {
 			const credentials = Buffer.from(`${username}:${password}`).toString(
 				"base64"
 			);
-			headers.push(["Authorization", `Basic ${credentials}`]);
+			headers.set("Authorization", `Basic ${credentials}`);
 		}
 
 		const response = await fetch(origin + pathname, {
 			method: "POST",
 			body: JSON.stringify({ method, arguments: args }),
-			headers: Object.fromEntries(headers),
+			headers,
 		});
 		if (response.status === 409) {
 			this.xTransmissionSessionId = response.headers.get(
@@ -140,6 +141,7 @@ export default class Transmission implements TorrentClient {
 		if (percentDone < 1) return InjectionResult.TORRENT_NOT_COMPLETE;
 
 		let addResponse: TorrentAddResponse;
+
 		try {
 			addResponse = await this.request<TorrentAddResponse>(
 				"torrent-add",

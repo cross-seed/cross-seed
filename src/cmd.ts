@@ -259,7 +259,6 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 			await db.migrate.latest();
 			await doStartupValidation();
 			await scanRssFeeds();
-			console.log("done scanning");
 			await db.destroy();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);

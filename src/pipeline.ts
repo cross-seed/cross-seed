@@ -73,7 +73,7 @@ async function findOnOtherSites(
 		.onConflict("name")
 		.ignore();
 
-	let response: { indexerId: number; candidates: Candidate[] }[];
+	let response: Candidate[];
 	try {
 		response = await searchTorznab(searchee.name);
 	} catch (e) {
@@ -82,31 +82,26 @@ async function findOnOtherSites(
 		return 0;
 	}
 
-	const results = response.flatMap((e) =>
-		e.candidates.map((candidate) => ({
-			...candidate,
-			indexerId: e.indexerId,
-		}))
-	);
+	const results = response;
 
 	const assessed = await Promise.all<AssessmentWithTracker>(
 		results.map(assessEach)
 	);
 
-	const allIndexerIds = response.map((i) => i.indexerId);
-
 	const { rateLimited, notRateLimited } = assessed.reduce(
 		(acc, cur, idx) => {
 			const candidate = results[idx];
-			if (cur.assessment.decision == Decision.RATE_LIMITED) {
+			if (cur.assessment.decision === Decision.RATE_LIMITED) {
 				acc.rateLimited.add(candidate.indexerId);
 				acc.notRateLimited.delete(candidate.indexerId);
+			} else if (!acc.rateLimited.has(candidate.indexerId)) {
+				acc.notRateLimited.add(candidate.indexerId);
 			}
 			return acc;
 		},
 		{
 			rateLimited: new Set<number>(),
-			notRateLimited: new Set(allIndexerIds),
+			notRateLimited: new Set<number>(),
 		}
 	);
 
