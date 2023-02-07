@@ -4,6 +4,7 @@ import { ResultAssessment } from "./decide.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
+import { formatStringsAsList } from "./utils.js";
 
 export let pushNotifier: PushNotifier;
 enum Event {
@@ -36,14 +37,6 @@ export class PushNotifier {
 	}
 }
 
-function formatTrackersAsList(trackers: TrackerName[]) {
-	// @ts-expect-error Intl.ListFormat totally exists on node 12
-	return new Intl.ListFormat("en", {
-		style: "long",
-		type: "conjunction",
-	}).format(trackers);
-}
-
 export function sendResultsNotification(
 	searchee: Searchee,
 	results: [ResultAssessment, TrackerName, ActionResult][],
@@ -64,7 +57,7 @@ export function sendResultsNotification(
 			([assessment]) => assessment.metafile.infoHash
 		);
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
-		const trackersListStr = formatTrackersAsList(trackers);
+		const trackersListStr = formatStringsAsList(trackers);
 		const performedAction =
 			notableSuccesses[0][2] === InjectionResult.SUCCESS
 				? "Injected"
@@ -88,7 +81,8 @@ export function sendResultsNotification(
 			([assessment]) => assessment.metafile.infoHash
 		);
 		const trackers = failures.map(([, tracker]) => tracker);
-		const trackersListStr = formatTrackersAsList(trackers);
+		const trackersListStr = formatStringsAsList(trackers);
+
 		pushNotifier.notify({
 			body: `Failed to inject ${name} from ${numTrackers} trackers: ${trackersListStr}`,
 			extra: {

@@ -15,6 +15,7 @@ import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	cleanseSeparators,
+	formatStringsAsList,
 	getTag,
 	MediaType,
 	nMsAgo,
@@ -142,7 +143,9 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 	return candidatesByUrl.flatMap((e) => e.candidates);
 }
 
-export async function searchTorznab(name: string): Promise<Candidate[]> {
+export async function searchTorznab(
+	name: string
+): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
 	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
 
 	// search history for name across all indexers
@@ -168,18 +171,22 @@ export async function searchTorznab(name: string): Promise<Candidate[]> {
 		);
 	});
 
-	const responses = await makeRequests(name, indexersToUse, (indexer) =>
+	const timestampCallout = " (filtered by timestamps)";
+	logger.info({
+		label: Label.TORZNAB,
+		message: `Searching ${indexersToUse.length} indexers for ${name}${
+			indexersToUse.length < enabledIndexers.length
+				? timestampCallout
+				: ""
+		}`,
+	});
+
+	return makeRequests(name, indexersToUse, (indexer) =>
 		createTorznabSearchQuery(name, {
 			search: indexer.searchCap,
 			tvSearch: indexer.tvSearchCap,
 			movieSearch: indexer.movieSearchCap,
 		})
-	);
-	return responses.flatMap((e) =>
-		e.candidates.map((candidate) => ({
-			...candidate,
-			indexerId: e.indexerId,
-		}))
 	);
 }
 

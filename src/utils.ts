@@ -79,3 +79,11 @@ export function humanReadable(timestamp: number): string {
 	// swedish conventions roughly follow the iso format!
 	return new Date(timestamp).toLocaleString("sv");
 }
+
+export function formatStringsAsList(strings: string[]) {
+	// @ts-expect-error Intl.ListFormat totally exists on node 12
+	return new Intl.ListFormat("en", {
+		style: "long",
+		type: "conjunction",
+	}).format(strings);
+}
