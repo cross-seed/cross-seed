@@ -4,7 +4,7 @@ import { ResultAssessment } from "./decide.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { formatStringsAsList } from "./utils.js";
+import { formatAsList } from "./utils.js";
 
 export let pushNotifier: PushNotifier;
 enum Event {
@@ -57,7 +57,7 @@ export function sendResultsNotification(
 			([assessment]) => assessment.metafile.infoHash
 		);
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
-		const trackersListStr = formatStringsAsList(trackers);
+		const trackersListStr = formatAsList(trackers);
 		const performedAction =
 			notableSuccesses[0][2] === InjectionResult.SUCCESS
 				? "Injected"
@@ -81,7 +81,7 @@ export function sendResultsNotification(
 			([assessment]) => assessment.metafile.infoHash
 		);
 		const trackers = failures.map(([, tracker]) => tracker);
-		const trackersListStr = formatStringsAsList(trackers);
+		const trackersListStr = formatAsList(trackers);
 
 		pushNotifier.notify({
 			body: `Failed to inject ${name} from ${numTrackers} trackers: ${trackersListStr}`,

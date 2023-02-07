@@ -80,7 +80,7 @@ export function humanReadable(timestamp: number): string {
 	return new Date(timestamp).toLocaleString("sv");
 }
 
-export function formatStringsAsList(strings: string[]) {
+export function formatAsList(strings: string[]) {
 	// @ts-expect-error Intl.ListFormat totally exists on node 12
 	return new Intl.ListFormat("en", {
 		style: "long",

@@ -15,7 +15,7 @@ import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	cleanseSeparators,
-	formatStringsAsList,
+	formatAsList,
 	getTag,
 	MediaType,
 	nMsAgo,
