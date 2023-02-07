@@ -148,17 +148,22 @@ export async function searchTorznab(
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
 	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
 
+	const enabledIndexers = await getEnabledIndexers();
+
 	// search history for name across all indexers
 	const timestampDataSql = await db("searchee")
 		.join("timestamp", "searchee.id", "timestamp.searchee_id")
 		.join("indexer", "timestamp.indexer_id", "indexer.id")
-		.where({ name })
+		.whereIn(
+			"indexer.id",
+			enabledIndexers.map((i) => i.id)
+		)
+		.andWhere({ name })
 		.select({
 			indexerId: "indexer.id",
 			firstSearched: "timestamp.first_searched",
 			lastSearched: "timestamp.last_searched",
 		});
-	const enabledIndexers = await getEnabledIndexers();
 	const indexersToUse = enabledIndexers.filter((indexer) => {
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id
@@ -414,7 +419,7 @@ async function makeRequests(
 		for (const abortController of abortControllers) {
 			abortController.abort();
 		}
-	}, 10000);
+	}, 10000).unref();
 	const outcomes = await Promise.allSettled<Candidate[]>(
 		searchUrls.map((url, i) =>
 			fetch(url, {

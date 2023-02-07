@@ -3,6 +3,9 @@ import { Label, logger } from "./logger.js";
 import { humanReadable } from "./utils.js";
 
 export enum IndexerStatus {
+	/**
+	 * equivalent to null
+	 */
 	OK = "OK",
 	RATE_LIMITED = "RATE_LIMITED",
 	UNKNOWN_ERROR = "UNKNOWN_ERROR",

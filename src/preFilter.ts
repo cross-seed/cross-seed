@@ -3,6 +3,7 @@ import ms from "ms";
 import path from "path";
 import { EP_REGEX, EXTENSIONS } from "./constants.js";
 import { db } from "./db.js";
+import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
@@ -54,11 +55,14 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-
 	const timestampDataSql = await db("searchee")
 		.join("timestamp", "searchee.id", "timestamp.searchee_id")
 		.join("indexer", "timestamp.indexer_id", "indexer.id")
-		.where({ name: searchee.name })
+		.where({
+			name: searchee.name,
+			"indexer.active": true,
+			"indexer.search_cap": true,
+		})
 		.max({ first_searched_all: "timestamp.first_searched" })
 		.min({ last_searched_all: "timestamp.last_searched" })
 		.first();
