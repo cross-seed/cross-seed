@@ -106,7 +106,6 @@ export default class Transmission implements TorrentClient {
 		try {
 			await this.request("session-get");
 		} catch (e) {
-			console.error(e);
 			const { transmissionRpcUrl } = getRuntimeConfig();
 			throw new CrossSeedError(
 				`Failed to reach Transmission at ${transmissionRpcUrl}`
