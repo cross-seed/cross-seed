@@ -1,4 +1,4 @@
-import fetch, { Response as FetchResponse } from "node-fetch";
+import fetch, { Response as FetchResponse, Headers } from "node-fetch";
 import parseTorrent, { Metafile } from "parse-torrent";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
@@ -106,6 +106,7 @@ export default class Transmission implements TorrentClient {
 		try {
 			await this.request("session-get");
 		} catch (e) {
+			console.error(e);
 			const { transmissionRpcUrl } = getRuntimeConfig();
 			throw new CrossSeedError(
 				`Failed to reach Transmission at ${transmissionRpcUrl}`
