@@ -15,7 +15,6 @@ import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	cleanseSeparators,
-	formatAsList,
 	getTag,
 	MediaType,
 	nMsAgo,
@@ -419,7 +418,8 @@ async function makeRequests(
 		for (const abortController of abortControllers) {
 			abortController.abort();
 		}
-	}, 10000).unref();
+	}, 30000).unref();
+
 	const outcomes = await Promise.allSettled<Candidate[]>(
 		searchUrls.map((url, i) =>
 			fetch(url, {
