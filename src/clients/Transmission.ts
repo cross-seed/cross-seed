@@ -150,7 +150,7 @@ export default class Transmission implements TorrentClient {
 					metainfo: parseTorrent
 						.toTorrentFile(newTorrent)
 						.toString("base64"),
-					paused: true,
+					paused: false,
 					labels: ["cross-seed"],
 				}
 			);
