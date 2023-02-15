@@ -21,10 +21,6 @@ export enum InjectionResult {
 	ALREADY_EXISTS = "ALREADY_EXISTS",
 	TORRENT_NOT_COMPLETE = "TORRENT_NOT_COMPLETE",
 }
-export enum RenameResult {
-	SUCCESS = "SUCESS",
-	FAILURE = "FAILURE",
-}
 
 export enum SaveResult {
 	SAVED = "SAVED",

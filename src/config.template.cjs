@@ -22,11 +22,18 @@ module.exports = {
 	dataDirs: [],
 
 	/**
-	 * Determines directory structure of data target. Media is an organized directory like that produced by Radarr. 
-	 * Downloads is an unstructured downloads folder like those produced by torrent clients.
+	 * Determines flexibility of naming during matching. "safe" will allow only perfect name matches
+	 * using the standard matching algorithm. "risky" uses filesize as its only comparison point.
+	 * Options: "safe", "risky"
 	 */
 
-	dataMode: [],
+	dataMode: undefined,
+
+	/** 
+	 * Defines what category torrents injected by data-based matching should use. Default is
+	 * cross-seed-data
+	 */
+	dataCategory: undefined,
 
 	/**
 	 * directory containing torrent files.

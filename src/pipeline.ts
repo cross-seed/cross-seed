@@ -199,14 +199,14 @@ async function findSearchableTorrents() {
 			torrents.map(createSearcheeFromTorrentFile) //also create searchee from path
 		);
 		parsedTorrents = searcheeResults.filter(ok);
-	} else if (dataDirs.length > 0) {
+	} else if (dataDirs && dataDirs.length > 0) {
 		var fullPaths: string[] = [];
 		dataDirs.forEach(dataDir => {
-            const allPaths = getFilePathsFromPath(dataDir, [], 0, 4);
+            const allPaths = getFilePathsFromPath(dataDir, [], 0, 2);
             fullPaths = fullPaths.concat(allPaths.filter(file => 
                 fs.statSync(file).isDirectory() || 
                 (DATA_EXTENSIONS.includes(path.extname(file))  // try to avoid searching for a RARed pieces
-                && fs.statSync(file).size > 100000000))); // 100 MB to start
+                && fs.statSync(file).size > 100000000)));      // 100 MB to start
         });
 		const searcheeResults = await Promise.all(fullPaths.map(createSearcheeFromPath))
 		parsedTorrents = searcheeResults.filter(ok);

@@ -73,6 +73,11 @@ function createCommandWithSharedOptions(name, description) {
 			"Safe will only download torrents with perfect matches. Risky will allow for renames and more matches, but might cause false positives",
 			fallback(fileConfig.dataMode, "safe")
 		)
+		.option(
+			"-dc --dataCategory <cat>",
+			"Category to assign torrents from data-based matching",
+			fallback(fileConfig.dataCategory, "cross-seed-data")
+		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
 			"Directory with torrent files",

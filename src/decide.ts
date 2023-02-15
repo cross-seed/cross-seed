@@ -111,7 +111,7 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: info};
 	}
-	if (dataDirs.length == 0) {
+	if (!dataDirs || dataDirs.length == 0) {
 		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 	if (!statSync(searchee.path).isDirectory() && 
