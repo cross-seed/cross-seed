@@ -143,11 +143,14 @@ export async function indexNewTorrents(): Promise<void> {
 				});
 				continue;
 			}
-			await db("torrent").insert({
-				file_path: filepath,
-				info_hash: meta.infoHash,
-				name: meta.name,
-			});
+			await db("torrent")
+				.insert({
+					file_path: filepath,
+					info_hash: meta.infoHash,
+					name: meta.name,
+				})
+				.onConflict("file_path")
+				.ignore();
 		}
 	}
 	// clean up torrents that no longer exist in the torrentDir
