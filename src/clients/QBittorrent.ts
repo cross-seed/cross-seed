@@ -272,15 +272,15 @@ export default class QBittorrent implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee
 	): Promise<InjectionResult> {
-		const { duplicateCategories } = getRuntimeConfig();
-		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
-			return InjectionResult.ALREADY_EXISTS;
-		}
-		const buf = parseTorrent.toTorrentFile(newTorrent);
-		const filename = `${newTorrent.name}.cross-seed.torrent`;
-		const tempFilepath = join(tmpdir(), filename);
-		await writeFile(tempFilepath, buf, { mode: 0o644 });
 		try {
+			const { duplicateCategories } = getRuntimeConfig();
+			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
+				return InjectionResult.ALREADY_EXISTS;
+			}
+			const buf = parseTorrent.toTorrentFile(newTorrent);
+			const filename = `${newTorrent.name}.cross-seed.torrent`;
+			const tempFilepath = join(tmpdir(), filename);
+			await writeFile(tempFilepath, buf, { mode: 0o644 });
 			const { save_path, isComplete, autoTMM, category } =
 				await this.getTorrentConfiguration(searchee);
 
