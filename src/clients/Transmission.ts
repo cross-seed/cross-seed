@@ -74,7 +74,10 @@ export default class Transmission implements TorrentClient {
 		}
 		try {
 			const responseBody = (await response.json()) as Response<T>;
-			if (responseBody.result === "success") {
+			if (
+				responseBody.result === "success" ||
+				responseBody.result === "duplicate torrent" // slight hack but best solution for now
+			) {
 				return responseBody.arguments;
 			} else {
 				throw new Error(
