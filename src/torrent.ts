@@ -159,7 +159,9 @@ export async function indexNewTorrents(): Promise<void> {
 }
 
 export async function getInfoHashesToExclude(): Promise<string[]> {
-	return (await db("torrent").select("info_hash")).map((t) => t.info_hash);
+	return (await db("torrent").select({ infoHash: "info_hash" })).map(
+		(t) => t.infoHash
+	);
 }
 
 export async function validateTorrentDir(): Promise<void> {

@@ -184,7 +184,11 @@ async function assessCandidateCaching(
 	const logReason = createReasonLogger(name, tracker, searchee.name);
 
 	const cacheEntry = await db("decision")
-		.select("decision.*")
+		.select({
+			decision: "decision.decision",
+			infoHash: "decision.info_hash",
+			id: "decision.id",
+		})
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.name, guid })
 		.first();
@@ -213,12 +217,12 @@ async function assessCandidateCaching(
 			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
 	} else if (
 		cacheEntry.decision === Decision.MATCH &&
-		existsInTorrentCache(cacheEntry.info_hash)
+		existsInTorrentCache(cacheEntry.infoHash)
 	) {
 		// cached match
 		assessment = {
 			decision: cacheEntry.decision,
-			metafile: await getCachedTorrentFile(cacheEntry.info_hash),
+			metafile: await getCachedTorrentFile(cacheEntry.infoHash),
 		};
 	} else if (cacheEntry.decision === Decision.MATCH) {
 		assessment = await assessAndSaveResults(
