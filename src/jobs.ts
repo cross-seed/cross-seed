@@ -17,7 +17,7 @@ class Job {
 		this.isActive = false;
 	}
 
-	async run() {
+	async run(): Promise<boolean> {
 		if (!this.isActive) {
 			this.isActive = true;
 			try {
@@ -29,7 +29,9 @@ class Job {
 			} finally {
 				this.isActive = false;
 			}
+			return true;
 		}
+		return false;
 	}
 }
 
@@ -41,7 +43,7 @@ const getJobs = () => {
 	].filter(Boolean);
 };
 
-export async function jobsLoop() {
+export function jobsLoop() {
 	const jobs = getJobs();
 
 	async function loop() {
@@ -58,19 +60,22 @@ export async function jobsLoop() {
 			const eligibilityTs = lastRun ? lastRun + job.cadence : now;
 			const lastRunStr = lastRun ? `${ms(now - lastRun)} ago` : "never";
 			const nextRunStr = ms(eligibilityTs - now);
-			logger.verbose({
+
+			logger.info({
 				label: Label.SCHEDULER,
 				message: `${job.name}: last run ${lastRunStr}, next run in ${nextRunStr}`,
 			});
 
 			if (now >= eligibilityTs) {
 				job.run()
-					.then(async () => {
-						// upon success, update the log
-						await db("job_log")
-							.insert({ name: job.name, last_run: now })
-							.onConflict("name")
-							.merge();
+					.then(async (didRun) => {
+						if (didRun) {
+							// upon success, update the log
+							await db("job_log")
+								.insert({ name: job.name, last_run: now })
+								.onConflict("name")
+								.merge();
+						}
 					})
 					.catch(exitOnCrossSeedErrors)
 					.catch((e) => void logger.error(e));

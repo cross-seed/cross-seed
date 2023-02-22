@@ -12,8 +12,6 @@ export enum MediaType {
 	OTHER = "unknown",
 }
 
-export const duration = (perfA, perfB) => (perfB - perfA).toFixed(0);
-
 export function stripExtension(filename: string): string {
 	for (const ext of EXTENSIONS) {
 		const re = new RegExp(`\\.${ext}$`);
@@ -40,10 +38,6 @@ export function getTag(name: string): MediaType {
 		: MediaType.OTHER;
 }
 
-export type Result<T> = T | Error;
-
-export const ok = <T>(r: Result<T>): r is T => !(r instanceof Error);
-
 export async function time<R>(cb: () => R, times: number[]) {
 	const before = performance.now();
 	try {
@@ -68,8 +62,9 @@ export function reformatTitleForSearching(name: string): string {
 		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? name;
 	return cleanseSeparators(fullMatch);
 }
-export const tapLog = (value) => {
-	console.log(value);
+
+export const tap = (fn) => (value) => {
+	fn(value);
 	return value;
 };
 
@@ -77,4 +72,17 @@ export async function filterAsync(arr, predicate) {
 	const results = await Promise.all(arr.map(predicate));
 
 	return arr.filter((_, index) => results[index]);
+}
+
+export function humanReadable(timestamp: number): string {
+	// swedish conventions roughly follow the iso format!
+	return new Date(timestamp).toLocaleString("sv");
+}
+
+export function formatAsList(strings: string[]) {
+	// @ts-expect-error Intl.ListFormat totally exists on node 12
+	return new Intl.ListFormat("en", {
+		style: "long",
+		type: "conjunction",
+	}).format(strings);
 }

@@ -81,9 +81,4 @@ async function down(knex: Knex.Knex): Promise<void> {
 	await knex.schema.dropTable("torrent");
 }
 
-export default {
-	name: "00-initialSchema",
-	up,
-	down,
-	config: { transaction: true },
-};
+export default { name: "00-initialSchema", up, down };

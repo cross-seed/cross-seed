@@ -7,6 +7,7 @@ import DailyRotateFile from "winston-daily-rotate-file";
 export enum Label {
 	QBITTORRENT = "qbittorrent",
 	RTORRENT = "rtorrent",
+	TRANSMISSION = "transmission",
 	DECIDE = "decide",
 	PREFILTER = "prefilter",
 	CONFIGDUMP = "configdump",
@@ -46,7 +47,10 @@ function redactMessage(message) {
 
 	// redact torznab api keys
 	message = message.replace(/apikey=[a-zA-Z0-9]+/g, `apikey=${redactionMsg}`);
-
+	message = message.replace(
+		/\/notification\/crossSeed\/\w+/g,
+		`/notification/crossSeed/${redactionMsg}`
+	);
 	for (const [key, urlStr] of Object.entries(runtimeConfig)) {
 		if (key.endsWith("Url") && urlStr) {
 			message = redactUrlPassword(message, urlStr);

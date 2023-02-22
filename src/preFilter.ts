@@ -1,11 +1,13 @@
 import { uniqBy } from "lodash-es";
+import ms from "ms";
 import path from "path";
 import { EP_REGEX, EXTENSIONS } from "./constants.js";
+import { db } from "./db.js";
+import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { db } from "./db.js";
-import { nMsAgo } from "./utils.js";
+import { humanReadable, nMsAgo } from "./utils.js";
 
 const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 
@@ -53,13 +55,20 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
-
 	const timestampDataSql = await db("searchee")
-		.where({ name: searchee.name })
+		.join("timestamp", "searchee.id", "timestamp.searchee_id")
+		.join("indexer", "timestamp.indexer_id", "indexer.id")
+		.where({
+			name: searchee.name,
+			"indexer.active": true,
+			"indexer.search_cap": true,
+		})
+		.max({ first_searched_all: "timestamp.first_searched" })
+		.min({ last_searched_all: "timestamp.last_searched" })
 		.first();
 
 	if (!timestampDataSql) return true;
-	const { first_searched, last_searched } = timestampDataSql;
+	const { first_searched_all, last_searched_all } = timestampDataSql;
 	function logReason(reason) {
 		logger.verbose({
 			label: Label.PREFILTER,
@@ -68,23 +77,27 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	}
 
 	if (
-		excludeOlder &&
-		first_searched &&
-		first_searched < nMsAgo(excludeOlder)
+		typeof excludeOlder === "number" &&
+		first_searched_all &&
+		first_searched_all < nMsAgo(excludeOlder)
 	) {
 		logReason(
-			`its first search timestamp ${first_searched} is older than ${excludeOlder} minutes ago`
+			`its first search timestamp ${humanReadable(
+				first_searched_all
+			)} is older than ${ms(excludeOlder, { long: true })} ago`
 		);
 		return false;
 	}
 
 	if (
-		excludeRecentSearch &&
-		last_searched &&
-		last_searched > nMsAgo(excludeRecentSearch)
+		typeof excludeRecentSearch === "number" &&
+		last_searched_all &&
+		last_searched_all > nMsAgo(excludeRecentSearch)
 	) {
 		logReason(
-			`its last search timestamp ${last_searched} is newer than ${excludeRecentSearch} minutes ago`
+			`its last search timestamp ${humanReadable(
+				last_searched_all
+			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`
 		);
 		return false;
 	}

@@ -25,7 +25,7 @@ to see the steps required for migration.
 
 ## Requirements
 
--   [Node 14+](https://nodejs.org/en/download)
+-   [Node 16+](https://nodejs.org/en/download)
 -   Any number of indexers that support Torznab (use Jackett or Prowlarr to
     help)
 

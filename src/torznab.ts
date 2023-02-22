@@ -1,16 +1,25 @@
-import { zip } from "lodash-es";
+import ms from "ms";
 import fetch from "node-fetch";
 import xml2js from "xml2js";
 import { EP_REGEX, SEASON_REGEX } from "./constants.js";
+import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
+import {
+	getEnabledIndexers,
+	Indexer,
+	IndexerStatus,
+	updateIndexerStatus,
+} from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
-import { EmptyNonceOptions, getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	cleanseSeparators,
 	getTag,
 	MediaType,
+	nMsAgo,
 	reformatTitleForSearching,
+	stripExtension,
 } from "./utils.js";
 
 interface TorznabParams {
@@ -29,218 +38,435 @@ interface Caps {
 	movieSearch: boolean;
 }
 
-let activeTorznabManager: TorznabManager;
+type TorznabSearchTechnique = [] | [{ $?: { available: "yes" | "no" } }];
 
-export class TorznabManager {
-	capsMap = new Map<URL, Caps>();
-
-	/**
-	 * Generates a Torznab query URL, given the srcUrl (user config)
-	 * and the torznab param configuration.
-	 * @param srcUrl
-	 * @param params
-	 */
-	assembleUrl(srcUrl: string | URL, params: TorznabParams): string {
-		const url = new URL(srcUrl);
-		const apikey = url.searchParams.get("apikey");
-		const searchParams = new URLSearchParams();
-
-		searchParams.set("apikey", apikey);
-
-		for (const [key, value] of Object.entries(params)) {
-			if (value != null) searchParams.set(key, value);
-		}
-
-		url.search = searchParams.toString();
-		return url.toString();
-	}
-
-	async validateTorznabUrls() {
-		const { torznab } = getRuntimeConfig();
-		if (!torznab) return;
-
-		const urls: URL[] = torznab.map((str) => new URL(str));
-		for (const url of urls) {
-			if (!url.pathname.endsWith("/api")) {
-				throw new CrossSeedError(
-					`Torznab url ${url} must have a path ending in /api`
-				);
+type TorznabCaps = {
+	caps?: {
+		searching?: [
+			{
+				search?: TorznabSearchTechnique;
+				"tv-search"?: TorznabSearchTechnique;
+				"movie-search"?: TorznabSearchTechnique;
 			}
-			if (!url.searchParams.has("apikey")) {
-				throw new CrossSeedError(
-					`Torznab url ${url} does not specify an apikey`
-				);
-			}
-		}
+		];
+	};
+};
 
-		const outcomes = await Promise.allSettled(
-			urls.map((url) => this.fetchCaps(url))
-		);
+interface TorznabResult {
+	guid: [string];
+	title: [string];
+	prowlarrindexer?: [{ _: string }];
+	jackettindexer?: [{ _: string }];
+	indexer?: [{ _: string }];
+	link: [string];
+	size: [string];
+	pubDate: [string];
+}
 
-		const zipped: [URL, PromiseSettledResult<Caps>][] = zip(urls, outcomes);
+type TorznabResults = { rss?: { channel?: [] | [{ item?: TorznabResult[] }] } };
 
-		// handle promise rejections
-		const rejected: [URL, PromiseRejectedResult][] = zipped.filter(
-			(bundle): bundle is [URL, PromiseRejectedResult] =>
-				bundle[1].status === "rejected"
-		);
+function sanitizeUrl(url: string | URL): string {
+	url = new URL(url);
+	return url.origin + url.pathname;
+}
 
-		for (const [url, outcome] of rejected) {
-			logger.warn(`Failed to reach ${url}`);
-			logger.debug(outcome.reason);
-		}
+function getApikey(url: string) {
+	return new URL(url).searchParams.get("apikey");
+}
 
-		const fulfilled = zipped
-			.filter(
-				(bundle): bundle is [URL, PromiseFulfilledResult<Caps>] =>
-					bundle[1].status === "fulfilled"
-			)
-			.map(
-				([url, outcome]: [URL, PromiseFulfilledResult<Caps>]): [
-					URL,
-					Caps
-				] => [url, outcome.value]
-			);
-
-		// handle trackers that can't search
-		const trackersWithoutSearchingCaps = fulfilled.filter(
-			([, caps]) => !caps.search
-		);
-		trackersWithoutSearchingCaps
-			.map(
-				([url]) =>
-					`Ignoring indexer that doesn't support searching: ${url}`
-			)
-			.forEach(logger.warn);
-
-		// store caps of usable trackers
-		const trackersWithSearchingCaps = fulfilled.filter(
-			([, caps]) => caps.search
-		);
-
-		for (const [url, caps] of trackersWithSearchingCaps) {
-			this.capsMap.set(url, caps);
-		}
-
-		if (trackersWithSearchingCaps.length === 0) {
-			throw new CrossSeedError("no working indexers available");
-		}
+function parseTorznabResults(xml: TorznabResults): Candidate[] {
+	const items = xml?.rss?.channel?.[0]?.item;
+	if (!items || !Array.isArray(items)) {
+		return [];
 	}
 
-	async fetchCaps(url: string | URL): Promise<Caps> {
-		return fetch(this.assembleUrl(url, { t: "caps" }))
-			.then((r) => r.text())
-			.then(xml2js.parseStringPromise)
-			.then(this.parseCaps);
-	}
+	return items.map((item) => ({
+		guid: item.guid[0],
+		name: item.title[0],
+		tracker:
+			item?.prowlarrindexer?.[0]?._ ??
+			item?.jackettindexer?.[0]?._ ??
+			item?.indexer?.[0]?._ ??
+			"Unknown tracker",
+		link: item.link[0],
+		size: Number(item.size[0]),
+		pubDate: new Date(item.pubDate[0]).getTime(),
+	}));
+}
 
-	parseCaps(xml): Caps {
-		const capsSection = xml?.caps?.searching?.[0];
-		const isAvailable = (searchTechnique) =>
-			searchTechnique?.[0]?.$?.available === "yes";
+function parseTorznabCaps(xml: TorznabCaps): Caps {
+	const capsSection = xml?.caps?.searching?.[0];
+	const isAvailable = (searchTechnique) =>
+		searchTechnique?.[0]?.$?.available === "yes";
+	return {
+		search: Boolean(isAvailable(capsSection?.search)),
+		tvSearch: Boolean(isAvailable(capsSection?.["tv-search"])),
+		movieSearch: Boolean(isAvailable(capsSection?.["movie-search"])),
+	};
+}
+
+function createTorznabSearchQuery(name: string, caps: Caps) {
+	const nameWithoutExtension = stripExtension(name);
+	const extractNumber = (str: string): number =>
+		parseInt(str.match(/\d+/)[0]);
+	const mediaType = getTag(nameWithoutExtension);
+	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
+		const match = nameWithoutExtension.match(EP_REGEX);
 		return {
-			search: isAvailable(capsSection?.search),
-			tvSearch: isAvailable(capsSection?.["tv-search"]),
-			movieSearch: isAvailable(capsSection?.["movie-search"]),
-		};
+			t: "tvsearch",
+			q: cleanseSeparators(match.groups.title),
+			season: extractNumber(match.groups.season),
+			ep: extractNumber(match.groups.episode),
+		} as const;
+	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
+		const match = nameWithoutExtension.match(SEASON_REGEX);
+		return {
+			t: "tvsearch",
+			q: cleanseSeparators(match.groups.title),
+			season: extractNumber(match.groups.season),
+		} as const;
+	} else {
+		return {
+			t: "search",
+			q: reformatTitleForSearching(nameWithoutExtension),
+		} as const;
 	}
+}
 
-	async parseResults(text: string): Promise<Candidate[]> {
-		const jsified = await xml2js.parseStringPromise(text);
-		const items = jsified?.rss?.channel?.[0]?.item;
-		if (!items || !Array.isArray(items)) {
-			return [];
-		}
+export async function queryRssFeeds(): Promise<Candidate[]> {
+	const candidatesByUrl = await makeRequests(
+		"",
+		await getEnabledIndexers(),
+		() => ({ t: "search", q: "" })
+	);
+	return candidatesByUrl.flatMap((e) => e.candidates);
+}
 
-		return items.map((item) => ({
-			guid: item.guid[0],
-			name: item.title[0],
-			tracker:
-				item?.prowlarrindexer?.[0]?._ ??
-				item?.jackettindexer?.[0]?._ ??
-				item?.indexer?.[0]?._ ??
-				"Unknown tracker",
-			link: item.link[0],
-			size: Number(item.size[0]),
-		}));
-	}
+export async function searchTorznab(
+	name: string
+): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
 
-	getBestSearchTechnique(name: string, caps: Caps): TorznabParams {
-		const extractNumber = (str: string): number =>
-			parseInt(str.match(/\d+/)[0]);
-		const mediaType = getTag(name);
-		if (mediaType === MediaType.EPISODE && caps.tvSearch) {
-			const match = name.match(EP_REGEX);
-			return {
-				t: "tvsearch",
-				q: cleanseSeparators(match.groups.title),
-				season: extractNumber(match.groups.season),
-				ep: extractNumber(match.groups.episode),
-			};
-		} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
-			const match = name.match(SEASON_REGEX);
-			return {
-				t: "tvsearch",
-				q: cleanseSeparators(match.groups.title),
-				season: extractNumber(match.groups.season),
-			};
-		} else {
-			return {
-				t: "search",
-				q: reformatTitleForSearching(name),
-			};
-		}
-	}
+	const enabledIndexers = await getEnabledIndexers();
 
-	async searchTorznab(
-		name: string,
-		nonceOptions = EmptyNonceOptions
-	): Promise<Candidate[]> {
-		const searchUrls = Array.from(this.capsMap).map(
-			([url, caps]: [URL, Caps]) => {
-				return this.assembleUrl(
-					url,
-					this.getBestSearchTechnique(name, caps)
-				);
+	// search history for name across all indexers
+	const timestampDataSql = await db("searchee")
+		.join("timestamp", "searchee.id", "timestamp.searchee_id")
+		.join("indexer", "timestamp.indexer_id", "indexer.id")
+		.whereIn(
+			"indexer.id",
+			enabledIndexers.map((i) => i.id)
+		)
+		.andWhere({ name })
+		.select({
+			indexerId: "indexer.id",
+			firstSearched: "timestamp.first_searched",
+			lastSearched: "timestamp.last_searched",
+		});
+	const indexersToUse = enabledIndexers.filter((indexer) => {
+		const entry = timestampDataSql.find(
+			(entry) => entry.indexerId === indexer.id
+		);
+		return (
+			!entry ||
+			((!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
+				(!excludeRecentSearch ||
+					entry.lastSearched < nMsAgo(excludeRecentSearch)))
+		);
+	});
+
+	const timestampCallout = " (filtered by timestamps)";
+	logger.info({
+		label: Label.TORZNAB,
+		message: `Searching ${indexersToUse.length} indexers for ${name}${
+			indexersToUse.length < enabledIndexers.length
+				? timestampCallout
+				: ""
+		}`,
+	});
+
+	return makeRequests(name, indexersToUse, (indexer) =>
+		createTorznabSearchQuery(name, {
+			search: indexer.searchCap,
+			tvSearch: indexer.tvSearchCap,
+			movieSearch: indexer.movieSearchCap,
+		})
+	);
+}
+
+export async function syncWithDb() {
+	const { torznab } = getRuntimeConfig();
+
+	const dbIndexers = await db<Indexer>("indexer")
+		.where({ active: true })
+		.select({
+			id: "id",
+			url: "url",
+			apikey: "apikey",
+			active: "active",
+			status: "status",
+			retryAfter: "retry_after",
+			searchCap: "search_cap",
+			tvSearchCap: "tv_search_cap",
+			movieSearchCap: "movie_search_cap",
+		});
+
+	const inConfigButNotInDb = torznab.filter(
+		(configIndexer) =>
+			!dbIndexers.some(
+				(dbIndexer) => dbIndexer.url === sanitizeUrl(configIndexer)
+			)
+	);
+
+	const inDbButNotInConfig = dbIndexers.filter(
+		(dbIndexer) =>
+			!torznab.some(
+				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url
+			)
+	);
+
+	const apikeyUpdates = dbIndexers.reduce<{ id: number; apikey: string }[]>(
+		(acc, dbIndexer) => {
+			const configIndexer = torznab.find(
+				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url
+			);
+			if (
+				configIndexer &&
+				dbIndexer.apikey !== getApikey(configIndexer)
+			) {
+				acc.push({
+					id: dbIndexer.id,
+					apikey: getApikey(configIndexer),
+				});
 			}
-		);
-		searchUrls.forEach(
-			(message) => void logger.verbose({ label: Label.TORZNAB, message })
-		);
-		const outcomes = await Promise.allSettled<Candidate[]>(
-			searchUrls.map((url) =>
-				fetch(url)
-					.then((r) => r.text())
-					.then(this.parseResults)
-			)
-		);
-		const rejected = zip(Array.from(this.capsMap.keys()), outcomes).filter(
-			([, outcome]) => outcome.status === "rejected"
-		);
-		rejected
-			.map(
-				([url, outcome]) =>
-					`Failed searching ${url} for ${name} with reason: ${outcome.reason}`
-			)
-			.forEach(logger.warn);
+			return acc;
+		},
+		[]
+	);
 
-		const fulfilled = outcomes
-			.filter(
-				(outcome): outcome is PromiseFulfilledResult<Candidate[]> =>
-					outcome.status === "fulfilled"
+	if (inDbButNotInConfig.length > 0) {
+		await db("indexer")
+			.whereIn(
+				"url",
+				inDbButNotInConfig.map((indexer) => indexer.url)
 			)
-			.map((outcome) => outcome.value);
-		return [].concat(...fulfilled);
+			.update({ active: false });
+	}
+
+	if (inConfigButNotInDb.length > 0) {
+		await db("indexer")
+			.insert(
+				inConfigButNotInDb.map((url) => ({
+					url: sanitizeUrl(url),
+					apikey: getApikey(url),
+					active: true,
+				}))
+			)
+			.onConflict("url")
+			.merge(["active", "apikey"]);
+	}
+
+	await db.transaction(async (trx) => {
+		for (const apikeyUpdate of apikeyUpdates) {
+			await trx("indexer")
+				.where({ id: apikeyUpdate.id })
+				.update({ apikey: apikeyUpdate.apikey });
+		}
+	});
+}
+
+function assembleUrl(
+	urlStr: string,
+	apikey: string,
+	params: TorznabParams
+): string {
+	const url = new URL(urlStr);
+	const searchParams = new URLSearchParams();
+
+	searchParams.set("apikey", apikey);
+
+	for (const [key, value] of Object.entries(params)) {
+		if (value != null) searchParams.set(key, value);
+	}
+
+	url.search = searchParams.toString();
+	return url.toString();
+}
+
+function fetchCaps(indexer: {
+	id: number;
+	url: string;
+	apikey: string;
+}): Promise<Caps> {
+	return fetch(assembleUrl(indexer.url, indexer.apikey, { t: "caps" }))
+		.then((r) => r.text())
+		.then(xml2js.parseStringPromise)
+		.then(parseTorznabCaps);
+}
+
+function collateOutcomes<Correlator, SuccessReturnType>(
+	correlators: Correlator[],
+	outcomes: PromiseSettledResult<SuccessReturnType>[]
+): {
+	rejected: [Correlator, PromiseRejectedResult["reason"]][];
+	fulfilled: [Correlator, SuccessReturnType][];
+} {
+	return outcomes.reduce<{
+		rejected: [Correlator, PromiseRejectedResult["reason"]][];
+		fulfilled: [Correlator, SuccessReturnType][];
+	}>(
+		({ rejected, fulfilled }, cur, idx) => {
+			if (cur.status === "rejected") {
+				rejected.push([correlators[idx], cur.reason]);
+			} else {
+				fulfilled.push([correlators[idx], cur.value]);
+			}
+			return { rejected, fulfilled };
+		},
+		{ rejected: [], fulfilled: [] }
+	);
+}
+
+async function updateCaps(
+	indexers: { id: number; url: string; apikey: string }[]
+): Promise<void> {
+	const outcomes = await Promise.allSettled<Caps>(
+		indexers.map((indexer) => fetchCaps(indexer))
+	);
+	const { fulfilled, rejected } = collateOutcomes<number, Caps>(
+		indexers.map((i) => i.id),
+		outcomes
+	);
+	for (const [indexerId, reason] of rejected) {
+		logger.warn(
+			`Failed to reach ${indexers.find((i) => i.id === indexerId).url}`
+		);
+		logger.debug(reason);
+	}
+
+	for (const [indexerId, caps] of fulfilled) {
+		await db("indexer").where({ id: indexerId }).update({
+			search_cap: caps.search,
+			tv_search_cap: caps.tvSearch,
+			movie_search_cap: caps.movieSearch,
+		});
 	}
 }
 
-function instantiateTorznabManager() {
-	activeTorznabManager = new TorznabManager();
+export async function validateTorznabUrls() {
+	const { torznab } = getRuntimeConfig();
+	if (!torznab) return;
+
+	const urls: URL[] = torznab.map((str) => new URL(str));
+	for (const url of urls) {
+		if (!url.pathname.endsWith("/api")) {
+			throw new CrossSeedError(
+				`Torznab url ${url} must have a path ending in /api`
+			);
+		}
+		if (!url.searchParams.has("apikey")) {
+			throw new CrossSeedError(
+				`Torznab url ${url} does not specify an apikey`
+			);
+		}
+	}
+	await syncWithDb();
+	const enabledIndexersWithoutCaps = await db("indexer")
+		.where({
+			active: true,
+			search_cap: null,
+			tv_search_cap: null,
+			movie_search_cap: null,
+		})
+		.select({ id: "id", url: "url", apikey: "apikey" });
+	await updateCaps(enabledIndexersWithoutCaps);
+
+	const indexersWithoutSearch = await db("indexer")
+		.where({ search_cap: false, active: true })
+		.select({ id: "id", url: "url" });
+
+	for (const indexer of indexersWithoutSearch) {
+		logger.warn(
+			`Ignoring indexer that doesn't support searching: ${indexer.url}`
+		);
+	}
+
+	const indexersWithSearch = await getEnabledIndexers();
+
+	if (indexersWithSearch.length === 0) {
+		throw new CrossSeedError("no working indexers available");
+	}
 }
 
-export function getTorznabManager(): TorznabManager {
-	if (!activeTorznabManager) {
-		instantiateTorznabManager();
+async function makeRequests(
+	name: string,
+	indexers: Indexer[],
+	getQuery: (indexer: Indexer) => TorznabParams
+): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+	const searchUrls = indexers.map((indexer: Indexer) =>
+		assembleUrl(indexer.url, indexer.apikey, getQuery(indexer))
+	);
+	searchUrls.forEach(
+		(message) => void logger.verbose({ label: Label.TORZNAB, message })
+	);
+	const abortControllers = Array.from(
+		new Array(20),
+		() => new AbortController()
+	);
+
+	setTimeout(() => {
+		for (const abortController of abortControllers) {
+			abortController.abort();
+		}
+	}, 30000).unref();
+
+	const outcomes = await Promise.allSettled<Candidate[]>(
+		searchUrls.map((url, i) =>
+			fetch(url, {
+				headers: { "User-Agent": "cross-seed" },
+				signal: abortControllers[i].signal,
+			})
+				.then((response) => {
+					if (!response.ok) {
+						if (response.status === 429) {
+							updateIndexerStatus(
+								IndexerStatus.RATE_LIMITED,
+								Date.now() + ms("1 hour"),
+								[indexers[i].id]
+							);
+						} else {
+							updateIndexerStatus(
+								IndexerStatus.UNKNOWN_ERROR,
+								Date.now() + ms("1 hour"),
+								[indexers[i].id]
+							);
+						}
+						throw new Error(
+							`request failed with code: ${response.status}`
+						);
+					}
+					return response;
+				})
+				.then((r) => r.text())
+				.then(xml2js.parseStringPromise)
+				.then(parseTorznabResults)
+		)
+	);
+
+	const { rejected, fulfilled } = collateOutcomes<number, Candidate[]>(
+		indexers.map((indexer) => indexer.id),
+		outcomes
+	);
+
+	for (const [indexerId, reason] of rejected) {
+		logger.warn(
+			`Failed to reach ${indexers.find((i) => i.id === indexerId).url}`
+		);
+		logger.debug(reason);
 	}
-	return activeTorznabManager;
+
+	return fulfilled.map(([indexerId, results]) => ({
+		indexerId,
+		candidates: results,
+	}));
 }
