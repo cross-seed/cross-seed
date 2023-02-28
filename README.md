@@ -9,6 +9,7 @@ Currently the supported clients are
 
 -   rTorrent
 -   qBittorrent
+-   Transmission
 
 [Request your client here.](https://github.com/cross-seed/cross-seed/issues/new)
 
