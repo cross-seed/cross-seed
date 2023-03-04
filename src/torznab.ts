@@ -409,10 +409,7 @@ async function makeRequests(
 	searchUrls.forEach(
 		(message) => void logger.verbose({ label: Label.TORZNAB, message })
 	);
-	const abortControllers = Array.from(
-		new Array(20),
-		() => new AbortController()
-	);
+	const abortControllers = searchUrls.map(() => new AbortController());
 
 	setTimeout(() => {
 		for (const abortController of abortControllers) {
