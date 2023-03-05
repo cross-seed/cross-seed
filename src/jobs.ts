@@ -43,10 +43,29 @@ const getJobs = () => {
 	].filter(Boolean);
 };
 
+function logNextRun(
+	name: string,
+	cadence: number,
+	lastRun: number | undefined | null
+) {
+	const now = Date.now();
+
+	const eligibilityTs = lastRun ? lastRun + cadence : now;
+
+	const lastRunStr = lastRun ? `${ms(now - lastRun)} ago` : "never";
+	const nextRunStr =
+		now >= eligibilityTs ? "now" : `in ${ms(eligibilityTs - now)}`;
+
+	logger.info({
+		label: Label.SCHEDULER,
+		message: `${name}: last run ${lastRunStr}, next run ${nextRunStr}`,
+	});
+}
+
 export function jobsLoop() {
 	const jobs = getJobs();
 
-	async function loop() {
+	async function loop(isFirstRun?: true) {
 		const now = Date.now();
 		for (const job of jobs) {
 			const lastRun = (
@@ -58,13 +77,7 @@ export function jobsLoop() {
 
 			// if it's never been run, you are eligible immediately
 			const eligibilityTs = lastRun ? lastRun + job.cadence : now;
-			const lastRunStr = lastRun ? `${ms(now - lastRun)} ago` : "never";
-			const nextRunStr = ms(eligibilityTs - now);
-
-			logger.info({
-				label: Label.SCHEDULER,
-				message: `${job.name}: last run ${lastRunStr}, next run in ${nextRunStr}`,
-			});
+			if (isFirstRun) logNextRun(job.name, job.cadence, lastRun);
 
 			if (now >= eligibilityTs) {
 				job.run()
@@ -75,6 +88,7 @@ export function jobsLoop() {
 								.insert({ name: job.name, last_run: now })
 								.onConflict("name")
 								.merge();
+							logNextRun(job.name, job.cadence, now);
 						}
 					})
 					.catch(exitOnCrossSeedErrors)
@@ -84,6 +98,6 @@ export function jobsLoop() {
 	}
 
 	const interval = setInterval(loop, ms("1 minute"));
-	loop();
+	loop(true);
 	return () => clearInterval(interval);
 }
