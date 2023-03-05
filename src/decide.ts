@@ -54,8 +54,9 @@ const createReasonLogger =
 				reason = decision;
 				break;
 		}
-		if (cached) logReason(`${reason} (cached)`);
-		else logReason(reason);
+		if (!cached) {
+			logReason(reason);
+		}
 	};
 
 export function compareFileTrees(

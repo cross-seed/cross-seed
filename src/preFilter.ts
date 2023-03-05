@@ -3,7 +3,6 @@ import ms from "ms";
 import path from "path";
 import { EP_REGEX, EXTENSIONS } from "./constants.js";
 import { db } from "./db.js";
-import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
@@ -56,18 +55,27 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const timestampDataSql = await db("searchee")
-		.join("timestamp", "searchee.id", "timestamp.searchee_id")
-		.join("indexer", "timestamp.indexer_id", "indexer.id")
+		// @ts-expect-error crossJoin supports string
+		.crossJoin("indexer")
+		.leftOuterJoin("timestamp", {
+			"timestamp.indexer_id": "indexer.id",
+			"timestamp.searchee_id": "searchee.id",
+		})
 		.where({
 			name: searchee.name,
 			"indexer.active": true,
 			"indexer.search_cap": true,
 		})
-		.max({ first_searched_all: "timestamp.first_searched" })
-		.min({ last_searched_all: "timestamp.last_searched" })
+		.max({
+			first_searched_all: db.raw(
+				"coalesce(timestamp.first_searched, 9223372036854775807)"
+			),
+		})
+		.min({
+			last_searched_all: db.raw("coalesce(timestamp.last_searched, 0)"),
+		})
 		.first();
 
-	if (!timestampDataSql) return true;
 	const { first_searched_all, last_searched_all } = timestampDataSql;
 	function logReason(reason) {
 		logger.verbose({

@@ -31,7 +31,7 @@ export class PushNotifier {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ title, body, ...rest }),
 			}).catch(() => {
-				logger.error({ message: "" });
+				logger.error({ message: "Failed to send push notification" });
 			});
 		}
 	}
