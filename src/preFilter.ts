@@ -1,10 +1,8 @@
-import knex from "knex";
 import { uniqBy } from "lodash-es";
 import ms from "ms";
 import path from "path";
 import { EP_REGEX, EXTENSIONS } from "./constants.js";
 import { db } from "./db.js";
-import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
