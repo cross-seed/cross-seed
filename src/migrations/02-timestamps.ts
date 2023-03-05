@@ -32,7 +32,8 @@ async function backfill(knex: Knex.Knex) {
 			"searchee.last_searched as last_searched"
 		)
 		.from("searchee")
-		.crossJoin(knex.raw("indexer"));
+		// @ts-expect-error crossJoin supports string
+		.crossJoin("indexer");
 	await knex.batchInsert("timestamp", timestampRows, 100);
 }
 
