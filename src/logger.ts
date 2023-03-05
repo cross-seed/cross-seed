@@ -42,22 +42,25 @@ function redactUrlPassword(message, urlStr) {
 	return message;
 }
 
-function redactMessage(message) {
+function redactMessage(message: string | unknown) {
+	if (typeof message !== "string") {
+		return message;
+	}
 	const runtimeConfig = getRuntimeConfig();
+	let ret = message;
 
 	// redact torznab api keys
-	message = message.replace(/apikey=[a-zA-Z0-9]+/g, `apikey=${redactionMsg}`);
-	message = message.replace(
+	ret = ret.replace(/apikey=[a-zA-Z0-9]+/g, `apikey=${redactionMsg}`);
+	ret = ret.replace(
 		/\/notification\/crossSeed\/\w+/g,
 		`/notification/crossSeed/${redactionMsg}`
 	);
 	for (const [key, urlStr] of Object.entries(runtimeConfig)) {
 		if (key.endsWith("Url") && urlStr) {
-			message = redactUrlPassword(message, urlStr);
+			ret = redactUrlPassword(ret, urlStr);
 		}
 	}
-
-	return message;
+	return ret;
 }
 
 const logOnceCache: string[] = [];
