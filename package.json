@@ -1,6 +1,6 @@
 {
 	"name": "cross-seed",
-	"version": "4.4.0",
+	"version": "4.4.1",
 	"description": "Query Jackett for cross-seedable torrents",
 	"scripts": {
 		"test": "true",
