@@ -59,7 +59,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const timestampDataSql = await db("searchee")
 		// @ts-expect-error crossJoin supports string
 		.crossJoin("indexer")
-		.join("timestamp", {
+		.leftOuterJoin("timestamp", {
 			"timestamp.indexer_id": "indexer.id",
 			"timestamp.searchee_id": "searchee.id",
 		})
