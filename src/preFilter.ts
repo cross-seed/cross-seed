@@ -78,8 +78,8 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		})
 		.first();
 
-	if (!timestampDataSql) return true;
 	const { first_searched_all, last_searched_all } = timestampDataSql;
+	console.log(searchee.name, first_searched_all, last_searched_all);
 	function logReason(reason) {
 		logger.verbose({
 			label: Label.PREFILTER,
