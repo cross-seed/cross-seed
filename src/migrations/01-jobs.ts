@@ -1,12 +1,6 @@
 import Knex from "knex";
-import { join } from "path";
-import { appDir } from "../configuration.js";
 
 async function up(knex: Knex.Knex): Promise<void> {
-	const connection = await knex.client.acquireConnection();
-	await connection.backup(join(appDir(), "cross-seed.pre-jobs.backup.db"));
-	await knex.client.releaseConnection(connection);
-
 	await knex.schema.createTable("job_log", (table) => {
 		table.increments("id").primary();
 		table.string("name").unique();

@@ -109,6 +109,15 @@ module.exports = {
 	qbittorrentUrl: undefined,
 
 	/**
+	 * The url of your Transmission RPC interface.
+	 * Usually ends with "/transmission/rpc".
+	 * Only relevant with action: "inject".
+	 * Supply your username and password inside the url like so:
+	 * "http://username:password@localhost:9091/transmission/rpc"
+	 */
+	transmissionRpcUrl: undefined,
+
+	/**
 	 * qBittorrent-specific
 	 * Whether to inject using categories with the same save paths as your normal categories.
 	 * Example: if you have a category called "Movies",
@@ -127,6 +136,12 @@ module.exports = {
 	 * Listen on a custom port.
 	 */
 	port: 2468,
+
+	/**
+	 * Bind to a specific host address.
+	 * Example: "127.0.0.1"
+	 */
+	host: undefined,
 
 	/**
 	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms

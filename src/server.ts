@@ -71,6 +71,7 @@ async function search(
 		logger.error({ label: Label.SERVER, message });
 		res.writeHead(400);
 		res.end(message);
+		return;
 	}
 
 	const criteriaStr = inspect(criteria);
@@ -209,10 +210,10 @@ async function handleRequest(
 	}
 }
 
-export async function serve(port: number): Promise<void> {
+export function serve(port: number, host: string | undefined): void {
 	if (port) {
 		const server = http.createServer(handleRequest);
-		server.listen(port);
+		server.listen(port, host);
 		logger.info({
 			label: Label.SERVER,
 			message: `Server is running on port ${port}, ^C to stop.`,

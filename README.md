@@ -9,6 +9,7 @@ Currently the supported clients are
 
 -   rTorrent
 -   qBittorrent
+-   Transmission
 
 [Request your client here.](https://github.com/cross-seed/cross-seed/issues/new)
 
@@ -25,7 +26,7 @@ to see the steps required for migration.
 
 ## Requirements
 
--   [Node 14+](https://nodejs.org/en/download)
+-   [Node 16+](https://nodejs.org/en/download)
 -   Any number of indexers that support Torznab (use Jackett or Prowlarr to
     help)
 

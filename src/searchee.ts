@@ -3,8 +3,8 @@ import fs, { fstatSync } from "fs";
 import { Metafile } from "parse-torrent";
 import { join, relative, basename, sep as osSpecificPathSeparator } from "path";
 import { parseTorrentFromFilename } from "./torrent.js";
-import { Result } from "./utils.js";
 import { logger } from "./logger.js";
+import { Result, resultOf, resultOfErr } from "./Result.js";
 
 export interface File {
 	length: number;
@@ -60,7 +60,7 @@ function getFilesFromDataRoot(rootPath): File[] {
 	return torrentFiles
   }
 
-function getFilesFromTorrent(meta: Metafile): File[] {
+export function getFiles(meta: Metafile): File[] {
 	if (!meta.info.files) {
 		return [
 			{
@@ -90,7 +90,7 @@ function getFilesFromTorrent(meta: Metafile): File[] {
 
 export function createSearcheeFromMetafile(meta: Metafile): Searchee {
 	return {
-		files: getFilesFromTorrent(meta),
+		files: getFiles(meta),
 		infoHash: meta.infoHash,
 		name: meta.name,
 		length: meta.length,
@@ -99,28 +99,28 @@ export function createSearcheeFromMetafile(meta: Metafile): Searchee {
 
 export async function createSearcheeFromTorrentFile(
 	filepath: string
-): Promise<Result<Searchee>> {
+): Promise<Result<Searchee, Error>> {
 	try {
 		const meta = await parseTorrentFromFilename(filepath);
-		return createSearcheeFromMetafile(meta);
+		return resultOf(createSearcheeFromMetafile(meta));
 	} catch (e) {
 		logger.error(`Failed to parse ${basename(filepath)}`);
 		logger.debug(e);
-		return e;
+		return resultOfErr(e);
 	}
 }
 
 export async function createSearcheeFromPath(
 	filepath: string
-): Promise<Result<Searchee>> {
+): Promise<Result<Searchee, Error>> {
 		const fileName : string = basename(filepath);
 		const fileList : File[] = getFilesFromDataRoot(filepath);
 		var totalLength = fileList.reduce<number>((runningTotal, file) => runningTotal + file.length, 0);
-		return {
+		return resultOf({
 			files:  fileList,
 			path: filepath,
 			name: fileName,
 			length: totalLength,
-		};
+		});
 } 
 

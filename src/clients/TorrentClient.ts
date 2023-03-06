@@ -5,6 +5,7 @@ import { getRuntimeConfig, NonceOptions } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
+import Transmission from "./Transmission.js";
 
 let activeClient: TorrentClient;
 
@@ -18,11 +19,14 @@ export interface TorrentClient {
 }
 
 function instantiateDownloadClient() {
-	const { rtorrentRpcUrl, qbittorrentUrl } = getRuntimeConfig();
+	const { rtorrentRpcUrl, qbittorrentUrl, transmissionRpcUrl } =
+		getRuntimeConfig();
 	if (rtorrentRpcUrl) {
 		activeClient = new RTorrent();
 	} else if (qbittorrentUrl) {
 		activeClient = new QBittorrent();
+	} else if (transmissionRpcUrl) {
+		activeClient = new Transmission();
 	}
 }
 
