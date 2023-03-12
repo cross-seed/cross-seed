@@ -236,11 +236,13 @@ export default class QBittorrent implements TorrentClient {
 		category: string;
 	}> {
 		if (searchee.path) {
-			const save_path: string = dirname(searchee.path);
-			const isComplete: boolean = true;
-			const autoTMM: boolean = false;
-			const category: string = getRuntimeConfig().dataCategory;
-			return {save_path, isComplete, autoTMM, category}
+			const { dataCategory } = getRuntimeConfig();
+			return { 
+				save_path: dirname(searchee.path), 
+				isComplete: true, 
+				autoTMM: false, 
+				category: dataCategory 
+			};
 		}
 		const responseText = await this.request(
 			"/torrents/info",

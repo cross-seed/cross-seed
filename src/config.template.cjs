@@ -27,7 +27,7 @@ module.exports = {
 	 * Options: "safe", "risky"
 	 */
 
-	dataMode: undefined,
+	dataMode: "safe",
 
 	/** 
 	 * Defines what category torrents injected by data-based matching should use. Default is

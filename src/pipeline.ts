@@ -239,6 +239,7 @@ async function findSearchableTorrents() {
 	} else {
 		parsedTorrents = await loadTorrentDirLight();
 	}
+	
 	const hashesToExclude = parsedTorrents
 		.map((t) => t.infoHash)
 		.filter(Boolean);
@@ -258,7 +259,6 @@ async function findSearchableTorrents() {
 export async function main(): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
 	const { samples, hashesToExclude } =  await findSearchableTorrents();
-
 
 	fs.mkdirSync(outputDir, { recursive: true });
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);

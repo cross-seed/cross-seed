@@ -230,5 +230,4 @@ export default class RTorrent implements TorrentClient {
 		setTimeout(() => fs.unlink(torrentFilePath), 1000);
 		return InjectionResult.FAILURE;
 	}
-
 }
