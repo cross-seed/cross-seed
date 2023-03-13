@@ -1,14 +1,12 @@
 import { uniqBy } from "lodash-es";
 import ms from "ms";
-import path from "path";
-import { EP_REGEX, EXTENSIONS } from "./constants.js";
+import { extname } from "path";
+import { EP_REGEX, VIDEO_EXTENSIONS } from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { humanReadable, nMsAgo } from "./utils.js";
-
-const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 
 export function filterByContent(searchee: Searchee): boolean {
 	const { includeEpisodes, includeNonVideos } = getRuntimeConfig();
@@ -29,7 +27,7 @@ export function filterByContent(searchee: Searchee): boolean {
 	}
 
 	const allFilesAreVideos = searchee.files.every((file) =>
-		extensionsWithDots.includes(path.extname(file.name))
+		VIDEO_EXTENSIONS.includes(extname(file.name))
 	);
 
 	if (!includeNonVideos && !allFilesAreVideos) {

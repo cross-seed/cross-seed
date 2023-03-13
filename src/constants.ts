@@ -4,7 +4,7 @@ export const SEASON_REGEX =
 export const MOVIE_REGEX =
 	/^(?<title>.+)[. ][[(]?(?<year>\d{4})[)\]]?(?![pi])/i;
 
-export const EXTENSIONS = ["mkv", "mp4", "avi"];
+export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi"];
 
 export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
 

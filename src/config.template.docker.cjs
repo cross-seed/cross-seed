@@ -18,7 +18,7 @@ module.exports = {
 
 	/**
 	 * To search with downloaded data, you can pass in directories to your downloaded torrent data
-	 * to find matches rather using the torrent files themselves for matching. 
+	 * to find matches rather using the torrent files themselves for matching.
 	 */
 	dataDirs: [],
 
@@ -30,7 +30,7 @@ module.exports = {
 
 	dataMode: undefined,
 
-	/** 
+	/**
 	 * Defines what category torrents injected by data-based matching should use. Default is
 	 * cross-seed-data
 	 */
