@@ -4,7 +4,7 @@ import parseTorrent, { FileListing, Metafile } from "parse-torrent";
 import { dirname, resolve } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
-import { InjectionResult, RenameResult } from "../constants.js";
+import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { getRuntimeConfig, NonceOptions } from "../runtimeConfig.js";
@@ -231,11 +231,4 @@ export default class RTorrent implements TorrentClient {
 		return InjectionResult.FAILURE;
 	}
 
-	async rename(torrent: Metafile,
-		searchee: Searchee,
-		tracker: string,
-		nonceOptions: NonceOptions,
-		): Promise<RenameResult> {
-		return null;
-	}
 }

@@ -1,10 +1,11 @@
 import { CallTracker } from "assert";
 import { Metafile } from "parse-torrent";
-import { InjectionResult, RenameResult } from "../constants.js";
+import { InjectionResult } from "../constants.js";
 import { getRuntimeConfig, NonceOptions } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
+import Transmission from "./Transmission.js";
 
 let activeClient: TorrentClient;
 
@@ -15,20 +16,17 @@ export interface TorrentClient {
 		nonceOptions: NonceOptions
 	) => Promise<InjectionResult>;
 	validateConfig: () => Promise<void>;
-	rename: (
-		torrent: Metafile,
-		searchee: Searchee,
-		tracker: string,
-		nonceOptions: NonceOptions
-	) => Promise<RenameResult>;
 }
 
 function instantiateDownloadClient() {
-	const { rtorrentRpcUrl, qbittorrentUrl } = getRuntimeConfig();
+	const { rtorrentRpcUrl, qbittorrentUrl, transmissionRpcUrl } =
+		getRuntimeConfig();
 	if (rtorrentRpcUrl) {
 		activeClient = new RTorrent();
 	} else if (qbittorrentUrl) {
 		activeClient = new QBittorrent();
+	} else if (transmissionRpcUrl) {
+		activeClient = new Transmission();
 	}
 }
 

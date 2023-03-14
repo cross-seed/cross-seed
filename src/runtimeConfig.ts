@@ -6,6 +6,7 @@ export interface RuntimeConfig {
 	dataDirs: string[];
 	dataMode: string;
 	hardlinkDir: string;
+	dataCategory: string;
 	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;
@@ -17,6 +18,7 @@ export interface RuntimeConfig {
 	action: Action;
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
+	transmissionRpcUrl: string;
 	duplicateCategories: boolean;
 	notificationWebhookUrl: string;
 	torrents: string[];

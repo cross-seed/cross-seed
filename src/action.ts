@@ -58,14 +58,6 @@ export async function performAction(
 				);
 				break;
 		}
-		// f (result === InjectionResult.SUCCESS && decision === Decision.MATCH_EXCEPT_PARENT_DIR) {
-		// 	const renameResult = await getClient().rename(
-		// 		newMeta,
-		// 		searchee,
-		// 		tracker,
-		// 		nonceOptions,
-		// 	)
-		// 
 		return result;
 	} else {
 		saveTorrentFile(tracker, getTag(searchee.name), newMeta, nonceOptions);

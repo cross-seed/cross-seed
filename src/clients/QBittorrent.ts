@@ -7,7 +7,7 @@ import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
 import { basename, dirname, join, posix, sep } from "path";
 import { dataMode, hardlinkDir } from "../config.template.cjs";
-import { InjectionResult, RenameResult } from "../constants.js";
+import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
@@ -240,7 +240,7 @@ export default class QBittorrent implements TorrentClient {
 			const save_path: string = dirname(searchee.path);
 			const isComplete: boolean = true;
 			const autoTMM: boolean = false;
-			const category: string = " ";
+			const category: string = getRuntimeConfig().dataCategory;
 			return {save_path, isComplete, autoTMM, category}
 		}
 		const responseText = await this.request(
@@ -282,10 +282,6 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async isSubfolderContentLayout(searchee: Searchee): Promise<boolean> {
-		const { dataDirs } = getRuntimeConfig();
-		if (dataDirs.length > 0) {
-			return statSync(searchee.path).isDirectory();
-		}
 		const response = await this.request(
 			"/torrents/files",
 			`hash=${searchee.infoHash}`,
@@ -310,21 +306,26 @@ export default class QBittorrent implements TorrentClient {
 		const tempFilepath = join(tmpdir(), filename);
 		await writeFile(tempFilepath, buf, { mode: 0o644 });
 		try {
+			const { duplicateCategories } = getRuntimeConfig();
+			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
+				return InjectionResult.ALREADY_EXISTS;
+			}
+			const buf = parseTorrent.toTorrentFile(newTorrent);
+			const filename = `${newTorrent.name}.cross-seed.torrent`;
+			const tempFilepath = join(tmpdir(), filename);
+			await writeFile(tempFilepath, buf, { mode: 0o644 });
 			const { save_path, isComplete, autoTMM, category } =
 				await this.getTorrentConfiguration(searchee);
 
 			// As there's no way to know here if we matched perfectly or with a renamed top directory
 			// without the MATCH_EXCEPT_PARENT_DIR result, we have to manually check the new torrent's
 			// structure to see which directory is the correct parent.
-			const corrected_save_path = dataDirs.length > 0 ? 
+			const corrected_save_path = dataDirs && dataDirs.length > 0 ? 
 				await this.correct_path(newTorrent, searchee, save_path) : 
 				save_path;
 			
-			const newCategoryName = searchee.infoHash ? 
-			(duplicateCategories
-				? await this.setUpCrossSeedCategory(category)
-				: category) 
-				: "cross-seed-data";
+			const newCategoryName = duplicateCategories && !searchee.infoHash 
+				? await this.setUpCrossSeedCategory(category) : category;
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
@@ -349,7 +350,7 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("autoTMM", "false");
 				formData.append("savepath", corrected_save_path);
 			}
-			if (dataDirs.length > 0) {
+			if (dataDirs && dataDirs.length > 0) {
 				formData.append("skip_checking", hardlinkDir ? "true" : "false");
 				formData.append("paused", "true");
 			} else {
@@ -364,7 +365,7 @@ export default class QBittorrent implements TorrentClient {
 
 			await this.request("/torrents/add", formData);
 
-			if (dataDirs.length > 0 && !hardlinkDir) {
+			if (dataDirs && dataDirs.length > 0 && !hardlinkDir) {
 				const fileFormData = new FormData();
 				const file = newTorrent.files[0];
 				const isNestedFile = file.path.split(sep).length > 1;
@@ -415,32 +416,4 @@ export default class QBittorrent implements TorrentClient {
 			return InjectionResult.FAILURE;
 		}
 	}
-	async rename(
-		torrent: Metafile,
-		searchee: Searchee,
-		tracker: string): Promise<RenameResult> {
-			try {
-				
-				await this.request(               // for some reason, this pause, recheck, resume loop is required to get the torrents 
-					"/torrents/pause",            // to not just say "missing files." I hope there's a workaround for this,
-					`hashes=${torrent.infoHash}`, // because the recheck time would be immense when scanned on a large library.
-					X_WWW_FORM_URLENCODED
-				);
-				await this.request(
-					"/torrents/recheck", 
-					`hashes=${torrent.infoHash}`,
-					X_WWW_FORM_URLENCODED);
-				//await this.request(
-				//	"/torrents/resume", 
-				//	`hashes=${torrent.infoHash}`,
-				//	X_WWW_FORM_URLENCODED);
-				return RenameResult.SUCCESS;
-			} catch (e) {
-				logger.debug({
-					label: Label.QBITTORRENT,
-					message: `Rename failed: ${e.message}`,
-				});
-				return RenameResult.FAILURE;
-			}
-		}
 }

@@ -1,15 +1,19 @@
-import { existsSync, linkSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
+import { existsSync, symlinkSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
 import parseTorrent, { FileListing, Metafile } from "parse-torrent";
 import path, { basename, dirname, join, relative, sep } from "path";
 import { appDir } from "./configuration.js";
 import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
+import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
-import { db } from "./db.js";
-import { parseTorrentFromFilename, parseTorrentFromURL } from "./torrent.js";
-import { File } from "./searchee.js";
+import { File, getFiles, Searchee } from "./searchee.js";
+import {
+	parseTorrentFromFilename,
+	parseTorrentFromURL,
+	SnatchError,
+} from "./torrent.js";
+
 export interface ResultAssessment {
 	decision: Decision;
 	metafile?: Metafile;
@@ -34,6 +38,9 @@ const createReasonLogger =
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
 				break;
+			case Decision.RATE_LIMITED:
+				reason = "cross-seed has reached this tracker's rate limit";
+				break;
 			case Decision.DOWNLOAD_FAILED:
 				reason = "the torrent file failed to download";
 				break;
@@ -47,22 +54,23 @@ const createReasonLogger =
 				reason = decision;
 				break;
 		}
-		if (cached) logReason(`${reason} (cached)`);
-		else logReason(reason);
+		if (!cached) {
+			logReason(reason);
+		}
 	};
 
 export function compareFileTrees(
 	candidate: Metafile,
 	searchee: Searchee
 ): boolean {
-	const cmp = (elOfA: FileListing, elOfB: File) => {
+	const cmp = (elOfA: File, elOfB: File) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
 		const pathsAreEqual = elOfB.path === elOfA.path;
 
 		return lengthsAreEqual && pathsAreEqual;
 	};
 
-	return candidate.files.every((elOfA) =>
+	return getFiles(candidate).every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
 	);
 }
@@ -99,27 +107,33 @@ async function assessCandidateHelper(
 
 	if (!link) return { decision: Decision.NO_DOWNLOAD_LINK };
 
-	const info = await parseTorrentFromURL(link);
+	const result = await parseTorrentFromURL(link);
 
-	if (!info) return { decision: Decision.DOWNLOAD_FAILED };
+	if (result.isErr()) {
+		return result.unwrapErrOrThrow() === SnatchError.RATE_LIMITED
+			? { decision: Decision.RATE_LIMITED }
+			: { decision: Decision.DOWNLOAD_FAILED };
+	}
 
-	if (hashesToExclude.includes(info.infoHash)) {
+	const candidateMeta = result.unwrapOrThrow();
+
+	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
 	const { dataDirs, dataMode, hardlinkDir } = getRuntimeConfig();
-	const perfectMatch = compareFileTrees(info, searchee);
+	const perfectMatch = compareFileTrees(candidateMeta, searchee);
 	if (perfectMatch) {
 		await hardlinkExact(searchee.path, hardlinkDir);
-		return { decision: Decision.MATCH, metafile: info};
+		return { decision: Decision.MATCH, metafile: candidateMeta};
 	}
-	if (dataDirs.length == 0) {
+	if (!dataDirs || dataDirs.length == 0) {
 		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 	if (!statSync(searchee.path).isDirectory() && 
-		compareFileTreesIgnoringNames(info, searchee) &&
+		compareFileTreesIgnoringNames(candidateMeta, searchee) &&
 		dataMode == "risky") {
 			if (hardlinkDir) {
-				const candidateParentDir = dirname(info.files[0].path);
+				const candidateParentDir = dirname(candidateMeta.files[0].path);
 				var correctedHardlinkDir = hardlinkDir;
 				if (candidateParentDir != ".") {
 					if (!existsSync(join(hardlinkDir, candidateParentDir))) {
@@ -127,9 +141,9 @@ async function assessCandidateHelper(
 					}
 					correctedHardlinkDir = join(hardlinkDir, candidateParentDir);
 				}
-				hardlinkFile(dirname(searchee.path), correctedHardlinkDir, basename(searchee.path), basename(info.files[0].path));
+				hardlinkFile(dirname(searchee.path), correctedHardlinkDir, basename(searchee.path), basename(candidateMeta.files[0].path));
 			}
-			return { decision: Decision.MATCH_EXCEPT_PARENT_DIR, metafile: info};
+			return { decision: Decision.MATCH_EXCEPT_PARENT_DIR, metafile: candidateMeta};
 		}
 	return { decision: Decision.FILE_TREE_MISMATCH };	
 }
@@ -154,7 +168,7 @@ function hardlinkFile(oldPath:string, newPath: string, oldName: string, newName:
 	if (existsSync(join(newPath, newName))) {
         return;
     }
-	linkSync(join(oldPath, oldName), join(newPath, newName));
+	symlinkSync(join(oldPath, oldName), join(newPath, newName));
 }
 
 function existsInTorrentCache(infoHash: string): boolean {
@@ -227,7 +241,11 @@ async function assessCandidateCaching(
 	const logReason = createReasonLogger(name, tracker, searchee.name);
 
 	const cacheEntry = await db("decision")
-		.select("decision.*")
+		.select({
+			decision: "decision.decision",
+			infoHash: "decision.info_hash",
+			id: "decision.id",
+		})
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.name, guid })
 		.first();
@@ -235,7 +253,8 @@ async function assessCandidateCaching(
 
 	if (
 		!cacheEntry?.decision ||
-		cacheEntry.decision === Decision.DOWNLOAD_FAILED
+		cacheEntry.decision === Decision.DOWNLOAD_FAILED ||
+		cacheEntry.decision === Decision.RATE_LIMITED
 	) {
 		assessment = await assessAndSaveResults(
 			candidate,
@@ -257,12 +276,12 @@ async function assessCandidateCaching(
 	} else if (
 		cacheEntry.decision === Decision.MATCH || 
 		cacheEntry.decision === Decision.MATCH_EXCEPT_PARENT_DIR &&
-		existsInTorrentCache(cacheEntry.info_hash)
+		existsInTorrentCache(cacheEntry.infoHash)
 	) {
 		// cached match
 		assessment = {
 			decision: cacheEntry.decision,
-			metafile: await getCachedTorrentFile(cacheEntry.info_hash),
+			metafile: await getCachedTorrentFile(cacheEntry.infoHash),
 		};
 	} else if (
 		cacheEntry.decision === Decision.MATCH || 

@@ -1,5 +1,6 @@
-FROM node:14
-WORKDIR /usr/src/app
+FROM node:16
+WORKDIR /usr/src/cross-seed
+RUN npm install -g npm@9
 COPY package*.json ./
 RUN npm ci
 ENV CONFIG_DIR=/config
@@ -9,4 +10,5 @@ COPY src src
 RUN npm run build
 RUN npm link
 EXPOSE 2468
+WORKDIR /config
 ENTRYPOINT ["cross-seed"]

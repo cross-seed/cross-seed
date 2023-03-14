@@ -2,6 +2,7 @@ import chalk from "chalk";
 import fs from "fs";
 import { zip } from "lodash-es";
 import path from "path";
+import ms from "ms";
 import { performAction, performActions } from "./action.js";
 import {
 	ActionResult,
@@ -12,6 +13,11 @@ import {
 } from "./constants.js";
 import { db } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
+import {
+	IndexerStatus,
+	updateIndexerStatus,
+	updateSearchTimestamps,
+} from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
@@ -35,8 +41,8 @@ import {
 	loadTorrentDirLight,
 	TorrentLocator,
 } from "./torrent.js";
-import { getTorznabManager } from "./torznab.js";
-import { filterAsync, ok, stripExtension } from "./utils.js";
+import { queryRssFeeds, searchTorznab } from "./torznab.js";
+import { filterAsync, stripExtension } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -44,6 +50,8 @@ export interface Candidate {
 	size: number;
 	name: string;
 	tracker: string;
+	pubDate: number;
+	indexerId?: number;
 }
 
 interface AssessmentWithTracker {
@@ -63,29 +71,58 @@ async function findOnOtherSites(
 		tracker: result.tracker,
 	});
 
-	const query = stripExtension(searchee.name);
-
 	// make sure searchee is in database
 	await db("searchee")
 		.insert({ name: searchee.name })
 		.onConflict("name")
 		.ignore();
 
-	let response: Candidate[];
+	let response: { indexerId: number; candidates: Candidate[] }[];
 	try {
-		response = await getTorznabManager().searchTorznab(query, nonceOptions);
+		response = await searchTorznab(searchee.name);
 	} catch (e) {
-		logger.error(`error searching for ${query}`);
+		logger.error(`error searching for ${searchee.name}`);
+		logger.debug(e);
 		return 0;
 	}
-	const results = response;
 
-	const loaded = await Promise.all<AssessmentWithTracker>(
+	const results: Candidate[] = response.flatMap((e) =>
+		e.candidates.map((candidate) => ({
+			...candidate,
+			indexerId: e.indexerId,
+		}))
+	);
+
+	const assessed = await Promise.all<AssessmentWithTracker>(
 		results.map(assessEach)
 	);
-	const matches = loaded.filter(
-		(e) => (e.assessment.decision === Decision.MATCH || 
-			    e.assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR)
+
+	const { rateLimited, notRateLimited } = assessed.reduce(
+		(acc, cur, idx) => {
+			const candidate = results[idx];
+			if (cur.assessment.decision === Decision.RATE_LIMITED) {
+				acc.rateLimited.add(candidate.indexerId);
+				acc.notRateLimited.delete(candidate.indexerId);
+			}
+			return acc;
+		},
+		{
+			rateLimited: new Set<number>(),
+			notRateLimited: new Set(response.map((r) => r.indexerId)),
+		}
+	);
+
+	await updateSearchTimestamps(searchee.name, Array.from(notRateLimited));
+
+	await updateIndexerStatus(
+		IndexerStatus.RATE_LIMITED,
+		Date.now() + ms("1 hour"),
+		Array.from(rateLimited)
+	);
+
+	const matches = assessed.filter(
+		(e) => e.assessment.decision === Decision.MATCH|| 
+		e.assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR
 	);
 	const actionResults = await performActions(searchee, matches, nonceOptions);
 
@@ -96,23 +133,8 @@ async function findOnOtherSites(
 			actionResults
 		);
 		sendResultsNotification(searchee, zipped, Label.SEARCH);
-		await updateSearchTimestamps(searchee.name);
 	}
 	return matches.length;
-}
-
-async function updateSearchTimestamps(name: string): Promise<void> {
-	await db.transaction(async (trx) => {
-		const now = Date.now();
-		const entry = await trx("searchee").where({ name }).first();
-
-		await trx("searchee")
-			.where({ name })
-			.update({
-				last_searched: now,
-				first_searched: entry?.first_searched ? undefined : now,
-			});
-	});
 }
 
 async function findMatchesBatch(
@@ -198,18 +220,22 @@ async function findSearchableTorrents() {
 		const searcheeResults = await Promise.all(
 			torrents.map(createSearcheeFromTorrentFile) //also create searchee from path
 		);
-		parsedTorrents = searcheeResults.filter(ok);
-	} else if (dataDirs.length > 0) {
+		parsedTorrents = searcheeResults
+			.filter((t) => t.isOk())
+			.map((t) => t.unwrapOrThrow());
+	} else if (dataDirs && dataDirs.length > 0) {
 		var fullPaths: string[] = [];
 		dataDirs.forEach(dataDir => {
-            const allPaths = getFilePathsFromPath(dataDir, [], 0, 4);
+            const allPaths = getFilePathsFromPath(dataDir, [], 0, 2);
             fullPaths = fullPaths.concat(allPaths.filter(file => 
                 fs.statSync(file).isDirectory() || 
                 (DATA_EXTENSIONS.includes(path.extname(file))  // try to avoid searching for a RARed pieces
-                && fs.statSync(file).size > 100000000))); // 100 MB to start
+                && fs.statSync(file).size > 100000000)));      // 100 MB to start
         });
 		const searcheeResults = await Promise.all(fullPaths.map(createSearcheeFromPath))
-		parsedTorrents = searcheeResults.filter(ok);
+		parsedTorrents = searcheeResults
+			.filter((t) => t.isOk())
+			.map((t) => t.unwrapOrThrow());
 	} else {
 		parsedTorrents = await loadTorrentDirLight();
 	}
@@ -250,20 +276,32 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const candidates = await getTorznabManager().searchTorznab("");
+	const candidates = await queryRssFeeds();
+	const lastRun =
+		(await db("job_log").select("last_run").where({ name: "rss" }).first())
+			?.last_run ?? 0;
+	const candidatesSinceLastTime = candidates.filter(
+		(c) => c.pubDate > lastRun
+	);
 	logger.verbose({
 		label: Label.RSS,
-		message: `Scan returned ${candidates.length} results`,
+		message: `Scan returned ${
+			candidatesSinceLastTime.length
+		} new results, ignoring ${
+			candidates.length - candidatesSinceLastTime.length
+		} already seen`,
 	});
 	logger.verbose({
 		label: Label.RSS,
 		message: "Indexing new torrents...",
 	});
 	await indexNewTorrents();
-	for (const [i, candidate] of candidates.entries()) {
+	for (const [i, candidate] of candidatesSinceLastTime.entries()) {
 		logger.verbose({
 			label: Label.RSS,
-			message: `Processing release ${i + 1}/${candidates.length}`,
+			message: `Processing release ${i + 1}/${
+				candidatesSinceLastTime.length
+			}`,
 		});
 		await checkNewCandidateMatch(candidate);
 	}

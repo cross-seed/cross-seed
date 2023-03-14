@@ -8,7 +8,7 @@ import { generateConfig, getFileConfig } from "./configuration.js";
 import { Action } from "./constants.js";
 import { jobsLoop } from "./jobs.js";
 import { diffCmd } from "./diff.js";
-import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
+import { exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
 import {
@@ -76,7 +76,11 @@ function createCommandWithSharedOptions(name, description) {
 		.option(
 			"-h, --hardlink-dir <dir>",
 			"Directory to output data-matched hardlinks to",
-			fileConfig.hardlinkDir
+			fileConfig.hardlinkDir)
+		.option(
+			"-dc --dataCategory <cat>",
+			"Category to assign torrents from data-based matching",
+			fallback(fileConfig.dataCategory, "cross-seed-data")
 		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
@@ -98,6 +102,11 @@ function createCommandWithSharedOptions(name, description) {
 			"Include single-episode torrents in the search",
 			fallback(fileConfig.includeEpisodes, false)
 		)
+		.option(
+			"--no-include-non-videos",
+			"Don't include torrents which contain non-videos"
+		)
+		.option("--no-include-episodes", "Don't include episode torrents")
 		.requiredOption(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
@@ -132,6 +141,11 @@ function createCommandWithSharedOptions(name, description) {
 			"--qbittorrent-url <url>",
 			"The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.",
 			fileConfig.qbittorrentUrl
+		)
+		.option(
+			"--transmission-rpc-url <url>",
+			"The url of your Transmission RPC interface. Requires '-A inject'. See the docs for more information.",
+			fileConfig.transmissionRpcUrl
 		)
 		.option(
 			"--duplicate-categories",
@@ -175,6 +189,7 @@ program
 	.description("Clear the cache of downloaded-and-rejected torrents")
 	.action(async () => {
 		await db("decision").del();
+		await db.destroy();
 	});
 
 program
@@ -216,6 +231,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 		(n) => parseInt(n),
 		fallback(fileConfig.port, 2468)
 	)
+	.option("--host <host>", "Bind to a specific IP address", fileConfig.host)
 	.option("--no-port", "Do not listen on any port")
 	.option(
 		"--search-cadence <cadence>",
@@ -239,7 +255,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			});
 			await db.migrate.latest();
 			await doStartupValidation();
-			serve(options.port);
+			serve(options.port, options.host);
 			jobsLoop();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
@@ -287,7 +303,6 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),
 			});
-
 			await db.migrate.latest();
 			await doStartupValidation();
 			await main();

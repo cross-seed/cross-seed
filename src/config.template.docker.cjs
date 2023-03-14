@@ -23,11 +23,19 @@ module.exports = {
 	dataDirs: [],
 
 	/**
-	 * Determines directory structure of data target. Media is an organized directory like that produced by Radarr. 
-	 * Downloads is an unstructured downloads folder like those produced by torrent clients.
+	 * Determines flexibility of naming during matching. "safe" will allow only perfect name matches
+	 * using the standard matching algorithm. "risky" uses filesize as its only comparison point.
+	 * Options: "safe", "risky"
 	 */
 
-	dataMode: [],
+	dataMode: undefined,
+
+	/** 
+	 * Defines what category torrents injected by data-based matching should use. Default is
+	 * cross-seed-data
+	 */
+
+	dataCategory: undefined,
 
 	/**
 	 * directory containing torrent files.
@@ -107,13 +115,21 @@ module.exports = {
 	qbittorrentUrl: undefined,
 
 	/**
+	 * The url of your Transmission RPC interface.
+	 * Usually ends with "/transmission/rpc".
+	 * Only relevant with action: "inject".
+	 * Supply your username and password inside the url like so:
+	 * "http://username:password@localhost:9091/transmission/rpc"
+	 */
+	transmissionRpcUrl: undefined,
+
+	/**
 	 * qBittorrent-specific
 	 * Whether to inject using categories with the same save paths as your normal categories.
 	 * Example: if you have a category called "Movies",
 	 * this will automatically inject cross-seeds to "Movies.cross-seed"
 	 */
 	duplicateCategories: false,
-
 
 	/**
 	 * cross-seed will send POST requests to this url
@@ -126,6 +142,12 @@ module.exports = {
 	 * Listen on a custom port.
 	 */
 	port: 2468,
+
+	/**
+	 * Bind to a specific host address.
+	 * Example: "127.0.0.1"
+	 */
+	host: undefined,
 
 	/**
 	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms
@@ -147,5 +169,4 @@ module.exports = {
 	 * "3 days"
 	 */
 	searchCadence: undefined,
-
 };
