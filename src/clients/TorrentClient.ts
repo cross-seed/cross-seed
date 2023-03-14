@@ -1,4 +1,3 @@
-import { CallTracker } from "assert";
 import { Metafile } from "parse-torrent";
 import { InjectionResult } from "../constants.js";
 import { getRuntimeConfig, NonceOptions } from "../runtimeConfig.js";

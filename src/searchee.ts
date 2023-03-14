@@ -1,10 +1,10 @@
+import { readdirSync, statSync } from "fs";
 import { sortBy } from "lodash-es";
-import fs, { fstatSync } from "fs";
 import { Metafile } from "parse-torrent";
-import { join, relative, basename, sep as osSpecificPathSeparator } from "path";
-import { parseTorrentFromFilename } from "./torrent.js";
+import { basename, join, relative, sep as osSpecificPathSeparator } from "path";
 import { logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
+import { parseTorrentFromFilename } from "./torrent.js";
 
 export interface File {
 	length: number;
@@ -20,45 +20,29 @@ export interface Searchee {
 	length: number;
 }
 
-export function getFilePathsFromPath(dirPath, arrayOfFiles, depth, depthLimit) {
-	var files = fs.readdirSync(dirPath)
-
-	arrayOfFiles = arrayOfFiles || []
-
-	files.forEach(function(file) {
-		if (!fs.statSync(join(dirPath, file)).isDirectory() || fs.readdirSync(join(dirPath, file)).length > 1) {
-			arrayOfFiles.push(join(dirPath, file))
-		}
-		if (fs.statSync(join(dirPath, file)).isDirectory() && depth < depthLimit) {
-			arrayOfFiles = getFilePathsFromPath(
-				dirPath + osSpecificPathSeparator + file, 
-				arrayOfFiles, 
-				depth + 1, 
-				depthLimit
+function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {
+	const isDir =
+		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
+	if (isDir) {
+		return readdirSync(root, { withFileTypes: true }).flatMap((dirent) =>
+			getFileNamesFromRootRec(
+				join(root, dirent.name),
+				dirent.isDirectory()
 			)
-		} 
-		
-	})
-
-	return arrayOfFiles
+		);
+	} else {
+		return [root];
+	}
 }
 
-function getFilesFromDataRoot(rootPath): File[] {
-	if (fs.statSync(rootPath).isDirectory()) {
-		var files: string[] = getFilePathsFromPath(rootPath, [], 0, 100); // This doesn't produce multiple searchees, so it can go
-	} else { 															  // as deep as it needs.
-		var files: string[] = [rootPath];
-	}
-	var torrentFiles: File[] = [];
-	files.forEach(file => torrentFiles.push(
-		{
-			path: relative(join(rootPath, ".."), file),
-        	name: basename(file),
-			length : fs.statSync(file).size
-		})
-	)
-	return torrentFiles
-  }
+function getFilesFromDataRoot(rootPath: string): File[] {
+	const parentDir = join(rootPath, "..");
+	return getFileNamesFromRootRec(rootPath).map((file) => ({
+		path: relative(parentDir, file),
+		name: basename(file),
+		length: statSync(file).size,
+	}));
+}
 
 export function getFiles(meta: Metafile): File[] {
 	if (!meta.info.files) {
@@ -113,14 +97,14 @@ export async function createSearcheeFromTorrentFile(
 export async function createSearcheeFromPath(
 	filepath: string
 ): Promise<Result<Searchee, Error>> {
-		const fileName : string = basename(filepath);
-		const fileList : File[] = getFilesFromDataRoot(filepath);
-		var totalLength = fileList.reduce<number>((runningTotal, file) => runningTotal + file.length, 0);
-		return resultOf({
-			files:  fileList,
-			path: filepath,
-			name: fileName,
-			length: totalLength,
-		});
-} 
-
+	const totalLength = getFilesFromDataRoot(filepath).reduce<number>(
+		(runningTotal, file) => runningTotal + file.length,
+		0
+	);
+	return resultOf({
+		files: getFilesFromDataRoot(filepath),
+		path: filepath,
+		name: basename(filepath),
+		length: totalLength,
+	});
+}
