@@ -298,13 +298,6 @@ export default class QBittorrent implements TorrentClient {
 		searchee: Searchee
 	): Promise<InjectionResult> {
 		const { duplicateCategories, dataDirs } = getRuntimeConfig();
-		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
-			return InjectionResult.ALREADY_EXISTS;
-		}
-		const buf = parseTorrent.toTorrentFile(newTorrent);
-		const filename = `${newTorrent.name}.cross-seed.torrent`;
-		const tempFilepath = join(tmpdir(), filename);
-		await writeFile(tempFilepath, buf, { mode: 0o644 });
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
@@ -332,7 +325,7 @@ export default class QBittorrent implements TorrentClient {
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
 			const contentLayout =
-				isSingleFileTorrent(newTorrent) &&
+				isSingleFileTorrent(newTorrent) &&  !dataDirs &&
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";
