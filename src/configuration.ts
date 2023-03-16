@@ -21,7 +21,10 @@ interface FileConfig {
 	excludeRecentSearch?: string;
 	dataDirs?: string[];
 	dataMode?: string;
-	hardlinkDir?: string;
+	linkDir?: string;
+	useHardlinks?: boolean;
+	skipRecheck?: boolean;
+	maxDataDepth?: number;
 	dataCategory?: string;
 	torrentDir?: string;
 	torznab?: string[];

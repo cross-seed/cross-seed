@@ -12,6 +12,7 @@ export interface TorrentClient {
 	inject: (
 		newTorrent: Metafile,
 		searchee: Searchee,
+		path: string,
 		nonceOptions: NonceOptions
 	) => Promise<InjectionResult>;
 	validateConfig: () => Promise<void>;

@@ -74,13 +74,29 @@ function createCommandWithSharedOptions(name, description) {
 			fallback(fileConfig.dataMode, "safe")
 		)
 		.option(
-			"-h, --hardlink-dir <dir>",
-			"Directory to output data-matched hardlinks to",
-			fileConfig.hardlinkDir)
-		.option(
 			"-dc --dataCategory <cat>",
 			"Category to assign torrents from data-based matching",
 			fallback(fileConfig.dataCategory, "cross-seed-data")
+		)
+		.option(
+			"--link-dir <dir>",
+			"Directory to output data-matched hardlinks to",
+			fileConfig.linkDir
+		)
+		.option(
+			"--use-hardlink",
+			"Will use hardlinks if a link-dir is supplied instead of symlinks",
+			fallback(fileConfig.useHardlinks, false)
+		)
+		.option(
+			"--skip-recheck",
+			"Skips torrent recheck upon adding to QBittorrent",
+			fallback(fileConfig.skipRecheck, false)
+		)
+		.option(
+			"--maxDataDepth <depth>",
+			"Max depth to look for searchees in dataDirs",
+			fallback(fileConfig.maxDataDepth, 2)
 		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",

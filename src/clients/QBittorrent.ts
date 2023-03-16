@@ -6,7 +6,7 @@ import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
 import { basename, dirname, join, posix, sep } from "path";
-import { dataMode, hardlinkDir } from "../config.template.cjs";
+import { dataMode, linkDir } from "../config.template.cjs";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
@@ -274,9 +274,9 @@ export default class QBittorrent implements TorrentClient {
 	): Promise<string> {
 		// Path being a directory implies we got a perfect match at the directory level.
 		// Thus we don't need to rename since it's a perfect match.
-		const { hardlinkDir } = getRuntimeConfig();
-		if (hardlinkDir) {
-			return hardlinkDir;
+		const { linkDir } = getRuntimeConfig();
+		if (linkDir) {
+			return linkDir;
 		}
 		if (!statSync(searchee.path).isDirectory()) {
 			if (newTorrent.files[0].path.split(sep).length > 1) {
@@ -300,9 +300,10 @@ export default class QBittorrent implements TorrentClient {
 
 	async inject(
 		newTorrent: Metafile,
-		searchee: Searchee
+		searchee: Searchee,
+		path: string,
 	): Promise<InjectionResult> {
-		const { duplicateCategories, dataDirs, hardlinkDir } = getRuntimeConfig();
+		const { duplicateCategories, dataDirs, linkDir, skipRecheck } = getRuntimeConfig();
 		if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
@@ -324,10 +325,7 @@ export default class QBittorrent implements TorrentClient {
 			// As there's no way to know here if we matched perfectly or with a renamed top directory
 			// without the MATCH_EXCEPT_PARENT_DIR result, we have to manually check the new torrent's
 			// structure to see which directory is the correct parent.
-			const corrected_save_path =
-				dataDirs && dataDirs.length > 0
-					? await this.correct_path(newTorrent, searchee, save_path)
-					: save_path;
+			const corrected_save_path = path ? path : save_path;
 
 			const newCategoryName =
 				duplicateCategories && !searchee.infoHash
@@ -357,9 +355,9 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("autoTMM", "false");
 				formData.append("savepath", corrected_save_path);
 			}
-			if (dataDirs && dataDirs.length > 0) {
-				formData.append("skip_checking", hardlinkDir ? "true" : "false");
-				formData.append("paused", "true");
+			if (linkDir) {
+				formData.append("skip_checking", skipRecheck.toString());
+				formData.append("paused", (!skipRecheck).toString());
 			} else {
 				formData.append("contentLayout", contentLayout);
 				formData.append("skip_checking", "true");
@@ -371,49 +369,6 @@ export default class QBittorrent implements TorrentClient {
 			formData.append("foo", "bar");
 
 			await this.request("/torrents/add", formData);
-
-			if (dataDirs && dataDirs.length > 0 && !hardlinkDir) {
-				const fileFormData = new FormData();
-				const file = newTorrent.files[0];
-				const isNestedFile = file.path.split(sep).length > 1;
-				fileFormData.append("hash", newTorrent.infoHash);
-				const oldFilePath = file.path;
-				fileFormData.append("oldPath", oldFilePath);
-				const newFilePath = isNestedFile
-					? join(dirname(file.path), basename(searchee.path))
-					: basename(searchee.path);
-				fileFormData.append("newPath", newFilePath);
-				fileFormData.append("foo", "bar");
-				if (newFilePath != oldFilePath) {
-					await new Promise((resolve) => setTimeout(resolve, 100));
-					await this.request("/torrents/renameFile", fileFormData);
-				}
-				if (isNestedFile) {
-					const folderFormData = new FormData();
-					const newFolderPath = basename(dirname(searchee.path));
-					const oldFolderPath = file.path.split(sep)[0];
-					folderFormData.append("hash", newTorrent.infoHash);
-					folderFormData.append("oldPath", oldFolderPath);
-					folderFormData.append("newPath", newFolderPath);
-					folderFormData.append("foo", "bar");
-					if (newFolderPath != oldFolderPath) {
-						await new Promise((resolve) =>
-							setTimeout(resolve, 100)
-						);
-						await this.request(
-							"/torrents/renameFolder",
-							folderFormData
-						);
-					}
-				}
-				await new Promise(resolve => setTimeout(resolve, 100));
-				if (!hardlinkDir) {
-					await this.request(
-						"/torrents/recheck", 
-						`hashes=${newTorrent.infoHash}`,
-						X_WWW_FORM_URLENCODED);
-				}
-			}
 
 			unlink(tempFilepath).catch((error) => {
 				logger.debug(error);

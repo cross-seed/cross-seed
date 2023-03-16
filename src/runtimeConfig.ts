@@ -5,7 +5,10 @@ export interface RuntimeConfig {
 	torznab: string[];
 	dataDirs: string[];
 	dataMode: string;
-	hardlinkDir: string;
+	linkDir: string;
+	useHardlinks: boolean;
+	skipRecheck: boolean;
+	maxDataDepth: number;
 	dataCategory: string;
 	torrentDir: string;
 	outputDir: string;

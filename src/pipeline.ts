@@ -121,7 +121,7 @@ async function findOnOtherSites(
 	const matches = assessed.filter(
 		(e) =>
 			e.assessment.decision === Decision.MATCH ||
-			e.assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR
+			e.assessment.decision === Decision.MATCH_SIZE_ONLY
 	);
 	const actionResults = await performActions(searchee, matches, nonceOptions);
 
@@ -197,7 +197,7 @@ export async function checkNewCandidateMatch(
 
 	if (
 		assessment.decision !== Decision.MATCH &&
-		assessment.decision !== Decision.MATCH_EXCEPT_PARENT_DIR
+		assessment.decision !== Decision.MATCH_SIZE_ONLY
 	)
 		return false;
 
@@ -254,10 +254,11 @@ async function findSearchableTorrents() {
 }
 
 export async function main(): Promise<void> {
-	const { outputDir } = getRuntimeConfig();
+	const { outputDir, linkDir } = getRuntimeConfig();
 	const { samples, hashesToExclude } = await findSearchableTorrents();
 
 	fs.mkdirSync(outputDir, { recursive: true });
+	fs.mkdirSync(linkDir, { recursive: true});
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);
 
 	logger.info({

@@ -184,6 +184,7 @@ export default class RTorrent implements TorrentClient {
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,
+		path: string,
 		nonceOptions: NonceOptions
 	): Promise<InjectionResult> {
 		const { outputDir: runtimeConfigOutputDir } = getRuntimeConfig();
@@ -203,7 +204,7 @@ export default class RTorrent implements TorrentClient {
 			outputDir,
 			`${meta.name}.tmp.${Date.now()}.torrent`
 		);
-		await saveWithLibTorrentResume(meta, torrentFilePath, dataDir);
+		await saveWithLibTorrentResume(meta, torrentFilePath, path ? path : dataDir);
 
 		for (let i = 0; i < 5; i++) {
 			try {

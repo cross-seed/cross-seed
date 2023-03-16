@@ -1,4 +1,6 @@
 import chalk from "chalk";
+import { existsSync, symlinkSync, linkSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
+import path from "path";
 import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient.js";
 import {
@@ -21,7 +23,32 @@ export async function performAction(
 	tracker: string,
 	nonceOptions: NonceOptions
 ): Promise<ActionResult> {
-	const { action } = getRuntimeConfig();
+	const { action, linkDir } = getRuntimeConfig();
+
+	if (linkDir) {
+		if (decision == Decision.MATCH) {
+			await linkExact(searchee.path, linkDir);
+		} else if (decision == Decision.MATCH_SIZE_ONLY) {
+			// Size only matching is only supported for single file or
+			// single, nested file torrents.
+			const candidateParentDir = path.dirname(newMeta.files[0].path);
+			var correctedlinkDir = linkDir;
+
+			// Candidate is single, nested file
+			if (candidateParentDir != ".") {
+				if (!existsSync(path.join(linkDir, candidateParentDir))) {
+					mkdirSync(path.join(linkDir, candidateParentDir));
+				}
+				correctedlinkDir = path.join(linkDir, candidateParentDir);
+			}
+			linkFile(
+				path.dirname(searchee.path),
+				correctedlinkDir,
+				path.basename(searchee.path),
+				path.basename(newMeta.files[0].path)
+			);
+		}
+	}
 
 	const styledName = chalk.green.bold(newMeta.name);
 	const styledTracker = chalk.bold(tracker);
@@ -29,6 +56,7 @@ export async function performAction(
 		const result = await getClient().inject(
 			newMeta,
 			searchee,
+			linkDir ? linkDir : undefined,
 			nonceOptions
 		);
 		switch (result) {
@@ -80,4 +108,31 @@ export async function performActions(searchee, matches, nonceOptions) {
 		if (result === InjectionResult.TORRENT_NOT_COMPLETE) break;
 	}
 	return results;
+}
+
+function linkExact(oldPath: string, newPath: string) {
+	if (!newPath) {
+		return;
+	}
+	if (statSync(oldPath).isFile()) {
+		if (!existsSync(path.join(newPath, path.basename(oldPath)))) {
+			linkFile(path.dirname(oldPath), newPath, path.basename(oldPath), path.basename(oldPath));
+		}
+		return;
+	}
+	if (!existsSync(path.join(newPath, path.basename(oldPath)))) {
+		mkdirSync(path.join(newPath, path.basename(oldPath)));
+	}
+	readdirSync(oldPath).forEach(file => {linkExact(path.join(oldPath, file), path.join(newPath, path.basename(oldPath)))});
+}
+
+function linkFile(oldPath:string, newPath: string, oldName: string, newName: string) {
+	const { useHardlinks } = getRuntimeConfig();
+	if (existsSync(path.join(newPath, newName))) {
+        return;
+    } if (useHardlinks) {
+		linkSync(path.join(oldPath, oldName), path.join(newPath, newName));
+	} else {
+		symlinkSync(path.join(oldPath, oldName), path.join(newPath, newName));
+	}
 }
