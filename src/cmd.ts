@@ -84,7 +84,7 @@ function createCommandWithSharedOptions(name, description) {
 			fileConfig.linkDir
 		)
 		.option(
-			"--use-hardlink",
+			"--use-hardlinks",
 			"Will use hardlinks if a link-dir is supplied instead of symlinks",
 			fallback(fileConfig.useHardlinks, false)
 		)
@@ -94,9 +94,14 @@ function createCommandWithSharedOptions(name, description) {
 			fallback(fileConfig.skipRecheck, false)
 		)
 		.option(
-			"--maxDataDepth <depth>",
+			"--max-data-depth <depth>",
 			"Max depth to look for searchees in dataDirs",
 			fallback(fileConfig.maxDataDepth, 2)
+		)
+		.option(
+			"--single-search",
+			"Searches for exactly the specified path rather than looking for things to search inside it",
+			false
 		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",

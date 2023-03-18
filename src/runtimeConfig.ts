@@ -1,15 +1,16 @@
-import { Action } from "./constants.js";
+import { Action, DataMode } from "./constants.js";
 export interface RuntimeConfig {
 	offset: number;
 	delay: number;
 	torznab: string[];
 	dataDirs: string[];
-	dataMode: string;
+	dataMode: DataMode;
 	linkDir: string;
 	useHardlinks: boolean;
 	skipRecheck: boolean;
 	maxDataDepth: number;
 	dataCategory: string;
+	singleSearch: boolean;
 	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;

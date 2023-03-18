@@ -38,3 +38,8 @@ export enum Decision {
 	INFO_HASH_ALREADY_EXISTS = "INFO_HASH_ALREADY_EXISTS",
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
 }
+
+export enum DataMode {
+	SAFE = "risky",
+	RISKY = "safe",
+}
