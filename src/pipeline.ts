@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import fs from "fs";
+import { join  } from "path";
 import { zip } from "lodash-es";
 import ms from "ms";
 import { performAction, performActions } from "./action.js";
@@ -9,7 +10,7 @@ import {
 	InjectionResult,
 	SaveResult,
 } from "./constants.js";
-import { findSearcheesFromAllDataDirs } from "./dataFiles.js";
+import { findPotentialNestedRoots, findSearcheesFromAllDataDirs } from "./dataFiles.js";
 import { db } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
 import {
@@ -161,10 +162,20 @@ export async function searchForLocalTorrentByCriteria(
 	criteria: TorrentLocator,
 	nonceOptions: NonceOptions
 ): Promise<number> {
-	const meta = await getTorrentByCriteria(criteria);
+	var metafiles;
+	if (criteria.path) {
+		metafiles = await Promise.all(findSearcheesFromAllDataDirs([criteria.path])
+			.map(createSearcheeFromPath));
+	} else {
+		metafiles = [await getTorrentByCriteria(criteria)];
+	}
 	const hashesToExclude = await getInfoHashesToExclude();
-	if (!filterByContent(meta)) return null;
-	return findOnOtherSites(meta, hashesToExclude, nonceOptions);
+	var matches = 0;
+	for (var i = 0; i < metafiles.length; i++) {
+		if (!filterByContent(metafiles[i])) return null;
+		matches += await findOnOtherSites(metafiles[i], hashesToExclude, nonceOptions);
+	}
+	return matches;
 }
 
 export async function checkNewCandidateMatch(
@@ -228,7 +239,7 @@ async function findSearchableTorrents() {
 			.map((t) => t.unwrapOrThrow());
 	} else if (dataDirs && dataDirs.length > 0) {
 		const searcheeResults = await Promise.all(
-			findSearcheesFromAllDataDirs().map(createSearcheeFromPath)
+			findSearcheesFromAllDataDirs(dataDirs).map(createSearcheeFromPath)
 		);
 		parsedTorrents = searcheeResults
 			.filter((t) => t.isOk())

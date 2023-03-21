@@ -1,4 +1,4 @@
-import fs, { promises as fsPromises } from "fs";
+import fs, { promises as fsPromises, readdirSync } from "fs";
 import Fuse from "fuse.js";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path, { join } from "path";
@@ -15,6 +15,7 @@ import fetch, { Response } from "node-fetch";
 export interface TorrentLocator {
 	infoHash?: string;
 	name?: string;
+	path?: string;
 }
 
 export enum SnatchError {
