@@ -164,8 +164,11 @@ export async function searchForLocalTorrentByCriteria(
 ): Promise<number> {
 	var metafiles;
 	if (criteria.path) {
-		metafiles = await Promise.all(findSearcheesFromAllDataDirs([criteria.path])
+		const searcheeResults = await Promise.all(findSearcheesFromAllDataDirs([criteria.path])
 			.map(createSearcheeFromPath));
+		metafiles = searcheeResults
+			.filter((t) => t.isOk())
+			.map((t) => t.unwrapOrThrow());
 	} else {
 		metafiles = [await getTorrentByCriteria(criteria)];
 	}
