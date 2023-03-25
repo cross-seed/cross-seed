@@ -301,9 +301,10 @@ export default class QBittorrent implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		path: string,
+		path: string
 	): Promise<InjectionResult> {
-		const { duplicateCategories, dataDirs, linkDir, skipRecheck } = getRuntimeConfig();
+		const { duplicateCategories, dataDirs, linkDir, skipRecheck } =
+			getRuntimeConfig();
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
@@ -328,7 +329,8 @@ export default class QBittorrent implements TorrentClient {
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
 			const contentLayout =
-				isSingleFileTorrent(newTorrent) &&  !dataDirs &&
+				isSingleFileTorrent(newTorrent) &&
+				!dataDirs &&
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";

@@ -204,7 +204,11 @@ export default class RTorrent implements TorrentClient {
 			outputDir,
 			`${meta.name}.tmp.${Date.now()}.torrent`
 		);
-		await saveWithLibTorrentResume(meta, torrentFilePath, path ? path : dataDir);
+		await saveWithLibTorrentResume(
+			meta,
+			torrentFilePath,
+			path ? path : dataDir
+		);
 
 		for (let i = 0; i < 5; i++) {
 			try {

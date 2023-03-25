@@ -50,7 +50,7 @@ module.exports = {
 	useHardlinks: false,
 
 	/**
-	 * Whether to skip recheck in Qbittorrent. If using "risky" dataMode it is HIGHLY 
+	 * Whether to skip recheck in Qbittorrent. If using "risky" dataMode it is HIGHLY
 	 * recommended to set this to false.
 	 */
 

@@ -1,5 +1,13 @@
 import chalk from "chalk";
-import { existsSync, symlinkSync, linkSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
+import {
+	existsSync,
+	symlinkSync,
+	linkSync,
+	mkdirSync,
+	readdirSync,
+	statSync,
+	writeFileSync,
+} from "fs";
 import path from "path";
 import { Metafile } from "parse-torrent";
 import { getClient } from "./clients/TorrentClient.js";
@@ -32,7 +40,7 @@ export async function performAction(
 			// Size only matching is only supported for single file or
 			// single, nested file torrents.
 			const candidateParentDir = path.dirname(newMeta.files[0].path);
-			var correctedlinkDir = linkDir;
+			let correctedlinkDir = linkDir;
 
 			// Candidate is single, nested file
 			if (candidateParentDir != ".") {
@@ -116,21 +124,37 @@ function linkExact(oldPath: string, newPath: string) {
 	}
 	if (statSync(oldPath).isFile()) {
 		if (!existsSync(path.join(newPath, path.basename(oldPath)))) {
-			linkFile(path.dirname(oldPath), newPath, path.basename(oldPath), path.basename(oldPath));
+			linkFile(
+				path.dirname(oldPath),
+				newPath,
+				path.basename(oldPath),
+				path.basename(oldPath)
+			);
 		}
 		return;
 	}
 	if (!existsSync(path.join(newPath, path.basename(oldPath)))) {
 		mkdirSync(path.join(newPath, path.basename(oldPath)));
 	}
-	readdirSync(oldPath).forEach(file => {linkExact(path.join(oldPath, file), path.join(newPath, path.basename(oldPath)))});
+	readdirSync(oldPath).forEach((file) => {
+		linkExact(
+			path.join(oldPath, file),
+			path.join(newPath, path.basename(oldPath))
+		);
+	});
 }
 
-function linkFile(oldPath:string, newPath: string, oldName: string, newName: string) {
+function linkFile(
+	oldPath: string,
+	newPath: string,
+	oldName: string,
+	newName: string
+) {
 	const { useHardlinks } = getRuntimeConfig();
 	if (existsSync(path.join(newPath, newName))) {
-        return;
-    } if (useHardlinks) {
+		return;
+	}
+	if (useHardlinks) {
 		linkSync(path.join(oldPath, oldName), path.join(newPath, newName));
 	} else {
 		symlinkSync(path.join(oldPath, oldName), path.join(newPath, newName));

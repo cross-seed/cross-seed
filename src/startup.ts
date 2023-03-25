@@ -6,8 +6,16 @@ import { validateTorrentDir } from "./torrent.js";
 import { validateTorznabUrls } from "./torznab.js";
 
 function validateOptions() {
-	const { action, rtorrentRpcUrl, qbittorrentUrl, transmissionRpcUrl , dataDirs, linkDir, dataMode, skipRecheck } =
-		getRuntimeConfig();
+	const {
+		action,
+		rtorrentRpcUrl,
+		qbittorrentUrl,
+		transmissionRpcUrl,
+		dataDirs,
+		linkDir,
+		dataMode,
+		skipRecheck,
+	} = getRuntimeConfig();
 	if (
 		action === "inject" &&
 		!(rtorrentRpcUrl || qbittorrentUrl || transmissionRpcUrl)
@@ -16,13 +24,15 @@ function validateOptions() {
 			"You need to specify --rtorrent-rpc-url, --transmission-rpc-url, or --qbittorrent-url when using '-A inject'."
 		);
 	}
-	if ( dataDirs && !linkDir || !dataDirs && linkDir ) {
+	if ((dataDirs && !linkDir) || (!dataDirs && linkDir)) {
 		throw new CrossSeedError(
 			"Data based matching requries both --link-dir and --data-dirs"
 		);
 	}
-	if ( dataMode == "risky" && skipRecheck) {
-		logger.warn("It is strongly recommended to not skip rechecking for risky matching mode");
+	if (dataMode == "risky" && skipRecheck) {
+		logger.warn(
+			"It is strongly recommended to not skip rechecking for risky matching mode"
+		);
 	}
 }
 

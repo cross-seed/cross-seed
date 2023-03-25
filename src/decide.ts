@@ -1,4 +1,12 @@
-import { existsSync, symlinkSync, linkSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
+import {
+	existsSync,
+	symlinkSync,
+	linkSync,
+	mkdirSync,
+	readdirSync,
+	statSync,
+	writeFileSync,
+} from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { appDir } from "./configuration.js";
@@ -124,7 +132,7 @@ async function assessCandidateHelper(
 	const { dataDirs, dataMode, linkDir } = getRuntimeConfig();
 	const perfectMatch = compareFileTrees(candidateMeta, searchee);
 	if (perfectMatch) {
-		return { decision: Decision.MATCH, metafile: candidateMeta};
+		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
 	if (!dataDirs || dataDirs.length == 0) {
 		return { decision: Decision.FILE_TREE_MISMATCH };
@@ -132,10 +140,11 @@ async function assessCandidateHelper(
 	if (
 		!statSync(searchee.path).isDirectory() &&
 		compareFileTreesIgnoringNames(candidateMeta, searchee) &&
-		dataMode == "risky") {
-			return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta};
-		}
-	return { decision: Decision.FILE_TREE_MISMATCH };	
+		dataMode == "risky"
+	) {
+		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
+	}
+	return { decision: Decision.FILE_TREE_MISMATCH };
 }
 
 function existsInTorrentCache(infoHash: string): boolean {
