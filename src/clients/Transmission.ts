@@ -119,6 +119,7 @@ export default class Transmission implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
+		path: string,
 		nonceOptions: NonceOptions
 	): Promise<InjectionResult> {
 		if (!searchee.infoHash) {
@@ -149,7 +150,7 @@ export default class Transmission implements TorrentClient {
 			addResponse = await this.request<TorrentAddResponse>(
 				"torrent-add",
 				{
-					"download-dir": downloadDir,
+					"download-dir": path ? path : downloadDir,
 					metainfo: parseTorrent
 						.toTorrentFile(newTorrent)
 						.toString("base64"),

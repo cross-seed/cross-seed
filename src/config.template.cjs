@@ -36,6 +36,35 @@ module.exports = {
 	dataCategory: undefined,
 
 	/**
+	 * If this is specified, cross-seed will create links to scanned files in the specified directory.
+	 * It will create a different link for every changed file name or directory structure.
+	 */
+
+	linkDir: undefined,
+
+	/**
+	 * If this is set to true, cross-seed will link files across directories with hardlinks.
+	 * If disabled, it will instead use symlinks
+	 */
+
+	useHardlinks: false,
+
+	/**
+	 * Whether to skip recheck in Qbittorrent. If using "risky" dataMode it is HIGHLY 
+	 * recommended to set this to false.
+	 */
+
+	skipRecheck: false,
+
+	/**
+	 * Determines how deep into the specified dataDirs to go to generate new searchees.
+	 * Setting this to higher values will result in more searchees and more API hits to
+	 * your indexers.
+	 */
+
+	maxDataDepth: 2,
+
+	/**
 	 * directory containing torrent files.
 	 * For rtorrent, this is your session directory
 	 * as configured in your .rtorrent.rc file.

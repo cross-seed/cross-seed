@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
-import { Action } from "./constants.js";
+import { Action, DataMode } from "./constants.js";
 
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
@@ -20,7 +20,12 @@ interface FileConfig {
 	excludeOlder?: string;
 	excludeRecentSearch?: string;
 	dataDirs?: string[];
-	dataMode?: string;
+	dataMode?: DataMode;
+	linkDir?: string;
+	useHardlinks?: boolean;
+	skipRecheck?: boolean;
+	singleSearch?: boolean;
+	maxDataDepth?: number;
 	dataCategory?: string;
 	torrentDir?: string;
 	torznab?: string[];

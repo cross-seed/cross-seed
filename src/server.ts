@@ -63,11 +63,11 @@ async function search(
 		res.end(e.message);
 		return;
 	}
-	const criteria: TorrentLocator = pick(data, ["infoHash", "name"]);
+	const criteria: TorrentLocator = pick(data, ["infoHash", "name", "path"]);
 	const nonceOptions: NonceOptions = pick(data, ["outputDir"]);
 
-	if (!("infoHash" in criteria || "name" in criteria)) {
-		const message = "A name or info hash must be provided";
+	if (!("infoHash" in criteria || "name" in criteria || "path" in criteria)) {
+		const message = "A name, info hash, or path must be provided";
 		logger.error({ label: Label.SERVER, message });
 		res.writeHead(400);
 		res.end(message);

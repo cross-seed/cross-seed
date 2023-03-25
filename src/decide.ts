@@ -1,4 +1,4 @@
-import { existsSync, statSync, writeFileSync } from "fs";
+import { existsSync, symlinkSync, linkSync, mkdirSync, readdirSync, statSync, writeFileSync } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { appDir } from "./configuration.js";
@@ -121,10 +121,10 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
-	const { dataDirs, dataMode } = getRuntimeConfig();
+	const { dataDirs, dataMode, linkDir } = getRuntimeConfig();
 	const perfectMatch = compareFileTrees(candidateMeta, searchee);
 	if (perfectMatch) {
-		return { decision: Decision.MATCH, metafile: candidateMeta };
+		return { decision: Decision.MATCH, metafile: candidateMeta};
 	}
 	if (!dataDirs || dataDirs.length == 0) {
 		return { decision: Decision.FILE_TREE_MISMATCH };
@@ -132,14 +132,10 @@ async function assessCandidateHelper(
 	if (
 		!statSync(searchee.path).isDirectory() &&
 		compareFileTreesIgnoringNames(candidateMeta, searchee) &&
-		dataMode == "risky"
-	) {
-		return {
-			decision: Decision.MATCH_EXCEPT_PARENT_DIR,
-			metafile: candidateMeta,
-		};
-	}
-	return { decision: Decision.FILE_TREE_MISMATCH };
+		dataMode == "risky") {
+			return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta};
+		}
+	return { decision: Decision.FILE_TREE_MISMATCH };	
 }
 
 function existsInTorrentCache(infoHash: string): boolean {
@@ -179,7 +175,7 @@ async function assessAndSaveResults(
 
 	if (
 		assessment.decision === Decision.MATCH ||
-		assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR
+		assessment.decision === Decision.MATCH_SIZE_ONLY
 	) {
 		cacheTorrentFile(assessment.metafile);
 	}
@@ -196,7 +192,7 @@ async function assessAndSaveResults(
 			decision: assessment.decision,
 			info_hash:
 				assessment.decision === Decision.MATCH ||
-				assessment.decision === Decision.MATCH_EXCEPT_PARENT_DIR
+				assessment.decision === Decision.MATCH_SIZE_ONLY
 					? assessment.metafile.infoHash
 					: null,
 			last_seen: now,
@@ -239,7 +235,7 @@ async function assessCandidateCaching(
 		logReason(assessment.decision, false);
 	} else if (
 		cacheEntry.decision === Decision.MATCH ||
-		(cacheEntry.decision === Decision.MATCH_EXCEPT_PARENT_DIR &&
+		(cacheEntry.decision === Decision.MATCH_SIZE_ONLY &&
 			infoHashesToExclude.includes(cacheEntry.infoHash))
 	) {
 		// has been added since the last run
@@ -249,7 +245,7 @@ async function assessCandidateCaching(
 			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
 	} else if (
 		cacheEntry.decision === Decision.MATCH ||
-		(cacheEntry.decision === Decision.MATCH_EXCEPT_PARENT_DIR &&
+		(cacheEntry.decision === Decision.MATCH_SIZE_ONLY &&
 			existsInTorrentCache(cacheEntry.infoHash))
 	) {
 		// cached match
@@ -259,7 +255,7 @@ async function assessCandidateCaching(
 		};
 	} else if (
 		cacheEntry.decision === Decision.MATCH ||
-		cacheEntry.decision === Decision.MATCH_EXCEPT_PARENT_DIR
+		cacheEntry.decision === Decision.MATCH_SIZE_ONLY
 	) {
 		assessment = await assessAndSaveResults(
 			candidate,

@@ -78,6 +78,31 @@ function createCommandWithSharedOptions(name, description) {
 			"Category to assign torrents from data-based matching",
 			fallback(fileConfig.dataCategory, "cross-seed-data")
 		)
+		.option(
+			"--link-dir <dir>",
+			"Directory to output data-matched hardlinks to",
+			fileConfig.linkDir
+		)
+		.option(
+			"--use-hardlinks",
+			"Will use hardlinks if a link-dir is supplied instead of symlinks",
+			fallback(fileConfig.useHardlinks, false)
+		)
+		.option(
+			"--skip-recheck",
+			"Skips torrent recheck upon adding to QBittorrent",
+			fallback(fileConfig.skipRecheck, false)
+		)
+		.option(
+			"--max-data-depth <depth>",
+			"Max depth to look for searchees in dataDirs",
+			fallback(fileConfig.maxDataDepth, 2)
+		)
+		.option(
+			"--single-search",
+			"Searches for exactly the specified path rather than looking for things to search inside it",
+			false
+		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
 			"Directory with torrent files",
