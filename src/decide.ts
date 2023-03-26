@@ -1,16 +1,8 @@
-import {
-	existsSync,
-	symlinkSync,
-	linkSync,
-	mkdirSync,
-	readdirSync,
-	statSync,
-	writeFileSync,
-} from "fs";
+import { existsSync, statSync, writeFileSync } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { appDir } from "./configuration.js";
-import { Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
+import { DataMode, Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
@@ -140,7 +132,7 @@ async function assessCandidateHelper(
 	if (
 		!statSync(searchee.path).isDirectory() &&
 		compareFileTreesIgnoringNames(candidateMeta, searchee) &&
-		dataMode == "risky"
+		dataMode == DataMode.RISKY
 	) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}

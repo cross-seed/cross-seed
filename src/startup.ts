@@ -1,4 +1,5 @@
 import { getClient } from "./clients/TorrentClient.js";
+import { DataMode } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -29,7 +30,7 @@ function validateOptions() {
 			"Data based matching requries both --link-dir and --data-dirs"
 		);
 	}
-	if (dataMode == "risky" && skipRecheck) {
+	if (dataMode == DataMode.RISKY && skipRecheck) {
 		logger.warn(
 			"It is strongly recommended to not skip rechecking for risky matching mode"
 		);

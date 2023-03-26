@@ -40,6 +40,6 @@ export enum Decision {
 }
 
 export enum DataMode {
-	SAFE = "risky",
-	RISKY = "safe",
+	SAFE = "safe",
+	RISKY = "risky",
 }
