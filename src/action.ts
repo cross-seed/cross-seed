@@ -49,10 +49,8 @@ export async function performAction(
 				correctedlinkDir = path.join(linkDir, candidateParentDir);
 			}
 			linkFile(
-				path.dirname(searchee.path),
-				correctedlinkDir,
-				path.basename(searchee.path),
-				path.basename(newMeta.files[0].path)
+				searchee.path,
+				path.join(correctedlinkDir, newMeta.files[0].name)
 			);
 		}
 	}
@@ -116,17 +114,15 @@ function linkExact(oldPath: string, newPath: string) {
 	}
 	if (statSync(oldPath).isFile()) {
 		if (!existsSync(path.join(newPath, path.basename(oldPath)))) {
-			linkFile(
-				path.dirname(oldPath),
-				newPath,
-				path.basename(oldPath),
-				path.basename(oldPath)
-			);
+			linkFile(oldPath, newPath);
 		}
 		return;
 	}
-	if (!existsSync(path.join(newPath, path.basename(oldPath)))) {
+
+	try {
 		mkdirSync(path.join(newPath, path.basename(oldPath)));
+	} catch (e) {
+		// skip if it already exists
 	}
 	readdirSync(oldPath).forEach((file) => {
 		linkExact(
@@ -136,19 +132,13 @@ function linkExact(oldPath: string, newPath: string) {
 	});
 }
 
-function linkFile(
-	oldPath: string,
-	newPath: string,
-	oldName: string,
-	newName: string
-) {
+function linkFile(oldPath: string, newPath: string) {
 	const { linkType } = getRuntimeConfig();
-	if (existsSync(path.join(newPath, newName))) {
-		return;
-	}
+	if (existsSync(newPath)) return;
+
 	if (linkType === LinkType.HARDLINK) {
-		linkSync(path.join(oldPath, oldName), path.join(newPath, newName));
+		linkSync(oldPath, newPath);
 	} else {
-		symlinkSync(path.join(oldPath, oldName), path.join(newPath, newName));
+		symlinkSync(oldPath, newPath);
 	}
 }
