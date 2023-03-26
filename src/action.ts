@@ -19,7 +19,7 @@ import {
 	SaveResult,
 } from "./constants.js";
 import { logger } from "./logger.js";
-import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
@@ -28,8 +28,7 @@ export async function performAction(
 	newMeta: Metafile,
 	decision: Decision,
 	searchee: Searchee,
-	tracker: string,
-	nonceOptions: NonceOptions
+	tracker: string
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 
@@ -64,8 +63,7 @@ export async function performAction(
 		const result = await getClient().inject(
 			newMeta,
 			searchee,
-			linkDir ? linkDir : undefined,
-			nonceOptions
+			linkDir ? linkDir : undefined
 		);
 		switch (result) {
 			case InjectionResult.SUCCESS:
@@ -86,31 +84,25 @@ export async function performAction(
 				logger.error(
 					`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
 				);
-				saveTorrentFile(
-					tracker,
-					getTag(searchee.name),
-					newMeta,
-					nonceOptions
-				);
+				saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 				break;
 		}
 		return result;
 	} else {
-		saveTorrentFile(tracker, getTag(searchee.name), newMeta, nonceOptions);
+		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
 		return SaveResult.SAVED;
 	}
 }
 
-export async function performActions(searchee, matches, nonceOptions) {
+export async function performActions(searchee, matches) {
 	const results: ActionResult[] = [];
 	for (const { tracker, assessment } of matches) {
 		const result = await performAction(
 			assessment.metafile,
 			assessment.decision,
 			searchee,
-			tracker,
-			nonceOptions
+			tracker
 		);
 		results.push(result);
 		if (result === InjectionResult.TORRENT_NOT_COMPLETE) break;

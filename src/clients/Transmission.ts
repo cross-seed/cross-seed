@@ -1,9 +1,9 @@
-import fetch, { Response as FetchResponse, Headers } from "node-fetch";
+import fetch, { Headers } from "node-fetch";
 import parseTorrent, { Metafile } from "parse-torrent";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
-import { getRuntimeConfig, NonceOptions } from "../runtimeConfig.js";
+import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
 
@@ -119,8 +119,7 @@ export default class Transmission implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		path: string,
-		nonceOptions: NonceOptions
+		path: string
 	): Promise<InjectionResult> {
 		if (!searchee.infoHash) {
 			throw new CrossSeedError(

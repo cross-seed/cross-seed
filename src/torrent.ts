@@ -7,7 +7,7 @@ import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
-import { getRuntimeConfig, NonceOptions } from "./runtimeConfig.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
 import { stripExtension } from "./utils.js";
 import fetch, { Response } from "node-fetch";
@@ -102,11 +102,9 @@ export async function parseTorrentFromURL(
 export function saveTorrentFile(
 	tracker: string,
 	tag = "",
-	info: Metafile,
-	nonceOptions: NonceOptions
+	info: Metafile
 ): void {
-	const { outputDir: runtimeConfigOutputDir } = getRuntimeConfig();
-	const { outputDir = runtimeConfigOutputDir } = nonceOptions;
+	const { outputDir } = getRuntimeConfig();
 	const buf = parseTorrent.toTorrentFile(info);
 	const name = stripExtension(info.name);
 	const filename = `[${tag}][${tracker}]${name}.torrent`;

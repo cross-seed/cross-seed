@@ -23,11 +23,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
-import {
-	EmptyNonceOptions,
-	getRuntimeConfig,
-	NonceOptions,
-} from "./runtimeConfig.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromMetafile,
 	createSearcheeFromPath,
@@ -62,8 +58,7 @@ interface AssessmentWithTracker {
 
 async function findOnOtherSites(
 	searchee: Searchee,
-	hashesToExclude: string[],
-	nonceOptions: NonceOptions = EmptyNonceOptions
+	hashesToExclude: string[]
 ): Promise<number> {
 	const assessEach = async (
 		result: Candidate
@@ -126,7 +121,7 @@ async function findOnOtherSites(
 			e.assessment.decision === Decision.MATCH ||
 			e.assessment.decision === Decision.MATCH_SIZE_ONLY
 	);
-	const actionResults = await performActions(searchee, matches, nonceOptions);
+	const actionResults = await performActions(searchee, matches);
 
 	if (!actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
 		const zipped: [ResultAssessment, string, ActionResult][] = zip(
@@ -161,8 +156,7 @@ async function findMatchesBatch(
 }
 
 export async function searchForLocalTorrentByCriteria(
-	criteria: TorrentLocator,
-	nonceOptions: NonceOptions
+	criteria: TorrentLocator
 ): Promise<number> {
 	const { maxDataDepth } = getRuntimeConfig();
 
@@ -181,11 +175,7 @@ export async function searchForLocalTorrentByCriteria(
 	let matches = 0;
 	for (let i = 0; i < metafiles.length; i++) {
 		if (!filterByContent(metafiles[i])) return null;
-		matches += await findOnOtherSites(
-			metafiles[i],
-			hashesToExclude,
-			nonceOptions
-		);
+		matches += await findOnOtherSites(metafiles[i], hashesToExclude);
 	}
 	return matches;
 }
@@ -228,8 +218,7 @@ export async function checkNewCandidateMatch(
 		assessment.metafile,
 		assessment.decision,
 		searchee,
-		candidate.tracker,
-		EmptyNonceOptions
+		candidate.tracker
 	);
 	await sendResultsNotification(
 		searchee,

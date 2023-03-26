@@ -31,16 +31,6 @@ export interface RuntimeConfig {
 	rssCadence: number;
 }
 
-export interface NonceOptions {
-	torznab: string[];
-	outputDir: string;
-}
-
-export const EmptyNonceOptions = {
-	torznab: undefined,
-	outputDir: undefined,
-};
-
 let runtimeConfig: RuntimeConfig;
 
 export function setRuntimeConfig(configObj: RuntimeConfig): void {

@@ -8,7 +8,6 @@ import {
 	checkNewCandidateMatch,
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
-import { NonceOptions } from "./runtimeConfig.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 
 function getData(req): Promise<string> {
@@ -64,7 +63,6 @@ async function search(
 		return;
 	}
 	const criteria: TorrentLocator = pick(data, ["infoHash", "name", "path"]);
-	const nonceOptions: NonceOptions = pick(data, ["outputDir"]);
 
 	if (!("infoHash" in criteria || "name" in criteria || "path" in criteria)) {
 		const message = "A name, info hash, or path must be provided";
@@ -89,10 +87,7 @@ async function search(
 	try {
 		let numFound = null;
 		if (criteria) {
-			numFound = await searchForLocalTorrentByCriteria(
-				criteria,
-				nonceOptions
-			);
+			numFound = await searchForLocalTorrentByCriteria(criteria);
 		}
 
 		if (numFound === null) {
