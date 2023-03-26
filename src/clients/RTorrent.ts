@@ -7,6 +7,7 @@ import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
+import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { wait } from "../utils.js";
@@ -126,44 +127,54 @@ export default class RTorrent implements TorrentClient {
 		return downloadList.includes(infoHash.toUpperCase());
 	}
 
-	async getTorrentConfiguration(
+	async checkOriginalTorrent(
 		searchee: Searchee
-	): Promise<{ dataDir: string; isComplete: boolean }> {
-		if (!searchee.infoHash) {
-			throw new CrossSeedError(
-				"rTorrent direct injection not implemented for data-based searchees"
-			);
-		}
+	): Promise<
+		Result<
+			{ downloadDir: string },
+			InjectionResult.FAILURE | InjectionResult.TORRENT_NOT_COMPLETE
+		>
+	> {
 		const infoHash = searchee.infoHash.toUpperCase();
 		type returnType = [["0" | "1"], [string], ["0" | "1"]];
-		const result = await this.methodCallP<returnType>("system.multicall", [
-			[
-				{
-					methodName: "d.is_multi_file",
-					params: [infoHash],
-				},
-				{
-					methodName: "d.directory",
-					params: [infoHash],
-				},
-				{
-					methodName: "d.complete",
-					params: [infoHash],
-				},
-			],
-		]);
+		let result;
+		try {
+			result = await this.methodCallP<returnType>("system.multicall", [
+				[
+					{
+						methodName: "d.is_multi_file",
+						params: [infoHash],
+					},
+					{
+						methodName: "d.directory",
+						params: [infoHash],
+					},
+					{
+						methodName: "d.complete",
+						params: [infoHash],
+					},
+				],
+			]);
+		} catch (e) {
+			logger.debug(e);
+			return resultOfErr(InjectionResult.FAILURE);
+		}
 
 		// temp diag for #154
 		try {
 			const [[isMultiFileStr], [dir], [isCompleteStr]] = result;
-			return {
-				dataDir: Number(isMultiFileStr) ? dirname(dir) : dir,
-				isComplete: Boolean(Number(isCompleteStr)),
-			};
+			const isComplete = Boolean(Number(isCompleteStr));
+			if (!isComplete) {
+				return resultOfErr(InjectionResult.TORRENT_NOT_COMPLETE);
+			}
+			return resultOf({
+				downloadDir: Number(isMultiFileStr) ? dirname(dir) : dir,
+			});
 		} catch (e) {
 			logger.error(e);
 			logger.debug("Failure caused by server response below:");
 			logger.debug(inspect(result));
+			return resultOfErr(InjectionResult.FAILURE);
 		}
 	}
 
@@ -192,20 +203,29 @@ export default class RTorrent implements TorrentClient {
 			return InjectionResult.ALREADY_EXISTS;
 		}
 
-		const { dataDir, isComplete } = await this.getTorrentConfiguration(
-			searchee
-		);
+		let downloadDir: string;
 
-		if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
+		if (path) {
+			downloadDir = path;
+		} else {
+			const result = await this.checkOriginalTorrent(searchee);
+
+			if (result.isErr()) {
+				return result.unwrapErrOrThrow();
+			}
+
+			downloadDir = result.unwrapOrThrow().downloadDir;
+		}
 
 		const torrentFilePath = resolve(
 			outputDir,
 			`${meta.name}.tmp.${Date.now()}.torrent`
 		);
+
 		await saveWithLibTorrentResume(
 			meta,
 			torrentFilePath,
-			path ? path : dataDir
+			path ? path : downloadDir
 		);
 
 		for (let i = 0; i < 5; i++) {
@@ -213,7 +233,7 @@ export default class RTorrent implements TorrentClient {
 				await this.methodCallP<void>("load.start", [
 					"",
 					torrentFilePath,
-					`d.directory.set="${dataDir}"`,
+					`d.directory.set="${downloadDir}"`,
 					`d.custom1.set="cross-seed"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
 				]);

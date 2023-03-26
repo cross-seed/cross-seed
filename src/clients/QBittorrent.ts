@@ -1,12 +1,10 @@
 import { fileFrom } from "fetch-blob/from.js";
 import { FormData } from "formdata-polyfill/esm.min.js";
-import { statSync } from "fs";
 import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
-import { basename, dirname, join, posix, sep } from "path";
-import { matchMode, linkDir } from "../config.template.cjs";
+import { join, posix } from "path";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
@@ -235,15 +233,6 @@ export default class QBittorrent implements TorrentClient {
 		autoTMM: boolean;
 		category: string;
 	}> {
-		if (searchee.path) {
-			const { dataCategory } = getRuntimeConfig();
-			return {
-				save_path: dirname(searchee.path),
-				isComplete: true,
-				autoTMM: false,
-				category: dataCategory,
-			};
-		}
 		const responseText = await this.request(
 			"/torrents/info",
 			`hashes=${searchee.infoHash}`,
@@ -282,9 +271,9 @@ export default class QBittorrent implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		path: string
+		path?: string
 	): Promise<InjectionResult> {
-		const { duplicateCategories, dataDirs, linkDir, skipRecheck } =
+		const { duplicateCategories, linkDir, skipRecheck, dataCategory } =
 			getRuntimeConfig();
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
@@ -294,13 +283,14 @@ export default class QBittorrent implements TorrentClient {
 			const filename = `${newTorrent.name}.cross-seed.torrent`;
 			const tempFilepath = join(tmpdir(), filename);
 			await writeFile(tempFilepath, buf, { mode: 0o644 });
-			const { save_path, isComplete, autoTMM, category } =
-				await this.getTorrentConfiguration(searchee);
-
-			// As there's no way to know here if we matched perfectly or with a renamed top directory
-			// without the MATCH_EXCEPT_PARENT_DIR result, we have to manually check the new torrent's
-			// structure to see which directory is the correct parent.
-			const corrected_save_path = path ? path : save_path;
+			const { save_path, isComplete, autoTMM, category } = path
+				? {
+						save_path: path,
+						isComplete: true,
+						autoTMM: false,
+						category: dataCategory,
+				  }
+				: await this.getTorrentConfiguration(searchee);
 
 			const newCategoryName =
 				duplicateCategories && !searchee.infoHash
@@ -310,8 +300,8 @@ export default class QBittorrent implements TorrentClient {
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
 			const contentLayout =
+				!path &&
 				isSingleFileTorrent(newTorrent) &&
-				!dataDirs &&
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";
@@ -329,7 +319,7 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("autoTMM", "true");
 			} else {
 				formData.append("autoTMM", "false");
-				formData.append("savepath", corrected_save_path);
+				formData.append("savepath", save_path);
 			}
 			if (linkDir) {
 				formData.append("skip_checking", skipRecheck.toString());
