@@ -1,4 +1,4 @@
-import { Action, MatchMode } from "./constants.js";
+import { Action, LinkType, MatchMode } from "./constants.js";
 export interface RuntimeConfig {
 	offset: number;
 	delay: number;
@@ -6,7 +6,7 @@ export interface RuntimeConfig {
 	dataDirs: string[];
 	matchMode: MatchMode;
 	linkDir: string;
-	useHardlinks: boolean;
+	linkType: LinkType;
 	skipRecheck: boolean;
 	maxDataDepth: number;
 	dataCategory: string;

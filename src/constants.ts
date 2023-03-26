@@ -43,3 +43,8 @@ export enum MatchMode {
 	SAFE = "safe",
 	RISKY = "risky",
 }
+
+export enum LinkType {
+	SYMLINK = "symlink",
+	HARDLINK = "hardlink",
+}

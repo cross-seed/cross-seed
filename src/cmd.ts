@@ -5,7 +5,7 @@ import { createRequire } from "module";
 import ms from "ms";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
-import { Action, MatchMode } from "./constants.js";
+import { Action, LinkType, MatchMode } from "./constants.js";
 import { jobsLoop } from "./jobs.js";
 import { diffCmd } from "./diff.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
@@ -87,10 +87,14 @@ function createCommandWithSharedOptions(name, description) {
 			"Directory to output data-matched hardlinks to",
 			fileConfig.linkDir
 		)
-		.option(
-			"--use-hardlinks",
-			"Will use hardlinks if a link-dir is supplied instead of symlinks",
-			fallback(fileConfig.useHardlinks, false)
+		.addOption(
+			new Option(
+				"--link-type <type>",
+				"Use links of this type to inject data-based matches into your client"
+			)
+				.default(fallback(fileConfig.linkType, "symlink"))
+				.choices(Object.values(LinkType))
+				.makeOptionMandatory()
 		)
 		.option(
 			"--skip-recheck",

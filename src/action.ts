@@ -1,21 +1,21 @@
 import chalk from "chalk";
 import {
 	existsSync,
-	symlinkSync,
 	linkSync,
 	mkdirSync,
 	readdirSync,
 	statSync,
-	writeFileSync,
+	symlinkSync,
 } from "fs";
-import path from "path";
 import { Metafile } from "parse-torrent";
+import path from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
 	ActionResult,
 	Decision,
 	InjectionResult,
+	LinkType,
 	SaveResult,
 } from "./constants.js";
 import { logger } from "./logger.js";
@@ -150,11 +150,11 @@ function linkFile(
 	oldName: string,
 	newName: string
 ) {
-	const { useHardlinks } = getRuntimeConfig();
+	const { linkType } = getRuntimeConfig();
 	if (existsSync(path.join(newPath, newName))) {
 		return;
 	}
-	if (useHardlinks) {
+	if (linkType === LinkType.HARDLINK) {
 		linkSync(path.join(oldPath, oldName), path.join(newPath, newName));
 	} else {
 		symlinkSync(path.join(oldPath, oldName), path.join(newPath, newName));

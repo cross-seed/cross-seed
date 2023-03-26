@@ -27,35 +27,31 @@ module.exports = {
 	 * using the standard matching algorithm. "risky" uses filesize as its only comparison point.
 	 * Options: "safe", "risky"
 	 */
-
 	matchMode: undefined,
 
 	/**
 	 * Defines what category torrents injected by data-based matching should use. Default is
 	 * cross-seed-data
 	 */
-
 	dataCategory: undefined,
 
 	/**
 	 * If this is enabled, cross-seed will create hardlinks to scanned files in the specified directory.
 	 * It will create a different link for every changed file name or directory structure.
 	 */
-
 	linkDir: undefined,
 
 	/**
-	 * If this is set to true, cross-seed will link files across directories with hardlinks.
-	 * If disabled, it will instead use symlinks
+	 * cross-seed will use links of this type to inject data-based matches into your client.
+	 * Only relevant if dataDirs is specified.
+	 * Options: "symlink", "hardlink"
 	 */
-
-	useHardlinks: false,
+	linkType: "symlink",
 
 	/**
 	 * Whether to skip recheck in Qbittorrent. If using "risky" matchMode it is HIGHLY
 	 * recommended to set this to false.
 	 */
-
 	skipRecheck: false,
 
 	/**
@@ -63,7 +59,6 @@ module.exports = {
 	 * Setting this to higher values will result in more searchees and more API hits to
 	 * your indexers.
 	 */
-
 	maxDataDepth: 2,
 
 	/**
