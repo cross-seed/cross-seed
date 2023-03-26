@@ -102,7 +102,7 @@ async function assessCandidateHelper(
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { dataDirs, matchMode } = getRuntimeConfig();
+	const { matchMode } = getRuntimeConfig();
 
 	if (size != null && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
@@ -127,7 +127,7 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (!dataDirs || dataDirs.length == 0) {
+	if (!searchee.path) {
 		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 	if (
