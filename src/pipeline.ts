@@ -1,6 +1,5 @@
 import chalk from "chalk";
 import fs from "fs";
-import { join } from "path";
 import { zip } from "lodash-es";
 import ms from "ms";
 import { performAction, performActions } from "./action.js";
@@ -165,16 +164,16 @@ export async function searchForLocalTorrentByCriteria(
 	criteria: TorrentLocator,
 	nonceOptions: NonceOptions
 ): Promise<number> {
+	const { maxDataDepth } = getRuntimeConfig();
+
 	let metafiles;
 	if (criteria.path) {
 		const searcheeResults = await Promise.all(
-			findSearcheesFromAllDataDirs([criteria.path]).map(
+			findPotentialNestedRoots(criteria.path, maxDataDepth).map(
 				createSearcheeFromPath
 			)
 		);
-		metafiles = searcheeResults
-			.filter((t) => t.isOk())
-			.map((t) => t.unwrapOrThrow());
+		metafiles = searcheeResults.map((t) => t.unwrapOrThrow());
 	} else {
 		metafiles = [await getTorrentByCriteria(criteria)];
 	}
