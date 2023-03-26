@@ -13,16 +13,18 @@ function getApikey(url: string) {
 async function backfill(knex: Knex.Knex) {
 	const { torznab } = getRuntimeConfig();
 
-	await knex("indexer")
-		.insert(
-			torznab.map((url) => ({
-				url: sanitizeUrl(url),
-				apikey: getApikey(url),
-				active: true,
-			}))
-		)
-		.onConflict("url")
-		.merge(["active", "apikey"]);
+	if (torznab.length > 0) {
+		await knex("indexer")
+			.insert(
+				torznab.map((url) => ({
+					url: sanitizeUrl(url),
+					apikey: getApikey(url),
+					active: true,
+				}))
+			)
+			.onConflict("url")
+			.merge(["active", "apikey"]);
+	}
 
 	const timestampRows = await knex
 		.select(
