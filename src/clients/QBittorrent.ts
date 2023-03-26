@@ -267,25 +267,6 @@ export default class QBittorrent implements TorrentClient {
 		};
 	}
 
-	async correct_path(
-		newTorrent: Metafile,
-		searchee: Searchee,
-		save_path: string
-	): Promise<string> {
-		// Path being a directory implies we got a perfect match at the directory level.
-		// Thus we don't need to rename since it's a perfect match.
-		const { linkDir } = getRuntimeConfig();
-		if (linkDir) {
-			return linkDir;
-		}
-		if (!statSync(searchee.path).isDirectory()) {
-			if (newTorrent.files[0].path.split(sep).length > 1) {
-				return dirname(save_path);
-			}
-		}
-		return save_path;
-	}
-
 	async isSubfolderContentLayout(searchee: Searchee): Promise<boolean> {
 		const response = await this.request(
 			"/torrents/files",
