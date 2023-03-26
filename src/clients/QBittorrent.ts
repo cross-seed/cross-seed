@@ -6,7 +6,7 @@ import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
 import parseTorrent, { Metafile } from "parse-torrent";
 import { basename, dirname, join, posix, sep } from "path";
-import { dataMode, linkDir } from "../config.template.cjs";
+import { matchMode, linkDir } from "../config.template.cjs";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";

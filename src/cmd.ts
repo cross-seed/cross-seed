@@ -5,7 +5,7 @@ import { createRequire } from "module";
 import ms from "ms";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
-import { Action, DataMode } from "./constants.js";
+import { Action, MatchMode } from "./constants.js";
 import { jobsLoop } from "./jobs.js";
 import { diffCmd } from "./diff.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
@@ -70,11 +70,11 @@ function createCommandWithSharedOptions(name, description) {
 		)
 		.addOption(
 			new Option(
-				"--data-mode <mode>",
+				"--match-mode <mode>",
 				"Safe will only download torrents with perfect matches. Risky will allow for renames and more matches, but might cause false positives"
 			)
-				.default(fallback(fileConfig.dataMode, DataMode.SAFE))
-				.choices(Object.values(DataMode))
+				.default(fallback(fileConfig.matchMode, MatchMode.SAFE))
+				.choices(Object.values(MatchMode))
 				.makeOptionMandatory()
 		)
 		.option(

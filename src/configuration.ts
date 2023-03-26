@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
-import { Action, DataMode } from "./constants.js";
+import { Action, MatchMode } from "./constants.js";
 
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
@@ -20,7 +20,7 @@ interface FileConfig {
 	excludeOlder?: string;
 	excludeRecentSearch?: string;
 	dataDirs?: string[];
-	dataMode?: DataMode;
+	matchMode?: MatchMode;
 	linkDir?: string;
 	useHardlinks?: boolean;
 	skipRecheck?: boolean;

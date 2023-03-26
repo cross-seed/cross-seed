@@ -39,7 +39,7 @@ export enum Decision {
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
 }
 
-export enum DataMode {
+export enum MatchMode {
 	SAFE = "safe",
 	RISKY = "risky",
 }

@@ -2,7 +2,7 @@ import { existsSync, statSync, writeFileSync } from "fs";
 import parseTorrent, { Metafile } from "parse-torrent";
 import path from "path";
 import { appDir } from "./configuration.js";
-import { DataMode, Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
+import { MatchMode, Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
@@ -121,7 +121,7 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
-	const { dataDirs, dataMode, linkDir } = getRuntimeConfig();
+	const { dataDirs, matchMode, linkDir } = getRuntimeConfig();
 	const perfectMatch = compareFileTrees(candidateMeta, searchee);
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
@@ -132,7 +132,7 @@ async function assessCandidateHelper(
 	if (
 		!statSync(searchee.path).isDirectory() &&
 		compareFileTreesIgnoringNames(candidateMeta, searchee) &&
-		dataMode == DataMode.RISKY
+		matchMode == MatchMode.RISKY
 	) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}

@@ -28,7 +28,7 @@ module.exports = {
 	 * Options: "safe", "risky"
 	 */
 
-	dataMode: undefined,
+	matchMode: undefined,
 
 	/**
 	 * Defines what category torrents injected by data-based matching should use. Default is
@@ -52,7 +52,7 @@ module.exports = {
 	useHardlinks: false,
 
 	/**
-	 * Whether to skip recheck in Qbittorrent. If using "risky" dataMode it is HIGHLY
+	 * Whether to skip recheck in Qbittorrent. If using "risky" matchMode it is HIGHLY
 	 * recommended to set this to false.
 	 */
 

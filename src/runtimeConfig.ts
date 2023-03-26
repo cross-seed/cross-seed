@@ -1,10 +1,10 @@
-import { Action, DataMode } from "./constants.js";
+import { Action, MatchMode } from "./constants.js";
 export interface RuntimeConfig {
 	offset: number;
 	delay: number;
 	torznab: string[];
 	dataDirs: string[];
-	dataMode: DataMode;
+	matchMode: MatchMode;
 	linkDir: string;
 	useHardlinks: boolean;
 	skipRecheck: boolean;
