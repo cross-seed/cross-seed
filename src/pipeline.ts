@@ -281,7 +281,9 @@ export async function main(): Promise<void> {
 	const { samples, hashesToExclude } = await findSearchableTorrents();
 
 	fs.mkdirSync(outputDir, { recursive: true });
-	fs.mkdirSync(linkDir, { recursive: true });
+	if (linkDir) {
+		fs.mkdirSync(linkDir, { recursive: true });
+	}
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);
 
 	logger.info({
