@@ -130,9 +130,9 @@ async function assessCandidateHelper(
 		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
 	if (
+		matchMode == MatchMode.RISKY &&
 		!statSync(searchee.path).isDirectory() &&
-		compareFileTreesIgnoringNames(candidateMeta, searchee) &&
-		matchMode == MatchMode.RISKY
+		compareFileTreesIgnoringNames(candidateMeta, searchee)
 	) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}
