@@ -160,22 +160,22 @@ export async function searchForLocalTorrentByCriteria(
 ): Promise<number> {
 	const { maxDataDepth } = getRuntimeConfig();
 
-	let metafiles;
+	let searchees: Searchee[];
 	if (criteria.path) {
 		const searcheeResults = await Promise.all(
 			findPotentialNestedRoots(criteria.path, maxDataDepth).map(
 				createSearcheeFromPath
 			)
 		);
-		metafiles = searcheeResults.map((t) => t.unwrapOrThrow());
+		searchees = searcheeResults.map((t) => t.unwrapOrThrow());
 	} else {
-		metafiles = [await getTorrentByCriteria(criteria)];
+		searchees = [await getTorrentByCriteria(criteria)];
 	}
 	const hashesToExclude = await getInfoHashesToExclude();
 	let matches = 0;
-	for (let i = 0; i < metafiles.length; i++) {
-		if (!filterByContent(metafiles[i])) return null;
-		matches += await findOnOtherSites(metafiles[i], hashesToExclude);
+	for (let i = 0; i < searchees.length; i++) {
+		if (!filterByContent(searchees[i])) return null;
+		matches += await findOnOtherSites(searchees[i], hashesToExclude);
 	}
 	return matches;
 }
