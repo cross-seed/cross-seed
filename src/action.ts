@@ -63,7 +63,7 @@ export async function performAction(
 		const result = await getClient().inject(
 			newMeta,
 			searchee,
-			linkDir ? linkDir : undefined
+			searchee.path ? linkDir : undefined
 		);
 		switch (result) {
 			case InjectionResult.SUCCESS:
