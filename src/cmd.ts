@@ -101,9 +101,10 @@ function createCommandWithSharedOptions(name, description) {
 			"Skips torrent recheck upon adding to QBittorrent",
 			fallback(fileConfig.skipRecheck, false)
 		)
-		.option(
+		.requiredOption(
 			"--max-data-depth <depth>",
 			"Max depth to look for searchees in dataDirs",
+			(n) => parseInt(n),
 			fallback(fileConfig.maxDataDepth, 2)
 		)
 		.option(
@@ -139,6 +140,7 @@ function createCommandWithSharedOptions(name, description) {
 		.requiredOption(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
+			parseFloat,
 			fallback(fileConfig.fuzzySizeThreshold, 0.02)
 		)
 		.option(

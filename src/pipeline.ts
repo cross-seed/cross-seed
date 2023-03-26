@@ -252,7 +252,7 @@ async function findSearchableTorrents() {
 			.map((t) => t.unwrapOrThrow());
 	} else if (dataDirs && dataDirs.length > 0) {
 		const searcheeResults = await Promise.all(
-			findSearcheesFromAllDataDirs(dataDirs).map(createSearcheeFromPath)
+			findSearcheesFromAllDataDirs().map(createSearcheeFromPath)
 		);
 		parsedTorrents = searcheeResults
 			.filter((t) => t.isOk())

@@ -1,6 +1,7 @@
 import { readdirSync, statSync } from "fs";
 import { extname, join } from "path";
 import { DATA_EXTENSIONS } from "./constants.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export function findPotentialNestedRoots(
 	root: string,
@@ -31,10 +32,11 @@ export function findPotentialNestedRoots(
 	}
 }
 
-export function findSearcheesFromAllDataDirs(dataDirs: string[]): string[] {
+export function findSearcheesFromAllDataDirs(): string[] {
+	const { dataDirs, maxDataDepth } = getRuntimeConfig();
 	return dataDirs.flatMap((dataDir) =>
 		readdirSync(dataDir)
 			.map((dirent) => join(dataDir, dirent))
-			.flatMap((path) => findPotentialNestedRoots(path, 2))
+			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth))
 	);
 }
