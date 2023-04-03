@@ -107,11 +107,6 @@ function createCommandWithSharedOptions(name, description) {
 			(n) => parseInt(n),
 			fallback(fileConfig.maxDataDepth, 2)
 		)
-		.option(
-			"--single-search",
-			"Searches for exactly the specified path rather than looking for things to search inside it",
-			false
-		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
 			"Directory with torrent files",

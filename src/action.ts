@@ -114,7 +114,7 @@ function linkExact(oldPath: string, newPath: string) {
 	}
 	if (statSync(oldPath).isFile()) {
 		if (!existsSync(path.join(newPath, path.basename(oldPath)))) {
-			linkFile(oldPath, newPath);
+			linkFile(oldPath, path.join(newPath, path.basename(oldPath)));
 		}
 		return;
 	}
