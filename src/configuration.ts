@@ -24,7 +24,6 @@ interface FileConfig {
 	linkDir?: string;
 	linkType?: boolean;
 	skipRecheck?: boolean;
-	singleSearch?: boolean;
 	maxDataDepth?: number;
 	dataCategory?: string;
 	torrentDir?: string;
