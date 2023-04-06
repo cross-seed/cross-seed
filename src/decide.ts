@@ -236,9 +236,9 @@ async function assessCandidateCaching(
 		);
 		logReason(assessment.decision, false);
 	} else if (
-		cacheEntry.decision === Decision.MATCH ||
-		(cacheEntry.decision === Decision.MATCH_SIZE_ONLY &&
-			infoHashesToExclude.includes(cacheEntry.infoHash))
+		(cacheEntry.decision === Decision.MATCH ||
+			cacheEntry.decision === Decision.MATCH_SIZE_ONLY) &&
+		infoHashesToExclude.includes(cacheEntry.infoHash)
 	) {
 		// has been added since the last run
 		assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
@@ -246,9 +246,9 @@ async function assessCandidateCaching(
 			.where({ id: cacheEntry.id })
 			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
 	} else if (
-		cacheEntry.decision === Decision.MATCH ||
-		(cacheEntry.decision === Decision.MATCH_SIZE_ONLY &&
-			existsInTorrentCache(cacheEntry.infoHash))
+		(cacheEntry.decision === Decision.MATCH ||
+			cacheEntry.decision === Decision.MATCH_SIZE_ONLY) &&
+		existsInTorrentCache(cacheEntry.infoHash)
 	) {
 		// cached match
 		assessment = {
