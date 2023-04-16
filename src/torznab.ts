@@ -423,7 +423,7 @@ async function makeRequests(
 	const outcomes = await Promise.allSettled<Candidate[]>(
 		searchUrls.map((url, i) =>
 			fetch(url, {
-				headers: { "User-Agent": USERAGENT },
+				headers: { "User-Agent": USER_AGENT },
 				signal: abortControllers[i].signal,
 			})
 				.then((response) => {
