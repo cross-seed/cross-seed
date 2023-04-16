@@ -47,7 +47,7 @@ export async function parseTorrentFromURL(
 	let response: Response;
 	try {
 		response = await fetch(url, {
-			headers: { "User-Agent": USERAGENT },
+			headers: { "User-Agent": USER_AGENT },
 			signal: abortController.signal,
 			redirect: "manual",
 		});
