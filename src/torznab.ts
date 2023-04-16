@@ -21,7 +21,7 @@ import {
 	reformatTitleForSearching,
 	stripExtension,
 } from "./utils.js";
-import { USERAGENT } from "./constants.ts";
+import { USER_AGENT } from "./constants.ts";
 
 interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
