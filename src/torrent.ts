@@ -11,6 +11,7 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
 import { stripExtension } from "./utils.js";
 import fetch, { Response } from "node-fetch";
+import { USERAGENT } from "./constants.ts";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -46,7 +47,7 @@ export async function parseTorrentFromURL(
 	let response: Response;
 	try {
 		response = await fetch(url, {
-			headers: { "User-Agent": "cross-seed" },
+			headers: { "User-Agent": USERAGENT },
 			signal: abortController.signal,
 			redirect: "manual",
 		});
