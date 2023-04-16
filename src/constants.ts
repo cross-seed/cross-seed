@@ -12,7 +12,7 @@ export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 
-export const USERAGENT = `CrossSeed/${packageDotJson.version}`;
+export const USER_AGENT = `CrossSeed/${packageDotJson.version}`;
 
 export enum Action {
 	SAVE = "save",
