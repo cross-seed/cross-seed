@@ -75,7 +75,7 @@ export async function getFileConfig(): Promise<FileConfig> {
 	const configPath = path.join(appDir(), "config.js");
 
 	try {
-		return (await import(pathToFileURL(configPath).toString())).default;
+		return (await import(process.env.CONFIG_PATH || pathToFileURL(configPath).toString())).default;
 	} catch (e) {
 		if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
 		return {};
