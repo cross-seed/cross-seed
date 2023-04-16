@@ -11,7 +11,7 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
 import { stripExtension } from "./utils.js";
 import fetch, { Response } from "node-fetch";
-import { USERAGENT } from "./constants.ts";
+import { USER_AGENT } from "./constants.ts";
 
 export interface TorrentLocator {
 	infoHash?: string;
