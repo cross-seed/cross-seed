@@ -229,37 +229,40 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { torrents, dataDirs } = getRuntimeConfig();
-	let parsedTorrents: Searchee[];
+	const { torrents, dataDirs, torrentDir } = getRuntimeConfig();
+	let allSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
 			torrents.map(createSearcheeFromTorrentFile) //also create searchee from path
 		);
-		parsedTorrents = searcheeResults
-			.filter((t) => t.isOk())
-			.map((t) => t.unwrapOrThrow());
-	} else if (dataDirs && dataDirs.length > 0) {
-		const searcheeResults = await Promise.all(
-			findSearcheesFromAllDataDirs().map(createSearcheeFromPath)
-		);
-		parsedTorrents = searcheeResults
+		allSearchees = searcheeResults
 			.filter((t) => t.isOk())
 			.map((t) => t.unwrapOrThrow());
 	} else {
-		parsedTorrents = await loadTorrentDirLight();
+		if (Array.isArray(dataDirs)) {
+			const searcheeResults = await Promise.all(
+				findSearcheesFromAllDataDirs().map(createSearcheeFromPath)
+			);
+			allSearchees.push(
+				...searcheeResults
+					.filter((t) => t.isOk())
+					.map((t) => t.unwrapOrThrow())
+			);
+		}
+		if (typeof torrentDir === "string") {
+			allSearchees.push(...(await loadTorrentDirLight()));
+		}
 	}
 
-	const hashesToExclude = parsedTorrents
-		.map((t) => t.infoHash)
-		.filter(Boolean);
+	const hashesToExclude = allSearchees.map((t) => t.infoHash).filter(Boolean);
 	const filteredTorrents = await filterAsync(
-		filterDupes(parsedTorrents).filter(filterByContent),
+		filterDupes(allSearchees).filter(filterByContent),
 		filterTimestamps
 	);
 
 	logger.info({
 		label: Label.SEARCH,
-		message: `Found ${parsedTorrents.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
+		message: `Found ${allSearchees.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
 	});
 
 	return { samples: filteredTorrents, hashesToExclude };
