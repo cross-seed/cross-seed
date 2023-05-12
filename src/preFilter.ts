@@ -39,19 +39,17 @@ export function filterByContent(searchee: Searchee): boolean {
 }
 
 export function filterDupes(searchees: Searchee[]): Searchee[] {
-	searchees.reduce((acc, cur) => {
+	const duplicateMap = searchees.reduce((acc, cur) => {
 		const entry = acc.get(cur.name);
-		if (entry !== undefined) {
-			if (cur.infoHash && !entry.infoHash) {
-				acc.set(cur.name, cur);
-			}
-		} else {
+		if (entry === undefined) {
+			acc.set(cur.name, cur);
+		} else if (cur.infoHash && !entry.infoHash) {
 			acc.set(cur.name, cur);
 		}
 		return acc;
 	}, new Map());
 
-	const filtered = uniqBy<Searchee>(searchees, "name");
+	const filtered = Array.from(duplicateMap.values());
 	const numDupes = searchees.length - filtered.length;
 	if (numDupes > 0) {
 		logger.verbose({

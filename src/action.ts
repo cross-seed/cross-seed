@@ -32,7 +32,7 @@ export async function performAction(
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 
-	if (linkDir) {
+	if (searchee.path) {
 		if (decision == Decision.MATCH) {
 			await linkExact(searchee.path, linkDir);
 		} else if (decision == Decision.MATCH_SIZE_ONLY) {
