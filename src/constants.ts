@@ -4,7 +4,9 @@ export const SEASON_REGEX =
 export const MOVIE_REGEX =
 	/^(?<title>.+)[. ][[(]?(?<year>\d{4})[)\]]?(?![pi])/i;
 
-export const EXTENSIONS = ["mkv", "mp4", "avi"];
+export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi"];
+
+export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 
@@ -28,10 +30,21 @@ export type ActionResult = InjectionResult | SaveResult;
 
 export enum Decision {
 	MATCH = "MATCH",
+	MATCH_SIZE_ONLY = "MATCH_SIZE_ONLY",
 	SIZE_MISMATCH = "SIZE_MISMATCH",
 	NO_DOWNLOAD_LINK = "NO_DOWNLOAD_LINK",
 	DOWNLOAD_FAILED = "DOWNLOAD_FAILED",
 	RATE_LIMITED = "RATE_LIMITED",
 	INFO_HASH_ALREADY_EXISTS = "INFO_HASH_ALREADY_EXISTS",
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
+}
+
+export enum MatchMode {
+	SAFE = "safe",
+	RISKY = "risky",
+}
+
+export enum LinkType {
+	SYMLINK = "symlink",
+	HARDLINK = "hardlink",
 }

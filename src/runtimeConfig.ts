@@ -1,8 +1,15 @@
-import { Action } from "./constants.js";
+import { Action, LinkType, MatchMode } from "./constants.js";
 export interface RuntimeConfig {
 	offset: number;
 	delay: number;
 	torznab: string[];
+	dataDirs: string[];
+	matchMode: MatchMode;
+	linkDir: string;
+	linkType: LinkType;
+	skipRecheck: boolean;
+	maxDataDepth: number;
+	dataCategory: string;
 	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;
@@ -22,16 +29,6 @@ export interface RuntimeConfig {
 	searchCadence: number;
 	rssCadence: number;
 }
-
-export interface NonceOptions {
-	torznab: string[];
-	outputDir: string;
-}
-
-export const EmptyNonceOptions = {
-	torznab: undefined,
-	outputDir: undefined,
-};
 
 let runtimeConfig: RuntimeConfig;
 

@@ -1,6 +1,6 @@
 import {
 	EP_REGEX,
-	EXTENSIONS,
+	VIDEO_EXTENSIONS,
 	MOVIE_REGEX,
 	SEASON_REGEX,
 } from "./constants.js";
@@ -13,7 +13,7 @@ export enum MediaType {
 }
 
 export function stripExtension(filename: string): string {
-	for (const ext of EXTENSIONS) {
+	for (const ext of VIDEO_EXTENSIONS) {
 		const re = new RegExp(`\\.${ext}$`);
 		if (re.test(filename)) return filename.replace(re, "");
 	}

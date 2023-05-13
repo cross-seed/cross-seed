@@ -1,14 +1,12 @@
 import { uniqBy } from "lodash-es";
 import ms from "ms";
-import path from "path";
-import { EP_REGEX, EXTENSIONS } from "./constants.js";
+import { extname } from "path";
+import { EP_REGEX, VIDEO_EXTENSIONS } from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { humanReadable, nMsAgo } from "./utils.js";
-
-const extensionsWithDots = EXTENSIONS.map((e) => `.${e}`);
 
 export function filterByContent(searchee: Searchee): boolean {
 	const { includeEpisodes, includeNonVideos } = getRuntimeConfig();
@@ -29,7 +27,7 @@ export function filterByContent(searchee: Searchee): boolean {
 	}
 
 	const allFilesAreVideos = searchee.files.every((file) =>
-		extensionsWithDots.includes(path.extname(file.name))
+		VIDEO_EXTENSIONS.includes(extname(file.name))
 	);
 
 	if (!includeNonVideos && !allFilesAreVideos) {
@@ -41,7 +39,17 @@ export function filterByContent(searchee: Searchee): boolean {
 }
 
 export function filterDupes(searchees: Searchee[]): Searchee[] {
-	const filtered = uniqBy<Searchee>(searchees, "name");
+	const duplicateMap = searchees.reduce((acc, cur) => {
+		const entry = acc.get(cur.name);
+		if (entry === undefined) {
+			acc.set(cur.name, cur);
+		} else if (cur.infoHash && !entry.infoHash) {
+			acc.set(cur.name, cur);
+		}
+		return acc;
+	}, new Map());
+
+	const filtered = Array.from(duplicateMap.values());
 	const numDupes = searchees.length - filtered.length;
 	if (numDupes > 0) {
 		logger.verbose({

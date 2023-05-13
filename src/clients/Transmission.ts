@@ -1,9 +1,10 @@
-import fetch, { Response as FetchResponse, Headers } from "node-fetch";
+import fetch, { Headers } from "node-fetch";
 import parseTorrent, { Metafile } from "parse-torrent";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
-import { getRuntimeConfig, NonceOptions } from "../runtimeConfig.js";
+import { Result, resultOf, resultOfErr } from "../Result.js";
+import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
 
@@ -116,16 +117,14 @@ export default class Transmission implements TorrentClient {
 		}
 	}
 
-	async inject(
-		newTorrent: Metafile,
-		searchee: Searchee,
-		nonceOptions: NonceOptions
-	): Promise<InjectionResult> {
-		if (!searchee.infoHash) {
-			throw new CrossSeedError(
-				"inject not supported for data-based searchees"
-			);
-		}
+	async checkOriginalTorrent(
+		searchee: Searchee
+	): Promise<
+		Result<
+			{ downloadDir: string },
+			InjectionResult.FAILURE | InjectionResult.TORRENT_NOT_COMPLETE
+		>
+	> {
 		let queryResponse: TorrentGetResponseArgs;
 		try {
 			queryResponse = await this.request<TorrentGetResponseArgs>(
@@ -136,12 +135,37 @@ export default class Transmission implements TorrentClient {
 				}
 			);
 		} catch (e) {
-			return InjectionResult.FAILURE;
+			return resultOfErr(InjectionResult.FAILURE);
+		}
+		if (queryResponse.torrents.length === 0) {
+			return resultOfErr(InjectionResult.FAILURE);
 		}
 
-		if (queryResponse.torrents.length === 0) return InjectionResult.FAILURE;
 		const [{ downloadDir, percentDone }] = queryResponse.torrents;
-		if (percentDone < 1) return InjectionResult.TORRENT_NOT_COMPLETE;
+
+		if (percentDone < 1) {
+			return resultOfErr(InjectionResult.TORRENT_NOT_COMPLETE);
+		}
+
+		return resultOf({ downloadDir });
+	}
+
+	async inject(
+		newTorrent: Metafile,
+		searchee: Searchee,
+		path?: string
+	): Promise<InjectionResult> {
+		let downloadDir: string;
+
+		if (path) {
+			downloadDir = path;
+		} else {
+			const result = await this.checkOriginalTorrent(searchee);
+			if (result.isErr()) {
+				return result.unwrapErrOrThrow();
+			}
+			downloadDir = result.unwrapOrThrow().downloadDir;
+		}
 
 		let addResponse: TorrentAddResponse;
 

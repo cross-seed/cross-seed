@@ -16,6 +16,51 @@ module.exports = {
 	torznab: [],
 
 	/**
+	 * To search with downloaded data, you can pass in directories to your downloaded torrent data
+	 * to find matches rather using the torrent files themselves for matching.
+	 */
+	dataDirs: [],
+
+	/**
+	 * Determines flexibility of naming during matching. "safe" will allow only perfect name matches
+	 * using the standard matching algorithm. "risky" uses filesize as its only comparison point.
+	 * Options: "safe", "risky"
+	 */
+	matchMode: "safe",
+
+	/**
+	 * Defines what category torrents injected by data-based matching should use. Default is
+	 * cross-seed-data
+	 */
+	dataCategory: undefined,
+
+	/**
+	 * If this is specified, cross-seed will create links to scanned files in the specified directory.
+	 * It will create a different link for every changed file name or directory structure.
+	 */
+	linkDir: undefined,
+
+	/**
+	 * cross-seed will use links of this type to inject data-based matches into your client.
+	 * Only relevant if dataDirs is specified.
+	 * Options: "symlink", "hardlink"
+	 */
+	linkType: "symlink",
+
+	/**
+	 * Whether to skip recheck in Qbittorrent. If using "risky" matchMode it is HIGHLY
+	 * recommended to set this to false.
+	 */
+	skipRecheck: false,
+
+	/**
+	 * Determines how deep into the specified dataDirs to go to generate new searchees.
+	 * Setting this to higher values will result in more searchees and more API hits to
+	 * your indexers.
+	 */
+	maxDataDepth: 2,
+
+	/**
 	 * directory containing torrent files.
 	 * For rtorrent, this is your session directory
 	 * as configured in your .rtorrent.rc file.

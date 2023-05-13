@@ -5,7 +5,7 @@ import { createRequire } from "module";
 import ms from "ms";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
-import { Action } from "./constants.js";
+import { Action, LinkType, MatchMode } from "./constants.js";
 import { jobsLoop } from "./jobs.js";
 import { diffCmd } from "./diff.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
@@ -63,6 +63,50 @@ function createCommandWithSharedOptions(name, description) {
 			"Torznab urls with apikey included (separated by spaces)",
 			fallback(fileConfig.torznab)
 		)
+		.option(
+			"-d, --data-dirs <dirs...>",
+			"Directories to use if searching by data instead of torrents (separated by spaces)",
+			fallback(fileConfig.dataDirs)
+		)
+		.addOption(
+			new Option(
+				"--match-mode <mode>",
+				"Safe will only download torrents with perfect matches. Risky will allow for renames and more matches, but might cause false positives"
+			)
+				.default(fallback(fileConfig.matchMode, MatchMode.SAFE))
+				.choices(Object.values(MatchMode))
+				.makeOptionMandatory()
+		)
+		.option(
+			"-dc --dataCategory <cat>",
+			"Category to assign torrents from data-based matching",
+			fallback(fileConfig.dataCategory, "cross-seed-data")
+		)
+		.option(
+			"--link-dir <dir>",
+			"Directory to output data-matched hardlinks to",
+			fileConfig.linkDir
+		)
+		.addOption(
+			new Option(
+				"--link-type <type>",
+				"Use links of this type to inject data-based matches into your client"
+			)
+				.default(fallback(fileConfig.linkType, "symlink"))
+				.choices(Object.values(LinkType))
+				.makeOptionMandatory()
+		)
+		.option(
+			"--skip-recheck",
+			"Skips torrent recheck upon adding to QBittorrent",
+			fallback(fileConfig.skipRecheck, false)
+		)
+		.requiredOption(
+			"--max-data-depth <depth>",
+			"Max depth to look for searchees in dataDirs",
+			(n) => parseInt(n),
+			fallback(fileConfig.maxDataDepth, 2)
+		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
 			"Directory with torrent files",
@@ -91,6 +135,7 @@ function createCommandWithSharedOptions(name, description) {
 		.requiredOption(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
+			parseFloat,
 			fallback(fileConfig.fuzzySizeThreshold, 0.02)
 		)
 		.option(

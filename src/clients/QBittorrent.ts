@@ -270,10 +270,12 @@ export default class QBittorrent implements TorrentClient {
 
 	async inject(
 		newTorrent: Metafile,
-		searchee: Searchee
+		searchee: Searchee,
+		path?: string
 	): Promise<InjectionResult> {
+		const { duplicateCategories, linkDir, skipRecheck, dataCategory } =
+			getRuntimeConfig();
 		try {
-			const { duplicateCategories } = getRuntimeConfig();
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
 			}
@@ -281,16 +283,24 @@ export default class QBittorrent implements TorrentClient {
 			const filename = `${newTorrent.name}.cross-seed.torrent`;
 			const tempFilepath = join(tmpdir(), filename);
 			await writeFile(tempFilepath, buf, { mode: 0o644 });
-			const { save_path, isComplete, autoTMM, category } =
-				await this.getTorrentConfiguration(searchee);
+			const { save_path, isComplete, autoTMM, category } = path
+				? {
+						save_path: path,
+						isComplete: true,
+						autoTMM: false,
+						category: dataCategory,
+				  }
+				: await this.getTorrentConfiguration(searchee);
 
-			const newCategoryName = duplicateCategories
-				? await this.setUpCrossSeedCategory(category)
-				: category;
+			const newCategoryName =
+				duplicateCategories && !searchee.infoHash
+					? await this.setUpCrossSeedCategory(category)
+					: category;
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
 			const contentLayout =
+				!path &&
 				isSingleFileTorrent(newTorrent) &&
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
@@ -311,15 +321,29 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("autoTMM", "false");
 				formData.append("savepath", save_path);
 			}
-			formData.append("contentLayout", contentLayout);
-			formData.append("skip_checking", "true");
-			formData.append("paused", "false");
+			if (linkDir) {
+				formData.append("skip_checking", skipRecheck.toString());
+				formData.append("paused", (!skipRecheck).toString());
+			} else {
+				formData.append("contentLayout", contentLayout);
+				formData.append("skip_checking", "true");
+				formData.append("paused", "false");
+			}
 
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
 
 			await this.request("/torrents/add", formData);
+
+			if (!skipRecheck) {
+				await new Promise((resolve) => setTimeout(resolve, 100));
+				await this.request(
+					"/torrents/recheck",
+					`hashes=${newTorrent.infoHash}`,
+					X_WWW_FORM_URLENCODED
+				);
+			}
 
 			unlink(tempFilepath).catch((error) => {
 				logger.debug(error);

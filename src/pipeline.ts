@@ -9,6 +9,10 @@ import {
 	InjectionResult,
 	SaveResult,
 } from "./constants.js";
+import {
+	findPotentialNestedRoots,
+	findSearcheesFromAllDataDirs,
+} from "./dataFiles.js";
 import { db } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
 import {
@@ -19,13 +23,10 @@ import {
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
-import {
-	EmptyNonceOptions,
-	getRuntimeConfig,
-	NonceOptions,
-} from "./runtimeConfig.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromMetafile,
+	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
 	Searchee,
 } from "./searchee.js";
@@ -57,8 +58,7 @@ interface AssessmentWithTracker {
 
 async function findOnOtherSites(
 	searchee: Searchee,
-	hashesToExclude: string[],
-	nonceOptions: NonceOptions = EmptyNonceOptions
+	hashesToExclude: string[]
 ): Promise<number> {
 	const assessEach = async (
 		result: Candidate
@@ -117,9 +117,11 @@ async function findOnOtherSites(
 	);
 
 	const matches = assessed.filter(
-		(e) => e.assessment.decision === Decision.MATCH
+		(e) =>
+			e.assessment.decision === Decision.MATCH ||
+			e.assessment.decision === Decision.MATCH_SIZE_ONLY
 	);
-	const actionResults = await performActions(searchee, matches, nonceOptions);
+	const actionResults = await performActions(searchee, matches);
 
 	if (!actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
 		const zipped: [ResultAssessment, string, ActionResult][] = zip(
@@ -154,13 +156,28 @@ async function findMatchesBatch(
 }
 
 export async function searchForLocalTorrentByCriteria(
-	criteria: TorrentLocator,
-	nonceOptions: NonceOptions
+	criteria: TorrentLocator
 ): Promise<number> {
-	const meta = await getTorrentByCriteria(criteria);
+	const { maxDataDepth } = getRuntimeConfig();
+
+	let searchees: Searchee[];
+	if (criteria.path) {
+		const searcheeResults = await Promise.all(
+			findPotentialNestedRoots(criteria.path, maxDataDepth).map(
+				createSearcheeFromPath
+			)
+		);
+		searchees = searcheeResults.map((t) => t.unwrapOrThrow());
+	} else {
+		searchees = [await getTorrentByCriteria(criteria)];
+	}
 	const hashesToExclude = await getInfoHashesToExclude();
-	if (!filterByContent(meta)) return null;
-	return findOnOtherSites(meta, hashesToExclude, nonceOptions);
+	let matches = 0;
+	for (let i = 0; i < searchees.length; i++) {
+		if (!filterByContent(searchees[i])) return null;
+		matches += await findOnOtherSites(searchees[i], hashesToExclude);
+	}
+	return matches;
 }
 
 export async function checkNewCandidateMatch(
@@ -191,13 +208,17 @@ export async function checkNewCandidateMatch(
 		hashesToExclude
 	);
 
-	if (assessment.decision !== Decision.MATCH) return false;
+	if (
+		assessment.decision !== Decision.MATCH &&
+		assessment.decision !== Decision.MATCH_SIZE_ONLY
+	)
+		return false;
 
 	const result = await performAction(
 		assessment.metafile,
+		assessment.decision,
 		searchee,
-		candidate.tracker,
-		EmptyNonceOptions
+		candidate.tracker
 	);
 	await sendResultsNotification(
 		searchee,
@@ -208,40 +229,53 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { torrents } = getRuntimeConfig();
-	let parsedTorrents: Searchee[];
+	const { torrents, dataDirs, torrentDir } = getRuntimeConfig();
+	let allSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
-			torrents.map(createSearcheeFromTorrentFile)
+			torrents.map(createSearcheeFromTorrentFile) //also create searchee from path
 		);
-		parsedTorrents = searcheeResults
+		allSearchees = searcheeResults
 			.filter((t) => t.isOk())
 			.map((t) => t.unwrapOrThrow());
 	} else {
-		parsedTorrents = await loadTorrentDirLight();
+		if (Array.isArray(dataDirs)) {
+			const searcheeResults = await Promise.all(
+				findSearcheesFromAllDataDirs().map(createSearcheeFromPath)
+			);
+			allSearchees.push(
+				...searcheeResults
+					.filter((t) => t.isOk())
+					.map((t) => t.unwrapOrThrow())
+			);
+		}
+		if (typeof torrentDir === "string") {
+			allSearchees.push(...(await loadTorrentDirLight()));
+		}
 	}
 
-	const hashesToExclude = parsedTorrents
-		.map((t) => t.infoHash)
-		.filter(Boolean);
+	const hashesToExclude = allSearchees.map((t) => t.infoHash).filter(Boolean);
 	const filteredTorrents = await filterAsync(
-		filterDupes(parsedTorrents).filter(filterByContent),
+		filterDupes(allSearchees).filter(filterByContent),
 		filterTimestamps
 	);
 
 	logger.info({
 		label: Label.SEARCH,
-		message: `Found ${parsedTorrents.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
+		message: `Found ${allSearchees.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
 	});
 
 	return { samples: filteredTorrents, hashesToExclude };
 }
 
 export async function main(): Promise<void> {
-	const { outputDir } = getRuntimeConfig();
+	const { outputDir, linkDir } = getRuntimeConfig();
 	const { samples, hashesToExclude } = await findSearchableTorrents();
 
 	fs.mkdirSync(outputDir, { recursive: true });
+	if (linkDir) {
+		fs.mkdirSync(linkDir, { recursive: true });
+	}
 	const totalFound = await findMatchesBatch(samples, hashesToExclude);
 
 	logger.info({
