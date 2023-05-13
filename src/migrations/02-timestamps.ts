@@ -13,28 +13,30 @@ function getApikey(url: string) {
 async function backfill(knex: Knex.Knex) {
 	const { torznab } = getRuntimeConfig();
 
-	await knex("indexer")
-		.insert(
-			torznab.map((url) => ({
-				url: sanitizeUrl(url),
-				apikey: getApikey(url),
-				active: true,
-			}))
-		)
-		.onConflict("url")
-		.merge(["active", "apikey"]);
+	if (torznab.length > 0) {
+		await knex("indexer")
+			.insert(
+				torznab.map((url) => ({
+					url: sanitizeUrl(url),
+					apikey: getApikey(url),
+					active: true,
+				}))
+			)
+			.onConflict("url")
+			.merge(["active", "apikey"]);
 
-	const timestampRows = await knex
-		.select(
-			"searchee.id as searchee_id",
-			"indexer.id as indexer_id",
-			"searchee.first_searched as first_searched",
-			"searchee.last_searched as last_searched"
-		)
-		.from("searchee")
-		// @ts-expect-error crossJoin supports string
-		.crossJoin("indexer");
-	await knex.batchInsert("timestamp", timestampRows, 100);
+		const timestampRows = await knex
+			.select(
+				"searchee.id as searchee_id",
+				"indexer.id as indexer_id",
+				"searchee.first_searched as first_searched",
+				"searchee.last_searched as last_searched"
+			)
+			.from("searchee")
+			// @ts-expect-error crossJoin supports string
+			.crossJoin("indexer");
+		await knex.batchInsert("timestamp", timestampRows, 100);
+	}
 }
 
 async function up(knex: Knex.Knex): Promise<void> {

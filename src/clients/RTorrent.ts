@@ -186,6 +186,7 @@ export default class RTorrent implements TorrentClient {
 		try {
 			await this.methodCallP<string[]>("download_list", []);
 		} catch (e) {
+			logger.debug(e);
 			throw new CrossSeedError(
 				`Failed to reach rTorrent at ${rtorrentRpcUrl}`
 			);
