@@ -1,4 +1,3 @@
-import { uniqBy } from "lodash-es";
 import ms from "ms";
 import { extname } from "path";
 import { EP_REGEX, VIDEO_EXTENSIONS } from "./constants.js";
