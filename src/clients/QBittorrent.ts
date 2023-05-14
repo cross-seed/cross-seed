@@ -293,7 +293,7 @@ export default class QBittorrent implements TorrentClient {
 				: await this.getTorrentConfiguration(searchee);
 
 			const newCategoryName =
-				duplicateCategories && !searchee.infoHash
+				duplicateCategories && searchee.infoHash
 					? await this.setUpCrossSeedCategory(category)
 					: category;
 
