@@ -265,14 +265,14 @@ async function findSearchableTorrents() {
 		message: `Found ${allSearchees.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
 	});
 
-  if (searchLimit && filteredTorrents.length > searchLimit) {
-    logger.info({
-      label: Label.SEARCH,
-      message: `Limited to ${searchLimit} searches`,
-    });
+	if (searchLimit && filteredTorrents.length > searchLimit) {
+		logger.info({
+			label: Label.SEARCH,
+			message: `Limited to ${searchLimit} searches`,
+		});
 
-    filteredTorrents = filteredTorrents.slice(0, searchLimit);
-  }
+		filteredTorrents = filteredTorrents.slice(0, searchLimit);
+	}
 
 	return { samples: filteredTorrents, hashesToExclude };
 }

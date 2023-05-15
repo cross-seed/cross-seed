@@ -215,4 +215,11 @@ module.exports = {
 	 * null
 	 */
 	searchTimeout: undefined,
+
+	/**
+	 * The number of searches to be done before it stop.
+	 * Combine this with "excludeRecentSearch" and "searchCadence" for better results.
+	 * Default is no limit.
+	 */
+	searchLimit: undefined,
 };

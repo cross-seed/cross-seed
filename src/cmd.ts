@@ -207,6 +207,12 @@ function createCommandWithSharedOptions(name, description) {
 			"--search-timeout <timeout>",
 			"Timeout for unresponsive searches",
 			fallback(fileConfig.searchTimeout, "30 seconds")
+		)
+		.option(
+			"--search-limit <number>",
+			"The number of searches before stops",
+			parseFloat,
+			fallback(fileConfig.searchLimit, 0)
 		);
 }
 
@@ -333,12 +339,6 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			"--torrents <torrents...>",
 			"torrent files separated by spaces"
 		).hideHelp()
-	)
-	.addOption(
-		new Option(
-			"--search-limit <number>",
-			"set the limit of searches for the running"
-		)
 	)
 	.action(async (options) => {
 		try {
