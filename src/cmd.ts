@@ -334,6 +334,12 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			"torrent files separated by spaces"
 		).hideHelp()
 	)
+	.addOption(
+		new Option(
+			"--search-limit <number>",
+			"set the limit of searches for the running"
+		)
+	)
 	.action(async (options) => {
 		try {
 			const runtimeConfig = processOptions(options);
