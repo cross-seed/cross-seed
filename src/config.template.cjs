@@ -4,14 +4,15 @@
 module.exports = {
 	/**
 	 * Pause at least this much in between each search. Higher is safer.
-	 * 	It is not recommended to set this to less than 2 seconds.
+	 * It is not recommended to set this to less than 2 seconds.
 	 */
 	delay: 10,
+
 	/**
-	 * List of Torznab urls.
-	 * The path should end in /api
+	 * List of Torznab URLs.
 	 * For Jackett, click "Copy RSS feed"
-	 * For Prowlarr, click (i) and copy the Torznab Url, then append "?apikey=YOUR_PROWLARR_API_KEY"
+	 * For Prowlarr, click on the indexer name and copy the Torznab Url, then append "?apikey=YOUR_PROWLARR_API_KEY"
+	 * Wrap each URL in quotation marks, and separate them with commas.
 	 */
 	torznab: [],
 
@@ -29,8 +30,8 @@ module.exports = {
 	matchMode: "safe",
 
 	/**
-	 * Defines what category torrents injected by data-based matching should use. Default is
-	 * cross-seed-data
+	 * Defines what category torrents injected by data-based matching should use.
+	 * Default is "cross-seed-data"
 	 */
 	dataCategory: undefined,
 
@@ -61,7 +62,7 @@ module.exports = {
 	maxDataDepth: 2,
 
 	/**
-	 * directory containing torrent files.
+	 * Directory containing torrent files.
 	 * For rtorrent, this is your session directory
 	 * as configured in your .rtorrent.rc file.
 	 * For deluge, this is ~/.config/deluge/state.
@@ -69,7 +70,7 @@ module.exports = {
 	torrentDir: "/path/to/torrent/file/dir",
 
 	/**
-	 * where to put the torrent files that cross-seed finds for you.
+	 * Where to put the torrent files that cross-seed finds for you.
 	 */
 	outputDir: ".",
 
@@ -113,8 +114,8 @@ module.exports = {
 	excludeRecentSearch: undefined,
 
 	/**
-	 * can be either "save" or "inject".
 	 * With "inject" you need to set up one of the below clients.
+	 * Options: "save", "inject"
 	 */
 	action: "save",
 
@@ -165,6 +166,7 @@ module.exports = {
 	/**
 	 * Bind to a specific host address.
 	 * Example: "127.0.0.1"
+	 * Default is "0.0.0.0"
 	 */
 	host: undefined,
 
