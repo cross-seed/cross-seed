@@ -20,7 +20,7 @@ module.exports = {
 	 * To search with downloaded data, you can pass in directories to your downloaded torrent data
 	 * to find matches rather using the torrent files themselves for matching.
 	 */
-	dataDirs: [],
+	dataDirs: undefined,
 
 	/**
 	 * Determines flexibility of naming during matching. "safe" will allow only perfect name matches
