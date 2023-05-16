@@ -1,6 +1,6 @@
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
-import { humanReadable } from "./utils.js";
+import { humanReadable, nMsAgo } from "./utils.js";
 
 export enum IndexerStatus {
 	/**
@@ -46,6 +46,41 @@ export async function getEnabledIndexers() {
 			tvSearchCap: "tv_search_cap",
 			movieSearchCap: "movie_search_cap",
 		});
+}
+
+export async function filterIndexersByTimestamp(
+	name: string,
+	excludeRecentSearch: number,
+	excludeOlder: number,
+) {
+	const enabledIndexers = await getEnabledIndexers();
+
+	// search history for name across all indexers
+	const timestampDataSql = await db("searchee")
+		.join("timestamp", "searchee.id", "timestamp.searchee_id")
+		.join("indexer", "timestamp.indexer_id", "indexer.id")
+		.whereIn(
+			"indexer.id",
+			enabledIndexers.map((i) => i.id)
+		)
+		.andWhere({ name })
+		.select({
+			indexerId: "indexer.id",
+			firstSearched: "timestamp.first_searched",
+			lastSearched: "timestamp.last_searched",
+		});
+
+	return enabledIndexers.filter((indexer) => {
+		const entry = timestampDataSql.find(
+			(entry) => entry.indexerId === indexer.id
+		);
+		return (
+			!entry ||
+			((!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
+				(!excludeRecentSearch ||
+					entry.lastSearched < nMsAgo(excludeRecentSearch)))
+		);
+	});
 }
 
 export async function updateIndexerStatus(

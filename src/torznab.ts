@@ -17,7 +17,6 @@ import {
 	cleanseSeparators,
 	getTag,
 	MediaType,
-	nMsAgo,
 	reformatTitleForSearching,
 	stripExtension,
 } from "./utils.js";
@@ -146,36 +145,6 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 export async function searchTorznab(
 	name: string
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
-	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
-
-	const enabledIndexers = await getEnabledIndexers();
-
-	// search history for name across all indexers
-	const timestampDataSql = await db("searchee")
-		.join("timestamp", "searchee.id", "timestamp.searchee_id")
-		.join("indexer", "timestamp.indexer_id", "indexer.id")
-		.whereIn(
-			"indexer.id",
-			enabledIndexers.map((i) => i.id)
-		)
-		.andWhere({ name })
-		.select({
-			indexerId: "indexer.id",
-			firstSearched: "timestamp.first_searched",
-			lastSearched: "timestamp.last_searched",
-		});
-	const indexersToUse = enabledIndexers.filter((indexer) => {
-		const entry = timestampDataSql.find(
-			(entry) => entry.indexerId === indexer.id
-		);
-		return (
-			!entry ||
-			((!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
-				(!excludeRecentSearch ||
-					entry.lastSearched < nMsAgo(excludeRecentSearch)))
-		);
-	});
-
 	const timestampCallout = " (filtered by timestamps)";
 	logger.info({
 		label: Label.TORZNAB,
