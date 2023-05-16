@@ -51,7 +51,7 @@ export async function getEnabledIndexers() {
 export async function filterIndexersByTimestamp(
 	name: string,
 	excludeRecentSearch: number,
-	excludeOlder: number,
+	excludeOlder: number
 ) {
 	const enabledIndexers = await getEnabledIndexers();
 

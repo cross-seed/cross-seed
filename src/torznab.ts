@@ -143,8 +143,11 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 }
 
 export async function searchTorznab(
-	name: string
+	name: string,
+	indexersToUse: Indexer[]
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+	const enabledIndexers = await getEnabledIndexers();
+
 	const timestampCallout = " (filtered by timestamps)";
 	logger.info({
 		label: Label.TORZNAB,

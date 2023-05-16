@@ -16,7 +16,9 @@ import {
 import { db } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
 import {
+	Indexer,
 	IndexerStatus,
+	filterIndexersByTimestamp,
 	updateIndexerStatus,
 	updateSearchTimestamps,
 } from "./indexers.js";
@@ -58,7 +60,8 @@ interface AssessmentWithTracker {
 
 async function findOnOtherSites(
 	searchee: Searchee,
-	hashesToExclude: string[]
+	hashesToExclude: string[],
+	indexersToUse: Indexer[]
 ): Promise<number> {
 	const assessEach = async (
 		result: Candidate
@@ -75,7 +78,7 @@ async function findOnOtherSites(
 
 	let response: { indexerId: number; candidates: Candidate[] }[];
 	try {
-		response = await searchTorznab(searchee.name);
+		response = await searchTorznab(searchee.name, indexersToUse);
 	} catch (e) {
 		logger.error(`error searching for ${searchee.name}`);
 		logger.debug(e);
@@ -138,7 +141,7 @@ async function findMatchesBatch(
 	samples: Searchee[],
 	hashesToExclude: string[]
 ) {
-	const { delay } = getRuntimeConfig();
+	const { excludeRecentSearch, excludeOlder, delay } = getRuntimeConfig();
 
 	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
@@ -148,9 +151,17 @@ async function findMatchesBatch(
 		const name = stripExtension(sample.name);
 		logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
-		const numFoundPromise = findOnOtherSites(sample, hashesToExclude);
-		const [numFound] = await Promise.all([numFoundPromise, sleep]);
-		totalFound += numFound;
+		const indexersToUse = await filterIndexersByTimestamp(
+			sample.name,
+			excludeRecentSearch,
+			excludeOlder
+		);
+		totalFound += await findOnOtherSites(
+			sample,
+			hashesToExclude,
+			indexersToUse
+		);
+		if (indexersToUse.length > 0) await sleep;
 	}
 	return totalFound;
 }
@@ -158,7 +169,8 @@ async function findMatchesBatch(
 export async function searchForLocalTorrentByCriteria(
 	criteria: TorrentLocator
 ): Promise<number> {
-	const { maxDataDepth } = getRuntimeConfig();
+	const { excludeRecentSearch, excludeOlder, maxDataDepth } =
+		getRuntimeConfig();
 
 	let searchees: Searchee[];
 	if (criteria.path) {
@@ -171,11 +183,23 @@ export async function searchForLocalTorrentByCriteria(
 	} else {
 		searchees = [await getTorrentByCriteria(criteria)];
 	}
+
 	const hashesToExclude = await getInfoHashesToExclude();
+
 	let matches = 0;
 	for (let i = 0; i < searchees.length; i++) {
 		if (!filterByContent(searchees[i])) return null;
-		matches += await findOnOtherSites(searchees[i], hashesToExclude);
+
+		const indexersToUse = await filterIndexersByTimestamp(
+			searchees[i].name,
+			excludeRecentSearch,
+			excludeOlder
+		);
+		matches += await findOnOtherSites(
+			searchees[i],
+			hashesToExclude,
+			indexersToUse
+		);
 	}
 	return matches;
 }
