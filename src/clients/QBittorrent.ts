@@ -321,7 +321,7 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("autoTMM", "false");
 				formData.append("savepath", save_path);
 			}
-			if (linkDir) {
+			if (path) {
 				formData.append("skip_checking", skipRecheck.toString());
 				formData.append("paused", (!skipRecheck).toString());
 			} else {
@@ -336,7 +336,7 @@ export default class QBittorrent implements TorrentClient {
 
 			await this.request("/torrents/add", formData);
 
-			if (!skipRecheck) {
+			if (path && !skipRecheck) {
 				await new Promise((resolve) => setTimeout(resolve, 100));
 				await this.request(
 					"/torrents/recheck",

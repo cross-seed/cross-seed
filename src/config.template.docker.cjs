@@ -51,6 +51,7 @@ module.exports = {
 	/**
 	 * Whether to skip recheck in Qbittorrent. If using "risky" matchMode it is HIGHLY
 	 * recommended to set this to false.
+	 * Only applies to data based matches.
 	 */
 	skipRecheck: false,
 
