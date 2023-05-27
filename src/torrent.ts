@@ -37,7 +37,12 @@ export async function parseTorrentFromURL(
 	url: string
 ): Promise<Result<Metafile, SnatchError>> {
 	const abortController = new AbortController();
-	setTimeout(() => void abortController.abort(), 30000).unref();
+	const { snatchTimeout } = getRuntimeConfig();
+
+	console.log("parseTorrentFromURL", snatchTimeout);
+	if (typeof snatchTimeout === "number") {
+		setTimeout(() => void abortController.abort(), snatchTimeout).unref();
+	}
 
 	let response: Response;
 	try {

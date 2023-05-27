@@ -195,4 +195,28 @@ module.exports = {
 	 * "3 days"
 	 */
 	searchCadence: undefined,
+
+	/**
+	 * Fail snatch requests that haven't responded after this long.
+	 * Set to null for an infinite timeout.
+	 * Format: https://github.com/vercel/ms
+	 * Examples:
+	 * "30sec"
+	 * "10s"
+	 * "1min"
+	 * null
+	 */
+	snatchTimeout: undefined,
+
+	/**
+	 * Fail search requests that haven't responded after this long.
+	 * Set to null for an infinite timeout.
+	 * Format: https://github.com/vercel/ms
+	 * Examples:
+	 * "30sec"
+	 * "10s"
+	 * "1min"
+	 * null
+	 */
+	searchTimeout: undefined,
 };

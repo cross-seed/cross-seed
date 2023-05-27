@@ -403,6 +403,7 @@ async function makeRequests(
 	indexers: Indexer[],
 	getQuery: (indexer: Indexer) => TorznabParams
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+	const { searchTimeout } = getRuntimeConfig();
 	const searchUrls = indexers.map((indexer: Indexer) =>
 		assembleUrl(indexer.url, indexer.apikey, getQuery(indexer))
 	);
@@ -410,12 +411,14 @@ async function makeRequests(
 		(message) => void logger.verbose({ label: Label.TORZNAB, message })
 	);
 	const abortControllers = searchUrls.map(() => new AbortController());
-
-	setTimeout(() => {
-		for (const abortController of abortControllers) {
-			abortController.abort();
-		}
-	}, 30000).unref();
+	console.log("makeRequests", searchTimeout);
+	if (typeof searchTimeout === "number") {
+		setTimeout(() => {
+			for (const abortController of abortControllers) {
+				abortController.abort();
+			}
+		}, searchTimeout).unref();
+	}
 
 	const outcomes = await Promise.allSettled<Candidate[]>(
 		searchUrls.map((url, i) =>
