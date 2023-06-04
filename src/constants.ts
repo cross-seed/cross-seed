@@ -2,6 +2,10 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
+export const PROGRAM_NAME = packageDotJson.name;
+export const PROGRAM_VERSION = packageDotJson.version;
+export const USER_AGENT = `CrossSeed/${PROGRAM_VERSION}`;
+
 export const EP_REGEX = /^(?<title>.+)[. ](?<season>S\d+)(?<episode>E\d+)/i;
 export const SEASON_REGEX =
 	/^(?<title>.+)[. ](?<season>S\d+)(?:\s?-\s?(?<seasonmax>S?\d+))?(?!E\d+)/i;
@@ -13,8 +17,6 @@ export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi"];
 export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
-
-export const USER_AGENT = `CrossSeed/${packageDotJson.version}`;
 
 export enum Action {
 	SAVE = "save",
