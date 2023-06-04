@@ -21,6 +21,7 @@ import {
 	reformatTitleForSearching,
 	stripExtension,
 } from "./utils.js";
+import { USER_AGENT } from "./constants.js";
 
 interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
@@ -422,7 +423,7 @@ async function makeRequests(
 	const outcomes = await Promise.allSettled<Candidate[]>(
 		searchUrls.map((url, i) =>
 			fetch(url, {
-				headers: { "User-Agent": "cross-seed" },
+				headers: { "User-Agent": USER_AGENT },
 				signal: abortControllers[i].signal,
 			})
 				.then((response) => {

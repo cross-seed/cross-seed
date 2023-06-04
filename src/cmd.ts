@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
-import { createRequire } from "module";
 import ms from "ms";
 import { inspect } from "util";
 import { generateConfig, getFileConfig } from "./configuration.js";
-import { Action, LinkType, MatchMode } from "./constants.js";
-import { jobsLoop } from "./jobs.js";
+import {
+	Action,
+	LinkType,
+	MatchMode,
+	PROGRAM_NAME,
+	PROGRAM_VERSION,
+} from "./constants.js";
+import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
+import { jobsLoop } from "./jobs.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
 import {
@@ -19,11 +25,8 @@ import { RuntimeConfig, setRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
-import { db } from "./db.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
-const require = createRequire(import.meta.url);
-const packageDotJson = require("../package.json");
 
 function fallback(...args) {
 	for (const arg of args) {
@@ -207,13 +210,9 @@ function createCommandWithSharedOptions(name, description) {
 		);
 }
 
-program.name(packageDotJson.name);
+program.name(PROGRAM_NAME);
 program.description(chalk.yellow.bold("cross-seed"));
-program.version(
-	packageDotJson.version,
-	"-V, --version",
-	"output the current version"
-);
+program.version(PROGRAM_VERSION, "-V, --version", "output the current version");
 
 program
 	.command("gen-config")
