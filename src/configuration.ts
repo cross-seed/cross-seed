@@ -36,6 +36,8 @@ interface FileConfig {
 	host?: string;
 	searchCadence?: string;
 	rssCadence?: string;
+	snatchTimeout?: string;
+	searchTimeout?: string;
 }
 
 interface GenerateConfigParams {

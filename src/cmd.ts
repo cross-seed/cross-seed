@@ -49,6 +49,12 @@ function processOptions(options): RuntimeConfig {
 	if (options.excludeRecentSearch) {
 		options.excludeRecentSearch = ms(options.excludeRecentSearch);
 	}
+	if (options.snatchTimeout) {
+		options.snatchTimeout = ms(options.snatchTimeout);
+	}
+	if (options.searchTimeout) {
+		options.searchTimeout = ms(options.searchTimeout);
+	}
 	return options;
 }
 
@@ -64,7 +70,7 @@ function createCommandWithSharedOptions(name, description) {
 			fallback(fileConfig.torznab)
 		)
 		.option(
-			"-d, --data-dirs <dirs...>",
+			"--data-dirs <dirs...>",
 			"Directories to use if searching by data instead of torrents (separated by spaces)",
 			fallback(fileConfig.dataDirs)
 		)
@@ -78,7 +84,7 @@ function createCommandWithSharedOptions(name, description) {
 				.makeOptionMandatory()
 		)
 		.option(
-			"-dc --dataCategory <cat>",
+			"--data-category <cat>",
 			"Category to assign torrents from data-based matching",
 			fallback(fileConfig.dataCategory, "cross-seed-data")
 		)
@@ -188,6 +194,16 @@ function createCommandWithSharedOptions(name, description) {
 			"Pause duration (seconds) between searches",
 			parseFloat,
 			fallback(fileConfig.delay, 10)
+		)
+		.requiredOption(
+			"--snatch-timeout <timeout>",
+			"Timeout for unresponsive snatches",
+			fallback(fileConfig.snatchTimeout, "30 seconds")
+		)
+		.requiredOption(
+			"--search-timeout <timeout>",
+			"Timeout for unresponsive searches",
+			fallback(fileConfig.searchTimeout, "30 seconds")
 		);
 }
 

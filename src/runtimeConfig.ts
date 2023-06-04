@@ -28,6 +28,8 @@ export interface RuntimeConfig {
 	port: number | false | null;
 	searchCadence: number;
 	rssCadence: number;
+	snatchTimeout: number;
+	searchTimeout: number;
 }
 
 let runtimeConfig: RuntimeConfig;
