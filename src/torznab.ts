@@ -411,7 +411,6 @@ async function makeRequests(
 		(message) => void logger.verbose({ label: Label.TORZNAB, message })
 	);
 	const abortControllers = searchUrls.map(() => new AbortController());
-	console.log("makeRequests", searchTimeout);
 	if (typeof searchTimeout === "number") {
 		setTimeout(() => {
 			for (const abortController of abortControllers) {

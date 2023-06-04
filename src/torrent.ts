@@ -39,7 +39,6 @@ export async function parseTorrentFromURL(
 	const abortController = new AbortController();
 	const { snatchTimeout } = getRuntimeConfig();
 
-	console.log("parseTorrentFromURL", snatchTimeout);
 	if (typeof snatchTimeout === "number") {
 		setTimeout(() => void abortController.abort(), snatchTimeout).unref();
 	}
