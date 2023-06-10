@@ -52,7 +52,7 @@ function redactMessage(message: string | unknown) {
 	// redact torznab api keys
 	ret = ret.replace(/apikey=[a-zA-Z0-9]+/g, `apikey=${redactionMsg}`);
 	ret = ret.replace(
-		/\/notification\/crossSeed\/\w+/g,
+		/\/notification\/crossSeed\/[a-zA-Z-0-9_-]+/g,
 		`/notification/crossSeed/${redactionMsg}`
 	);
 	for (const [key, urlStr] of Object.entries(runtimeConfig)) {
