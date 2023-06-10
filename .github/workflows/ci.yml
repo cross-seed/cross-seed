@@ -28,7 +28,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/cross-seed
             ${{ secrets.DOCKERHUB_USERNAME }}/cross-seed
           tags: |
-            type=semver,pattern=version-{{version}}
+            type=semver,pattern={{version}}
             type=ref,event=branch
             type=ref,event=pr
       -
