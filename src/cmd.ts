@@ -207,6 +207,12 @@ function createCommandWithSharedOptions(name, description) {
 			"--search-timeout <timeout>",
 			"Timeout for unresponsive searches",
 			fallback(fileConfig.searchTimeout, "30 seconds")
+		)
+		.option(
+			"--search-limit <number>",
+			"The number of searches before stops",
+			parseInt,
+			fallback(fileConfig.searchLimit, 0)
 		);
 }
 

@@ -1,4 +1,5 @@
 import { Action, LinkType, MatchMode } from "./constants.js";
+
 export interface RuntimeConfig {
 	offset: number;
 	delay: number;
@@ -30,6 +31,7 @@ export interface RuntimeConfig {
 	rssCadence: number;
 	snatchTimeout: number;
 	searchTimeout: number;
+	searchLimit: number;
 }
 
 let runtimeConfig: RuntimeConfig;
