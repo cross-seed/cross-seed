@@ -218,7 +218,7 @@ module.exports = {
 
 	/**
 	 * The number of searches to be done before it stop.
-	 * Combine this with "excludeRecentSearch" and "searchCadence" for better results.
+	 * Combine this with "excludeRecentSearch" and "searchCadence" to smooth long-term API usage patterns.
 	 * Default is no limit.
 	 */
 	searchLimit: undefined,
