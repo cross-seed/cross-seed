@@ -26,12 +26,12 @@ declare module "parse-torrent" {
 			createdBy: string;
 			files: FileListing[];
 			info: {
-				files: {
+				files?: {
 					length: number;
 					path?: Buffer[];
 					"path.utf-8"?: Buffer[];
 				}[];
-				name: Buffer;
+				name?: Buffer;
 				"piece length": number;
 				pieces: Buffer;
 				private: number;

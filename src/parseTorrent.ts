@@ -22,11 +22,31 @@
  */
 
 import bencode from "bencode";
+import { Metafile } from "parse-torrent";
 import path from "path";
 
-function decodeTorrentFile(torrent) {
+interface Torrent {
+	info: {
+		"name.utf-8"?: Buffer;
+		name?: Buffer;
+
+		"piece length": number;
+		pieces: Buffer;
+
+		files?: {
+			length: number;
+			path?: Buffer[];
+			"path.utf-8"?: Buffer[];
+		}[];
+		length?: number;
+
+		private: number;
+	};
+}
+
+function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
 	if (Buffer.isBuffer(torrent)) {
-		torrent = bencode.decode(torrent);
+		torrent = bencode.decode(torrent) as Torrent;
 	}
 
 	// sanity check
@@ -44,7 +64,7 @@ function decodeTorrentFile(torrent) {
 		ensure(typeof torrent.info.length === "number", "info.length");
 	}
 
-	const result = {
+	const result: Metafile = {
 		info: torrent.info,
 		infoBuffer: bencode.encode(torrent.info),
 		name: (torrent.info["name.utf-8"] || torrent.info.name).toString(),
@@ -118,7 +138,7 @@ function decodeTorrentFile(torrent) {
 	return result;
 }
 
-function encodeTorrentFile(parsed) {
+function encodeTorrentFile(parsed: Metafile): Buffer {
 	const torrent = {
 		info: parsed.info,
 	};
