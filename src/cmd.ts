@@ -40,10 +40,15 @@ function processOptions(options): RuntimeConfig {
 		options.rssCadence = Math.max(ms(options.rssCadence), ms("10 minutes"));
 	}
 	if (options.searchCadence) {
-		options.searchCadence = Math.max(
-			ms(options.searchCadence),
-			ms("1 day")
-		);
+		options.searchCadence = ms(options.searchCadence);
+
+		// Set a minimum cadence of once a day if excludeRecentSearch hasn't been set to avoid flooding requests
+		if (!options.excludeRecentSearch) {
+			options.searchCadence = Math.max(
+				options.searchCadence,
+				ms("1 day")
+			);
+		}
 	}
 
 	if (options.excludeOlder) {
