@@ -56,10 +56,15 @@ interface AssessmentWithTracker {
 	tracker: string;
 }
 
+interface FoundOnOtherSites {
+	searchedIndexers: number;
+	matches: number;
+}
+
 async function findOnOtherSites(
 	searchee: Searchee,
 	hashesToExclude: string[]
-): Promise<number> {
+): Promise<FoundOnOtherSites> {
 	const assessEach = async (
 		result: Candidate
 	): Promise<AssessmentWithTracker> => ({
@@ -79,7 +84,7 @@ async function findOnOtherSites(
 	} catch (e) {
 		logger.error(`error searching for ${searchee.name}`);
 		logger.debug(e);
-		return 0;
+		return { searchedIndexers: 0, matches: 0 };
 	}
 
 	const results: Candidate[] = response.flatMap((e) =>
@@ -131,7 +136,7 @@ async function findOnOtherSites(
 		);
 		sendResultsNotification(searchee, zipped, Label.SEARCH);
 	}
-	return matches.length;
+	return { matches: matches.length, searchedIndexers: response.length };
 }
 
 async function findMatchesBatch(
@@ -148,9 +153,15 @@ async function findMatchesBatch(
 		const name = stripExtension(sample.name);
 		logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
-		const numFoundPromise = findOnOtherSites(sample, hashesToExclude);
-		const [numFound] = await Promise.all([numFoundPromise, sleep]);
-		totalFound += numFound;
+		const { matches, searchedIndexers } = await findOnOtherSites(
+			sample,
+			hashesToExclude
+		);
+		totalFound += matches;
+
+		// if all indexers were rate limited, don't sleep
+		if (searchedIndexers === 0) continue;
+		await sleep;
 	}
 	return totalFound;
 }
@@ -175,7 +186,11 @@ export async function searchForLocalTorrentByCriteria(
 	let matches = 0;
 	for (let i = 0; i < searchees.length; i++) {
 		if (!filterByContent(searchees[i])) return null;
-		matches += await findOnOtherSites(searchees[i], hashesToExclude);
+		const foundOnOtherSites = await findOnOtherSites(
+			searchees[i],
+			hashesToExclude
+		);
+		matches += foundOnOtherSites.matches;
 	}
 	return matches;
 }
