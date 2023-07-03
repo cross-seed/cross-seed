@@ -147,21 +147,26 @@ async function findMatchesBatch(
 
 	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
-		const sleep = new Promise((r) => setTimeout(r, delay * 1000));
+		try {
+			const sleep = new Promise((r) => setTimeout(r, delay * 1000));
 
-		const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
-		const name = stripExtension(sample.name);
-		logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
+			const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
+			const name = stripExtension(sample.name);
+			logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
-		const { matches, searchedIndexers } = await findOnOtherSites(
-			sample,
-			hashesToExclude
-		);
-		totalFound += matches;
+			const { matches, searchedIndexers } = await findOnOtherSites(
+				sample,
+				hashesToExclude
+			);
+			totalFound += matches;
 
-		// if all indexers were rate limited, don't sleep
-		if (searchedIndexers === 0) continue;
-		await sleep;
+			// if all indexers were rate limited, don't sleep
+			if (searchedIndexers === 0) continue;
+			await sleep;
+		} catch (e) {
+			logger.error(`error searching for ${sample.name}`);
+			logger.debug(e);
+		}
 	}
 	return totalFound;
 }
