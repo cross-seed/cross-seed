@@ -239,6 +239,9 @@ async function findSearchableTorrents() {
 			.filter((t) => t.isOk())
 			.map((t) => t.unwrapOrThrow());
 	} else {
+		if (typeof torrentDir === "string") {
+			allSearchees.push(...(await loadTorrentDirLight()));
+		}
 		if (Array.isArray(dataDirs)) {
 			const searcheeResults = await Promise.all(
 				findSearcheesFromAllDataDirs().map(createSearcheeFromPath)
@@ -248,9 +251,6 @@ async function findSearchableTorrents() {
 					.filter((t) => t.isOk())
 					.map((t) => t.unwrapOrThrow())
 			);
-		}
-		if (typeof torrentDir === "string") {
-			allSearchees.push(...(await loadTorrentDirLight()));
 		}
 	}
 
