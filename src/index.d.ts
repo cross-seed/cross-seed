@@ -22,7 +22,7 @@ declare module "parse-torrent" {
 
 		export interface Metafile {
 			announce: string[];
-			created: string;
+			created: Date;
 			createdBy: string;
 			files: FileListing[];
 			info: {
@@ -46,6 +46,7 @@ declare module "parse-torrent" {
 			pieces: string[];
 			private: boolean;
 			urlList: string[];
+			comment: string;
 		}
 	}
 }

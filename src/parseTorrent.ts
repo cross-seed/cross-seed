@@ -42,6 +42,9 @@ interface Torrent {
 
 		private: number;
 	};
+	comment: Buffer;
+	announce: Buffer;
+	"announce-list": Buffer[][];
 }
 
 function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
@@ -90,7 +93,6 @@ function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
 		Array.isArray(torrent["announce-list"]) &&
 		torrent["announce-list"].length > 0
 	) {
-		console.log(torrent["announce-list"]);
 		torrent["announce-list"].forEach((urls) => {
 			urls.forEach((url) => {
 				result.announce.push(url.toString());
