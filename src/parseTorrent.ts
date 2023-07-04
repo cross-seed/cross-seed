@@ -23,7 +23,7 @@
 
 import bencode from "bencode";
 import path from "path";
-import sha1 from "simple-sha1";
+import { createHash } from "crypto";
 
 export interface FileListing {
 	length: number;
@@ -111,8 +111,7 @@ export function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
 		announce: [],
 	};
 
-	result.infoHash = sha1.sync(result.infoBuffer);
-	result.infoHashBuffer = Buffer.from(result.infoHash, "hex");
+	result.infoHash = sha1(result.infoBuffer);
 
 	if (torrent.info.private !== undefined)
 		result.private = !!torrent.info.private;
@@ -222,4 +221,10 @@ function splitPieces(buf) {
 function ensure(bool, fieldName) {
 	if (!bool)
 		throw new Error(`Torrent is missing required field: ${fieldName}`);
+}
+
+function sha1(buf: Buffer): string {
+	const hash = createHash("sha1");
+	hash.update(buf);
+	return hash.digest("hex");
 }
