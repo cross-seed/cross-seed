@@ -24,6 +24,12 @@
 import bencode from "bencode";
 import { Metafile } from "parse-torrent";
 import path from "path";
+import sha1 from "simple-sha1";
+interface TorrentDirent {
+	length: number;
+	path?: Buffer[];
+	"path.utf-8"?: Buffer[];
+}
 
 interface Torrent {
 	info: {
@@ -33,16 +39,12 @@ interface Torrent {
 		"piece length": number;
 		pieces: Buffer;
 
-		files?: {
-			length: number;
-			path?: Buffer[];
-			"path.utf-8"?: Buffer[];
-		}[];
+		files?: TorrentDirent[];
 		length?: number;
 
 		private: number;
 	};
-	comment: Buffer;
+	comment: Buffer | string;
 	announce: Buffer;
 	"announce-list": Buffer[][];
 }
@@ -67,7 +69,7 @@ function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
 		ensure(typeof torrent.info.length === "number", "info.length");
 	}
 
-	const result: Metafile = {
+	const result: Partial<Metafile> = {
 		info: torrent.info,
 		infoBuffer: bencode.encode(torrent.info),
 		name: (torrent.info["name.utf-8"] || torrent.info.name).toString(),
@@ -114,16 +116,18 @@ function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
 	result.announce = Array.from(new Set(result.announce));
 	result.urlList = Array.from(new Set(result.urlList));
 
-	const files = torrent.info.files || [torrent.info];
+	const files: TorrentDirent[] = torrent.info.files || [
+		torrent.info as TorrentDirent,
+	];
 	result.files = files.map((file, i) => {
-		const parts = []
+		const parts = ([] as (Buffer | string)[])
 			.concat(result.name, file["path.utf-8"] || file.path || [])
 			.map((p) => p.toString());
 		return {
-			path: path.join.apply(null, [path.sep].concat(parts)).slice(1),
+			path: path.join.apply(null, ...[path.sep].concat(parts)).slice(1),
 			name: parts[parts.length - 1],
 			length: file.length,
-			offset: files.slice(0, i).reduce(sumLength, 0),
+			offset: files.slice(0, i).reduce<number>(sumLength, 0),
 		};
 	});
 
@@ -137,25 +141,21 @@ function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
 		result.pieceLength;
 	result.pieces = splitPieces(torrent.info.pieces);
 
-	return result;
+	return result as Metafile;
 }
 
 function encodeTorrentFile(parsed: Metafile): Buffer {
-	const torrent = {
+	const torrent: Partial<Torrent> = {
 		info: parsed.info,
 	};
 
-	torrent["announce-list"] = (parsed.announce || []).map((url) => {
-		if (!torrent.announce) torrent.announce = url;
-		url = Buffer.from(url, "utf8");
-		return [url];
+	torrent["announce-list"] = (parsed.announce || []).map<Buffer[]>((url) => {
+		const buf = Buffer.from(url, "utf8");
+		if (!torrent.announce) torrent.announce = buf;
+		return [buf];
 	});
 
 	torrent["url-list"] = parsed.urlList || [];
-
-	if (parsed.private !== undefined) {
-		torrent.private = Number(parsed.private);
-	}
 
 	if (parsed.created) {
 		torrent["creation date"] = (parsed.created.getTime() / 1000) | 0;
@@ -169,13 +169,10 @@ function encodeTorrentFile(parsed: Metafile): Buffer {
 		torrent.comment = parsed.comment;
 	}
 
-	console.log(torrent.announce);
-	console.log(torrent["announce-list"]);
-
 	return bencode.encode(torrent);
 }
 
-function sumLength(sum, file) {
+function sumLength(sum: number, file: { length: number }): number {
 	return sum + file.length;
 }
 
