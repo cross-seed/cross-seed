@@ -22,9 +22,44 @@
  */
 
 import bencode from "bencode";
-import { Metafile } from "parse-torrent";
 import path from "path";
 import sha1 from "simple-sha1";
+
+export interface FileListing {
+	length: number;
+	name: string;
+	offset: number;
+	path: string;
+}
+export interface Metafile {
+	announce: string[];
+	created: Date;
+	createdBy: string;
+	files: FileListing[];
+	info: {
+		files?: {
+			length: number;
+			path?: Buffer[];
+			"path.utf-8"?: Buffer[];
+		}[];
+		name?: Buffer;
+		"piece length": number;
+		pieces: Buffer;
+		private: number;
+	};
+	infoBuffer: Buffer;
+	infoHash: string;
+	infoHashBuffer: Buffer;
+	lastPieceLength: number;
+	length: number;
+	name: string;
+	pieceLength: number;
+	pieces: string[];
+	private: boolean;
+	urlList: string[];
+	comment: string;
+}
+
 interface TorrentDirent {
 	length: number;
 	path?: Buffer[];
@@ -49,7 +84,7 @@ interface Torrent {
 	"announce-list": Buffer[][];
 }
 
-function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
+export function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
 	if (Buffer.isBuffer(torrent)) {
 		torrent = bencode.decode(torrent) as Torrent;
 	}
@@ -144,7 +179,7 @@ function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
 	return result as Metafile;
 }
 
-function encodeTorrentFile(parsed: Metafile): Buffer {
+export function encodeTorrentFile(parsed: Metafile): Buffer {
 	const torrent: Partial<Torrent> = {
 		info: parsed.info,
 	};

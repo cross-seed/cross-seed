@@ -1,17 +1,18 @@
-import fs, { promises as fsPromises, readdirSync } from "fs";
+import fs, { promises as fsPromises } from "fs";
 import Fuse from "fuse.js";
-import parseTorrent, { Metafile } from "parse-torrent";
+import fetch, { Response } from "node-fetch";
+import { Metafile } from "./parseTorrent.js";
 import path, { join } from "path";
 import { inspect } from "util";
+import { USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
+import { decodeTorrentFile, encodeTorrentFile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
 import { stripExtension } from "./utils.js";
-import fetch, { Response } from "node-fetch";
-import { USER_AGENT } from "./constants.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -31,7 +32,7 @@ export async function parseTorrentFromFilename(
 	filename: string
 ): Promise<Metafile> {
 	const data = await fsPromises.readFile(filename);
-	return parseTorrent(data);
+	return decodeTorrentFile(data);
 }
 
 export async function parseTorrentFromURL(
@@ -90,7 +91,7 @@ export async function parseTorrentFromURL(
 	}
 	try {
 		return resultOf(
-			parseTorrent(
+			decodeTorrentFile(
 				Buffer.from(new Uint8Array(await response.arrayBuffer()))
 			)
 		);
@@ -110,7 +111,7 @@ export function saveTorrentFile(
 	info: Metafile
 ): void {
 	const { outputDir } = getRuntimeConfig();
-	const buf = parseTorrent.toTorrentFile(info);
+	const buf = encodeTorrentFile(info);
 	const name = stripExtension(info.name);
 	const filename = `[${tag}][${tracker}]${name}.torrent`;
 	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });

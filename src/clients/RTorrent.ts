@@ -1,12 +1,13 @@
 import bencode from "bencode";
 import { promises as fs, Stats } from "fs";
-import parseTorrent, { FileListing, Metafile } from "parse-torrent";
+import { FileListing, Metafile } from "../parseTorrent.js";
 import { dirname, resolve } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
+import { encodeTorrentFile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
@@ -67,7 +68,7 @@ async function saveWithLibTorrentResume(
 	savePath: string,
 	dataDir: string
 ): Promise<void> {
-	const rawMeta = bencode.decode(parseTorrent.toTorrentFile(meta));
+	const rawMeta = bencode.decode(encodeTorrentFile(meta));
 	rawMeta.libtorrent_resume = await createLibTorrentResumeTree(meta, dataDir);
 	await fs.writeFile(savePath, bencode.encode(rawMeta));
 }

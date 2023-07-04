@@ -1,6 +1,6 @@
 import { readdirSync, statSync } from "fs";
 import { sortBy } from "lodash-es";
-import { Metafile } from "parse-torrent";
+import { Metafile } from "./parseTorrent.js";
 import { basename, join, relative, sep as osSpecificPathSeparator } from "path";
 import { logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";

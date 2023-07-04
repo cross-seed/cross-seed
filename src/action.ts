@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { Metafile } from "parse-torrent";
+import { Metafile } from "./parseTorrent.js";
 import path from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
