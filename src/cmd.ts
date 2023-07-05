@@ -27,13 +27,7 @@ import { serve } from "./server.js";
 import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
-
-function fallback(...args) {
-	for (const arg of args) {
-		if (arg !== undefined) return arg;
-	}
-	return undefined;
-}
+import { fallback } from "./utils.js";
 
 function processOptions(options): RuntimeConfig {
 	if (options.rssCadence) {

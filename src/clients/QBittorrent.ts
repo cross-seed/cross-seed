@@ -3,15 +3,13 @@ import { FormData } from "formdata-polyfill/esm.min.js";
 import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
-import { Metafile } from "../parseTorrent.js";
 import { join, posix } from "path";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
-import { encodeTorrentFile } from "../parseTorrent.js";
+import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
-import { isSingleFileTorrent } from "../torrent.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const X_WWW_FORM_URLENCODED = {
@@ -280,7 +278,7 @@ export default class QBittorrent implements TorrentClient {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
 			}
-			const buf = encodeTorrentFile(newTorrent);
+			const buf = newTorrent.encode();
 			const filename = `${newTorrent.name}.cross-seed.torrent`;
 			const tempFilepath = join(tmpdir(), filename);
 			await writeFile(tempFilepath, buf, { mode: 0o644 });
@@ -302,7 +300,7 @@ export default class QBittorrent implements TorrentClient {
 
 			const contentLayout =
 				!path &&
-				isSingleFileTorrent(newTorrent) &&
+				newTorrent.isSingleFileTorrent &&
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";

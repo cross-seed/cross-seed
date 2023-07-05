@@ -1,9 +1,8 @@
 import fetch, { Headers } from "node-fetch";
-import { Metafile } from "../parseTorrent.js";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
-import { encodeTorrentFile } from "../parseTorrent.js";
+import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
@@ -175,7 +174,7 @@ export default class Transmission implements TorrentClient {
 				"torrent-add",
 				{
 					"download-dir": downloadDir,
-					metainfo: encodeTorrentFile(newTorrent).toString("base64"),
+					metainfo: newTorrent.encode().toString("base64"),
 					paused: false,
 					labels: ["cross-seed"],
 				}

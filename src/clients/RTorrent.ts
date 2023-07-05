@@ -1,36 +1,33 @@
-import bencode from "bencode";
 import { promises as fs, Stats } from "fs";
-import { FileListing, Metafile } from "../parseTorrent.js";
 import { dirname, resolve } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
-import { encodeTorrentFile } from "../parseTorrent.js";
+import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee } from "../searchee.js";
+import { File, Searchee } from "../searchee.js";
 import { wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
-interface LibTorrentResumeFileEntry {
+export interface LibTorrentResumeFileEntry {
 	completed: number;
 	mtime: number;
 	priority: number;
 }
 
-interface LibTorrentResume {
+export interface LibTorrentResume {
 	bitfield: number;
 	files: LibTorrentResumeFileEntry[];
 }
-
 async function createLibTorrentResumeTree(
 	meta: Metafile,
 	dataDir: string
 ): Promise<LibTorrentResume> {
 	async function getFileResumeData(
-		file: FileListing
+		file: File
 	): Promise<LibTorrentResumeFileEntry> {
 		const filePath = resolve(dataDir, file.path);
 		const fileStat = await fs
@@ -68,9 +65,14 @@ async function saveWithLibTorrentResume(
 	savePath: string,
 	dataDir: string
 ): Promise<void> {
-	const rawMeta = bencode.decode(encodeTorrentFile(meta));
-	rawMeta.libtorrent_resume = await createLibTorrentResumeTree(meta, dataDir);
-	await fs.writeFile(savePath, bencode.encode(rawMeta));
+	const rawWithLibtorrentResume = {
+		...meta.raw,
+		libtorrent_resume: await createLibTorrentResumeTree(meta, dataDir),
+	};
+	await fs.writeFile(
+		savePath,
+		new Metafile(rawWithLibtorrentResume).encode()
+	);
 }
 
 export default class RTorrent implements TorrentClient {

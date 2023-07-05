@@ -1,14 +1,13 @@
 import { existsSync, statSync, writeFileSync } from "fs";
-import { Metafile } from "./parseTorrent.js";
 import path from "path";
 import { appDir } from "./configuration.js";
-import { MatchMode, Decision, TORRENT_CACHE_FOLDER } from "./constants.js";
+import { Decision, MatchMode, TORRENT_CACHE_FOLDER } from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
-import { encodeTorrentFile } from "./parseTorrent.js";
+import { Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { File, getFiles, Searchee } from "./searchee.js";
+import { File, Searchee } from "./searchee.js";
 import {
 	parseTorrentFromFilename,
 	parseTorrentFromURL,
@@ -71,7 +70,7 @@ export function compareFileTrees(
 		return lengthsAreEqual && pathsAreEqual;
 	};
 
-	return getFiles(candidate).every((elOfA) =>
+	return candidate.files.every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
 	);
 }
@@ -160,7 +159,7 @@ function cacheTorrentFile(meta: Metafile): void {
 			TORRENT_CACHE_FOLDER,
 			`${meta.infoHash}.cached.torrent`
 		),
-		encodeTorrentFile(meta)
+		meta.encode()
 	);
 }
 

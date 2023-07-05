@@ -7,7 +7,6 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { Metafile } from "./parseTorrent.js";
 import path from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
@@ -19,6 +18,7 @@ import {
 	SaveResult,
 } from "./constants.js";
 import { logger } from "./logger.js";
+import { Metafile } from "./parseTorrent.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";

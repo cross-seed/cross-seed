@@ -20,45 +20,11 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-
-import bencode from "bencode";
-import path from "path";
+import { encode as bencode, decode as bdecode } from "bencode";
 import { createHash } from "crypto";
-
-export interface FileListing {
-	length: number;
-	name: string;
-	offset: number;
-	path: string;
-}
-export interface Metafile {
-	announce: string[];
-	created: Date;
-	createdBy: string;
-	files: FileListing[];
-	info: {
-		files?: {
-			length: number;
-			path?: Buffer[];
-			"path.utf-8"?: Buffer[];
-		}[];
-		name?: Buffer;
-		"piece length": number;
-		pieces: Buffer;
-		private: number;
-	};
-	infoBuffer: Buffer;
-	infoHash: string;
-	infoHashBuffer: Buffer;
-	lastPieceLength: number;
-	length: number;
-	name: string;
-	pieceLength: number;
-	pieces: string[];
-	private: boolean;
-	urlList: string[];
-	comment: string;
-}
+import { join } from "path";
+import { File } from "./searchee.js";
+import { fallback } from "./utils.js";
 
 interface TorrentDirent {
 	length: number;
@@ -84,138 +50,81 @@ interface Torrent {
 	"announce-list": Buffer[][];
 }
 
-export function decodeTorrentFile(torrent: Buffer | Torrent): Metafile {
-	if (Buffer.isBuffer(torrent)) {
-		torrent = bencode.decode(torrent) as Torrent;
-	}
+export class Metafile {
+	infoHash: string;
+	length: number;
+	name: string;
+	pieceLength: number;
+	files: File[];
+	isSingleFileTorrent: boolean;
+	raw: Torrent;
 
-	// sanity check
-	ensure(torrent.info, "info");
-	ensure(torrent.info["name.utf-8"] || torrent.info.name, "info.name");
-	ensure(torrent.info["piece length"], "info['piece length']");
-	ensure(torrent.info.pieces, "info.pieces");
+	constructor(raw: Torrent) {
+		ensure(raw.info, "info");
+		ensure(raw.info["name.utf-8"] || raw.info.name, "info.name");
+		ensure(raw.info["piece length"], "info['piece length']");
+		ensure(raw.info.pieces, "info.pieces");
 
-	if (torrent.info.files) {
-		torrent.info.files.forEach((file) => {
-			ensure(typeof file.length === "number", "info.files[0].length");
-			ensure(file["path.utf-8"] || file.path, "info.files[0].path");
-		});
-	} else {
-		ensure(typeof torrent.info.length === "number", "info.length");
-	}
-
-	const result: Partial<Metafile> = {
-		info: torrent.info,
-		infoBuffer: bencode.encode(torrent.info),
-		name: (torrent.info["name.utf-8"] || torrent.info.name).toString(),
-		announce: [],
-	};
-
-	result.infoHash = sha1(result.infoBuffer);
-
-	if (torrent.info.private !== undefined)
-		result.private = !!torrent.info.private;
-
-	if (torrent["creation date"])
-		result.created = new Date(torrent["creation date"] * 1000);
-	if (torrent["created by"])
-		result.createdBy = torrent["created by"].toString();
-
-	if (Buffer.isBuffer(torrent.comment))
-		result.comment = torrent.comment.toString();
-
-	// announce and announce-list will be missing if metadata fetched via ut_metadata
-	if (
-		Array.isArray(torrent["announce-list"]) &&
-		torrent["announce-list"].length > 0
-	) {
-		torrent["announce-list"].forEach((urls) => {
-			urls.forEach((url) => {
-				result.announce.push(url.toString());
+		if (raw.info.files) {
+			raw.info.files.forEach((file) => {
+				ensure(typeof file.length === "number", "info.files[0].length");
+				ensure(file["path.utf-8"] || file.path, "info.files[0].path");
 			});
-		});
-	} else if (torrent.announce) {
-		result.announce.push(torrent.announce.toString());
+		} else {
+			ensure(typeof raw.info.length === "number", "info.length");
+		}
+
+		this.raw = raw;
+		this.infoHash = sha1(bencode(raw.info));
+		this.name = fallback(raw.info["name.utf-8"], raw.info.name).toString();
+		this.pieceLength = raw.info["piece length"];
+
+		if (!raw.info.files) {
+			this.files = [
+				{
+					name: this.name,
+					path: this.name,
+					length: raw.info.length,
+				},
+			];
+			this.length = raw.info.length;
+			this.isSingleFileTorrent = true;
+		} else {
+			this.files = raw.info.files
+				.map((file) => {
+					const rawPathSegments: Buffer[] = fallback(
+						file["path.utf-8"],
+						file.path
+					);
+					const pathSegments = rawPathSegments.map((buf) => {
+						const seg = buf.toString();
+						// convention for zero-length path segments is to treat them as underscores
+						return seg === "" ? "_" : seg;
+					});
+					return {
+						name: pathSegments[pathSegments.length - 1],
+						length: file.length,
+						path: join(this.name, ...pathSegments),
+					};
+				})
+				.sort((a, b) => a.path.localeCompare(b.path));
+
+			this.length = this.files.reduce(sumLength, 0);
+			this.isSingleFileTorrent = false;
+		}
 	}
 
-	// handle url-list (BEP19 / web seeding)
-	if (Buffer.isBuffer(torrent["url-list"])) {
-		// some clients set url-list to empty string
-		torrent["url-list"] =
-			torrent["url-list"].length > 0 ? [torrent["url-list"]] : [];
-	}
-	result.urlList = (torrent["url-list"] || []).map((url) => url.toString());
-
-	// remove duplicates by converting to Set and back
-	result.announce = Array.from(new Set(result.announce));
-	result.urlList = Array.from(new Set(result.urlList));
-
-	const files: TorrentDirent[] = torrent.info.files || [
-		torrent.info as TorrentDirent,
-	];
-	result.files = files.map((file, i) => {
-		const parts = ([] as (Buffer | string)[])
-			.concat(result.name, file["path.utf-8"] || file.path || [])
-			.map((p) => p.toString());
-		return {
-			path: path.join.apply(null, ...[path.sep].concat(parts)).slice(1),
-			name: parts[parts.length - 1],
-			length: file.length,
-			offset: files.slice(0, i).reduce<number>(sumLength, 0),
-		};
-	});
-
-	result.length = files.reduce(sumLength, 0);
-
-	const lastFile = result.files[result.files.length - 1];
-
-	result.pieceLength = torrent.info["piece length"];
-	result.lastPieceLength =
-		(lastFile.offset + lastFile.length) % result.pieceLength ||
-		result.pieceLength;
-	result.pieces = splitPieces(torrent.info.pieces);
-
-	return result as Metafile;
-}
-
-export function encodeTorrentFile(parsed: Metafile): Buffer {
-	const torrent: Partial<Torrent> = {
-		info: parsed.info,
-	};
-
-	torrent["announce-list"] = (parsed.announce || []).map<Buffer[]>((url) => {
-		const buf = Buffer.from(url, "utf8");
-		if (!torrent.announce) torrent.announce = buf;
-		return [buf];
-	});
-
-	torrent["url-list"] = parsed.urlList || [];
-
-	if (parsed.created) {
-		torrent["creation date"] = (parsed.created.getTime() / 1000) | 0;
+	static decode(buf: Buffer) {
+		return new Metafile(bdecode(buf));
 	}
 
-	if (parsed.createdBy) {
-		torrent["created by"] = parsed.createdBy;
+	encode(): Buffer {
+		return bencode(this.raw);
 	}
-
-	if (parsed.comment) {
-		torrent.comment = parsed.comment;
-	}
-
-	return bencode.encode(torrent);
 }
 
 function sumLength(sum: number, file: { length: number }): number {
 	return sum + file.length;
-}
-
-function splitPieces(buf) {
-	const pieces = [];
-	for (let i = 0; i < buf.length; i += 20) {
-		pieces.push(buf.slice(i, i + 20).toString("hex"));
-	}
-	return pieces;
 }
 
 function ensure(bool, fieldName) {
