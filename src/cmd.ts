@@ -64,11 +64,13 @@ function createCommandWithSharedOptions(name, description) {
 		.option(
 			"-T, --torznab <urls...>",
 			"Torznab urls with apikey included (separated by spaces)",
+			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.torznab)
 		)
 		.option(
 			"--data-dirs <dirs...>",
 			"Directories to use if searching by data instead of torrents (separated by spaces)",
+			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.dataDirs)
 		)
 		.addOption(
@@ -95,7 +97,7 @@ function createCommandWithSharedOptions(name, description) {
 				"--link-type <type>",
 				"Use links of this type to inject data-based matches into your client"
 			)
-				.default(fallback(fileConfig.linkType, "symlink"))
+				.default(fallback(fileConfig.linkType, LinkType.SYMLINK))
 				.choices(Object.values(LinkType))
 				.makeOptionMandatory()
 		)
