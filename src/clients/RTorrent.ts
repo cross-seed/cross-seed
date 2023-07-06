@@ -12,13 +12,13 @@ import { File, Searchee } from "../searchee.js";
 import { wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
-export interface LibTorrentResumeFileEntry {
+interface LibTorrentResumeFileEntry {
 	completed: number;
 	mtime: number;
 	priority: number;
 }
 
-export interface LibTorrentResume {
+interface LibTorrentResume {
 	bitfield: number;
 	files: LibTorrentResumeFileEntry[];
 }
