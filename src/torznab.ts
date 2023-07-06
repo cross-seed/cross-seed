@@ -294,15 +294,44 @@ function assembleUrl(
 	return url.toString();
 }
 
-function fetchCaps(indexer: {
+async function fetchCaps(indexer: {
 	id: number;
 	url: string;
 	apikey: string;
 }): Promise<Caps> {
-	return fetch(assembleUrl(indexer.url, indexer.apikey, { t: "caps" }))
-		.then((r) => r.text())
-		.then(xml2js.parseStringPromise)
-		.then(parseTorznabCaps);
+	const response = await fetch(
+		assembleUrl(indexer.url, indexer.apikey, { t: "caps" })
+	);
+	const responseText = await response.text();
+	if (!response.ok) {
+		const error = new Error(
+			`Indexer ${indexer.url} responded with code ${response.status} when fetching caps`
+		);
+		logger.error(error);
+		logger.debug(
+			`Response body first 1000 characters: ${responseText.substring(
+				0,
+				1000
+			)}`
+		);
+		throw error;
+	}
+	try {
+		const parsedXml = await xml2js.parseStringPromise(responseText);
+		return parseTorznabCaps(parsedXml);
+	} catch {
+		const error = new Error(
+			`Indexer ${indexer.url} responded with invalid XML when fetching caps`
+		);
+		logger.error(error);
+		logger.debug(
+			`Response body first 1000 characters: ${responseText.substring(
+				0,
+				1000
+			)}`
+		);
+		throw error;
+	}
 }
 
 function collateOutcomes<Correlator, SuccessReturnType>(
