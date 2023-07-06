@@ -44,7 +44,7 @@ export async function performAction(
 			// Candidate is single, nested file
 			if (candidateParentDir != ".") {
 				if (!existsSync(path.join(linkDir, candidateParentDir))) {
-					mkdirSync(path.join(linkDir, candidateParentDir));
+					mkdirSync(path.join(linkDir, candidateParentDir), { recursive: true });
 				}
 				correctedlinkDir = path.join(linkDir, candidateParentDir);
 			}
