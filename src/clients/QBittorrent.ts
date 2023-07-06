@@ -322,6 +322,7 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("savepath", save_path);
 			}
 			if (path) {
+				formData.append("contentLayout", "Original");
 				formData.append("skip_checking", skipRecheck.toString());
 				formData.append("paused", (!skipRecheck).toString());
 			} else {
