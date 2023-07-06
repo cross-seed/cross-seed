@@ -1,4 +1,4 @@
-import { encode as bencode, decode as bdecode } from "bencode";
+import bencode from "bencode";
 import { createHash } from "crypto";
 import { join } from "path";
 import { File } from "./searchee.js";
@@ -68,7 +68,7 @@ export class Metafile {
 		}
 
 		this.raw = raw;
-		this.infoHash = sha1(bencode(raw.info));
+		this.infoHash = sha1(bencode.encode(raw.info));
 		this.name = fallback(raw.info["name.utf-8"], raw.info.name).toString();
 		this.pieceLength = raw.info["piece length"];
 
@@ -108,10 +108,10 @@ export class Metafile {
 	}
 
 	static decode(buf: Buffer) {
-		return new Metafile(bdecode(buf));
+		return new Metafile(bencode.decode(buf));
 	}
 
 	encode(): Buffer {
-		return bencode(this.raw);
+		return bencode.encode(this.raw);
 	}
 }
