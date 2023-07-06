@@ -379,6 +379,7 @@ export async function validateTorznabUrls() {
 			tv_search_cap: null,
 			movie_search_cap: null,
 		})
+		.orWhere({ search_cap: false, active: true })
 		.select({ id: "id", url: "url", apikey: "apikey" });
 	await updateCaps(enabledIndexersWithoutCaps);
 
