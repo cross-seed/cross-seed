@@ -299,9 +299,17 @@ async function fetchCaps(indexer: {
 	url: string;
 	apikey: string;
 }): Promise<Caps> {
-	const response = await fetch(
-		assembleUrl(indexer.url, indexer.apikey, { t: "caps" })
-	);
+	let response;
+	try {
+		response = await fetch(
+			assembleUrl(indexer.url, indexer.apikey, { t: "caps" })
+		);
+	} catch (e) {
+		const error = new Error(`Indexer ${indexer.url} failed to respond`);
+		logger.debug(error);
+		throw error;
+	}
+
 	const responseText = await response.text();
 	if (!response.ok) {
 		const error = new Error(
@@ -319,7 +327,7 @@ async function fetchCaps(indexer: {
 	try {
 		const parsedXml = await xml2js.parseStringPromise(responseText);
 		return parseTorznabCaps(parsedXml);
-	} catch {
+	} catch (_) {
 		const error = new Error(
 			`Indexer ${indexer.url} responded with invalid XML when fetching caps`
 		);
