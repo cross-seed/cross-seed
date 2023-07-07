@@ -373,16 +373,10 @@ async function updateCaps(
 	const outcomes = await Promise.allSettled<Caps>(
 		indexers.map((indexer) => fetchCaps(indexer))
 	);
-	const { fulfilled, rejected } = collateOutcomes<number, Caps>(
+	const { fulfilled } = collateOutcomes<number, Caps>(
 		indexers.map((i) => i.id),
 		outcomes
 	);
-	for (const [indexerId, reason] of rejected) {
-		logger.warn(
-			`Failed to reach ${indexers.find((i) => i.id === indexerId).url}`
-		);
-		logger.debug(reason);
-	}
 
 	for (const [indexerId, caps] of fulfilled) {
 		await db("indexer").where({ id: indexerId }).update({
