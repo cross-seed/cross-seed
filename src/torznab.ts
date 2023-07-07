@@ -309,6 +309,7 @@ async function fetchCaps(indexer: {
 			`Indexer ${indexer.url} failed to respond, check verbose logs`
 		);
 		logger.error(error);
+		logger.debug(e);
 		throw error;
 	}
 
