@@ -23,7 +23,7 @@ function instantiateDownloadClient() {
 	if (rtorrentRpcUrl) {
 		activeClient = new RTorrent();
 	} else if (qbittorrentUrl) {
-		activeClient = new QBittorrent();
+		activeClient = QBittorrent.instance();
 	} else if (transmissionRpcUrl) {
 		activeClient = new Transmission();
 	}

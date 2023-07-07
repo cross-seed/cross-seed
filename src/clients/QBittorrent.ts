@@ -3,7 +3,7 @@ import { FormData } from "formdata-polyfill/esm.min.js";
 import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
 import { tmpdir } from "os";
-import { join, posix } from "path";
+import { basename, join, posix } from "path";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
@@ -87,6 +87,15 @@ interface Category {
 export default class QBittorrent implements TorrentClient {
 	url: URL;
 	cookie: string;
+
+	private static _instance: QBittorrent;
+
+	static instance() {
+		if (!QBittorrent._instance) {
+			QBittorrent._instance = new QBittorrent();
+		}
+		return QBittorrent._instance;
+	}
 
 	constructor() {
 		const { qbittorrentUrl } = getRuntimeConfig();
@@ -357,5 +366,48 @@ export default class QBittorrent implements TorrentClient {
 			});
 			return InjectionResult.FAILURE;
 		}
+	}
+
+	async loadSearchees(): Promise<Searchee[]> {
+		const { qbittorrentCategories } = getRuntimeConfig();
+
+		const responseText = await this.request(
+			"/torrents/info",
+			"filter=completed",
+			X_WWW_FORM_URLENCODED
+		);
+		const infos: TorrentInfo[] = JSON.parse(responseText);
+
+		const whitelistedInfos = infos.filter((i) =>
+			qbittorrentCategories.includes(i.category)
+		);
+
+		const searchees: Searchee[] = [];
+
+		for (const info of whitelistedInfos) {
+			const response = await this.request(
+				"/torrents/files",
+				`hash=${info.hash}`,
+				X_WWW_FORM_URLENCODED
+			);
+
+			const files: TorrentFiles[] = JSON.parse(response);
+			const searchee: Searchee = {
+				name: info.name,
+				length: info.size,
+				files: files
+					.map((file) => {
+						return {
+							length: file.size,
+							name: basename(file.name),
+							path: file.name,
+						};
+					})
+					.sort((a, b) => a.path.localeCompare(b.path)),
+			};
+			searchees.push(searchee);
+		}
+
+		return searchees;
 	}
 }

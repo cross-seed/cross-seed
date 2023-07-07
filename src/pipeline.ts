@@ -3,6 +3,7 @@ import fs from "fs";
 import { zip } from "lodash-es";
 import ms from "ms";
 import { performAction, performActions } from "./action.js";
+import QBittorrent from "./clients/QBittorrent.js";
 import {
 	ActionResult,
 	Decision,
@@ -240,7 +241,7 @@ export async function checkNewCandidateMatch(
 		searchee,
 		candidate.tracker
 	);
-	await sendResultsNotification(
+	sendResultsNotification(
 		searchee,
 		[[assessment, candidate.tracker, result]],
 		Label.REVERSE_LOOKUP
@@ -249,7 +250,13 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { torrents, dataDirs, torrentDir, searchLimit } = getRuntimeConfig();
+	const {
+		torrents,
+		dataDirs,
+		torrentDir,
+		searchLimit,
+		qbittorrentCategories,
+	} = getRuntimeConfig();
 	let allSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
@@ -259,7 +266,11 @@ async function findSearchableTorrents() {
 			.filter((t) => t.isOk())
 			.map((t) => t.unwrapOrThrow());
 	} else {
-		if (typeof torrentDir === "string") {
+		if (Array.isArray(qbittorrentCategories)) {
+			allSearchees.push(
+				...(await QBittorrent.instance().loadSearchees())
+			);
+		} else if (typeof torrentDir === "string") {
 			allSearchees.push(...(await loadTorrentDirLight()));
 		}
 		if (Array.isArray(dataDirs)) {

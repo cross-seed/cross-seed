@@ -29,6 +29,7 @@ interface FileConfig {
 	torrentDir?: string;
 	torznab?: string[];
 	qbittorrentUrl?: string;
+	qbittorrentCategories?: string[];
 	transmissionRpcUrl?: string;
 	duplicateCategories?: boolean;
 	notificationWebhookUrl?: string;

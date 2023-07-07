@@ -31,6 +31,7 @@ const createReasonLogger =
 		let reason;
 		switch (decision) {
 			case Decision.MATCH:
+			case Decision.MATCH_SIZE_ONLY:
 				return;
 			case Decision.SIZE_MISMATCH:
 				reason = "its size does not match";

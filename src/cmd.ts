@@ -117,6 +117,10 @@ function createCommandWithSharedOptions(name, description) {
 			(n) => parseInt(n),
 			fallback(fileConfig.maxDataDepth, 2)
 		)
+		.option(
+			"--qbittorrent-categories <cats...>",
+			"qBittorrent categories to use"
+		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
 			"Directory with torrent files",
