@@ -305,15 +305,17 @@ async function fetchCaps(indexer: {
 			assembleUrl(indexer.url, indexer.apikey, { t: "caps" })
 		);
 	} catch (e) {
-		const error = new Error(`Indexer ${indexer.url} failed to respond`);
-		logger.debug(error);
+		const error = new Error(
+			`Indexer ${indexer.url} failed to respond, check verbose logs`
+		);
+		logger.error(error);
 		throw error;
 	}
 
 	const responseText = await response.text();
 	if (!response.ok) {
 		const error = new Error(
-			`Indexer ${indexer.url} responded with code ${response.status} when fetching caps`
+			`Indexer ${indexer.url} responded with code ${response.status} when fetching caps, check verbose logs`
 		);
 		logger.error(error);
 		logger.debug(
@@ -329,7 +331,7 @@ async function fetchCaps(indexer: {
 		return parseTorznabCaps(parsedXml);
 	} catch (_) {
 		const error = new Error(
-			`Indexer ${indexer.url} responded with invalid XML when fetching caps`
+			`Indexer ${indexer.url} responded with invalid XML when fetching caps, check verbose logs`
 		);
 		logger.error(error);
 		logger.debug(
