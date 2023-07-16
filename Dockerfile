@@ -14,6 +14,7 @@ FROM node:18-alpine
 WORKDIR /usr/src/cross-seed
 COPY --from=build-stage /usr/src/cross-seed .
 RUN npm link
+RUN apk add --no-cache curl
 ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
 EXPOSE 2468
