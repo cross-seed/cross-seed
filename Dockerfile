@@ -7,6 +7,7 @@ RUN npm install -g npm@9 \
 COPY tsconfig.json tsconfig.json
 COPY src src
 RUN npm run build \
+    && npm prune --production \
     && rm -rf src tsconfig.json
 
 # Production Stage
