@@ -1,14 +1,23 @@
-FROM node:16
+# Build Stage
+FROM node:18-alpine AS build-stage
 WORKDIR /usr/src/cross-seed
-RUN npm install -g npm@9
 COPY package*.json ./
-RUN npm ci
-ENV CONFIG_DIR=/config
-ENV DOCKER_ENV=true
+RUN npm install -g npm@9 \
+    && npm ci
 COPY tsconfig.json tsconfig.json
 COPY src src
-RUN npm run build
+RUN npm run build \
+    && npm prune --production \
+    && rm -rf src tsconfig.json
+
+# Production Stage
+FROM node:18-alpine
+WORKDIR /usr/src/cross-seed
+COPY --from=build-stage /usr/src/cross-seed .
 RUN npm link
+RUN apk add --no-cache curl
+ENV CONFIG_DIR=/config
+ENV DOCKER_ENV=true
 EXPOSE 2468
 WORKDIR /config
 ENTRYPOINT ["cross-seed"]
