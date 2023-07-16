@@ -294,15 +294,55 @@ function assembleUrl(
 	return url.toString();
 }
 
-function fetchCaps(indexer: {
+async function fetchCaps(indexer: {
 	id: number;
 	url: string;
 	apikey: string;
 }): Promise<Caps> {
-	return fetch(assembleUrl(indexer.url, indexer.apikey, { t: "caps" }))
-		.then((r) => r.text())
-		.then(xml2js.parseStringPromise)
-		.then(parseTorznabCaps);
+	let response;
+	try {
+		response = await fetch(
+			assembleUrl(indexer.url, indexer.apikey, { t: "caps" })
+		);
+	} catch (e) {
+		const error = new Error(
+			`Indexer ${indexer.url} failed to respond, check verbose logs`
+		);
+		logger.error(error);
+		logger.debug(e);
+		throw error;
+	}
+
+	const responseText = await response.text();
+	if (!response.ok) {
+		const error = new Error(
+			`Indexer ${indexer.url} responded with code ${response.status} when fetching caps, check verbose logs`
+		);
+		logger.error(error);
+		logger.debug(
+			`Response body first 1000 characters: ${responseText.substring(
+				0,
+				1000
+			)}`
+		);
+		throw error;
+	}
+	try {
+		const parsedXml = await xml2js.parseStringPromise(responseText);
+		return parseTorznabCaps(parsedXml);
+	} catch (_) {
+		const error = new Error(
+			`Indexer ${indexer.url} responded with invalid XML when fetching caps, check verbose logs`
+		);
+		logger.error(error);
+		logger.debug(
+			`Response body first 1000 characters: ${responseText.substring(
+				0,
+				1000
+			)}`
+		);
+		throw error;
+	}
 }
 
 function collateOutcomes<Correlator, SuccessReturnType>(
@@ -334,16 +374,10 @@ async function updateCaps(
 	const outcomes = await Promise.allSettled<Caps>(
 		indexers.map((indexer) => fetchCaps(indexer))
 	);
-	const { fulfilled, rejected } = collateOutcomes<number, Caps>(
+	const { fulfilled } = collateOutcomes<number, Caps>(
 		indexers.map((i) => i.id),
 		outcomes
 	);
-	for (const [indexerId, reason] of rejected) {
-		logger.warn(
-			`Failed to reach ${indexers.find((i) => i.id === indexerId).url}`
-		);
-		logger.debug(reason);
-	}
 
 	for (const [indexerId, caps] of fulfilled) {
 		await db("indexer").where({ id: indexerId }).update({
@@ -379,6 +413,7 @@ export async function validateTorznabUrls() {
 			tv_search_cap: null,
 			movie_search_cap: null,
 		})
+		.orWhere({ search_cap: false, active: true })
 		.select({ id: "id", url: "url", apikey: "apikey" });
 	await updateCaps(enabledIndexersWithoutCaps);
 
