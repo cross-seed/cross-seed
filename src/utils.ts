@@ -84,5 +84,5 @@ export function formatAsList(strings: string[]) {
 	return new Intl.ListFormat("en", {
 		style: "long",
 		type: "conjunction",
-	}).format(strings);
+	}).format(strings.sort((a, b) => a.localeCompare(b)));
 }
