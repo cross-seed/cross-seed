@@ -1,8 +1,8 @@
 import {
 	EP_REGEX,
-	VIDEO_EXTENSIONS,
 	MOVIE_REGEX,
 	SEASON_REGEX,
+	VIDEO_EXTENSIONS,
 } from "./constants.js";
 
 export enum MediaType {
@@ -85,4 +85,11 @@ export function formatAsList(strings: string[]) {
 		style: "long",
 		type: "conjunction",
 	}).format(strings.sort((a, b) => a.localeCompare(b)));
+}
+
+export function fallback<T>(...args: T[]): T {
+	for (const arg of args) {
+		if (arg !== undefined) return arg;
+	}
+	return undefined;
 }

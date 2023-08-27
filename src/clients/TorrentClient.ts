@@ -1,4 +1,4 @@
-import { Metafile } from "parse-torrent";
+import { Metafile } from "../parseTorrent.js";
 import { InjectionResult } from "../constants.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";

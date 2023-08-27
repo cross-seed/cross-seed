@@ -27,13 +27,7 @@ import { serve } from "./server.js";
 import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
-
-function fallback(...args) {
-	for (const arg of args) {
-		if (arg !== undefined) return arg;
-	}
-	return undefined;
-}
+import { fallback } from "./utils.js";
 
 function processOptions(options): RuntimeConfig {
 	if (options.rssCadence) {
@@ -75,11 +69,13 @@ function createCommandWithSharedOptions(name, description) {
 		.option(
 			"-T, --torznab <urls...>",
 			"Torznab urls with apikey included (separated by spaces)",
+			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.torznab)
 		)
 		.option(
 			"--data-dirs <dirs...>",
 			"Directories to use if searching by data instead of torrents (separated by spaces)",
+			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.dataDirs)
 		)
 		.addOption(
@@ -106,7 +102,7 @@ function createCommandWithSharedOptions(name, description) {
 				"--link-type <type>",
 				"Use links of this type to inject data-based matches into your client"
 			)
-				.default(fallback(fileConfig.linkType, "symlink"))
+				.default(fallback(fileConfig.linkType, LinkType.SYMLINK))
 				.choices(Object.values(LinkType))
 				.makeOptionMandatory()
 		)

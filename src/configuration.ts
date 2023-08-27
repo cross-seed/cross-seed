@@ -22,7 +22,7 @@ interface FileConfig {
 	dataDirs?: string[];
 	matchMode?: MatchMode;
 	linkDir?: string;
-	linkType?: boolean;
+	linkType?: string;
 	skipRecheck?: boolean;
 	maxDataDepth?: number;
 	dataCategory?: string;
