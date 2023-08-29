@@ -14,7 +14,7 @@ export enum MediaType {
 
 export function stripExtension(filename: string): string {
 	for (const ext of VIDEO_EXTENSIONS) {
-		const re = new RegExp(`\\.${ext}$`);
+		const re = new RegExp(`${ext}$`);
 		if (re.test(filename)) return filename.replace(re, "");
 	}
 	return filename;
