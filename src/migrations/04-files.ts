@@ -25,4 +25,4 @@ function down(): void {
 	// no new tables created
 }
 
-export default { name: "03-rateLimits", up, down };
+export default { name: "04-files", up, down };
