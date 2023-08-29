@@ -1,3 +1,4 @@
+import { basename } from "path";
 import {
 	EP_REGEX,
 	MOVIE_REGEX,
@@ -14,8 +15,7 @@ export enum MediaType {
 
 export function stripExtension(filename: string): string {
 	for (const ext of VIDEO_EXTENSIONS) {
-		const re = new RegExp(`\\.${ext}$`);
-		if (re.test(filename)) return filename.replace(re, "");
+		if (filename.endsWith(ext)) return basename(filename, ext);
 	}
 	return filename;
 }
