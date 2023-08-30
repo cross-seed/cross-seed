@@ -39,6 +39,9 @@ interface FileConfig {
 	snatchTimeout?: string;
 	searchTimeout?: string;
 	searchLimit?: number;
+	prowlarrUrl?: string;
+	prowlarrApiKey?: number;
+	prowlarrTag?: string;
 }
 
 interface GenerateConfigParams {

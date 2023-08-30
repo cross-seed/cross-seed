@@ -255,8 +255,8 @@ program
 		"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
 		fileConfig.notificationWebhookUrl
 	)
-	.action((options) => {
-		setRuntimeConfig(options);
+	.action(async (options) => {
+		await setRuntimeConfig(options);
 		initializeLogger();
 		initializePushNotifier();
 		sendTestNotification();
@@ -301,7 +301,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	.action(async (options) => {
 		try {
 			const runtimeConfig = processOptions(options);
-			setRuntimeConfig(runtimeConfig);
+			await setRuntimeConfig(runtimeConfig);
 			initializeLogger();
 			initializePushNotifier();
 			logger.verbose({
@@ -322,7 +322,7 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 	async (options) => {
 		try {
 			const runtimeConfig = processOptions(options);
-			setRuntimeConfig(runtimeConfig);
+			await setRuntimeConfig(runtimeConfig);
 			initializeLogger();
 			initializePushNotifier();
 			logger.verbose({
@@ -351,7 +351,7 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 	.action(async (options) => {
 		try {
 			const runtimeConfig = processOptions(options);
-			setRuntimeConfig(runtimeConfig);
+			await setRuntimeConfig(runtimeConfig);
 			initializeLogger();
 			initializePushNotifier();
 			logger.verbose({

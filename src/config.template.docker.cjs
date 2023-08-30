@@ -226,4 +226,20 @@ module.exports = {
 	 * Default is no limit.
 	 */
 	searchLimit: undefined,
+
+	/**
+	 * This would be the URL where Prowlarr is accessible at.
+	 */
+	prowlarrUrl: undefined,
+
+	/**
+	 * The API key for Prowlarr
+	 */
+	prowlarrApiKey: undefined,
+
+	/**
+	 * The tag which is used when fetching indexers from Prowlarr.
+	 * Will only return indexers with this tag.
+	 */
+	prowlarrTag: undefined,
 };

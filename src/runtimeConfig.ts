@@ -1,4 +1,5 @@
 import { Action, LinkType, MatchMode } from "./constants.js";
+import { getProwlarrIndexers } from "./prowlarr.js";
 
 export interface RuntimeConfig {
 	offset: number;
@@ -36,7 +37,12 @@ export interface RuntimeConfig {
 
 let runtimeConfig: RuntimeConfig;
 
-export function setRuntimeConfig(configObj: RuntimeConfig): void {
+export async function setRuntimeConfig(configObj: RuntimeConfig): Promise<void> {
+	const prowlarrIndexers = await getProwlarrIndexers();
+	if (prowlarrIndexers) {
+		configObj.torznab = [...configObj.torznab,
+			...prowlarrIndexers];
+	}
 	runtimeConfig = configObj;
 }
 
