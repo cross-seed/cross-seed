@@ -14,6 +14,7 @@ import {
 import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
+import { ingest } from "./ingest.js";
 import { jobsLoop } from "./jobs.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
@@ -371,6 +372,28 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			await db.destroy();
 		}
 	});
+
+createCommandWithSharedOptions("ingest", "run ingestion").action(
+	async (options) => {
+		try {
+			const runtimeConfig = processOptions(options);
+			setRuntimeConfig(runtimeConfig);
+			initializeLogger();
+			initializePushNotifier();
+			logger.verbose({
+				label: Label.CONFIGDUMP,
+				message: inspect(runtimeConfig),
+			});
+			await db.migrate.latest();
+			await doStartupValidation();
+			await ingest();
+			await db.destroy();
+		} catch (e) {
+			exitOnCrossSeedErrors(e);
+			await db.destroy();
+		}
+	}
+);
 
 program.showHelpAfterError("(add --help for additional information)");
 

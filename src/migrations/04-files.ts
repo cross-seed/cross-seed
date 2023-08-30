@@ -4,8 +4,8 @@ async function up(knex: Knex.Knex): Promise<void> {
 	await knex("torrent").del();
 	await knex.schema.alterTable("torrent", (table) => {
 		table.integer("searchee_id").references("id").inTable("searchee");
-		table.string("info_hash").unique();
-		table.renameColumn("file_path", "guid");
+		table.unique(["info_hash"]);
+		table.dropColumn("file_path");
 	});
 
 	await knex.schema.createTable("file", (table) => {
@@ -13,7 +13,8 @@ async function up(knex: Knex.Knex): Promise<void> {
 		table.integer("searchee_id").references("id").inTable("searchee");
 		table.string("name");
 		table.string("path");
-		table.string("length");
+		table.integer("length");
+		table.unique(["searchee_id", "path"]);
 	});
 
 	await knex.schema.alterTable("searchee", (table) => {
@@ -21,8 +22,8 @@ async function up(knex: Knex.Knex): Promise<void> {
 	});
 }
 
-function down(): void {
-	// no new tables created
+async function down(knex: Knex.Knex): Promise<void> {
+	await knex.schema.dropTable("file");
 }
 
 export default { name: "04-files", up, down };

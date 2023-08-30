@@ -249,7 +249,7 @@ export async function checkNewCandidateMatch(
 	return result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
 }
 
-async function findSearchableTorrents() {
+export async function findSearchableTorrents() {
 	const {
 		torrents,
 		dataDirs,

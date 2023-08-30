@@ -1,5 +1,6 @@
 import QBittorrent from "./clients/QBittorrent.js";
 import { findSearcheesFromAllDataDirs } from "./dataFiles.js";
+import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -11,7 +12,46 @@ import {
 import { loadTorrentDirLight } from "./torrent.js";
 import { filterAsync } from "./utils.js";
 
-async function findSearchableTorrents() {
+async function persist(searchee: Searchee) {
+	await db.transaction(async (trx) => {
+		const [{ id: searcheeId }] = await trx("searchee")
+			.insert(
+				[
+					{
+						name: searchee.name,
+						data_root: searchee.path ?? null,
+					},
+				],
+				["id"]
+			)
+			.onConflict("name")
+			.merge(["data_root"]);
+		console.log(searcheeId);
+		await trx("file")
+			.insert(
+				searchee.files.map((file) => ({
+					searchee_id: searcheeId,
+					name: file.name,
+					path: file.path,
+					length: file.length,
+				}))
+			)
+			.onConflict()
+			.ignore();
+
+		if (searchee.infoHash) {
+			await trx("torrent")
+				.insert({
+					searchee_id: searcheeId,
+					info_hash: searchee.infoHash,
+				})
+				.onConflict()
+				.ignore();
+		}
+	});
+}
+
+async function getAllSearchees() {
 	const {
 		torrents,
 		dataDirs,
@@ -46,26 +86,13 @@ async function findSearchableTorrents() {
 			);
 		}
 	}
+	return allSearchees;
+}
 
-	const hashesToExclude = allSearchees.map((t) => t.infoHash).filter(Boolean);
-	let filteredTorrents = await filterAsync(
-		filterDupes(allSearchees).filter(filterByContent),
-		filterTimestamps
-	);
-
-	logger.info({
-		label: Label.SEARCH,
-		message: `Found ${allSearchees.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
-	});
-
-	if (searchLimit && filteredTorrents.length > searchLimit) {
-		logger.info({
-			label: Label.SEARCH,
-			message: `Limited to ${searchLimit} searches`,
-		});
-
-		filteredTorrents = filteredTorrents.slice(0, searchLimit);
+export async function ingest() {
+	const searchees = await getAllSearchees();
+	for (const searchee of searchees) {
+		await persist(searchee);
 	}
-
-	return { samples: filteredTorrents, hashesToExclude };
+	console.log(searchees);
 }
