@@ -219,6 +219,12 @@ function createCommandWithSharedOptions(name, description) {
 			"The number of searches before stops",
 			parseInt,
 			fallback(fileConfig.searchLimit, 0)
+		)
+		.option(
+			"--qbittorrent-categories <categories...>",
+			"qBittorrent categories to pull searchable torrents from",
+			// @ts-expect-error commander supports non-string defaults
+			fallback(fileConfig.qbittorrentCategories)
 		);
 }
 

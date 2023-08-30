@@ -394,6 +394,7 @@ export default class QBittorrent implements TorrentClient {
 			const files: TorrentFiles[] = JSON.parse(response);
 			const searchee: Searchee = {
 				name: info.name,
+				infoHash: info.hash.toLowerCase(),
 				length: info.size,
 				files: files
 					.map((file) => {

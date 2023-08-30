@@ -2,8 +2,6 @@ import { resolve } from "path";
 import QBittorrent from "./clients/QBittorrent.js";
 import { findSearcheesFromAllDataDirs } from "./dataFiles.js";
 import { db } from "./db.js";
-import { Label, logger } from "./logger.js";
-import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromPath,
@@ -11,7 +9,6 @@ import {
 	Searchee,
 } from "./searchee.js";
 import { loadTorrentDirLight } from "./torrent.js";
-import { filterAsync } from "./utils.js";
 
 async function persist(searchee: Searchee) {
 	await db.transaction(async (trx) => {
@@ -71,9 +68,9 @@ async function getAllSearchees() {
 			.map((t) => t.unwrapOrThrow());
 	} else {
 		if (Array.isArray(qbittorrentCategories)) {
-			allSearchees.push(
-				...(await QBittorrent.instance().loadSearchees())
-			);
+			const searchees = await QBittorrent.instance().loadSearchees();
+			console.log(searchees);
+			allSearchees.push(...searchees);
 		} else if (typeof torrentDir === "string") {
 			allSearchees.push(...(await loadTorrentDirLight()));
 		}
@@ -81,11 +78,11 @@ async function getAllSearchees() {
 			const searcheeResults = await Promise.all(
 				findSearcheesFromAllDataDirs().map(createSearcheeFromPath)
 			);
-			const searchees = searcheeResults
-				.filter((t) => t.isOk())
-				.map((t) => t.unwrapOrThrow());
-			console.log(searchees);
-			allSearchees.push(...searchees);
+			allSearchees.push(
+				...searcheeResults
+					.filter((t) => t.isOk())
+					.map((t) => t.unwrapOrThrow())
+			);
 		}
 	}
 	return allSearchees;
