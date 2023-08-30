@@ -40,7 +40,7 @@ interface FileConfig {
 	searchTimeout?: string;
 	searchLimit?: number;
 	prowlarrUrl?: string;
-	prowlarrApiKey?: number;
+	prowlarrApiKey?: string;
 	prowlarrTag?: string;
 }
 
