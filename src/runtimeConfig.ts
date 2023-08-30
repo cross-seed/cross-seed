@@ -39,6 +39,7 @@ let runtimeConfig: RuntimeConfig;
 
 export async function setRuntimeConfig(configObj: RuntimeConfig): Promise<void> {
 	const prowlarrIndexers = await getProwlarrIndexers();
+	configObj.torznab = configObj.torznab || [];
 	if (prowlarrIndexers) {
 		configObj.torznab = [...configObj.torznab,
 			...prowlarrIndexers];
