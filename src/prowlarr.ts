@@ -45,7 +45,7 @@ export async function getProwlarrIndexers(): Promise<string[] | void> {
 					});
 
 					return filteredIndexers.map(indexer => {
-						return `${fileConfig.prowlarrUrl}/${indexer.id}/api?apiKey=${fileConfig.prowlarrApiKey}`;
+						return `${fileConfig.prowlarrUrl}/${indexer.id}/api?apikey=${fileConfig.prowlarrApiKey}`;
 					});
 				}
 			} catch (error) {
