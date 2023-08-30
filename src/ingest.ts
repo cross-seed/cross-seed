@@ -1,3 +1,4 @@
+import { resolve } from "path";
 import QBittorrent from "./clients/QBittorrent.js";
 import { findSearcheesFromAllDataDirs } from "./dataFiles.js";
 import { db } from "./db.js";
@@ -19,20 +20,21 @@ async function persist(searchee: Searchee) {
 				[
 					{
 						name: searchee.name,
-						data_root: searchee.path ?? null,
+						data_root: searchee.path
+							? resolve(searchee.path)
+							: null,
 					},
 				],
 				["id"]
 			)
 			.onConflict("name")
 			.merge(["data_root"]);
-		console.log(searcheeId);
 		await trx("file")
 			.insert(
 				searchee.files.map((file) => ({
 					searchee_id: searcheeId,
 					name: file.name,
-					path: file.path,
+					path: resolve(file.path),
 					length: file.length,
 				}))
 			)
@@ -79,11 +81,11 @@ async function getAllSearchees() {
 			const searcheeResults = await Promise.all(
 				findSearcheesFromAllDataDirs().map(createSearcheeFromPath)
 			);
-			allSearchees.push(
-				...searcheeResults
-					.filter((t) => t.isOk())
-					.map((t) => t.unwrapOrThrow())
-			);
+			const searchees = searcheeResults
+				.filter((t) => t.isOk())
+				.map((t) => t.unwrapOrThrow());
+			console.log(searchees);
+			allSearchees.push(...searchees);
 		}
 	}
 	return allSearchees;
@@ -94,5 +96,4 @@ export async function ingest() {
 	for (const searchee of searchees) {
 		await persist(searchee);
 	}
-	console.log(searchees);
 }
