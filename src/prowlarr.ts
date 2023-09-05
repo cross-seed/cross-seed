@@ -36,10 +36,10 @@ export async function getProwlarrIndexers(): Promise<string[] | void> {
 
 			try {
 				const tagId = await fetchTagId(fileConfig);
-				const response = await axios.get(`${fileConfig.prowlarrUrl}/api/v1/indexer?apikey=${fileConfig.prowlarrApiKey}`);
-				const indexers:  Indexer[] = response.data as Indexer[];
 
 				if (tagId !== null) {
+					const response = await axios.get(`${fileConfig.prowlarrUrl}/api/v1/indexer?apikey=${fileConfig.prowlarrApiKey}`);
+					const indexers: Indexer[] = response.data as Indexer[];
 					const filteredIndexers = indexers.filter(indexer => {
 						return indexer.enable && indexer.tags && indexer.tags.includes(tagId);
 					});
@@ -51,8 +51,6 @@ export async function getProwlarrIndexers(): Promise<string[] | void> {
 			} catch (error) {
 				console.error(`An error occurred: ${error}`);
 			}
-		} else {
-			/* do nothing */
 		}
 	} catch (error1) {
 		console.error(`An error occurred: ${error1}`);
