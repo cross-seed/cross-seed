@@ -29,7 +29,7 @@ async function fetchTagId(fileConfig: ValidatedFileConfig): Promise<number| null
 	try {
 		const response = await fetch(buildUrl(fileConfig.prowlarrUrl, 'tag', fileConfig.prowlarrApiKey));
 		if (!response.ok) {
-			logger.error('Prowlarr response was not ok ' + response.statusText);
+			logger.error('Prowlarr: response was not ok ' + response.statusText);
 			return null;
 		}
 		const tags: Tag[] = await response.json() as Tag[];
@@ -55,7 +55,7 @@ export async function getProwlarrIndexers(): Promise<string[] | null> {
 				if (tagId !== null) {
 					const response = await fetch(buildUrl(fileConfig.prowlarrUrl, 'indexer', fileConfig.prowlarrApiKey));
 					if (!response.ok) {
-						logger.error('Prowlarr: Network response was not ok ' + response.statusText);
+						logger.error('Prowlarr: response was not ok ' + response.statusText);
 						return null;
 					}
 					const indexers: Indexer[] = await response.json() as Indexer[];
