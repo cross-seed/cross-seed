@@ -82,7 +82,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 				"coalesce(timestamp.first_searched, 9223372036854775807)"
 			),
 		})
-		.max({
+		.min({
 			last_searched_all: db.raw("coalesce(timestamp.last_searched, 0)"),
 		})
 		.first();
