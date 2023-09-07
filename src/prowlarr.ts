@@ -23,8 +23,7 @@ async function fetchTagId(fileConfig): Promise<number| null> {
 		}
 		const tags: Tag[] = await response.json() as Tag[];
 
-		const tagObj = tags.find(tag => tag.label === fileConfig.prowlarrTag);
-		return tagObj ? tagObj.id : null;
+		return tags.find(tag => tag.label === fileConfig.prowlarrTag)?.id;
 	} catch (error) {
 		console.error(`Error fetching tag IDs from Prowlarr: ${error}`);
 		return null;
