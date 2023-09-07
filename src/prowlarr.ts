@@ -1,4 +1,4 @@
-import axios from 'axios';
+import fetch from 'node-fetch';
 import { getFileConfig } from "./configuration.js";
 
 interface Indexer {
@@ -16,8 +16,11 @@ interface Tag {
 
 async function fetchTagId(fileConfig): Promise<number| null> {
 	try {
-		const response = await axios.get(`${fileConfig.prowlarrUrl}/api/v1/tag?apikey=${fileConfig.prowlarrApiKey}`);
-		const tags: Tag[] = response.data as Tag[];
+		const response = await fetch(`${fileConfig.prowlarrUrl}/api/v1/tag?apikey=${fileConfig.prowlarrApiKey}`);
+		if (!response.ok) {
+			console.error('Prowlarr response was not ok ' + response.statusText);
+		}
+		const tags: Tag[] = await response.json() as Tag[];
 
 		const tagObj = tags.find(tag => tag.label === fileConfig.prowlarrTag);
 		return tagObj ? tagObj.id : null;
@@ -38,8 +41,11 @@ export async function getProwlarrIndexers(): Promise<string[] | void> {
 				const tagId = await fetchTagId(fileConfig);
 
 				if (tagId !== null) {
-					const response = await axios.get(`${fileConfig.prowlarrUrl}/api/v1/indexer?apikey=${fileConfig.prowlarrApiKey}`);
-					const indexers: Indexer[] = response.data as Indexer[];
+					const response = await fetch(`${fileConfig.prowlarrUrl}/api/v1/indexer?apikey=${fileConfig.prowlarrApiKey}`);
+					if (!response.ok) {
+						console.error('Network response was not ok ' + response.statusText);
+					}
+					const indexers: Indexer[] = await response.json() as Indexer[];
 					const filteredIndexers = indexers.filter(indexer => {
 						return indexer.enable && indexer.tags && indexer.tags.includes(tagId);
 					});
