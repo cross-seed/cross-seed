@@ -14,9 +14,19 @@ interface Tag {
 	label: string;
 }
 
-async function fetchTagId(fileConfig): Promise<number| null> {
+interface ValidatedFileConfig {
+	prowlarrUrl: string;
+	prowlarrApiKey: string;
+	prowlarrTag: string;
+}
+
+function buildUrl(base: string, endpoint: string, apiKey: string): string {
+	return `${base}/api/v1/${endpoint}?apikey=${apiKey}`;
+}
+
+async function fetchTagId(fileConfig: ValidatedFileConfig): Promise<number| null> {
 	try {
-		const response = await fetch(`${fileConfig.prowlarrUrl}/api/v1/tag?apikey=${fileConfig.prowlarrApiKey}`);
+		const response = await fetch(buildUrl(fileConfig.prowlarrUrl, 'tag', fileConfig.prowlarrApiKey));
 		if (!response.ok) {
 			console.error('Prowlarr response was not ok ' + response.statusText);
 			return null;
@@ -30,7 +40,7 @@ async function fetchTagId(fileConfig): Promise<number| null> {
 	}
 }
 
-export async function getProwlarrIndexers(): Promise<string[] | void> {
+export async function getProwlarrIndexers(): Promise<string[] | null> {
 	try {
 		const fileConfig = await getFileConfig();
 		if (fileConfig.prowlarrUrl !== undefined &&
@@ -38,10 +48,10 @@ export async function getProwlarrIndexers(): Promise<string[] | void> {
 			fileConfig.prowlarrTag !== undefined) {
 
 			try {
-				const tagId = await fetchTagId(fileConfig);
+				const tagId = await fetchTagId(fileConfig as ValidatedFileConfig);
 
 				if (tagId !== null) {
-					const response = await fetch(`${fileConfig.prowlarrUrl}/api/v1/indexer?apikey=${fileConfig.prowlarrApiKey}`);
+					const response = await fetch(buildUrl(fileConfig.prowlarrUrl, 'indexer', fileConfig.prowlarrApiKey));
 					if (!response.ok) {
 						console.error('Network response was not ok ' + response.statusText);
 						return null;
@@ -52,7 +62,7 @@ export async function getProwlarrIndexers(): Promise<string[] | void> {
 					});
 
 					return filteredIndexers.map(indexer => {
-						return `${fileConfig.prowlarrUrl}/${indexer.id}/api?apikey=${fileConfig.prowlarrApiKey}`;
+						return buildUrl(fileConfig.prowlarrUrl, `${indexer.id}/api`, fileConfig.prowlarrApiKey);
 					});
 				}
 			} catch (error) {
