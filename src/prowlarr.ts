@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { logger } from "./logger.js";
 import { getFileConfig } from "./configuration.js";
 
 interface Indexer {
@@ -28,14 +29,15 @@ async function fetchTagId(fileConfig: ValidatedFileConfig): Promise<number| null
 	try {
 		const response = await fetch(buildUrl(fileConfig.prowlarrUrl, 'tag', fileConfig.prowlarrApiKey));
 		if (!response.ok) {
-			console.error('Prowlarr response was not ok ' + response.statusText);
+			logger.error('Prowlarr response was not ok ' + response.statusText);
 			return null;
 		}
 		const tags: Tag[] = await response.json() as Tag[];
+		logger.info(`Prowlarr: Found ${tags.length} tags from Prowlarr.`);
 
 		return tags.find(tag => tag.label === fileConfig.prowlarrTag)?.id;
 	} catch (error) {
-		console.error(`Error fetching tag IDs from Prowlarr: ${error}`);
+		logger.error(`Prowlarr: Error fetching tag IDs: ${error}`);
 		return null;
 	}
 }
@@ -53,7 +55,7 @@ export async function getProwlarrIndexers(): Promise<string[] | null> {
 				if (tagId !== null) {
 					const response = await fetch(buildUrl(fileConfig.prowlarrUrl, 'indexer', fileConfig.prowlarrApiKey));
 					if (!response.ok) {
-						console.error('Network response was not ok ' + response.statusText);
+						logger.error('Prowlarr: Network response was not ok ' + response.statusText);
 						return null;
 					}
 					const indexers: Indexer[] = await response.json() as Indexer[];
@@ -61,16 +63,18 @@ export async function getProwlarrIndexers(): Promise<string[] | null> {
 						return indexer.enable && indexer.tags && indexer.tags.includes(tagId);
 					});
 
+					logger.info(`Prowlarr: Found ${filteredIndexers.length} enabled indexers with the specified tag`);
+
 					return filteredIndexers.map(indexer => {
 						return buildUrl(fileConfig.prowlarrUrl, `${indexer.id}/api`, fileConfig.prowlarrApiKey);
 					});
 				}
 			} catch (error) {
-				console.error(`An error occurred: ${error}`);
+				logger.error(`Prowlarr: An error occurred: ${error}`);
 			}
 		}
 	} catch (error1) {
-		console.error(`An error occurred: ${error1}`);
+		logger.error(`Prowlarr: An error occurred: ${error1}`);
 	}
 }
 
