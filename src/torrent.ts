@@ -209,15 +209,30 @@ export async function getTorrentByFuzzyName(
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
 	var filteredNames = [];
 	if (episode[0]) {
-		filteredNames = allNames.filter((dbName) => episode === dbName.match(EP_REGEX));
+		episode[0] = episode[0].replace(".", "").replace(" ", "").toLowerCase();
+		filteredNames = allNames.filter((dbName) => {
+			var match = dbName.match(EP_REGEX); 
+			if (!match) return false;
+			match[0] = match[0].replace(".", "").replace(" ", "").toLowerCase(); 
+			return episode === match});
 	} else if (season[0]) {
-		filteredNames = allNames.filter((dbName) => season === dbName.match(SEASON_REGEX));
+		season[0] = season[0].replace(".", "").replace(" ", "").toLowerCase();
+		filteredNames = allNames.filter((dbName) => {
+			var match = dbName.match(SEASON_REGEX); 
+			if (!match) return false;
+			match[0] = match[0].replace(".", "").replace(" ", "").toLowerCase(); 
+			return season === match});
 	} else if (movie[0]) {
-		filteredNames = allNames.filter((dbName) => movie === dbName.match(MOVIE_REGEX));
+		movie[0] = movie[0].replace(".", "").replace(" ", "").toLowerCase();
+		filteredNames = allNames.filter((dbName) => {
+			var match = dbName.match(MOVIE_REGEX); 
+			if (!match) return false;
+			match[0] = match[0].replace(".", "").replace(" ", "").toLowerCase(); 
+			return movie === match});
 	}
 
 	// If none match, proceed with fuzzy name check on all names.
-	
+
 	// @ts-expect-error fuse types are confused
 	const potentialMatches = new Fuse(length(filteredNames) > 0 ? filteredNames : allNames, 
 	{
