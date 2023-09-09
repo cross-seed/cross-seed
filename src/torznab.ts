@@ -179,11 +179,10 @@ export async function searchTorznab(
 	const timestampCallout = " (filtered by timestamps)";
 	logger.info({
 		label: Label.TORZNAB,
-		message: `Searching ${indexersToUse.length} indexers for ${name}${
-			indexersToUse.length < enabledIndexers.length
-				? timestampCallout
-				: ""
-		}`,
+		message: `Searching ${indexersToUse.length} indexers for ${name}${indexersToUse.length < enabledIndexers.length
+			? timestampCallout
+			: ""
+			}`,
 	});
 
 	return makeRequests(name, indexersToUse, (indexer) =>
@@ -463,26 +462,32 @@ async function makeRequests(
 			})
 				.then((response) => {
 					if (!response.ok) {
+						let indexerStatusError = IndexerStatus.UNKNOWN_ERROR;
+						let retryInMs = 3600000; // Default 1 hour in milliseconds
+
 						if (response.status === 429) {
-							updateIndexerStatus(
-								IndexerStatus.RATE_LIMITED,
-								Date.now() + ms("1 hour"),
-								[indexers[i].id]
-							);
-						} else {
-							updateIndexerStatus(
-								IndexerStatus.UNKNOWN_ERROR,
-								Date.now() + ms("1 hour"),
-								[indexers[i].id]
-							);
+							indexerStatusError = IndexerStatus.RATE_LIMITED;
+							const retryAfter = response.headers.get('Retry-After');
+							if (retryAfter) {
+								const retryAfterInSeconds = parseInt(retryAfter);
+								if (!isNaN(retryAfterInSeconds)) {
+									retryInMs = retryAfterInSeconds * 1000;
+								} else {
+									const retryAfterDate = new Date(retryAfter);
+									if (!isNaN(retryAfterDate.getTime())) {
+										retryInMs = retryAfterDate.getTime() - Date.now();
+									}
+								}
+							}
 						}
-						throw new Error(
-							`request failed with code: ${response.status}`
-						);
+
+						updateIndexerStatus(indexerStatusError, Date.now() + retryInMs, [indexers[i].id]);
+
+						throw new Error(`request failed with code: ${response.status}`);
 					}
-					return response;
+
+					return response.text();
 				})
-				.then((r) => r.text())
 				.then(xml2js.parseStringPromise)
 				.then(parseTorznabResults)
 		)
