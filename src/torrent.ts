@@ -3,7 +3,7 @@ import Fuse from "fuse.js";
 import fetch, { Response } from "node-fetch";
 import path, { join } from "path";
 import { inspect } from "util";
-import { USER_AGENT } from "./constants.js";
+import { USER_AGENT, EP_REGEX, SEASON_REGEX, MOVIE_REGEX } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
@@ -201,8 +201,26 @@ export async function getTorrentByFuzzyName(
 	name: string
 ): Promise<null | Metafile> {
 	const allNames = await db("torrent").select("name", "file_path");
+
+	const episode = name.match(EP_REGEX);
+	const season = name.match(SEASON_REGEX);
+	const movie = name.match(MOVIE_REGEX);
+
+	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
+	var filteredNames = [];
+	if (episode[0]) {
+		filteredNames = allNames.filter((dbName) => episode === dbName.match(EP_REGEX));
+	} else if (season[0]) {
+		filteredNames = allNames.filter((dbName) => season === dbName.match(SEASON_REGEX));
+	} else if (movie[0]) {
+		filteredNames = allNames.filter((dbName) => movie === dbName.match(MOVIE_REGEX));
+	}
+
+	// If none match, proceed with fuzzy name check on all names.
+	
 	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(allNames, {
+	const potentialMatches = new Fuse(length(filteredNames) > 0 ? filteredNames : allNames, 
+	{
 		keys: ["name"],
 		distance: 6,
 		threshold: 0.25,
