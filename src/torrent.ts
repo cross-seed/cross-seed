@@ -206,7 +206,7 @@ export async function getTorrentByFuzzyName(
 	const season = name.match(SEASON_REGEX);
 	const movie = name.match(MOVIE_REGEX);
 	const fullMatch = (episode?.[0] ?? season?.[0] ?? movie?.[0])
-		.replace(".", "").replace(" ", "").toLowerCase();
+		.replaceAll(".", "").replaceAll(" ", "").toLowerCase();
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
 	var filteredNames = [];
