@@ -205,36 +205,27 @@ export async function getTorrentByFuzzyName(
 	const episode = name.match(EP_REGEX);
 	const season = name.match(SEASON_REGEX);
 	const movie = name.match(MOVIE_REGEX);
+	const fullMatch = (episode?.[0] ?? season?.[0] ?? movie?.[0])
+		.replace(".", "").replace(" ", "").toLowerCase();
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
 	var filteredNames = [];
-	if (episode[0]) {
-		episode[0] = episode[0].replace(".", "").replace(" ", "").toLowerCase();
+
+	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
-			var match = dbName.match(EP_REGEX); 
-			if (!match) return false;
-			match[0] = match[0].replace(".", "").replace(" ", "").toLowerCase(); 
-			return episode === match});
-	} else if (season[0]) {
-		season[0] = season[0].replace(".", "").replace(" ", "").toLowerCase();
-		filteredNames = allNames.filter((dbName) => {
-			var match = dbName.match(SEASON_REGEX); 
-			if (!match) return false;
-			match[0] = match[0].replace(".", "").replace(" ", "").toLowerCase(); 
-			return season === match});
-	} else if (movie[0]) {
-		movie[0] = movie[0].replace(".", "").replace(" ", "").toLowerCase();
-		filteredNames = allNames.filter((dbName) => {
-			var match = dbName.match(MOVIE_REGEX); 
-			if (!match) return false;
-			match[0] = match[0].replace(".", "").replace(" ", "").toLowerCase(); 
-			return movie === match});
+			const dbEpisode = dbName.match(EP_REGEX);
+			const dbSeason = dbName.match(SEASON_REGEX);
+			const dbMovie = dbName.match(MOVIE_REGEX);
+			const dbMatch = (dbEpisode?.[0] ?? dbSeason?.[0] ?? dbMovie?.[0])
+			.replaceAll(".", "").replaceAll(" ", "").toLowerCase();
+			if (!dbMatch) return false;
+			return fullMatch === dbMatch});
 	}
 
 	// If none match, proceed with fuzzy name check on all names.
 
 	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(length(filteredNames) > 0 ? filteredNames : allNames, 
+	const potentialMatches = new Fuse(filteredNames.length > 0 ? filteredNames : allNames, 
 	{
 		keys: ["name"],
 		distance: 6,
