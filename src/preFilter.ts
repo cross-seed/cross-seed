@@ -86,7 +86,6 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			last_searched_all: db.raw("coalesce(timestamp.last_searched, 0)"),
 		})
 		.first();
-		
 	const { first_searched_all, last_searched_all } = timestampDataSql;
 	function logReason(reason) {
 		logger.verbose({
