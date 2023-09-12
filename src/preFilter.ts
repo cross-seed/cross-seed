@@ -70,12 +70,15 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			"timestamp.indexer_id": "indexer.id",
 			"timestamp.searchee_id": "searchee.id",
 		})
+		.where("searchee.name",
+		searchee.name
+		)
 		.whereIn(
 			"indexer.id",
 			enabledIndexers.map((i) => i.id)
 		)
-		.max({
-			first_searched_all: db.raw(
+		.min({
+			first_searched_any: db.raw(
 				"coalesce(timestamp.first_searched, 9223372036854775807)"
 			),
 		})
@@ -84,7 +87,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		})
 		.first();
 
-	const { first_searched_all, last_searched_all } = timestampDataSql;
+	const { first_searched_any, last_searched_all } = timestampDataSql;
 	function logReason(reason) {
 		logger.verbose({
 			label: Label.PREFILTER,
@@ -94,12 +97,12 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 
 	if (
 		typeof excludeOlder === "number" &&
-		first_searched_all &&
-		first_searched_all < nMsAgo(excludeOlder)
+		first_searched_any &&
+		first_searched_any < nMsAgo(excludeOlder)
 	) {
 		logReason(
 			`its first search timestamp ${humanReadable(
-				first_searched_all
+				first_searched_any
 			)} is older than ${ms(excludeOlder, { long: true })} ago`
 		);
 		return false;
