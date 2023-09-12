@@ -489,9 +489,8 @@ async function makeRequests(
 							`request failed with code: ${response.status}`
 						);
 					}
-					return response;
+					return response.text();
 				})
-				.then((r) => r.text())
 				.then(xml2js.parseStringPromise)
 				.then(parseTorznabResults)
 		)
