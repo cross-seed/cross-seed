@@ -3,7 +3,12 @@ import Fuse from "fuse.js";
 import fetch, { Response } from "node-fetch";
 import path, { join } from "path";
 import { inspect } from "util";
-import { USER_AGENT, EP_REGEX, SEASON_REGEX, MOVIE_REGEX } from "./constants.js";
+import {
+	USER_AGENT,
+	EP_REGEX,
+	SEASON_REGEX,
+	MOVIE_REGEX,
+} from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
@@ -11,7 +16,7 @@ import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { stripExtension } from "./utils.js";
+import { reformatTitleForSearching, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -202,35 +207,36 @@ export async function getTorrentByFuzzyName(
 ): Promise<null | Metafile> {
 	const allNames = await db("torrent").select("name", "file_path");
 
-	const episode = name.match(EP_REGEX);
-	const season = name.match(SEASON_REGEX);
-	const movie = name.match(MOVIE_REGEX);
-	const fullMatch = (episode?.[0] ?? season?.[0] ?? movie?.[0])
-		.replaceAll(".", "").replaceAll(" ", "").toLowerCase();
+	const fullMatch = reformatTitleForSearching(name).replace(
+		/[^a-z0-9]/gi,
+		""
+	);
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
-	var filteredNames = [];
+	let filteredNames = [];
 
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
-			const dbEpisode = dbName.match(EP_REGEX);
-			const dbSeason = dbName.match(SEASON_REGEX);
-			const dbMovie = dbName.match(MOVIE_REGEX);
-			const dbMatch = (dbEpisode?.[0] ?? dbSeason?.[0] ?? dbMovie?.[0])
-			.replaceAll(".", "").replaceAll(" ", "").toLowerCase();
+			const dbMatch = reformatTitleForSearching(dbName).replace(
+				/[^a-z0-9]/gi,
+				""
+			);
 			if (!dbMatch) return false;
-			return fullMatch === dbMatch});
+			return fullMatch === dbMatch;
+		});
 	}
 
 	// If none match, proceed with fuzzy name check on all names.
 
 	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(filteredNames.length > 0 ? filteredNames : allNames, 
-	{
-		keys: ["name"],
-		distance: 6,
-		threshold: 0.25,
-	}).search(name);
+	const potentialMatches = new Fuse(
+		filteredNames.length > 0 ? filteredNames : allNames,
+		{
+			keys: ["name"],
+			distance: 6,
+			threshold: 0.25,
+		}
+	).search(name);
 
 	if (potentialMatches.length === 0) return null;
 	const [firstMatch] = potentialMatches;

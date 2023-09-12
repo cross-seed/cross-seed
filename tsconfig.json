@@ -6,7 +6,8 @@
 		"module": "nodenext",
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
-		"sourceMap": true
+		"sourceMap": true,
+		"lib": ["ES2021.String",]
 	},
 	"include": ["./src/**/*"]
 }
