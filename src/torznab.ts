@@ -1,7 +1,7 @@
 import ms from "ms";
 import fetch from "node-fetch";
 import xml2js from "xml2js";
-import { EP_REGEX, SEASON_REGEX } from "./constants.js";
+import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
@@ -21,7 +21,6 @@ import {
 	reformatTitleForSearching,
 	stripExtension,
 } from "./utils.js";
-import { USER_AGENT } from "./constants.js";
 
 interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
@@ -179,10 +178,11 @@ export async function searchTorznab(
 	const timestampCallout = " (filtered by timestamps)";
 	logger.info({
 		label: Label.TORZNAB,
-		message: `Searching ${indexersToUse.length} indexers for ${name}${indexersToUse.length < enabledIndexers.length
-			? timestampCallout
-			: ""
-			}`,
+		message: `Searching ${indexersToUse.length} indexers for ${name}${
+			indexersToUse.length < enabledIndexers.length
+				? timestampCallout
+				: ""
+		}`,
 	});
 
 	return makeRequests(name, indexersToUse, (indexer) =>
@@ -462,32 +462,36 @@ async function makeRequests(
 			})
 				.then((response) => {
 					if (!response.ok) {
-						let indexerStatusError = IndexerStatus.UNKNOWN_ERROR;
-						let retryInMs = 3600000; // Default 1 hour in milliseconds
+						const retryAfterSeconds = Number(
+							response.headers.get("Retry-After")
+						);
 
-						if (response.status === 429) {
-							indexerStatusError = IndexerStatus.RATE_LIMITED;
-							const retryAfter = response.headers.get('Retry-After');
-							if (retryAfter) {
-								const retryAfterInSeconds = parseInt(retryAfter);
-								if (!isNaN(retryAfterInSeconds)) {
-									retryInMs = retryAfterInSeconds * 1000;
-								} else {
-									const retryAfterDate = new Date(retryAfter);
-									if (!isNaN(retryAfterDate.getTime())) {
-										retryInMs = retryAfterDate.getTime() - Date.now();
-									}
-								}
-							}
+						if (!Number.isNaN(retryAfterSeconds)) {
+							updateIndexerStatus(
+								response.status === 429
+									? IndexerStatus.RATE_LIMITED
+									: IndexerStatus.UNKNOWN_ERROR,
+								Date.now() + ms(`${retryAfterSeconds} seconds`),
+								[indexers[i].id]
+							);
+						} else {
+							updateIndexerStatus(
+								response.status === 429
+									? IndexerStatus.RATE_LIMITED
+									: IndexerStatus.UNKNOWN_ERROR,
+								response.status === 429
+									? Date.now() + ms("1 hour")
+									: Date.now() + ms("10 minutes"),
+								[indexers[i].id]
+							);
 						}
-
-						updateIndexerStatus(indexerStatusError, Date.now() + retryInMs, [indexers[i].id]);
-
-						throw new Error(`request failed with code: ${response.status}`);
+						throw new Error(
+							`request failed with code: ${response.status}`
+						);
 					}
-
-					return response.text();
+					return response;
 				})
+				.then((r) => r.text())
 				.then(xml2js.parseStringPromise)
 				.then(parseTorznabResults)
 		)
