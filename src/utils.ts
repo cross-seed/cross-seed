@@ -1,8 +1,9 @@
+import { basename } from "path";
 import {
 	EP_REGEX,
-	VIDEO_EXTENSIONS,
 	MOVIE_REGEX,
 	SEASON_REGEX,
+	VIDEO_EXTENSIONS,
 } from "./constants.js";
 
 export enum MediaType {
@@ -14,8 +15,7 @@ export enum MediaType {
 
 export function stripExtension(filename: string): string {
 	for (const ext of VIDEO_EXTENSIONS) {
-		const re = new RegExp(`\\.${ext}$`);
-		if (re.test(filename)) return filename.replace(re, "");
+		if (filename.endsWith(ext)) return basename(filename, ext);
 	}
 	return filename;
 }
@@ -84,5 +84,12 @@ export function formatAsList(strings: string[]) {
 	return new Intl.ListFormat("en", {
 		style: "long",
 		type: "conjunction",
-	}).format(strings);
+	}).format(strings.sort((a, b) => a.localeCompare(b)));
+}
+
+export function fallback<T>(...args: T[]): T {
+	for (const arg of args) {
+		if (arg !== undefined) return arg;
+	}
+	return undefined;
 }

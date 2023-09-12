@@ -1,17 +1,17 @@
-import fs, { promises as fsPromises, readdirSync } from "fs";
+import fs, { promises as fsPromises } from "fs";
 import Fuse from "fuse.js";
-import parseTorrent, { Metafile } from "parse-torrent";
+import fetch, { Response } from "node-fetch";
 import path, { join } from "path";
 import { inspect } from "util";
+import { USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
+import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
 import { stripExtension } from "./utils.js";
-import fetch, { Response } from "node-fetch";
-import { USER_AGENT } from "./constants.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -31,7 +31,7 @@ export async function parseTorrentFromFilename(
 	filename: string
 ): Promise<Metafile> {
 	const data = await fsPromises.readFile(filename);
-	return parseTorrent(data);
+	return Metafile.decode(data);
 }
 
 export async function parseTorrentFromURL(
@@ -90,7 +90,7 @@ export async function parseTorrentFromURL(
 	}
 	try {
 		return resultOf(
-			parseTorrent(
+			Metafile.decode(
 				Buffer.from(new Uint8Array(await response.arrayBuffer()))
 			)
 		);
@@ -107,11 +107,11 @@ export async function parseTorrentFromURL(
 export function saveTorrentFile(
 	tracker: string,
 	tag = "",
-	info: Metafile
+	meta: Metafile
 ): void {
 	const { outputDir } = getRuntimeConfig();
-	const buf = parseTorrent.toTorrentFile(info);
-	const name = stripExtension(info.name);
+	const buf = meta.encode();
+	const name = stripExtension(meta.name);
 	const filename = `[${tag}][${tracker}]${name}.torrent`;
 	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });
 }
@@ -236,8 +236,4 @@ export async function getTorrentByCriteria(
 		throw new Error(message);
 	}
 	return parseTorrentFromFilename(findResult.file_path);
-}
-
-export function isSingleFileTorrent(meta: Metafile): boolean {
-	return !meta.info.files;
 }

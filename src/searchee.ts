@@ -1,8 +1,7 @@
 import { readdirSync, statSync } from "fs";
-import { sortBy } from "lodash-es";
-import { Metafile } from "parse-torrent";
-import { basename, join, relative, sep as osSpecificPathSeparator } from "path";
+import { basename, join, relative } from "path";
 import { logger } from "./logger.js";
+import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 
@@ -44,37 +43,9 @@ function getFilesFromDataRoot(rootPath: string): File[] {
 	}));
 }
 
-export function getFiles(meta: Metafile): File[] {
-	if (!meta.info.files) {
-		return [
-			{
-				name: meta.name,
-				path: meta.name,
-				length: meta.length,
-			},
-		];
-	}
-
-	const unsortedFiles = meta.info.files.map((file) => {
-		const rawPathSegments: Buffer[] = file["path.utf-8"] || file.path;
-		const pathSegments = rawPathSegments.map((s) => s.toString());
-		return {
-			name: pathSegments[pathSegments.length - 1],
-			length: file.length,
-			// Note that we don't use path.join here because of
-			// https://github.com/cross-seed/cross-seed/issues/46.
-			// path.join ignores zero-length path segments,
-			// which we do not want.
-			path: [meta.name, ...pathSegments].join(osSpecificPathSeparator),
-		};
-	});
-
-	return sortBy(unsortedFiles, "path");
-}
-
 export function createSearcheeFromMetafile(meta: Metafile): Searchee {
 	return {
-		files: getFiles(meta),
+		files: meta.files,
 		infoHash: meta.infoHash,
 		name: meta.name,
 		length: meta.length,
