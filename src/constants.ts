@@ -6,11 +6,11 @@ export const PROGRAM_NAME = packageDotJson.name;
 export const PROGRAM_VERSION = packageDotJson.version;
 export const USER_AGENT = `CrossSeed/${PROGRAM_VERSION}`;
 
-export const EP_REGEX = /^(?<title>.+)[. ](?<season>S\d+)(?<episode>E\d+)/i;
+export const EP_REGEX = /^(?<title>.+?)[\s._](?<season>S\d+)?[_.\s]?(?<episode>E\d+(?:[-\s]?E?\d+)?)/i;
 export const SEASON_REGEX =
-	/^(?<title>.+)[. ](?<season>S\d+)(?:\s?-\s?(?<seasonmax>S?\d+))?(?!E\d+)/i;
+	/^(?<title>.+?)[_.\s](?<season>S\d+)(?:[.\-\s]*?(?<seasonmax>S?\d+))?(?=[_.\s](?!E\d+))/i;
 export const MOVIE_REGEX =
-	/^(?<title>.+)[. ][[(]?(?<year>\d{4})[)\]]?(?![pi])/i;
+	/^(?<title>.+?)[._\s][[(]?(?<year>\d{4})[)\]]?(?![pi])/i;
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi"];
 
