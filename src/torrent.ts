@@ -1,3 +1,4 @@
+import uFuzzy from "@leeoniya/ufuzzy";
 import fs, { promises as fsPromises } from "fs";
 import Fuse from "fuse.js";
 import fetch, { Response } from "node-fetch";
@@ -217,7 +218,7 @@ export async function getTorrentByFuzzyName(
 
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
-			const dbMatch = reformatTitleForSearching(dbName).replace(
+			const dbMatch = reformatTitleForSearching(dbName.item.name).replace(
 				/[^a-z0-9]/gi,
 				""
 			);
@@ -228,18 +229,18 @@ export async function getTorrentByFuzzyName(
 
 	// If none match, proceed with fuzzy name check on all names.
 
-	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(
-		filteredNames.length > 0 ? filteredNames : allNames,
-		{
-			keys: ["name"],
-			distance: 6,
-			threshold: 0.25,
-		}
-	).search(name);
+	const uf = new uFuzzy();
+	const names = filteredNames.length > 0 ? filteredNames : allNames;
+	const haystack = (filteredNames.length > 0 ? filteredNames : allNames).map(
+		(name) => name.item.name
+	);
 
-	if (potentialMatches.length === 0) return null;
-	const [firstMatch] = potentialMatches;
+	let [idxs, info, order] = uf.search(haystack, name, false, 1e3);
+
+	// Valid matches exist
+	if (order.length === 0) return null;
+
+	const [firstMatch] = names[info.idx[order[0]]];
 	return parseTorrentFromFilename(firstMatch.item.file_path);
 }
 
