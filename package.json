@@ -32,7 +32,6 @@
 		"commander": "^8.3.0",
 		"fetch-blob": "^3.1.4",
 		"formdata-polyfill": "^4.0.10",
-		"fuse.js": "^6.6.2",
 		"knex": "^2.4.2",
 		"lodash-es": "^4.17.21",
 		"ms": "^2.1.3",
