@@ -32,6 +32,8 @@ export enum SnatchError {
 	UNKNOWN_ERROR = "UNKNOWN_ERROR",
 }
 
+const uf = new uFuzzy();
+
 export async function parseTorrentFromFilename(
 	filename: string
 ): Promise<Metafile> {
@@ -217,18 +219,19 @@ export async function getTorrentByFuzzyName(
 
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
-			const dbMatch = reformatTitleForSearching(dbName.item.name).replace(
+			const dbMatch = reformatTitleForSearching(dbName.name).replace(
 				/[^a-z0-9]/gi,
 				""
 			);
 			if (!dbMatch) return false;
 			return fullMatch === dbMatch;
 		});
+	} else {
+		filteredNames = allNames;
 	}
 
 	// If none match, proceed with fuzzy name check on all names.
 
-	const uf = new uFuzzy();
 	const names = filteredNames.length > 0 ? filteredNames : allNames;
 	const haystack = (filteredNames.length > 0 ? filteredNames : allNames).map(
 		(name) => name.item.name
@@ -240,7 +243,7 @@ export async function getTorrentByFuzzyName(
 	if (order.length === 0) return null;
 
 	const [firstMatch] = names[info.idx[order[0]]];
-	return parseTorrentFromFilename(firstMatch.item.file_path);
+	return parseTorrentFromFilename(firstMatch.file_path);
 }
 
 export async function getTorrentByCriteria(
