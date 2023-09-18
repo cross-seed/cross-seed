@@ -1,4 +1,4 @@
-import uFuzzy from "@leeoniya/ufuzzy";
+import Fuse from "fuse.js";
 import fs, { promises as fsPromises } from "fs";
 import fetch, { Response } from "node-fetch";
 import path, { join } from "path";
@@ -31,8 +31,6 @@ export enum SnatchError {
 	INVALID_CONTENTS = "INVALID_CONTENTS",
 	UNKNOWN_ERROR = "UNKNOWN_ERROR",
 }
-
-const uf = new uFuzzy();
 
 export async function parseTorrentFromFilename(
 	filename: string
@@ -208,41 +206,38 @@ export async function getTorrentByFuzzyName(
 	name: string
 ): Promise<null | Metafile> {
 	const allNames = await db("torrent").select("name", "file_path");
-
 	const fullMatch = reformatTitleForSearching(name).replace(
 		/[^a-z0-9]/gi,
 		""
-	);
+	).toLowerCase();
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
 	let filteredNames = [];
-
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
 			const dbMatch = reformatTitleForSearching(dbName.name).replace(
 				/[^a-z0-9]/gi,
 				""
-			);
+			).toLowerCase();
 			if (!dbMatch) return false;
 			return fullMatch === dbMatch;
 		});
-	} else {
-		filteredNames = allNames;
 	}
 
 	// If none match, proceed with fuzzy name check on all names.
+	filteredNames = filteredNames.length > 0 ? filteredNames : allNames;
 
-	const haystack = (filteredNames).map(
-		(filteredName) => filteredName.name
-	);
-
-	let [idxs, info, order] = uf.search(haystack, name, false, 1e3);
+	const potentialMatches = new Fuse(filteredNames, {
+		keys: ["name"],
+		distance: 6,
+		threshold: 0.6,
+	}).search(name);
 
 	// Valid matches exist
-	if (order.length === 0) return null;
+	if (potentialMatches.length === 0) return null;
 
-	const [firstMatch] = filteredNames[info.idx[order[0]]];
-	return parseTorrentFromFilename(firstMatch.file_path);
+	const firstMatch = potentialMatches[0];
+	return parseTorrentFromFilename(firstMatch.item.file_path);
 }
 
 export async function getTorrentByCriteria(
