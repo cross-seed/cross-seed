@@ -232,9 +232,8 @@ export async function getTorrentByFuzzyName(
 
 	// If none match, proceed with fuzzy name check on all names.
 
-	const names = filteredNames.length > 0 ? filteredNames : allNames;
-	const haystack = (filteredNames.length > 0 ? filteredNames : allNames).map(
-		(name) => name.item.name
+	const haystack = (filteredNames).map(
+		(filteredName) => filteredName.name
 	);
 
 	let [idxs, info, order] = uf.search(haystack, name, false, 1e3);
@@ -242,7 +241,7 @@ export async function getTorrentByFuzzyName(
 	// Valid matches exist
 	if (order.length === 0) return null;
 
-	const [firstMatch] = names[info.idx[order[0]]];
+	const [firstMatch] = filteredNames[info.idx[order[0]]];
 	return parseTorrentFromFilename(firstMatch.file_path);
 }
 
