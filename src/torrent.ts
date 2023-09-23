@@ -226,7 +226,8 @@ export async function getTorrentByFuzzyName(
 
 	// If none match, proceed with fuzzy name check on all names.
 	filteredNames = filteredNames.length > 0 ? filteredNames : allNames;
-
+	
+	// @ts-expect-error fuse types are confused
 	const potentialMatches = new Fuse(filteredNames, {
 		keys: ["name"],
 		distance: 6,
