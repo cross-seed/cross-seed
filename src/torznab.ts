@@ -1,7 +1,7 @@
 import ms from "ms";
 import fetch from "node-fetch";
 import xml2js from "xml2js";
-import { EP_REGEX, SEASON_REGEX } from "./constants.js";
+import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
@@ -21,7 +21,6 @@ import {
 	reformatTitleForSearching,
 	stripExtension,
 } from "./utils.js";
-import { USER_AGENT } from "./constants.js";
 
 interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
@@ -463,16 +462,26 @@ async function makeRequests(
 			})
 				.then((response) => {
 					if (!response.ok) {
-						if (response.status === 429) {
+						const retryAfterSeconds = Number(
+							response.headers.get("Retry-After")
+						);
+
+						if (!Number.isNaN(retryAfterSeconds)) {
 							updateIndexerStatus(
-								IndexerStatus.RATE_LIMITED,
-								Date.now() + ms("1 hour"),
+								response.status === 429
+									? IndexerStatus.RATE_LIMITED
+									: IndexerStatus.UNKNOWN_ERROR,
+								Date.now() + ms(`${retryAfterSeconds} seconds`),
 								[indexers[i].id]
 							);
 						} else {
 							updateIndexerStatus(
-								IndexerStatus.UNKNOWN_ERROR,
-								Date.now() + ms("1 hour"),
+								response.status === 429
+									? IndexerStatus.RATE_LIMITED
+									: IndexerStatus.UNKNOWN_ERROR,
+								response.status === 429
+									? Date.now() + ms("1 hour")
+									: Date.now() + ms("10 minutes"),
 								[indexers[i].id]
 							);
 						}
@@ -480,9 +489,8 @@ async function makeRequests(
 							`request failed with code: ${response.status}`
 						);
 					}
-					return response;
+					return response.text();
 				})
-				.then((r) => r.text())
 				.then(xml2js.parseStringPromise)
 				.then(parseTorznabResults)
 		)
