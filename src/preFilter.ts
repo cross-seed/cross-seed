@@ -1,15 +1,16 @@
 import ms from "ms";
 import { extname } from "path";
-import { EP_REGEX, VIDEO_EXTENSIONS } from "./constants.js";
+import { EP_REGEX, SEASON_REGEX, VIDEO_EXTENSIONS } from "./constants.js";
 import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { humanReadable, nMsAgo } from "./utils.js";
+import path from "path";
 
 export function filterByContent(searchee: Searchee): boolean {
-	const { includeEpisodes, includeNonVideos } = getRuntimeConfig();
+	const { includeEpisodes, includeNonVideos, includeSeasonPackEpisodes } = getRuntimeConfig();
 
 	function logReason(reason): void {
 		logger.verbose({
@@ -18,14 +19,18 @@ export function filterByContent(searchee: Searchee): boolean {
 		});
 	}
 
-	const isSingleEpisodeTorrent =
-		searchee.files.length === 1 && EP_REGEX.test(searchee.files[0].name);
-
-	if (!includeEpisodes && isSingleEpisodeTorrent) {
+	const isSingleEpisodeTorrent = searchee.files.length === 1 && EP_REGEX.test(searchee.name); 
+	const isSeasonPack = typeof searchee.path !== 'undefined' ? SEASON_REGEX.test(path.dirname(searchee.path).split(path.sep).reverse()[0]): false;
+	
+	if (!includeEpisodes && isSingleEpisodeTorrent && !isSeasonPack) {
 		logReason("it is a single episode");
 		return false;
 	}
 
+	if (!includeSeasonPackEpisodes && (searchee.files.length === 1 && isSeasonPack)) {
+		logReason("it is a season pack episode");
+		return false;
+	}
 	const allFilesAreVideos = searchee.files.every((file) =>
 		VIDEO_EXTENSIONS.includes(extname(file.name))
 	);

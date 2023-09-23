@@ -80,15 +80,25 @@ module.exports = {
 	outputDir: "/cross-seeds",
 
 	/**
+	 * 
+	 * To search for everything except individual episodes, use (includeEpisodes: false, includeSeasonPackEpisodes: false, includeNonVideos: true)
+	 * To search for all episodes, use (includeEpisodes: true, includeSeasonPackEpisodes: true, includeNonVideos: true)
+	 * To search for season pack episodes, but exclude single episode torrents, use (includeEpisodes: false, includeSeasonPackEpisodes: true, includeNonVideos: true)
+	 *
 	 * Whether to search for single episode torrents
 	 */
 	includeEpisodes: false,
 
 	/**
+	 * Whether to search for single episodes from a season pack during
+	 * data based searches.
+	 */
+	includeSeasonPackEpisodes: false,
+
+	/**
 	 * Include torrents which contain non-video files
-	 * This option does not override includeEpisodes.
-	 * To search for everything except episodes, use (includeEpisodes: false, includeNonVideos: true)
-	 * To search for everything including episodes, use (includeEpisodes: true, includeNonVideos: true)
+	 * This option does not override includeEpisodes or
+	 * includeSeasonPackEpisodes.
 	 */
 	includeNonVideos: false,
 
