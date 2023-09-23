@@ -138,10 +138,16 @@ function createCommandWithSharedOptions(name, description) {
 			fallback(fileConfig.includeEpisodes, false)
 		)
 		.option(
+			"--include-season-pack-episodes",
+			"Include episodes from a season pack in the search",
+			fallback(fileConfig.includeSeasonPackEpisodes, false)
+		)
+		.option(
 			"--no-include-non-videos",
 			"Don't include torrents which contain non-videos"
 		)
 		.option("--no-include-episodes", "Don't include episode torrents")
+		.option("--no-include-season-pack-episodes", "Don't include episodes from a season pack")
 		.requiredOption(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
