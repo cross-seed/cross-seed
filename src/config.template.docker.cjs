@@ -85,12 +85,12 @@ module.exports = {
 	 * To search for only single episodes, but exclude season pack episodes (data-based)
 	 *    use (includeEpisodes: false, includeSingleEpisodes: true, includeNonVideos: true)
 	 *
-	 * Whether to search for all episode torrents (Overrides includeSingleEpisodes)
+	 * Whether to search for all episode torrents, including those from season packs. This option overrides includeSingleEpisodes.
 	 */
 	includeEpisodes: false,
 
 	/**
-	 * Whether to search only for single episodes (not from season packs)
+	 * Search for single episodes (not from season packs)
 	 * during data based searches. 
 	 */
 	includeSingleEpisodes: false,
