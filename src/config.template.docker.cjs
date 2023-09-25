@@ -90,15 +90,15 @@ module.exports = {
 	includeEpisodes: false,
 
 	/**
-	 * Search for single episodes (not from season packs)
-	 * during data based searches. 
+	 * Whether to include single episode torrents in the search (not from season packs). 
+	 * Like `includeEpisodes` but slightly more restrictive.
 	 */
 	includeSingleEpisodes: false,
 
 	/**
 	 * Include torrents which contain non-video files
 	 * This option does not override includeEpisodes or
-	 * includeSeasonPackEpisodes.
+	 * includeSingleEpisodes.
 	 */
 	includeNonVideos: false,
 
@@ -231,7 +231,7 @@ module.exports = {
 	searchTimeout: undefined,
 
 	/**
-	 * The number of searches to be done before stop.
+	 * The number of searches to be done before it stop.
 	 * Combine this with "excludeRecentSearch" and "searchCadence" to smooth long-term API usage patterns.
 	 * Default is no limit.
 	 */

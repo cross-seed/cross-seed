@@ -86,8 +86,8 @@ module.exports = {
 	includeEpisodes: false,
 
 	/**
-	 * Search for single episodes (not from season packs)
-	 * during data based searches. 
+	 * Whether to include single episode torrents in the search (not from season packs). 
+	 * Like `includeEpisodes` but slightly more restrictive.
 	 */
 	includeSingleEpisodes: false,
 
