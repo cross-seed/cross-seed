@@ -27,7 +27,7 @@ export function filterByContent(searchee: Searchee): boolean {
 		return false;
 	}
 
-	if (includeSingleEpisodes && isSeasonPackEpisode) {
+	if (!includeEpisodes && isSeasonPackEpisode) {
 		logReason("it is a season pack episode");
 		return false;
 	}
