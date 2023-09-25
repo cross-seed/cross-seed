@@ -20,14 +20,14 @@ export function filterByContent(searchee: Searchee): boolean {
 	}
 
 	const isSingleEpisodeTorrent = searchee.files.length === 1 && EP_REGEX.test(searchee.name); 
-	const isSeasonPack = typeof searchee.path !== 'undefined' ? SEASON_REGEX.test(path.dirname(searchee.path).split(path.sep).reverse()[0]): false;
-	
-	if (!includeEpisodes && isSingleEpisodeTorrent && !isSeasonPack) {
+	const isSeasonPackEpisode = searchee.path && searchee.files.length === 1 && SEASON_REGEX.test(path.basename(path.dirname(searchee.path)));
+
+	if (!includeEpisodes && isSingleEpisodeTorrent && !isSeasonPackEpisode) {
 		logReason("it is a single episode");
 		return false;
 	}
 
-	if (!includeSeasonPackEpisodes && (searchee.files.length === 1 && isSeasonPack)) {
+	if (!includeSeasonPackEpisodes && isSeasonPackEpisode) {
 		logReason("it is a season pack episode");
 		return false;
 	}

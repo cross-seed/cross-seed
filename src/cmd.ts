@@ -140,7 +140,7 @@ function createCommandWithSharedOptions(name, description) {
 		.option(
 			"--include-season-pack-episodes",
 			"Include episodes from a season pack in the search",
-			fallback(fileConfig.includeSeasonPackEpisodes, false)
+			fallback(fileConfig.includeSeasonPackEpisodes, fileConfig.includeEpisodes)
 		)
 		.option(
 			"--no-include-non-videos",
