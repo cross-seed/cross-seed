@@ -134,20 +134,20 @@ function createCommandWithSharedOptions(name, description) {
 		)
 		.option(
 			"-e, --include-episodes",
-			"Include single-episode torrents in the search",
+			"Include all episode torrents in the search",
 			fallback(fileConfig.includeEpisodes, false)
 		)
 		.option(
-			"--include-season-pack-episodes",
-			"Include episodes from a season pack in the search",
-			fallback(fileConfig.includeSeasonPackEpisodes, fileConfig.includeEpisodes)
+			"--include-single-episodes",
+			"Include only single episodes torrents in the search",
+			fallback(fileConfig.includeSingleEpisodes, false)
 		)
 		.option(
 			"--no-include-non-videos",
 			"Don't include torrents which contain non-videos"
 		)
 		.option("--no-include-episodes", "Don't include episode torrents")
-		.option("--no-include-season-pack-episodes", "Don't include episodes from a season pack")
+		.option("--no-include-single-episodes", "Don't include episodes from a season pack")
 		.requiredOption(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
