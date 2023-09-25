@@ -134,12 +134,12 @@ function createCommandWithSharedOptions(name, description) {
 		)
 		.option(
 			"-e, --include-episodes",
-			"Include all episode torrents in the search",
+			"Include all episode torrents in the search (including from season packs)",
 			fallback(fileConfig.includeEpisodes, false)
 		)
 		.option(
 			"--include-single-episodes",
-			"Include only single episodes torrents in the search",
+			"Include single episode torrents in the search",
 			fallback(fileConfig.includeSingleEpisodes, false)
 		)
 		.option(
