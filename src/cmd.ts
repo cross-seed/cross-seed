@@ -147,7 +147,6 @@ function createCommandWithSharedOptions(name, description) {
 			"Don't include torrents which contain non-videos"
 		)
 		.option("--no-include-episodes", "Don't include episode torrents")
-		.option("--no-include-single-episodes", "Don't include episodes from a season pack")
 		.requiredOption(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
