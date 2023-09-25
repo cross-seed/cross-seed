@@ -80,25 +80,24 @@ module.exports = {
 	outputDir: "/cross-seeds",
 
 	/**
-	 * 
-	 * To search for all episodes, use (includeEpisodes: true, includeNonVideos: true)
-	 * To search for only single episodes, but exclude season pack episodes (data-based)
-	 *    use (includeEpisodes: false, includeSingleEpisodes: true, includeNonVideos: true)
-	 *
 	 * Whether to search for all episode torrents, including those from season packs. This option overrides includeSingleEpisodes.
 	 */
 	includeEpisodes: false,
 
 	/**
-	 * Search for single episodes (not from season packs)
-	 * during data based searches. 
+	 * Whether to include single episode torrents in the search (not from season packs). 
+	 * Like `includeEpisodes` but slightly more restrictive.
 	 */
 	includeSingleEpisodes: false,
 
 	/**
 	 * Include torrents which contain non-video files
-	 * This option does not override includeEpisodes or
-	 * includeSeasonPackEpisodes.
+	 * This option does not override includeEpisodes or includeSingleEpisodes.
+	 * 
+	 * To search for everything except episodes, use (includeEpisodes: false, includeSingleEpisodes: false, includeNonVideos: true)
+	 * To search for everything including episodes, use (includeEpisodes: true, includeNonVideos: true)
+	 * To search for everything except season pack episodes (data-based)
+	 *    use (includeEpisodes: false, includeSingleEpisodes: true, includeNonVideos: true)
 	 */
 	includeNonVideos: false,
 
@@ -233,7 +232,7 @@ module.exports = {
 	searchTimeout: undefined,
 
 	/**
-	 * The number of searches to be done before stop.
+	 * The number of searches to be done before it stops.
 	 * Combine this with "excludeRecentSearch" and "searchCadence" to smooth long-term API usage patterns.
 	 * Default is no limit.
 	 */

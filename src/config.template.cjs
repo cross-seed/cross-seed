@@ -76,11 +76,6 @@ module.exports = {
 	outputDir: ".",
 
 	/**
-	 * 
-	 * To search for all episodes, use (includeEpisodes: true, includeNonVideos: true)
-	 * To search for only single episodes, but exclude season pack episodes (data-based)
-	 *    use (includeEpisodes: false, includeSingleEpisodes: true, includeNonVideos: true)
-	 *
 	 * Whether to search for all episode torrents, including those from season packs. This option overrides includeSingleEpisodes.
 	 */
 	includeEpisodes: false,
@@ -93,8 +88,12 @@ module.exports = {
 
 	/**
 	 * Include torrents which contain non-video files
-	 * This option does not override includeEpisodes or
-	 * includeSingleEpisodes.
+	 * This option does not override includeEpisodes or includeSingleEpisodes.
+	 * 
+	 * To search for everything except episodes, use (includeEpisodes: false, includeSingleEpisodes: false, includeNonVideos: true)
+	 * To search for everything including episodes, use (includeEpisodes: true, includeNonVideos: true)
+	 * To search for everything except season pack episodes (data-based)
+	 *    use (includeEpisodes: false, includeSingleEpisodes: true, includeNonVideos: true)
 	 */
 	includeNonVideos: false,
 
@@ -166,6 +165,8 @@ module.exports = {
 	 * cross-seed will send POST requests to this url
 	 * with a JSON payload of { title, body }.
 	 * Conforms to the caronc/apprise REST API.
+	 * If necessary, supply your username and password inside the url like so:
+	 * "http://username:password@localhost:8000/notify/cross-seed"
 	 */
 	notificationWebhookUrl: undefined,
 
@@ -227,7 +228,7 @@ module.exports = {
 	searchTimeout: undefined,
 
 	/**
-	 * The number of searches to be done before it stop.
+	 * The number of searches to be done before it stops.
 	 * Combine this with "excludeRecentSearch" and "searchCadence" to smooth long-term API usage patterns.
 	 * Default is no limit.
 	 */
