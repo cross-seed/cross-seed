@@ -20,54 +20,19 @@ interface PushNotification {
 
 export class PushNotifier {
 	url: string;
-	username: string | undefined;
-	password: string | undefined;
-
-	constructor(url: string)  {
-		const urlObj = new URL(url);
-
-		if (urlObj.username && urlObj.password) {
-			this.username = urlObj.username;
-			this.password = urlObj.password;
-
-			// Remove the username and password from the URL
-			urlObj.username = "";
-			urlObj.password = "";
-
-			this.url = urlObj.toString();
-		} else {
+	constructor(url: string) {
 		this.url = url;
-		}
 	}
 
-	async notify({ title = "cross-seed", body, ...rest }: PushNotification): Promise<void> {
+	notify({ title = "cross-seed", body, ...rest }: PushNotification): void {
 		if (this.url) {
-			const headers = new Headers();
-			headers.append("Content-Type", "application/json");
-		
-			if (this.username && this.password) {
-				const credentials = `${this.username}:${this.password}`;
-				const basicAuth = "Basic " + btoa(credentials);
-				headers.append("Authorization", basicAuth);
-			}
-
-			logger.verbose(`Notification request send to ${this.url}`);
-
-			try {
-				const response = await fetch(this.url, {
-					method: "POST",
-					headers,
-					body: JSON.stringify({ title, body, ...rest }),
-				});
-
-				const responseText = await response.text();
-				response.ok
-					? logger.verbose(`Notifiaction server response:\n${responseText}`)
-					: logger.error(`Notifiaction server error: ${response.status}, ${response.statusText}`);
-
-			} catch (error) {
-				logger.error({ message: "Failed to send push notification", error });
-			}
+			fetch(this.url, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ title, body, ...rest }),
+			}).catch(() => {
+				logger.error({ message: "Failed to send push notification" });
+			});
 		}
 	}
 }

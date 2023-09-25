@@ -309,6 +309,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			setRuntimeConfig(runtimeConfig);
 			initializeLogger();
 			initializePushNotifier();
+			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
 			logger.verbose({
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),

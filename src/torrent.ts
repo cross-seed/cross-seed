@@ -1,9 +1,14 @@
-import fs, { promises as fsPromises } from "fs";
 import Fuse from "fuse.js";
+import fs, { promises as fsPromises } from "fs";
 import fetch, { Response } from "node-fetch";
 import path, { join } from "path";
 import { inspect } from "util";
-import { USER_AGENT } from "./constants.js";
+import {
+	USER_AGENT,
+	EP_REGEX,
+	SEASON_REGEX,
+	MOVIE_REGEX,
+} from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
@@ -11,7 +16,7 @@ import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { stripExtension } from "./utils.js";
+import { reformatTitleForSearching, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -201,15 +206,38 @@ export async function getTorrentByFuzzyName(
 	name: string
 ): Promise<null | Metafile> {
 	const allNames = await db("torrent").select("name", "file_path");
+	const fullMatch = reformatTitleForSearching(name).replace(
+		/[^a-z0-9]/gi,
+		""
+	).toLowerCase();
+
+	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
+	let filteredNames = [];
+	if (fullMatch) {
+		filteredNames = allNames.filter((dbName) => {
+			const dbMatch = reformatTitleForSearching(dbName.name).replace(
+				/[^a-z0-9]/gi,
+				""
+			).toLowerCase();
+			if (!dbMatch) return false;
+			return fullMatch === dbMatch;
+		});
+	}
+
+	// If none match, proceed with fuzzy name check on all names.
+	filteredNames = filteredNames.length > 0 ? filteredNames : allNames;
+	
 	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(allNames, {
+	const potentialMatches = new Fuse(filteredNames, {
 		keys: ["name"],
 		distance: 6,
-		threshold: 0.25,
+		threshold: 0.6,
 	}).search(name);
 
+	// Valid matches exist
 	if (potentialMatches.length === 0) return null;
-	const [firstMatch] = potentialMatches;
+
+	const firstMatch = potentialMatches[0];
 	return parseTorrentFromFilename(firstMatch.item.file_path);
 }
 
