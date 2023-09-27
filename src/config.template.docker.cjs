@@ -85,7 +85,7 @@ module.exports = {
 	includeEpisodes: false,
 
 	/**
-	 * Whether to include single episode torrents in the search (not from season packs). 
+	 * Whether to include single episode torrents in the search (not from season packs).
 	 * Like `includeEpisodes` but slightly more restrictive.
 	 */
 	includeSingleEpisodes: false,
@@ -93,7 +93,7 @@ module.exports = {
 	/**
 	 * Include torrents which contain non-video files
 	 * This option does not override includeEpisodes or includeSingleEpisodes.
-	 * 
+	 *
 	 * To search for everything except episodes, use (includeEpisodes: false, includeSingleEpisodes: false, includeNonVideos: true)
 	 * To search for everything including episodes, use (includeEpisodes: true, includeNonVideos: true)
 	 * To search for everything except season pack episodes (data-based)
@@ -169,8 +169,6 @@ module.exports = {
 	 * cross-seed will send POST requests to this url
 	 * with a JSON payload of { title, body }.
 	 * Conforms to the caronc/apprise REST API.
-	 * If necessary, supply your username and password inside the url like so:
-	 * "http://username:password@localhost:8000/notify/cross-seed"
 	 */
 	notificationWebhookUrl: undefined,
 
