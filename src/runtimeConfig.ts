@@ -14,6 +14,7 @@ export interface RuntimeConfig {
 	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;
+	includeSingleEpisodes: boolean;
 	verbose: boolean;
 	includeNonVideos: boolean;
 	fuzzySizeThreshold: number;
