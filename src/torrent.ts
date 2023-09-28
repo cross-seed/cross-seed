@@ -231,7 +231,7 @@ export async function getTorrentByFuzzyName(
 	const potentialMatches = new Fuse(filteredNames, {
 		keys: ["name"],
 		distance: 6,
-		threshold: 0.6,
+		threshold: 0.25,
 	}).search(name);
 
 	// Valid matches exist
