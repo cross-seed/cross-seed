@@ -5,6 +5,7 @@ import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { validateTorrentDir } from "./torrent.js";
 import { validateTorznabUrls } from "./torznab.js";
+import { validateAction } from "./action.js";
 
 function validateOptions() {
 	const {
@@ -43,6 +44,7 @@ export async function doStartupValidation(): Promise<void> {
 	const downloadClient = getClient();
 	await Promise.all<void>(
 		[
+			validateAction(),
 			validateTorznabUrls(),
 			downloadClient?.validateConfig(),
 			validateTorrentDir(),
