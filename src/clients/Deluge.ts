@@ -1,4 +1,3 @@
-import axios, { AxiosResponse } from "axios";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
@@ -6,7 +5,7 @@ import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
-
+import fetch, { Headers, Response } from "node-fetch";
 export default class Deluge implements TorrentClient {
 	private msgId = 0;
 	private loggedIn = false;
@@ -50,12 +49,10 @@ export default class Deluge implements TorrentClient {
 			);
 		}
 
-		if (
-			response.data.result &&
-			response.headers &&
-			response.headers["set-cookie"]
-		) {
-			this.delugeCookie = response.headers["set-cookie"][0].split(";")[0];
+		if (response.data.result && response.headers.has("Set-Cookie")) {
+			this.delugeCookie = response.headers
+				.get("Set-Cookie")
+				.split(";")[0];
 			this.loggedIn = true;
 			return;
 		}
@@ -86,26 +83,28 @@ export default class Deluge implements TorrentClient {
 			: response.data.error;
 	}
 
-	private async call(body: any): Promise<AxiosResponse | null> {
-		return new Promise((resolve) => {
-			body.id = ++this.msgId;
-			if (this.msgId > 1024) this.msgId = 0;
-			axios
-				.post(
-					this.delugeWebUrl.origin + this.delugeWebUrl.pathname,
-					body,
-					{
-						headers: {
-							"Content-Type": "application/json",
-							Cookie: this.delugeCookie,
-						},
-					}
-				)
-				.then((data) => {
-					resolve(data);
-				})
-				.catch(() => resolve(null));
-		});
+	private async call(body: { method: string; params: any[] }) {
+		this.msgId = (this.msgId + 1) % 1024;
+
+		const headers = new Headers({ "Content-Type": "application/json" });
+		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
+
+		const url = this.delugeWebUrl.origin + this.delugeWebUrl.pathname;
+		let response: Response;
+		try {
+			response = await fetch(url, {
+				body: JSON.stringify({ ...body, msgId: this.msgId }),
+				method: "POST",
+				headers: headers,
+			});
+		} catch (networkError) {
+			return null;
+		}
+
+		if (!response.ok) {
+			return null;
+		}
+		return { ...response, data: (await response.json()) as any };
 	}
 
 	/**
@@ -187,7 +186,7 @@ export default class Deluge implements TorrentClient {
 	 */
 	async checkCompleted(searchee: Searchee): Promise<boolean> {
 		try {
-			let params = [
+			const params = [
 				["name", "state", "save_path"],
 				{ hash: searchee.infoHash },
 			];
