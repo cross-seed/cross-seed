@@ -5,6 +5,7 @@ import {
 	SEASON_REGEX,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
+import { Result, resultOf, resultOfErr } from "./Result.js";
 
 export enum MediaType {
 	EPISODE = "episode",
@@ -92,4 +93,19 @@ export function fallback<T>(...args: T[]): T {
 		if (arg !== undefined) return arg;
 	}
 	return undefined;
+}
+
+export function extractCredentialsFromUrl(
+	url: string
+): Result<{ username: string; password: string; href: string }, "invalid URL"> {
+	try {
+		const { origin, pathname, username, password } = new URL(url);
+		return resultOf({
+			username: decodeURIComponent(username),
+			password: decodeURIComponent(password),
+			href: origin + pathname,
+		});
+	} catch (e) {
+		return resultOfErr("invalid URL");
+	}
 }
