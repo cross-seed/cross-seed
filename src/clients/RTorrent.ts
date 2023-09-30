@@ -1,5 +1,5 @@
 import { promises as fs, Stats } from "fs";
-import { dirname, resolve } from "path";
+import { basename, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants.js";
@@ -29,14 +29,19 @@ async function createLibTorrentResumeTree(
 	async function getFileResumeData(
 		file: File
 	): Promise<LibTorrentResumeFileEntry> {
-		const filePath = resolve(dataDir, file.path);
+		let filePath = file.path;
+		if (filePath.indexOf(sep) != -1) {
+			filePath = filePath.split(sep).slice(1).join(sep);
+		}
+
+		const normalizedFilePath = resolve(dataDir, filePath);
 		const fileStat = await fs
-			.lstat(filePath)
+			.lstat(normalizedFilePath)
 			.catch(() => ({ isFile: () => false } as Stats));
 		if (!fileStat.isFile() || fileStat.size !== file.length) {
 			logger.debug({
 				label: Label.RTORRENT,
-				message: `File ${filePath} either doesn't exist or is the wrong size.`,
+				message: `File ${normalizedFilePath} either doesn't exist or is the wrong size.`,
 			});
 			return {
 				completed: 0,
@@ -140,10 +145,6 @@ export default class RTorrent implements TorrentClient {
 			result = await this.methodCallP<returnType>("system.multicall", [
 				[
 					{
-						methodName: "d.is_multi_file",
-						params: [infoHash],
-					},
-					{
 						methodName: "d.directory",
 						params: [infoHash],
 					},
@@ -160,13 +161,13 @@ export default class RTorrent implements TorrentClient {
 
 		// temp diag for #154
 		try {
-			const [[isMultiFileStr], [dir], [isCompleteStr]] = result;
+			const [[dir], [isCompleteStr]] = result;
 			const isComplete = Boolean(Number(isCompleteStr));
 			if (!isComplete) {
 				return resultOfErr(InjectionResult.TORRENT_NOT_COMPLETE);
 			}
 			return resultOf({
-				downloadDir: Number(isMultiFileStr) ? dirname(dir) : dir,
+				downloadDir: dir,
 			});
 		} catch (e) {
 			logger.error(e);
@@ -232,7 +233,7 @@ export default class RTorrent implements TorrentClient {
 				await this.methodCallP<void>("load.start", [
 					"",
 					torrentFilePath,
-					`d.directory.set="${downloadDir}"`,
+					`d.directory_base.set="${downloadDir}"`,
 					`d.custom1.set="cross-seed"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
 				]);
