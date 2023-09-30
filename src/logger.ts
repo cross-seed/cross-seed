@@ -8,6 +8,7 @@ export enum Label {
 	QBITTORRENT = "qbittorrent",
 	RTORRENT = "rtorrent",
 	TRANSMISSION = "transmission",
+	DELUGE = "deluge",
 	DECIDE = "decide",
 	PREFILTER = "prefilter",
 	CONFIGDUMP = "configdump",

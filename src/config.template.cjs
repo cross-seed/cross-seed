@@ -154,6 +154,15 @@ module.exports = {
 	transmissionRpcUrl: undefined,
 
 	/**
+	 * The url of your Deluge JSON-RPC interface.
+	 * Usually ends with "/json".
+	 * Only relevant with action: "inject".
+	 * Supply your WebUI password as well
+	 * "http://:password@localhost:8112/json"
+	 */
+	delugeWebUrl: undefined,
+
+	/**
 	 * qBittorrent-specific
 	 * Whether to inject using categories with the same save paths as your normal categories.
 	 * Example: if you have a category called "Movies",

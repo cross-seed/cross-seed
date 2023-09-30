@@ -189,6 +189,11 @@ function createCommandWithSharedOptions(name, description) {
 			fileConfig.transmissionRpcUrl
 		)
 		.option(
+			"--deluge-web-url <url>",
+			"The url of your Deluge WebUI interface. Requires '-A inject'. See the docs for more information.",
+			fileConfig.delugeWebUrl
+		)
+		.option(
 			"--duplicate-categories",
 			"Create and inject using categories with the same save paths as your normal categories",
 			fileConfig.duplicateCategories
