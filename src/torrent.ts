@@ -1,14 +1,9 @@
-import Fuse from "fuse.js";
 import fs, { promises as fsPromises } from "fs";
+import Fuse from "fuse.js";
 import fetch, { Response } from "node-fetch";
 import path, { join } from "path";
 import { inspect } from "util";
-import {
-	USER_AGENT,
-	EP_REGEX,
-	SEASON_REGEX,
-	MOVIE_REGEX,
-} from "./constants.js";
+import { USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
@@ -206,19 +201,17 @@ export async function getTorrentByFuzzyName(
 	name: string
 ): Promise<null | Metafile> {
 	const allNames = await db("torrent").select("name", "file_path");
-	const fullMatch = reformatTitleForSearching(name).replace(
-		/[^a-z0-9]/gi,
-		""
-	).toLowerCase();
+	const fullMatch = reformatTitleForSearching(name)
+		.replace(/[^a-z0-9]/gi, "")
+		.toLowerCase();
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
 	let filteredNames = [];
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
-			const dbMatch = reformatTitleForSearching(dbName.name).replace(
-				/[^a-z0-9]/gi,
-				""
-			).toLowerCase();
+			const dbMatch = reformatTitleForSearching(dbName.name)
+				.replace(/[^a-z0-9]/gi, "")
+				.toLowerCase();
 			if (!dbMatch) return false;
 			return fullMatch === dbMatch;
 		});
@@ -226,7 +219,7 @@ export async function getTorrentByFuzzyName(
 
 	// If none match, proceed with fuzzy name check on all names.
 	filteredNames = filteredNames.length > 0 ? filteredNames : allNames;
-	
+
 	// @ts-expect-error fuse types are confused
 	const potentialMatches = new Fuse(filteredNames, {
 		keys: ["name"],

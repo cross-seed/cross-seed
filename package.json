@@ -6,7 +6,9 @@
 		"test": "true",
 		"build": "tsc",
 		"watch": "tsc --watch",
-		"prepublishOnly": "rimraf dist && npm run build && husky install"
+		"typecheck": "tsc --noEmit",
+		"prepublishOnly": "rimraf dist && npm run build && husky install",
+		"lint": "prettier --check 'src/{**/*,*}.{js,ts,cjs,mjs}' && eslint 'src/{**/*,*}.{js,ts,cjs,mjs}'"
 	},
 	"bin": {
 		"cross-seed": "dist/cmd.js"
