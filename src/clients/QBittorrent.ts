@@ -98,7 +98,7 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async login(): Promise<void> {
-		let { origin, pathname, username, password } = this.url;
+		const { origin, pathname, username, password } = this.url;
 
 		let searchParams;
 		try {
