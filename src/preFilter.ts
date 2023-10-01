@@ -10,7 +10,8 @@ import { humanReadable, nMsAgo } from "./utils.js";
 import path from "path";
 
 export function filterByContent(searchee: Searchee): boolean {
-	const { includeEpisodes, includeNonVideos, includeSingleEpisodes } = getRuntimeConfig();
+	const { includeEpisodes, includeNonVideos, includeSingleEpisodes } =
+		getRuntimeConfig();
 
 	function logReason(reason): void {
 		logger.verbose({
@@ -19,10 +20,19 @@ export function filterByContent(searchee: Searchee): boolean {
 		});
 	}
 
-	const isSingleEpisodeTorrent = searchee.files.length === 1 && EP_REGEX.test(searchee.name); 
-	const isSeasonPackEpisode = searchee.path && searchee.files.length === 1 && SEASON_REGEX.test(path.basename(path.dirname(searchee.path)));
+	const isSingleEpisodeTorrent =
+		searchee.files.length === 1 && EP_REGEX.test(searchee.name);
+	const isSeasonPackEpisode =
+		searchee.path &&
+		searchee.files.length === 1 &&
+		SEASON_REGEX.test(path.basename(path.dirname(searchee.path)));
 
-	if (!includeEpisodes && !includeSingleEpisodes && isSingleEpisodeTorrent && !isSeasonPackEpisode) {
+	if (
+		!includeEpisodes &&
+		!includeSingleEpisodes &&
+		isSingleEpisodeTorrent &&
+		!isSeasonPackEpisode
+	) {
 		logReason("it is a single episode");
 		return false;
 	}
@@ -75,9 +85,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			"timestamp.indexer_id": "indexer.id",
 			"timestamp.searchee_id": "searchee.id",
 		})
-		.where("searchee.name",
-		searchee.name
-		)
+		.where("searchee.name", searchee.name)
 		.whereIn(
 			"indexer.id",
 			enabledIndexers.map((i) => i.id)

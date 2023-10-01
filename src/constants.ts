@@ -6,7 +6,8 @@ export const PROGRAM_NAME = packageDotJson.name;
 export const PROGRAM_VERSION = packageDotJson.version;
 export const USER_AGENT = `CrossSeed/${PROGRAM_VERSION}`;
 
-export const EP_REGEX = /^(?<title>.+?)[\s._](?<season>S\d+)?[_.\s]?(?<episode>E\d+(?:[-\s]?E?\d+)?)/i;
+export const EP_REGEX =
+	/^(?<title>.+?)[\s._](?<season>S\d+)?[_.\s]?(?<episode>E\d+(?:[-\s]?E?\d+)?)/i;
 export const SEASON_REGEX =
 	/^(?<title>.+?)[_.\s](?<season>S\d+)(?:[.\-\s]*?(?<seasonmax>S?\d+))?(?=[_.\s](?!E\d+))/i;
 export const MOVIE_REGEX =
