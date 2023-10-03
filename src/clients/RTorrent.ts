@@ -233,7 +233,7 @@ export default class RTorrent implements TorrentClient {
 				await this.methodCallP<void>("load.start", [
 					"",
 					torrentFilePath,
-					`d.directory_base.set="${downloadDir}"`,
+					`d.${path ? "directory" : "directory_base"}.set="${downloadDir}"`,
 					`d.custom1.set="cross-seed"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
 				]);
