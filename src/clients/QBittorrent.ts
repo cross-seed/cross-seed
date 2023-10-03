@@ -87,18 +87,23 @@ interface Category {
 
 export default class QBittorrent implements TorrentClient {
 	cookie: string;
+	url: { username: string; password: string; href: string };
 
-	async login(): Promise<void> {
+	constructor() {
 		const { qbittorrentUrl } = getRuntimeConfig();
-		const { username, password, href } = extractCredentialsFromUrl(
-			qbittorrentUrl
+		this.url = extractCredentialsFromUrl(
+			qbittorrentUrl,
+			"/api/v2"
 		).unwrapOrThrow(
 			new CrossSeedError("qBittorrent url must be percent-encoded")
 		);
+	}
 
+	async login(): Promise<void> {
 		let response: Response;
+		const { href, username, password } = this.url;
 		try {
-			response = await fetch(`${href}api/v2/auth/login`, {
+			response = await fetch(`${href}/auth/login`, {
 				method: "POST",
 				body: new URLSearchParams({ username, password }),
 			});
@@ -137,10 +142,8 @@ export default class QBittorrent implements TorrentClient {
 			label: Label.QBITTORRENT,
 			message: `Making request to ${path} with body ${body.toString()}`,
 		});
-		const { qbittorrentUrl } = getRuntimeConfig();
-		const { href } =
-			extractCredentialsFromUrl(qbittorrentUrl).unwrapOrThrow();
-		const response = await fetch(`${href}api/v2${path}`, {
+
+		const response = await fetch(`${this.url.href}${path}`, {
 			method: "post",
 			headers: { Cookie: this.cookie, ...headers },
 			body,
