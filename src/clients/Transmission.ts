@@ -6,6 +6,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
+import { extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
@@ -46,8 +47,10 @@ export default class Transmission implements TorrentClient {
 	): Promise<T> {
 		const { transmissionRpcUrl } = getRuntimeConfig();
 
-		const { username, password, origin, pathname } = new URL(
+		const { username, password, href } = extractCredentialsFromUrl(
 			transmissionRpcUrl
+		).unwrapOrThrow(
+			new CrossSeedError("Transmission rpc url must be percent-encoded")
 		);
 
 		const headers = new Headers();
@@ -62,7 +65,7 @@ export default class Transmission implements TorrentClient {
 			headers.set("Authorization", `Basic ${credentials}`);
 		}
 
-		const response = await fetch(origin + pathname, {
+		const response = await fetch(href, {
 			method: "POST",
 			body: JSON.stringify({ method, arguments: args }),
 			headers,

@@ -3,7 +3,7 @@ export interface Result<T, U> {
 	isErr(): boolean;
 	mapOk<R>(mapper: (t: T) => R): Result<R, U>;
 	mapErr<R>(mapper: (u: U) => R): Result<T, R>;
-	unwrapOrThrow(): T;
+	unwrapOrThrow(errToThrow?: Error): T;
 	unwrapErrOrThrow(): U;
 }
 
@@ -26,11 +26,13 @@ class OkResult<T, U> implements Result<T, U> {
 		return new OkResult(mapper(this.contents));
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	mapErr<R>(mapper: (u: U) => R): Result<T, R> {
 		return this as unknown as Result<T, R>;
 	}
 
-	unwrapOrThrow(): T {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	unwrapOrThrow(errToThrow?: Error): T {
 		return this.contents;
 	}
 
@@ -54,6 +56,7 @@ class ErrResult<T, U> implements Result<T, U> {
 		return true;
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	mapOk<R>(mapper: (t: T) => R): Result<R, U> {
 		return this as unknown as Result<R, U>;
 	}
@@ -62,8 +65,8 @@ class ErrResult<T, U> implements Result<T, U> {
 		return new ErrResult(mapper(this.contents));
 	}
 
-	unwrapOrThrow(): T {
-		throw new Error("Tried to unwrap an ErrResult's error");
+	unwrapOrThrow(errToThrow?: Error): T {
+		throw errToThrow ?? new Error("Tried to unwrap an ErrResult's error");
 	}
 
 	unwrapErrOrThrow(): U {

@@ -9,7 +9,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { File, Searchee } from "../searchee.js";
-import { wait } from "../utils.js";
+import { extractCredentialsFromUrl, wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 interface LibTorrentResumeFileEntry {
@@ -80,30 +80,25 @@ export default class RTorrent implements TorrentClient {
 	constructor() {
 		const { rtorrentRpcUrl } = getRuntimeConfig();
 
-		try {
-			const { origin, username, password, protocol, pathname } = new URL(
-				rtorrentRpcUrl
-			);
+		const { href, username, password } = extractCredentialsFromUrl(
+			rtorrentRpcUrl
+		).unwrapOrThrow(
+			new CrossSeedError("rTorrent url must be percent-encoded")
+		);
 
-			const clientCreator =
-				protocol === "https:"
-					? xmlrpc.createSecureClient
-					: xmlrpc.createClient;
+		const clientCreator =
+			new URL(href).protocol === "https:"
+				? xmlrpc.createSecureClient
+				: xmlrpc.createClient;
 
-			const shouldUseAuth = Boolean(username && password);
+		const shouldUseAuth = Boolean(username && password);
 
-			this.client = clientCreator({
-				url: origin + pathname,
-				basic_auth: shouldUseAuth
-					? {
-							user: decodeURIComponent(username),
-							pass: decodeURIComponent(password),
-					  }
-					: undefined,
-			});
-		} catch (e) {
-			throw new CrossSeedError("rTorrent url must be percent-encoded");
-		}
+		this.client = clientCreator({
+			url: href,
+			basic_auth: shouldUseAuth
+				? { user: username, pass: password }
+				: undefined,
+		});
 	}
 
 	private async methodCallP<R>(method: string, args): Promise<R> {
