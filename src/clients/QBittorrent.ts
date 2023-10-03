@@ -98,7 +98,7 @@ export default class QBittorrent implements TorrentClient {
 
 		let response: Response;
 		try {
-			response = await fetch(`${href}/api/v2/auth/login`, {
+			response = await fetch(`${href}api/v2/auth/login`, {
 				method: "POST",
 				body: new URLSearchParams({ username, password }),
 			});
@@ -140,7 +140,7 @@ export default class QBittorrent implements TorrentClient {
 		const { qbittorrentUrl } = getRuntimeConfig();
 		const { href } =
 			extractCredentialsFromUrl(qbittorrentUrl).unwrapOrThrow();
-		const response = await fetch(`${href}/api/v2${path}`, {
+		const response = await fetch(`${href}api/v2${path}`, {
 			method: "post",
 			headers: { Cookie: this.cookie, ...headers },
 			body,
