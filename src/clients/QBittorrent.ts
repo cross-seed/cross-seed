@@ -10,6 +10,7 @@ import { Label, logger, logOnce } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
+import { extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const X_WWW_FORM_URLENCODED = {
@@ -85,36 +86,21 @@ interface Category {
 }
 
 export default class QBittorrent implements TorrentClient {
-	url: URL;
 	cookie: string;
 
-	constructor() {
-		const { qbittorrentUrl } = getRuntimeConfig();
-		try {
-			this.url = new URL(`${qbittorrentUrl}/api/v2`);
-		} catch (e) {
-			throw new CrossSeedError("qBittorrent url must be percent-encoded");
-		}
-	}
-
 	async login(): Promise<void> {
-		const { origin, pathname, username, password } = this.url;
-
-		let searchParams;
-		try {
-			searchParams = new URLSearchParams({
-				username: decodeURIComponent(username),
-				password: decodeURIComponent(password),
-			});
-		} catch (e) {
-			throw new CrossSeedError("qBittorrent url must be percent-encoded");
-		}
+		const { qbittorrentUrl } = getRuntimeConfig();
+		const { username, password, href } = extractCredentialsFromUrl(
+			qbittorrentUrl
+		).unwrapOrThrow(
+			new CrossSeedError("qBittorrent url must be percent-encoded")
+		);
 
 		let response: Response;
 		try {
-			response = await fetch(`${origin}${pathname}/auth/login`, {
+			response = await fetch(`${href}/api/v2/auth/login`, {
 				method: "POST",
-				body: searchParams,
+				body: new URLSearchParams({ username, password }),
 			});
 		} catch (e) {
 			throw new CrossSeedError(`qBittorrent login failed: ${e.message}`);
@@ -151,8 +137,10 @@ export default class QBittorrent implements TorrentClient {
 			label: Label.QBITTORRENT,
 			message: `Making request to ${path} with body ${body.toString()}`,
 		});
-		const { origin, pathname } = this.url;
-		const response = await fetch(`${origin}${pathname}${path}`, {
+		const { qbittorrentUrl } = getRuntimeConfig();
+		const { href } =
+			extractCredentialsFromUrl(qbittorrentUrl).unwrapOrThrow();
+		const response = await fetch(`${href}/api/v2${path}`, {
 			method: "post",
 			headers: { Cookie: this.cookie, ...headers },
 			body,
