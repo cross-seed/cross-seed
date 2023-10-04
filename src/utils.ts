@@ -105,7 +105,7 @@ export function extractCredentialsFromUrl(
 			username: decodeURIComponent(username),
 			password: decodeURIComponent(password),
 			href: basePath
-				? origin + join(pathname, basePath)
+				? origin + path.posix.join(pathname, basePath)
 				: pathname === "/"
 				? origin
 				: origin + pathname,
