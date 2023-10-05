@@ -11,15 +11,24 @@ import fetch, { Headers, Response } from "node-fetch";
 interface DelugeResponse {
 	error?: {
 		message?: string;
-		code?: number;
+		code?: DelugeErrorCode;
 	};
 	result?: string | boolean;
 }
+enum DelugeErrorCode {
+	NO_AUTH = 1,
+	BAD_METHOD = 2,
+	CALL_ERR = 3,
+	RPC_FAIL = 4,
+	BAD_JSON = 5,
+}
+interface TorrentInfo {
+	complete: boolean;
+	save_path?: string;
+}
 
 export default class Deluge implements TorrentClient {
-	private msgId = 0;
-	private delugeCookie = "";
-	private delugeRpcUrl: URL;
+	private delugeCookie = null;
 	private delugeLabel = "cross-seed";
 	private isLabelEnabled: boolean;
 
@@ -43,18 +52,13 @@ export default class Deluge implements TorrentClient {
 		);
 		if (!password) {
 			throw new CrossSeedError(
-				"you need to define a password in the delugeRpcUrl. (eg: http://:<PASSWORD>@localhost:8112)"
+				"you need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)"
 			);
 		}
-		const response = await this.call("auth.login", [password]);
-		if (response === null) {
-			throw new CrossSeedError(
-				`failed to establish a connection to deluge: ${href}`
-			);
-		}
+		const response = await this.call("auth.login", [password], 0);
 		if (!response.result) {
 			throw new CrossSeedError(
-				`failed to authenticate with deluge: ${href}`
+				`reached deluge, but failed to authenticate: ${href}`
 			);
 		}
 	}
@@ -67,7 +71,6 @@ export default class Deluge implements TorrentClient {
 		const { href } = extractCredentialsFromUrl(delugeRpcUrl).unwrapOrThrow(
 			new CrossSeedError("delugeRpcUrl must be percent-encoded")
 		);
-		this.msgId = (this.msgId + 1) % 1024;
 		const headers = new Headers({ "Content-Type": "application/json" });
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
@@ -76,24 +79,23 @@ export default class Deluge implements TorrentClient {
 			response = await fetch(href, {
 				body: JSON.stringify({
 					...{ method: method, params: params },
-					id: this.msgId,
+					id: Math.floor(Math.random() * 1000000),
 				}),
 				method: "POST",
 				headers: headers,
 			});
 			json = (await response.json()) as DelugeResponse;
-		} catch (networkError) {
-			return null;
+		} catch (NetworkError) {
+			throw new CrossSeedError(
+				`failed to establish a connection to deluge: ${href}`
+			);
 		}
-		if (json?.error?.code === 1 && retries > 0) {
+		if (json?.error?.code === DelugeErrorCode.NO_AUTH && retries > 0) {
+			this.delugeCookie = null;
 			await this.authenticate();
 			return this.call(method, params, 0);
 		}
-		if (!response.ok) {
-			return null;
-		}
 		this.handleResponseHeaders(response.headers);
-
 		return json;
 	}
 
@@ -114,25 +116,22 @@ export default class Deluge implements TorrentClient {
 	 */
 	private async labelEnabled() {
 		const enabledLabels = await this.call("core.get_enabled_plugins", []);
-		return enabledLabels?.result?.includes("Label");
+		return enabledLabels?.result?.includes?.("Label");
 	}
 
 	/**
 	 * if Label plugin is loaded, adds (if necessary)
 	 * and sets the label based on torrent hash.
 	 */
-	private async setLabel(infoHash: string): Promise<void> {
+	private async setLabel(infoHash: string, label: string): Promise<void> {
 		if (this.isLabelEnabled) {
 			const setResult = await this.call("label.set_torrent", [
 				infoHash,
-				this.delugeLabel,
+				label,
 			]);
-			if (setResult?.error?.code == 4) {
-				await this.call("label.add", [this.delugeLabel]);
-				await this.call("label.set_torrent", [
-					infoHash,
-					this.delugeLabel,
-				]);
+			if (setResult?.error?.code == DelugeErrorCode.RPC_FAIL) {
+				await this.call("label.add", [label]);
+				await this.call("label.set_torrent", [infoHash, label]);
 			}
 		}
 	}
@@ -145,17 +144,30 @@ export default class Deluge implements TorrentClient {
 		searchee: Searchee,
 		path?: string
 	): Promise<InjectionResult> {
-		if (searchee.infoHash && !(await this.checkCompleted(searchee))) {
-			return InjectionResult.TORRENT_NOT_COMPLETE;
+		let torrentInfo;
+		if (searchee.infoHash) {
+			torrentInfo = await this.getTorrentInfo(searchee);
+			if (!torrentInfo.complete) {
+				return InjectionResult.TORRENT_NOT_COMPLETE;
+			}
 		}
+
 		const params = this.formatData(
 			`${newTorrent.name}.cross-seed.torrent`,
 			newTorrent.encode().toString("base64"),
-			path ? path : await this.getSavePath(searchee)
+			path ? path : torrentInfo.save_path
 		);
-		const addResult = await this.call("core.add_torrent_file", params);
-		if (addResult.result) {
-			this.setLabel(newTorrent.infoHash);
+		const addResult = (await this.call(
+			"core.add_torrent_file",
+			params
+		)) as DelugeResponse;
+		if (addResult?.result) {
+			if (searchee.infoHash) {
+				await this.setLabel(newTorrent.infoHash, this.delugeLabel);
+			} else {
+				const { dataCategory } = getRuntimeConfig();
+				await this.setLabel(newTorrent.infoHash, dataCategory);
+			}
 			return InjectionResult.SUCCESS;
 		} else if (addResult?.error?.message?.includes("already")) {
 			return InjectionResult.ALREADY_EXISTS;
@@ -184,43 +196,33 @@ export default class Deluge implements TorrentClient {
 	}
 
 	/**
-	 * returns true if the torrent hash is completed in deluge
+	 * returns information needed to complete/validate injection
 	 */
-	private async getSavePath(searchee: Searchee): Promise<string> {
+	private async getTorrentInfo(searchee: Searchee): Promise<TorrentInfo> {
 		try {
-			const params = [["save_path"], { hash: searchee.infoHash }];
+			const params = [
+				["state", "progress", "save_path"],
+				{ hash: searchee.infoHash },
+			];
 
 			const response = await this.call("web.update_ui", params);
-			return response?.result?.torrents?.[searchee.infoHash]?.save_path;
-		} catch (e) {
-			logger.debug({
-				label: Label.DELUGE,
-				message: `failed to fetch torrent save_path: ${searchee.name} - ${searchee.infoHash}`,
-			});
-		}
-		return null;
-	}
-
-	/**
-	 * returns true if the torrent hash is Seeding (completed)
-	 */
-	private async checkCompleted(searchee: Searchee): Promise<boolean> {
-		try {
-			const params = [["state", "progress"], { hash: searchee.infoHash }];
-
-			const response = await this.call("web.update_ui", params);
-			return (
+			const completedTorrent =
 				response?.result?.torrents?.[searchee.infoHash]?.state ===
 					"Seeding" ||
 				response?.result?.torrents?.[searchee.infoHash]?.progress ===
-					100
-			);
+					100;
+			return {
+				complete: completedTorrent,
+				save_path: completedTorrent
+					? response?.result?.torrents?.[searchee.infoHash]?.save_path
+					: undefined,
+			} as TorrentInfo;
 		} catch (e) {
 			logger.debug({
 				label: Label.DELUGE,
-				message: `failed to fetch torrent state: ${searchee.name} - ${searchee.infoHash}`,
+				message: `failed to fetch torrent data from deluge: ${searchee.name} - ${searchee.infoHash}`,
 			});
 		}
-		return false;
+		return { complete: false } as TorrentInfo;
 	}
 }

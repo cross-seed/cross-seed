@@ -12,18 +12,20 @@ module.exports = {
 	 * List of Torznab URLs.
 	 * For Jackett, click "Copy RSS feed"
 	 * For Prowlarr, click on the indexer name and copy the Torznab Url, then append "?apikey=YOUR_PROWLARR_API_KEY"
-	 * Wrap each URL in quotation marks, and separate them with commas.
+	 * Wrap each URL in quotation marks, and separate them with commas, and surround the entire set in brackets.
 	 */
 	torznab: [],
 
 	/**
-	 * To search with downloaded data, you can pass in directories to your downloaded torrent data
-	 * to find matches rather using the torrent files themselves for matching.
+	 * To search with downloaded data, you can pass in directories to your downloaded torrent
+	 * data to find matches rather using the torrent files themselves for matching.
 	 *
-	 * If enabled, this needs to be surrounded by brackets.
-	 * eg:
+	 * If enabled, this needs to be surrounded by brackets. Windows users will need to use
+	 * double backslash in all paths in this config.
+	 * e.g.
 	 * 		dataDirs: ["/path/here"],
 	 * 		dataDirs: ["/path/here", "/other/path/here"],
+	 * 		dataDirs: ["C:\\My Data\\Downloads"]
 	 */
 	dataDirs: undefined,
 
@@ -68,10 +70,13 @@ module.exports = {
 	maxDataDepth: 2,
 
 	/**
-	 * Directory containing torrent files.
+	 * Directory containing .torrent files.
+	 * For qBittorrent, this is BT_Backup
 	 * For rtorrent, this is your session directory
-	 * as configured in your .rtorrent.rc file.
-	 * For deluge, this is ~/.config/deluge/state.
+	 * 		as configured in your .rtorrent.rc file.
+	 * For Deluge, this is ~/.config/deluge/state.
+	 * For Transmission, this would be ~/.config/transmission/torrents
+	 *
 	 * Don't change this for Docker.
 	 * Instead set the volume mapping on your docker container.
 	 */
