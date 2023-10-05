@@ -13,7 +13,7 @@ function validateOptions() {
 		rtorrentRpcUrl,
 		qbittorrentUrl,
 		transmissionRpcUrl,
-		delugeWebUrl,
+		delugeRpcUrl,
 		dataDirs,
 		linkDir,
 		matchMode,
@@ -25,11 +25,11 @@ function validateOptions() {
 			rtorrentRpcUrl ||
 			qbittorrentUrl ||
 			transmissionRpcUrl ||
-			delugeWebUrl
+			delugeRpcUrl
 		)
 	) {
 		throw new CrossSeedError(
-			"You need to specify --rtorrent-rpc-url, --transmission-rpc-url, --qbittorrent-url, or --deluge-web-url when using '-A inject'."
+			"You need to specify --rtorrent-rpc-url, --transmission-rpc-url, --qbittorrent-url, or --deluge-rpc-url when using '-A inject'."
 		);
 	}
 	if ((dataDirs && !linkDir) || (!dataDirs && linkDir)) {

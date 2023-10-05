@@ -19,6 +19,11 @@ module.exports = {
 	/**
 	 * To search with downloaded data, you can pass in directories to your downloaded torrent data
 	 * to find matches rather using the torrent files themselves for matching.
+	 *
+	 * If enabled, this needs to be surrounded by brackets.
+	 * eg:
+	 * 		dataDirs: ["/path/here"],
+	 * 		dataDirs: ["/path/here", "/other/path/here"],
 	 */
 	dataDirs: undefined,
 
@@ -160,7 +165,7 @@ module.exports = {
 	 * Supply your WebUI password as well
 	 * "http://:password@localhost:8112/json"
 	 */
-	delugeWebUrl: undefined,
+	delugeRpcUrl: undefined,
 
 	/**
 	 * qBittorrent-specific

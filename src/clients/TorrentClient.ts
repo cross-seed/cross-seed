@@ -19,7 +19,7 @@ export interface TorrentClient {
 }
 
 function instantiateDownloadClient() {
-	const { rtorrentRpcUrl, qbittorrentUrl, transmissionRpcUrl, delugeWebUrl } =
+	const { rtorrentRpcUrl, qbittorrentUrl, transmissionRpcUrl, delugeRpcUrl } =
 		getRuntimeConfig();
 	if (rtorrentRpcUrl) {
 		activeClient = new RTorrent();
@@ -27,7 +27,7 @@ function instantiateDownloadClient() {
 		activeClient = new QBittorrent();
 	} else if (transmissionRpcUrl) {
 		activeClient = new Transmission();
-	} else if (delugeWebUrl) {
+	} else if (delugeRpcUrl) {
 		activeClient = new Deluge();
 	}
 }

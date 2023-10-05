@@ -24,7 +24,7 @@ export interface RuntimeConfig {
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
 	transmissionRpcUrl: string;
-	delugeWebUrl: string;
+	delugeRpcUrl: string;
 	duplicateCategories: boolean;
 	notificationWebhookUrl: string;
 	torrents: string[];

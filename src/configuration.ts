@@ -31,7 +31,7 @@ interface FileConfig {
 	torznab?: string[];
 	qbittorrentUrl?: string;
 	transmissionRpcUrl?: string;
-	delugeWebUrl?: string;
+	delugeRpcUrl?: string;
 	duplicateCategories?: boolean;
 	notificationWebhookUrl?: string;
 	port?: number;
