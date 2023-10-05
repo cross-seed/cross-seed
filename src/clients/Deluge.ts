@@ -5,6 +5,7 @@ import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
+import { extractCredentialsFromUrl } from "../utils.js";
 import fetch, { Headers, Response } from "node-fetch";
 
 interface DelugeResponse {
@@ -19,24 +20,13 @@ export default class Deluge implements TorrentClient {
 	private msgId = 0;
 	private delugeCookie = "";
 	private delugeRpcUrl: URL;
-	private delugeLabel: string;
+	private delugeLabel = "cross-seed";
 	private isLabelEnabled: boolean;
-
-	constructor() {
-		const { delugeRpcUrl } = getRuntimeConfig();
-		this.delugeRpcUrl = new URL(delugeRpcUrl);
-		this.delugeLabel = "cross-seed";
-	}
 
 	/**
 	 * validates the login and host for deluge webui
 	 */
 	async validateConfig(): Promise<void> {
-		if (!this.delugeRpcUrl.password) {
-			throw new CrossSeedError(
-				"you need to define a password in the delugeRpcUrl. (eg: http://:<PASSWORD>@localhost:8112)"
-			);
-		}
 		await this.authenticate();
 		this.isLabelEnabled = await this.labelEnabled();
 	}
@@ -45,17 +35,26 @@ export default class Deluge implements TorrentClient {
 	 * connects and authenticates to the webui
 	 */
 	private async authenticate(): Promise<void> {
-		const response = await this.call("auth.login", [
-			this.delugeRpcUrl.password,
-		]);
+		const { delugeRpcUrl } = getRuntimeConfig();
+		const { href, password } = extractCredentialsFromUrl(
+			delugeRpcUrl
+		).unwrapOrThrow(
+			new CrossSeedError("delugeRpcUrl must be percent-encoded")
+		);
+		if (!password) {
+			throw new CrossSeedError(
+				"you need to define a password in the delugeRpcUrl. (eg: http://:<PASSWORD>@localhost:8112)"
+			);
+		}
+		const response = await this.call("auth.login", [password]);
 		if (response === null) {
 			throw new CrossSeedError(
-				`failed to establish a connection to deluge: ${this.delugeRpcUrl.origin}`
+				`failed to establish a connection to deluge: ${href}`
 			);
 		}
 		if (!response.result) {
 			throw new CrossSeedError(
-				`failed to authenticate with deluge: ${this.delugeRpcUrl.origin}`
+				`failed to authenticate with deluge: ${href}`
 			);
 		}
 	}
@@ -64,15 +63,17 @@ export default class Deluge implements TorrentClient {
 	 * ensures authentication and sends JSON-RPC calls to deluge
 	 */
 	private async call(method: string, params: object, retries = 1) {
+		const { delugeRpcUrl } = getRuntimeConfig();
+		const { href } = extractCredentialsFromUrl(delugeRpcUrl).unwrapOrThrow(
+			new CrossSeedError("delugeRpcUrl must be percent-encoded")
+		);
 		this.msgId = (this.msgId + 1) % 1024;
-		const url = this.delugeRpcUrl.origin + this.delugeRpcUrl.pathname;
-
 		const headers = new Headers({ "Content-Type": "application/json" });
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
 		let response: Response, json: DelugeResponse;
 		try {
-			response = await fetch(url, {
+			response = await fetch(href, {
 				body: JSON.stringify({
 					...{ method: method, params: params },
 					id: this.msgId,
