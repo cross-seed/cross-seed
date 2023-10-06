@@ -1,4 +1,4 @@
-import { basename } from "path";
+import path, { basename, join } from "path";
 import {
 	EP_REGEX,
 	MOVIE_REGEX,
@@ -96,14 +96,19 @@ export function fallback<T>(...args: T[]): T {
 }
 
 export function extractCredentialsFromUrl(
-	url: string
+	url: string,
+	basePath?: string
 ): Result<{ username: string; password: string; href: string }, "invalid URL"> {
 	try {
 		const { origin, pathname, username, password } = new URL(url);
 		return resultOf({
 			username: decodeURIComponent(username),
 			password: decodeURIComponent(password),
-			href: origin + pathname,
+			href: basePath
+				? origin + path.posix.join(pathname, basePath)
+				: pathname === "/"
+				? origin
+				: origin + pathname,
 		});
 	} catch (e) {
 		return resultOfErr("invalid URL");
