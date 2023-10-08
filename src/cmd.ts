@@ -292,6 +292,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 		fallback(fileConfig.port, 2468)
 	)
 	.option("--host <host>", "Bind to a specific IP address", fileConfig.host)
+	.option("--apikey <apikey>", "Require API auth", fileConfig.apikey)
 	.option("--no-port", "Do not listen on any port")
 	.option(
 		"--search-cadence <cadence>",
@@ -316,7 +317,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			});
 			await db.migrate.latest();
 			await doStartupValidation();
-			serve(options.port, options.host);
+			serve(options.port, options.host, options.apikey);
 			jobsLoop();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);

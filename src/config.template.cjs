@@ -181,6 +181,12 @@ module.exports = {
 	host: undefined,
 
 	/**
+	 * Force authentication for API
+	 * Example: "my-long-good-token"
+	 */
+	apikey: undefined,
+
+	/**
 	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms
 	 * Set to undefined or null to disable. Minimum of 10 minutes.
 	 * Examples:

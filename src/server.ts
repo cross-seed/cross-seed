@@ -1,4 +1,5 @@
 import http, { IncomingMessage, ServerResponse } from "http";
+import url from "url";
 import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
@@ -9,6 +10,8 @@ import {
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
+
+let secretApiKey = "";
 
 function getData(req): Promise<string> {
 	return new Promise((resolve) => {
@@ -45,10 +48,40 @@ function parseData(data) {
 	return parsed;
 }
 
+// isValidAPIKey check if api key is valid or not
+function isValidAPIKey(req: IncomingMessage): boolean {
+	// if no api key is set then always return true
+	if (secretApiKey === "") {
+		return true
+	}
+
+	const parsedUrl = url.parse(req.url, true);
+
+	// get apikey from query /params?apikey=supersecretapikey
+	const apiKeyQueryParam = parsedUrl.query.apikey;
+
+	// get apikey from header
+	const apiKeyHeader = req.headers['x-api-key'];
+
+	if (apiKeyQueryParam === secretApiKey || apiKeyHeader === secretApiKey) {
+		return true; // API key is valid.
+	}
+
+	return false; // API key is invalid.
+}
+
 async function search(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<void> {
+	if (!isValidAPIKey(req)) {
+		const message = "Unauthorized";
+		logger.error({ label: Label.SERVER, message });
+		res.writeHead(401);
+		res.end();
+		return;
+	}
+
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -111,6 +144,14 @@ async function announce(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<void> {
+	if (!isValidAPIKey(req)) {
+		const message = "Unauthorized";
+		logger.error({ label: Label.SERVER, message });
+		res.writeHead(401);
+		res.end();
+		return;
+	}
+
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -205,7 +246,11 @@ async function handleRequest(
 	}
 }
 
-export function serve(port: number, host: string | undefined): void {
+export function serve(port: number, host: string | undefined, apiKey: string | undefined): void {
+	if (apiKey) {
+		secretApiKey = apiKey
+	}
+
 	if (port) {
 		const server = http.createServer(handleRequest);
 		server.listen(port, host);
