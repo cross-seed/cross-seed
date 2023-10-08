@@ -52,7 +52,7 @@ function parseData(data) {
 function isValidAPIKey(req: IncomingMessage): boolean {
 	// if no api key is set then always return true
 	if (secretApiKey === "") {
-		return true
+		return true;
 	}
 
 	const parsedUrl = url.parse(req.url, true);
@@ -61,7 +61,7 @@ function isValidAPIKey(req: IncomingMessage): boolean {
 	const apiKeyQueryParam = parsedUrl.query.apikey;
 
 	// get apikey from header
-	const apiKeyHeader = req.headers['x-api-key'];
+	const apiKeyHeader = req.headers["x-api-key"];
 
 	if (apiKeyQueryParam === secretApiKey || apiKeyHeader === secretApiKey) {
 		return true; // API key is valid.
@@ -246,9 +246,13 @@ async function handleRequest(
 	}
 }
 
-export function serve(port: number, host: string | undefined, apiKey: string | undefined): void {
+export function serve(
+	port: number,
+	host: string | undefined,
+	apiKey: string | undefined
+): void {
 	if (apiKey) {
-		secretApiKey = apiKey
+		secretApiKey = apiKey;
 	}
 
 	if (port) {
