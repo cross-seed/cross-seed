@@ -24,13 +24,14 @@ interface LibTorrentResume {
 }
 async function createLibTorrentResumeTree(
 	meta: Metafile,
-	dataDir: string
+	dataDir: string,
+	isBasePath: boolean
 ): Promise<LibTorrentResume> {
 	async function getFileResumeData(
 		file: File
 	): Promise<LibTorrentResumeFileEntry> {
 		let filePath = file.path;
-		if (filePath.indexOf(sep) != -1) {
+		if (isBasePath && filePath.indexOf(sep) != -1) {
 			filePath = filePath.split(sep).slice(1).join(sep);
 		}
 
@@ -68,11 +69,12 @@ async function createLibTorrentResumeTree(
 async function saveWithLibTorrentResume(
 	meta: Metafile,
 	savePath: string,
-	dataDir: string
+	dataDir: string,
+	isBasePath: boolean
 ): Promise<void> {
 	const rawWithLibtorrentResume = {
 		...meta.raw,
-		libtorrent_resume: await createLibTorrentResumeTree(meta, dataDir),
+		libtorrent_resume: await createLibTorrentResumeTree(meta, dataDir, isBasePath),
 	};
 	await fs.writeFile(
 		savePath,
@@ -225,7 +227,8 @@ export default class RTorrent implements TorrentClient {
 		await saveWithLibTorrentResume(
 			meta,
 			torrentFilePath,
-			path ? path : downloadDir
+			downloadDir,
+			!Boolean(path)
 		);
 
 		for (let i = 0; i < 5; i++) {
