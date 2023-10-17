@@ -28,7 +28,7 @@ interface TorrentInfo {
 }
 
 export default class Deluge implements TorrentClient {
-	private delugeCookie = null;
+	private delugeCookie: string | null = null;
 	private delugeLabel = "cross-seed";
 	private isLabelEnabled: boolean;
 
@@ -36,11 +36,7 @@ export default class Deluge implements TorrentClient {
 	 * validates the login and host for deluge webui
 	 */
 	async validateConfig(): Promise<void> {
-		try {
-			await this.authenticate();
-		} catch (validateError) {
-			throw new CrossSeedError(validateError);
-		}
+		await this.authenticate();
 		this.isLabelEnabled = await this.labelEnabled();
 	}
 
@@ -51,16 +47,18 @@ export default class Deluge implements TorrentClient {
 		const { delugeRpcUrl } = getRuntimeConfig();
 		const { href, password } = extractCredentialsFromUrl(
 			delugeRpcUrl
-		).unwrapOrThrow(new Error("delugeRpcUrl must be percent-encoded"));
+		).unwrapOrThrow(
+			new CrossSeedError("delugeRpcUrl must be percent-encoded")
+		);
 		if (!password) {
-			throw new Error(
-				"you need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)"
+			throw new CrossSeedError(
+				"You need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)"
 			);
 		}
 		const response = await this.call("auth.login", [password], 0);
 		if (!response.result) {
-			throw new Error(
-				`reached deluge, but failed to authenticate: ${href}`
+			throw new CrossSeedError(
+				`Reached Deluge, but failed to authenticate: ${href}`
 			);
 		}
 	}
@@ -70,9 +68,8 @@ export default class Deluge implements TorrentClient {
 	 */
 	private async call(method: string, params: object, retries = 1) {
 		const { delugeRpcUrl } = getRuntimeConfig();
-		const { href } = extractCredentialsFromUrl(delugeRpcUrl).unwrapOrThrow(
-			new CrossSeedError("delugeRpcUrl must be percent-encoded")
-		);
+		const { href } =
+			extractCredentialsFromUrl(delugeRpcUrl).unwrapOrThrow();
 		const headers = new Headers({ "Content-Type": "application/json" });
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
@@ -86,15 +83,18 @@ export default class Deluge implements TorrentClient {
 				method: "POST",
 				headers: headers,
 			});
-			try {
-				json = await response.json();
-			} catch (jsonParseError) {
-				throw new Error(
-					`Deluge method ${method} response was non-JSON ${jsonParseError}`
-				);
-			}
 		} catch (networkError) {
-			throw new Error(`Failed to connect to Deluge at ${href}`);
+			// @ts-expect-error ts needs updating
+			throw new Error(`Failed to connect to Deluge at ${href}`, {
+				cause: networkError,
+			});
+		}
+		try {
+			json = await response.json();
+		} catch (jsonParseError) {
+			throw new Error(
+				`Deluge method ${method} response was non-JSON ${jsonParseError}`
+			);
 		}
 		if (json?.error?.code === DelugeErrorCode.NO_AUTH && retries > 0) {
 			this.delugeCookie = null;
@@ -115,10 +115,9 @@ export default class Deluge implements TorrentClient {
 	 * parses the set-cookie header and updates stored value
 	 */
 	private handleResponseHeaders(headers: Headers) {
-		if (headers?.has("Set-Cookie")) {
+		if (headers.has("Set-Cookie")) {
 			this.delugeCookie = headers.get("Set-Cookie").split(";")[0];
 		}
-		return;
 	}
 
 	/**
@@ -155,7 +154,7 @@ export default class Deluge implements TorrentClient {
 		searchee: Searchee,
 		path?: string
 	): Promise<InjectionResult> {
-		let torrentInfo;
+		let torrentInfo: TorrentInfo;
 		if (searchee.infoHash) {
 			torrentInfo = await this.getTorrentInfo(searchee);
 			if (!torrentInfo.complete) {
@@ -182,25 +181,20 @@ export default class Deluge implements TorrentClient {
 		} catch (injectResult) {
 			logger.error({
 				label: Label.DELUGE,
-				message: `injection failed: ${injectResult}`,
+				message: `Injection failed: ${injectResult}`,
 			});
 			logger.debug(injectResult);
 			return InjectionResult.FAILURE;
 		}
 		if (addResult?.result) {
-			if (searchee.infoHash) {
-				await this.setLabel(newTorrent.infoHash, this.delugeLabel);
-			} else {
-				const { dataCategory } = getRuntimeConfig();
-				await this.setLabel(newTorrent.infoHash, dataCategory);
-			}
+			await this.setLabel(newTorrent.infoHash, this.delugeLabel);
 			return InjectionResult.SUCCESS;
 		} else if (addResult?.error?.message?.includes("already")) {
 			return InjectionResult.ALREADY_EXISTS;
 		} else if (addResult?.error?.message) {
 			logger.debug({
 				label: Label.DELUGE,
-				message: `injection failed: ${addResult.error.message}`,
+				message: `Injection failed: ${addResult.error.message}`,
 			});
 			return InjectionResult.FAILURE;
 		}
@@ -257,7 +251,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				label: Label.DELUGE,
-				message: `Failed to fetch torrent data from Deluge: ${searchee.name} - (${searchee.infoHash})`,
+				message: `Failed to fetch torrent data: ${searchee.name} - (${searchee.infoHash})`,
 			});
 			logger.debug(e);
 			return { complete: false, save_path: "missing" };
