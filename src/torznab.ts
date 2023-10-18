@@ -115,8 +115,8 @@ function createTorznabSearchQuery(name: string, caps: Caps) {
 		return {
 			t: "tvsearch",
 			q: cleanseSeparators(match.groups.title),
-			season: extractNumber(match.groups.season),
-			ep: extractNumber(match.groups.episode),
+			season: extractNumber(match.groups.season) || match.groups.year,
+			ep: extractNumber(match.groups.episode) || `${match.groups.month}/${match.groups.day}`,
 		} as const;
 	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
