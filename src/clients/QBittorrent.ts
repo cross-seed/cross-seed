@@ -263,7 +263,7 @@ export default class QBittorrent implements TorrentClient {
 		searchee: Searchee,
 		path?: string
 	): Promise<InjectionResult> {
-		const { duplicateCategories, linkDir, skipRecheck, dataCategory } =
+		const { duplicateCategories, skipRecheck, dataCategory } =
 			getRuntimeConfig();
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {

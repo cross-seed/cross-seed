@@ -1,4 +1,4 @@
-import path, { basename, join } from "path";
+import path, { basename } from "path";
 import {
 	EP_REGEX,
 	MOVIE_REGEX,
