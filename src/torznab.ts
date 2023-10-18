@@ -28,8 +28,8 @@ interface TorznabParams {
 	limit?: number;
 	offset?: number;
 	apikey?: string;
-	season?: number;
-	ep?: number;
+	season?: number | string;
+	ep?: number | string;
 }
 
 interface Caps {
