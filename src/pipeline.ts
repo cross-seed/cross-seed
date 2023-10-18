@@ -202,18 +202,18 @@ export async function searchForLocalTorrentByCriteria(
 
 export async function checkNewCandidateMatch(
 	candidate: Candidate
-): Promise<boolean> {
+): Promise<InjectionResult | SaveResult> {
 	const meta = await getTorrentByFuzzyName(candidate.name);
 	if (meta === null) {
 		logger.verbose({
 			label: Label.REVERSE_LOOKUP,
 			message: `Did not find an existing entry for ${candidate.name}`,
 		});
-		return false;
+		return null;
 	}
 
 	const hashesToExclude = await getInfoHashesToExclude();
-	if (!filterByContent(meta)) return false;
+	if (!filterByContent(meta)) return null;
 	const searchee = createSearcheeFromMetafile(meta);
 
 	// make sure searchee is in database
@@ -232,7 +232,7 @@ export async function checkNewCandidateMatch(
 		assessment.decision !== Decision.MATCH &&
 		assessment.decision !== Decision.MATCH_SIZE_ONLY
 	)
-		return false;
+		return null;
 
 	const result = await performAction(
 		assessment.metafile,
@@ -245,7 +245,7 @@ export async function checkNewCandidateMatch(
 		[[assessment, candidate.tracker, result]],
 		Label.REVERSE_LOOKUP
 	);
-	return result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
+	return result;
 }
 
 async function findSearchableTorrents() {
