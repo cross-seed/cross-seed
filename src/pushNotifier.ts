@@ -103,6 +103,6 @@ export function initializePushNotifier(): void {
 }
 
 export function sendTestNotification(): void {
-	pushNotifier.notify({ body: "Test" });
+	pushNotifier.notify({ body: "Test", extra: { event: "TEST" } });
 	logger.info("Sent test notification");
 }
