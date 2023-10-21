@@ -236,10 +236,6 @@ async function handleRequest(
 }
 
 export function serve(port: number, host: string | undefined): void {
-	if (apiKey) {
-		secretApiKey = apiKey;
-	}
-
 	if (port) {
 		const server = http.createServer(handleRequest);
 		server.listen(port, host);

@@ -334,7 +334,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			});
 			await db.migrate.latest();
 			await doStartupValidation();
-			serve(options.port, options.host, options.apikey);
+			serve(options.port, options.host);
 			jobsLoop();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
