@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { Option, program } from "commander";
 import ms from "ms";
 import { inspect } from "util";
+import { getApiKeyFromDatabase, resetApiKey } from "./auth.js";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import {
 	Action,
@@ -282,6 +283,22 @@ program
 		console.log(
 			createSearcheeFromMetafile(await parseTorrentFromFilename(fn))
 		);
+	});
+
+program
+	.command("api-key")
+	.description("Show the api key")
+	.action(async () => {
+		await db.migrate.latest();
+		console.log(await getApiKeyFromDatabase());
+	});
+
+program
+	.command("reset-api-key")
+	.description("Reset the api key")
+	.action(async () => {
+		await db.migrate.latest();
+		console.log(await resetApiKey());
 	});
 
 createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
