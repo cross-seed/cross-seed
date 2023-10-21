@@ -1,8 +1,8 @@
 import http, { IncomingMessage, ServerResponse } from "http";
-import url from "url";
 import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
+import { checkApiKey } from "./auth.js";
 import { Label, logger } from "./logger.js";
 import {
 	Candidate,
@@ -11,9 +11,7 @@ import {
 } from "./pipeline.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 
-let secretApiKey = "";
-
-function getData(req): Promise<string> {
+function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
 		const chunks = [];
 		req.on("data", (chunk) => {
@@ -25,7 +23,7 @@ function getData(req): Promise<string> {
 	});
 }
 
-function parseData(data) {
+function parseData(data: string) {
 	let parsed;
 	try {
 		parsed = JSON.parse(data);
@@ -48,39 +46,36 @@ function parseData(data) {
 	return parsed;
 }
 
-// isValidAPIKey check if api key is valid or not
-function isValidAPIKey(req: IncomingMessage): boolean {
-	// if no api key is set then always return true
-	if (secretApiKey === "") {
-		return true;
+async function authorize(
+	req: IncomingMessage,
+	res: ServerResponse
+): Promise<boolean> {
+	const apiKey =
+		(req.headers["x-api-key"] as string) ??
+		new URL(req.url).searchParams.get("apikey");
+	const isAuthorized = await checkApiKey(apiKey);
+	if (!isAuthorized) {
+		const ipAddress =
+			(req.headers["x-forwarded-for"] as string)?.split(",").shift() ||
+			req.socket?.remoteAddress;
+		const pathname = new URL(req.url).pathname;
+		logger.error({
+			label: Label.SERVER,
+			message: `Unauthorized API access attempt to ${pathname} from ${ipAddress}`,
+		});
+		res.writeHead(401, "Unauthorized");
+		res.end(
+			"Specify the API key in an X-Api-Key header or an apikey query param."
+		);
 	}
-
-	const parsedUrl = url.parse(req.url, true);
-
-	// get apikey from query /params?apikey=supersecretapikey
-	const apiKeyQueryParam = parsedUrl.query.apikey;
-
-	// get apikey from header
-	const apiKeyHeader = req.headers["x-api-key"];
-
-	if (apiKeyQueryParam === secretApiKey || apiKeyHeader === secretApiKey) {
-		return true; // API key is valid.
-	}
-
-	return false; // API key is invalid.
+	return isAuthorized;
 }
 
 async function search(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<void> {
-	if (!isValidAPIKey(req)) {
-		const message = "Unauthorized";
-		logger.error({ label: Label.SERVER, message });
-		res.writeHead(401);
-		res.end();
-		return;
-	}
+	if (!(await authorize(req, res))) return;
 
 	const dataStr = await getData(req);
 	let data;
@@ -144,13 +139,7 @@ async function announce(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<void> {
-	if (!isValidAPIKey(req)) {
-		const message = "Unauthorized";
-		logger.error({ label: Label.SERVER, message });
-		res.writeHead(401);
-		res.end();
-		return;
-	}
+	if (!(await authorize(req, res))) return;
 
 	const dataStr = await getData(req);
 	let data;
@@ -246,11 +235,7 @@ async function handleRequest(
 	}
 }
 
-export function serve(
-	port: number,
-	host: string | undefined,
-	apiKey: string | undefined
-): void {
+export function serve(port: number, host: string | undefined): void {
 	if (apiKey) {
 		secretApiKey = apiKey;
 	}
