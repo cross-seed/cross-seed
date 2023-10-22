@@ -3,7 +3,7 @@ import { db } from "./db.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
 function generateApiKey(): string {
-	return randomBytes(16).toString("hex");
+	return randomBytes(24).toString("hex");
 }
 
 export async function resetApiKey(): Promise<string> {
