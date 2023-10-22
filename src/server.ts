@@ -75,8 +75,6 @@ async function search(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<void> {
-	if (!(await authorize(req, res))) return;
-
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -139,8 +137,6 @@ async function announce(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<void> {
-	if (!(await authorize(req, res))) return;
-
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -205,6 +201,8 @@ async function handleRequest(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<void> {
+	if (!(await authorize(req, res))) return;
+
 	if (req.method !== "POST") {
 		res.writeHead(405);
 		res.end("Methods allowed: POST");

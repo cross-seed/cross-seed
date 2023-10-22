@@ -19,8 +19,8 @@ export async function getApiKeyFromDatabase(): Promise<string> {
 }
 
 export async function checkApiKey(keyToCheck: string): Promise<boolean> {
-	const { auth } = getRuntimeConfig();
-	if (!auth) return true;
+	const { apiAuth } = getRuntimeConfig();
+	if (!apiAuth) return true;
 	const apikey = await getApiKeyFromDatabase();
 	return apikey === keyToCheck;
 }

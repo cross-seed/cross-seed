@@ -185,10 +185,11 @@ module.exports = {
 	host: undefined,
 
 	/**
-	 * Force authentication for API
-	 * Example: "my-long-good-token"
+	 * Whether to require authentication for API.
+	 * Run the command `cross-seed api-key` to find your api key.
+	 * Keys can be provided in an X-Api-Key HTTP header or a query param.
 	 */
-	apikey: undefined,
+	apiAuth: true,
 
 	/**
 	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms

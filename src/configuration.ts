@@ -35,7 +35,7 @@ interface FileConfig {
 	notificationWebhookUrl?: string;
 	port?: number;
 	host?: string;
-	auth?: boolean;
+	apiAuth?: boolean;
 	searchCadence?: string;
 	rssCadence?: string;
 	snatchTimeout?: string;

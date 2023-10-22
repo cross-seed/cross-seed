@@ -33,7 +33,7 @@ export interface RuntimeConfig {
 	snatchTimeout: number;
 	searchTimeout: number;
 	searchLimit: number;
-	auth: boolean;
+	apiAuth: boolean;
 }
 
 let runtimeConfig: RuntimeConfig;
