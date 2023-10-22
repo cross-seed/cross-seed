@@ -9,8 +9,8 @@ async function up(knex: Knex.Knex): Promise<void> {
 	await knex("settings").insert({ id: 0 });
 }
 
-function down(): void {
-	// no new tables created
+async function down(knex: Knex.Knex): Promise<void> {
+	await knex.schema.dropTable("settings");
 }
 
 export default { name: "04-auth", up, down };
