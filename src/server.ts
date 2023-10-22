@@ -50,18 +50,17 @@ async function authorize(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<boolean> {
+	const url = new URL(req.url, `http://${req.headers.host}`);
 	const apiKey =
-		(req.headers["x-api-key"] as string) ??
-		new URL(req.url).searchParams.get("apikey");
+		(req.headers["x-api-key"] as string) ?? url.searchParams.get("apikey");
 	const isAuthorized = await checkApiKey(apiKey);
 	if (!isAuthorized) {
 		const ipAddress =
 			(req.headers["x-forwarded-for"] as string)?.split(",").shift() ||
 			req.socket?.remoteAddress;
-		const pathname = new URL(req.url).pathname;
 		logger.error({
 			label: Label.SERVER,
-			message: `Unauthorized API access attempt to ${pathname} from ${ipAddress}`,
+			message: `Unauthorized API access attempt to ${url.pathname} from ${ipAddress}`,
 		});
 		res.writeHead(401, "Unauthorized");
 		res.end(

@@ -291,6 +291,7 @@ program
 	.action(async () => {
 		await db.migrate.latest();
 		console.log(await getApiKeyFromDatabase());
+		await db.destroy();
 	});
 
 program
@@ -299,6 +300,7 @@ program
 	.action(async () => {
 		await db.migrate.latest();
 		console.log(await resetApiKey());
+		await db.destroy();
 	});
 
 createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
