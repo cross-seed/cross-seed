@@ -309,7 +309,11 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 		fallback(fileConfig.port, 2468)
 	)
 	.option("--host <host>", "Bind to a specific IP address", fileConfig.host)
-	.option("--api-auth", "Require API auth via API key", fileConfig.apiAuth)
+	.option(
+		"--api-auth",
+		"Require API auth via API key",
+		fallback(fileConfig.apiAuth, false)
+	)
 	.option("--no-api-auth", "Don't require API auth")
 	.option("--no-port", "Do not listen on any port")
 	.option(
