@@ -23,6 +23,16 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
+import { CrossSeedError } from "./errors.js";
+
+export async function validateAction(): Promise<void> {
+	const { action } = getRuntimeConfig();
+	if (action !== Action.INJECT && action !== Action.SAVE) {
+		throw new CrossSeedError(
+			`Action method "${action}" is invalid. Allowed choices are "save" and "inject".`
+		);
+	}
+}
 
 export async function performAction(
 	newMeta: Metafile,
