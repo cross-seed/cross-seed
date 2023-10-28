@@ -6,7 +6,6 @@ import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
 import { VALIDATION_SCHEMA } from "./zod.js";
-
 const fileConfig = await getFileConfig();
 
 function validateOptions() {
@@ -45,6 +44,7 @@ function validateOptions() {
 		);
 	}
 }
+
 export async function validateWithZod() {
 	const {
 		action,
@@ -83,11 +83,12 @@ export async function validateWithZod() {
 				VALIDATION_SCHEMA.URL.parse(transmissionRpcUrl);
 			}
 		}
-
 		const downloadClient = getClient();
-		downloadClient?.validateConfig();
-		validateTorznabUrls();
-
+		await Promise.all<void>(
+			[validateTorznabUrls(), downloadClient?.validateConfig()].filter(
+				Boolean
+			)
+		);
 		if (notificationWebhookUrl) {
 			VALIDATION_SCHEMA.URL.parse(notificationWebhookUrl);
 		}
@@ -95,7 +96,7 @@ export async function validateWithZod() {
 		if (excludeOlder) {
 			VALIDATION_SCHEMA.MS.parse(excludeOlder);
 		} else if (!excludeOlder && fileConfig.excludeOlder) {
-			throw new CrossSeedError(
+			throw new Error(
 				"your interval does not comply with vercel's 'ms' format"
 			);
 		}
@@ -103,21 +104,21 @@ export async function validateWithZod() {
 		if (excludeRecentSearch) {
 			VALIDATION_SCHEMA.MS.parse(excludeRecentSearch);
 		} else if (!excludeRecentSearch && fileConfig.excludeRecentSearch) {
-			throw new CrossSeedError(
+			throw new Error(
 				"your interval does not comply with vercel's 'ms' format"
 			);
 		}
 		if (rssCadence) {
 			VALIDATION_SCHEMA.MS.parse(rssCadence);
 		} else if (!rssCadence && fileConfig.rssCadence) {
-			throw new CrossSeedError(
+			throw new Error(
 				"your interval does not comply with vercel's 'ms' format"
 			);
 		}
 		if (searchCadence) {
 			VALIDATION_SCHEMA.MS.parse(searchCadence);
 		} else if (!searchCadence && fileConfig.searchCadence) {
-			throw new CrossSeedError(
+			throw new Error(
 				"your interval does not comply with vercel's 'ms' format"
 			);
 		}
@@ -137,21 +138,20 @@ export async function validateWithZod() {
 		VALIDATION_SCHEMA.BOOLEAN.parse(duplicateCategories);
 
 		if (dataDirs) {
-			await VALIDATION_SCHEMA.PATH.parseAsync(dataDirs);
-			await VALIDATION_SCHEMA.PATH.parseAsync(linkDir);
-			await VALIDATION_SCHEMA.LINKTYPE.parseAsync(linkType);
+			VALIDATION_SCHEMA.PATH.parse(dataDirs);
+			VALIDATION_SCHEMA.PATH.parse(linkDir);
+			VALIDATION_SCHEMA.LINKTYPE.parse(linkType);
 		}
-		await VALIDATION_SCHEMA.PATH.parseAsync(outputDir);
-		await VALIDATION_SCHEMA.PATH.parseAsync(torrentDir);
+		VALIDATION_SCHEMA.PATH.parse(outputDir);
+		VALIDATION_SCHEMA.PATH.parse(torrentDir);
 	} catch (errors) {
 		throw new CrossSeedError(errors);
 	}
-
 	logger.info("Your configuration is zod valid!");
 }
 export async function doStartupValidation(): Promise<void> {
 	logger.info("Validating your configuration...");
 	validateOptions();
-	await Promise.all<void>([validateWithZod()]);
+	await validateWithZod();
 	logger.info("Your configuration is valid!");
 }
