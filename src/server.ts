@@ -8,6 +8,7 @@ import {
 	checkNewCandidateMatch,
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
+import { InjectionResult, SaveResult } from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 
 function getData(req): Promise<string> {
@@ -152,18 +153,22 @@ async function announce(
 	try {
 		await indexNewTorrents();
 		const result = await checkNewCandidateMatch(candidate);
-		if (!result) {
-			res.writeHead(204);
-			res.end();
-			return;
+		const isOk =
+			result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
+		if (!isOk) {
+			if (result === InjectionResult.TORRENT_NOT_COMPLETE) {
+				res.writeHead(202);
+			} else {
+				res.writeHead(204);
+			}
+		} else {
+			logger.info({
+				label: Label.SERVER,
+				message: `Added announce from ${candidate.tracker}: ${candidate.name}`,
+			});
+			res.writeHead(200);
 		}
-		logger.info({
-			label: Label.SERVER,
-			message: `Added announce from ${candidate.tracker}: ${candidate.name}`,
-		});
-		res.setHeader("Content-Type", "application/json");
-		res.writeHead(200);
-		res.end(JSON.stringify(result));
+		res.end();
 	} catch (e) {
 		logger.error(e);
 		res.writeHead(500);
