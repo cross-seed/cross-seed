@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { Action, LinkType, MatchMode } from "./constants.js";
-import { existsSync } from "fs";
 import { logger } from "./logger.js";
-import { getFileConfig } from "./configuration.js";
-
-const fileConfig = await getFileConfig();
 
 /**
  * VALIDATION_SCHEMA is just a object of all the zod schemas
@@ -13,55 +9,25 @@ const fileConfig = await getFileConfig();
 
 export const VALIDATION_SCHEMA = z
 	.object({
-		notificationWebhookUrl: z.union([
-			z.undefined(),
-			z
-				.string()
-				.url()
-				.refine((url) => ({
-					message: `invalid notificationWebhookUrl URL - ${url}`,
-				})),
-		]),
-		torznab: z.array(
-			z
-				.string()
-				.url()
-				.refine((url) => ({
-					message: `invalid torznab URL - ${url}`,
-				}))
-		),
-		dataDirs: z.union([
-			z.undefined(),
-			z.array(
-				z.string().refine(
-					(path) => existsSync(path),
-					(path) => ({
-						message: `the dataDirs path ${path} does not exist on the filesystem`,
-					})
-				)
-			),
-		]),
-		torrentDir: z.string().refine(
-			(path) => existsSync(path),
-			(path) => ({
-				message: `the torrentDir path ${path} does not exist on the filesystem`,
-			})
-		),
-		linkDir: z.union([
-			z.undefined(),
-			z.string().refine(
-				(path) => existsSync(path),
-				(path) => ({
-					message: `the linkDir path ${path} does not exist on the filesystem`,
-				})
-			),
-		]),
-		outputDir: z.string().refine(
-			(path) => existsSync(path),
-			(path) => ({
-				message: `the outputDir path ${path} does not exist on the filesystem`,
-			})
-		),
+		delay: z.number().gte(0, {
+			message: "delay is in seconds, you can't travel back in time.",
+		}),
+		torznab: z.array(z.string().url()),
+		dataDirs: z.array(z.string()).nullish(),
+		matchMode: z.nativeEnum(MatchMode, {
+			invalid_type_error: `matchMode must be either '${MatchMode.RISKY}' or '${MatchMode.SAFE}'`,
+		}),
+		dataCategory: z.string().nullish(),
+		linkDir: z.string().nullish(),
+		linkType: z.nativeEnum(LinkType, {
+			invalid_type_error: `linkType must have a value of "${LinkType.HARDLINK}" or "${LinkType.SYMLINK}"`,
+		}),
+		skipRecheck: z.boolean(),
+		maxDataDepth: z.number().gte(1, {
+			message: "maxDataDepth must be a number greater than 0",
+		}),
+		torrentDir: z.string(),
+		outputDir: z.string(),
 		includeEpisodes: z.boolean({
 			invalid_type_error:
 				"includeEpisodes must be a defined boolean (true or false)",
@@ -74,131 +40,114 @@ export const VALIDATION_SCHEMA = z
 			invalid_type_error:
 				"includeNonVideos must be a defined boolean (true or false)",
 		}),
+		fuzzySizeThreshold: z.number().gte(0).lte(1, {
+			message: "fuzzySizeThreshold must be a decimal percentage",
+		}),
+		excludeOlder: z.union([
+			z.number().nullish(),
+			z.nan().refine(() => {
+				logger.warn(
+					"your excludeOlder does not follow vercel's `ms` style"
+				);
+				return true;
+			}),
+		]),
+		excludeRecentSearch: z.union([
+			z.number().nullish(),
+			z.nan().refine(() => {
+				logger.warn(
+					"your excludeRecentSearch does not follow vercel's `ms` style"
+				);
+				return true;
+			}),
+		]),
+		action: z.nativeEnum(Action, {
+			invalid_type_error: `action must be either '${Action.SAVE}' or '${Action.INJECT}'`,
+		}),
+		qbittorrentUrl: z.string().url().nullish(),
+		rtorrentRpcUrl: z.string().url().nullish(),
+		transmissionRpcUrl: z.string().url().nullish(),
 		duplicateCategories: z.boolean({
 			invalid_type_error:
 				"duplicateCategories must be a defined boolean (true or false)",
 		}),
-		skipRecheck: z.boolean({
-			invalid_type_error:
-				"skipRecheck must be a defined boolean (true or false)",
-		}),
-		maxDataDepth: z.number().gte(1, {
-			message: "maxDataDepth must be a number greater than 0",
-		}),
-		port: z.number().gte(1).lte(65535, {
-			message: "port must be a number between 1 and 65535",
-		}),
-		searchLimit: z.union([z.number(), z.undefined()], {
-			invalid_type_error: "searchLimit must be a number or undefined",
-		}),
-		delay: z.number().gt(1).lt(1000, {
-			message:
-				"delay is in seconds, >1000 implies you think it's milliseconds",
-		}),
-		action: z.nativeEnum(Action, {
-			invalid_type_error: `action must be either '${Action.SAVE}' or '${Action.INJECT}'`,
-		}),
-		qbittorrentUrl: z.string().url().optional(),
-		rtorrentRpcUrl: z.string().url().optional(),
-		transmissionRpcUrl: z.string().url().optional(),
-
-		matchMode: z.nativeEnum(MatchMode, {
-			invalid_type_error: `matchMode must be either '${MatchMode.RISKY}' or '${MatchMode.SAFE}'`,
-		}),
-		linkType: z.nativeEnum(LinkType, {
-			invalid_type_error: `linkType must have a value of "${LinkType.HARDLINK}" or "${LinkType.SYMLINK}"`,
-		}),
-		dataCategory: z.union([
-			z.undefined(),
-			z.string().min(1).max(24, {
-				message: "dataCategory must have a length of 1-24 characters",
+		notificationWebhookUrl: z
+			.string()
+			.url({
+				message: `invalid notificationWebhookUrl URL`,
+			})
+			.nullish(),
+		port: z
+			.number()
+			.gte(1)
+			.lte(65535, {
+				message: "port must be a number between 1 and 65535",
+			})
+			.nullish(),
+		rssCadence: z.union([
+			z.number().nullish(),
+			z.nan().refine(() => {
+				logger.warn(
+					"your rssCadence does not follow vercel's `ms` style"
+				);
+				return true;
 			}),
 		]),
-		fuzzySizeThreshold: z.number().gt(0).lt(1, {
-			message:
-				"fuzzySizeThreshold must be a decimal percentage greater than 0 and less than 1",
-		}),
 		searchCadence: z.union([
-			z.number(),
-			z.undefined(),
-			z.nan().refine(
-				() => {
-					return typeof fileConfig.searchCadence === "undefined";
-				},
-				{
-					message:
-						"your searchCadence does not follow vercel's `ms` style",
-				}
-			),
+			z.number().nullish(),
+			z.nan().refine(() => {
+				logger.warn(
+					"your searchCadence does not follow vercel's `ms` style"
+				);
+				return true;
+			}),
 		]),
-		rssCadence: z.union([
-			z.number(),
-			z.undefined(),
-			z.nan().refine(
-				() => {
-					return typeof fileConfig.rssCadence === "undefined";
-				},
-				{
-					message:
-						"your rssCadence does not follow vercel's `ms` style",
-				}
-			),
+		snatchTimeout: z.union([
+			z.number().nullish(),
+			z.nan().refine(() => {
+				logger.warn(
+					"your snatchTimeout does not follow vercel's `ms` style"
+				);
+				return true;
+			}),
 		]),
-		excludeOlder: z.union([
-			z.number(),
-			z.undefined(),
-			z.nan().refine(
-				() => {
-					return typeof fileConfig.excludeOlder === "undefined";
-				},
-				{
-					message:
-						"your excludeOlder does not follow vercel's `ms` style",
-				}
-			),
+		searchTimeout: z.union([
+			z.number().nullish(),
+			z.nan().refine(() => {
+				logger.warn(
+					"your searchTimeout does not follow vercel's `ms` style"
+				);
+				return true;
+			}),
 		]),
-		excludeRecentSearch: z.union([
-			z.number(),
-			z.undefined(),
-			z.nan().refine(
-				() => {
-					return (
-						typeof fileConfig.excludeRecentSearch === "undefined"
-					);
-				},
-				{
-					message:
-						"your excludeRecentSearch does not follow vercel's `ms` style",
-				}
-			),
-		]),
+		searchLimit: z.number().nullish(),
 	})
 	.refine(
-		(config) => {
-			if (config.action === Action.INJECT) {
-				return (
-					config.rtorrentRpcUrl ||
-					config.qbittorrentUrl ||
-					config.transmissionRpcUrl
-				);
-			}
-			return true;
-		},
+		(config) =>
+			config.action !== Action.INJECT ||
+			config.rtorrentRpcUrl ||
+			config.qbittorrentUrl ||
+			config.transmissionRpcUrl,
 		() => ({
 			message:
-				"You need to specify rtorrentRpcUrl, transmissionRpcUrl, or qbittorrentUrl when using 'inject'.",
+				"You need to specify rtorrentRpcUrl, transmissionRpcUrl, or qbittorrentUrl when using 'inject'",
 		})
 	)
 	.refine(
 		(config) => {
-			if (config.dataDirs || config.linkDir) {
-				return config.dataDirs && config.linkDir && config.linkType;
+			if (
+				(config.dataDirs !== undefined &&
+					config.dataDirs !== null &&
+					config.dataDirs?.length > 0) ||
+				(config.linkDir !== undefined && config.linkDir !== null)
+			) {
+				return config.dataDirs?.length > 0 && config.linkDir;
 			}
 			return true;
 		},
 		() => ({
 			message:
-				"Data-Based Matching requires linkType, dataDirs, and linkDir to be defined.",
+				"Data-Based Matching requires linkType, dataDirs, and linkDir to be defined",
 		})
 	)
 	.refine((config) => {
