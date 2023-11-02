@@ -4,6 +4,8 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { VALIDATION_SCHEMA } from "./zod.js";
 import { existsSync } from "fs";
 import { Action } from "./constants.js";
+import { validateTorznabUrls } from "./torznab.js";
+import { getClient } from "./clients/TorrentClient.js";
 
 export async function doStartupValidation(): Promise<void> {
 	logger.info("Validating your configuration...");
@@ -19,6 +21,11 @@ export async function doStartupValidation(): Promise<void> {
 		);
 		throw new CrossSeedError(error.message.replace("Error: ", ""));
 	}
+	const downloadClient = getClient();
+	await Promise.all<void>([
+		validateTorznabUrls(),
+		downloadClient?.validateConfig(),
+	]);
 	logger.info("Your configuration is valid!");
 }
 
