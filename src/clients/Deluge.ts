@@ -187,7 +187,11 @@ export default class Deluge implements TorrentClient {
 			return InjectionResult.FAILURE;
 		}
 		if (addResult?.result) {
-			await this.setLabel(newTorrent.infoHash, this.delugeLabel);
+			const { dataCategory } = getRuntimeConfig();
+			await this.setLabel(
+				newTorrent.infoHash,
+				searchee.path ? dataCategory : this.delugeLabel
+			);
 			return InjectionResult.SUCCESS;
 		} else if (addResult?.error?.message?.includes("already")) {
 			return InjectionResult.ALREADY_EXISTS;
@@ -213,10 +217,8 @@ export default class Deluge implements TorrentClient {
 			filename,
 			filedump,
 			{
-				add_paused: false,
-				seed_mode: isTorrent
-					? isTorrent
-					: getRuntimeConfig().skipRecheck,
+				add_paused: isTorrent ? false : !getRuntimeConfig().skipRecheck,
+				seed_mode: isTorrent ? true : getRuntimeConfig().skipRecheck,
 				download_location: path,
 			},
 		];
