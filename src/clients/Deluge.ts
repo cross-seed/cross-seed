@@ -154,52 +154,52 @@ export default class Deluge implements TorrentClient {
 		searchee: Searchee,
 		path?: string
 	): Promise<InjectionResult> {
-		let torrentInfo: TorrentInfo;
-		if (searchee.infoHash) {
-			torrentInfo = await this.getTorrentInfo(searchee);
-			if (!torrentInfo.complete) {
-				if (
-					torrentInfo.save_path == "missing" &&
-					!path &&
-					!searchee.path
-				) {
-					return InjectionResult.FAILURE;
-				}
-				return InjectionResult.TORRENT_NOT_COMPLETE;
-			}
-		}
-
-		const params = this.formatData(
-			`${newTorrent.name}.cross-seed.torrent`,
-			newTorrent.encode().toString("base64"),
-			path ? path : torrentInfo.save_path,
-			!!searchee.infoHash
-		);
-		let addResult: DelugeResponse;
 		try {
-			addResult = await this.call("core.add_torrent_file", params);
+			let torrentInfo: TorrentInfo;
+			if (searchee.infoHash) {
+				torrentInfo = await this.getTorrentInfo(searchee);
+				if (!torrentInfo.complete) {
+					if (
+						torrentInfo.save_path == "missing" &&
+						!path &&
+						!searchee.path
+					) {
+						return InjectionResult.FAILURE;
+					}
+					return InjectionResult.TORRENT_NOT_COMPLETE;
+				}
+			}
+
+			const params = this.formatData(
+				`${newTorrent.name}.cross-seed.torrent`,
+				newTorrent.encode().toString("base64"),
+				path ? path : torrentInfo.save_path,
+				!!searchee.infoHash
+			);
+			const addResult = await this.call("core.add_torrent_file", params);
+
+			if (addResult?.result) {
+				const { dataCategory } = getRuntimeConfig();
+				await this.setLabel(
+					newTorrent.infoHash,
+					searchee.path ? dataCategory : this.delugeLabel
+				);
+				return InjectionResult.SUCCESS;
+			} else if (addResult?.error?.message?.includes("already")) {
+				return InjectionResult.ALREADY_EXISTS;
+			} else if (addResult?.error?.message) {
+				logger.debug({
+					label: Label.DELUGE,
+					message: `Injection failed: ${addResult.error.message}`,
+				});
+				return InjectionResult.FAILURE;
+			}
 		} catch (injectResult) {
 			logger.error({
 				label: Label.DELUGE,
 				message: `Injection failed: ${injectResult}`,
 			});
 			logger.debug(injectResult);
-			return InjectionResult.FAILURE;
-		}
-		if (addResult?.result) {
-			const { dataCategory } = getRuntimeConfig();
-			await this.setLabel(
-				newTorrent.infoHash,
-				searchee.path ? dataCategory : this.delugeLabel
-			);
-			return InjectionResult.SUCCESS;
-		} else if (addResult?.error?.message?.includes("already")) {
-			return InjectionResult.ALREADY_EXISTS;
-		} else if (addResult?.error?.message) {
-			logger.debug({
-				label: Label.DELUGE,
-				message: `Injection failed: ${addResult.error.message}`,
-			});
 			return InjectionResult.FAILURE;
 		}
 	}
