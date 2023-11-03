@@ -113,6 +113,17 @@ async function findOnOtherSites(
 		}
 	);
 
+	const matches = assessed.filter(
+		(e) =>
+			e.assessment.decision === Decision.MATCH ||
+			e.assessment.decision === Decision.MATCH_SIZE_ONLY
+	);
+	const actionResults = await performActions(searchee, matches);
+	if (actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
+		// If the torrent is not complete, "cancel the search"
+		return { matches: 0, searchedIndexers: 0 };
+	}
+
 	await updateSearchTimestamps(searchee.name, Array.from(notRateLimited));
 
 	await updateIndexerStatus(
@@ -121,21 +132,13 @@ async function findOnOtherSites(
 		Array.from(rateLimited)
 	);
 
-	const matches = assessed.filter(
-		(e) =>
-			e.assessment.decision === Decision.MATCH ||
-			e.assessment.decision === Decision.MATCH_SIZE_ONLY
+	const zipped: [ResultAssessment, string, ActionResult][] = zip(
+		matches.map((m) => m.assessment),
+		matches.map((m) => m.tracker),
+		actionResults
 	);
-	const actionResults = await performActions(searchee, matches);
+	sendResultsNotification(searchee, zipped, Label.SEARCH);
 
-	if (!actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
-		const zipped: [ResultAssessment, string, ActionResult][] = zip(
-			matches.map((m) => m.assessment),
-			matches.map((m) => m.tracker),
-			actionResults
-		);
-		sendResultsNotification(searchee, zipped, Label.SEARCH);
-	}
 	return { matches: matches.length, searchedIndexers: response.length };
 }
 
