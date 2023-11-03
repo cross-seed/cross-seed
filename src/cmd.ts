@@ -189,6 +189,11 @@ function createCommandWithSharedOptions(name, description) {
 			fileConfig.transmissionRpcUrl
 		)
 		.option(
+			"--deluge-rpc-url <url>",
+			"The url of your Deluge JSON-RPC interface. Requires '-A inject'. See the docs for more information.",
+			fileConfig.delugeRpcUrl
+		)
+		.option(
 			"--duplicate-categories",
 			"Create and inject using categories with the same save paths as your normal categories",
 			fileConfig.duplicateCategories

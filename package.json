@@ -1,7 +1,7 @@
 {
 	"name": "cross-seed",
 	"version": "5.6.0",
-	"description": "Query Jackett for cross-seedable torrents",
+	"description": "Fully-automatic cross-seeding with Torznab",
 	"scripts": {
 		"test": "true",
 		"build": "tsc",
