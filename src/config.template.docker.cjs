@@ -177,9 +177,10 @@ module.exports = {
 	delugeRpcUrl: undefined,
 
 	/**
-	 * qBittorrent-specific
-	 * Whether to inject using categories with the same save paths as your normal categories.
-	 * Example: if you have a category called "Movies",
+	 * qBittorrent and Deluge specific
+	 * Whether to inject using the same labels/categories as the original torrent.
+	 * qBittorrent: This will apply the category's save path
+	 * Example: if you have a label/category called "Movies",
 	 * this will automatically inject cross-seeds to "Movies.cross-seed"
 	 */
 	duplicateCategories: false,
