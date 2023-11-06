@@ -24,7 +24,8 @@ enum DelugeErrorCode {
 }
 interface TorrentInfo {
 	complete: boolean;
-	save_path?: string;
+	save_path: string;
+	label?: string;
 }
 
 export default class Deluge implements TorrentClient {
@@ -156,6 +157,7 @@ export default class Deluge implements TorrentClient {
 	): Promise<InjectionResult> {
 		try {
 			let torrentInfo: TorrentInfo;
+			const { duplicateCategories } = getRuntimeConfig();
 			if (searchee.infoHash) {
 				torrentInfo = await this.getTorrentInfo(searchee);
 				if (!torrentInfo.complete) {
@@ -182,7 +184,13 @@ export default class Deluge implements TorrentClient {
 				const { dataCategory } = getRuntimeConfig();
 				await this.setLabel(
 					newTorrent.infoHash,
-					searchee.path ? dataCategory : this.delugeLabel
+					searchee.path
+						? dataCategory
+						: torrentInfo.label
+						? duplicateCategories
+							? `${torrentInfo.label}.cross-seed`
+							: torrentInfo.label
+						: this.delugeLabel
 				);
 				return InjectionResult.SUCCESS;
 			} else if (addResult?.error?.message?.includes("already")) {
@@ -229,17 +237,26 @@ export default class Deluge implements TorrentClient {
 	 */
 	private async getTorrentInfo(searchee: Searchee): Promise<TorrentInfo> {
 		try {
+			let torrentLabel: string = undefined;
 			const params = [
-				["state", "progress", "save_path"],
+				["state", "progress", "save_path", "label"],
 				{ hash: searchee.infoHash },
 			];
-
 			const response = await this.call("web.update_ui", params);
 			if (response?.result?.torrents?.[searchee.infoHash] === undefined) {
 				throw new Error(
 					`Torrent not found in client (${searchee.infoHash})`
 				);
 			}
+			if (
+				this.isLabelEnabled &&
+				response?.result?.torrents?.[searchee.infoHash]?.label
+					?.length != 0
+			) {
+				torrentLabel =
+					response?.result?.torrents?.[searchee.infoHash]?.label;
+			}
+
 			const completedTorrent =
 				response?.result?.torrents?.[searchee.infoHash]?.state ===
 					"Seeding" ||
@@ -249,6 +266,7 @@ export default class Deluge implements TorrentClient {
 				complete: completedTorrent,
 				save_path:
 					response?.result?.torrents?.[searchee.infoHash]?.save_path,
+				label: torrentLabel,
 			};
 		} catch (e) {
 			logger.error({
