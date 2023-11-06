@@ -23,8 +23,9 @@ export function findPotentialNestedRoots(
 		);
 		return [root, ...allDescendants];
 	} else if (
-		DATA_EXTENSIONS.includes(extname(root)) &&
-		!root.includes("sample")
+		isDir ||
+		(DATA_EXTENSIONS.includes(extname(root)) &&
+			!root.toLowerCase().includes("sample"))
 	) {
 		return [root];
 	} else {

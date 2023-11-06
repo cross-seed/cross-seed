@@ -14,6 +14,7 @@ import {
 import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
+import { ingest } from "./ingest.js";
 import { jobsLoop } from "./jobs.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
@@ -116,6 +117,10 @@ function createCommandWithSharedOptions(name, description) {
 			"Max depth to look for searchees in dataDirs",
 			(n) => parseInt(n),
 			fallback(fileConfig.maxDataDepth, 2)
+		)
+		.option(
+			"--qbittorrent-categories <cats...>",
+			"qBittorrent categories to use"
 		)
 		.requiredOption(
 			"-i, --torrent-dir <dir>",
@@ -224,6 +229,12 @@ function createCommandWithSharedOptions(name, description) {
 			"The number of searches before stops",
 			parseInt,
 			fallback(fileConfig.searchLimit, 0)
+		)
+		.option(
+			"--qbittorrent-categories <categories...>",
+			"qBittorrent categories to pull searchable torrents from",
+			// @ts-expect-error commander supports non-string defaults
+			fallback(fileConfig.qbittorrentCategories)
 		);
 }
 
@@ -378,6 +389,28 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			await db.destroy();
 		}
 	});
+
+createCommandWithSharedOptions("ingest", "run ingestion").action(
+	async (options) => {
+		try {
+			const runtimeConfig = processOptions(options);
+			setRuntimeConfig(runtimeConfig);
+			initializeLogger();
+			initializePushNotifier();
+			logger.verbose({
+				label: Label.CONFIGDUMP,
+				message: inspect(runtimeConfig),
+			});
+			await db.migrate.latest();
+			await doStartupValidation();
+			await ingest();
+			await db.destroy();
+		} catch (e) {
+			exitOnCrossSeedErrors(e);
+			await db.destroy();
+		}
+	}
+);
 
 program.showHelpAfterError("(add --help for additional information)");
 

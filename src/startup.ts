@@ -18,6 +18,7 @@ function validateOptions() {
 		linkDir,
 		matchMode,
 		skipRecheck,
+		qbittorrentCategories,
 	} = getRuntimeConfig();
 	if (
 		action === "inject" &&
@@ -35,6 +36,11 @@ function validateOptions() {
 	if ((dataDirs && !linkDir) || (!dataDirs && linkDir)) {
 		throw new CrossSeedError(
 			"Data based matching requires both --link-dir and --data-dirs"
+		);
+	}
+	if (qbittorrentCategories && !qbittorrentUrl) {
+		throw new CrossSeedError(
+			"You need to specify --qbittorrent-url when using --qbittorrent-categories."
 		);
 	}
 	if (matchMode == MatchMode.RISKY && skipRecheck) {

@@ -23,6 +23,7 @@ export interface RuntimeConfig {
 	action: Action;
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
+	qbittorrentCategories: string[];
 	transmissionRpcUrl: string;
 	delugeRpcUrl: string;
 	duplicateCategories: boolean;
