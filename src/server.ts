@@ -2,6 +2,7 @@ import http, { IncomingMessage, ServerResponse } from "http";
 import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
+import { checkApiKey } from "./auth.js";
 import { Label, logger } from "./logger.js";
 import {
 	Candidate,
@@ -11,7 +12,7 @@ import {
 import { InjectionResult, SaveResult } from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 
-function getData(req): Promise<string> {
+function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
 		const chunks = [];
 		req.on("data", (chunk) => {
@@ -23,7 +24,7 @@ function getData(req): Promise<string> {
 	});
 }
 
-function parseData(data) {
+function parseData(data: string) {
 	let parsed;
 	try {
 		parsed = JSON.parse(data);
@@ -44,6 +45,30 @@ function parseData(data) {
 	}
 
 	return parsed;
+}
+
+async function authorize(
+	req: IncomingMessage,
+	res: ServerResponse
+): Promise<boolean> {
+	const url = new URL(req.url, `http://${req.headers.host}`);
+	const apiKey =
+		(req.headers["x-api-key"] as string) ?? url.searchParams.get("apikey");
+	const isAuthorized = await checkApiKey(apiKey);
+	if (!isAuthorized) {
+		const ipAddress =
+			(req.headers["x-forwarded-for"] as string)?.split(",").shift() ||
+			req.socket?.remoteAddress;
+		logger.error({
+			label: Label.SERVER,
+			message: `Unauthorized API access attempt to ${url.pathname} from ${ipAddress}`,
+		});
+		res.writeHead(401, "Unauthorized");
+		res.end(
+			"Specify the API key in an X-Api-Key header or an apikey query param."
+		);
+	}
+	return isAuthorized;
 }
 
 async function search(
@@ -180,6 +205,8 @@ async function handleRequest(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<void> {
+	if (!(await authorize(req, res))) return;
+
 	if (req.method !== "POST") {
 		res.writeHead(405);
 		res.end("Methods allowed: POST");

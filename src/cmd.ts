@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { Option, program } from "commander";
 import ms from "ms";
 import { inspect } from "util";
+import { getApiKeyFromDatabase, resetApiKey } from "./auth.js";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import {
 	Action,
@@ -289,6 +290,24 @@ program
 		);
 	});
 
+program
+	.command("api-key")
+	.description("Show the api key")
+	.action(async () => {
+		await db.migrate.latest();
+		console.log(await getApiKeyFromDatabase());
+		await db.destroy();
+	});
+
+program
+	.command("reset-api-key")
+	.description("Reset the api key")
+	.action(async () => {
+		await db.migrate.latest();
+		console.log(await resetApiKey());
+		await db.destroy();
+	});
+
 createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	.option(
 		"-p, --port <port>",
@@ -297,6 +316,12 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 		fallback(fileConfig.port, 2468)
 	)
 	.option("--host <host>", "Bind to a specific IP address", fileConfig.host)
+	.option(
+		"--api-auth",
+		"Require API auth via API key",
+		fallback(fileConfig.apiAuth, false)
+	)
+	.option("--no-api-auth", "Don't require API auth")
 	.option("--no-port", "Do not listen on any port")
 	.option(
 		"--search-cadence <cadence>",
