@@ -5,6 +5,7 @@ import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { validateTorrentDir } from "./torrent.js";
 import { validateTorznabUrls } from "./torznab.js";
+import { validateAction } from "./action.js";
 
 function validateOptions() {
 	const {
@@ -12,6 +13,7 @@ function validateOptions() {
 		rtorrentRpcUrl,
 		qbittorrentUrl,
 		transmissionRpcUrl,
+		delugeRpcUrl,
 		dataDirs,
 		linkDir,
 		matchMode,
@@ -19,15 +21,20 @@ function validateOptions() {
 	} = getRuntimeConfig();
 	if (
 		action === "inject" &&
-		!(rtorrentRpcUrl || qbittorrentUrl || transmissionRpcUrl)
+		!(
+			rtorrentRpcUrl ||
+			qbittorrentUrl ||
+			transmissionRpcUrl ||
+			delugeRpcUrl
+		)
 	) {
 		throw new CrossSeedError(
-			"You need to specify --rtorrent-rpc-url, --transmission-rpc-url, or --qbittorrent-url when using '-A inject'."
+			"You need to specify --rtorrent-rpc-url, --transmission-rpc-url, --qbittorrent-url, or --deluge-rpc-url when using '-A inject'."
 		);
 	}
 	if ((dataDirs && !linkDir) || (!dataDirs && linkDir)) {
 		throw new CrossSeedError(
-			"Data based matching requries both --link-dir and --data-dirs"
+			"Data based matching requires both --link-dir and --data-dirs"
 		);
 	}
 	if (matchMode == MatchMode.RISKY && skipRecheck) {
@@ -43,6 +50,7 @@ export async function doStartupValidation(): Promise<void> {
 	const downloadClient = getClient();
 	await Promise.all<void>(
 		[
+			validateAction(),
 			validateTorznabUrls(),
 			downloadClient?.validateConfig(),
 			validateTorrentDir(),

@@ -113,6 +113,17 @@ async function findOnOtherSites(
 		}
 	);
 
+	const matches = assessed.filter(
+		(e) =>
+			e.assessment.decision === Decision.MATCH ||
+			e.assessment.decision === Decision.MATCH_SIZE_ONLY
+	);
+	const actionResults = await performActions(searchee, matches);
+	if (actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
+		// If the torrent is not complete, "cancel the search"
+		return { matches: 0, searchedIndexers: 0 };
+	}
+
 	await updateSearchTimestamps(searchee.name, Array.from(notRateLimited));
 
 	await updateIndexerStatus(
@@ -121,21 +132,13 @@ async function findOnOtherSites(
 		Array.from(rateLimited)
 	);
 
-	const matches = assessed.filter(
-		(e) =>
-			e.assessment.decision === Decision.MATCH ||
-			e.assessment.decision === Decision.MATCH_SIZE_ONLY
+	const zipped: [ResultAssessment, string, ActionResult][] = zip(
+		matches.map((m) => m.assessment),
+		matches.map((m) => m.tracker),
+		actionResults
 	);
-	const actionResults = await performActions(searchee, matches);
+	sendResultsNotification(searchee, zipped, Label.SEARCH);
 
-	if (!actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
-		const zipped: [ResultAssessment, string, ActionResult][] = zip(
-			matches.map((m) => m.assessment),
-			matches.map((m) => m.tracker),
-			actionResults
-		);
-		sendResultsNotification(searchee, zipped, Label.SEARCH);
-	}
 	return { matches: matches.length, searchedIndexers: response.length };
 }
 
@@ -202,18 +205,18 @@ export async function searchForLocalTorrentByCriteria(
 
 export async function checkNewCandidateMatch(
 	candidate: Candidate
-): Promise<boolean> {
+): Promise<InjectionResult | SaveResult> {
 	const meta = await getTorrentByFuzzyName(candidate.name);
 	if (meta === null) {
 		logger.verbose({
 			label: Label.REVERSE_LOOKUP,
 			message: `Did not find an existing entry for ${candidate.name}`,
 		});
-		return false;
+		return null;
 	}
 
 	const hashesToExclude = await getInfoHashesToExclude();
-	if (!filterByContent(meta)) return false;
+	if (!filterByContent(meta)) return null;
 	const searchee = createSearcheeFromMetafile(meta);
 
 	// make sure searchee is in database
@@ -232,7 +235,7 @@ export async function checkNewCandidateMatch(
 		assessment.decision !== Decision.MATCH &&
 		assessment.decision !== Decision.MATCH_SIZE_ONLY
 	)
-		return false;
+		return null;
 
 	const result = await performAction(
 		assessment.metafile,
@@ -245,7 +248,7 @@ export async function checkNewCandidateMatch(
 		[[assessment, candidate.tracker, result]],
 		Label.REVERSE_LOOKUP
 	);
-	return result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
+	return result;
 }
 
 async function findSearchableTorrents() {

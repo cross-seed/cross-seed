@@ -1,5 +1,5 @@
 import { promises as fs, Stats } from "fs";
-import { dirname, resolve } from "path";
+import { dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
 import { InjectionResult } from "../constants.js";
@@ -22,21 +22,37 @@ interface LibTorrentResume {
 	bitfield: number;
 	files: LibTorrentResumeFileEntry[];
 }
+
+interface DownloadLocation {
+	/**
+	 * directoryBase is the root directory of a multi-file torrent,
+	 * or the parent directory of a single-file torrent.
+	 */
+	directoryBase: string;
+	basePath: string;
+	downloadDir: string;
+}
+
 async function createLibTorrentResumeTree(
 	meta: Metafile,
-	dataDir: string
+	basePath: string
 ): Promise<LibTorrentResume> {
 	async function getFileResumeData(
 		file: File
 	): Promise<LibTorrentResumeFileEntry> {
-		const filePath = resolve(dataDir, file.path);
+		const filePathWithoutFirstSegment = file.path
+			.split(sep)
+			.slice(1)
+			.join(sep);
+
+		const resolvedFilePath = resolve(basePath, filePathWithoutFirstSegment);
 		const fileStat = await fs
-			.lstat(filePath)
+			.stat(resolvedFilePath)
 			.catch(() => ({ isFile: () => false } as Stats));
 		if (!fileStat.isFile() || fileStat.size !== file.length) {
 			logger.debug({
 				label: Label.RTORRENT,
-				message: `File ${filePath} either doesn't exist or is the wrong size.`,
+				message: `File ${resolvedFilePath} either doesn't exist or is the wrong size.`,
 			});
 			return {
 				completed: 0,
@@ -63,11 +79,11 @@ async function createLibTorrentResumeTree(
 async function saveWithLibTorrentResume(
 	meta: Metafile,
 	savePath: string,
-	dataDir: string
+	basePath: string
 ): Promise<void> {
 	const rawWithLibtorrentResume = {
 		...meta.raw,
-		libtorrent_resume: await createLibTorrentResumeTree(meta, dataDir),
+		libtorrent_resume: await createLibTorrentResumeTree(meta, basePath),
 	};
 	await fs.writeFile(
 		savePath,
@@ -125,24 +141,20 @@ export default class RTorrent implements TorrentClient {
 		return downloadList.includes(infoHash.toUpperCase());
 	}
 
-	async checkOriginalTorrent(
+	private async checkOriginalTorrent(
 		searchee: Searchee
 	): Promise<
 		Result<
-			{ downloadDir: string },
+			{ directoryBase: string },
 			InjectionResult.FAILURE | InjectionResult.TORRENT_NOT_COMPLETE
 		>
 	> {
 		const infoHash = searchee.infoHash.toUpperCase();
-		type returnType = [["0" | "1"], [string], ["0" | "1"]];
+		type ReturnType = [[string], ["0" | "1"]];
 		let result;
 		try {
-			result = await this.methodCallP<returnType>("system.multicall", [
+			result = await this.methodCallP<ReturnType>("system.multicall", [
 				[
-					{
-						methodName: "d.is_multi_file",
-						params: [infoHash],
-					},
 					{
 						methodName: "d.directory",
 						params: [infoHash],
@@ -160,19 +172,45 @@ export default class RTorrent implements TorrentClient {
 
 		// temp diag for #154
 		try {
-			const [[isMultiFileStr], [dir], [isCompleteStr]] = result;
+			const [[directoryBase], [isCompleteStr]] = result;
 			const isComplete = Boolean(Number(isCompleteStr));
 			if (!isComplete) {
 				return resultOfErr(InjectionResult.TORRENT_NOT_COMPLETE);
 			}
-			return resultOf({
-				downloadDir: Number(isMultiFileStr) ? dirname(dir) : dir,
-			});
+			return resultOf({ directoryBase });
 		} catch (e) {
 			logger.error(e);
 			logger.debug("Failure caused by server response below:");
 			logger.debug(inspect(result));
 			return resultOfErr(InjectionResult.FAILURE);
+		}
+	}
+
+	private async getDownloadLocation(
+		meta: Metafile,
+		searchee: Searchee,
+		path?: string
+	): Promise<
+		Result<
+			DownloadLocation,
+			InjectionResult.FAILURE | InjectionResult.TORRENT_NOT_COMPLETE
+		>
+	> {
+		if (path) {
+			const basePath = join(path, searchee.name);
+			const directoryBase = meta.isSingleFileTorrent ? path : basePath;
+			return resultOf({ downloadDir: path, basePath, directoryBase });
+		} else {
+			const result = await this.checkOriginalTorrent(searchee);
+			return result.mapOk(({ directoryBase }) => ({
+				directoryBase,
+				downloadDir: meta.isSingleFileTorrent
+					? directoryBase
+					: dirname(directoryBase),
+				basePath: meta.isSingleFileTorrent
+					? join(directoryBase, searchee.name)
+					: directoryBase,
+			}));
 		}
 	}
 
@@ -202,37 +240,23 @@ export default class RTorrent implements TorrentClient {
 			return InjectionResult.ALREADY_EXISTS;
 		}
 
-		let downloadDir: string;
-
-		if (path) {
-			downloadDir = path;
-		} else {
-			const result = await this.checkOriginalTorrent(searchee);
-
-			if (result.isErr()) {
-				return result.unwrapErrOrThrow();
-			}
-
-			downloadDir = result.unwrapOrThrow().downloadDir;
-		}
+		const result = await this.getDownloadLocation(meta, searchee, path);
+		if (result.isErr()) return result.unwrapErrOrThrow();
+		const { directoryBase, basePath } = result.unwrapOrThrow();
 
 		const torrentFilePath = resolve(
 			outputDir,
 			`${meta.name}.tmp.${Date.now()}.torrent`
 		);
 
-		await saveWithLibTorrentResume(
-			meta,
-			torrentFilePath,
-			path ? path : downloadDir
-		);
+		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
 
 		for (let i = 0; i < 5; i++) {
 			try {
 				await this.methodCallP<void>("load.start", [
 					"",
 					torrentFilePath,
-					`d.directory.set="${downloadDir}"`,
+					`d.directory_base.set="${directoryBase}"`,
 					`d.custom1.set="cross-seed"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
 				]);

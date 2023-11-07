@@ -1,4 +1,4 @@
-import path, { basename, join } from "path";
+import path, { basename } from "path";
 import {
 	EP_REGEX,
 	MOVIE_REGEX,
@@ -81,7 +81,6 @@ export function humanReadable(timestamp: number): string {
 }
 
 export function formatAsList(strings: string[]) {
-	// @ts-expect-error Intl.ListFormat totally exists on node 12
 	return new Intl.ListFormat("en", {
 		style: "long",
 		type: "conjunction",

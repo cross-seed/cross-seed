@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import path from "path";
+import { join, resolve, dirname, basename } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -23,6 +23,16 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
+import { CrossSeedError } from "./errors.js";
+
+export async function validateAction(): Promise<void> {
+	const { action } = getRuntimeConfig();
+	if (action !== Action.INJECT && action !== Action.SAVE) {
+		throw new CrossSeedError(
+			`Action method "${action}" is invalid. Allowed choices are "save" and "inject".`
+		);
+	}
+}
 
 export async function performAction(
 	newMeta: Metafile,
@@ -38,21 +48,19 @@ export async function performAction(
 		} else if (decision == Decision.MATCH_SIZE_ONLY) {
 			// Size only matching is only supported for single file or
 			// single, nested file torrents.
-			const candidateParentDir = path.dirname(newMeta.files[0].path);
+			const candidateParentDir = dirname(newMeta.files[0].path);
 			let correctedlinkDir = linkDir;
 
 			// Candidate is single, nested file
-			if (candidateParentDir != ".") {
-				if (!existsSync(path.join(linkDir, candidateParentDir))) {
-					mkdirSync(path.join(linkDir, candidateParentDir), {
-						recursive: true,
-					});
-				}
-				correctedlinkDir = path.join(linkDir, candidateParentDir);
+			if (candidateParentDir !== ".") {
+				mkdirSync(join(linkDir, candidateParentDir), {
+					recursive: true,
+				});
+				correctedlinkDir = join(linkDir, candidateParentDir);
 			}
 			linkFile(
 				searchee.path,
-				path.join(correctedlinkDir, newMeta.files[0].name)
+				join(correctedlinkDir, newMeta.files[0].name)
 			);
 		}
 	}
@@ -115,32 +123,29 @@ function linkExact(oldPath: string, newPath: string) {
 		return;
 	}
 	if (statSync(oldPath).isFile()) {
-		if (!existsSync(path.join(newPath, path.basename(oldPath)))) {
-			linkFile(oldPath, path.join(newPath, path.basename(oldPath)));
+		if (!existsSync(join(newPath, basename(oldPath)))) {
+			linkFile(oldPath, join(newPath, basename(oldPath)));
 		}
 		return;
 	}
-
-	try {
-		mkdirSync(path.join(newPath, path.basename(oldPath)));
-	} catch (e) {
-		// skip if it already exists
-	}
+	mkdirSync(join(newPath, basename(oldPath)), { recursive: true });
 	readdirSync(oldPath).forEach((file) => {
-		linkExact(
-			path.join(oldPath, file),
-			path.join(newPath, path.basename(oldPath))
-		);
+		linkExact(join(oldPath, file), join(newPath, basename(oldPath)));
 	});
 }
 
 function linkFile(oldPath: string, newPath: string) {
 	const { linkType } = getRuntimeConfig();
-	if (existsSync(newPath)) return;
-
-	if (linkType === LinkType.HARDLINK) {
-		linkSync(oldPath, newPath);
-	} else {
-		symlinkSync(oldPath, newPath);
+	try {
+		if (linkType === LinkType.HARDLINK) {
+			linkSync(oldPath, newPath);
+		} else {
+			// we need to resolve because symlinks are resolved outside
+			// the context of cross-seed's working directory
+			symlinkSync(oldPath, resolve(newPath));
+		}
+	} catch (e) {
+		if (e.code === "EEXIST") return;
+		throw e;
 	}
 }

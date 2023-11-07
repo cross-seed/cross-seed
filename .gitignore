@@ -36,6 +36,7 @@ output/
 input/
 *.heapsnapshot
 qbit/
+docker/
 cache.json
 docker-compose.yml
 utils.zsh
