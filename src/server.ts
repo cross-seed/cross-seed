@@ -213,7 +213,7 @@ async function handleRequest(
 		return;
 	}
 
-	switch (req.url) {
+	switch (req.url.split("?")[0]) {
 		case "/api/webhook": {
 			logger.verbose({
 				label: Label.SERVER,
