@@ -25,9 +25,26 @@ enum DelugeErrorCode {
 interface TorrentInfo {
 	complete: boolean;
 	save_path: string;
+	label?: string | undefined;
+}
+interface InjectResponse {
+	result?: boolean;
+	error?: {
+		message?: string;
+	};
+}
+interface TorrentObject {
+	progress: number;
+	save_path: string;
+	state: string;
 	label?: string;
 }
-
+interface InfoResponse {
+	result?: { torrents?: Record<string, TorrentObject> };
+	error?: {
+		message?: string;
+	};
+}
 export default class Deluge implements TorrentClient {
 	private delugeCookie: string | null = null;
 	private delugeLabel = "cross-seed";
@@ -99,14 +116,15 @@ export default class Deluge implements TorrentClient {
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
 		let response: Response, json: DelugeResponse;
+		const id = Math.floor(Math.random() * 0x7fffffff);
 		try {
 			response = await fetch(href, {
 				body: JSON.stringify({
-					...{ method: method, params: params },
-					id: Math.floor(Math.random() * 0x7fffffff),
+					...{ method, params },
+					id,
 				}),
 				method: "POST",
-				headers: headers,
+				headers,
 			});
 		} catch (networkError) {
 			// @ts-expect-error needs es2022 target (tsconfig)
@@ -197,10 +215,14 @@ export default class Deluge implements TorrentClient {
 			const params = this.formatData(
 				`${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`,
 				newTorrent.encode().toString("base64"),
+				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				path ? path : torrentInfo!.save_path,
 				!!searchee.infoHash
 			);
-			const addResult = await this.call("core.add_torrent_file", params);
+			const addResult = (await this.call(
+				"core.add_torrent_file",
+				params
+			)) as InjectResponse;
 
 			if (addResult?.result) {
 				const { dataCategory } = getRuntimeConfig();
@@ -263,7 +285,6 @@ export default class Deluge implements TorrentClient {
 	 */
 	private async getTorrentInfo(searchee: Searchee): Promise<TorrentInfo> {
 		try {
-			let torrentLabel: string | undefined;
 			const params = [
 				["state", "progress", "save_path", "label"],
 				{ hash: searchee.infoHash },
@@ -271,7 +292,10 @@ export default class Deluge implements TorrentClient {
 			if (!searchee.infoHash)
 				throw new Error("Can't search a torrent without a infoHash");
 
-			const response = await this.call("web.update_ui", params);
+			const response = (await this.call(
+				"web.update_ui",
+				params
+			)) as InfoResponse;
 			const torrent = response?.result?.torrents?.[searchee.infoHash];
 
 			if (torrent === undefined) {
@@ -279,12 +303,14 @@ export default class Deluge implements TorrentClient {
 					`Torrent not found in client (${searchee.infoHash})`
 				);
 			}
-			if (this.isLabelEnabled && torrent?.label?.length != 0) {
-				torrentLabel = torrent.label;
-			}
 
 			const completedTorrent =
 				torrent.state === "Seeding" || torrent.progress === 100;
+			const torrentLabel =
+				this.isLabelEnabled && torrent?.label?.length != 0
+					? torrent.label
+					: undefined;
+
 			return {
 				complete: completedTorrent,
 				save_path: torrent.save_path,
