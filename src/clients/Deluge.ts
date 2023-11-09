@@ -226,6 +226,8 @@ export default class Deluge implements TorrentClient {
 					message: `Injection failed: ${addResult.error.message}`,
 				});
 				return InjectionResult.FAILURE;
+			} else {
+				return InjectionResult.FAILURE;
 			}
 		} catch (injectResult) {
 			logger.error({
@@ -235,7 +237,6 @@ export default class Deluge implements TorrentClient {
 			logger.debug(injectResult);
 			return InjectionResult.FAILURE;
 		}
-		return InjectionResult.FAILURE;
 	}
 
 	/**
