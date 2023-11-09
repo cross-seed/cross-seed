@@ -140,9 +140,7 @@ export default class Deluge implements TorrentClient {
 	 * parses the set-cookie header and updates stored value
 	 */
 	private handleResponseHeaders(headers: Headers) {
-		if (headers.has("Set-Cookie")) {
-			this.delugeCookie = headers.get("Set-Cookie").split(";")[0];
-		}
+		this.delugeCookie = headers.get("Set-Cookie")?.split(";")[0] ?? null;
 	}
 
 	/**
