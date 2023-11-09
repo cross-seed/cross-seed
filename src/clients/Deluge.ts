@@ -180,18 +180,19 @@ export default class Deluge implements TorrentClient {
 		try {
 			let torrentInfo: TorrentInfo;
 			const { duplicateCategories } = getRuntimeConfig();
-			if (searchee.infoHash) {
-				torrentInfo = await this.getTorrentInfo(searchee);
-				if (!torrentInfo.complete) {
-					if (
-						torrentInfo.save_path == "missing" &&
-						!path &&
-						!searchee.path
-					) {
-						return InjectionResult.FAILURE;
-					}
-					return InjectionResult.TORRENT_NOT_COMPLETE;
+			if (!searchee.infoHash)
+				return InjectionResult.FAILURE;
+
+			torrentInfo = await this.getTorrentInfo(searchee);
+			if (!torrentInfo.complete) {
+				if (
+					torrentInfo.save_path == "missing" &&
+					!path &&
+					!searchee.path
+				) {
+					return InjectionResult.FAILURE;
 				}
+				return InjectionResult.TORRENT_NOT_COMPLETE;
 			}
 
 			const params = this.formatData(
