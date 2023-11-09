@@ -262,7 +262,7 @@ export default class Deluge implements TorrentClient {
 	 */
 	private async getTorrentInfo(searchee: Searchee): Promise<TorrentInfo> {
 		try {
-			let torrentLabel: string = undefined;
+			let torrentLabel: string | undefined;
 			const params = [
 				["state", "progress", "save_path", "label"],
 				{ hash: searchee.infoHash },
