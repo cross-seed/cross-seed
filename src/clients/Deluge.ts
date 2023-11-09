@@ -267,6 +267,8 @@ export default class Deluge implements TorrentClient {
 				["state", "progress", "save_path", "label"],
 				{ hash: searchee.infoHash },
 			];
+			if (!searchee.infoHash) throw new Error("Can't search a torrent without a infoHash")
+
 			const response = await this.call("web.update_ui", params);
 			if (response?.result?.torrents?.[searchee.infoHash] === undefined) {
 				throw new Error(
