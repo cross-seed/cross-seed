@@ -234,6 +234,7 @@ export default class Deluge implements TorrentClient {
 			logger.debug(injectResult);
 			return InjectionResult.FAILURE;
 		}
+		return InjectionResult.FAILURE;
 	}
 
 	/**
