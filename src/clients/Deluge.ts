@@ -180,8 +180,7 @@ export default class Deluge implements TorrentClient {
 		try {
 			let torrentInfo: TorrentInfo;
 			const { duplicateCategories } = getRuntimeConfig();
-			if (!searchee.infoHash)
-				return InjectionResult.FAILURE;
+			if (!searchee.infoHash) return InjectionResult.FAILURE;
 
 			torrentInfo = await this.getTorrentInfo(searchee);
 			if (!torrentInfo.complete) {
@@ -269,32 +268,26 @@ export default class Deluge implements TorrentClient {
 				["state", "progress", "save_path", "label"],
 				{ hash: searchee.infoHash },
 			];
-			if (!searchee.infoHash) throw new Error("Can't search a torrent without a infoHash")
+			if (!searchee.infoHash)
+				throw new Error("Can't search a torrent without a infoHash");
 
 			const response = await this.call("web.update_ui", params);
-			if (response?.result?.torrents?.[searchee.infoHash] === undefined) {
+			const torrent = response?.result?.torrents?.[searchee.infoHash];
+
+			if (torrent === undefined) {
 				throw new Error(
 					`Torrent not found in client (${searchee.infoHash})`
 				);
 			}
-			if (
-				this.isLabelEnabled &&
-				response?.result?.torrents?.[searchee.infoHash]?.label
-					?.length != 0
-			) {
-				torrentLabel =
-					response?.result?.torrents?.[searchee.infoHash]?.label;
+			if (this.isLabelEnabled && torrent?.label?.length != 0) {
+				torrentLabel = torrent.label;
 			}
 
 			const completedTorrent =
-				response?.result?.torrents?.[searchee.infoHash]?.state ===
-					"Seeding" ||
-				response?.result?.torrents?.[searchee.infoHash]?.progress ===
-					100;
+				torrent.state === "Seeding" || torrent.progress === 100;
 			return {
 				complete: completedTorrent,
-				save_path:
-					response?.result?.torrents?.[searchee.infoHash]?.save_path,
+				save_path: torrent.save_path,
 				label: torrentLabel,
 			};
 		} catch (e) {
