@@ -8,12 +8,12 @@ import { TorrentClient } from "./TorrentClient.js";
 import { extractCredentialsFromUrl } from "../utils.js";
 import fetch, { Headers, Response } from "node-fetch";
 
-interface DelugeResponse {
-	error?: {
-		message?: string;
-		code?: DelugeErrorCode;
-	};
-	result?: string | boolean;
+interface TorrentInfo {
+	complete?: boolean;
+	save_path: string;
+	state?: string;
+	progress?: number;
+	label?: string;
 }
 enum DelugeErrorCode {
 	NO_AUTH = 1,
@@ -22,29 +22,14 @@ enum DelugeErrorCode {
 	RPC_FAIL = 4,
 	BAD_JSON = 5,
 }
-interface TorrentInfo {
-	complete: boolean;
-	save_path: string;
-	label?: string | undefined;
-}
-interface InjectResponse {
-	result?: boolean;
-	error?: {
-		message?: string;
-	};
-}
-interface TorrentObject {
-	progress: number;
-	save_path: string;
-	state: string;
-	label?: string;
-}
-interface InfoResponse {
-	result?: { torrents?: Record<string, TorrentObject> };
-	error?: {
-		message?: string;
-	};
-}
+type DelugeJSON<DelugeResult, ErrorType> = {
+	result?: DelugeResult;
+	error?: ErrorType;
+};
+type ErrorType = { message?: string; code?: DelugeErrorCode };
+type DelugeResult = boolean | string | TorrentStatus;
+type TorrentStatus = { torrents?: Record<string, TorrentInfo> };
+
 export default class Deluge implements TorrentClient {
 	private delugeCookie: string | null = null;
 	private delugeLabel = "cross-seed";
@@ -115,7 +100,7 @@ export default class Deluge implements TorrentClient {
 		const headers = new Headers({ "Content-Type": "application/json" });
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
-		let response: Response, json: DelugeResponse;
+		let response: Response, json: DelugeJSON<DelugeResult, ErrorType>;
 		const id = Math.floor(Math.random() * 0x7fffffff);
 		try {
 			response = await fetch(href, {
@@ -133,7 +118,9 @@ export default class Deluge implements TorrentClient {
 			});
 		}
 		try {
-			json = await (response.json() as Promise<DelugeResponse>);
+			json = await (response.json() as Promise<
+				DelugeJSON<DelugeResult, ErrorType>
+			>);
 		} catch (jsonParseError) {
 			throw new Error(
 				`Deluge method ${method} response was non-JSON ${jsonParseError}`
@@ -158,7 +145,9 @@ export default class Deluge implements TorrentClient {
 	 * parses the set-cookie header and updates stored value
 	 */
 	private handleResponseHeaders(headers: Headers) {
-		this.delugeCookie = headers.get("Set-Cookie")?.split(";")[0] ?? null;
+		if (headers.has("Set-Cookie")) {
+			this.delugeCookie = headers.get("Set-Cookie").split(";")[0];
+		}
 	}
 
 	/**
@@ -166,8 +155,11 @@ export default class Deluge implements TorrentClient {
 	 * returns true if successful.
 	 */
 	private async labelEnabled() {
-		const enabledLabels = await this.call("core.get_enabled_plugins", []);
-		return enabledLabels?.result?.includes?.("Label");
+		const enabledPlugins = await this.call("core.get_enabled_plugins", []);
+		if (!enabledPlugins) {
+			return false;
+		}
+		return enabledPlugins.result.includes("Label");
 	}
 
 	/**
@@ -180,7 +172,11 @@ export default class Deluge implements TorrentClient {
 				infoHash,
 				label,
 			]);
-			if (setResult?.error?.code == DelugeErrorCode.RPC_FAIL) {
+			if (!setResult) {
+				throw new Error(
+					"label.set_torrent: Client returned empty response"
+				);
+			} else if (setResult.error?.code == DelugeErrorCode.RPC_FAIL) {
 				await this.call("label.add", [label]);
 				await this.call("label.set_torrent", [infoHash, label]);
 			}
@@ -196,7 +192,8 @@ export default class Deluge implements TorrentClient {
 		path?: string
 	): Promise<InjectionResult> {
 		try {
-			let torrentInfo: TorrentInfo;
+			let torrentInfo: TorrentInfo,
+				addResult: DelugeJSON<DelugeResult, ErrorType>;
 			const { duplicateCategories } = getRuntimeConfig();
 
 			if (searchee.infoHash) {
@@ -207,6 +204,10 @@ export default class Deluge implements TorrentClient {
 						!path &&
 						!searchee.path
 					) {
+						logger.debug({
+							label: Label.DELUGE,
+							message: `Injection failure: ${searchee.name} (${searchee.infoHash}) was not found in the client.`,
+						});
 						return InjectionResult.FAILURE;
 					}
 					return InjectionResult.TORRENT_NOT_COMPLETE;
@@ -219,12 +220,32 @@ export default class Deluge implements TorrentClient {
 				path ? path : torrentInfo!.save_path,
 				!!searchee.infoHash
 			);
-			const addResult = (await this.call(
-				"core.add_torrent_file",
-				params
-			)) as InjectResponse;
+			addResult = await this.call("core.add_torrent_file", params);
 
-			if (addResult?.result) {
+			if (path || (searchee.infoHash && torrentInfo)) {
+				const params = this.formatData(
+					`${newTorrent.name}.cross-seed.torrent`,
+					newTorrent.encode().toString("base64"),
+					path ? path : torrentInfo.save_path,
+					!!searchee.infoHash
+				);
+
+				addResult = await this.call("core.add_torrent_file", params);
+			} else {
+				logger.debug({
+					label: Label.DELUGE,
+					message: `Injection failure: ${newTorrent.name} was missing critical data.`,
+				});
+				return InjectionResult.FAILURE;
+			}
+
+			if (!addResult) {
+				logger.debug({
+					label: Label.DELUGE,
+					message: `Injection failure: Client returned empty response.`,
+				});
+				return InjectionResult.FAILURE;
+			} else if (addResult.result) {
 				const { dataCategory } = getRuntimeConfig();
 				await this.setLabel(
 					newTorrent.infoHash,
@@ -239,24 +260,36 @@ export default class Deluge implements TorrentClient {
 						: this.delugeLabel
 				);
 				return InjectionResult.SUCCESS;
-			} else if (addResult?.error?.message?.includes("already")) {
+			} else if (addResult.error.message.includes("already")) {
 				return InjectionResult.ALREADY_EXISTS;
-			} else if (addResult?.error?.message) {
+			} else if (addResult.error.message) {
 				logger.debug({
 					label: Label.DELUGE,
 					message: `Injection failed: ${addResult.error.message}`,
 				});
 				return InjectionResult.FAILURE;
 			} else {
+				logger.debug({
+					label: Label.DELUGE,
+					message: `Unknown injection failure: ${newTorrent.name} (${newTorrent.infoHash})`,
+				});
 				return InjectionResult.FAILURE;
 			}
 		} catch (injectResult) {
-			logger.error({
-				label: Label.DELUGE,
-				message: `Injection failed: ${injectResult}`,
-			});
-			logger.debug(injectResult);
-			return InjectionResult.FAILURE;
+			if (injectResult.includes("label.set_torrent")) {
+				logger.warning({
+					label: Label.DELUGE,
+					message: `Label failure: ${newTorrent.name} (${newTorrent.infoHash})`,
+				});
+				return InjectionResult.SUCCESS;
+			} else {
+				logger.error({
+					label: Label.DELUGE,
+					message: `Injection failed: ${injectResult}`,
+				});
+				logger.debug(injectResult);
+				return InjectionResult.FAILURE;
+			}
 		}
 	}
 
@@ -284,19 +317,29 @@ export default class Deluge implements TorrentClient {
 	 * returns information needed to complete/validate injection
 	 */
 	private async getTorrentInfo(searchee: Searchee): Promise<TorrentInfo> {
+		if (!searchee.infoHash) {
+			throw new Error("Can't search a torrent without a infoHash");
+		}
+
+		let torrent: TorrentInfo;
 		try {
 			const params = [
 				["state", "progress", "save_path", "label"],
 				{ hash: searchee.infoHash },
 			];
-			if (!searchee.infoHash)
-				throw new Error("Can't search a torrent without a infoHash");
 
 			const response = (await this.call(
 				"web.update_ui",
 				params
-			)) as InfoResponse;
-			const torrent = response?.result?.torrents?.[searchee.infoHash];
+			)) as DelugeJSON<DelugeResult, ErrorType>;
+
+			if (response && typeof response.result === "object") {
+				torrent = response.result.torrents?.[searchee.infoHash];
+			} else {
+				throw new Error(
+					"Client returned unexpected response (non-object)"
+				);
+			}
 
 			if (torrent === undefined) {
 				throw new Error(
@@ -307,7 +350,7 @@ export default class Deluge implements TorrentClient {
 			const completedTorrent =
 				torrent.state === "Seeding" || torrent.progress === 100;
 			const torrentLabel =
-				this.isLabelEnabled && torrent?.label?.length != 0
+				this.isLabelEnabled && torrent.label.length != 0
 					? torrent.label
 					: undefined;
 
