@@ -1,4 +1,5 @@
 import { createRequire } from "module";
+import { z } from "zod";
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
@@ -19,6 +20,21 @@ export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 
+export const ZOD_ERROR_MAP: z.ZodErrorMap = (error, ctx) => {
+	switch (error.code) {
+		case z.ZodIssueCode.invalid_union:
+			return {
+				message: error.unionErrors
+					.reduce((acc, error) => {
+						error.errors.forEach((x) => acc.push(x.message));
+						return acc;
+					}, [])
+					.join("; "),
+			};
+	}
+
+	return { message: ctx.defaultError };
+};
 export enum Action {
 	SAVE = "save",
 	INJECT = "inject",

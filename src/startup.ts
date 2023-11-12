@@ -1,24 +1,15 @@
 import { CrossSeedError } from "./errors.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { VALIDATION_SCHEMA } from "./zod.js";
 import { existsSync } from "fs";
 import { Action } from "./constants.js";
 import { validateTorznabUrls } from "./torznab.js";
 import { getClient } from "./clients/TorrentClient.js";
 
 export async function doStartupValidation(): Promise<void> {
-	logger.info("Validating your configuration...");
 	try {
-		VALIDATION_SCHEMA.parse(getRuntimeConfig());
 		checkConfigPaths();
 	} catch (error) {
-		logger.error(
-			"Your configuration is invalid, please see the error below for details."
-		);
-		logger.error(
-			"Documentation: https://www.cross-seed.org/docs/basics/options#all-options"
-		);
 		throw new CrossSeedError(error.message.replace("Error: ", ""));
 	}
 	const downloadClient = getClient();

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
-import ms from "ms";
 import { inspect } from "util";
 import { getApiKeyFromDatabase, resetApiKey } from "./auth.js";
 import { generateConfig, getFileConfig } from "./configuration.js";
@@ -11,10 +10,11 @@ import {
 	MatchMode,
 	PROGRAM_NAME,
 	PROGRAM_VERSION,
+	ZOD_ERROR_MAP,
 } from "./constants.js";
 import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
-import { exitOnCrossSeedErrors } from "./errors.js";
+import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { jobsLoop } from "./jobs.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
@@ -29,37 +29,7 @@ import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { fallback } from "./utils.js";
-
-function processOptions(options): RuntimeConfig {
-	if (options.rssCadence) {
-		options.rssCadence = Math.max(ms(options.rssCadence), ms("10 minutes"));
-	}
-	if (options.searchCadence) {
-		options.searchCadence = ms(options.searchCadence);
-
-		// Set a minimum cadence of once a day if excludeRecentSearch hasn't been set to avoid flooding requests
-		if (!options.excludeRecentSearch) {
-			options.searchCadence = Math.max(
-				options.searchCadence,
-				ms("1 day")
-			);
-		}
-	}
-
-	if (options.excludeOlder) {
-		options.excludeOlder = ms(options.excludeOlder);
-	}
-	if (options.excludeRecentSearch) {
-		options.excludeRecentSearch = ms(options.excludeRecentSearch);
-	}
-	if (options.snatchTimeout) {
-		options.snatchTimeout = ms(options.snatchTimeout);
-	}
-	if (options.searchTimeout) {
-		options.searchTimeout = ms(options.searchTimeout);
-	}
-	return options;
-}
+import { VALIDATION_SCHEMA } from "./zod.js";
 
 const fileConfig = await getFileConfig();
 
@@ -335,8 +305,12 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	)
 	.action(async (options) => {
 		try {
-			const runtimeConfig = processOptions(options);
+			const runtimeConfig = VALIDATION_SCHEMA.parse(options, {
+				errorMap: ZOD_ERROR_MAP,
+			});
 			setRuntimeConfig(runtimeConfig);
+			console.log(runtimeConfig);
+			throw new CrossSeedError("exited");
 			initializeLogger();
 			initializePushNotifier();
 			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
@@ -357,14 +331,38 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 createCommandWithSharedOptions("rss", "Run an rss scan").action(
 	async (options) => {
 		try {
-			const runtimeConfig = processOptions(options);
+			let runtimeConfig: RuntimeConfig = options;
 			setRuntimeConfig(runtimeConfig);
 			initializeLogger();
-			initializePushNotifier();
+			logger.info("Validating your configuration...");
+			try {
+				runtimeConfig = VALIDATION_SCHEMA.parse(await getFileConfig(), {
+					errorMap: ZOD_ERROR_MAP,
+				});
+			} catch (error) {
+				error.errors.forEach(({ path, message }) => {
+					const url_path = path.toString().toLowerCase();
+					logger.error(
+						`Option: "${path}"\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${
+							url_path.includes("fuzzy")
+								? "fuzzysizethreshold-experimental"
+								: url_path
+						})\n`
+					);
+				});
+				throw new CrossSeedError(
+					`Your configuration is invalid, please see the ${
+						error.errors.length > 1 ? "errors" : "error"
+					} above for details.`
+				);
+			}
+			setRuntimeConfig(runtimeConfig);
 			logger.verbose({
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),
 			});
+			initializeLogger();
+			initializePushNotifier();
 
 			await db.migrate.latest();
 			await doStartupValidation();
@@ -386,8 +384,12 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 	)
 	.action(async (options) => {
 		try {
-			const runtimeConfig = processOptions(options);
+			const runtimeConfig = VALIDATION_SCHEMA.parse(options, {
+				errorMap: ZOD_ERROR_MAP,
+			});
 			setRuntimeConfig(runtimeConfig);
+			console.log(runtimeConfig);
+			throw new CrossSeedError("exited");
 			initializeLogger();
 			initializePushNotifier();
 			logger.verbose({
