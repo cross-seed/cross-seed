@@ -305,40 +305,15 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	)
 	.action(async (options) => {
 		try {
-			const runtimeConfig = VALIDATION_SCHEMA.parse(options, {
-				errorMap: ZOD_ERROR_MAP,
-			});
-			setRuntimeConfig(runtimeConfig);
-			console.log(runtimeConfig);
-			throw new CrossSeedError("exited");
-			initializeLogger();
-			initializePushNotifier();
-			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
-			logger.verbose({
-				label: Label.CONFIGDUMP,
-				message: inspect(runtimeConfig),
-			});
-			await db.migrate.latest();
-			await doStartupValidation();
-			serve(options.port, options.host);
-			jobsLoop();
-		} catch (e) {
-			exitOnCrossSeedErrors(e);
-			await db.destroy();
-		}
-	});
-
-createCommandWithSharedOptions("rss", "Run an rss scan").action(
-	async (options) => {
-		try {
 			let runtimeConfig: RuntimeConfig = options;
 			setRuntimeConfig(runtimeConfig);
 			initializeLogger();
+			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
 			logger.info("Validating your configuration...");
 			try {
 				runtimeConfig = VALIDATION_SCHEMA.parse(await getFileConfig(), {
 					errorMap: ZOD_ERROR_MAP,
-				});
+				}) as RuntimeConfig;
 			} catch (error) {
 				error.errors.forEach(({ path, message }) => {
 					const url_path = path.toString().toLowerCase();
@@ -361,9 +336,52 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),
 			});
-			initializeLogger();
 			initializePushNotifier();
+			await db.migrate.latest();
+			await doStartupValidation();
+			serve(options.port, options.host);
+			jobsLoop();
+		} catch (e) {
+			exitOnCrossSeedErrors(e);
+			await db.destroy();
+		}
+	});
 
+createCommandWithSharedOptions("rss", "Run an rss scan").action(
+	async (options) => {
+		try {
+			let runtimeConfig: RuntimeConfig = options;
+			setRuntimeConfig(runtimeConfig);
+			initializeLogger();
+			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
+			logger.info("Validating your configuration...");
+			try {
+				runtimeConfig = VALIDATION_SCHEMA.parse(await getFileConfig(), {
+					errorMap: ZOD_ERROR_MAP,
+				}) as RuntimeConfig;
+			} catch (error) {
+				error.errors.forEach(({ path, message }) => {
+					const url_path = path.toString().toLowerCase();
+					logger.error(
+						`Option: "${path}"\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${
+							url_path.includes("fuzzy")
+								? "fuzzysizethreshold-experimental"
+								: url_path
+						})\n`
+					);
+				});
+				throw new CrossSeedError(
+					`Your configuration is invalid, please see the ${
+						error.errors.length > 1 ? "errors" : "error"
+					} above for details.`
+				);
+			}
+			setRuntimeConfig(runtimeConfig);
+			logger.verbose({
+				label: Label.CONFIGDUMP,
+				message: inspect(runtimeConfig),
+			});
+			initializePushNotifier();
 			await db.migrate.latest();
 			await doStartupValidation();
 			await scanRssFeeds();
@@ -384,18 +402,38 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 	)
 	.action(async (options) => {
 		try {
-			const runtimeConfig = VALIDATION_SCHEMA.parse(options, {
-				errorMap: ZOD_ERROR_MAP,
-			});
+			let runtimeConfig: RuntimeConfig = options;
 			setRuntimeConfig(runtimeConfig);
-			console.log(runtimeConfig);
-			throw new CrossSeedError("exited");
 			initializeLogger();
-			initializePushNotifier();
+			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
+			logger.info("Validating your configuration...");
+			try {
+				runtimeConfig = VALIDATION_SCHEMA.parse(await getFileConfig(), {
+					errorMap: ZOD_ERROR_MAP,
+				}) as RuntimeConfig;
+			} catch (error) {
+				error.errors.forEach(({ path, message }) => {
+					const url_path = path.toString().toLowerCase();
+					logger.error(
+						`Option: "${path}"\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${
+							url_path.includes("fuzzy")
+								? "fuzzysizethreshold-experimental"
+								: url_path
+						})\n`
+					);
+				});
+				throw new CrossSeedError(
+					`Your configuration is invalid, please see the ${
+						error.errors.length > 1 ? "errors" : "error"
+					} above for details.`
+				);
+			}
+			setRuntimeConfig(runtimeConfig);
 			logger.verbose({
 				label: Label.CONFIGDUMP,
 				message: inspect(runtimeConfig),
 			});
+			initializePushNotifier();
 			await db.migrate.latest();
 			await doStartupValidation();
 			await main();
