@@ -113,3 +113,8 @@ export function extractCredentialsFromUrl(
 		return resultOfErr("invalid URL");
 	}
 }
+
+export function sanitizeTorrentName(name: string): string {
+	const sanitizedName = name.replace("/", "");
+	return sanitizedName;
+}

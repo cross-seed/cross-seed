@@ -11,7 +11,11 @@ import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { reformatTitleForSearching, stripExtension } from "./utils.js";
+import {
+	reformatTitleForSearching,
+	sanitizeTorrentName,
+	stripExtension,
+} from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -112,7 +116,7 @@ export function saveTorrentFile(
 	const { outputDir } = getRuntimeConfig();
 	const buf = meta.encode();
 	const name = stripExtension(meta.name);
-	const filename = `[${tag}][${tracker}]${name}.torrent`;
+	const filename = `[${tag}][${tracker}]${sanitizeTorrentName(name)}.torrent`;
 	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });
 }
 

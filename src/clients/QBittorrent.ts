@@ -10,7 +10,7 @@ import { Label, logger, logOnce } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
-import { extractCredentialsFromUrl } from "../utils.js";
+import { extractCredentialsFromUrl, sanitizeTorrentName } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const X_WWW_FORM_URLENCODED = {
@@ -270,7 +270,9 @@ export default class QBittorrent implements TorrentClient {
 				return InjectionResult.ALREADY_EXISTS;
 			}
 			const buf = newTorrent.encode();
-			const filename = `${newTorrent.name}.cross-seed.torrent`;
+			const filename = `${sanitizeTorrentName(
+				newTorrent.name
+			)}.cross-seed.torrent`;
 			const tempFilepath = join(tmpdir(), filename);
 			await writeFile(tempFilepath, buf, { mode: 0o644 });
 			const { save_path, isComplete, autoTMM, category } = path
