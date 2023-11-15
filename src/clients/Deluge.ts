@@ -188,7 +188,9 @@ export default class Deluge implements TorrentClient {
 						? dataCategory
 						: torrentInfo.label
 						? duplicateCategories
-							? `${torrentInfo.label}.cross-seed`
+							? torrentInfo.label.endsWith(".cross-seed")
+								? torrentInfo.label
+								: `${torrentInfo.label}.cross-seed`
 							: torrentInfo.label
 						: this.delugeLabel
 				);
