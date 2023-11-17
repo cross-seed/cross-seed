@@ -56,11 +56,31 @@ export default class Deluge implements TorrentClient {
 				"You need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)"
 			);
 		}
-		const response = await this.call("auth.login", [password], 0);
-		if (!response.result) {
+		const authResponse = await this.call("auth.login", [password], 0);
+		if (!authResponse.result) {
 			throw new CrossSeedError(
 				`Reached Deluge, but failed to authenticate: ${href}`
 			);
+		}
+		const connectedResponse = await this.call("web.connected", [], 0);
+
+		if (!connectedResponse.result) {
+			logger.warn(
+				"Deluge WebUI disconnected from daemon...attempting to reconnect."
+			);
+			const webuiHostList = await this.call("web.get_hosts", [], 0);
+			const connectResponse = await this.call(
+				"web.connect",
+				[webuiHostList.result[0][0]],
+				0
+			);
+			if (connectResponse) {
+				logger.info("Deluge WebUI connected to the daemon.");
+			} else {
+				throw new CrossSeedError(
+					"Unable to connect WebUI to Deluge daemon. Connect to the WebUI to resolve this."
+				);
+			}
 		}
 	}
 
