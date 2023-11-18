@@ -111,8 +111,9 @@ export function saveTorrentFile(
 ): void {
 	const { outputDir } = getRuntimeConfig();
 	const buf = meta.encode();
-	const name = stripExtension(meta.name);
-	const filename = `[${tag}][${tracker}]${stripExtension(meta.getFileSystemSafeName())}.torrent`;
+	const filename = `[${tag}][${tracker}]${stripExtension(
+		meta.getFileSystemSafeName()
+	)}.torrent`;
 	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });
 }
 
