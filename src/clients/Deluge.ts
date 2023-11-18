@@ -5,7 +5,7 @@ import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
-import { extractCredentialsFromUrl, sanitizeTorrentName } from "../utils.js";
+import { extractCredentialsFromUrl } from "../utils.js";
 import fetch, { Headers, Response } from "node-fetch";
 
 interface DelugeResponse {
@@ -173,7 +173,7 @@ export default class Deluge implements TorrentClient {
 			}
 
 			const params = this.formatData(
-				`${sanitizeTorrentName(newTorrent.name)}.cross-seed.torrent`,
+				`${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`,
 				newTorrent.encode().toString("base64"),
 				path ? path : torrentInfo.save_path,
 				!!searchee.infoHash
