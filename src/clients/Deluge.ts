@@ -193,7 +193,7 @@ export default class Deluge implements TorrentClient {
 			}
 
 			const params = this.formatData(
-				`${newTorrent.name}.cross-seed.torrent`,
+				`${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`,
 				newTorrent.encode().toString("base64"),
 				path ? path : torrentInfo.save_path,
 				!!searchee.infoHash
@@ -208,7 +208,9 @@ export default class Deluge implements TorrentClient {
 						? dataCategory
 						: torrentInfo.label
 						? duplicateCategories
-							? `${torrentInfo.label}.cross-seed`
+							? torrentInfo.label.endsWith(".cross-seed")
+								? torrentInfo.label
+								: `${torrentInfo.label}.cross-seed`
 							: torrentInfo.label
 						: this.delugeLabel
 				);

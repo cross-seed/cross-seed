@@ -110,6 +110,9 @@ export class Metafile {
 	static decode(buf: Buffer) {
 		return new Metafile(bencode.decode(buf));
 	}
+	getFileSystemSafeName(): string {
+		return this.name.replace("/", "");
+	}
 
 	encode(): Buffer {
 		return bencode.encode(this.raw);

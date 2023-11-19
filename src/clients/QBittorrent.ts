@@ -270,7 +270,7 @@ export default class QBittorrent implements TorrentClient {
 				return InjectionResult.ALREADY_EXISTS;
 			}
 			const buf = newTorrent.encode();
-			const filename = `${newTorrent.name}.cross-seed.torrent`;
+			const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
 			const tempFilepath = join(tmpdir(), filename);
 			await writeFile(tempFilepath, buf, { mode: 0o644 });
 			const { save_path, isComplete, autoTMM, category } = path
