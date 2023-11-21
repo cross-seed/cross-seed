@@ -1,6 +1,6 @@
 {
 	"name": "cross-seed",
-	"version": "5.8.2",
+	"version": "5.8.3",
 	"description": "Fully-automatic cross-seeding with Torznab",
 	"scripts": {
 		"test": "true",
