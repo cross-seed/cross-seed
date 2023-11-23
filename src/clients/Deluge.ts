@@ -56,11 +56,15 @@ export default class Deluge implements TorrentClient {
 				"You need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)"
 			);
 		}
-		const authResponse = await this.call("auth.login", [password], 0);
-		if (!authResponse.result) {
-			throw new CrossSeedError(
-				`Reached Deluge, but failed to authenticate: ${href}`
-			);
+		try {
+			const authResponse = await this.call("auth.login", [password], 0);
+			if (!authResponse.result) {
+				throw new CrossSeedError(
+					`Reached Deluge, but failed to authenticate: ${href}`
+				);
+			}
+		} catch (networkError) {
+			throw new CrossSeedError(networkError);
 		}
 		const connectedResponse = await this.call("web.connected", [], 0);
 
