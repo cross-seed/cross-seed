@@ -1,4 +1,3 @@
-import fetch, { BodyInit, Response, FormData } from "node-fetch";
 import { posix } from "path";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
@@ -113,10 +112,8 @@ export default class QBittorrent implements TorrentClient {
 			);
 		}
 
-		const cookieArray = response.headers.raw()["set-cookie"];
-		if (cookieArray) {
-			this.cookie = cookieArray[0].split(";")[0];
-		} else {
+		this.cookie = response.headers.getSetCookie()[0];
+		if (!this.cookie) {
 			throw new CrossSeedError(
 				`qBittorrent login failed: Invalid username or password`
 			);
@@ -277,7 +274,7 @@ export default class QBittorrent implements TorrentClient {
 						isComplete: true,
 						autoTMM: false,
 						category: dataCategory,
-				  }
+					}
 				: await this.getTorrentConfiguration(searchee);
 
 			const newCategoryName =
