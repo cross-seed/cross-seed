@@ -265,13 +265,13 @@ export default class QBittorrent implements TorrentClient {
 	): Promise<InjectionResult> {
 		const { duplicateCategories, skipRecheck, dataCategory } =
 			getRuntimeConfig();
+		const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
+		const tempFilepath = join(appDir(), TORRENT_CACHE_FOLDER, filename);
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
 			}
 			const buf = newTorrent.encode();
-			const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
-			const tempFilepath = join(appDir(), TORRENT_CACHE_FOLDER, filename);
 			await writeFile(tempFilepath, buf, { mode: 0o600 });
 			const { save_path, isComplete, autoTMM, category } = path
 				? {
@@ -336,10 +336,6 @@ export default class QBittorrent implements TorrentClient {
 				);
 			}
 
-			unlink(tempFilepath).catch((error) => {
-				logger.debug(error);
-			});
-
 			return InjectionResult.SUCCESS;
 		} catch (e) {
 			logger.debug({
@@ -347,6 +343,10 @@ export default class QBittorrent implements TorrentClient {
 				message: `injection failed: ${e.message}`,
 			});
 			return InjectionResult.FAILURE;
+		} finally {
+			await unlink(tempFilepath).catch((error) => {
+				logger.debug(error);
+			});
 		}
 	}
 }
