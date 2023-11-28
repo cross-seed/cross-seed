@@ -2,9 +2,9 @@ import { fileFrom } from "fetch-blob/from.js";
 import { FormData } from "formdata-polyfill/esm.min.js";
 import { unlink, writeFile } from "fs/promises";
 import fetch, { BodyInit, Response } from "node-fetch";
-import { tmpdir } from "os";
 import { join, posix } from "path";
-import { InjectionResult } from "../constants.js";
+import { appDir } from "../configuration.js";
+import { InjectionResult, TORRENT_CACHE_FOLDER } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -271,8 +271,8 @@ export default class QBittorrent implements TorrentClient {
 			}
 			const buf = newTorrent.encode();
 			const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
-			const tempFilepath = join(tmpdir(), filename);
-			await writeFile(tempFilepath, buf, { mode: 0o644 });
+			const tempFilepath = join(appDir(), TORRENT_CACHE_FOLDER, filename);
+			await writeFile(tempFilepath, buf, { mode: 0o600 });
 			const { save_path, isComplete, autoTMM, category } = path
 				? {
 						save_path: path,
