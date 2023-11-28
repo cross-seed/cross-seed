@@ -1,10 +1,6 @@
-import { fileFrom } from "fetch-blob/from.js";
-import { FormData } from "formdata-polyfill/esm.min.js";
-import { unlink, writeFile } from "fs/promises";
-import fetch, { BodyInit, Response } from "node-fetch";
-import { join, posix } from "path";
-import { appDir } from "../configuration.js";
-import { InjectionResult, TORRENT_CACHE_FOLDER } from "../constants.js";
+import fetch, { BodyInit, Response, FormData } from "node-fetch";
+import { posix } from "path";
+import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -265,14 +261,16 @@ export default class QBittorrent implements TorrentClient {
 	): Promise<InjectionResult> {
 		const { duplicateCategories, skipRecheck, dataCategory } =
 			getRuntimeConfig();
-		const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
-		const tempFilepath = join(appDir(), TORRENT_CACHE_FOLDER, filename);
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
 			}
-			const buf = newTorrent.encode();
-			await writeFile(tempFilepath, buf, { mode: 0o600 });
+
+			const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
+			const buffer = new Blob([newTorrent.encode()], {
+				type: "application/x-bittorrent",
+			});
+
 			const { save_path, isComplete, autoTMM, category } = path
 				? {
 						save_path: path,
@@ -296,12 +294,8 @@ export default class QBittorrent implements TorrentClient {
 					? "Subfolder"
 					: "Original";
 
-			const file = await fileFrom(
-				tempFilepath,
-				"application/x-bittorrent"
-			);
 			const formData = new FormData();
-			formData.append("torrents", file, filename);
+			formData.append("torrents", buffer, filename);
 			formData.append("tags", "cross-seed");
 			formData.append("category", newCategoryName);
 
@@ -343,10 +337,6 @@ export default class QBittorrent implements TorrentClient {
 				message: `injection failed: ${e.message}`,
 			});
 			return InjectionResult.FAILURE;
-		} finally {
-			await unlink(tempFilepath).catch((error) => {
-				logger.debug(error);
-			});
 		}
 	}
 }
