@@ -171,7 +171,7 @@ async function announce(
 
 	logger.verbose({
 		label: Label.SERVER,
-		message: `Received announce: ${data.name}`,
+		message: `Received announce from ${data.tracker}: ${data.name}`,
 	});
 
 	const candidate = data as Candidate;
