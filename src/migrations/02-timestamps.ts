@@ -11,7 +11,7 @@ function getApikey(url: string) {
 }
 
 async function backfill(knex: Knex.Knex) {
-	const { torznab } = getRuntimeConfig();
+	const torznab = getRuntimeConfig()?.torznab ?? [];
 
 	if (torznab.length > 0) {
 		await knex("indexer")
