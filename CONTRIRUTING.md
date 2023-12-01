@@ -36,3 +36,27 @@ mostly i stick with `--save` (the default i think) usually i use docker to run
 whichever client. you could install it yourself though I have a gitignored
 docker_compose.yml that keeps track of all of the clients but i only run them
 one at a time
+
+# Releasing
+
+```
+git checkout master
+git pull
+npx np
+```
+
+If there's a new typescript file, it'll tell you it won't be included. That's
+correct - the typescript files in `src` aren't included, but they compile down
+to javascript files in `dist` which _are_ included.
+
+It'll ask you if you want to increment patch, minor, or major version. I think
+I'd say _don't bump major_ unless we've talked about it in `#development`. Minor
+vs patch is kind of meaningless but mostly patch for fixes and minor for
+features.
+
+Then it'll do a bunch of compiling, etc. Eventually it will open a tab in your
+browser asking you to create a release. Then you can just click the Submit
+button and you're done.
+
+If you ever fuck up (often due to forgetting the github release), just release
+again with a `patch` version bump. no big deal
