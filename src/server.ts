@@ -37,7 +37,11 @@ function parseData(data: string) {
 		if ("infoHash" in parsed) {
 			parsed.infoHash = parsed.infoHash.toLowerCase();
 		}
-		if ("size" in parsed && typeof parsed.size === "string") {
+		if (
+			"size" in parsed &&
+			typeof parsed.size === "string" &&
+			parsed.size !== "0"
+		) {
 			parsed.size = Number(parsed.size);
 		}
 	} catch (e) {
