@@ -41,22 +41,30 @@ export async function performAction(
 	tracker: string
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
-
+	let trackerLinkDir: string;
+	if (linkDir) {
+		trackerLinkDir = join(linkDir, tracker);
+	}
+	if (!existsSync(trackerLinkDir)) {
+		mkdirSync(trackerLinkDir, {
+			recursive: true,
+		});
+	}
 	if (searchee.path) {
 		if (decision == Decision.MATCH) {
-			await linkExact(searchee.path, linkDir);
+			await linkExact(searchee.path, trackerLinkDir);
 		} else if (decision == Decision.MATCH_SIZE_ONLY) {
 			// Size only matching is only supported for single file or
 			// single, nested file torrents.
 			const candidateParentDir = dirname(newMeta.files[0].path);
-			let correctedlinkDir = linkDir;
+			let correctedlinkDir = trackerLinkDir;
 
 			// Candidate is single, nested file
 			if (candidateParentDir !== ".") {
-				mkdirSync(join(linkDir, candidateParentDir), {
+				mkdirSync(join(trackerLinkDir, candidateParentDir), {
 					recursive: true,
 				});
-				correctedlinkDir = join(linkDir, candidateParentDir);
+				correctedlinkDir = join(trackerLinkDir, candidateParentDir);
 			}
 			linkFile(
 				searchee.path,
@@ -71,7 +79,7 @@ export async function performAction(
 		const result = await getClient().inject(
 			newMeta,
 			searchee,
-			searchee.path ? linkDir : undefined
+			searchee.path ? trackerLinkDir : undefined
 		);
 		switch (result) {
 			case InjectionResult.SUCCESS:
