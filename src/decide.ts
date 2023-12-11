@@ -104,7 +104,7 @@ async function assessCandidateHelper(
 ): Promise<ResultAssessment> {
 	const { matchMode } = getRuntimeConfig();
 
-	if (size != null && !sizeDoesMatch(size, searchee)) {
+	if (size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
 
