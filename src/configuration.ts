@@ -42,6 +42,7 @@ interface FileConfig {
 	snatchTimeout?: string;
 	searchTimeout?: string;
 	searchLimit?: number;
+	searchLimitIndexer?: number;
 }
 
 interface GenerateConfigParams {

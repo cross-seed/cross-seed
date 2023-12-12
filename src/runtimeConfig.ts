@@ -34,6 +34,7 @@ export interface RuntimeConfig {
 	snatchTimeout: number;
 	searchTimeout: number;
 	searchLimit: number;
+	searchLimitIndexer: number;
 	apiAuth: boolean;
 }
 

@@ -253,8 +253,15 @@ module.exports = {
 
 	/**
 	 * The number of searches to be done before it stops.
-	 * Combine this with "excludeRecentSearch" and "searchCadence" to smooth long-term API usage patterns.
+	 * Combine this with "searchLimit", "excludeRecentSearch", and "searchCadence" to smooth long-term API usage patterns.
 	 * Default is no limit.
 	 */
 	searchLimit: undefined,
+
+	/**
+	 * The number of searches per indexer to be done before it stops.
+	 * Combine this with "searchLimit", "excludeRecentSearch", and "searchCadence" to smooth long-term API usage patterns.
+	 * Default is no limit.
+	 */
+	searchLimitIndexer: undefined,
 };

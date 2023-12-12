@@ -225,6 +225,12 @@ function createCommandWithSharedOptions(name, description) {
 			"The number of searches before stops",
 			parseInt,
 			fallback(fileConfig.searchLimit, 0)
+		)
+		.option(
+			"--search-limit-indexer <number>",
+			"The number of searches per indexer before stops",
+			parseInt,
+			fallback(fileConfig.searchLimitIndexer, 0)
 		);
 }
 
