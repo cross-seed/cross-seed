@@ -181,21 +181,23 @@ export async function searchTorznab(
 	});
 
 	// remove indexers that have reached search limit
-	for (let i = indexersToUse.length - 1; i >= 0; i--) {
-		const indexer = indexersToUse[i];
-		if (indexerSearchCount.get(indexer.id) >= searchLimitIndexer) {
-			logger.verbose({
-				label: Label.TORZNAB,
-				message: `[${indexerSearchCount.get(indexer.id)}/${searchLimitIndexer}] Indexer ${indexer.url} has reached search limit`,
-			});
-			indexersToUse.splice(i, 1);
-		}
-		else {
-			indexerSearchCount.set(indexer.id, indexerSearchCount.get(indexer.id) + 1);
-			logger.verbose({
-				label: Label.TORZNAB,
-				message: `[${indexerSearchCount.get(indexer.id)}/${searchLimitIndexer}] Indexer ${indexer.url} searches`,
-			});
+	if (searchLimitIndexer) {
+		for (let i = indexersToUse.length - 1; i >= 0; i--) {
+			const indexer = indexersToUse[i];
+			if (indexerSearchCount.get(indexer.id) >= searchLimitIndexer) {
+				logger.verbose({
+					label: Label.TORZNAB,
+					message: `[${indexerSearchCount.get(indexer.id)}/${searchLimitIndexer}] Indexer ${indexer.url} has reached search limit`,
+				});
+				indexersToUse.splice(i, 1);
+			}
+			else {
+				indexerSearchCount.set(indexer.id, indexerSearchCount.get(indexer.id) + 1);
+				logger.verbose({
+					label: Label.TORZNAB,
+					message: `[${indexerSearchCount.get(indexer.id)}/${searchLimitIndexer}] Indexer ${indexer.url} searches`,
+				});
+			}
 		}
 	}
 
