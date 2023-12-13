@@ -184,6 +184,9 @@ export async function searchTorznab(
 	if (searchLimitIndexer) {
 		for (let i = indexersToUse.length - 1; i >= 0; i--) {
 			const indexer = indexersToUse[i];
+			if (!indexerSearchCount.has(indexer.id)) {
+				indexerSearchCount.set(indexer.id, 0);
+			}
 			if (indexerSearchCount.get(indexer.id) >= searchLimitIndexer) {
 				logger.verbose({
 					label: Label.TORZNAB,
