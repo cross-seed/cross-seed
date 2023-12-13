@@ -69,7 +69,11 @@ export async function parseTorrentFromURL(
 		return resultOfErr(SnatchError.MAGNET_LINK);
 	} else if (response.status === 429) {
 		return resultOfErr(SnatchError.RATE_LIMITED);
-	} else if (!response.ok) {
+	} else if (
+		!response.ok &&
+		response.status !== 301 &&
+		response.status !== 302
+	) {
 		logger.error(
 			`error downloading torrent at ${url}: ${response.status} ${response.statusText}`
 		);
