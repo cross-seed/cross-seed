@@ -269,7 +269,7 @@ export async function checkNewCandidateMatch(
 }
 
 async function findSearchableTorrents() {
-	const { torrents, dataDirs, torrentDir, searchLimit, searchLimitIndexer } = getRuntimeConfig();
+	const { torrents, dataDirs, torrentDir, searchLimit } = getRuntimeConfig();
 	let allSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
@@ -305,18 +305,10 @@ async function findSearchableTorrents() {
 		message: `Found ${allSearchees.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
 	});
 
-	if (searchLimit && filteredTorrents.length > searchLimit) {
+	if (searchLimit > 0) {
 		logger.info({
 			label: Label.SEARCH,
-			message: `Limited to ${searchLimit} searches`,
-		});
-
-		filteredTorrents = filteredTorrents.slice(0, searchLimit);
-	}
-	if (searchLimitIndexer) {
-		logger.info({
-			label: Label.SEARCH,
-			message: `Limited to ${searchLimitIndexer} searches per indexer`,
+			message: `Limited to ${searchLimit} searches per indexer`,
 		});
 	}
 

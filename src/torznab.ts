@@ -150,7 +150,7 @@ export async function searchTorznab(
 	name: string,
 	indexerSearchCount: Map<number, number>
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
-	const { excludeRecentSearch, excludeOlder, searchLimitIndexer } = getRuntimeConfig();
+	const { excludeRecentSearch, excludeOlder, searchLimit } = getRuntimeConfig();
 
 	const enabledIndexers = await getEnabledIndexers();
 
@@ -181,16 +181,16 @@ export async function searchTorznab(
 	});
 
 	// remove indexers that have reached search limit
-	if (searchLimitIndexer) {
+	if (searchLimit > 0) {
 		for (let i = indexersToUse.length - 1; i >= 0; i--) {
 			const indexer = indexersToUse[i];
 			if (!indexerSearchCount.has(indexer.id)) {
 				indexerSearchCount.set(indexer.id, 0);
 			}
-			if (indexerSearchCount.get(indexer.id) >= searchLimitIndexer) {
+			if (indexerSearchCount.get(indexer.id) >= searchLimit) {
 				logger.verbose({
 					label: Label.TORZNAB,
-					message: `[${indexerSearchCount.get(indexer.id)}/${searchLimitIndexer}] Indexer ${indexer.url} has reached search limit`,
+					message: `[${indexerSearchCount.get(indexer.id)}/${searchLimit}] Indexer ${indexer.url} has reached search limit`,
 				});
 				indexersToUse.splice(i, 1);
 			}
@@ -198,7 +198,7 @@ export async function searchTorznab(
 				indexerSearchCount.set(indexer.id, indexerSearchCount.get(indexer.id) + 1);
 				logger.verbose({
 					label: Label.TORZNAB,
-					message: `[${indexerSearchCount.get(indexer.id)}/${searchLimitIndexer}] Indexer ${indexer.url} searches`,
+					message: `[${indexerSearchCount.get(indexer.id)}/${searchLimit}] Indexer ${indexer.url} searches`,
 				});
 			}
 		}
