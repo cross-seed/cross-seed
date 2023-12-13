@@ -16,7 +16,6 @@ import {
 import { db } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
 import {
-	getEnabledIndexers,
 	IndexerStatus,
 	updateIndexerStatus,
 	updateSearchTimestamps,
@@ -161,12 +160,8 @@ async function findMatchesBatch(
 	hashesToExclude: string[]
 ) {
 	const { delay } = getRuntimeConfig();
-	const enabledIndexers = await getEnabledIndexers();
-	let indexerSearchCount = new Map<number, number>();
-	for (const indexer of enabledIndexers) {
-		indexerSearchCount.set(indexer.id, 0);
-	}
 	
+	let indexerSearchCount = new Map<number, number>();
 	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
 		try {
@@ -211,11 +206,7 @@ export async function searchForLocalTorrentByCriteria(
 		searchees = [await getTorrentByCriteria(criteria)];
 	}
 	const hashesToExclude = await getInfoHashesToExclude();
-	const enabledIndexers = await getEnabledIndexers();
 	let indexerSearchCount = new Map<number, number>();
-	for (const indexer of enabledIndexers) {
-		indexerSearchCount.set(indexer.id, 0);
-	}
 	let matches = 0;
 	for (let i = 0; i < searchees.length; i++) {
 		if (!filterByContent(searchees[i])) return null;
