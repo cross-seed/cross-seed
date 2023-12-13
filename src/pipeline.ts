@@ -349,9 +349,9 @@ export async function scanRssFeeds() {
 		label: Label.RSS,
 		message: `Scan returned ${
 			candidatesSinceLastTime.length
-			} new results, ignoring ${
-				candidates.length - candidatesSinceLastTime.length
-			} already seen`,
+		} new results, ignoring ${
+			candidates.length - candidatesSinceLastTime.length
+		} already seen`,
 	});
 	logger.verbose({
 		label: Label.RSS,
@@ -363,7 +363,7 @@ export async function scanRssFeeds() {
 			label: Label.RSS,
 			message: `Processing release ${i + 1}/${
 				candidatesSinceLastTime.length
-				}`,
+			}`,
 		});
 		await checkNewCandidateMatch(candidate);
 	}

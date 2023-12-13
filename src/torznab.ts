@@ -211,7 +211,7 @@ export async function searchTorznab(
 			indexersToUse.length < enabledIndexers.length
 				? timestampCallout
 				: ""
-			}`,
+		}`,
 	});
 
 	return makeRequests(name, indexersToUse, (indexer) =>
