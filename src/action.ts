@@ -42,10 +42,10 @@ export async function performAction(
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 	const trackerLinkDir = linkDir ? join(linkDir, tracker) : undefined;
-	}
-		mkdirSync(trackerLinkDir, {
-			recursive: true,
-		});
+	mkdirSync(trackerLinkDir, {
+		recursive: true,
+	});
+
 	if (searchee.path) {
 		if (decision == Decision.MATCH) {
 			await linkExact(searchee.path, trackerLinkDir);
