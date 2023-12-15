@@ -45,11 +45,9 @@ export async function performAction(
 	if (linkDir) {
 		trackerLinkDir = join(linkDir, tracker);
 	}
-	if (!existsSync(trackerLinkDir)) {
 		mkdirSync(trackerLinkDir, {
 			recursive: true,
 		});
-	}
 	if (searchee.path) {
 		if (decision == Decision.MATCH) {
 			await linkExact(searchee.path, trackerLinkDir);
