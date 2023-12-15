@@ -41,9 +41,7 @@ export async function performAction(
 	tracker: string
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
-	let trackerLinkDir: string;
-	if (linkDir) {
-		trackerLinkDir = join(linkDir, tracker);
+	const trackerLinkDir = linkDir ? join(linkDir, tracker) : undefined;
 	}
 		mkdirSync(trackerLinkDir, {
 			recursive: true,
