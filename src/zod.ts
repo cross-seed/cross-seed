@@ -2,9 +2,20 @@ import { z } from "zod";
 import { Action, LinkType, MatchMode } from "./constants.js";
 import { logger } from "./logger.js";
 import ms from "ms";
-
 /**
- * VALIDATION_SCHEMA is just a object of all the zod schemas
+ * error messages returned upon Zod validation failure
+ */
+enum zodErrorMsg {
+	vercel = "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
+	emptyString = "cannot have an empty string",
+	delay = "delay is in seconds, you can't travel back in time.",
+	fuzzySizeThreshold = "fuzzySizeThreshold must be a decimal percentage",
+	injectUrl = "You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
+	dataBased = "Data-Based Matching requires linkType, dataDirs, and linkDir to be defined",
+	riskyRecheckWarn = "It is strongly recommended to not skip rechecking for risky matching mode",
+}
+/**
+ * an object of the zod schema
  * each are named after what they are intended to validate
  */
 
@@ -13,7 +24,7 @@ export const VALIDATION_SCHEMA = z
 		delay: z
 			.number()
 			.positive({
-				message: "delay is in seconds, you can't travel back in time.",
+				message: zodErrorMsg.delay,
 			})
 			.default(10),
 		torznab: z.array(z.string().url()),
@@ -30,17 +41,17 @@ export const VALIDATION_SCHEMA = z
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
 		fuzzySizeThreshold: z.number().positive().lte(1, {
-			message: "fuzzySizeThreshold must be a decimal percentage",
+			message: zodErrorMsg.fuzzySizeThreshold,
 		}),
 		excludeOlder: z
 			.string()
-			.min(1, { message: "cannot have an empty string" })
+			.min(1, { message: zodErrorMsg.emptyString })
 			.transform((time, ctx) => {
 				const vercel = ms(time);
 				if (isNaN(vercel)) {
 					ctx.addIssue({
 						code: "custom",
-						message: "format does not follow vercel's `ms` style",
+						message: zodErrorMsg.vercel,
 					});
 				}
 				return vercel;
@@ -48,13 +59,13 @@ export const VALIDATION_SCHEMA = z
 			.nullish(),
 		excludeRecentSearch: z
 			.string()
-			.min(1, { message: "cannot have an empty string" })
+			.min(1, { message: zodErrorMsg.emptyString })
 			.transform((time, ctx) => {
 				const vercel = ms(time);
 				if (isNaN(vercel)) {
 					ctx.addIssue({
 						code: "custom",
-						message: "format does not follow vercel's `ms` style",
+						message: zodErrorMsg.vercel,
 					});
 				}
 				return vercel;
@@ -75,13 +86,13 @@ export const VALIDATION_SCHEMA = z
 		host: z.string().ip().nullish(),
 		rssCadence: z
 			.string()
-			.min(1, { message: "cannot have an empty string" })
+			.min(1, { message: zodErrorMsg.emptyString })
 			.transform((time, ctx) => {
 				const vercel = ms(time);
 				if (isNaN(vercel)) {
 					ctx.addIssue({
 						code: "custom",
-						message: "format does not follow vercel's `ms` style",
+						message: zodErrorMsg.vercel,
 					});
 				}
 				return vercel;
@@ -89,13 +100,13 @@ export const VALIDATION_SCHEMA = z
 			.nullish(),
 		searchCadence: z
 			.string()
-			.min(1, { message: "cannot have an empty string" })
+			.min(1, { message: zodErrorMsg.emptyString })
 			.transform((time, ctx) => {
 				const vercel = ms(time);
 				if (isNaN(vercel)) {
 					ctx.addIssue({
 						code: "custom",
-						message: "format does not follow vercel's `ms` style",
+						message: zodErrorMsg.vercel,
 					});
 				}
 				return vercel;
@@ -103,13 +114,13 @@ export const VALIDATION_SCHEMA = z
 			.nullish(),
 		snatchTimeout: z
 			.string()
-			.min(1, { message: "cannot have an empty string" })
+			.min(1, { message: zodErrorMsg.emptyString })
 			.transform((time, ctx) => {
 				const vercel = ms(time);
 				if (isNaN(vercel)) {
 					ctx.addIssue({
 						code: "custom",
-						message: "format does not follow vercel's `ms` style",
+						message: zodErrorMsg.vercel,
 					});
 				}
 				return vercel;
@@ -117,13 +128,13 @@ export const VALIDATION_SCHEMA = z
 			.nullish(),
 		searchTimeout: z
 			.string()
-			.min(1, { message: "cannot have an empty string" })
+			.min(1, { message: zodErrorMsg.emptyString })
 			.transform((time, ctx) => {
 				const vercel = ms(time);
 				if (isNaN(vercel)) {
 					ctx.addIssue({
 						code: "custom",
-						message: "format does not follow vercel's `ms` style",
+						message: zodErrorMsg.vercel,
 					});
 				}
 				return vercel;
@@ -140,10 +151,10 @@ export const VALIDATION_SCHEMA = z
 			config.action !== Action.INJECT ||
 			config.rtorrentRpcUrl ||
 			config.qbittorrentUrl ||
-			config.transmissionRpcUrl,
+			config.transmissionRpcUrl ||
+			config.delugeRpcUrl,
 		() => ({
-			message:
-				"You need to specify rtorrentRpcUrl, transmissionRpcUrl, or qbittorrentUrl when using 'inject'",
+			message: zodErrorMsg.injectUrl,
 		})
 	)
 	.refine(
@@ -159,15 +170,12 @@ export const VALIDATION_SCHEMA = z
 			return true;
 		},
 		() => ({
-			message:
-				"Data-Based Matching requires linkType, dataDirs, and linkDir to be defined",
+			message: zodErrorMsg.dataBased,
 		})
 	)
 	.refine((config) => {
 		if (config.skipRecheck && config.matchMode == MatchMode.RISKY) {
-			logger.warn(
-				"It is strongly recommended to not skip rechecking for risky matching mode"
-			);
+			logger.warn(zodErrorMsg.riskyRecheckWarn);
 		}
 		return true;
 	});
