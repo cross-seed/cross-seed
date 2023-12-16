@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Action, LinkType, MatchMode } from "./constants.js";
 import { logger } from "./logger.js";
 import ms from "ms";
+
 /**
  * error messages returned upon Zod validation failure
  */
@@ -14,6 +15,7 @@ enum zodErrorMsg {
 	dataBased = "Data-Based Matching requires linkType, dataDirs, and linkDir to be defined",
 	riskyRecheckWarn = "It is strongly recommended to not skip rechecking for risky matching mode",
 }
+
 /**
  * an object of the zod schema
  * each are named after what they are intended to validate
