@@ -34,6 +34,16 @@ export async function parseTorrentFromFilename(
 	return Metafile.decode(data);
 }
 
+function isMagnetRedirectError(error: Error): boolean {
+	return (
+		// node-fetch
+		error.message.includes('URL scheme "magnet" is not supported.') ||
+		// undici
+		// @ts-expect-error error causes "not supported yet"
+		error?.cause.message.includes("URL scheme must be a HTTP(S) scheme")
+	);
+}
+
 export async function parseTorrentFromURL(
 	url: string
 ): Promise<Result<Metafile, SnatchError>> {
@@ -49,25 +59,21 @@ export async function parseTorrentFromURL(
 		response = await fetch(url, {
 			headers: { "User-Agent": USER_AGENT },
 			signal: abortController.signal,
-			redirect: "manual",
 		});
 	} catch (e) {
 		if (e.name === "AbortError") {
 			logger.error(`snatching ${url} timed out`);
 			return resultOfErr(SnatchError.ABORTED);
+		} else if (isMagnetRedirectError(e)) {
+			logger.error(`Unsupported: magnet link detected at ${url}`);
+			return resultOfErr(SnatchError.MAGNET_LINK);
 		}
 		logger.error(`failed to access ${url}`);
 		logger.debug(e);
 		return resultOfErr(SnatchError.UNKNOWN_ERROR);
 	}
 
-	if (
-		response.status.toString().startsWith("3") &&
-		response.headers.get("location")?.startsWith("magnet:")
-	) {
-		logger.error(`Unsupported: magnet link detected at ${url}`);
-		return resultOfErr(SnatchError.MAGNET_LINK);
-	} else if (response.status === 429) {
+	if (response.status === 429) {
 		return resultOfErr(SnatchError.RATE_LIMITED);
 	} else if (!response.ok) {
 		logger.error(
