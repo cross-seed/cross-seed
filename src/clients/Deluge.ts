@@ -22,22 +22,23 @@ enum DelugeErrorCode {
 	RPC_FAIL = 4,
 	BAD_JSON = 5,
 }
-type injectData = [
-	string,
-	string,
-	{
+type InjectData = [
+	filename: string,
+	filedump: string,
+	options: {
 		add_paused: boolean;
 		seed_mode: boolean;
 		download_location: string;
 	}
 ];
+type WebHostList = [string, string, number, string][];
+type ErrorType = { message?: string; code?: DelugeErrorCode };
+type TorrentStatus = { torrents?: Record<string, TorrentInfo> };
 
 type DelugeJSON<ResultType> = {
 	result?: ResultType;
 	error?: ErrorType;
 };
-type ErrorType = { message?: string; code?: DelugeErrorCode };
-type TorrentStatus = { torrents?: Record<string, TorrentInfo> };
 
 export default class Deluge implements TorrentClient {
 	private delugeCookie: string | null = null;
@@ -91,7 +92,7 @@ export default class Deluge implements TorrentClient {
 			logger.warn(
 				"Deluge WebUI disconnected from daemon...attempting to reconnect."
 			);
-			const webuiHostList = await this.call<object>(
+			const webuiHostList = await this.call<WebHostList>(
 				"web.get_hosts",
 				[],
 				0
@@ -116,7 +117,7 @@ export default class Deluge implements TorrentClient {
 	 */
 	private async call<ResultType>(
 		method: string,
-		params: object,
+		params: unknown[],
 		retries = 1
 	): Promise<DelugeJSON<ResultType>> {
 		const { delugeRpcUrl } = getRuntimeConfig();
@@ -168,9 +169,9 @@ export default class Deluge implements TorrentClient {
 	 * parses the set-cookie header and updates stored value
 	 */
 	private handleResponseHeaders(headers: Headers) {
-		this.delugeCookie = headers.has("Set-Cookie")
-			? headers.get("Set-Cookie").split(";")[0]
-			: null;
+		if (headers.has("Set-Cookie")) {
+			this.delugeCookie = headers.get("Set-Cookie").split(";")[0];
+		}
 	}
 
 	/**
@@ -182,7 +183,9 @@ export default class Deluge implements TorrentClient {
 			"core.get_enabled_plugins",
 			[]
 		);
-		return enabledPlugins ? enabledPlugins.result.includes("Label") : false;
+		return enabledPlugins.error
+			? false
+			: enabledPlugins.result.includes("Label");
 	}
 
 	/**
@@ -193,11 +196,7 @@ export default class Deluge implements TorrentClient {
 		const setResult = this.isLabelEnabled
 			? await this.call<void>("label.set_torrent", [infoHash, label])
 			: undefined;
-		if (!setResult) {
-			throw new Error(
-				"label.set_torrent: Client returned empty response"
-			);
-		} else if (setResult.error?.code == DelugeErrorCode.RPC_FAIL) {
+		if (setResult?.error?.code === DelugeErrorCode.RPC_FAIL) {
 			await this.call<void>("label.add", [label]);
 			await this.call<void>("label.set_torrent", [infoHash, label]);
 		}
@@ -301,7 +300,7 @@ export default class Deluge implements TorrentClient {
 		filedump: string,
 		path: string,
 		isTorrent: boolean
-	): injectData {
+	): InjectData {
 		return [
 			filename,
 			filedump,
@@ -333,14 +332,13 @@ export default class Deluge implements TorrentClient {
 				params
 			);
 
-			if (response && typeof response.result === "object") {
+			if (response.result.torrents) {
 				torrent = response.result.torrents?.[searchee.infoHash];
 			} else {
 				throw new Error(
-					"Client returned unexpected response (non-object)"
+					"Client returned unexpected response (object missing)"
 				);
 			}
-
 			if (torrent === undefined) {
 				throw new Error(
 					`Torrent not found in client (${searchee.infoHash})`
@@ -365,7 +363,10 @@ export default class Deluge implements TorrentClient {
 				message: `Failed to fetch torrent data: ${searchee.name} - (${searchee.infoHash})`,
 			});
 			logger.debug(e);
-			throw new Error("web.update_ui: failed to fetch data from client");
+			// @ts-expect-error needs es2022 target (tsconfig)
+			throw new Error("web.update_ui: failed to fetch data from client", {
+				cause: e,
+			});
 			//return { complete: false, save_path: "missing" };
 		}
 	}
