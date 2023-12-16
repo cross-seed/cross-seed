@@ -207,17 +207,6 @@ export default class Deluge implements TorrentClient {
 			if (searchee.infoHash) {
 				torrentInfo = await this.getTorrentInfo(searchee);
 				if (!torrentInfo.complete) {
-					if (
-						torrentInfo.save_path == "missing" &&
-						!path &&
-						!searchee.path
-					) {
-						logger.debug({
-							label: Label.DELUGE,
-							message: `Injection failure: ${searchee.name} (${searchee.infoHash}) was not found in the client.`,
-						});
-						return InjectionResult.FAILURE;
-					}
 					return InjectionResult.TORRENT_NOT_COMPLETE;
 				}
 			}
@@ -360,7 +349,8 @@ export default class Deluge implements TorrentClient {
 				message: `Failed to fetch torrent data: ${searchee.name} - (${searchee.infoHash})`,
 			});
 			logger.debug(e);
-			return { complete: false, save_path: "missing" };
+			throw new Error("web.update_ui: failed to fetch data from client");
+			//return { complete: false, save_path: "missing" };
 		}
 	}
 }
