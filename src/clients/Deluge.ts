@@ -191,15 +191,15 @@ export default class Deluge implements TorrentClient {
 	 */
 	private async setLabel(infoHash: string, label: string): Promise<void> {
 		const setResult = this.isLabelEnabled
-			? await this.call<undefined>("label.set_torrent", [infoHash, label])
+			? await this.call<void>("label.set_torrent", [infoHash, label])
 			: undefined;
 		if (!setResult) {
 			throw new Error(
 				"label.set_torrent: Client returned empty response"
 			);
 		} else if (setResult.error?.code == DelugeErrorCode.RPC_FAIL) {
-			await this.call<undefined>("label.add", [label]);
-			await this.call<undefined>("label.set_torrent", [infoHash, label]);
+			await this.call<void>("label.add", [label]);
+			await this.call<void>("label.set_torrent", [infoHash, label]);
 		}
 	}
 
