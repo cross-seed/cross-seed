@@ -193,12 +193,15 @@ export default class Deluge implements TorrentClient {
 	 * and sets the label based on torrent hash.
 	 */
 	private async setLabel(infoHash: string, label: string): Promise<void> {
-		const setResult = this.isLabelEnabled
-			? await this.call<void>("label.set_torrent", [infoHash, label])
-			: undefined;
-		if (setResult?.error?.code === DelugeErrorCode.RPC_FAIL) {
-			await this.call<void>("label.add", [label]);
-			await this.call<void>("label.set_torrent", [infoHash, label]);
+		if (this.isLabelEnabled) {
+			const setResult = await this.call<void>("label.set_torrent", [
+				infoHash,
+				label,
+			]);
+			if (setResult.error?.code === DelugeErrorCode.RPC_FAIL) {
+				await this.call<void>("label.add", [label]);
+				await this.call<void>("label.set_torrent", [infoHash, label]);
+			}
 		}
 	}
 
@@ -229,7 +232,7 @@ export default class Deluge implements TorrentClient {
 			}
 
 			const params = this.formatData(
-				`${newTorrent.name}.cross-seed.torrent`,
+				`${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`,
 				newTorrent.encode().toString("base64"),
 				path ? path : torrentInfo.save_path,
 				!!searchee.infoHash
@@ -238,13 +241,7 @@ export default class Deluge implements TorrentClient {
 				"core.add_torrent_file",
 				params
 			);
-			if (!addResult) {
-				logger.debug({
-					label: Label.DELUGE,
-					message: `Injection failure: Client returned empty response.`,
-				});
-				return InjectionResult.FAILURE;
-			} else if (addResult.result) {
+			if (addResult.result) {
 				const { dataCategory } = getRuntimeConfig();
 				await this.setLabel(
 					newTorrent.infoHash,
@@ -367,7 +364,6 @@ export default class Deluge implements TorrentClient {
 			throw new Error("web.update_ui: failed to fetch data from client", {
 				cause: e,
 			});
-			//return { complete: false, save_path: "missing" };
 		}
 	}
 }
