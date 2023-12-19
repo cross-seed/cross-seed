@@ -308,6 +308,32 @@ export default class Deluge implements TorrentClient {
 	}
 
 	/**
+	 * returns directory of a infohash in deluge as a string
+	 */
+	async getDownloadDir(searchee: Searchee): Promise<string> {
+		let torrent: TorrentInfo;
+		const params = [["save_path"], { hash: searchee.infoHash }];
+		const response = await this.call<TorrentStatus>(
+			"web.update_ui",
+			params
+		);
+
+		if (response.result.torrents) {
+			torrent = response.result.torrents?.[searchee.infoHash];
+		} else {
+			throw new Error(
+				"Client returned unexpected response (object missing)"
+			);
+		}
+		if (torrent === undefined) {
+			throw new Error(
+				`Torrent not found in client (${searchee.infoHash})`
+			);
+		}
+		return torrent.save_path;
+	}
+
+	/**
 	 * returns information needed to complete/validate injection
 	 */
 	private async getTorrentInfo(searchee: Searchee): Promise<TorrentInfo> {
