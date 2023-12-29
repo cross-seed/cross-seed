@@ -131,7 +131,8 @@ export default class Deluge implements TorrentClient {
 		try {
 			response = await fetch(href, {
 				body: JSON.stringify({
-					...{ method, params },
+					method,
+					params,
 					id,
 				}),
 				method: "POST",
