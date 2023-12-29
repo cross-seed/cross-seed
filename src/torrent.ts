@@ -258,7 +258,7 @@ export async function getTorrentByCriteria(
 		.first();
 
 	if (findResult === undefined) {
-		const message = `could not find a torrent with the criteria ${inspect(
+		const message = `torrentDir does not have any torrent with criteria ${inspect(
 			criteria
 		)}`;
 		throw new Error(message);
