@@ -139,7 +139,6 @@ export default class Deluge implements TorrentClient {
 				headers,
 			});
 		} catch (networkError) {
-			// @ts-expect-error needs es2022 target (tsconfig)
 			throw new Error(`Failed to connect to Deluge at ${href}`, {
 				cause: networkError,
 			});
