@@ -65,8 +65,8 @@ async function assessCandidates(
 	candidates: Candidate[],
 	searchee: Searchee,
 	hashesToExclude: string[]
-) {
-	const assessments = [];
+): Promise<AssessmentWithTracker[]> {
+	const assessments: AssessmentWithTracker[] = [];
 	for (const result of candidates) {
 		const assessment = await assessCandidate(
 			result,
