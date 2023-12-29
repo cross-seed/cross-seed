@@ -61,17 +61,27 @@ interface FoundOnOtherSites {
 	matches: number;
 }
 
+async function assessCandidates(
+	candidates: Candidate[],
+	searchee: Searchee,
+	hashesToExclude: string[]
+): Promise<AssessmentWithTracker[]> {
+	const assessments: AssessmentWithTracker[] = [];
+	for (const result of candidates) {
+		const assessment = await assessCandidate(
+			result,
+			searchee,
+			hashesToExclude
+		);
+		assessments.push({ assessment, tracker: result.tracker });
+	}
+	return assessments;
+}
+
 async function findOnOtherSites(
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<FoundOnOtherSites> {
-	const assessEach = async (
-		result: Candidate
-	): Promise<AssessmentWithTracker> => ({
-		assessment: await assessCandidate(result, searchee, hashesToExclude),
-		tracker: result.tracker,
-	});
-
 	// make sure searchee is in database
 	await db("searchee")
 		.insert({ name: searchee.name })
@@ -94,11 +104,13 @@ async function findOnOtherSites(
 		}))
 	);
 
-	const assessed = await Promise.all<AssessmentWithTracker>(
-		results.map(assessEach)
+	const assessments = await assessCandidates(
+		results,
+		searchee,
+		hashesToExclude
 	);
 
-	const { rateLimited, notRateLimited } = assessed.reduce(
+	const { rateLimited, notRateLimited } = assessments.reduce(
 		(acc, cur, idx) => {
 			const candidate = results[idx];
 			if (cur.assessment.decision === Decision.RATE_LIMITED) {
@@ -113,7 +125,7 @@ async function findOnOtherSites(
 		}
 	);
 
-	const matches = assessed.filter(
+	const matches = assessments.filter(
 		(e) =>
 			e.assessment.decision === Decision.MATCH ||
 			e.assessment.decision === Decision.MATCH_SIZE_ONLY
