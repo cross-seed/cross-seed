@@ -12,10 +12,9 @@
 		"plugin:@typescript-eslint/recommended"
 	],
 	"parserOptions": {
-		"ecmaVersion": 2020
+		"ecmaVersion": 2022
 	},
 	"rules": {
-		"no-mixed-spaces-and-tabs": "off",
 		"@typescript-eslint/no-var-requires": "off"
 	}
 }

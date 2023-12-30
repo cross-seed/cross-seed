@@ -30,9 +30,9 @@ export interface RuntimeConfig {
 	torrents: string[];
 	port: number | false | null;
 	searchCadence: number;
-	rssCadence: number;
-	snatchTimeout: number;
-	searchTimeout: number;
+	rssCadence?: number;
+	snatchTimeout?: number;
+	searchTimeout?: number;
 	searchLimit: number;
 	apiAuth: boolean;
 }
