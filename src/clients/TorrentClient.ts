@@ -14,7 +14,7 @@ export interface TorrentClient {
 	getDownloadDir: (
 		searchee: Searchee
 	) => Promise<
-		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "NETWORK_ERROR">
 	>;
 	inject: (
 		newTorrent: Metafile,

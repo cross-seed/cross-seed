@@ -155,14 +155,22 @@ export default class Transmission implements TorrentClient {
 	async getDownloadDir(
 		searchee: Searchee
 	): Promise<
-		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "NETWORK_ERROR">
 	> {
 		const result = await this.checkOriginalTorrent(
 			searchee as SearcheeWithInfoHash
 		);
 		return result
 			.mapOk((r) => r.downloadDir)
-			.mapErr((err) => (err === "FAILURE" ? "UNKNOWN_ERROR" : err));
+			.mapErr((err) => {
+				if (err === InjectionResult.FAILURE) {
+					return "NETWORK_ERROR";
+				} else if (err === InjectionResult.TORRENT_NOT_COMPLETE) {
+					return "TORRENT_NOT_COMPLETE";
+				} else {
+					return "NOT_FOUND";
+				}
+			});
 	}
 
 	async inject(
@@ -170,17 +178,20 @@ export default class Transmission implements TorrentClient {
 		searchee: Searchee,
 		path?: string
 	): Promise<InjectionResult> {
-		let downloadDir: string;
+		let downloadDir:
+			| string
+			| Result<
+					string,
+					"NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "NETWORK_ERROR"
+			  >;
 		if (path) {
 			downloadDir = path;
 		} else {
-			const result = await this.getDownloadDir(
+			downloadDir = await this.getDownloadDir(
 				searchee as SearcheeWithInfoHash
 			);
-			if (result.isErr()) {
+			if (downloadDir.isErr()) {
 				return InjectionResult.FAILURE;
-			} else {
-				downloadDir = result.unwrapOrThrow();
 			}
 		}
 
