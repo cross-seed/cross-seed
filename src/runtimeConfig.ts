@@ -18,8 +18,8 @@ export interface RuntimeConfig {
 	verbose: boolean;
 	includeNonVideos: boolean;
 	fuzzySizeThreshold: number;
-	excludeOlder: number;
-	excludeRecentSearch: number;
+	excludeOlder?: number;
+	excludeRecentSearch?: number;
 	action: Action;
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
