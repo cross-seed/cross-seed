@@ -1,6 +1,6 @@
-import { z } from "zod";
 import { Action, LinkType, MatchMode } from "./constants.js";
 import { logger } from "./logger.js";
+import { z } from "zod";
 import ms from "ms";
 
 /**
@@ -15,6 +15,12 @@ enum zodErrorMsg {
 	dataBased = "Data-Based Matching requires linkType, dataDirs, and linkDir to be defined",
 	riskyRecheckWarn = "It is strongly recommended to not skip rechecking for risky matching mode",
 }
+/**
+ * custom zod error map for logging
+ * @param error ZodIssue messaging object
+ * @param ctx ZodError map
+ * @returns (the custom error for config display)
+ */
 export const ZOD_ERROR_MAP: z.ZodErrorMap = (error, ctx) => {
 	switch (error.code) {
 		case z.ZodIssueCode.invalid_union:
@@ -32,11 +38,13 @@ export const ZOD_ERROR_MAP: z.ZodErrorMap = (error, ctx) => {
 };
 /**
  * helper functions for validation
+ * @return transformed duration (string -> milliseconds)
  */
 
 function transformDurationString(durationStr: string, ctx) {
 	const duration = ms(durationStr);
 	if (isNaN(duration)) {
+		// adds the error to the Zod Issues
 		ctx.addIssue({
 			code: "custom",
 			message: zodErrorMsg.vercel,

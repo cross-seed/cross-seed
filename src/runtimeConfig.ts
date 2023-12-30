@@ -34,6 +34,7 @@ export interface RuntimeConfig {
 	searchTimeout: number;
 	searchLimit: number;
 	apiAuth: boolean;
+	configValid: boolean;
 }
 
 let runtimeConfig: RuntimeConfig;
