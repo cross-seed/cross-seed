@@ -27,7 +27,7 @@ export const ZOD_ERROR_MAP: z.ZodErrorMap = (error, ctx) => {
 			return {
 				message: error.unionErrors
 					.reduce((acc, error) => {
-						// @ts-expect-error
+						// @ts-expect-error avoids type conflict string to never
 						error.errors.forEach((x) => acc.push(x.message));
 						return acc;
 					}, [])
@@ -151,7 +151,7 @@ export const VALIDATION_SCHEMA = z
 					config.dataDirs?.length > 0) ||
 				(config.linkDir !== undefined && config.linkDir !== null)
 			) {
-				return config.dataDirs?.length! > 0 && config.linkDir;
+				return config.dataDirs!.length > 0 && config.linkDir;
 			}
 			return true;
 		},
