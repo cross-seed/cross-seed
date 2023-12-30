@@ -18,8 +18,8 @@ export interface RuntimeConfig {
 	verbose: boolean;
 	includeNonVideos: boolean;
 	fuzzySizeThreshold: number;
-	excludeOlder: number;
-	excludeRecentSearch: number;
+	excludeOlder?: number;
+	excludeRecentSearch?: number;
 	action: Action;
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
@@ -30,9 +30,9 @@ export interface RuntimeConfig {
 	torrents: string[];
 	port: number | false | null;
 	searchCadence: number;
-	rssCadence: number;
-	snatchTimeout: number;
-	searchTimeout: number;
+	rssCadence?: number;
+	snatchTimeout?: number;
+	searchTimeout?: number;
 	searchLimit: number;
 	apiAuth: boolean;
 }

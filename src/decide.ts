@@ -208,7 +208,7 @@ async function assessAndSaveResults(
 		assessment.decision === Decision.MATCH ||
 		assessment.decision === Decision.MATCH_SIZE_ONLY
 	) {
-		cacheTorrentFile(assessment.metafile);
+		cacheTorrentFile(assessment.metafile!);
 	}
 
 	await db.transaction(async (trx) => {
@@ -224,7 +224,7 @@ async function assessAndSaveResults(
 			info_hash:
 				assessment.decision === Decision.MATCH ||
 				assessment.decision === Decision.MATCH_SIZE_ONLY
-					? assessment.metafile.infoHash
+					? assessment.metafile!.infoHash
 					: null,
 			last_seen: now,
 			first_seen: now,

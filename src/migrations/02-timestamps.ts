@@ -2,7 +2,9 @@ import Knex from "knex";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 
 function sanitizeUrl(url: string | URL): string {
-	url = new URL(url);
+	if (typeof url === "string") {
+		url = new URL(url);
+	}
 	return url.origin + url.pathname;
 }
 
