@@ -99,7 +99,7 @@ export default class Deluge implements TorrentClient {
 			);
 			const connectResponse = await this.call<undefined>(
 				"web.connect",
-				[webuiHostList.result[0][0]],
+				[webuiHostList.result![0][0]],
 				0
 			);
 			if (!connectResponse.error) {
@@ -139,13 +139,12 @@ export default class Deluge implements TorrentClient {
 				headers,
 			});
 		} catch (networkError) {
-			// @ts-expect-error needs es2022 target (tsconfig)
 			throw new Error(`Failed to connect to Deluge at ${href}`, {
 				cause: networkError,
 			});
 		}
 		try {
-			json = await response.json();
+			json = (await response.json()) as DelugeJSON<ResultType>;
 		} catch (jsonParseError) {
 			throw new Error(
 				`Deluge method ${method} response was non-JSON ${jsonParseError}`
@@ -171,7 +170,7 @@ export default class Deluge implements TorrentClient {
 	 */
 	private handleResponseHeaders(headers: Headers) {
 		if (headers.has("Set-Cookie")) {
-			this.delugeCookie = headers.get("Set-Cookie").split(";")[0];
+			this.delugeCookie = headers.get("Set-Cookie")!.split(";")[0];
 		}
 	}
 
@@ -186,7 +185,7 @@ export default class Deluge implements TorrentClient {
 		);
 		return enabledPlugins.error
 			? false
-			: enabledPlugins.result.includes("Label");
+			: enabledPlugins.result!.includes("Label");
 	}
 
 	/**
@@ -215,16 +214,15 @@ export default class Deluge implements TorrentClient {
 		path?: string
 	): Promise<InjectionResult> {
 		try {
-			let torrentInfo: TorrentInfo;
 			const { duplicateCategories } = getRuntimeConfig();
-
+			let torrentInfo: TorrentInfo;
 			if (searchee.infoHash) {
 				torrentInfo = await this.getTorrentInfo(searchee);
 				if (!torrentInfo.complete) {
 					return InjectionResult.TORRENT_NOT_COMPLETE;
 				}
 			}
-			if (!path && (!searchee.infoHash || !torrentInfo)) {
+			if (!path && (!searchee.infoHash || !torrentInfo!)) {
 				logger.debug({
 					label: Label.DELUGE,
 					message: `Injection failure: ${newTorrent.name} was missing critical data.`,
@@ -235,7 +233,7 @@ export default class Deluge implements TorrentClient {
 			const params = this.formatData(
 				`${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`,
 				newTorrent.encode().toString("base64"),
-				path ? path : torrentInfo.save_path,
+				path ? path : torrentInfo!.save_path,
 				!!searchee.infoHash
 			);
 			const addResult = await this.call<string>(
@@ -248,21 +246,21 @@ export default class Deluge implements TorrentClient {
 					newTorrent.infoHash,
 					searchee.path
 						? dataCategory
-						: torrentInfo.label
+						: torrentInfo!.label
 						? duplicateCategories
-							? torrentInfo.label.endsWith(".cross-seed")
-								? torrentInfo.label
-								: `${torrentInfo.label}.cross-seed`
-							: torrentInfo.label
+							? torrentInfo!.label.endsWith(".cross-seed")
+								? torrentInfo!.label
+								: `${torrentInfo!.label}.cross-seed`
+							: torrentInfo!.label
 						: this.delugeLabel
 				);
 				return InjectionResult.SUCCESS;
-			} else if (addResult.error.message.includes("already")) {
+			} else if (addResult.error!.message!.includes("already")) {
 				return InjectionResult.ALREADY_EXISTS;
-			} else if (addResult.error.message) {
+			} else if (addResult.error!.message) {
 				logger.debug({
 					label: Label.DELUGE,
-					message: `Injection failed: ${addResult.error.message}`,
+					message: `Injection failed: ${addResult.error!.message}`,
 				});
 				return InjectionResult.FAILURE;
 			} else {
@@ -330,8 +328,8 @@ export default class Deluge implements TorrentClient {
 				params
 			);
 
-			if (response.result.torrents) {
-				torrent = response.result.torrents?.[searchee.infoHash];
+			if (response.result!.torrents) {
+				torrent = response.result!.torrents?.[searchee.infoHash];
 			} else {
 				throw new Error(
 					"Client returned unexpected response (object missing)"
@@ -346,7 +344,7 @@ export default class Deluge implements TorrentClient {
 			const completedTorrent =
 				torrent.state === "Seeding" || torrent.progress === 100;
 			const torrentLabel =
-				this.isLabelEnabled && torrent.label.length != 0
+				this.isLabelEnabled && torrent.label!.length != 0
 					? torrent.label
 					: undefined;
 
@@ -361,7 +359,6 @@ export default class Deluge implements TorrentClient {
 				message: `Failed to fetch torrent data: ${searchee.name} - (${searchee.infoHash})`,
 			});
 			logger.debug(e);
-			// @ts-expect-error needs es2022 target (tsconfig)
 			throw new Error("web.update_ui: failed to fetch data from client", {
 				cause: e,
 			});

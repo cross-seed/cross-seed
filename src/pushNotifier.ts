@@ -82,7 +82,7 @@ export function sendResultsNotification(
 	if (notableSuccesses.length) {
 		const numTrackers = notableSuccesses.length;
 		const infoHashes = notableSuccesses.map(
-			([assessment]) => assessment.metafile.infoHash
+			([assessment]) => assessment.metafile!.infoHash
 		);
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
 		const trackersListStr = formatAsList(trackers);
@@ -106,7 +106,7 @@ export function sendResultsNotification(
 	if (failures.length) {
 		const numTrackers = failures.length;
 		const infoHashes = failures.map(
-			([assessment]) => assessment.metafile.infoHash
+			([assessment]) => assessment.metafile!.infoHash
 		);
 		const trackers = failures.map(([, tracker]) => tracker);
 		const trackersListStr = formatAsList(trackers);
