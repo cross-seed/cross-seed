@@ -69,6 +69,11 @@ export const tap = (fn) => (value) => {
 	return value;
 };
 
+type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
+
+export function isTruthy<T>(value: T): value is Truthy<T> {
+	return Boolean(value);
+}
 export async function filterAsync(arr, predicate) {
 	const results = await Promise.all(arr.map(predicate));
 

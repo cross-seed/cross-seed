@@ -39,7 +39,7 @@ import {
 	TorrentLocator,
 } from "./torrent.js";
 import { queryRssFeeds, searchTorznab } from "./torznab.js";
-import { filterAsync, stripExtension } from "./utils.js";
+import { filterAsync, isTruthy, stripExtension } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -114,8 +114,8 @@ async function findOnOtherSites(
 		(acc, cur, idx) => {
 			const candidate = results[idx];
 			if (cur.assessment.decision === Decision.RATE_LIMITED) {
-				acc.rateLimited.add(candidate.indexerId);
-				acc.notRateLimited.delete(candidate.indexerId);
+				acc.rateLimited.add(candidate.indexerId!);
+				acc.notRateLimited.delete(candidate.indexerId!);
 			}
 			return acc;
 		},
@@ -188,7 +188,7 @@ async function findMatchesBatch(
 
 export async function searchForLocalTorrentByCriteria(
 	criteria: TorrentLocator
-): Promise<number> {
+): Promise<number | null> {
 	const { maxDataDepth } = getRuntimeConfig();
 
 	let searchees: Searchee[];
@@ -250,7 +250,7 @@ export async function checkNewCandidateMatch(
 		return null;
 
 	const result = await performAction(
-		assessment.metafile,
+		assessment.metafile!,
 		assessment.decision,
 		searchee,
 		candidate.tracker
@@ -289,7 +289,9 @@ async function findSearchableTorrents() {
 		}
 	}
 
-	const hashesToExclude = allSearchees.map((t) => t.infoHash).filter(Boolean);
+	const hashesToExclude = allSearchees
+		.map((t) => t.infoHash)
+		.filter(isTruthy);
 	let filteredTorrents = await filterAsync(
 		filterDupes(allSearchees).filter(filterByContent),
 		filterTimestamps
