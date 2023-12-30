@@ -87,7 +87,7 @@ export function formatAsList(strings: string[]) {
 	}).format(strings.sort((a, b) => a.localeCompare(b)));
 }
 
-export function fallback<T>(...args: T[]): T {
+export function fallback<T>(...args: T[]): T | undefined {
 	for (const arg of args) {
 		if (arg !== undefined) return arg;
 	}

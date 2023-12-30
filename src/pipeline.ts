@@ -217,7 +217,7 @@ export async function searchForLocalTorrentByCriteria(
 
 export async function checkNewCandidateMatch(
 	candidate: Candidate
-): Promise<InjectionResult | SaveResult> {
+): Promise<InjectionResult | SaveResult | null> {
 	const meta = await getTorrentByFuzzyName(candidate.name);
 	if (meta === null) {
 		logger.verbose({

@@ -144,7 +144,7 @@ export default class Deluge implements TorrentClient {
 			});
 		}
 		try {
-			json = await response.json();
+			json = (await response.json()) as DelugeResponse;
 		} catch (jsonParseError) {
 			throw new Error(
 				`Deluge method ${method} response was non-JSON ${jsonParseError}`

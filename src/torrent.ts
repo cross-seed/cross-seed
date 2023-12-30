@@ -206,13 +206,15 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 export async function getTorrentByFuzzyName(
 	name: string
 ): Promise<null | Metafile> {
-	const allNames = await db("torrent").select("name", "file_path");
+	const allNames: { name: string; file_path: string }[] = await db(
+		"torrent"
+	).select("name", "file_path");
 	const fullMatch = reformatTitleForSearching(name)
 		.replace(/[^a-z0-9]/gi, "")
 		.toLowerCase();
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
-	let filteredNames = [];
+	let filteredNames: typeof allNames = [];
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
 			const dbMatch = reformatTitleForSearching(dbName.name)
