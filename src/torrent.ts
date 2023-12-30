@@ -39,7 +39,7 @@ function isMagnetRedirectError(error: Error): boolean {
 		// node-fetch
 		error.message.includes('URL scheme "magnet" is not supported.') ||
 		// undici
-		error?.cause.message.includes("URL scheme must be a HTTP(S) scheme")
+		error.cause?.message.includes("URL scheme must be a HTTP(S) scheme")
 	);
 }
 
