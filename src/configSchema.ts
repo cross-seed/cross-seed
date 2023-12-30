@@ -4,16 +4,45 @@ import { logger } from "./logger.js";
 import ms from "ms";
 
 /**
- * error messages returned upon Zod validation failure
+ * error messages and map returned upon Zod validation failure
  */
 enum zodErrorMsg {
 	vercel = "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
 	emptyString = "cannot have an empty string",
 	delay = "delay is in seconds, you can't travel back in time.",
-	fuzzySizeThreshold = "fuzzySizeThreshold must be a decimal percentage",
+	fuzzySizeThreshold = "fuzzySizeThreshold must be between 0 and 1",
 	injectUrl = "You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	dataBased = "Data-Based Matching requires linkType, dataDirs, and linkDir to be defined",
 	riskyRecheckWarn = "It is strongly recommended to not skip rechecking for risky matching mode",
+}
+export const ZOD_ERROR_MAP: z.ZodErrorMap = (error, ctx) => {
+	switch (error.code) {
+		case z.ZodIssueCode.invalid_union:
+			return {
+				message: error.unionErrors
+					.reduce((acc, error) => {
+						error.errors.forEach((x) => acc.push(x.message));
+						return acc;
+					}, [])
+					.join("; "),
+			};
+	}
+
+	return { message: ctx.defaultError };
+};
+/**
+ * helper functions for validation
+ */
+
+function transformDurationString(durationStr: string, ctx) {
+	const duration = ms(durationStr);
+	if (isNaN(duration)) {
+		ctx.addIssue({
+			code: "custom",
+			message: zodErrorMsg.vercel,
+		});
+	}
+	return duration;
 }
 
 /**
@@ -48,30 +77,12 @@ export const VALIDATION_SCHEMA = z
 		excludeOlder: z
 			.string()
 			.min(1, { message: zodErrorMsg.emptyString })
-			.transform((time, ctx) => {
-				const vercel = ms(time);
-				if (isNaN(vercel)) {
-					ctx.addIssue({
-						code: "custom",
-						message: zodErrorMsg.vercel,
-					});
-				}
-				return vercel;
-			})
+			.transform(transformDurationString)
 			.nullish(),
 		excludeRecentSearch: z
 			.string()
 			.min(1, { message: zodErrorMsg.emptyString })
-			.transform((time, ctx) => {
-				const vercel = ms(time);
-				if (isNaN(vercel)) {
-					ctx.addIssue({
-						code: "custom",
-						message: zodErrorMsg.vercel,
-					});
-				}
-				return vercel;
-			})
+			.transform(transformDurationString)
 			.nullish(),
 		action: z.nativeEnum(Action),
 		qbittorrentUrl: z.string().url().nullish(),
@@ -89,58 +100,22 @@ export const VALIDATION_SCHEMA = z
 		rssCadence: z
 			.string()
 			.min(1, { message: zodErrorMsg.emptyString })
-			.transform((time, ctx) => {
-				const vercel = ms(time);
-				if (isNaN(vercel)) {
-					ctx.addIssue({
-						code: "custom",
-						message: zodErrorMsg.vercel,
-					});
-				}
-				return vercel;
-			})
+			.transform(transformDurationString)
 			.nullish(),
 		searchCadence: z
 			.string()
 			.min(1, { message: zodErrorMsg.emptyString })
-			.transform((time, ctx) => {
-				const vercel = ms(time);
-				if (isNaN(vercel)) {
-					ctx.addIssue({
-						code: "custom",
-						message: zodErrorMsg.vercel,
-					});
-				}
-				return vercel;
-			})
+			.transform(transformDurationString)
 			.nullish(),
 		snatchTimeout: z
 			.string()
 			.min(1, { message: zodErrorMsg.emptyString })
-			.transform((time, ctx) => {
-				const vercel = ms(time);
-				if (isNaN(vercel)) {
-					ctx.addIssue({
-						code: "custom",
-						message: zodErrorMsg.vercel,
-					});
-				}
-				return vercel;
-			})
+			.transform(transformDurationString)
 			.nullish(),
 		searchTimeout: z
 			.string()
 			.min(1, { message: zodErrorMsg.emptyString })
-			.transform((time, ctx) => {
-				const vercel = ms(time);
-				if (isNaN(vercel)) {
-					ctx.addIssue({
-						code: "custom",
-						message: zodErrorMsg.vercel,
-					});
-				}
-				return vercel;
-			})
+			.transform(transformDurationString)
 			.nullish(),
 		searchLimit: z.number().positive().nullish(),
 		apiAuth: z.boolean().default(false),

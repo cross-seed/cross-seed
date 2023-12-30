@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { Option, program } from "commander";
 import { inspect } from "util";
 import { getApiKeyFromDatabase, resetApiKey } from "./auth.js";
+import { VALIDATION_SCHEMA, ZOD_ERROR_MAP } from "./configSchema.js";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import {
 	Action,
@@ -10,7 +11,6 @@ import {
 	MatchMode,
 	PROGRAM_NAME,
 	PROGRAM_VERSION,
-	ZOD_ERROR_MAP,
 } from "./constants.js";
 import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
@@ -29,9 +29,46 @@ import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { fallback } from "./utils.js";
-import { VALIDATION_SCHEMA } from "./zod.js";
 
 const fileConfig = await getFileConfig();
+
+/**
+ * validates and sets RuntimeConfig
+ */
+
+export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
+	setRuntimeConfig(options);
+	initializeLogger();
+	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
+	logger.info("Validating your configuration...");
+	try {
+		options = VALIDATION_SCHEMA.parse(await getFileConfig(), {
+			errorMap: ZOD_ERROR_MAP,
+		}) as RuntimeConfig;
+	} catch (error) {
+		error.errors.forEach(({ path, message }) => {
+			const urlPath = path.toString().toLowerCase();
+			logger.error(
+				`\tOption:\t"${path}"\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${urlPath})\n`
+			);
+		});
+		throw new CrossSeedError(
+			`Your configuration is invalid, please see the ${
+				error.errors.length > 1 ? "errors" : "error"
+			} above for details.`
+		);
+	}
+	setRuntimeConfig(options);
+	logger.verbose({
+		label: Label.CONFIGDUMP,
+		message: inspect(options),
+	});
+	initializePushNotifier();
+}
+
+/**
+ * parsing and processing of CLI and config file
+ */
 
 function createCommandWithSharedOptions(name, description) {
 	return program
@@ -305,38 +342,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	)
 	.action(async (options) => {
 		try {
-			let runtimeConfig: RuntimeConfig = options;
-			setRuntimeConfig(runtimeConfig);
-			initializeLogger();
-			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
-			logger.info("Validating your configuration...");
-			try {
-				runtimeConfig = VALIDATION_SCHEMA.parse(await getFileConfig(), {
-					errorMap: ZOD_ERROR_MAP,
-				}) as RuntimeConfig;
-			} catch (error) {
-				error.errors.forEach(({ path, message }) => {
-					const url_path = path.toString().toLowerCase();
-					logger.error(
-						`Option: "${path}"\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${
-							url_path.includes("fuzzy")
-								? "fuzzysizethreshold-experimental"
-								: url_path
-						})\n`
-					);
-				});
-				throw new CrossSeedError(
-					`Your configuration is invalid, please see the ${
-						error.errors.length > 1 ? "errors" : "error"
-					} above for details.`
-				);
-			}
-			setRuntimeConfig(runtimeConfig);
-			logger.verbose({
-				label: Label.CONFIGDUMP,
-				message: inspect(runtimeConfig),
-			});
-			initializePushNotifier();
+			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
 			serve(options.port, options.host);
@@ -350,38 +356,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 createCommandWithSharedOptions("rss", "Run an rss scan").action(
 	async (options) => {
 		try {
-			let runtimeConfig: RuntimeConfig = options;
-			setRuntimeConfig(runtimeConfig);
-			initializeLogger();
-			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
-			logger.info("Validating your configuration...");
-			try {
-				runtimeConfig = VALIDATION_SCHEMA.parse(await getFileConfig(), {
-					errorMap: ZOD_ERROR_MAP,
-				}) as RuntimeConfig;
-			} catch (error) {
-				error.errors.forEach(({ path, message }) => {
-					const url_path = path.toString().toLowerCase();
-					logger.error(
-						`Option: "${path}"\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${
-							url_path.includes("fuzzy")
-								? "fuzzysizethreshold-experimental"
-								: url_path
-						})\n`
-					);
-				});
-				throw new CrossSeedError(
-					`Your configuration is invalid, please see the ${
-						error.errors.length > 1 ? "errors" : "error"
-					} above for details.`
-				);
-			}
-			setRuntimeConfig(runtimeConfig);
-			logger.verbose({
-				label: Label.CONFIGDUMP,
-				message: inspect(runtimeConfig),
-			});
-			initializePushNotifier();
+			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
 			await scanRssFeeds();
@@ -402,38 +377,7 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 	)
 	.action(async (options) => {
 		try {
-			let runtimeConfig: RuntimeConfig = options;
-			setRuntimeConfig(runtimeConfig);
-			initializeLogger();
-			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
-			logger.info("Validating your configuration...");
-			try {
-				runtimeConfig = VALIDATION_SCHEMA.parse(await getFileConfig(), {
-					errorMap: ZOD_ERROR_MAP,
-				}) as RuntimeConfig;
-			} catch (error) {
-				error.errors.forEach(({ path, message }) => {
-					const url_path = path.toString().toLowerCase();
-					logger.error(
-						`Option: "${path}"\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${
-							url_path.includes("fuzzy")
-								? "fuzzysizethreshold-experimental"
-								: url_path
-						})\n`
-					);
-				});
-				throw new CrossSeedError(
-					`Your configuration is invalid, please see the ${
-						error.errors.length > 1 ? "errors" : "error"
-					} above for details.`
-				);
-			}
-			setRuntimeConfig(runtimeConfig);
-			logger.verbose({
-				label: Label.CONFIGDUMP,
-				message: inspect(runtimeConfig),
-			});
-			initializePushNotifier();
+			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
 			await main();

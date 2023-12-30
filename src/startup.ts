@@ -26,26 +26,26 @@ function checkConfigPaths() {
 
 	if (!existsSync(torrentDir)) {
 		throw new Error(
-			"'torrentDir' is not a valid directory on the filesystem."
+			`Your torrentDir <${torrentDir}> is not a valid directory on the filesystem.`
 		);
 	}
 
 	if (action == Action.SAVE && !existsSync(outputDir)) {
 		throw new Error(
-			"'outputDir' is not a valid directory on the filesystem."
+			`Your outputDir <${outputDir}> is not a valid directory on the filesystem.`
 		);
 	}
 
 	if (linkDir && !existsSync(linkDir)) {
 		throw new Error(
-			"'linkDir' is not a valid directory on the filesystem."
+			`Your linkDir <${linkDir}> is not a valid directory on the filesystem.`
 		);
 	}
 	if (dataDirs) {
 		for (const dataDir of dataDirs) {
 			if (!existsSync(dataDir)) {
 				throw new Error(
-					`'dataDirs' path '${dataDir}' is not a valid directory on the filesystem.`
+					`Your dataDirs path <${dataDir}> is not a valid directory on the filesystem.`
 				);
 			}
 		}
