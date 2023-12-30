@@ -24,6 +24,7 @@ import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
 import { CrossSeedError } from "./errors.js";
+import { Result } from "./Result.js";
 
 export async function validateAction(): Promise<void> {
 	const { action } = getRuntimeConfig();
@@ -43,36 +44,49 @@ export async function performAction(
 	const { action, linkDir } = getRuntimeConfig();
 	const trackerLinkDir = linkDir ? join(linkDir, tracker) : undefined;
 	if (trackerLinkDir) {
-		mkdirSync(trackerLinkDir, {
-			recursive: true,
-		});
+		const downloadDir: Result<
+			string,
+			"NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "NETWORK_ERROR"
+		> = await getClient().getDownloadDir(searchee);
+		if (downloadDir.isOk) {
+			mkdirSync(trackerLinkDir, {
+				recursive: true,
+			});
 
 			if (decision == Decision.MATCH) {
-			linkExact(
-				searchee.infoHash
-					? await getClient().getDownloadDir(searchee)
-					: searchee.path,
-				trackerLinkDir
-			);
-		} else if (decision == Decision.MATCH_SIZE_ONLY) {
-			// Size only matching is only supported for single file or
-			// single, nested file torrents.
-			const candidateParentDir = dirname(newMeta.files[0].path);
-			let correctedlinkDir = trackerLinkDir;
+				linkExact(
+					searchee.infoHash
+						? downloadDir.unwrapOrThrow(
+								// potentially needs better error messaging?
+								new Error("LINKING_FAILURE")
+						  )
+						: searchee.path,
+					trackerLinkDir
+				);
+			} else if (decision == Decision.MATCH_SIZE_ONLY) {
+				// Size only matching is only supported for single file or
+				// single, nested file torrents.
+				const candidateParentDir = dirname(newMeta.files[0].path);
+				let correctedlinkDir = trackerLinkDir;
 
 				// Candidate is single, nested file
 				if (candidateParentDir !== ".") {
 					correctedlinkDir = join(trackerLinkDir, candidateParentDir);
-				mkdirSync(correctedlinkDir, {
-					recursive: true,
-				});
+					mkdirSync(correctedlinkDir, {
+						recursive: true,
+					});
+				}
+				linkFile(
+					searchee.infoHash
+						? downloadDir.unwrapOrThrow(
+								// potentially needs better error messaging?
+								new Error("LINKING_FAILURE")
+						  )
+						: searchee.path,
+
+					join(correctedlinkDir, newMeta.files[0].name)
+				);
 			}
-			linkFile(
-				searchee.infoHash
-					? await getClient().getDownloadDir(searchee)
-					: searchee.path,
-				join(correctedlinkDir, newMeta.files[0].name)
-			);}
 		}
 	}
 

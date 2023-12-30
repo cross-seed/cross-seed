@@ -7,6 +7,7 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
+import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
 
 const X_WWW_FORM_URLENCODED = {
@@ -216,25 +217,28 @@ export default class QBittorrent implements TorrentClient {
 			return false;
 		}
 	}
-	async getDownloadDir(searchee: Searchee): Promise<string> {
-		if (await this.isInfoHashInClient(searchee.infoHash)) {
-			const responseText = await this.request(
-				"/torrents/info",
-				`hashes=${searchee.infoHash}`,
-				X_WWW_FORM_URLENCODED
-			);
-			const searchResult = JSON.parse(responseText).find(
-				(e) => e.hash === searchee.infoHash
-			) as TorrentInfo;
-			if (searchResult === undefined) {
-				throw new Error(
-					"Failed to retrieve data dir; torrent not found in client"
-				);
+	async getDownloadDir(
+		searchee: Searchee
+	): Promise<
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "NETWORK_ERROR">
+	> {
+		let torrentInfo: TorrentConfiguration;
+		try {
+			if (await this.isInfoHashInClient(searchee.infoHash)) {
+				torrentInfo = await this.getTorrentConfiguration(searchee);
+				if (torrentInfo.save_path === undefined) {
+					return resultOfErr("NOT_FOUND");
+				}
 			}
-
-			return searchResult.save_path;
+		} catch (e) {
+			if (e.includes("retrieve")) {
+				return resultOfErr("NOT_FOUND");
+			}
+			return resultOfErr("NETWORK_ERROR");
 		}
+		return resultOf(torrentInfo.save_path);
 	}
+
 	async getTorrentConfiguration(
 		searchee: Searchee
 	): Promise<TorrentConfiguration> {
