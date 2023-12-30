@@ -8,7 +8,7 @@ import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { File, Searchee } from "../searchee.js";
+import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { extractCredentialsFromUrl, wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
@@ -142,7 +142,7 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	private async checkOriginalTorrent(
-		searchee: Searchee
+		searchee: SearcheeWithInfoHash
 	): Promise<
 		Result<
 			{ directoryBase: string },
@@ -201,7 +201,9 @@ export default class RTorrent implements TorrentClient {
 			const directoryBase = meta.isSingleFileTorrent ? path : basePath;
 			return resultOf({ downloadDir: path, basePath, directoryBase });
 		} else {
-			const result = await this.checkOriginalTorrent(searchee);
+			const result = await this.checkOriginalTorrent(
+				searchee as SearcheeWithInfoHash
+			);
 			return result.mapOk(({ directoryBase }) => ({
 				directoryBase,
 				downloadDir: meta.isSingleFileTorrent

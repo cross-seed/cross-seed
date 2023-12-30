@@ -35,13 +35,13 @@ class Job {
 	}
 }
 
-const getJobs = () => {
+function getJobs(): Job[] {
 	const { rssCadence, searchCadence } = getRuntimeConfig();
-	return [
-		rssCadence && new Job("rss", rssCadence, scanRssFeeds),
-		searchCadence && new Job("search", searchCadence, main),
-	].filter(Boolean);
-};
+	const jobs: Job[] = [];
+	if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
+	if (searchCadence) jobs.push(new Job("search", searchCadence, main));
+	return jobs;
+}
 
 function logNextRun(
 	name: string,

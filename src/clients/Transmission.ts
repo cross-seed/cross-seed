@@ -5,7 +5,7 @@ import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee } from "../searchee.js";
+import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
@@ -73,7 +73,7 @@ export default class Transmission implements TorrentClient {
 		if (response.status === 409) {
 			this.xTransmissionSessionId = response.headers.get(
 				XTransmissionSessionId
-			);
+			)!;
 			return this.request(method, args, retries - 1);
 		}
 		try {
@@ -121,7 +121,7 @@ export default class Transmission implements TorrentClient {
 	}
 
 	async checkOriginalTorrent(
-		searchee: Searchee
+		searchee: SearcheeWithInfoHash
 	): Promise<
 		Result<
 			{ downloadDir: string },
@@ -163,7 +163,9 @@ export default class Transmission implements TorrentClient {
 		if (path) {
 			downloadDir = path;
 		} else {
-			const result = await this.checkOriginalTorrent(searchee);
+			const result = await this.checkOriginalTorrent(
+				searchee as SearcheeWithInfoHash
+			);
 			if (result.isErr()) {
 				return result.unwrapErrOrThrow();
 			}

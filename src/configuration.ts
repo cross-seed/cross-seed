@@ -53,8 +53,8 @@ export function appDir(): string {
 	return (
 		process.env.CONFIG_DIR ||
 		(process.platform === "win32"
-			? path.resolve(process.env.LOCALAPPDATA, packageDotJson.name)
-			: path.resolve(process.env.HOME, `.${packageDotJson.name}`))
+			? path.resolve(process.env.LOCALAPPDATA!, packageDotJson.name)
+			: path.resolve(process.env.HOME!, `.${packageDotJson.name}`))
 	);
 }
 

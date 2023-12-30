@@ -4,6 +4,7 @@ import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { parseTorrentFromFilename } from "./torrent.js";
+import { WithRequired } from "./utils.js";
 
 export interface File {
 	length: number;
@@ -17,6 +18,14 @@ export interface Searchee {
 	files: File[];
 	name: string;
 	length: number;
+}
+
+export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
+
+export function hasInfoHash(
+	searchee: Searchee
+): searchee is SearcheeWithInfoHash {
+	return searchee.infoHash != null;
 }
 
 function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {
