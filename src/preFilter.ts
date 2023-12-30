@@ -75,10 +75,15 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 	return filtered;
 }
 
+type TimestampDataSql = {
+	first_searched_any: number;
+	last_searched_all: number;
+};
+
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const enabledIndexers = await getEnabledIndexers();
-	const timestampDataSql = await db("searchee")
+	const timestampDataSql: TimestampDataSql = (await db("searchee")
 		// @ts-expect-error crossJoin supports string
 		.crossJoin("indexer")
 		.leftOuterJoin("timestamp", {
@@ -98,7 +103,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		.min({
 			last_searched_all: db.raw("coalesce(timestamp.last_searched, 0)"),
 		})
-		.first();
+		.first()) as TimestampDataSql;
 
 	const { first_searched_any, last_searched_all } = timestampDataSql;
 	function logReason(reason) {
