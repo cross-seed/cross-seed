@@ -14,6 +14,14 @@ export enum MediaType {
 	OTHER = "unknown",
 }
 
+type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
+
+export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };
+
+export function isTruthy<T>(value: T): value is Truthy<T> {
+	return Boolean(value);
+}
+
 export function stripExtension(filename: string): string {
 	for (const ext of VIDEO_EXTENSIONS) {
 		if (filename.endsWith(ext)) return basename(filename, ext);
@@ -69,11 +77,6 @@ export const tap = (fn) => (value) => {
 	return value;
 };
 
-type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
-
-export function isTruthy<T>(value: T): value is Truthy<T> {
-	return Boolean(value);
-}
 export async function filterAsync(arr, predicate) {
 	const results = await Promise.all(arr.map(predicate));
 

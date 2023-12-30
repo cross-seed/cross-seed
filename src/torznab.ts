@@ -66,7 +66,9 @@ interface TorznabResult {
 type TorznabResults = { rss?: { channel?: [] | [{ item?: TorznabResult[] }] } };
 
 function sanitizeUrl(url: string | URL): string {
-	url = new URL(url);
+	if (typeof url === "string") {
+		url = new URL(url);
+	}
 	return url.origin + url.pathname;
 }
 
