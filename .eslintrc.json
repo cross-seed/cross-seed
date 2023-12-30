@@ -15,6 +15,7 @@
 		"ecmaVersion": 2022
 	},
 	"rules": {
+		"no-mixed-spaces-and-tabs": "off",
 		"@typescript-eslint/no-var-requires": "off"
 	}
 }
