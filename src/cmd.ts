@@ -37,7 +37,7 @@ const fileConfig = await getFileConfig();
  */
 
 export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
-	let zodErrorCount: number;
+	let zodErrorCount = 0;
 	options.configValid = true;
 	setRuntimeConfig(options);
 	initializeLogger();
