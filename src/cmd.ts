@@ -39,8 +39,7 @@ const fileConfig = await getFileConfig();
 export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 	let zodErrorCount = 0;
 	options.configValid = true;
-	setRuntimeConfig(options);
-	initializeLogger();
+	initializeLogger(false /* verbose = false */);
 	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
 	logger.info("Validating your configuration...");
 	try {
@@ -271,7 +270,7 @@ program
 	)
 	.action((options) => {
 		setRuntimeConfig(options);
-		initializeLogger();
+		initializeLogger(false /* verbose = false */);
 		initializePushNotifier();
 		sendTestNotification();
 	});

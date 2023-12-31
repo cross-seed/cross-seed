@@ -72,7 +72,7 @@ export function logOnce(cacheKey: string, cb: () => void) {
 	}
 }
 
-export function initializeLogger(): void {
+export function initializeLogger(verbose: boolean): void {
 	createAppDir();
 	logger = winston.createLogger({
 		level: "info",
@@ -114,7 +114,7 @@ export function initializeLogger(): void {
 				level: "silly",
 			}),
 			new winston.transports.Console({
-				level: getRuntimeConfig().verbose ? "silly" : "info",
+				level: verbose ? "silly" : "info",
 				format: winston.format.combine(
 					winston.format.errors({ stack: true }),
 					winston.format.splat(),
