@@ -1,5 +1,4 @@
 import ms from "ms";
-import fetch from "node-fetch";
 import xml2js from "xml2js";
 import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";

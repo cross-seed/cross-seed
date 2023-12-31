@@ -1,4 +1,3 @@
-import fetch from "node-fetch";
 import { ActionResult, InjectionResult, SaveResult } from "./constants.js";
 import { ResultAssessment } from "./decide.js";
 import { Label, logger } from "./logger.js";

@@ -6,7 +6,6 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { extractCredentialsFromUrl } from "../utils.js";
-import fetch, { Headers, Response } from "node-fetch";
 
 interface TorrentInfo {
 	complete?: boolean;
