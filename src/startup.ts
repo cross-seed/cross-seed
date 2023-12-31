@@ -8,44 +8,83 @@ import {
 	getRuntimeConfig,
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
-import { existsSync } from "fs";
 import { inspect } from "util";
+import { stat, access } from "fs/promises";
+import { constants } from "fs";
+
+/**
+ * validates existence, permission, and that a path is a directory
+ * @param path string of path to validate
+ * @param optionName name of the configuration key
+ * @returns true if path exists and has required permission
+ */
+async function verifyPath(
+	path: string,
+	optionName: string,
+	permissions: number
+): Promise<boolean> {
+	try {
+		if ((await stat(path)).isDirectory()) {
+			switch (optionName) {
+				case "torrentDir":
+				case "dataDirs": {
+					await access(path, permissions);
+					return true;
+				}
+				case "outputDir":
+				case "linkDir": {
+					await access(path, permissions);
+					return true;
+				}
+			}
+		}
+	} catch (error) {
+		if (error.code === "ENOENT") {
+			logger.error(
+				`\tYour ${optionName} "${path}" is not a valid directory on the filesystem.\n`
+			);
+		} else {
+			logger.error(
+				`\tYour ${optionName} "${path}" has invalid permissions.`
+			);
+		}
+	}
+	return false;
+}
 
 /**
  * verifies the config paths provided against the filesystem
  * @returns true (if paths are valid)
  */
-function checkConfigPaths(): void {
+async function checkConfigPaths(): Promise<void> {
 	const { action, linkDir, dataDirs, torrentDir, outputDir } =
 		getRuntimeConfig();
 	let pathFailure: number = 0;
 
-	if (!existsSync(torrentDir)) {
-		logger.error(
-			`\tYour torrentDir "${torrentDir}" is not a valid directory on the filesystem.\n`
-		);
+	if (!(await verifyPath(torrentDir, "torrentDir", constants.R_OK))) {
 		pathFailure++;
 	}
 
-	if (action == Action.SAVE && !existsSync(outputDir)) {
-		logger.error(
-			`\tYour outputDir path "${outputDir}" is not a valid directory on the filesystem.\n`
-		);
+	if (
+		action == Action.SAVE &&
+		!(await verifyPath(
+			outputDir,
+			"outputDir",
+			constants.R_OK | constants.W_OK
+		))
+	) {
 		pathFailure++;
 	}
 
-	if (linkDir && !existsSync(linkDir)) {
-		logger.error(
-			`\tYour linkDir path "${linkDir}" is not a valid directory on the filesystem.\n`
-		);
+	if (
+		linkDir &&
+		!(await verifyPath(linkDir, "linkDir", constants.R_OK | constants.W_OK))
+	) {
 		pathFailure++;
 	}
 	if (dataDirs) {
 		for (const dataDir of dataDirs) {
-			if (!existsSync(dataDir)) {
-				logger.error(
-					`\tYour dataDirs path "${dataDir}" is not a valid directory on the filesystem.\n`
-				);
+			if (!(await verifyPath(dataDir, "dataDirs", constants.R_OK))) {
 				pathFailure++;
 			}
 		}
@@ -61,7 +100,7 @@ function checkConfigPaths(): void {
 
 export async function doStartupValidation(): Promise<void> {
 	const runtimeConfig: RuntimeConfig = getRuntimeConfig();
-	checkConfigPaths();
+	await checkConfigPaths();
 	setRuntimeConfig(runtimeConfig);
 
 	const downloadClient = getClient();
