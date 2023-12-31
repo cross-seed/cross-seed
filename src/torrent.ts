@@ -1,6 +1,5 @@
 import fs, { promises as fsPromises } from "fs";
 import Fuse from "fuse.js";
-import fetch, { Response } from "node-fetch";
 import path, { join } from "path";
 import { inspect } from "util";
 import { USER_AGENT } from "./constants.js";
