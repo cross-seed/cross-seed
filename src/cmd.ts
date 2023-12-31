@@ -2,7 +2,7 @@
 import chalk from "chalk";
 import { Option, program } from "commander";
 import { getApiKeyFromDatabase, resetApiKey } from "./auth.js";
-import { VALIDATION_SCHEMA, ZOD_ERROR_MAP } from "./configSchema.js";
+import { VALIDATION_SCHEMA, zodErrorMap } from "./configSchema.js";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import {
 	Action,
@@ -45,7 +45,7 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 	logger.info("Validating your configuration...");
 	try {
 		options = VALIDATION_SCHEMA.parse(await getFileConfig(), {
-			errorMap: ZOD_ERROR_MAP,
+			errorMap: zodErrorMap,
 		}) as RuntimeConfig;
 	} catch (error) {
 		options.configValid = false;

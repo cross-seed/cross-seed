@@ -6,22 +6,27 @@ import ms from "ms";
 /**
  * error messages and map returned upon Zod validation failure
  */
-enum zodErrorMsg {
-	vercel = "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
-	emptyString = "cannot have an empty string",
-	delay = "delay is in seconds, you can't travel back in time.",
-	fuzzySizeThreshold = "fuzzySizeThreshold must be between 0 and 1",
-	injectUrl = "You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
-	dataBased = "Data-Based Matching requires linkType, dataDirs, and linkDir to be defined",
-	riskyRecheckWarn = "It is strongly recommended to not skip rechecking for risky matching mode",
-}
+const ZodErrorMessages = {
+	vercel: "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
+	emptyString:
+		"cannot have an empty string. If you want to unset it, use null",
+	delay: "delay is in seconds, you can't travel back in time.",
+	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1",
+	injectUrl:
+		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
+	dataBased:
+		"Data-Based Matching requires linkType, dataDirs, and linkDir to be defined",
+	riskyRecheckWarn:
+		"It is strongly recommended to not skip rechecking for risky matching mode",
+};
+
 /**
  * custom zod error map for logging
  * @param error ZodIssue messaging object
  * @param ctx ZodError map
  * @returns (the custom error for config display)
  */
-export const ZOD_ERROR_MAP: z.ZodErrorMap = (error, ctx) => {
+export const zodErrorMap: z.ZodErrorMap = (error, ctx) => {
 	switch (error.code) {
 		case z.ZodIssueCode.invalid_union:
 			return {
@@ -37,8 +42,9 @@ export const ZOD_ERROR_MAP: z.ZodErrorMap = (error, ctx) => {
 
 	return { message: ctx.defaultError };
 };
+
 /**
- * helper functions for validation
+ * helper function for validation
  * @return transformed duration (string -> milliseconds)
  */
 
@@ -48,7 +54,7 @@ function transformDurationString(durationStr: string, ctx) {
 		// adds the error to the Zod Issues
 		ctx.addIssue({
 			code: "custom",
-			message: zodErrorMsg.vercel,
+			message: ZodErrorMessages.vercel,
 		});
 	}
 	return duration;
@@ -64,7 +70,7 @@ export const VALIDATION_SCHEMA = z
 		delay: z
 			.number()
 			.positive({
-				message: zodErrorMsg.delay,
+				message: ZodErrorMessages.delay,
 			})
 			.default(10),
 		torznab: z.array(z.string().url()),
@@ -81,16 +87,16 @@ export const VALIDATION_SCHEMA = z
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
 		fuzzySizeThreshold: z.number().positive().lte(1, {
-			message: zodErrorMsg.fuzzySizeThreshold,
+			message: ZodErrorMessages.fuzzySizeThreshold,
 		}),
 		excludeOlder: z
 			.string()
-			.min(1, { message: zodErrorMsg.emptyString })
+			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
 			.nullish(),
 		excludeRecentSearch: z
 			.string()
-			.min(1, { message: zodErrorMsg.emptyString })
+			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
 			.nullish(),
 		action: z.nativeEnum(Action),
@@ -108,22 +114,22 @@ export const VALIDATION_SCHEMA = z
 		host: z.string().ip().nullish(),
 		rssCadence: z
 			.string()
-			.min(1, { message: zodErrorMsg.emptyString })
+			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
 			.nullish(),
 		searchCadence: z
 			.string()
-			.min(1, { message: zodErrorMsg.emptyString })
+			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
 			.nullish(),
 		snatchTimeout: z
 			.string()
-			.min(1, { message: zodErrorMsg.emptyString })
+			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
 			.nullish(),
 		searchTimeout: z
 			.string()
-			.min(1, { message: zodErrorMsg.emptyString })
+			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
 			.nullish(),
 		searchLimit: z.number().positive().nullish(),
@@ -140,7 +146,7 @@ export const VALIDATION_SCHEMA = z
 			config.transmissionRpcUrl ||
 			config.delugeRpcUrl,
 		() => ({
-			message: zodErrorMsg.injectUrl,
+			message: ZodErrorMessages.injectUrl,
 		})
 	)
 	.refine(
@@ -156,12 +162,12 @@ export const VALIDATION_SCHEMA = z
 			return true;
 		},
 		() => ({
-			message: zodErrorMsg.dataBased,
+			message: ZodErrorMessages.dataBased,
 		})
 	)
 	.refine((config) => {
 		if (config.skipRecheck && config.matchMode == MatchMode.RISKY) {
-			logger.warn(zodErrorMsg.riskyRecheckWarn);
+			logger.warn(ZodErrorMessages.riskyRecheckWarn);
 		}
 		return true;
 	});
