@@ -1,4 +1,3 @@
-import fetch, { Headers } from "node-fetch";
 import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
