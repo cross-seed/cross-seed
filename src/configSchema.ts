@@ -2,6 +2,7 @@ import { Action, LinkType, MatchMode } from "./constants.js";
 import { logger } from "./logger.js";
 import { z } from "zod";
 import ms from "ms";
+import { sep } from "path";
 
 /**
  * error messages and map returned upon Zod validation failure
@@ -9,15 +10,16 @@ import ms from "ms";
 const ZodErrorMessages = {
 	vercel: "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
 	emptyString:
-		"cannot have an empty string. If you want to unset it, use null",
+		"cannot have an empty string. If you want to unset it, use null or undefined.",
 	delay: "delay is in seconds, you can't travel back in time.",
-	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1",
+	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	dataBased:
-		"Data-Based Matching requires linkType, dataDirs, and linkDir to be defined",
+		"Data-Based Matching requires linkType, dataDirs, and linkDir to be defined.",
 	riskyRecheckWarn:
-		"It is strongly recommended to not skip rechecking for risky matching mode",
+		"It is strongly recommended to not skip rechecking for risky matching mode.",
+	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
 };
 
 /**
@@ -61,6 +63,46 @@ function transformDurationString(durationStr: string, ctx) {
 }
 
 /**
+ * adds an issue in Zod's error mapped formatting
+ * @param setting the value of the setting
+ * @param errorMessage the error message to append on a newline
+ * @param ctx ZodError map
+ */
+function zodAddIssue(setting: string, errorMessage: string, ctx): void {
+	ctx.addIssue({
+		code: "custom",
+		message: `\t"${setting}"\n\t${errorMessage}`,
+	});
+}
+
+/**
+ * helper function for directory validation
+ * @return true if valid formatting
+ */
+function checkValidPathFormat(paths: string[] | string, ctx) {
+	if (!paths) {
+		return undefined;
+	}
+
+	if (typeof paths === "object") {
+		paths.forEach((pathStr) => {
+			if (
+				sep === "\\" &&
+				!pathStr.includes("\\") &&
+				!pathStr.includes("/")
+			) {
+				zodAddIssue(pathStr, ZodErrorMessages.windowsPath, ctx);
+			}
+		});
+	} else {
+		if (sep === "\\" && !paths.includes("\\") && !paths.includes("/")) {
+			zodAddIssue(paths, ZodErrorMessages.windowsPath, ctx);
+		}
+	}
+	return paths; // This will return the array with only valid paths
+}
+
+/**
  * an object of the zod schema
  * each are named after what they are intended to validate
  */
@@ -74,10 +116,17 @@ export const VALIDATION_SCHEMA = z
 			})
 			.default(10),
 		torznab: z.array(z.string().url()),
-		dataDirs: z.array(z.string()).nullish(),
+		dataDirs: z
+			.array(z.string())
+			.transform((value, ctx) =>
+				value && value.length > 0
+					? checkValidPathFormat(value, ctx)
+					: null
+			)
+			.nullish(),
 		matchMode: z.nativeEnum(MatchMode),
 		dataCategory: z.string().nullish(),
-		linkDir: z.string().nullish(),
+		linkDir: z.string().transform(checkValidPathFormat).nullish(),
 		linkType: z.nativeEnum(LinkType),
 		skipRecheck: z.boolean(),
 		maxDataDepth: z.number().gte(1),
@@ -110,7 +159,8 @@ export const VALIDATION_SCHEMA = z
 			.number()
 			.positive()
 			.lte(65535)
-			.or(z.boolean().transform(() => null)),
+			.or(z.boolean().transform(() => null))
+			.nullish(),
 		host: z.string().ip().nullish(),
 		rssCadence: z
 			.string()
@@ -132,7 +182,7 @@ export const VALIDATION_SCHEMA = z
 			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
 			.nullish(),
-		searchLimit: z.number().positive().nullish(),
+		searchLimit: z.number().nonnegative().nullish(),
 		apiAuth: z.boolean().default(false),
 		verbose: z.boolean().default(false),
 		torrents: z.array(z.string()).optional(),

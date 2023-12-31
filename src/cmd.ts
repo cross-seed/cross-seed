@@ -13,9 +13,9 @@ import {
 } from "./constants.js";
 import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
-import { exitOnCrossSeedErrors } from "./errors.js";
+import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { jobsLoop } from "./jobs.js";
-import { initializeLogger, logger } from "./logger.js";
+import { Label, initializeLogger, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
 import {
 	initializePushNotifier,
@@ -28,6 +28,7 @@ import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { fallback } from "./utils.js";
+import { inspect } from "util";
 
 const fileConfig = await getFileConfig();
 
@@ -38,7 +39,7 @@ const fileConfig = await getFileConfig();
 
 export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 	let zodErrorCount = 0;
-	initializeLogger(false /* verbose = false */);
+	initializeLogger(options);
 	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
 	logger.info("Validating your configuration...");
 	try {
@@ -49,14 +50,26 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 		error.errors.forEach(({ path, message }) => {
 			const urlPath = path.toString().toLowerCase();
 			logger.error(
-				`\tOption:\t"${path}"\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${urlPath})\n`
+				`${
+					path.length > 0 ? `\tOption:\t${path}` : "\tConfiguration:"
+				}\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${urlPath})\n`
 			);
+		});
+		logger.verbose({
+			label: Label.CONFIGDUMP,
+			message: inspect(options),
 		});
 		zodErrorCount = error.errors.length;
 	}
+	if (zodErrorCount > 0) {
+		throw new CrossSeedError(
+			`\tYour configuration is invalid, please see the ${
+				zodErrorCount > 1 ? "errors" : "error"
+			} above for details.`
+		);
+	}
 	setRuntimeConfig(options);
 	initializePushNotifier();
-	return zodErrorCount;
 }
 
 /**
@@ -268,7 +281,7 @@ program
 	)
 	.action((options) => {
 		setRuntimeConfig(options);
-		initializeLogger(false /* verbose = false */);
+		initializeLogger(options);
 		initializePushNotifier();
 		sendTestNotification();
 	});
@@ -335,9 +348,9 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	)
 	.action(async (options) => {
 		try {
-			const errorCount = await validateAndSetRuntimeConfig(options);
+			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
-			await doStartupValidation(errorCount);
+			await doStartupValidation();
 			serve(options.port, options.host);
 			jobsLoop();
 		} catch (e) {
@@ -349,9 +362,9 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 createCommandWithSharedOptions("rss", "Run an rss scan").action(
 	async (options) => {
 		try {
-			const errorCount = await validateAndSetRuntimeConfig(options);
+			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
-			await doStartupValidation(errorCount);
+			await doStartupValidation();
 			await scanRssFeeds();
 			await db.destroy();
 		} catch (e) {
@@ -370,9 +383,9 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 	)
 	.action(async (options) => {
 		try {
-			const errorCount = await validateAndSetRuntimeConfig(options);
+			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
-			await doStartupValidation(errorCount);
+			await doStartupValidation();
 			await main();
 			await db.destroy();
 		} catch (e) {

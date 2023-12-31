@@ -9,64 +9,59 @@ import {
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
 import { existsSync } from "fs";
-import { sep } from "path";
 import { inspect } from "util";
-
-/**
- * logs an error message for invalid path settings (either filesystem or formatting)
- * @param configSetting (the name of the option set)
- * @param configValue (the value the option is set to)
- */
-function reportBadPath(configSetting: string, configValue: string) {
-	const pathError =
-		sep === "\\" &&
-		!configValue.includes("\\") &&
-		!configValue.includes("/")
-			? `Your ${configSetting} "${configValue}" is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.\n`
-			: `Your ${configSetting} "${configValue}" is not a valid directory on the filesystem.\n`;
-	logger.error(pathError);
-}
 
 /**
  * verifies the config paths provided against the filesystem
  * @returns true (if paths are valid)
  */
-function checkConfigPaths(): boolean {
+function checkConfigPaths(): void {
 	const { action, linkDir, dataDirs, torrentDir, outputDir } =
 		getRuntimeConfig();
+	let pathFailure: number = 0;
 
-	let pathFailure = false;
 	if (!existsSync(torrentDir)) {
-		reportBadPath("torrentDir", torrentDir);
-		pathFailure = true;
+		logger.error(
+			`\tYour torrentDir "${torrentDir}" is not a valid directory on the filesystem.\n`
+		);
+		pathFailure++;
 	}
 
 	if (action == Action.SAVE && !existsSync(outputDir)) {
-		reportBadPath("outputDir", outputDir);
-		pathFailure = true;
+		logger.error(
+			`\tYour outputDir path "${outputDir}" is not a valid directory on the filesystem.\n`
+		);
+		pathFailure++;
 	}
 
 	if (linkDir && !existsSync(linkDir)) {
-		reportBadPath("linkDir", linkDir);
-		pathFailure = true;
+		logger.error(
+			`\tYour linkDir path "${linkDir}" is not a valid directory on the filesystem.\n`
+		);
+		pathFailure++;
 	}
 	if (dataDirs) {
 		for (const dataDir of dataDirs) {
 			if (!existsSync(dataDir)) {
-				reportBadPath("dataDirs", dataDir);
-				pathFailure = true;
+				logger.error(
+					`\tYour dataDirs path "${dataDir}" is not a valid directory on the filesystem.\n`
+				);
+				pathFailure++;
 			}
 		}
 	}
-	return !pathFailure;
+	if (pathFailure) {
+		throw new CrossSeedError(
+			`\tYour configuration is invalid, please see the ${
+				pathFailure > 1 ? "errors" : "error"
+			} above for details.`
+		);
+	}
 }
 
-export async function doStartupValidation(
-	zodErrorCount: number
-): Promise<void> {
+export async function doStartupValidation(): Promise<void> {
 	const runtimeConfig: RuntimeConfig = getRuntimeConfig();
-	const validConfigPaths = checkConfigPaths();
-	runtimeConfig.configValid = !zodErrorCount && validConfigPaths;
+	checkConfigPaths();
 	setRuntimeConfig(runtimeConfig);
 
 	const downloadClient = getClient();
@@ -78,14 +73,5 @@ export async function doStartupValidation(
 		label: Label.CONFIGDUMP,
 		message: inspect(runtimeConfig),
 	});
-	if (!runtimeConfig.configValid) {
-		throw new CrossSeedError(
-			`Your configuration is invalid, please see the ${
-				zodErrorCount > 1 || (zodErrorCount > 0 && !validConfigPaths)
-					? "errors"
-					: "error"
-			} above for details.`
-		);
-	}
 	logger.info("Your configuration is valid!");
 }
