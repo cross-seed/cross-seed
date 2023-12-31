@@ -43,7 +43,7 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
 	logger.info("Validating your configuration...");
 	try {
-		options = VALIDATION_SCHEMA.parse(await getFileConfig(), {
+		options = VALIDATION_SCHEMA.parse(options, {
 			errorMap: zodErrorMap,
 		}) as RuntimeConfig;
 	} catch (error) {
