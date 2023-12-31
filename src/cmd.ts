@@ -38,7 +38,6 @@ const fileConfig = await getFileConfig();
 
 export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 	let zodErrorCount = 0;
-	options.configValid = true;
 	initializeLogger(false /* verbose = false */);
 	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
 	logger.info("Validating your configuration...");
@@ -47,7 +46,6 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 			errorMap: zodErrorMap,
 		}) as RuntimeConfig;
 	} catch (error) {
-		options.configValid = false;
 		error.errors.forEach(({ path, message }) => {
 			const urlPath = path.toString().toLowerCase();
 			logger.error(
