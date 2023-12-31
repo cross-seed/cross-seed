@@ -140,11 +140,13 @@ export const VALIDATION_SCHEMA = z
 	.strict()
 	.refine(
 		(config) =>
-			config.action !== Action.INJECT ||
-			config.rtorrentRpcUrl ||
-			config.qbittorrentUrl ||
-			config.transmissionRpcUrl ||
-			config.delugeRpcUrl,
+			!(
+				config.action == Action.INJECT &&
+				!config.rtorrentRpcUrl &&
+				!config.qbittorrentUrl &&
+				!config.transmissionRpcUrl &&
+				!config.delugeRpcUrl
+			),
 		() => ({
 			message: ZodErrorMessages.injectUrl,
 		})
