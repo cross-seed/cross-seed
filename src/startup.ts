@@ -25,18 +25,8 @@ async function verifyPath(
 ): Promise<boolean> {
 	try {
 		if ((await stat(path)).isDirectory()) {
-			switch (optionName) {
-				case "torrentDir":
-				case "dataDirs": {
-					await access(path, permissions);
-					return true;
-				}
-				case "outputDir":
-				case "linkDir": {
-					await access(path, permissions);
-					return true;
-				}
-			}
+			await access(path, permissions);
+			return true;
 		}
 	} catch (error) {
 		if (error.code === "ENOENT") {
