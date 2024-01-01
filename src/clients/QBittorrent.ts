@@ -7,6 +7,7 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
+import { BodyInit } from "undici-types";
 
 const X_WWW_FORM_URLENCODED = {
 	"Content-Type": "application/x-www-form-urlencoded",
@@ -133,7 +134,7 @@ export default class QBittorrent implements TorrentClient {
 	): Promise<string> {
 		logger.verbose({
 			label: Label.QBITTORRENT,
-			message: `Making request to ${path} with body ${body.toString()}`,
+			message: `Making request to ${path} with body ${body!.toString()}`,
 		});
 
 		const response = await fetch(`${this.url.href}${path}`, {
@@ -274,7 +275,7 @@ export default class QBittorrent implements TorrentClient {
 						isComplete: true,
 						autoTMM: false,
 						category: dataCategory,
-					}
+				  }
 				: await this.getTorrentConfiguration(searchee);
 
 			const newCategoryName =
