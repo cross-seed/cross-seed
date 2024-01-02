@@ -3,7 +3,7 @@ import { Label, logger } from "./logger.js";
 import { Action } from "./constants.js";
 import { validateTorznabUrls } from "./torznab.js";
 import { getClient } from "./clients/TorrentClient.js";
-import { RuntimeConfig, getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import { inspect } from "util";
 import { stat, access, constants } from "fs/promises";
 
@@ -44,32 +44,27 @@ async function verifyPath(
 async function checkConfigPaths(): Promise<void> {
 	const { action, linkDir, dataDirs, torrentDir, outputDir, rtorrentRpcUrl } =
 		getRuntimeConfig();
+	const READ_ONLY = constants.R_OK;
+	const READ_AND_WRITE = constants.R_OK | constants.W_OK;
 	let pathFailure: number = 0;
 
-	if (!(await verifyPath(torrentDir, "torrentDir", constants.R_OK))) {
+	if (!(await verifyPath(torrentDir, "torrentDir", READ_ONLY))) {
 		pathFailure++;
 	}
 
 	if (
 		(action === Action.SAVE || rtorrentRpcUrl) &&
-		!(await verifyPath(
-			outputDir,
-			"outputDir",
-			constants.R_OK | constants.W_OK
-		))
+		!(await verifyPath(outputDir, "outputDir", READ_AND_WRITE))
 	) {
 		pathFailure++;
 	}
 
-	if (
-		linkDir &&
-		!(await verifyPath(linkDir, "linkDir", constants.R_OK | constants.W_OK))
-	) {
+	if (linkDir && !(await verifyPath(linkDir, "linkDir", READ_AND_WRITE))) {
 		pathFailure++;
 	}
 	if (dataDirs) {
 		for (const dataDir of dataDirs) {
-			if (!(await verifyPath(dataDir, "dataDirs", constants.R_OK))) {
+			if (!(await verifyPath(dataDir, "dataDirs", READ_ONLY))) {
 				pathFailure++;
 			}
 		}
@@ -84,7 +79,6 @@ async function checkConfigPaths(): Promise<void> {
 }
 
 export async function doStartupValidation(): Promise<void> {
-	const runtimeConfig: RuntimeConfig = getRuntimeConfig();
 	const downloadClient = getClient();
 	await Promise.all<void>([
 		checkConfigPaths(),
@@ -93,7 +87,7 @@ export async function doStartupValidation(): Promise<void> {
 	]);
 	logger.verbose({
 		label: Label.CONFIGDUMP,
-		message: inspect(runtimeConfig),
+		message: inspect(getRuntimeConfig()),
 	});
 	logger.info("Your configuration is valid!");
 }
