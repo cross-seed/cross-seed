@@ -3,14 +3,9 @@ import { Label, logger } from "./logger.js";
 import { Action } from "./constants.js";
 import { validateTorznabUrls } from "./torznab.js";
 import { getClient } from "./clients/TorrentClient.js";
-import {
-	RuntimeConfig,
-	getRuntimeConfig,
-	setRuntimeConfig,
-} from "./runtimeConfig.js";
+import { RuntimeConfig, getRuntimeConfig } from "./runtimeConfig.js";
 import { inspect } from "util";
-import { stat, access } from "fs/promises";
-import { constants } from "fs";
+import { stat, access, constants } from "fs/promises";
 
 /**
  * validates existence, permission, and that a path is a directory
@@ -47,7 +42,7 @@ async function verifyPath(
  * @returns true (if paths are valid)
  */
 async function checkConfigPaths(): Promise<void> {
-	const { action, linkDir, dataDirs, torrentDir, outputDir } =
+	const { action, linkDir, dataDirs, torrentDir, outputDir, rtorrentRpcUrl } =
 		getRuntimeConfig();
 	let pathFailure: number = 0;
 
@@ -56,7 +51,7 @@ async function checkConfigPaths(): Promise<void> {
 	}
 
 	if (
-		action == Action.SAVE &&
+		(action === Action.SAVE || rtorrentRpcUrl) &&
 		!(await verifyPath(
 			outputDir,
 			"outputDir",
@@ -90,11 +85,9 @@ async function checkConfigPaths(): Promise<void> {
 
 export async function doStartupValidation(): Promise<void> {
 	const runtimeConfig: RuntimeConfig = getRuntimeConfig();
-	await checkConfigPaths();
-	setRuntimeConfig(runtimeConfig);
-
 	const downloadClient = getClient();
 	await Promise.all<void>([
+		checkConfigPaths(),
 		validateTorznabUrls(),
 		downloadClient?.validateConfig(),
 	]);
