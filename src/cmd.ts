@@ -38,7 +38,6 @@ const fileConfig = await getFileConfig();
  */
 
 export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
-	let zodErrorCount = 0;
 	initializeLogger(options);
 	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
 	logger.info("Validating your configuration...");
@@ -47,6 +46,10 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 			errorMap: zodErrorMap,
 		}) as RuntimeConfig;
 	} catch (error) {
+		logger.verbose({
+			label: Label.CONFIGDUMP,
+			message: inspect(options),
+		});
 		error.errors.forEach(({ path, message }) => {
 			const urlPath = path.toString().toLowerCase();
 			logger.error(
@@ -55,19 +58,15 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 				}\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${urlPath})\n`
 			);
 		});
-		logger.verbose({
-			label: Label.CONFIGDUMP,
-			message: inspect(options),
-		});
-		zodErrorCount = error.errors.length;
+		if (error.errors.length > 0) {
+			throw new CrossSeedError(
+				`\tYour configuration is invalid, please see the ${
+					error.errors.length > 1 ? "errors" : "error"
+				} above for details.`
+			);
+		}
 	}
-	if (zodErrorCount > 0) {
-		throw new CrossSeedError(
-			`\tYour configuration is invalid, please see the ${
-				zodErrorCount > 1 ? "errors" : "error"
-			} above for details.`
-		);
-	}
+
 	setRuntimeConfig(options);
 	initializePushNotifier();
 }
