@@ -54,10 +54,7 @@ function transformDurationString(durationStr: string, ctx) {
 	const duration = ms(durationStr);
 	if (isNaN(duration)) {
 		// adds the error to the Zod Issues
-		ctx.addIssue({
-			code: "custom",
-			message: ZodErrorMessages.vercel,
-		});
+		zodAddIssue(durationStr, ZodErrorMessages.vercel, ctx);
 	}
 	return duration;
 }
