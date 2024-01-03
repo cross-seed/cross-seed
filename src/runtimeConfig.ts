@@ -1,7 +1,6 @@
 import { Action, LinkType, MatchMode } from "./constants.js";
 
 export interface RuntimeConfig {
-	offset: number;
 	delay: number;
 	torznab: string[];
 	dataDirs: string[];
@@ -28,11 +27,11 @@ export interface RuntimeConfig {
 	duplicateCategories: boolean;
 	notificationWebhookUrl: string;
 	torrents: string[];
-	port: number | false | null;
+	port: number | null;
 	searchCadence: number;
-	rssCadence?: number;
-	snatchTimeout?: number;
-	searchTimeout?: number;
+	rssCadence: number;
+	snatchTimeout: number;
+	searchTimeout: number;
 	searchLimit: number;
 	apiAuth: boolean;
 }
