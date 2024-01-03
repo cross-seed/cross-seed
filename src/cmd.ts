@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
-import ms from "ms";
-import { inspect } from "util";
 import { getApiKeyFromDatabase, resetApiKey } from "./auth.js";
+import { VALIDATION_SCHEMA, zodErrorMap } from "./configSchema.js";
 import { generateConfig, getFileConfig } from "./configuration.js";
 import {
 	Action,
@@ -14,9 +13,9 @@ import {
 } from "./constants.js";
 import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
-import { exitOnCrossSeedErrors } from "./errors.js";
+import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { jobsLoop } from "./jobs.js";
-import { initializeLogger, Label, logger } from "./logger.js";
+import { Label, initializeLogger, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
 import {
 	initializePushNotifier,
@@ -29,39 +28,60 @@ import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { fallback } from "./utils.js";
+import { inspect } from "util";
 
-function processOptions(options): RuntimeConfig {
-	if (options.rssCadence) {
-		options.rssCadence = Math.max(ms(options.rssCadence), ms("10 minutes"));
-	}
-	if (options.searchCadence) {
-		options.searchCadence = ms(options.searchCadence);
+const fileConfig = await getFileConfig();
 
-		// Set a minimum cadence of once a day if excludeRecentSearch hasn't been set to avoid flooding requests
-		if (!options.excludeRecentSearch) {
-			options.searchCadence = Math.max(
-				options.searchCadence,
-				ms("1 day")
+/**
+ * validates and sets RuntimeConfig
+ * @return (the number of errors Zod encountered in the configuration)
+ */
+
+export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
+	initializeLogger(options);
+	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
+	logger.info("Validating your configuration...");
+	try {
+		options = VALIDATION_SCHEMA.parse(options, {
+			errorMap: zodErrorMap,
+		}) as RuntimeConfig;
+	} catch (error) {
+		logger.verbose({
+			label: Label.CONFIGDUMP,
+			message: inspect(options),
+		});
+		error.errors.forEach(({ path, message }) => {
+			const urlPath = path[0];
+			const optionLine =
+				path.length === 2
+					? `${path[0]} (position #${path[1] + 1})`
+					: path;
+			logger.error(
+				`${
+					path.length > 0
+						? `\tOption:\t ${optionLine}`
+						: "\tConfiguration:"
+				}\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options${
+					urlPath ? `#${urlPath}` : ""
+				})\n`
+			);
+		});
+		if (error.errors.length > 0) {
+			throw new CrossSeedError(
+				`\tYour configuration is invalid, please see the ${
+					error.errors.length > 1 ? "errors" : "error"
+				} above for details.`
 			);
 		}
 	}
 
-	if (options.excludeOlder) {
-		options.excludeOlder = ms(options.excludeOlder);
-	}
-	if (options.excludeRecentSearch) {
-		options.excludeRecentSearch = ms(options.excludeRecentSearch);
-	}
-	if (options.snatchTimeout) {
-		options.snatchTimeout = ms(options.snatchTimeout);
-	}
-	if (options.searchTimeout) {
-		options.searchTimeout = ms(options.searchTimeout);
-	}
-	return options;
+	setRuntimeConfig(options);
+	initializePushNotifier();
 }
 
-const fileConfig = await getFileConfig();
+/**
+ * parsing and processing of CLI and config file
+ */
 
 function createCommandWithSharedOptions(name, description) {
 	return program
@@ -268,7 +288,7 @@ program
 	)
 	.action((options) => {
 		setRuntimeConfig(options);
-		initializeLogger();
+		initializeLogger(options);
 		initializePushNotifier();
 		sendTestNotification();
 	});
@@ -335,15 +355,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	)
 	.action(async (options) => {
 		try {
-			const runtimeConfig = processOptions(options);
-			setRuntimeConfig(runtimeConfig);
-			initializeLogger();
-			initializePushNotifier();
-			logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
-			logger.verbose({
-				label: Label.CONFIGDUMP,
-				message: inspect(runtimeConfig),
-			});
+			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
 			serve(options.port, options.host);
@@ -357,15 +369,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 createCommandWithSharedOptions("rss", "Run an rss scan").action(
 	async (options) => {
 		try {
-			const runtimeConfig = processOptions(options);
-			setRuntimeConfig(runtimeConfig);
-			initializeLogger();
-			initializePushNotifier();
-			logger.verbose({
-				label: Label.CONFIGDUMP,
-				message: inspect(runtimeConfig),
-			});
-
+			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
 			await scanRssFeeds();
@@ -386,14 +390,7 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 	)
 	.action(async (options) => {
 		try {
-			const runtimeConfig = processOptions(options);
-			setRuntimeConfig(runtimeConfig);
-			initializeLogger();
-			initializePushNotifier();
-			logger.verbose({
-				label: Label.CONFIGDUMP,
-				message: inspect(runtimeConfig),
-			});
+			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
 			await main();
