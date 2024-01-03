@@ -4,7 +4,6 @@ import path, { join } from "path";
 import { inspect } from "util";
 import { USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
-import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -175,15 +174,6 @@ export async function getInfoHashesToExclude(): Promise<string[]> {
 	return (await db("torrent").select({ infoHash: "info_hash" })).map(
 		(t) => t.infoHash
 	);
-}
-
-export async function validateTorrentDir(): Promise<void> {
-	const { torrentDir } = getRuntimeConfig();
-	try {
-		await fsPromises.readdir(torrentDir);
-	} catch (e) {
-		throw new CrossSeedError(`Torrent dir ${torrentDir} is invalid`);
-	}
 }
 
 export async function loadTorrentDirLight(): Promise<Searchee[]> {
