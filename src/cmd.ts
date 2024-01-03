@@ -54,9 +54,9 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 			const urlPath = path.toString().toLowerCase().split(",")[0];
 			const optionLine = path.toString().includes(",")
 				? (() => {
-						const setting = path.toString().split(",")[0];
+						const setting = path.toString().split(",");
 						const position = Number(setting[1].trim()) + 1;
-						return `${setting} (position #${position})`;
+						return `${setting[0]} (position #${position})`;
 				  })()
 				: path;
 			logger.error(
