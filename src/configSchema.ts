@@ -46,20 +46,6 @@ export const zodErrorMap: z.ZodErrorMap = (error, ctx) => {
 };
 
 /**
- * helper function for validation
- * @return transformed duration (string -> milliseconds)
- */
-
-function transformDurationString(durationStr: string, ctx) {
-	const duration = ms(durationStr);
-	if (isNaN(duration)) {
-		// adds the error to the Zod Issues
-		zodAddIssue(durationStr, ZodErrorMessages.vercel, ctx);
-	}
-	return duration;
-}
-
-/**
  * adds an issue in Zod's error mapped formatting
  * @param setting the value of the setting
  * @param errorMessage the error message to append on a newline
@@ -73,30 +59,28 @@ function zodAddIssue(setting: string, errorMessage: string, ctx): void {
 }
 
 /**
+ * helper function for ms time validation
+ * @return transformed duration (string -> milliseconds)
+ */
+
+function transformDurationString(durationStr: string, ctx) {
+	const duration = ms(durationStr);
+	if (isNaN(duration)) {
+		// adds the error to the Zod Issues
+		zodAddIssue(durationStr, ZodErrorMessages.vercel, ctx);
+	}
+	return duration;
+}
+
+/**
  * helper function for directory validation
  * @return true if valid formatting
  */
-function checkValidPathFormat(paths: string[] | string, ctx) {
-	if (!paths) {
-		return undefined;
+function checkValidPathFormat(path: string, ctx) {
+	if (sep === "\\" && !path.includes("\\") && !path.includes("/")) {
+		zodAddIssue(path, ZodErrorMessages.windowsPath, ctx);
 	}
-
-	if (typeof paths === "object") {
-		paths.forEach((pathStr) => {
-			if (
-				sep === "\\" &&
-				!pathStr.includes("\\") &&
-				!pathStr.includes("/")
-			) {
-				zodAddIssue(pathStr, ZodErrorMessages.windowsPath, ctx);
-			}
-		});
-	} else {
-		if (sep === "\\" && !paths.includes("\\") && !paths.includes("/")) {
-			zodAddIssue(paths, ZodErrorMessages.windowsPath, ctx);
-		}
-	}
-	return paths; // This will return the array with only valid paths
+	return path;
 }
 
 /**
@@ -106,20 +90,21 @@ function checkValidPathFormat(paths: string[] | string, ctx) {
 
 export const VALIDATION_SCHEMA = z
 	.object({
-		delay: z
-			.number()
-			.positive({
-				message: ZodErrorMessages.delay,
-			})
-			.default(10),
+		delay: z.number().positive({
+			message: ZodErrorMessages.delay,
+		}),
 		torznab: z.array(z.string().url()),
 		dataDirs: z
-			.array(z.string())
-			.transform((value, ctx) =>
-				value && value.length > 0
-					? checkValidPathFormat(value, ctx)
-					: null
+			.array(
+				z
+					.string()
+					.transform((value, ctx) =>
+						value && value.length > 0
+							? checkValidPathFormat(value, ctx)
+							: null
+					)
 			)
+
 			.nullish(),
 		matchMode: z.nativeEnum(MatchMode),
 		dataCategory: z.string().nullish(),

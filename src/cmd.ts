@@ -51,10 +51,19 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 			message: inspect(options),
 		});
 		error.errors.forEach(({ path, message }) => {
-			const urlPath = path.toString().toLowerCase();
+			const urlPath = path.toString().toLowerCase().split(",")[0];
+			const optionLine = path.toString().includes(",")
+				? (() => {
+						const setting = path.toString().split(",")[0];
+						const position = Number(setting[1].trim()) + 1;
+						return `${setting} (position #${position})`;
+				  })()
+				: path;
 			logger.error(
 				`${
-					path.length > 0 ? `\tOption:\t${path}` : "\tConfiguration:"
+					path.length > 0
+						? `\tOption:\t${optionLine}`
+						: "\tConfiguration:"
 				}\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${urlPath})\n`
 			);
 		});
