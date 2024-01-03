@@ -62,7 +62,7 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 			logger.error(
 				`${
 					path.length > 0
-						? `\tOption:\t${optionLine}`
+						? `\tOption:\t ${optionLine}`
 						: "\tConfiguration:"
 				}\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options#${urlPath})\n`
 			);

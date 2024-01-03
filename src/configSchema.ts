@@ -54,7 +54,7 @@ export const zodErrorMap: z.ZodErrorMap = (error, ctx) => {
 function zodAddIssue(setting: string, errorMessage: string, ctx): void {
 	ctx.addIssue({
 		code: "custom",
-		message: `\t"${setting}"\n\t${errorMessage}`,
+		message: `Setting: "${setting}"\n\t${errorMessage}`,
 	});
 }
 
