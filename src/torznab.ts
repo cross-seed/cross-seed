@@ -25,7 +25,6 @@ interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
-	offset?: number;
 	apikey?: string;
 	season?: number | string;
 	ep?: number | string;
