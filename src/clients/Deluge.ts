@@ -313,19 +313,19 @@ export default class Deluge implements TorrentClient {
 	async getDownloadDir(
 		searchee: Searchee
 	): Promise<
-		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "NETWORK_ERROR">
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
 		let torrent: TorrentInfo, response: DelugeJSON<TorrentStatus>;
 		const params = [["save_path", "progress"], { hash: searchee.infoHash }];
 		try {
 			response = await this.call<TorrentStatus>("web.update_ui", params);
 		} catch (e) {
-			return resultOfErr("NETWORK_ERROR");
+			return resultOfErr("UNKNOWN_ERROR");
 		}
 		if (response.result!.torrents) {
 			torrent = response.result!.torrents?.[searchee.infoHash!];
 		} else {
-			return resultOfErr("NETWORK_ERROR");
+			return resultOfErr("UNKNOWN_ERROR");
 		}
 		if (torrent === undefined) {
 			return resultOfErr("NOT_FOUND");
