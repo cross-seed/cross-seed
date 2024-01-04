@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { join, resolve, dirname, basename } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -17,14 +17,13 @@ import {
 	LinkType,
 	SaveResult,
 } from "./constants.js";
+import { CrossSeedError } from "./errors.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
-import { CrossSeedError } from "./errors.js";
-import { Result } from "./Result.js";
 
 export async function validateAction(): Promise<void> {
 	const { action } = getRuntimeConfig();
@@ -44,49 +43,38 @@ export async function performAction(
 	const { action, linkDir } = getRuntimeConfig();
 	const trackerLinkDir = linkDir ? join(linkDir, tracker) : undefined;
 	if (trackerLinkDir) {
-		const downloadDir: Result<
-			string,
-			"NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "NETWORK_ERROR"
-		> = await getClient().getDownloadDir(searchee);
-		if (downloadDir.isOk) {
-			mkdirSync(trackerLinkDir, {
-				recursive: true,
-			});
+		const downloadDirResult = await getClient().getDownloadDir(searchee);
+		if (downloadDirResult.isErr()) {
+			// TODO figure out something better or add logging
+			return InjectionResult.FAILURE;
+		}
+		mkdirSync(trackerLinkDir, { recursive: true });
 
-			if (decision == Decision.MATCH) {
-				linkExact(
-					searchee.infoHash
-						? downloadDir.unwrapOrThrow(
-								// potentially needs better error messaging?
-								new Error("LINKING_FAILURE")
-						  )
-						: searchee.path,
-					trackerLinkDir
-				);
-			} else if (decision == Decision.MATCH_SIZE_ONLY) {
-				// Size only matching is only supported for single file or
-				// single, nested file torrents.
-				const candidateParentDir = dirname(newMeta.files[0].path);
-				let correctedlinkDir = trackerLinkDir;
+		if (decision == Decision.MATCH) {
+			linkExact(
+				searchee.infoHash
+					? downloadDirResult.unwrapOrThrow()
+					: searchee.path,
+				trackerLinkDir
+			);
+		} else if (decision == Decision.MATCH_SIZE_ONLY) {
+			// Size only matching is only supported for single file or
+			// single, nested file torrents.
+			const candidateParentDir = dirname(newMeta.files[0].path);
+			let correctedlinkDir = trackerLinkDir;
 
-				// Candidate is single, nested file
-				if (candidateParentDir !== ".") {
-					correctedlinkDir = join(trackerLinkDir, candidateParentDir);
-					mkdirSync(correctedlinkDir, {
-						recursive: true,
-					});
-				}
-				linkFile(
-					searchee.infoHash
-						? downloadDir.unwrapOrThrow(
-								// potentially needs better error messaging?
-								new Error("LINKING_FAILURE")
-						  )
-						: searchee.path,
-
-					join(correctedlinkDir, newMeta.files[0].name)
-				);
+			// Candidate is single, nested file
+			if (candidateParentDir !== ".") {
+				correctedlinkDir = join(trackerLinkDir, candidateParentDir);
+				mkdirSync(correctedlinkDir, { recursive: true });
 			}
+			linkFile(
+				searchee.infoHash
+					? downloadDirResult.unwrapOrThrow()
+					: searchee.path,
+
+				join(correctedlinkDir, newMeta.files[0].name)
+			);
 		}
 	}
 

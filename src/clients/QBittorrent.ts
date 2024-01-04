@@ -220,7 +220,7 @@ export default class QBittorrent implements TorrentClient {
 	async getDownloadDir(
 		searchee: Searchee
 	): Promise<
-		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "NETWORK_ERROR">
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
 		let torrentInfo: TorrentConfiguration;
 		try {
@@ -234,7 +234,7 @@ export default class QBittorrent implements TorrentClient {
 			if (e.includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
 			}
-			return resultOfErr("NETWORK_ERROR");
+			return resultOfErr("UNKNOWN_ERROR");
 		}
 		return resultOf(torrentInfo.save_path);
 	}
