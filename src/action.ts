@@ -42,30 +42,32 @@ export async function performAction(
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 	const trackerLinkDir = linkDir ? join(linkDir, tracker) : undefined;
-	mkdirSync(trackerLinkDir, {
-		recursive: true,
-	});
+	if (trackerLinkDir) {
+		mkdirSync(trackerLinkDir, {
+			recursive: true,
+		});
 
-	if (searchee.path) {
-		if (decision == Decision.MATCH) {
-			await linkExact(searchee.path, trackerLinkDir);
-		} else if (decision == Decision.MATCH_SIZE_ONLY) {
-			// Size only matching is only supported for single file or
-			// single, nested file torrents.
-			const candidateParentDir = dirname(newMeta.files[0].path);
-			let correctedlinkDir = trackerLinkDir;
+		if (searchee.path) {
+			if (decision == Decision.MATCH) {
+				await linkExact(searchee.path, trackerLinkDir);
+			} else if (decision == Decision.MATCH_SIZE_ONLY) {
+				// Size only matching is only supported for single file or
+				// single, nested file torrents.
+				const candidateParentDir = dirname(newMeta.files[0].path);
+				let correctedlinkDir = trackerLinkDir;
 
-			// Candidate is single, nested file
-			if (candidateParentDir !== ".") {
-				mkdirSync(join(trackerLinkDir, candidateParentDir), {
-					recursive: true,
-				});
-				correctedlinkDir = join(trackerLinkDir, candidateParentDir);
+				// Candidate is single, nested file
+				if (candidateParentDir !== ".") {
+					mkdirSync(join(trackerLinkDir, candidateParentDir), {
+						recursive: true,
+					});
+					correctedlinkDir = join(trackerLinkDir, candidateParentDir);
+				}
+				linkFile(
+					searchee.path,
+					join(correctedlinkDir, newMeta.files[0].name)
+				);
 			}
-			linkFile(
-				searchee.path,
-				join(correctedlinkDir, newMeta.files[0].name)
-			);
 		}
 	}
 
