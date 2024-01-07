@@ -299,7 +299,7 @@ export default class QBittorrent implements TorrentClient {
 						isComplete: true,
 						autoTMM: false,
 						category: dataCategory,
-					}
+				  }
 				: await this.getTorrentConfiguration(searchee);
 
 			const newCategoryName =
