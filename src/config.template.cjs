@@ -200,13 +200,6 @@ module.exports = {
 	host: undefined,
 
 	/**
-	 * Whether to require authentication for API.
-	 * Run the command `cross-seed api-key` to find your api key.
-	 * Keys can be provided in an X-Api-Key HTTP header or a query param.
-	 */
-	apiAuth: true,
-
-	/**
 	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms
 	 * Set to undefined or null to disable. Minimum of 10 minutes.
 	 * Examples:

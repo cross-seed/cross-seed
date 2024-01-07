@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
 import { db } from "./db.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
 
 function generateApiKey(): string {
 	return randomBytes(24).toString("hex");
@@ -19,8 +18,6 @@ export async function getApiKeyFromDatabase(): Promise<string> {
 }
 
 export async function checkApiKey(keyToCheck: string): Promise<boolean> {
-	const { apiAuth } = getRuntimeConfig();
-	if (!apiAuth) return true;
 	const apikey = await getApiKeyFromDatabase();
 	return apikey === keyToCheck;
 }
