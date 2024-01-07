@@ -165,7 +165,6 @@ export const VALIDATION_SCHEMA = z
 			.transform(transformDurationString)
 			.nullish(),
 		searchLimit: z.number().nonnegative().nullish(),
-		apiAuth: z.boolean(),
 		verbose: z.boolean(),
 		torrents: z.array(z.string()).optional(),
 	})
