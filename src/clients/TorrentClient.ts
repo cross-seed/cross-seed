@@ -10,6 +10,7 @@ import Deluge from "./Deluge.js";
 let activeClient: TorrentClient;
 
 export interface TorrentClient {
+	getDownloadDir: (searchee: Searchee) => Promise<string>;
 	inject: (
 		newTorrent: Metafile,
 		searchee: Searchee,

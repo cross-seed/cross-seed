@@ -80,6 +80,12 @@ interface Category {
 	name: string;
 	savePath: string;
 }
+interface TorrentConfiguration {
+	save_path: string;
+	isComplete: boolean;
+	autoTMM: boolean;
+	category: string;
+}
 
 export default class QBittorrent implements TorrentClient {
 	cookie: string;
@@ -210,13 +216,28 @@ export default class QBittorrent implements TorrentClient {
 			return false;
 		}
 	}
+	async getDownloadDir(searchee: Searchee): Promise<string> {
+		if (await this.isInfoHashInClient(searchee.infoHash)) {
+			const responseText = await this.request(
+				"/torrents/info",
+				`hashes=${searchee.infoHash}`,
+				X_WWW_FORM_URLENCODED
+			);
+			const searchResult = JSON.parse(responseText).find(
+				(e) => e.hash === searchee.infoHash
+			) as TorrentInfo;
+			if (searchResult === undefined) {
+				throw new Error(
+					"Failed to retrieve data dir; torrent not found in client"
+				);
+			}
 
-	async getTorrentConfiguration(searchee: Searchee): Promise<{
-		save_path: string;
-		isComplete: boolean;
-		autoTMM: boolean;
-		category: string;
-	}> {
+			return searchResult.save_path;
+		}
+	}
+	async getTorrentConfiguration(
+		searchee: Searchee
+	): Promise<TorrentConfiguration> {
 		const responseText = await this.request(
 			"/torrents/info",
 			`hashes=${searchee.infoHash}`,
@@ -264,11 +285,10 @@ export default class QBittorrent implements TorrentClient {
 				return InjectionResult.ALREADY_EXISTS;
 			}
 
-			const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
+const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
 			const buffer = new Blob([newTorrent.encode()], {
 				type: "application/x-bittorrent",
 			});
-
 			const { save_path, isComplete, autoTMM, category } = path
 				? {
 						save_path: path,
