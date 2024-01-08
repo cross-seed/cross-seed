@@ -35,6 +35,8 @@ const createReasonLogger =
 		}
 		let reason;
 		switch (decision) {
+			case Decision.MATCH_SIZE_ONLY:
+				return;
 			case Decision.MATCH:
 				return;
 			case Decision.SIZE_MISMATCH:
@@ -54,6 +56,9 @@ const createReasonLogger =
 				break;
 			case Decision.FILE_TREE_MISMATCH:
 				reason = "it has a different file tree";
+				break;
+			case Decision.RELEASE_GROUP_MISMATCH:
+				reason = "its release group does not match";
 				break;
 			default:
 				reason = decision;
