@@ -12,6 +12,7 @@ export const SEASON_REGEX =
 	/^(?<title>.+?)[_.\s-]+(?<season>S\d+)(?:[_.\s-]*?(?<seasonmax>S?\d+))?(?=[_.\s](?!E\d+))/i;
 export const MOVIE_REGEX =
 	/^(?<title>.+?)[_.\s][[(]?(?<year>\d{4})[)\]]?(?![pi])/i;
+export const GROUP_REGEX = /$(?<=(?:-)(?<group>[\w\040]+)(?:\.\w+)?)/i;
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi"];
 
@@ -46,6 +47,7 @@ export enum Decision {
 	RATE_LIMITED = "RATE_LIMITED",
 	INFO_HASH_ALREADY_EXISTS = "INFO_HASH_ALREADY_EXISTS",
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
+	RELEASE_GROUP_MISMATCH = "RELEASE_GROUP_MISMATCH",
 }
 
 export enum MatchMode {

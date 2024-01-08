@@ -1,7 +1,12 @@
 import { existsSync, statSync, writeFileSync } from "fs";
 import path from "path";
 import { appDir } from "./configuration.js";
-import { Decision, MatchMode, TORRENT_CACHE_FOLDER } from "./constants.js";
+import {
+	Decision,
+	GROUP_REGEX,
+	MatchMode,
+	TORRENT_CACHE_FOLDER,
+} from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
@@ -97,8 +102,24 @@ function sizeDoesMatch(resultSize, searchee) {
 	return resultSize >= lowerBound && resultSize <= upperBound;
 }
 
+function releaseGroupDoesMatch(
+	searcheeRelease: string,
+	candidateRelease: string,
+	matchMode: string
+) {
+	const searcheeGroup = searcheeRelease.match(GROUP_REGEX)[0].toLowerCase();
+	const candidateGroup = candidateRelease.match(GROUP_REGEX)[0].toLowerCase();
+	if (
+		(searcheeGroup || candidateGroup) &&
+		(!searcheeGroup || !candidateGroup)
+	) {
+		return matchMode === "risky";
+	}
+	return searcheeGroup === candidateGroup;
+}
+
 async function assessCandidateHelper(
-	{ link, size }: Candidate,
+	{ link, size, name }: Candidate,
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
@@ -109,6 +130,9 @@ async function assessCandidateHelper(
 	}
 
 	if (!link) return { decision: Decision.NO_DOWNLOAD_LINK };
+
+	if (!releaseGroupDoesMatch(searchee.name, name, matchMode))
+		return { decision: Decision.RELEASE_GROUP_MISMATCH };
 
 	const result = await parseTorrentFromURL(link);
 
