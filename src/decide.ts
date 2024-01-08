@@ -3,8 +3,8 @@ import path from "path";
 import { appDir } from "./configuration.js";
 import {
 	Decision,
-	GROUP_REGEX,
 	MatchMode,
+	RELEASE_GROUP_REGEX,
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -103,19 +103,19 @@ function sizeDoesMatch(resultSize, searchee) {
 }
 
 function releaseGroupDoesMatch(
-	searcheeRelease: string,
-	candidateRelease: string,
-	matchMode: string
+	searcheeName: string,
+	candidateName: string,
+	matchMode: MatchMode
 ) {
-	const searcheeGroup = searcheeRelease.match(GROUP_REGEX)[0].toLowerCase();
-	const candidateGroup = candidateRelease.match(GROUP_REGEX)[0].toLowerCase();
-	if (
-		(searcheeGroup || candidateGroup) &&
-		(!searcheeGroup || !candidateGroup)
-	) {
-		return matchMode === "risky";
+	const searcheeMatch = searcheeName.match(RELEASE_GROUP_REGEX);
+	const candidateMatch = candidateName.match(RELEASE_GROUP_REGEX);
+
+	// if we are unsure, pass in risky mode but fail in safe mode
+	if (!searcheeMatch || !candidateMatch) {
+		return matchMode === MatchMode.RISKY;
 	}
-	return searcheeGroup === candidateGroup;
+
+	return searcheeMatch[0].toLowerCase() === candidateMatch[0].toLowerCase();
 }
 
 async function assessCandidateHelper(
