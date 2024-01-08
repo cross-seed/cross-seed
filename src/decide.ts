@@ -1,7 +1,12 @@
 import { existsSync, statSync, writeFileSync } from "fs";
 import path from "path";
 import { appDir } from "./configuration.js";
-import { Decision, MatchMode, TORRENT_CACHE_FOLDER } from "./constants.js";
+import {
+	Decision,
+	MatchMode,
+	RELEASE_GROUP_REGEX,
+	TORRENT_CACHE_FOLDER,
+} from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
@@ -30,6 +35,8 @@ const createReasonLogger =
 		}
 		let reason;
 		switch (decision) {
+			case Decision.MATCH_SIZE_ONLY:
+				return;
 			case Decision.MATCH:
 				return;
 			case Decision.SIZE_MISMATCH:
@@ -49,6 +56,9 @@ const createReasonLogger =
 				break;
 			case Decision.FILE_TREE_MISMATCH:
 				reason = "it has a different file tree";
+				break;
+			case Decision.RELEASE_GROUP_MISMATCH:
+				reason = "it has a different release group";
 				break;
 			default:
 				reason = decision;
@@ -97,8 +107,24 @@ function sizeDoesMatch(resultSize, searchee) {
 	return resultSize >= lowerBound && resultSize <= upperBound;
 }
 
+function releaseGroupDoesMatch(
+	searcheeName: string,
+	candidateName: string,
+	matchMode: MatchMode
+) {
+	const searcheeMatch = searcheeName.match(RELEASE_GROUP_REGEX);
+	const candidateMatch = candidateName.match(RELEASE_GROUP_REGEX);
+
+	// if we are unsure, pass in risky mode but fail in safe mode
+	if (!searcheeMatch || !candidateMatch) {
+		return matchMode === MatchMode.RISKY;
+	}
+
+	return searcheeMatch[0].toLowerCase() === candidateMatch[0].toLowerCase();
+}
+
 async function assessCandidateHelper(
-	{ link, size }: Candidate,
+	{ link, size, name }: Candidate,
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
@@ -109,6 +135,9 @@ async function assessCandidateHelper(
 	}
 
 	if (!link) return { decision: Decision.NO_DOWNLOAD_LINK };
+
+	if (!releaseGroupDoesMatch(searchee.name, name, matchMode))
+		return { decision: Decision.RELEASE_GROUP_MISMATCH };
 
 	const result = await parseTorrentFromURL(link);
 
