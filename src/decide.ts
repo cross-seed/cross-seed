@@ -58,7 +58,7 @@ const createReasonLogger =
 				reason = "it has a different file tree";
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
-				reason = "its release group does not match";
+				reason = "it has a different release group";
 				break;
 			default:
 				reason = decision;
