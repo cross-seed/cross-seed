@@ -224,7 +224,7 @@ export default class QBittorrent implements TorrentClient {
 	> {
 		let torrentInfo: TorrentConfiguration;
 		try {
-			if (await this.isInfoHashInClient(searchee.infoHash)) {
+			if (await this.isInfoHashInClient(searchee.infoHash!)) {
 				torrentInfo = await this.getTorrentConfiguration(searchee);
 				if (torrentInfo.save_path === undefined) {
 					return resultOfErr("NOT_FOUND");
@@ -236,7 +236,7 @@ export default class QBittorrent implements TorrentClient {
 			}
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		return resultOf(torrentInfo.save_path);
+		return resultOf(torrentInfo!.save_path);
 	}
 
 	async getTorrentConfiguration(
@@ -289,7 +289,7 @@ export default class QBittorrent implements TorrentClient {
 				return InjectionResult.ALREADY_EXISTS;
 			}
 
-const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
+			const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
 			const buffer = new Blob([newTorrent.encode()], {
 				type: "application/x-bittorrent",
 			});

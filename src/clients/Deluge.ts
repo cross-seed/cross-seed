@@ -322,15 +322,15 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		if (response.result.torrents) {
-			torrent = response.result.torrents?.[searchee.infoHash];
+		if (response.result!.torrents) {
+			torrent = response.result!.torrents?.[searchee.infoHash!];
 		} else {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
 		if (torrent === undefined) {
 			return resultOfErr("NOT_FOUND");
 		} else if (
-			response.result.torrents?.[searchee.infoHash].progress !== 100
+			response.result!.torrents?.[searchee.infoHash!].progress !== 100
 		) {
 			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}

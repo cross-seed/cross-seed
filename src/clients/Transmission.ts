@@ -157,7 +157,9 @@ export default class Transmission implements TorrentClient {
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		const result = await this.checkOriginalTorrent(searchee);
+		const result = await this.checkOriginalTorrent(
+			searchee as SearcheeWithInfoHash
+		);
 		return result
 			.mapOk((r) => r.downloadDir)
 			.mapErr((err) => (err === "FAILURE" ? "UNKNOWN_ERROR" : err));

@@ -263,7 +263,9 @@ export default class RTorrent implements TorrentClient {
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		const result = await this.checkOriginalTorrent(searchee);
+		const result = await this.checkOriginalTorrent(
+			searchee as SearcheeWithInfoHash
+		);
 		return result
 			.mapOk(({ directoryBase, isMultiFile }) => {
 				return isMultiFile ? dirname(directoryBase) : directoryBase;

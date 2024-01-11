@@ -54,7 +54,7 @@ export async function performAction(
 			linkExact(
 				searchee.infoHash
 					? downloadDirResult.unwrapOrThrow()
-					: searchee.path,
+					: searchee.path!,
 				trackerLinkDir
 			);
 		} else if (decision == Decision.MATCH_SIZE_ONLY) {
@@ -71,7 +71,7 @@ export async function performAction(
 			linkFile(
 				searchee.infoHash
 					? downloadDirResult.unwrapOrThrow()
-					: searchee.path,
+					: searchee.path!,
 
 				join(correctedlinkDir, newMeta.files[0].name)
 			);
