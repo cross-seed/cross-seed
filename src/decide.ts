@@ -119,8 +119,9 @@ function releaseGroupDoesMatch(
 	if (!searcheeMatch || !candidateMatch) {
 		return matchMode === MatchMode.RISKY;
 	}
-
-	return searcheeMatch[0].toLowerCase() === candidateMatch[0].toLowerCase();
+	return searcheeMatch[0]
+		.toLowerCase()
+		.startsWith(candidateMatch[0].toLowerCase());
 }
 
 async function assessCandidateHelper(
