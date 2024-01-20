@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { basename, dirname, join, resolve } from "path";
+import { basename, dirname, join, resolve, sep } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -53,7 +53,11 @@ export async function performAction(
 		if (decision == Decision.MATCH) {
 			linkExact(
 				searchee.infoHash
-					? downloadDirResult.unwrapOrThrow()
+					? `${downloadDirResult.unwrapOrThrow()}${sep}${
+							newMeta.isSingleFileTorrent
+								? newMeta.files[0].name
+								: searchee.name
+					  }`
 					: searchee.path!,
 				trackerLinkDir
 			);
