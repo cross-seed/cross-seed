@@ -62,7 +62,10 @@ export function filterByContent(searchee: Searchee): boolean {
 	return true;
 }
 
-function releaseInBlockList(release: string, blockList: string[]): boolean {
+export function releaseInBlockList(
+	release: string,
+	blockList: string[]
+): boolean {
 	return blockList.some((str) => release.includes(str));
 }
 
