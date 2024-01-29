@@ -245,6 +245,12 @@ function createCommandWithSharedOptions(name, description) {
 			"The number of searches before stops",
 			parseInt,
 			fallback(fileConfig.searchLimit, 0)
+		)
+		.option(
+			"--block-list <strings>",
+			"The strings you wish to block",
+			// @ts-expect-error commander supports non-string defaults
+			fallback(fileConfig.blockList, [])
 		);
 }
 

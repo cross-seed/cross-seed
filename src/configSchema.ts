@@ -74,7 +74,7 @@ function transformDurationString(durationStr: string, ctx) {
 
 /**
  * helper function for directory validation
- * @return true if valid formatting
+ * @return path if valid formatting
  */
 function checkValidPathFormat(path: string, ctx) {
 	if (sep === "\\" && !path.includes("\\") && !path.includes("/")) {
@@ -167,6 +167,10 @@ export const VALIDATION_SCHEMA = z
 		searchLimit: z.number().nonnegative().nullish(),
 		verbose: z.boolean(),
 		torrents: z.array(z.string()).optional(),
+		blockList: z
+			.array(z.string())
+			.nullish()
+			.transform((value) => (Array.isArray(value) ? value : [])),
 	})
 	.strict()
 	.refine(

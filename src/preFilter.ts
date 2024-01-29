@@ -10,14 +10,23 @@ import { humanReadable, nMsAgo } from "./utils.js";
 import path from "path";
 
 export function filterByContent(searchee: Searchee): boolean {
-	const { includeEpisodes, includeNonVideos, includeSingleEpisodes } =
-		getRuntimeConfig();
+	const {
+		includeEpisodes,
+		includeNonVideos,
+		includeSingleEpisodes,
+		blockList,
+	} = getRuntimeConfig();
 
 	function logReason(reason): void {
 		logger.verbose({
 			label: Label.PREFILTER,
 			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
 		});
+	}
+
+	if (releaseInBlockList(searchee.name, blockList)) {
+		logReason("it matched the blocklist");
+		return false;
 	}
 
 	const isSingleEpisodeTorrent =
@@ -51,6 +60,10 @@ export function filterByContent(searchee: Searchee): boolean {
 	}
 
 	return true;
+}
+
+function releaseInBlockList(release: string, blockList: string[]): boolean {
+	return blockList.some((str) => release.includes(str));
 }
 
 export function filterDupes(searchees: Searchee[]): Searchee[] {
