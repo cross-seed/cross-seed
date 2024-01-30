@@ -66,7 +66,6 @@ export async function performAction(
 			// single, nested file torrents.
 			const candidateParentDir = dirname(newMeta.files[0].path);
 			let correctedlinkDir = trackerLinkDir;
-
 			// Candidate is single, nested file
 			if (candidateParentDir !== ".") {
 				correctedlinkDir = join(trackerLinkDir, candidateParentDir);
@@ -74,10 +73,17 @@ export async function performAction(
 			}
 			linkFile(
 				searchee.infoHash
-					? downloadDirResult.unwrapOrThrow()
+					? `${downloadDirResult.unwrapOrThrow()}${sep}${
+							searchee.files[0].path
+					  }`
 					: searchee.path!,
 
-				join(correctedlinkDir, newMeta.files[0].name)
+				join(
+					correctedlinkDir,
+					newMeta.isSingleFileTorrent
+						? newMeta.files[0].name
+						: basename(newMeta.files[0].path)
+				)
 			);
 		}
 	}
