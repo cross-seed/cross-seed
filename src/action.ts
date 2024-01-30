@@ -42,9 +42,10 @@ export async function performAction(
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 	const trackerLinkDir = linkDir ? join(linkDir, tracker) : undefined;
+
 	if (trackerLinkDir) {
 		const downloadDirResult = await getClient().getDownloadDir(searchee);
-		if (downloadDirResult.isErr()) {
+		if (searchee.infoHash && downloadDirResult.isErr()) {
 			// TODO figure out something better or add logging
 			return InjectionResult.FAILURE;
 		}
@@ -64,6 +65,7 @@ export async function performAction(
 		} else if (decision == Decision.MATCH_SIZE_ONLY) {
 			// Size only matching is only supported for single file or
 			// single, nested file torrents.
+
 			const candidateParentDir = dirname(newMeta.files[0].path);
 			let correctedlinkDir = trackerLinkDir;
 			// Candidate is single, nested file
