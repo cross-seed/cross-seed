@@ -1,5 +1,10 @@
 import fetch from "node-fetch";
-import { ActionResult, InjectionResult, SaveResult } from "./constants.js";
+import {
+	ActionResult,
+	InjectionResult,
+	SaveResult,
+	USER_AGENT,
+} from "./constants.js";
 import { ResultAssessment } from "./decide.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -24,15 +29,38 @@ export class PushNotifier {
 		this.url = url;
 	}
 
-	notify({ title = "cross-seed", body, ...rest }: PushNotification): void {
+	async notify({
+		title = "cross-seed",
+		body,
+		...rest
+	}: PushNotification): Promise<void> {
 		if (this.url) {
-			fetch(this.url, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ title, body, ...rest }),
-			}).catch(() => {
-				logger.error({ message: "Failed to send push notification" });
-			});
+			try {
+				const response = await fetch(this.url, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"User-Agent": USER_AGENT,
+					},
+					body: JSON.stringify({ title, body, ...rest }),
+				});
+
+				if (!response.ok) {
+					logger.error({
+						message: "Failed to send push notification",
+					});
+					logger.debug({
+						message: `Server response: ${response.status} ${response.statusText}`,
+					});
+				}
+			} catch (error) {
+				logger.error({
+					message: "Failed to send push notification",
+				});
+				logger.debug({
+					message: error,
+				});
+			}
 		}
 	}
 }
