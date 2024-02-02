@@ -117,7 +117,9 @@ function releaseGroupDoesMatch(
 
 	// if we are unsure, pass in risky mode but fail in safe mode
 	if (!searcheeMatch || !candidateMatch) {
-		return matchMode === MatchMode.RISKY;
+		return matchMode === MatchMode.RISKY
+			? searcheeMatch || candidateMatch
+			: !searcheeMatch && !candidateMatch;
 	}
 	return searcheeMatch[0]
 		.toLowerCase()
