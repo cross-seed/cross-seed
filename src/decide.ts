@@ -140,7 +140,7 @@ async function assessCandidateHelper(
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
 	const { matchMode, blockList } = getRuntimeConfig();
-	if (releaseInBlockList(searchee.name, blockList)) {
+	if (releaseInBlockList(searchee, blockList)) {
 		return { decision: Decision.BLOCKED_RELEASE };
 	}
 	if (size && !sizeDoesMatch(size, searchee)) {

@@ -1,6 +1,11 @@
 import ms from "ms";
 import { extname } from "path";
-import { EP_REGEX, SEASON_REGEX, VIDEO_EXTENSIONS } from "./constants.js";
+import {
+	EP_REGEX,
+	INFOHASH_REGEX,
+	SEASON_REGEX,
+	VIDEO_EXTENSIONS,
+} from "./constants.js";
 import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
@@ -24,7 +29,7 @@ export function filterByContent(searchee: Searchee): boolean {
 		});
 	}
 
-	if (releaseInBlockList(searchee.name, blockList)) {
+	if (releaseInBlockList(searchee, blockList)) {
 		logReason("it matched the blocklist");
 		return false;
 	}
@@ -63,10 +68,16 @@ export function filterByContent(searchee: Searchee): boolean {
 }
 
 export function releaseInBlockList(
-	release: string,
+	searchee: Searchee,
 	blockList: string[]
 ): boolean {
-	return blockList.some((str) => release.includes(str));
+	return blockList.some((str) => {
+		if (str.length === 40 && INFOHASH_REGEX.test(str)) {
+			return searchee.infoHash && str === searchee.infoHash;
+		} else {
+			return searchee.name.includes(str);
+		}
+	});
 }
 
 export function filterDupes(searchees: Searchee[]): Searchee[] {

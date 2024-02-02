@@ -248,7 +248,7 @@ function createCommandWithSharedOptions(name, description) {
 		)
 		.option(
 			"--block-list <strings>",
-			"The strings you wish to block",
+			"The infohashes and/or strings in torrent name to block from cross-seed",
 			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.blockList, [])
 		);
