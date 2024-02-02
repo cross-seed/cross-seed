@@ -112,8 +112,8 @@ function releaseGroupDoesMatch(
 	candidateName: string,
 	matchMode: MatchMode
 ) {
-	const searcheeMatch = searcheeName.match(RELEASE_GROUP_REGEX);
-	const candidateMatch = candidateName.match(RELEASE_GROUP_REGEX);
+	const searcheeMatch = searcheeName.match(RELEASE_GROUP_REGEX)[0]?.trim();
+	const candidateMatch = candidateName.match(RELEASE_GROUP_REGEX)[0]?.trim();
 
 	// if we are unsure, pass in risky mode but fail in safe mode
 	if (!searcheeMatch || !candidateMatch) {
@@ -121,9 +121,7 @@ function releaseGroupDoesMatch(
 			? searcheeMatch || candidateMatch
 			: !searcheeMatch && !candidateMatch;
 	}
-	return searcheeMatch[0]
-		.toLowerCase()
-		.startsWith(candidateMatch[0].toLowerCase());
+	return searcheeMatch.toLowerCase().startsWith(candidateMatch.toLowerCase());
 }
 
 async function assessCandidateHelper(
