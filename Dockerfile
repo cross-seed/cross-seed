@@ -1,9 +1,8 @@
 # Build Stage
-FROM node:18-alpine AS build-stage
+FROM node:20-alpine AS build-stage
 WORKDIR /usr/src/cross-seed
 COPY package*.json ./
-RUN npm install -g npm@9 \
-    && npm ci
+RUN npm ci
 COPY tsconfig.json tsconfig.json
 COPY src src
 RUN npm run build \
@@ -11,7 +10,7 @@ RUN npm run build \
     && rm -rf src tsconfig.json
 
 # Production Stage
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /usr/src/cross-seed
 COPY --from=build-stage /usr/src/cross-seed .
 RUN npm link
