@@ -18,7 +18,7 @@ import {
 	parseTorrentFromURL,
 	SnatchError,
 } from "./torrent.js";
-import { startsWithIgnoreCase } from "./utils.js";
+import { startsWithIgnoringCase } from "./utils.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -122,7 +122,7 @@ function releaseGroupDoesMatch(
 			? searcheeMatch || candidateMatch
 			: !searcheeMatch && !candidateMatch;
 	}
-	return startsWithIgnoreCase(searcheeMatch[0], candidateMatch[0]);
+	return startsWithIgnoringCase(searcheeMatch, candidateMatch);
 }
 
 async function assessCandidateHelper(

@@ -114,10 +114,10 @@ export function extractCredentialsFromUrl(
 	}
 }
 
-export function startsWithIgnoreCase(a: string, b: string): boolean {
+export function startsWithIgnoringCase(a: string, b: string): boolean {
 	if (a.length < b.length) {
 		return false;
 	}
-	const prefix = a.substring(0, b.length)
-	return prefix.localeCompare(b, undefined, { sensitivity: 'base'}) === 0
+	const prefix = a.substring(0, b.length);
+	return prefix.localeCompare(b, undefined, { sensitivity: "base" }) === 0;
 }
