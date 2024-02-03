@@ -2,8 +2,7 @@
 FROM node:20-alpine AS build-stage
 WORKDIR /usr/src/cross-seed
 COPY package*.json ./
-RUN apk add --no-cache build-base python3 && \
-    npm ci
+RUN npm ci
 COPY tsconfig.json ./
 COPY src src
 RUN npm run build && \
