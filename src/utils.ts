@@ -113,3 +113,11 @@ export function extractCredentialsFromUrl(
 		return resultOfErr("invalid URL");
 	}
 }
+
+export function startsWithIgnoreCase(a: string, b: string): boolean {
+	if (a.length < b.length) {
+		return false;
+	}
+	const prefix = a.substring(0, b.length)
+	return prefix.localeCompare(b, undefined, { sensitivity: 'base'}) === 0
+}
