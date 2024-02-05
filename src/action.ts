@@ -40,53 +40,59 @@ export async function performAction(
 	searchee: Searchee,
 	tracker: string
 ): Promise<ActionResult> {
-	const { action, linkDir } = getRuntimeConfig();
-	const trackerLinkDir = linkDir ? join(linkDir, tracker) : undefined;
+	const { action, linkDir, legacyLinking } = getRuntimeConfig();
+	const fullLinkPath = linkDir
+		? legacyLinking
+			? linkDir
+			: join(linkDir, tracker)
+		: undefined;
+	const downloadDirResult = await getClient().getDownloadDir(searchee);
+	let sourceExists = false;
 
-	if (trackerLinkDir) {
-		const downloadDirResult = await getClient().getDownloadDir(searchee);
+	if (fullLinkPath) {
 		if (searchee.infoHash && downloadDirResult.isErr()) {
 			// TODO figure out something better or add logging
+			logger.debug(downloadDirResult.unwrapErrOrThrow());
 			return InjectionResult.FAILURE;
 		}
-		mkdirSync(trackerLinkDir, { recursive: true });
+		const sourceFile = `${downloadDirResult.unwrapOrThrow()}${sep}${
+			newMeta.isSingleFileTorrent ? newMeta.files[0].name : searchee.name
+		}`;
+		sourceExists = existsSync(sourceFile);
+		if (sourceExists) {
+			mkdirSync(fullLinkPath, { recursive: true });
 
-		if (decision == Decision.MATCH) {
-			linkExact(
-				searchee.infoHash
-					? `${downloadDirResult.unwrapOrThrow()}${sep}${
-							newMeta.isSingleFileTorrent
-								? newMeta.files[0].name
-								: searchee.name
-					  }`
-					: searchee.path!,
-				trackerLinkDir
-			);
-		} else if (decision == Decision.MATCH_SIZE_ONLY) {
-			// Size only matching is only supported for single file or
-			// single, nested file torrents.
+			if (decision == Decision.MATCH) {
+				linkExact(
+					searchee.infoHash ? sourceFile : searchee.path!,
+					fullLinkPath
+				);
+			} else if (decision == Decision.MATCH_SIZE_ONLY) {
+				// Size only matching is only supported for single file or
+				// single, nested file torrents.
 
-			const candidateParentDir = dirname(newMeta.files[0].path);
-			let correctedlinkDir = trackerLinkDir;
-			// Candidate is single, nested file
-			if (candidateParentDir !== ".") {
-				correctedlinkDir = join(trackerLinkDir, candidateParentDir);
-				mkdirSync(correctedlinkDir, { recursive: true });
+				const candidateParentDir = dirname(newMeta.files[0].path);
+				let correctedlinkDir = fullLinkPath;
+				// Candidate is single, nested file
+				if (candidateParentDir !== ".") {
+					correctedlinkDir = join(fullLinkPath, candidateParentDir);
+					mkdirSync(correctedlinkDir, { recursive: true });
+				}
+				linkFile(
+					searchee.infoHash
+						? `${downloadDirResult.unwrapOrThrow()}${sep}${
+								searchee.files[0].path
+						  }`
+						: searchee.path!,
+
+					join(
+						correctedlinkDir,
+						newMeta.isSingleFileTorrent
+							? newMeta.files[0].name
+							: basename(newMeta.files[0].path)
+					)
+				);
 			}
-			linkFile(
-				searchee.infoHash
-					? `${downloadDirResult.unwrapOrThrow()}${sep}${
-							searchee.files[0].path
-					  }`
-					: searchee.path!,
-
-				join(
-					correctedlinkDir,
-					newMeta.isSingleFileTorrent
-						? newMeta.files[0].name
-						: basename(newMeta.files[0].path)
-				)
-			);
 		}
 	}
 
@@ -96,7 +102,9 @@ export async function performAction(
 		const result = await getClient().inject(
 			newMeta,
 			searchee,
-			trackerLinkDir
+			linkDir && sourceExists
+				? fullLinkPath
+				: downloadDirResult.unwrapOrThrow()
 		);
 		switch (result) {
 			case InjectionResult.SUCCESS:
