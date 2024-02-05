@@ -152,23 +152,36 @@ export default class Transmission implements TorrentClient {
 		return resultOf({ downloadDir });
 	}
 
+	async getDownloadDir(
+		searchee: Searchee
+	): Promise<
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
+	> {
+		const result = await this.checkOriginalTorrent(
+			searchee as SearcheeWithInfoHash
+		);
+		return result
+			.mapOk((r) => r.downloadDir)
+			.mapErr((err) => (err === "FAILURE" ? "UNKNOWN_ERROR" : err));
+	}
+
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
 		path?: string
 	): Promise<InjectionResult> {
 		let downloadDir: string;
-
 		if (path) {
 			downloadDir = path;
 		} else {
-			const result = await this.checkOriginalTorrent(
+			const result = await this.getDownloadDir(
 				searchee as SearcheeWithInfoHash
 			);
 			if (result.isErr()) {
-				return result.unwrapErrOrThrow();
+				return InjectionResult.FAILURE;
+			} else {
+				downloadDir = result.unwrapOrThrow();
 			}
-			downloadDir = result.unwrapOrThrow().downloadDir;
 		}
 
 		let addResponse: TorrentAddResponse;

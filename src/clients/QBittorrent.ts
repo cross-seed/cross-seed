@@ -7,6 +7,7 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
+import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
 
 const X_WWW_FORM_URLENCODED = {
@@ -79,6 +80,12 @@ interface TorrentFiles {
 interface Category {
 	name: string;
 	savePath: string;
+}
+interface TorrentConfiguration {
+	save_path: string;
+	isComplete: boolean;
+	autoTMM: boolean;
+	category: string;
 }
 
 export default class QBittorrent implements TorrentClient {
@@ -210,13 +217,31 @@ export default class QBittorrent implements TorrentClient {
 			return false;
 		}
 	}
+	async getDownloadDir(
+		searchee: Searchee
+	): Promise<
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
+	> {
+		let torrentInfo: TorrentConfiguration;
+		try {
+			if (await this.isInfoHashInClient(searchee.infoHash!)) {
+				torrentInfo = await this.getTorrentConfiguration(searchee);
+				if (torrentInfo.save_path === undefined) {
+					return resultOfErr("NOT_FOUND");
+				}
+			}
+		} catch (e) {
+			if (e.includes("retrieve")) {
+				return resultOfErr("NOT_FOUND");
+			}
+			return resultOfErr("UNKNOWN_ERROR");
+		}
+		return resultOf(torrentInfo!.save_path);
+	}
 
-	async getTorrentConfiguration(searchee: Searchee): Promise<{
-		save_path: string;
-		isComplete: boolean;
-		autoTMM: boolean;
-		category: string;
-	}> {
+	async getTorrentConfiguration(
+		searchee: Searchee
+	): Promise<TorrentConfiguration> {
 		const responseText = await this.request(
 			"/torrents/info",
 			`hashes=${searchee.infoHash}`,
@@ -268,7 +293,6 @@ export default class QBittorrent implements TorrentClient {
 			const buffer = new Blob([newTorrent.encode()], {
 				type: "application/x-bittorrent",
 			});
-
 			const { save_path, isComplete, autoTMM, category } = path
 				? {
 						save_path: path,

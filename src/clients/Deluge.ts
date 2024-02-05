@@ -6,7 +6,7 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { extractCredentialsFromUrl } from "../utils.js";
-
+import { Result, resultOf, resultOfErr } from "../Result.js";
 interface TorrentInfo {
 	complete?: boolean;
 	save_path: string;
@@ -305,6 +305,36 @@ export default class Deluge implements TorrentClient {
 				download_location: path,
 			},
 		];
+	}
+
+	/**
+	 * returns directory of a infohash in deluge as a string
+	 */
+	async getDownloadDir(
+		searchee: Searchee
+	): Promise<
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
+	> {
+		let torrent: TorrentInfo, response: DelugeJSON<TorrentStatus>;
+		const params = [["save_path", "progress"], { hash: searchee.infoHash }];
+		try {
+			response = await this.call<TorrentStatus>("web.update_ui", params);
+		} catch (e) {
+			return resultOfErr("UNKNOWN_ERROR");
+		}
+		if (response.result!.torrents) {
+			torrent = response.result!.torrents?.[searchee.infoHash!];
+		} else {
+			return resultOfErr("UNKNOWN_ERROR");
+		}
+		if (torrent === undefined) {
+			return resultOfErr("NOT_FOUND");
+		} else if (
+			response.result!.torrents?.[searchee.infoHash!].progress !== 100
+		) {
+			return resultOfErr("TORRENT_NOT_COMPLETE");
+		}
+		return resultOf(torrent.save_path);
 	}
 
 	/**

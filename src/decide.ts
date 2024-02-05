@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from "fs";
+import { existsSync, statSync, writeFileSync } from "fs";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
@@ -135,7 +135,7 @@ async function assessCandidateHelper(
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { matchMode } = getRuntimeConfig();
+	const { matchMode, linkDir } = getRuntimeConfig();
 
 	if (size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
@@ -168,7 +168,18 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (matchMode == MatchMode.RISKY && searchee.files.length === 1) {
+	if (!searchee.path && !linkDir) {
+		return { decision: Decision.FILE_TREE_MISMATCH };
+	}
+	if (
+		matchMode == MatchMode.RISKY &&
+		((searchee.path &&
+			!statSync(searchee.path).isDirectory() &&
+			compareFileTreesIgnoringNames(candidateMeta, searchee)) ||
+			(searchee.infoHash &&
+				linkDir &&
+				compareFileTreesIgnoringNames(candidateMeta, searchee)))
+	) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}
 	return { decision: Decision.FILE_TREE_MISMATCH };
