@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { join, resolve, dirname, basename } from "path";
+import { basename, dirname, join, resolve, sep } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -17,13 +17,13 @@ import {
 	LinkType,
 	SaveResult,
 } from "./constants.js";
+import { CrossSeedError } from "./errors.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
-import { CrossSeedError } from "./errors.js";
 
 export async function validateAction(): Promise<void> {
 	const { action } = getRuntimeConfig();
@@ -40,32 +40,57 @@ export async function performAction(
 	searchee: Searchee,
 	tracker: string
 ): Promise<ActionResult> {
-	const { action, linkDir } = getRuntimeConfig();
-	const trackerLinkDir = linkDir ? join(linkDir, tracker) : undefined;
-	if (trackerLinkDir) {
-		mkdirSync(trackerLinkDir, {
-			recursive: true,
-		});
+	const { action, linkDir, legacyLinking } = getRuntimeConfig();
+	const fullLinkPath = linkDir
+		? legacyLinking
+			? linkDir
+			: join(linkDir, tracker)
+		: undefined;
+	const downloadDirResult = await getClient().getDownloadDir(searchee);
+	let sourceExists = false;
 
-		if (searchee.path) {
+	if (fullLinkPath) {
+		if (searchee.infoHash && downloadDirResult.isErr()) {
+			// TODO figure out something better or add logging
+			logger.debug(downloadDirResult.unwrapErrOrThrow());
+			return InjectionResult.FAILURE;
+		}
+		const sourceFile = `${downloadDirResult.unwrapOrThrow()}${sep}${
+			newMeta.isSingleFileTorrent ? newMeta.files[0].name : searchee.name
+		}`;
+		sourceExists = existsSync(sourceFile);
+		if (sourceExists) {
+			mkdirSync(fullLinkPath, { recursive: true });
+
 			if (decision == Decision.MATCH) {
-				await linkExact(searchee.path, trackerLinkDir);
+				linkExact(
+					searchee.infoHash ? sourceFile : searchee.path!,
+					fullLinkPath
+				);
 			} else if (decision == Decision.MATCH_SIZE_ONLY) {
 				// Size only matching is only supported for single file or
 				// single, nested file torrents.
-				const candidateParentDir = dirname(newMeta.files[0].path);
-				let correctedlinkDir = trackerLinkDir;
 
+				const candidateParentDir = dirname(newMeta.files[0].path);
+				let correctedlinkDir = fullLinkPath;
 				// Candidate is single, nested file
 				if (candidateParentDir !== ".") {
-					mkdirSync(join(trackerLinkDir, candidateParentDir), {
-						recursive: true,
-					});
-					correctedlinkDir = join(trackerLinkDir, candidateParentDir);
+					correctedlinkDir = join(fullLinkPath, candidateParentDir);
+					mkdirSync(correctedlinkDir, { recursive: true });
 				}
 				linkFile(
-					searchee.path,
-					join(correctedlinkDir, newMeta.files[0].name)
+					searchee.infoHash
+						? `${downloadDirResult.unwrapOrThrow()}${sep}${
+								searchee.files[0].path
+						  }`
+						: searchee.path!,
+
+					join(
+						correctedlinkDir,
+						newMeta.isSingleFileTorrent
+							? newMeta.files[0].name
+							: basename(newMeta.files[0].path)
+					)
 				);
 			}
 		}
@@ -77,7 +102,9 @@ export async function performAction(
 		const result = await getClient().inject(
 			newMeta,
 			searchee,
-			searchee.path ? trackerLinkDir : undefined
+			linkDir && sourceExists
+				? fullLinkPath
+				: downloadDirResult.unwrapOrThrow()
 		);
 		switch (result) {
 			case InjectionResult.SUCCESS:

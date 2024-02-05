@@ -118,6 +118,11 @@ function createCommandWithSharedOptions(name, description) {
 			"Directory to output data-matched hardlinks to",
 			fileConfig.linkDir
 		)
+		.option(
+			"--legacy-linking",
+			"Use flat linking directory structure (without individual tracker folders)",
+			fallback(fileConfig.legacyLinking, false)
+		)
 		.addOption(
 			new Option(
 				"--link-type <type>",
