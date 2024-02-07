@@ -1,11 +1,6 @@
 import ms from "ms";
 import { extname } from "path";
-import {
-	EP_REGEX,
-	INFOHASH_REGEX,
-	SEASON_REGEX,
-	VIDEO_EXTENSIONS,
-} from "./constants.js";
+import { EP_REGEX, SEASON_REGEX, VIDEO_EXTENSIONS } from "./constants.js";
 import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
