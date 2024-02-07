@@ -129,7 +129,7 @@ async function assessCandidateHelper(
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { matchMode } = getRuntimeConfig();
+	const { matchMode, linkDir } = getRuntimeConfig();
 
 	if (size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
@@ -153,17 +153,24 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
+	const sizeMatch = compareFileTreesIgnoringNames(candidateMeta, searchee);
+	if (!sizeMatch) {
+		return { decision: Decision.SIZE_MISMATCH };
+	}
+
 	const perfectMatch = compareFileTrees(candidateMeta, searchee);
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (!searchee.path) {
+	if (!searchee.path && !linkDir) {
 		return { decision: Decision.FILE_TREE_MISMATCH };
 	}
+	// linkdir exists and is torrent, so torrent should be linked?
 	if (
+		searchee.path &&
 		matchMode == MatchMode.RISKY &&
-		!statSync(searchee.path).isDirectory() &&
-		compareFileTreesIgnoringNames(candidateMeta, searchee)
+		!statSync(searchee.path).isDirectory() //&&  not sure if this is necessary anymore with datamatching - we tested this and files can be linked into dirs and shit
+		// not necessary since sizeMatch will always be true - compareFileTreesIgnoringNames(candidateMeta, searchee)
 	) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}
