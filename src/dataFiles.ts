@@ -1,6 +1,10 @@
 import { readdirSync, statSync } from "fs";
-import { extname, join } from "path";
-import { DATA_EXTENSIONS } from "./constants.js";
+import { basename, extname, join } from "path";
+import {
+	BADFOLDERS_REGEX,
+	DATA_EXTENSIONS,
+	IGNOREDFILES_REGEX,
+} from "./constants.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export function findPotentialNestedRoots(
@@ -10,7 +14,12 @@ export function findPotentialNestedRoots(
 ): string[] {
 	const isDir =
 		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
-
+	if (
+		IGNOREDFILES_REGEX.test(basename(root)) ||
+		BADFOLDERS_REGEX.test(basename(root))
+	) {
+		return [];
+	}
 	// if depth is 0, don't look at children
 	if (depth > 0 && isDir) {
 		const directChildren = readdirSync(root, { withFileTypes: true });

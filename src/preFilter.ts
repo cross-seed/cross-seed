@@ -71,19 +71,11 @@ export function releaseInBlockList(
 	searchee: Searchee,
 	blockList: string[]
 ): boolean {
-	const IGNOREDFILES_REGEX =
-		/.+\.((mp3)|(m3u)|(vob)|(bup)|(ifo)|(nfo)|(sfv)|(bmdv)|(mpls)|(clpi)|(m2ts))$/i;
-	const BADFOLDERS_REGEX =
-		/^((S(eason )?\d{1,4})|((CD|DVD|DISC)\d{1,2})|(BDMV)|(CERTIFICATE)|(VIDEO_TS)|(SAMPLE)|(PROOF)|(BACKUP)|(CLIPINF)|(META)|(PLAYLIST)|(STREAM))$/i;
 	return blockList.some((str) => {
 		if (str.length === 40 && INFOHASH_REGEX.test(str)) {
 			return searchee.infoHash && str === searchee.infoHash;
 		} else {
-			return (
-				searchee.name.includes(str) ||
-				BADFOLDERS_REGEX.test(searchee.name) ||
-				IGNOREDFILES_REGEX.test(searchee.name)
-			);
+			return searchee.name.includes(str);
 		}
 	});
 }

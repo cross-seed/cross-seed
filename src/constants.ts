@@ -22,6 +22,10 @@ export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi"];
 export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
+export const IGNOREDFILES_REGEX =
+	/.+\.(mp3|m3u|vob|bup|ifo|nfo|sfv|bmdv|mpls|clpi|m2ts)$/i;
+export const BADFOLDERS_REGEX =
+	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2})|BDMV|CERTIFICATE|VIDEO_TS|SAMPLE|PROOF|BACKUP|CLIPINF|META|PLAYLIST|STREAM)$/i;
 
 export enum Action {
 	SAVE = "save",
