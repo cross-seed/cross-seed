@@ -1,4 +1,4 @@
-import { existsSync, statSync, writeFileSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
@@ -129,7 +129,7 @@ async function assessCandidateHelper(
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { matchMode, linkDir } = getRuntimeConfig();
+	const { matchMode } = getRuntimeConfig();
 
 	if (size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
@@ -162,16 +162,7 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (!searchee.path && !linkDir) {
-		return { decision: Decision.FILE_TREE_MISMATCH };
-	}
-	// linkdir exists and is torrent, so torrent should be linked?
-	if (
-		searchee.path &&
-		matchMode == MatchMode.RISKY &&
-		!statSync(searchee.path).isDirectory() //&&  not sure if this is necessary anymore with datamatching - we tested this and files can be linked into dirs and shit
-		// not necessary since sizeMatch will always be true - compareFileTreesIgnoringNames(candidateMeta, searchee)
-	) {
+	if (matchMode == MatchMode.RISKY && searchee.files.length === 1) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}
 	return { decision: Decision.FILE_TREE_MISMATCH };
