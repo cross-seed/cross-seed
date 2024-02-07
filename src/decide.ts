@@ -112,16 +112,22 @@ function releaseGroupDoesMatch(
 	candidateName: string,
 	matchMode: MatchMode
 ) {
-	const searcheeMatch = searcheeName.match(RELEASE_GROUP_REGEX);
-	const candidateMatch = candidateName.match(RELEASE_GROUP_REGEX);
-
+	const searcheeReleaseGroup = searcheeName
+		.match(RELEASE_GROUP_REGEX)?.[0]
+		?.trim()
+		?.toLowerCase();
+	const candidateReleaseGroup = candidateName
+		.match(RELEASE_GROUP_REGEX)?.[0]
+		?.trim()
+		?.toLowerCase();
+	if (searcheeReleaseGroup === candidateReleaseGroup) {
+		return true;
+	}
 	// if we are unsure, pass in risky mode but fail in safe mode
-	if (!searcheeMatch || !candidateMatch) {
+	if (!searcheeReleaseGroup || !candidateReleaseGroup) {
 		return matchMode === MatchMode.RISKY;
 	}
-	return searcheeMatch[0]
-		.toLowerCase()
-		.startsWith(candidateMatch[0].toLowerCase());
+	return searcheeReleaseGroup.startsWith(candidateReleaseGroup);
 }
 
 async function assessCandidateHelper(
