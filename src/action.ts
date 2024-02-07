@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { basename, dirname, join, resolve, sep } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -23,6 +23,70 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
+
+function logInjectionResult(
+	result: InjectionResult,
+	tracker: string,
+	name: string
+) {
+	const styledName = chalk.green.bold(name);
+	const styledTracker = chalk.bold(tracker);
+	switch (result) {
+		case InjectionResult.SUCCESS:
+			logger.info(`Found ${styledName} on ${styledTracker} - injected`);
+			break;
+		case InjectionResult.ALREADY_EXISTS:
+			logger.info(`Found ${styledName} on ${styledTracker} - exists`);
+			break;
+		case InjectionResult.TORRENT_NOT_COMPLETE:
+			logger.warn(
+				`Found ${styledName} on ${styledTracker} - skipping incomplete torrent`
+			);
+			break;
+		case InjectionResult.FAILURE:
+		default:
+			logger.error(
+				`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
+			);
+			break;
+	}
+}
+
+function fuzzyLinkSingleFile(
+	searchee: Searchee,
+	newMeta: Metafile,
+	destinationDir: string,
+	sourceDir: string
+) {
+	// Size only matching is only supported for single file or
+	// single, nested file torrents.
+
+	const candidateParentDir = dirname(newMeta.files[0].path);
+	let correctedLinkDir = destinationDir;
+	// Candidate is single, nested file
+
+	// destinationDir is /Movies/PTP
+	// newMeta has a file that looks like Movie/Movie/Movie.mkv
+	if (candidateParentDir !== ".") {
+		correctedLinkDir = join(destinationDir, candidateParentDir);
+		mkdirSync(correctedLinkDir, { recursive: true });
+	}
+
+	// linking happens
+	// we link from <> to /Movies/PTP/Movie/Movie/Movie.mkv
+
+	linkFile(
+		searchee.infoHash
+			? join(sourceDir, searchee.files[0].path)
+			: searchee.path!,
+		join(
+			correctedLinkDir,
+			newMeta.isSingleFileTorrent
+				? newMeta.files[0].name
+				: basename(newMeta.files[0].path)
+		)
+	);
+}
 
 export async function performAction(
 	newMeta: Metafile,
@@ -45,9 +109,11 @@ export async function performAction(
 			logger.debug(downloadDirResult.unwrapErrOrThrow());
 			return InjectionResult.FAILURE;
 		}
-		const sourceFile = `${downloadDirResult.unwrapOrThrow()}${sep}${
-			newMeta.isSingleFileTorrent ? newMeta.files[0].name : searchee.name
-		}`;
+		const sourceFile = join(
+			downloadDirResult.unwrapOrThrow(),
+			// there may be a reason we need to use newMeta.files[0].name instead
+			searchee.name
+		);
 		sourceExists = existsSync(sourceFile);
 		if (sourceExists) {
 			mkdirSync(fullLinkPath, { recursive: true });
@@ -58,36 +124,16 @@ export async function performAction(
 					fullLinkPath
 				);
 			} else if (decision == Decision.MATCH_SIZE_ONLY) {
-				// Size only matching is only supported for single file or
-				// single, nested file torrents.
-
-				const candidateParentDir = dirname(newMeta.files[0].path);
-				let correctedlinkDir = fullLinkPath;
-				// Candidate is single, nested file
-				if (candidateParentDir !== ".") {
-					correctedlinkDir = join(fullLinkPath, candidateParentDir);
-					mkdirSync(correctedlinkDir, { recursive: true });
-				}
-				linkFile(
-					searchee.infoHash
-						? `${downloadDirResult.unwrapOrThrow()}${sep}${
-								searchee.files[0].path
-						  }`
-						: searchee.path!,
-
-					join(
-						correctedlinkDir,
-						newMeta.isSingleFileTorrent
-							? newMeta.files[0].name
-							: basename(newMeta.files[0].path)
-					)
+				fuzzyLinkSingleFile(
+					searchee,
+					newMeta,
+					fullLinkPath,
+					downloadDirResult.unwrapOrThrow()
 				);
 			}
 		}
 	}
 
-	const styledName = chalk.green.bold(newMeta.name);
-	const styledTracker = chalk.bold(tracker);
 	if (action === Action.INJECT) {
 		const result = await getClient().inject(
 			newMeta,
@@ -96,31 +142,15 @@ export async function performAction(
 				? fullLinkPath
 				: downloadDirResult.unwrapOrThrow()
 		);
-		switch (result) {
-			case InjectionResult.SUCCESS:
-				logger.info(
-					`Found ${styledName} on ${styledTracker} - injected`
-				);
-				break;
-			case InjectionResult.ALREADY_EXISTS:
-				logger.info(`Found ${styledName} on ${styledTracker} - exists`);
-				break;
-			case InjectionResult.TORRENT_NOT_COMPLETE:
-				logger.warn(
-					`Found ${styledName} on ${styledTracker} - skipping incomplete torrent`
-				);
-				break;
-			case InjectionResult.FAILURE:
-			default:
-				logger.error(
-					`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
-				);
-				saveTorrentFile(tracker, getTag(searchee.name), newMeta);
-				break;
+		logInjectionResult(result, tracker, newMeta.name);
+		if (result === InjectionResult.FAILURE) {
+			saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 		}
 		return result;
 	} else {
 		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
+		const styledName = chalk.green.bold(newMeta.name);
+		const styledTracker = chalk.bold(tracker);
 		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
 		return SaveResult.SAVED;
 	}
