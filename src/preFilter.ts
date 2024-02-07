@@ -72,11 +72,12 @@ export function releaseInBlockList(
 	blockList: string[]
 ): boolean {
 	return blockList.some((str) => {
-		if (str.length === 40 && INFOHASH_REGEX.test(str)) {
-			return searchee.infoHash && str === searchee.infoHash;
-		} else {
-			return searchee.name.includes(str);
-		}
+		return (
+			searchee.name.includes(str) ||
+			(str.length === 40 &&
+				searchee.infoHash &&
+				str === searchee.infoHash)
+		);
 	});
 }
 
