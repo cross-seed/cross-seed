@@ -2,11 +2,19 @@ import { readdirSync, statSync } from "fs";
 import { basename, extname, join } from "path";
 import {
 	BADFOLDERS_REGEX,
-	DATA_EXTENSIONS,
-	IGNOREDFILES_REGEX,
+	IGNORED_FOLDERS,
+	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
+function checkIgnorePath(root: string, isDir: boolean) {
+	return (
+		(isDir &&
+			(IGNORED_FOLDERS.includes(basename(root).toLowerCase()) ||
+				BADFOLDERS_REGEX.test(basename(root)))) ||
+		(!isDir && !VIDEO_EXTENSIONS.includes(extname(basename(root))))
+	);
+}
 export function findPotentialNestedRoots(
 	root: string,
 	depth: number,
@@ -14,10 +22,7 @@ export function findPotentialNestedRoots(
 ): string[] {
 	const isDir =
 		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
-	if (
-		IGNOREDFILES_REGEX.test(basename(root)) ||
-		BADFOLDERS_REGEX.test(basename(root))
-	) {
+	if (checkIgnorePath(root, isDir)) {
 		return [];
 	}
 	// if depth is 0, don't look at children
@@ -31,13 +36,8 @@ export function findPotentialNestedRoots(
 			)
 		);
 		return [root, ...allDescendants];
-	} else if (
-		DATA_EXTENSIONS.includes(extname(root)) &&
-		!root.includes("sample")
-	) {
-		return [root];
 	} else {
-		return [];
+		return [root];
 	}
 }
 

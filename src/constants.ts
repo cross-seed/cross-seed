@@ -15,14 +15,9 @@ export const MOVIE_REGEX =
 export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?<group>[\w ]+)(?:\))?(?=(?:\.\w{1,5})?$)/i;
 
-export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi"];
+export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
 
-export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
-
-export const IGNOREDFILES_REGEX =
-	/.+\.(mp3|m3u|vob|bup|ifo|nfo|sfv|bmdv|mpls|clpi|m2ts)$/i;
-export const BADFOLDERS_REGEX =
-	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2})|BDMV|CERTIFICATE|VIDEO_TS|SAMPLE|PROOF|BACKUP)$/i;
+export const BADFOLDERS_REGEX = /^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 
@@ -66,3 +61,12 @@ export enum LinkType {
 	SYMLINK = "symlink",
 	HARDLINK = "hardlink",
 }
+
+export const IGNORED_FOLDERS = [
+	"sample",
+	"proof",
+	"bdmv",
+	"bdrom",
+	"certificate",
+	"video_ts",
+];
