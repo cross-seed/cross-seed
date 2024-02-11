@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { basename, dirname, join, resolve } from "path";
+import { basename, dirname, join, relative, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -19,6 +19,7 @@ import {
 } from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
+import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
@@ -52,95 +53,96 @@ function logInjectionResult(
 	}
 }
 
-function fuzzyLinkSingleFile(
+/**
+ * this may not work with subfolder content layout
+ * @return the root of linked file. most likely "destinationDir/name". Not necessarily a file, it can be a directory
+ */
+function fuzzyLinkOneFile(
 	searchee: Searchee,
 	newMeta: Metafile,
 	destinationDir: string,
-	sourceDir: string
-) {
-	// Size only matching is only supported for single file or
-	// single, nested file torrents.
+	sourceRoot: string
+): string {
+	const srcFilePath = join(
+		sourceRoot,
+		relative(searchee.name, searchee.files[0].path)
+	);
+	const destFilePath = join(destinationDir, newMeta.files[0].path);
+	mkdirSync(dirname(destFilePath), { recursive: true });
+	linkFile(srcFilePath, destFilePath);
+	return join(destinationDir, newMeta.name);
+}
 
-	const candidateParentDir = dirname(newMeta.files[0].path);
-	let correctedLinkDir = destinationDir;
-	// Candidate is single, nested file
-
-	// destinationDir is /Movies/PTP
-	// newMeta has a file that looks like Movie/Movie/Movie.mkv
-	if (candidateParentDir !== ".") {
-		correctedLinkDir = join(destinationDir, candidateParentDir);
-		mkdirSync(correctedLinkDir, { recursive: true });
+async function linkAllFilesInMetafile(
+	searchee: Searchee,
+	newMeta: Metafile,
+	tracker: string,
+	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY
+): Promise<
+	Result<
+		string,
+		| "MISSING_DATA"
+		| "TORRENT_NOT_FOUND"
+		| "TORRENT_NOT_COMPLETE"
+		| "UNKNOWN_ERROR"
+	>
+> {
+	const { linkDir, legacyLinking } = getRuntimeConfig();
+	const fullLinkDir = legacyLinking ? linkDir : join(linkDir, tracker);
+	let sourceRoot: string;
+	if (searchee.path) {
+		sourceRoot = searchee.path;
+	} else {
+		const downloadDirResult = await getClient().getDownloadDir(searchee);
+		if (downloadDirResult.isErr()) {
+			return downloadDirResult.mapErr((e) =>
+				e === "NOT_FOUND" ? "TORRENT_NOT_FOUND" : e
+			);
+		}
+		sourceRoot = join(downloadDirResult.unwrapOrThrow(), searchee.name);
 	}
 
-	// linking happens
-	// we link from <> to /Movies/PTP/Movie/Movie/Movie.mkv
+	if (!existsSync(sourceRoot)) {
+		logger.error(`Linking failed, ${sourceRoot} not found`);
+		return resultOfErr("MISSING_DATA");
+	}
 
-	linkFile(
-		searchee.infoHash
-			? join(sourceDir, searchee.files[0].path)
-			: searchee.path!,
-		join(
-			correctedLinkDir,
-			newMeta.isSingleFileTorrent
-				? newMeta.files[0].name
-				: basename(newMeta.files[0].path)
-		)
+	if (decision === Decision.MATCH) {
+		linkExactTree(sourceRoot, fullLinkDir);
+	}
+	return resultOf(
+		fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot)
 	);
 }
 
 export async function performAction(
 	newMeta: Metafile,
-	decision: Decision,
+	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY,
 	searchee: Searchee,
 	tracker: string
 ): Promise<ActionResult> {
-	const { action, linkDir, legacyLinking } = getRuntimeConfig();
-	const fullLinkPath = linkDir
-		? legacyLinking
-			? linkDir
-			: join(linkDir, tracker)
-		: undefined;
-	const downloadDirResult = await getClient().getDownloadDir(searchee);
-	let sourceExists = false;
+	const { action, linkDir } = getRuntimeConfig();
+	let linkedFilesRoot: string | undefined;
 
-	if (fullLinkPath) {
-		if (searchee.infoHash && downloadDirResult.isErr()) {
-			// TODO figure out something better or add logging
-			logger.debug(downloadDirResult.unwrapErrOrThrow());
+	if (linkDir) {
+		const linkedFilesRootResult = await linkAllFilesInMetafile(
+			searchee,
+			newMeta,
+			tracker,
+			decision
+		);
+		if (linkedFilesRootResult.isErr()) {
+			// TODO
 			return InjectionResult.FAILURE;
 		}
-		const sourceFile = join(
-			downloadDirResult.unwrapOrThrow(),
-			// there may be a reason we need to use newMeta.files[0].name instead
-			searchee.name
-		);
-		sourceExists = existsSync(sourceFile);
-		if (sourceExists) {
-			mkdirSync(fullLinkPath, { recursive: true });
-
-			if (decision == Decision.MATCH) {
-				linkExact(
-					searchee.infoHash ? sourceFile : searchee.path!,
-					fullLinkPath
-				);
-			} else if (decision == Decision.MATCH_SIZE_ONLY) {
-				fuzzyLinkSingleFile(
-					searchee,
-					newMeta,
-					fullLinkPath,
-					downloadDirResult.unwrapOrThrow()
-				);
-			}
-		}
+		linkedFilesRoot = linkedFilesRootResult.unwrapOrThrow();
 	}
 
 	if (action === Action.INJECT) {
 		const result = await getClient().inject(
 			newMeta,
 			searchee,
-			linkDir && sourceExists
-				? fullLinkPath
-				: downloadDirResult.unwrapOrThrow()
+			linkedFilesRoot
 		);
 		logInjectionResult(result, tracker, newMeta.name);
 		if (result === InjectionResult.FAILURE) {
@@ -171,20 +173,21 @@ export async function performActions(searchee, matches) {
 	return results;
 }
 
-function linkExact(oldPath: string, newPath: string) {
-	if (!newPath) {
-		return;
-	}
+/**
+ * @return the root of linked files.
+ */
+
+function linkExactTree(oldPath: string, dest: string): string {
+	const newPath = join(dest, basename(oldPath));
 	if (statSync(oldPath).isFile()) {
-		if (!existsSync(join(newPath, basename(oldPath)))) {
-			linkFile(oldPath, join(newPath, basename(oldPath)));
+		linkFile(oldPath, newPath);
+	} else {
+		mkdirSync(newPath, { recursive: true });
+		for (const dirent of readdirSync(oldPath)) {
+			linkExactTree(join(oldPath, dirent), newPath);
 		}
-		return;
 	}
-	mkdirSync(join(newPath, basename(oldPath)), { recursive: true });
-	readdirSync(oldPath).forEach((file) => {
-		linkExact(join(oldPath, file), join(newPath, basename(oldPath)));
-	});
+	return newPath;
 }
 
 function linkFile(oldPath: string, newPath: string) {
