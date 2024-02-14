@@ -46,6 +46,7 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 			errorMap: zodErrorMap,
 		}) as RuntimeConfig;
 	} catch (error) {
+		console.log(error);
 		logger.verbose({
 			label: Label.CONFIGDUMP,
 			message: inspect(options),
