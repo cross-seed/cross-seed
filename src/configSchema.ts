@@ -15,8 +15,6 @@ const ZodErrorMessages = {
 	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
-	dataBased:
-		"Data-Based Matching requires linkType, dataDirs, and linkDir to be defined.",
 	riskyRecheckWarn:
 		"It is strongly recommended to not skip rechecking for risky matching mode.",
 	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
@@ -92,7 +90,7 @@ function checkValidPathFormat(path: string, ctx) {
 
 export const VALIDATION_SCHEMA = z
 	.object({
-		delay: z.number().positive({
+		delay: z.number().nonnegative({
 			message: ZodErrorMessages.delay,
 		}),
 		torznab: z.array(z.string().url()),
@@ -141,7 +139,7 @@ export const VALIDATION_SCHEMA = z
 		rtorrentRpcUrl: z.string().url().nullish(),
 		transmissionRpcUrl: z.string().url().nullish(),
 		delugeRpcUrl: z.string().url().nullish(),
-		duplicateCategories: z.boolean(),
+		duplicateCategories: z.boolean().nullish(),
 		notificationWebhookUrl: z.string().url().nullish(),
 		port: z
 			.number()
@@ -200,22 +198,6 @@ export const VALIDATION_SCHEMA = z
 			),
 		() => ({
 			message: ZodErrorMessages.injectUrl,
-		})
-	)
-	.refine(
-		(config) => {
-			if (
-				(config.dataDirs !== undefined &&
-					config.dataDirs !== null &&
-					config.dataDirs?.length > 0) ||
-				(config.linkDir !== undefined && config.linkDir !== null)
-			) {
-				return config.dataDirs!.length > 0 && config.linkDir;
-			}
-			return true;
-		},
-		() => ({
-			message: ZodErrorMessages.dataBased,
 		})
 	)
 	.refine((config) => {

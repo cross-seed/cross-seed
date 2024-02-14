@@ -108,11 +108,12 @@ async function linkAllFilesInMetafile(
 	}
 
 	if (decision === Decision.MATCH) {
-		linkExactTree(sourceRoot, fullLinkDir);
+		return resultOf(linkExactTree(sourceRoot, fullLinkDir));
+	} else {
+		return resultOf(
+			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot)
+		);
 	}
-	return resultOf(
-		fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot)
-	);
 }
 
 export async function performAction(
@@ -139,11 +140,11 @@ export async function performAction(
 	}
 
 	if (action === Action.INJECT) {
-		const result = await getClient().inject(
-			newMeta,
-			searchee,
-			linkedFilesRoot
-		);
+		// using downloadDir for now but we might want to use linkedFilesRoot instead if we get missing files errors
+		const downloadDir = linkedFilesRoot
+			? dirname(linkedFilesRoot)
+			: linkedFilesRoot;
+		const result = await getClient().inject(newMeta, searchee, downloadDir);
 		logInjectionResult(result, tracker, newMeta.name);
 		if (result === InjectionResult.FAILURE) {
 			saveTorrentFile(tracker, getTag(searchee.name), newMeta);
@@ -180,6 +181,7 @@ export async function performActions(searchee, matches) {
 function linkExactTree(oldPath: string, dest: string): string {
 	const newPath = join(dest, basename(oldPath));
 	if (statSync(oldPath).isFile()) {
+		mkdirSync(dirname(newPath), { recursive: true });
 		linkFile(oldPath, newPath);
 	} else {
 		mkdirSync(newPath, { recursive: true });
