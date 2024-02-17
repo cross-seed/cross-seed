@@ -4,7 +4,6 @@ import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
 import { Action, MatchMode } from "./constants.js";
-
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
@@ -48,6 +47,15 @@ interface GenerateConfigParams {
 	docker?: boolean;
 }
 
+export const UNPARSABLE_CONFIG_MESSAGE = `
+Your config file is improperly formatted.
+Make sure that
+  - strings (words, URLs, etc) are wrapped in "quotation marks"
+  - any arrays (lists of things, even one thing) are wrapped in [square brackets]
+  - every entry has a comma after it, including inside arrays
+The location of the error is below, but you may have to look backwards to see where the root cause is. 
+`.trim();
+
 export function appDir(): string {
 	return (
 		process.env.CONFIG_DIR ||
@@ -89,7 +97,18 @@ export async function getFileConfig(): Promise<FileConfig> {
 	try {
 		return (await import(pathToFileURL(configPath).toString())).default;
 	} catch (e) {
-		if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
-		return {};
+		if (e.code === "ERR_MODULE_NOT_FOUND") {
+			return {};
+		} else if (e instanceof SyntaxError) {
+			const prettyStack = e
+				.stack!.split("\n")
+				.filter((l) => !l.trim().startsWith("at"))
+				.join("\n");
+			const error = new Error(UNPARSABLE_CONFIG_MESSAGE);
+			error.stack = prettyStack;
+			throw error;
+		} else {
+			throw e;
+		}
 	}
 }
