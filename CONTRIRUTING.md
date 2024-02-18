@@ -7,7 +7,7 @@
 4. run npm install
 5. start coding :)
 
-the code is in /src cmd.js is the entrypoint pipeline.js is the interesting high
+the code is in `/src`. `cmd.js` is the entrypoint, `pipeline.js` is the interesting high
 level functions (doRss, etc...)
 
 # Build and Run
