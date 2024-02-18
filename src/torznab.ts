@@ -148,11 +148,13 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 
 export async function searchTorznab(
 	name: string,
-	indexerSearchCount: Map<number, number>
+	indexer: Indexer,
+	indexerSearchCount: Map<number, number>,
+	
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
 	const { excludeRecentSearch, excludeOlder, searchLimit } = getRuntimeConfig();
 
-	const enabledIndexers = await getEnabledIndexers();
+	const enabledIndexers = (await getEnabledIndexers()).filter((idx) => idx.id === indexer.id);
 
 	// search history for name across all indexers
 	const timestampDataSql = await db("searchee")
@@ -184,9 +186,6 @@ export async function searchTorznab(
 	if (searchLimit > 0) {
 		for (let i = indexersToUse.length - 1; i >= 0; i--) {
 			const indexer = indexersToUse[i];
-			if (!indexerSearchCount.has(indexer.id)) {
-				indexerSearchCount.set(indexer.id, 0);
-			}
 			if (indexerSearchCount.get(indexer.id) >= searchLimit) {
 				logger.verbose({
 					label: Label.TORZNAB,
@@ -204,15 +203,17 @@ export async function searchTorznab(
 		}
 	}
 
-	const timestampCallout = " (filtered by timestamps)";
-	logger.info({
-		label: Label.TORZNAB,
-		message: `Searching ${indexersToUse.length} indexers for ${name}${
-			indexersToUse.length < enabledIndexers.length
-				? timestampCallout
-				: ""
-		}`,
-	});
+	if (indexersToUse.length > 0) {
+		const timestampCallout = " (filtered by timestamps)";
+		logger.info({
+			label: Label.TORZNAB,
+			message: `${indexer.url}: Searching for ${name}${
+				indexersToUse.length < enabledIndexers.length
+					? timestampCallout
+					: ""
+			}`,
+		});
+	}
 
 	return makeRequests(name, indexersToUse, (indexer) =>
 		createTorznabSearchQuery(name, {

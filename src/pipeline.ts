@@ -16,7 +16,9 @@ import {
 import { db } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
 import {
+	Indexer,
 	IndexerStatus,
+	getEnabledIndexers,
 	updateIndexerStatus,
 	updateSearchTimestamps,
 } from "./indexers.js";
@@ -81,6 +83,7 @@ async function assessCandidates(
 async function findOnOtherSites(
 	searchee: Searchee,
 	hashesToExclude: string[],
+	indexer: Indexer,
 	indexerSearchCount: Map<number, number>
 ): Promise<FoundOnOtherSites> {
 	// make sure searchee is in database
@@ -91,11 +94,11 @@ async function findOnOtherSites(
 
 	let response: { indexerId: number; candidates: Candidate[] }[];
 	try {
-		response = await searchTorznab(searchee.name, indexerSearchCount);
+		response = await searchTorznab(searchee.name, indexer, indexerSearchCount);
 	} catch (e) {
 		logger.error(`error searching for ${searchee.name}`);
 		logger.debug(e);
-		return { searchedIndexers: 0, matches: 0 };
+		return { matches: 0, searchedIndexers: 0};
 	}
 
 	const results: Candidate[] = response.flatMap((e) =>
@@ -155,13 +158,13 @@ async function findOnOtherSites(
 	return { matches: matches.length, searchedIndexers: response.length };
 }
 
-async function findMatchesBatch(
+async function findMatchesForIndexer(
 	samples: Searchee[],
-	hashesToExclude: string[]
-) {
-	const { delay } = getRuntimeConfig();
-	
-	let indexerSearchCount = new Map<number, number>();
+	hashesToExclude: string[],
+	indexer: Indexer,
+	indexerSearchCount: Map<number, number>,
+	delay: number
+): Promise<number> {
 	let totalFound = 0;
 	for (const [i, sample] of samples.entries()) {
 		try {
@@ -169,22 +172,68 @@ async function findMatchesBatch(
 
 			const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
 			const name = stripExtension(sample.name);
-			logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
 			const { matches, searchedIndexers } = await findOnOtherSites(
 				sample,
 				hashesToExclude,
+				indexer,
 				indexerSearchCount
 			);
-			totalFound += matches;
+			if (matches > 0)
+			{
+				logger.info(`${progress} for ${indexer.url}: ${chalk.dim("Found match for")} ${name}`);
+				totalFound += matches;
+			} else if (searchedIndexers > 0) {
+				logger.info(`${progress} for ${indexer.url}: ${chalk.dim("No match for")} ${name}`);
+			}
 
-			// if all indexers were rate limited, don't sleep
+			// If rate limited, don't sleep
 			if (searchedIndexers === 0) continue;
 			await sleep;
 		} catch (e) {
-			logger.error(`error searching for ${sample.name}`);
+			logger.error(`[${i + 1}/${samples.length}] for ${indexer.url}: Error searching for ${sample.name}`);
 			logger.debug(e);
 		}
+	}
+	return totalFound;
+}
+
+async function findMatchesBatch(
+	samples: Searchee[],
+	hashesToExclude: string[]
+): Promise<number> {
+	const { delay } = getRuntimeConfig();
+	
+	const enabledIndexers = await getEnabledIndexers();
+	logger.info({
+		label: Label.SEARCH,
+		message: `Searching on ${enabledIndexers.length} indexers for ${samples.length} torrents asynchronously`,
+	});
+	let indexerSearchCount = new Map<number, number>();
+	let indexerCallbacks = new Array<Promise<number>>();
+	for (const indexer of enabledIndexers) {
+		indexerSearchCount.set(indexer.id, 0);
+		indexerCallbacks.push(findMatchesForIndexer(samples, hashesToExclude, indexer, indexerSearchCount, delay));
+	}
+	const results = await Promise.all(indexerCallbacks);
+	return results.reduce((acc, cur) => acc + cur, 0);
+}
+
+async function searchForLocalTorrentByCriteriaPerIndexer(
+	searchees: Searchee[],
+	hashesToExclude: string[],
+	indexer: Indexer,
+	indexerSearchCount: Map<number, number>
+): Promise<number> {
+	let totalFound = 0;
+	for (let i = 0; i < searchees.length; i++) {
+		const { matches } = await findOnOtherSites(
+			searchees[i],
+			hashesToExclude,
+			indexer,
+			indexerSearchCount
+		);
+		totalFound += matches;
 	}
 	return totalFound;
 }
@@ -206,18 +255,27 @@ export async function searchForLocalTorrentByCriteria(
 		searchees = [await getTorrentByCriteria(criteria)];
 	}
 	const hashesToExclude = await getInfoHashesToExclude();
+	const enabledIndexers = await getEnabledIndexers();
 	let indexerSearchCount = new Map<number, number>();
-	let matches = 0;
+	let indexerCallbacks = new Array<Promise<number>>();
+	for (const indexer of enabledIndexers) {
+		indexerSearchCount.set(indexer.id, 0);
+	}
 	for (let i = 0; i < searchees.length; i++) {
 		if (!filterByContent(searchees[i])) return null;
-		const foundOnOtherSites = await findOnOtherSites(
-			searchees[i],
-			hashesToExclude,
-			indexerSearchCount
-		);
-		matches += foundOnOtherSites.matches;
 	}
-	return matches;
+	for (const indexer of enabledIndexers) {
+		indexerCallbacks.push(
+			searchForLocalTorrentByCriteriaPerIndexer(
+				searchees,
+				hashesToExclude,
+				indexer,
+				indexerSearchCount
+			)
+		);
+	}
+	const results = await Promise.all(indexerCallbacks);
+	return results.reduce((acc, cur) => acc + cur, 0);
 }
 
 export async function checkNewCandidateMatch(
