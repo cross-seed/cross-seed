@@ -66,12 +66,10 @@ export function releaseInBlockList(
 	searchee: Searchee,
 	blockList: string[]
 ): boolean {
-	return blockList.some((str) => {
+	return blockList.some((blockedStr) => {
 		return (
-			searchee.name.includes(str) ||
-			(str.length === 40 &&
-				searchee.infoHash &&
-				str === searchee.infoHash)
+			searchee.name.includes(blockedStr) ||
+			blockedStr === searchee.infoHash
 		);
 	});
 }

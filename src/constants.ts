@@ -17,7 +17,8 @@ export const RELEASE_GROUP_REGEX =
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
 
-export const BADFOLDERS_REGEX = /^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;
+export const IGNORED_FOLDERS_REGEX =
+	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 
@@ -62,7 +63,7 @@ export enum LinkType {
 	HARDLINK = "hardlink",
 }
 
-export const IGNORED_FOLDERS = [
+export const IGNORED_FOLDERS_SUBSTRINGS = [
 	"sample",
 	"proof",
 	"bdmv",

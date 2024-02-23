@@ -1,19 +1,22 @@
 import { readdirSync, statSync } from "fs";
 import { basename, extname, join } from "path";
 import {
-	BADFOLDERS_REGEX,
-	IGNORED_FOLDERS,
+	IGNORED_FOLDERS_SUBSTRINGS,
+	IGNORED_FOLDERS_REGEX,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
-function checkIgnorePath(root: string, isDir: boolean) {
-	return (
-		(isDir &&
-			(IGNORED_FOLDERS.includes(basename(root).toLowerCase()) ||
-				BADFOLDERS_REGEX.test(basename(root)))) ||
-		(!isDir && !VIDEO_EXTENSIONS.includes(extname(basename(root))))
-	);
+function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
+	const folderBaseName = basename(root);
+	if (isDir) {
+		return (
+			IGNORED_FOLDERS_SUBSTRINGS.includes(folderBaseName.toLowerCase()) ||
+			IGNORED_FOLDERS_REGEX.test(folderBaseName)
+		);
+	} else {
+		return !VIDEO_EXTENSIONS.includes(extname(folderBaseName));
+	}
 }
 export function findPotentialNestedRoots(
 	root: string,
@@ -22,11 +25,11 @@ export function findPotentialNestedRoots(
 ): string[] {
 	const isDir =
 		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
-	if (checkIgnorePath(root, isDir)) {
+	if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir)) {
 		return [];
 	}
 	// if depth is 0, don't look at children
-	if (depth > 0 && isDir) {
+	else if (depth > 0 && isDir) {
 		const directChildren = readdirSync(root, { withFileTypes: true });
 		const allDescendants = directChildren.flatMap((dirent) =>
 			findPotentialNestedRoots(
