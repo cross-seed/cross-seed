@@ -45,12 +45,12 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 		options = VALIDATION_SCHEMA.parse(options, {
 			errorMap: zodErrorMap,
 		}) as RuntimeConfig;
-	} catch (error) {
+	} catch ({ errors }) {
 		logger.verbose({
 			label: Label.CONFIGDUMP,
 			message: inspect(options),
 		});
-		error.errors.forEach(({ path, message }) => {
+		errors?.forEach(({ path, message }) => {
 			const urlPath = path[0];
 			const optionLine =
 				path.length === 2
@@ -66,10 +66,10 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 				})\n`
 			);
 		});
-		if (error.errors.length > 0) {
+		if (errors?.length > 0) {
 			throw new CrossSeedError(
 				`\tYour configuration is invalid, please see the ${
-					error.errors.length > 1 ? "errors" : "error"
+					errors.length > 1 ? "errors" : "error"
 				} above for details.`
 			);
 		}
