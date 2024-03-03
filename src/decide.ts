@@ -85,6 +85,20 @@ export function compareFileTrees(
 	);
 }
 
+export function compareFileTreesIgnoringFolders(
+	candidate: Metafile,
+	searchee: Searchee
+): boolean {
+	const cmp = (elOfA: File, elOfB: File) => {
+		const lengthsAreEqual = elOfB.length === elOfA.length;
+		const pathsAreEqual = elOfB.name === elOfA.name;
+		return lengthsAreEqual && pathsAreEqual;
+	};
+
+	return candidate.files.every((elOfA) =>
+		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
+	);
+}
 export function compareFileTreesIgnoringNames(
 	candidate: Metafile,
 	searchee: Searchee

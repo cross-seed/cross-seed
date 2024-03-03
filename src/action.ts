@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { basename, dirname, join, relative, resolve } from "path";
+import { basename, dirname, join, posix, relative, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -24,6 +24,7 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
+import { compareFileTrees, compareFileTreesIgnoringFolders } from "./decide.js";
 
 function logInjectionResult(
 	result: InjectionResult,
@@ -123,40 +124,79 @@ export async function performAction(
 	tracker: string
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
-	let linkedFilesRoot: string | undefined;
 
-	if (linkDir) {
-		const linkedFilesRootResult = await linkAllFilesInMetafile(
-			searchee,
-			newMeta,
-			tracker,
-			decision
-		);
-		if (linkedFilesRootResult.isErr()) {
-			// TODO
-			return InjectionResult.FAILURE;
-		}
-		linkedFilesRoot = linkedFilesRootResult.unwrapOrThrow();
-	}
-
-	if (action === Action.INJECT) {
-		// using downloadDir for now but we might want to use linkedFilesRoot instead if we get missing files errors
-		const downloadDir = linkedFilesRoot
-			? dirname(linkedFilesRoot)
-			: linkedFilesRoot;
-		const result = await getClient().inject(newMeta, searchee, downloadDir);
-		logInjectionResult(result, tracker, newMeta.name);
-		if (result === InjectionResult.FAILURE) {
-			saveTorrentFile(tracker, getTag(searchee.name), newMeta);
-		}
-		return result;
-	} else {
+	if (action === Action.SAVE) {
 		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
 		return SaveResult.SAVED;
 	}
+
+	let destinationDir: string | undefined,
+		ogDownloadDir,
+		linkedFilesRootResult;
+	if (searchee.infoHash) {
+		ogDownloadDir = await getClient().getDownloadDir(searchee);
+		destinationDir = ogDownloadDir.isOk()
+			? ogDownloadDir.unwrapOrThrow()
+			: undefined;
+	}
+	if (
+		linkDir &&
+		typeof destinationDir === "string" &&
+		existsSync(destinationDir)
+	) {
+		linkedFilesRootResult = await linkAllFilesInMetafile(
+			searchee,
+			newMeta,
+			tracker,
+			decision
+		);
+		destinationDir = linkedFilesRootResult.isOk()
+			? linkedFilesRootResult.unwrapOrThrow()
+			: destinationDir;
+		/*} else {
+			//linking failed - need to compare file trees or figure out nested linking?
+			//compareFileTrees(newMeta, searchee);
+			//	logInjectionResult(result, tracker, newMeta.name);
+
+			destinationDir = ogDownloadDir.unwrapOrThrow();
+
+			/* extra code for referencing
+				const result =
+					linkedFilesRootResult.unwrapErrOrThrow() as InjectionResult;
+				logInjectionResult(result, tracker, newMeta.name);
+				saveTorrentFile(tracker, getTag(searchee.name), newMeta);
+				return InjectionResult.FAILURE;
+				*/
+	}
+	if (typeof destinationDir !== "string") {
+		logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
+		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
+		return InjectionResult.FAILURE;
+	}
+
+	const nestedMatch = compareFileTreesIgnoringFolders(newMeta, searchee);
+	const perfectMatch = compareFileTrees(newMeta, searchee);
+	const downloadDir =
+		linkedFilesRootResult && linkedFilesRootResult.isOk()
+			? destinationDir
+			: perfectMatch
+			? destinationDir
+			: newMeta.isSingleFileTorrent && nestedMatch
+			? posix.join(destinationDir, searchee.name)
+			: undefined;
+
+	const result = downloadDir
+		? await getClient().inject(newMeta, searchee, downloadDir)
+		: InjectionResult.FAILURE;
+
+	logInjectionResult(result, tracker, newMeta.name);
+	if (result === InjectionResult.FAILURE) {
+		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
+	}
+	return result;
 }
 
 export async function performActions(searchee, matches) {
