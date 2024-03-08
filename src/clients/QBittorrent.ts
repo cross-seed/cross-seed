@@ -1,5 +1,5 @@
 import { posix } from "path";
-import { InjectionResult, TORRENT_TAG } from "../constants.js";
+import { InjectionResult, TORRENT_TAG, TORRENT_CATEGORY_SUFFIX } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -155,12 +155,12 @@ export default class QBittorrent implements TorrentClient {
 
 	async setUpCrossSeedCategory(ogCategoryName: string): Promise<string> {
 		if (!ogCategoryName) return "";
-		if (ogCategoryName.endsWith(".cross-seed")) return ogCategoryName;
+		if (ogCategoryName.endsWith(TORRENT_CATEGORY_SUFFIX)) return ogCategoryName;
 
 		const categoriesStr = await this.request("/torrents/categories", "");
 		const categories: Record<string, Category> = JSON.parse(categoriesStr);
 		const ogCategory = categories[ogCategoryName];
-		const newCategoryName = `${ogCategoryName}.cross-seed`;
+		const newCategoryName = `${ogCategoryName}${TORRENT_CATEGORY_SUFFIX}`;
 		const maybeNewCategory = categories[newCategoryName];
 
 		if (!ogCategory.savePath) {
@@ -275,7 +275,7 @@ export default class QBittorrent implements TorrentClient {
 						isComplete: true,
 						autoTMM: false,
 						category: dataCategory,
-				  }
+					}
 				: await this.getTorrentConfiguration(searchee);
 
 			const newCategoryName =
