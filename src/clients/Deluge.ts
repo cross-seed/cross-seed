@@ -1,4 +1,4 @@
-import { InjectionResult } from "../constants.js";
+import { InjectionResult, TORRENT_TAG } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -41,7 +41,7 @@ type DelugeJSON<ResultType> = {
 
 export default class Deluge implements TorrentClient {
 	private delugeCookie: string | null = null;
-	private delugeLabel = "cross-seed";
+	private delugeLabel = TORRENT_TAG;
 	private isLabelEnabled: boolean;
 
 	/**

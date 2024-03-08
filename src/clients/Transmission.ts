@@ -1,4 +1,4 @@
-import { InjectionResult } from "../constants.js";
+import { InjectionResult, TORRENT_TAG } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -180,7 +180,7 @@ export default class Transmission implements TorrentClient {
 					"download-dir": downloadDir,
 					metainfo: newTorrent.encode().toString("base64"),
 					paused: false,
-					labels: ["cross-seed"],
+					labels: [TORRENT_TAG],
 				}
 			);
 		} catch (e) {

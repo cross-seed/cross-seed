@@ -1,5 +1,5 @@
 import { posix } from "path";
-import { InjectionResult } from "../constants.js";
+import { InjectionResult, TORRENT_TAG } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -192,7 +192,7 @@ export default class QBittorrent implements TorrentClient {
 	async createTag(): Promise<void> {
 		await this.request(
 			"/torrents/createTags",
-			"tags=cross-seed",
+			`tags=${TORRENT_TAG}`,
 			X_WWW_FORM_URLENCODED
 		);
 	}
@@ -294,7 +294,7 @@ export default class QBittorrent implements TorrentClient {
 
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
-			formData.append("tags", "cross-seed");
+			formData.append("tags", TORRENT_TAG);
 			formData.append("category", newCategoryName);
 
 			if (autoTMM) {
