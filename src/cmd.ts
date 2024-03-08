@@ -249,7 +249,7 @@ function createCommandWithSharedOptions(name, description) {
 }
 
 program.name(PROGRAM_NAME);
-program.description(chalk.yellow.bold("cross-seed"));
+program.description(chalk.yellow.bold(`${PROGRAM_NAME} v${PROGRAM_VERSION}`));
 program.version(PROGRAM_VERSION, "-V, --version", "output the current version");
 
 program
