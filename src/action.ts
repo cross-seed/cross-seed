@@ -125,6 +125,7 @@ export async function performAction(
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 
+	// SAVES FIRST, PREVENTS LINKING THOUGH IN THIS ORDER
 	if (action === Action.SAVE) {
 		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
@@ -136,6 +137,9 @@ export async function performAction(
 	let destinationDir: string | undefined,
 		ogDownloadDir,
 		linkedFilesRootResult;
+
+	// SET THE CLIENTS SAVE PATH - PREVENTS ERROR IF DATADIR/LINKDIR IS SET
+	// BUT NOT THE TORRENT DATA DIRECTORY AND/OR LINKING THROWS OR IS NOT SET
 	if (searchee.infoHash) {
 		ogDownloadDir = await getClient().getDownloadDir(searchee);
 		destinationDir = ogDownloadDir.isOk()
@@ -177,15 +181,18 @@ export async function performAction(
 		return InjectionResult.FAILURE;
 	}
 
+	// NEW compare() for STRICTLY COMPARING FILES (nested linking)
 	const nestedMatch = compareFileTreesIgnoringFolders(newMeta, searchee);
 	const perfectMatch = compareFileTrees(newMeta, searchee);
+
+	// SO SORRY!!!! TERNARY HELL D:
 	const downloadDir =
 		linkedFilesRootResult && linkedFilesRootResult.isOk()
 			? destinationDir
 			: perfectMatch
 			? destinationDir
 			: newMeta.isSingleFileTorrent && nestedMatch
-			? posix.join(destinationDir, searchee.name)
+			? posix.join(destinationDir, searchee.name) // using posix for dev env only. needs to be removed.
 			: undefined;
 
 	const result = downloadDir
