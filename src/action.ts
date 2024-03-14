@@ -134,14 +134,12 @@ export async function performAction(
 		return SaveResult.SAVED;
 	}
 
-	let destinationDir: string | undefined,
-		ogDownloadDir,
-		linkedFilesRootResult;
+	let destinationDir: string | undefined, linkedFilesRootResult;
 
 	// SET THE CLIENTS SAVE PATH - PREVENTS ERROR IF DATADIR/LINKDIR IS SET
 	// BUT NOT THE TORRENT DATA DIRECTORY AND/OR LINKING THROWS OR IS NOT SET
 	if (searchee.infoHash) {
-		ogDownloadDir = await getClient().getDownloadDir(searchee);
+		const ogDownloadDir = await getClient().getDownloadDir(searchee);
 		destinationDir = ogDownloadDir.isOk()
 			? ogDownloadDir.unwrapOrThrow()
 			: undefined;
@@ -160,20 +158,6 @@ export async function performAction(
 		destinationDir = linkedFilesRootResult.isOk()
 			? linkedFilesRootResult.unwrapOrThrow()
 			: destinationDir;
-		/*} else {
-			//linking failed - need to compare file trees or figure out nested linking?
-			//compareFileTrees(newMeta, searchee);
-			//	logInjectionResult(result, tracker, newMeta.name);
-
-			destinationDir = ogDownloadDir.unwrapOrThrow();
-
-			/* extra code for referencing
-				const result =
-					linkedFilesRootResult.unwrapErrOrThrow() as InjectionResult;
-				logInjectionResult(result, tracker, newMeta.name);
-				saveTorrentFile(tracker, getTag(searchee.name), newMeta);
-				return InjectionResult.FAILURE;
-				*/
 	}
 	if (typeof destinationDir !== "string") {
 		logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
