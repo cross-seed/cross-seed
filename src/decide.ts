@@ -91,8 +91,8 @@ export function compareFileTreesIgnoringFolders(
 ): boolean {
 	const cmp = (elOfA: File, elOfB: File) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
-		const pathsAreEqual = elOfB.name === elOfA.name;
-		return lengthsAreEqual && pathsAreEqual;
+		const namesAreEqual = elOfB.name === elOfA.name;
+		return lengthsAreEqual && namesAreEqual;
 	};
 
 	return candidate.files.every((elOfA) =>
