@@ -5,8 +5,8 @@ const packageDotJson = require("../package.json");
 export const PROGRAM_NAME = packageDotJson.name;
 export const PROGRAM_VERSION = packageDotJson.version;
 export const USER_AGENT = `CrossSeed/${PROGRAM_VERSION}`;
-export const TORRENT_TAG = PROGRAM_NAME;
-export const TORRENT_CATEGORY_SUFFIX = `.${PROGRAM_NAME}`;
+export const TORRENT_TAG = 'cross-seed';
+export const TORRENT_CATEGORY_SUFFIX = `.cross-seed`;
 
 export const EP_REGEX =
 	/^(?<title>.+?)[_.\s-]+(?:(?<season>S\d+)?[_.\s]?(?<episode>E\d+(?:[\s-]?E?\d+)?(?![ip]))(?!\d+[ip])|(?<date>(?<year>\d{4})[_.\s-](?<month>\d{2})[_.\s-](?<day>\d{2})))/i;
