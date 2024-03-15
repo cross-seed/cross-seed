@@ -2,6 +2,7 @@ import {
 	ActionResult,
 	InjectionResult,
 	SaveResult,
+	PROGRAM_NAME,
 	USER_AGENT,
 } from "./constants.js";
 import { ResultAssessment } from "./decide.js";
@@ -29,7 +30,7 @@ export class PushNotifier {
 	}
 
 	async notify({
-		title = "cross-seed",
+		title = PROGRAM_NAME,
 		body,
 		...rest
 	}: PushNotification): Promise<void> {
