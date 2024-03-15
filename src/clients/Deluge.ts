@@ -1,4 +1,8 @@
-import { InjectionResult } from "../constants.js";
+import {
+	InjectionResult,
+	TORRENT_TAG,
+	TORRENT_CATEGORY_SUFFIX,
+} from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -41,7 +45,8 @@ type DelugeJSON<ResultType> = {
 
 export default class Deluge implements TorrentClient {
 	private delugeCookie: string | null = null;
-	private delugeLabel = "cross-seed";
+	private delugeLabel = TORRENT_TAG;
+	private delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
 	private isLabelEnabled: boolean;
 
 	/**
@@ -247,9 +252,13 @@ export default class Deluge implements TorrentClient {
 						? dataCategory
 						: torrentInfo!.label
 						? duplicateCategories
-							? torrentInfo!.label.endsWith(".cross-seed")
+							? torrentInfo!.label.endsWith(
+									this.delugeLabelSuffix
+							  )
 								? torrentInfo!.label
-								: `${torrentInfo!.label}.cross-seed`
+								: `${torrentInfo!.label}${
+										this.delugeLabelSuffix
+								  }`
 							: torrentInfo!.label
 						: this.delugeLabel
 				);
