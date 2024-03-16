@@ -1,4 +1,8 @@
-import { InjectionResult, TORRENT_TAG, TORRENT_CATEGORY_SUFFIX } from "../constants.js";
+import {
+	InjectionResult,
+	TORRENT_TAG,
+	TORRENT_CATEGORY_SUFFIX,
+} from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -248,9 +252,13 @@ export default class Deluge implements TorrentClient {
 						? dataCategory
 						: torrentInfo!.label
 						? duplicateCategories
-							? torrentInfo!.label.endsWith(this.delugeLabelSuffix)
+							? torrentInfo!.label.endsWith(
+									this.delugeLabelSuffix
+							  )
 								? torrentInfo!.label
-								: `${torrentInfo!.label}${this.delugeLabelSuffix}`
+								: `${torrentInfo!.label}${
+										this.delugeLabelSuffix
+								  }`
 							: torrentInfo!.label
 						: this.delugeLabel
 				);
