@@ -94,7 +94,7 @@ async function linkAllFilesInMetafile(
 	if (searchee.path) {
 		sourceRoot = searchee.path;
 	} else {
-		const downloadDirResult = await getClient().getDownloadDir(searchee);
+		const downloadDirResult = await getClient().getDownloadDir(searchee); // dont we already get this in performAction ? can we pass it? ogDownloadDir
 		if (downloadDirResult.isErr()) {
 			return downloadDirResult.mapErr((e) =>
 				e === "NOT_FOUND" ? "TORRENT_NOT_FOUND" : e
@@ -112,7 +112,7 @@ async function linkAllFilesInMetafile(
 		return resultOf(linkExactTree(sourceRoot, fullLinkDir));
 	} else {
 		return resultOf(
-			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot)
+			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot) // MATCH_SIZE_ONLY - linking single -> nested returns path with searchee.name appended
 		);
 	}
 }
@@ -133,7 +133,7 @@ export async function performAction(
 		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
 		return SaveResult.SAVED;
 	}
-
+	console.log(decision);
 	let destinationDir: string | undefined, linkedFilesRootResult;
 
 	// SET THE CLIENTS SAVE PATH - PREVENTS ERROR IF DATADIR/LINKDIR IS SET
@@ -143,6 +143,7 @@ export async function performAction(
 		destinationDir = ogDownloadDir.isOk()
 			? ogDownloadDir.unwrapOrThrow()
 			: undefined;
+		//console.log(destinationDir);
 	}
 	if (
 		linkDir &&
@@ -158,6 +159,8 @@ export async function performAction(
 		destinationDir = linkedFilesRootResult.isOk()
 			? linkedFilesRootResult.unwrapOrThrow()
 			: destinationDir;
+		//console.log(linkedFilesRootResult.unwrapOrThrow());
+		//console.log(destinationDir);
 	}
 	if (typeof destinationDir !== "string") {
 		logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
@@ -168,7 +171,7 @@ export async function performAction(
 	// NEW compare() for STRICTLY COMPARING FILES (nested linking)
 	const nestedMatch = compareFileTreesIgnoringFolders(newMeta, searchee);
 	const perfectMatch = compareFileTrees(newMeta, searchee);
-
+	//console.log(newMeta.isSingleFileTorrent);
 	// SO SORRY!!!! TERNARY HELL D:
 	const downloadDir =
 		linkedFilesRootResult && linkedFilesRootResult.isOk()
@@ -178,7 +181,7 @@ export async function performAction(
 			: newMeta.isSingleFileTorrent && nestedMatch
 			? posix.join(destinationDir, searchee.name) // using posix for dev env only. needs to be removed.
 			: undefined;
-
+	//console.log(downloadDir);
 	const result = downloadDir
 		? await getClient().inject(newMeta, searchee, downloadDir)
 		: InjectionResult.FAILURE;
