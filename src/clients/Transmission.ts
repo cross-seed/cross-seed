@@ -162,7 +162,7 @@ export default class Transmission implements TorrentClient {
 		const [{ downloadDir, percentDone }] = queryResponse.torrents;
 
 		if (downloadDir == undefined || percentDone === undefined) {
-			return resultOfErr(InjectionResult.FAILURE)
+			return resultOfErr(InjectionResult.FAILURE);
 		}
 		if (percentDone < 1) {
 			return resultOfErr(InjectionResult.TORRENT_NOT_COMPLETE);
