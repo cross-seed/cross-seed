@@ -44,8 +44,6 @@ type TorrentDuplicateResponse = { "torrent-duplicate": TorrentMetadata };
 type TorrentAddedResponse = { "torrent-added": TorrentMetadata };
 type TorrentAddResponse = TorrentAddedResponse | TorrentDuplicateResponse;
 
-type TorrentStartResponse = {};
-
 function doesAlreadyExist(
 	args: TorrentAddResponse
 ): args is TorrentDuplicateResponse {
@@ -54,7 +52,6 @@ function doesAlreadyExist(
 
 export default class Transmission implements TorrentClient {
 	xTransmissionSessionId: string;
-
 	private async request<T>(
 		method: Method,
 		args: unknown = {},
@@ -232,7 +229,7 @@ export default class Transmission implements TorrentClient {
 
 			const [{ percentDone, status }] = getResponse.torrents;
 			if (status === TorrentStatus.Stopped && percentDone === 1) {
-				await this.request<TorrentStartResponse>("torrent-start", {
+				await this.request<unknown>("torrent-start", {
 					ids: [torrentId],
 				});
 				return InjectionResult.SUCCESS;
