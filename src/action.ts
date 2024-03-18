@@ -150,6 +150,10 @@ export async function performAction(
 			logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
 			saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 			return InjectionResult.FAILURE;
+		} else {
+			logger.warn(
+				"You have inaccessible data required for linking torrents. Consider making the torrent structure available to cross-seed."
+			);
 		}
 	}
 

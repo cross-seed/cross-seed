@@ -181,7 +181,8 @@ export const VALIDATION_SCHEMA = z
 		if (
 			config.action == Action.INJECT &&
 			config.qbittorrentUrl &&
-			!config.legacyLinking
+			!config.legacyLinking &&
+			config.linkDir
 		) {
 			logger.warn(ZodErrorMessages.qBitLegacyLinking);
 		}
