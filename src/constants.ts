@@ -17,9 +17,10 @@ export const MOVIE_REGEX =
 export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?<group>[\w ]+)(?:\))?(?=(?:\.\w{1,5})?$)/i;
 
-export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi"];
+export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
 
-export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
+export const IGNORED_FOLDERS_REGEX =
+	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 
@@ -51,6 +52,7 @@ export enum Decision {
 	INFO_HASH_ALREADY_EXISTS = "INFO_HASH_ALREADY_EXISTS",
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
 	RELEASE_GROUP_MISMATCH = "RELEASE_GROUP_MISMATCH",
+	BLOCKED_RELEASE = "BLOCKED_RELEASE",
 }
 
 export enum MatchMode {
@@ -62,3 +64,12 @@ export enum LinkType {
 	SYMLINK = "symlink",
 	HARDLINK = "hardlink",
 }
+
+export const IGNORED_FOLDERS_SUBSTRINGS = [
+	"sample",
+	"proof",
+	"bdmv",
+	"bdrom",
+	"certificate",
+	"video_ts",
+];
