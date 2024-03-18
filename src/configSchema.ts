@@ -113,7 +113,7 @@ export const VALIDATION_SCHEMA = z
 		legacyLinking: z
 			.boolean()
 			.nullish()
-			.transform((value) => (typeof value !== "boolean" ? value : false)),
+			.transform((value) => (typeof value === "boolean" ? value : false)),
 		skipRecheck: z.boolean(),
 		maxDataDepth: z.number().gte(1),
 		torrentDir: z.string(),
