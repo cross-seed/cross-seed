@@ -93,7 +93,7 @@ async function linkAllFilesInMetafile(
 	if (searchee.path) {
 		sourceRoot = searchee.path;
 	} else {
-		const downloadDirResult = await getClient().getDownloadDir(searchee); // dont we already get this in performAction ? can we pass it? ogDownloadDir
+		const downloadDirResult = await getClient().getDownloadDir(searchee);
 		if (downloadDirResult.isErr()) {
 			return downloadDirResult.mapErr((e) =>
 				e === "NOT_FOUND" ? "TORRENT_NOT_FOUND" : e
@@ -111,7 +111,7 @@ async function linkAllFilesInMetafile(
 		return resultOf(linkExactTree(sourceRoot, fullLinkDir));
 	} else {
 		return resultOf(
-			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot) // MATCH_SIZE_ONLY - linking single -> nested returns path with searchee.name appended
+			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot)
 		);
 	}
 }
