@@ -123,7 +123,17 @@ export async function performAction(
 	tracker: string
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
-	let linkedFilesRoot: string | undefined;
+
+	// SAVES FIRST, PREVENTS LINKING THOUGH IN THIS ORDER
+	if (action === Action.SAVE) {
+		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
+		const styledName = chalk.green.bold(newMeta.name);
+		const styledTracker = chalk.bold(tracker);
+		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
+		return SaveResult.SAVED;
+	}
+
+	let destinationDir: string | undefined;
 
 	if (linkDir) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
@@ -132,31 +142,24 @@ export async function performAction(
 			tracker,
 			decision
 		);
-		if (linkedFilesRootResult.isErr()) {
-			// TODO
+		if (linkedFilesRootResult.isOk()) {
+			destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
+		} else if (
+			linkedFilesRootResult.unwrapErrOrThrow() !== "MISSING_DATA"
+		) {
+			logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
+			saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 			return InjectionResult.FAILURE;
 		}
-		linkedFilesRoot = linkedFilesRootResult.unwrapOrThrow();
 	}
 
-	if (action === Action.INJECT) {
-		// using downloadDir for now but we might want to use linkedFilesRoot instead if we get missing files errors
-		const downloadDir = linkedFilesRoot
-			? dirname(linkedFilesRoot)
-			: linkedFilesRoot;
-		const result = await getClient().inject(newMeta, searchee, downloadDir);
-		logInjectionResult(result, tracker, newMeta.name);
-		if (result === InjectionResult.FAILURE) {
-			saveTorrentFile(tracker, getTag(searchee.name), newMeta);
-		}
-		return result;
-	} else {
+	const result = await getClient().inject(newMeta, searchee, destinationDir);
+
+	logInjectionResult(result, tracker, newMeta.name);
+	if (result === InjectionResult.FAILURE) {
 		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
-		const styledName = chalk.green.bold(newMeta.name);
-		const styledTracker = chalk.bold(tracker);
-		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
-		return SaveResult.SAVED;
 	}
+	return result;
 }
 
 export async function performActions(searchee, matches) {
