@@ -135,14 +135,6 @@ export async function performAction(
 	console.log(decision);
 	let destinationDir: string | undefined, linkedFilesRootResult;
 
-	// SET THE CLIENTS SAVE PATH - PREVENTS ERROR IF DATADIR/LINKDIR IS SET
-	// BUT NOT THE TORRENT DATA DIRECTORY AND/OR LINKING THROWS OR IS NOT SET
-	if (searchee.infoHash) {
-		const ogDownloadDir = await getClient().getDownloadDir(searchee);
-		if (ogDownloadDir.isOk()) {
-			destinationDir = ogDownloadDir.unwrapOrThrow();
-		}
-	}
 	if (
 		linkDir &&
 		((typeof destinationDir === "string" && existsSync(destinationDir)) ||
@@ -171,7 +163,11 @@ export async function performAction(
 			: undefined;
 
 	const result = downloadDir
-		? await getClient().inject(newMeta, searchee, downloadDir)
+		? await getClient().inject(
+				newMeta,
+				searchee,
+				linkedFilesRootResult.isOk() ? downloadDir : undefined
+		  )
 		: InjectionResult.FAILURE;
 
 	logInjectionResult(result, tracker, newMeta.name);
