@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { basename, dirname, join, posix, relative, resolve } from "path";
+import { basename, dirname, join, relative, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -24,7 +24,6 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
-import { compareFileTrees, compareFileTreesIgnoringFolders } from "./decide.js";
 
 function logInjectionResult(
 	result: InjectionResult,
@@ -143,12 +142,11 @@ export async function performAction(
 		destinationDir = ogDownloadDir.isOk()
 			? ogDownloadDir.unwrapOrThrow()
 			: undefined;
-		//console.log(destinationDir);
 	}
 	if (
 		linkDir &&
-		typeof destinationDir === "string" &&
-		existsSync(destinationDir)
+		((typeof destinationDir === "string" && existsSync(destinationDir)) ||
+			searchee.path)
 	) {
 		linkedFilesRootResult = await linkAllFilesInMetafile(
 			searchee,
@@ -159,29 +157,19 @@ export async function performAction(
 		destinationDir = linkedFilesRootResult.isOk()
 			? linkedFilesRootResult.unwrapOrThrow()
 			: destinationDir;
-		//console.log(linkedFilesRootResult.unwrapOrThrow());
-		//console.log(destinationDir);
 	}
+
 	if (typeof destinationDir !== "string") {
 		logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
 		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 		return InjectionResult.FAILURE;
 	}
 
-	// NEW compare() for STRICTLY COMPARING FILES (nested linking)
-	const nestedMatch = compareFileTreesIgnoringFolders(newMeta, searchee);
-	const perfectMatch = compareFileTrees(newMeta, searchee);
-	//console.log(newMeta.isSingleFileTorrent);
-	// SO SORRY!!!! TERNARY HELL D:
 	const downloadDir =
 		linkedFilesRootResult && linkedFilesRootResult.isOk()
-			? destinationDir
-			: perfectMatch
-			? destinationDir
-			: newMeta.isSingleFileTorrent && nestedMatch
-			? posix.join(destinationDir, searchee.name) // using posix for dev env only. needs to be removed.
+			? dirname(destinationDir)
 			: undefined;
-	//console.log(downloadDir);
+
 	const result = downloadDir
 		? await getClient().inject(newMeta, searchee, downloadDir)
 		: InjectionResult.FAILURE;
