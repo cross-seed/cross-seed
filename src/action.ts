@@ -139,9 +139,9 @@ export async function performAction(
 	// BUT NOT THE TORRENT DATA DIRECTORY AND/OR LINKING THROWS OR IS NOT SET
 	if (searchee.infoHash) {
 		const ogDownloadDir = await getClient().getDownloadDir(searchee);
-		destinationDir = ogDownloadDir.isOk()
-			? ogDownloadDir.unwrapOrThrow()
-			: undefined;
+		if (ogDownloadDir.isOk()) {
+			destinationDir = ogDownloadDir.unwrapOrThrow();
+		}
 	}
 	if (
 		linkDir &&
@@ -154,9 +154,9 @@ export async function performAction(
 			tracker,
 			decision
 		);
-		destinationDir = linkedFilesRootResult.isOk()
-			? linkedFilesRootResult.unwrapOrThrow()
-			: destinationDir;
+		if (linkedFilesRootResult.isOk()) {
+			destinationDir = linkedFilesRootResult.unwrapOrThrow();
+		}
 	}
 
 	if (typeof destinationDir !== "string") {
