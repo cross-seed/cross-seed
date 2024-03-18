@@ -132,43 +132,28 @@ export async function performAction(
 		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
 		return SaveResult.SAVED;
 	}
-	console.log(decision);
-	let destinationDir: string | undefined, linkedFilesRootResult;
 
-	if (
-		linkDir &&
-		((typeof destinationDir === "string" && existsSync(destinationDir)) ||
-			searchee.path)
-	) {
-		linkedFilesRootResult = await linkAllFilesInMetafile(
+	let destinationDir: string | undefined;
+
+	if (linkDir) {
+		const linkedFilesRootResult = await linkAllFilesInMetafile(
 			searchee,
 			newMeta,
 			tracker,
 			decision
 		);
 		if (linkedFilesRootResult.isOk()) {
-			destinationDir = linkedFilesRootResult.unwrapOrThrow();
+			destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
+		} else if (
+			linkedFilesRootResult.unwrapErrOrThrow() !== "MISSING_DATA"
+		) {
+			logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
+			saveTorrentFile(tracker, getTag(searchee.name), newMeta);
+			return InjectionResult.FAILURE;
 		}
 	}
 
-	if (typeof destinationDir !== "string") {
-		logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
-		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
-		return InjectionResult.FAILURE;
-	}
-
-	const downloadDir =
-		linkedFilesRootResult && linkedFilesRootResult.isOk()
-			? dirname(destinationDir)
-			: undefined;
-
-	const result = downloadDir
-		? await getClient().inject(
-				newMeta,
-				searchee,
-				linkedFilesRootResult.isOk() ? downloadDir : undefined
-		  )
-		: InjectionResult.FAILURE;
+	const result = await getClient().inject(newMeta, searchee, destinationDir);
 
 	logInjectionResult(result, tracker, newMeta.name);
 	if (result === InjectionResult.FAILURE) {
