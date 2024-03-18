@@ -11,6 +11,7 @@ import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
+import { releaseInBlockList } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 import {
@@ -59,6 +60,9 @@ const createReasonLogger =
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
 				reason = "it has a different release group";
+				break;
+			case Decision.BLOCKED_RELEASE:
+				reason = "it matches the blocklist";
 				break;
 			default:
 				reason = decision;
@@ -135,8 +139,10 @@ async function assessCandidateHelper(
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { matchMode } = getRuntimeConfig();
-
+	const { matchMode, blockList } = getRuntimeConfig();
+	if (releaseInBlockList(searchee, blockList)) {
+		return { decision: Decision.BLOCKED_RELEASE };
+	}
 	if (size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
