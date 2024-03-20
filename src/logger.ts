@@ -1,8 +1,8 @@
 import { join } from "path";
 import winston from "winston";
-import { appDir, createAppDir } from "./configuration.js";
-import { RuntimeConfig, getRuntimeConfig } from "./runtimeConfig.js";
 import DailyRotateFile from "winston-daily-rotate-file";
+import { appDir, createAppDir } from "./configuration.js";
+import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -119,11 +119,16 @@ export function initializeLogger(options: RuntimeConfig): void {
 					winston.format.errors({ stack: true }),
 					winston.format.splat(),
 					winston.format.colorize(),
-					winston.format.printf(({ level, message, label }) => {
-						return `${level}: ${
-							label ? `[${label}] ` : ""
-						}${redactMessage(message, options)}`;
-					})
+					winston.format.printf(
+						({ level, message, label, timestamp, stack }) => {
+							return `${timestamp} ${level}: ${
+								label ? `[${label}] ` : ""
+							}${redactMessage(
+								stack ? stack : message,
+								options
+							)}`;
+						}
+					)
 				),
 			}),
 		],

@@ -246,8 +246,9 @@ export async function checkNewCandidateMatch(
 	if (
 		assessment.decision !== Decision.MATCH &&
 		assessment.decision !== Decision.MATCH_SIZE_ONLY
-	)
+	) {
 		return null;
+	}
 
 	const result = await performAction(
 		assessment.metafile!,
