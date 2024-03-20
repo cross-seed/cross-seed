@@ -1,5 +1,6 @@
 import { posix } from "path";
 import {
+	Decision,
 	InjectionResult,
 	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
@@ -289,6 +290,7 @@ export default class QBittorrent implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
+		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
 		path?: string
 	): Promise<InjectionResult> {
 		const { duplicateCategories, skipRecheck, dataCategory } =
@@ -324,6 +326,11 @@ export default class QBittorrent implements TorrentClient {
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";
+			
+			const skipRecheckTorrent =
+				decision === Decision.MATCH_PARTIAL
+				  	? skipRecheck
+					: true;
 
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
@@ -342,8 +349,8 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("paused", (!skipRecheck).toString());
 			} else {
 				formData.append("contentLayout", contentLayout);
-				formData.append("skip_checking", "true");
-				formData.append("paused", "false");
+				formData.append("skip_checking", skipRecheckTorrent.toString());
+				formData.append("paused", (!skipRecheckTorrent).toString());
 			}
 
 			// for some reason the parser parses the last kv pair incorrectly

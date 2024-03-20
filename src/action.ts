@@ -192,7 +192,7 @@ export async function performAction(
 		destinationDir = dirname(searchee.path);
 	}
 
-	const result = await getClient().inject(newMeta, searchee, destinationDir);
+	const result = await getClient().inject(newMeta, searchee, decision, destinationDir);
 
 	logInjectionResult(result, tracker, newMeta.name);
 	if (result === InjectionResult.FAILURE) {
