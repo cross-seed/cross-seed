@@ -20,6 +20,7 @@ const ZodErrorMessages = {
 	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
 	qBitLegacyLinking:
 		"Using Automatic Torrent Management in qBittorrent without legacyLinking enabled can result in injection path failures.",
+	riskyNeedsLinkDir: "You need to set a linkDir for risky matching to work.",
 };
 
 /**
@@ -179,7 +180,7 @@ export const VALIDATION_SCHEMA = z
 	.strict()
 	.refine((config) => {
 		if (
-			config.action == Action.INJECT &&
+			config.action === Action.INJECT &&
 			config.qbittorrentUrl &&
 			!config.legacyLinking &&
 			config.linkDir
@@ -191,19 +192,21 @@ export const VALIDATION_SCHEMA = z
 	.refine(
 		(config) =>
 			!(
-				config.action == Action.INJECT &&
+				config.action === Action.INJECT &&
 				!config.rtorrentRpcUrl &&
 				!config.qbittorrentUrl &&
 				!config.transmissionRpcUrl &&
 				!config.delugeRpcUrl
 			),
-		() => ({
-			message: ZodErrorMessages.injectUrl,
-		})
+		ZodErrorMessages.injectUrl
 	)
 	.refine((config) => {
-		if (config.skipRecheck && config.matchMode == MatchMode.RISKY) {
+		if (config.skipRecheck && config.matchMode === MatchMode.RISKY) {
 			logger.warn(ZodErrorMessages.riskyRecheckWarn);
 		}
 		return true;
-	});
+	})
+	.refine(
+		(config) => config.matchMode !== MatchMode.RISKY || config.linkDir,
+		ZodErrorMessages.riskyNeedsLinkDir
+	);

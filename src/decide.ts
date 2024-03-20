@@ -175,7 +175,7 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (matchMode == MatchMode.RISKY && searchee.files.length === 1) {
+	if (matchMode === MatchMode.RISKY && searchee.files.length === 1) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}
 	return { decision: Decision.FILE_TREE_MISMATCH };
