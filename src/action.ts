@@ -73,11 +73,39 @@ function fuzzyLinkOneFile(
 	return join(destinationDir, newMeta.name);
 }
 
+function fuzzyLinkPartial(
+	searchee: Searchee,
+	newMeta: Metafile,
+	destinationDir: string,
+	sourceRoot: string
+): string {
+	for (const newFile of newMeta.files) {
+		let matchedSearcheeFiles = searchee.files.filter(
+			(searcheeFile) => searcheeFile.length === newFile.length
+		);
+		if (matchedSearcheeFiles.length > 1) {
+			matchedSearcheeFiles = matchedSearcheeFiles.filter(
+				(searcheeFile) => searcheeFile.name === newFile.name
+			);
+		}
+		if (matchedSearcheeFiles.length) {
+			const srcFilePath =
+				statSync(sourceRoot).isFile()
+					? sourceRoot
+					: join(dirname(sourceRoot), matchedSearcheeFiles[0].path);
+			const destFilePath = join(destinationDir, newFile.path);
+			mkdirSync(dirname(destFilePath), { recursive: true });
+			linkFile(srcFilePath, destFilePath);
+		}
+	}
+	return join(destinationDir, newMeta.name);
+}
+
 async function linkAllFilesInMetafile(
 	searchee: Searchee,
 	newMeta: Metafile,
 	tracker: string,
-	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY
+	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL
 ): Promise<
 	Result<
 		string,
@@ -111,16 +139,20 @@ async function linkAllFilesInMetafile(
 
 	if (decision === Decision.MATCH) {
 		return resultOf(linkExactTree(sourceRoot, fullLinkDir));
-	} else {
+	} else if (decision === Decision.MATCH_SIZE_ONLY) {
 		return resultOf(
 			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot)
+		);
+	} else {
+		return resultOf(
+			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot)
 		);
 	}
 }
 
 export async function performAction(
 	newMeta: Metafile,
-	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY,
+	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
 	searchee: Searchee,
 	tracker: string
 ): Promise<ActionResult> {
