@@ -36,6 +36,8 @@ const createReasonLogger =
 		}
 		let reason;
 		switch (decision) {
+			case Decision.MATCH_PARTIAL:
+				return;
 			case Decision.MATCH_SIZE_ONLY:
 				return;
 			case Decision.MATCH:
@@ -102,6 +104,28 @@ export function compareFileTreesIgnoringNames(
 	);
 }
 
+export function compareFileTreesPartial(
+	candidate: Metafile,
+	searchee: Searchee
+): boolean {
+	const { fuzzySizeThreshold } = getRuntimeConfig();
+	let matchedSizes = 0;
+	for (const candidateFile of candidate.files) {
+		let matchedSearcheeFiles = searchee.files.filter(
+			(searcheeFile) => searcheeFile.length === candidateFile.length
+		);
+		if (matchedSearcheeFiles.length > 1) {
+			matchedSearcheeFiles = matchedSearcheeFiles.filter(
+				(searcheeFile) => searcheeFile.name === candidateFile.name
+			);
+		}
+		if (matchedSearcheeFiles.length) {
+			matchedSizes += candidateFile.length;
+		}
+	}
+	return matchedSizes / candidate.length >= 1-fuzzySizeThreshold;
+}
+
 function sizeDoesMatch(resultSize, searchee) {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 
@@ -127,9 +151,9 @@ function releaseGroupDoesMatch(
 	if (searcheeReleaseGroup === candidateReleaseGroup) {
 		return true;
 	}
-	// if we are unsure, pass in risky mode but fail in safe mode
+	// if we are unsure, pass in risky or partial mode but fail in safe mode
 	if (!searcheeReleaseGroup || !candidateReleaseGroup) {
-		return matchMode === MatchMode.RISKY;
+		return matchMode !== MatchMode.SAFE;
 	}
 	return searcheeReleaseGroup.startsWith(candidateReleaseGroup);
 }
@@ -166,8 +190,13 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
+
+	const partialMatch = compareFileTreesPartial(candidateMeta, searchee);
+	if (matchMode === MatchMode.PARTIAL && !partialMatch) {
+		return { decision: Decision.SIZE_MISMATCH };
+	}
 	const sizeMatch = compareFileTreesIgnoringNames(candidateMeta, searchee);
-	if (!sizeMatch) {
+	if (matchMode !== MatchMode.PARTIAL && !sizeMatch) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
 
@@ -175,8 +204,11 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (matchMode === MatchMode.RISKY && searchee.files.length === 1) {
+	if (sizeMatch && matchMode !== MatchMode.SAFE && searchee.files.length === 1) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
+	}
+	if (partialMatch && matchMode === MatchMode.PARTIAL) {
+		return { decision: Decision.MATCH_PARTIAL, metafile: candidateMeta };
 	}
 	return { decision: Decision.FILE_TREE_MISMATCH };
 }
@@ -218,7 +250,8 @@ async function assessAndSaveResults(
 
 	if (
 		assessment.decision === Decision.MATCH ||
-		assessment.decision === Decision.MATCH_SIZE_ONLY
+		assessment.decision === Decision.MATCH_SIZE_ONLY ||
+		assessment.decision === Decision.MATCH_PARTIAL
 	) {
 		cacheTorrentFile(assessment.metafile!);
 	}
@@ -235,7 +268,8 @@ async function assessAndSaveResults(
 			decision: assessment.decision,
 			info_hash:
 				assessment.decision === Decision.MATCH ||
-				assessment.decision === Decision.MATCH_SIZE_ONLY
+				assessment.decision === Decision.MATCH_SIZE_ONLY ||
+				assessment.decision === Decision.MATCH_PARTIAL
 					? assessment.metafile!.infoHash
 					: null,
 			last_seen: now,
@@ -278,7 +312,8 @@ async function assessCandidateCaching(
 		logReason(assessment.decision, false);
 	} else if (
 		(cacheEntry.decision === Decision.MATCH ||
-			cacheEntry.decision === Decision.MATCH_SIZE_ONLY) &&
+			cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
+			cacheEntry.decision === Decision.MATCH_PARTIAL) &&
 		infoHashesToExclude.includes(cacheEntry.infoHash)
 	) {
 		// has been added since the last run
@@ -288,7 +323,8 @@ async function assessCandidateCaching(
 			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
 	} else if (
 		(cacheEntry.decision === Decision.MATCH ||
-			cacheEntry.decision === Decision.MATCH_SIZE_ONLY) &&
+			cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
+			cacheEntry.decision === Decision.MATCH_PARTIAL) &&
 		existsInTorrentCache(cacheEntry.infoHash)
 	) {
 		// cached match
@@ -298,7 +334,8 @@ async function assessCandidateCaching(
 		};
 	} else if (
 		cacheEntry.decision === Decision.MATCH ||
-		cacheEntry.decision === Decision.MATCH_SIZE_ONLY
+		cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
+		cacheEntry.decision === Decision.MATCH_PARTIAL
 	) {
 		assessment = await assessAndSaveResults(
 			candidate,
