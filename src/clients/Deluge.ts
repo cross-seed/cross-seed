@@ -1,4 +1,5 @@
 import {
+	Decision,
 	InjectionResult,
 	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
@@ -215,6 +216,7 @@ export default class Deluge implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
+		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
 		path?: string
 	): Promise<InjectionResult> {
 		try {
@@ -238,7 +240,8 @@ export default class Deluge implements TorrentClient {
 				`${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`,
 				newTorrent.encode().toString("base64"),
 				path ? path : torrentInfo!.save_path,
-				!!searchee.infoHash
+				!!searchee.infoHash,
+				decision
 			);
 			const addResult = await this.call<string>(
 				"core.add_torrent_file",
@@ -303,14 +306,20 @@ export default class Deluge implements TorrentClient {
 		filename: string,
 		filedump: string,
 		path: string,
-		isTorrent: boolean
+		isTorrent: boolean,
+		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL
 	): InjectData {
+		const { skipRecheck } = getRuntimeConfig();
+		const skipRecheckTorrent =
+			decision === Decision.MATCH_PARTIAL
+				? skipRecheck
+				: true;
 		return [
 			filename,
 			filedump,
 			{
-				add_paused: isTorrent ? false : !getRuntimeConfig().skipRecheck,
-				seed_mode: isTorrent ? true : getRuntimeConfig().skipRecheck,
+				add_paused: isTorrent ? !skipRecheckTorrent : !skipRecheck,
+				seed_mode: isTorrent ? skipRecheckTorrent : skipRecheck,
 				download_location: path,
 			},
 		];

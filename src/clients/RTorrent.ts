@@ -3,7 +3,7 @@ import { stat, unlink, writeFile } from "fs/promises";
 import { dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
-import { InjectionResult, TORRENT_TAG } from "../constants.js";
+import { Decision, InjectionResult, TORRENT_TAG } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -276,9 +276,10 @@ export default class RTorrent implements TorrentClient {
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,
+		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
 		path?: string
 	): Promise<InjectionResult> {
-		const { outputDir } = getRuntimeConfig();
+		const { outputDir, skipRecheck } = getRuntimeConfig();
 
 		if (await this.checkForInfoHashInClient(meta.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
@@ -304,6 +305,11 @@ export default class RTorrent implements TorrentClient {
 
 		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
 
+		const paused =
+			decision === Decision.MATCH_PARTIAL
+				? skipRecheck ? 0 : 1
+				: 0;
+
 		for (let i = 0; i < 5; i++) {
 			try {
 				await this.methodCallP<void>("load.start", [
@@ -312,6 +318,7 @@ export default class RTorrent implements TorrentClient {
 					`d.directory_base.set="${directoryBase}"`,
 					`d.custom1.set="${TORRENT_TAG}"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
+					`d.custom2.set=paused,${paused}`,
 				]);
 				break;
 			} catch (e) {

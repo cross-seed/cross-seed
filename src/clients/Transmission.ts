@@ -1,4 +1,4 @@
-import { InjectionResult, TORRENT_TAG } from "../constants.js";
+import { Decision, InjectionResult, TORRENT_TAG } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -168,8 +168,11 @@ export default class Transmission implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
+		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
 		path?: string
 	): Promise<InjectionResult> {
+		const { skipRecheck } = getRuntimeConfig();
+
 		let downloadDir: string;
 		if (path) {
 			downloadDir = path;
@@ -186,13 +189,18 @@ export default class Transmission implements TorrentClient {
 
 		let addResponse: TorrentAddResponse;
 
+		const skipRecheckTorrent =
+			decision === Decision.MATCH_PARTIAL
+				? skipRecheck
+				: true;
+
 		try {
 			addResponse = await this.request<TorrentAddResponse>(
 				"torrent-add",
 				{
 					"download-dir": downloadDir,
 					metainfo: newTorrent.encode().toString("base64"),
-					paused: false,
+					paused: !skipRecheckTorrent,
 					labels: [TORRENT_TAG],
 				}
 			);
