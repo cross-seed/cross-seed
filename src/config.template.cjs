@@ -99,7 +99,8 @@ module.exports = {
 	/**
 	 * Determines flexibility of naming during matching. "safe" will allow only perfect name/size matches
 	 * using the standard matching algorithm. "risky" uses filesize as its only comparison point.
-	 * Options: "safe", "risky"
+	 * "partial" is like risky but allows matches if they are missing small files like .nfo/.srt
+	 * Options: "safe", "risky", "partial"
 	 */
 	matchMode: "safe",
 
@@ -138,7 +139,7 @@ module.exports = {
 	legacyLinking: false,
 
 	/**
-	 * Whether to skip recheck in Qbittorrent. If using "risky" matchMode it is HIGHLY
+	 * Whether to skip recheck in Qbittorrent. If using "risky" or "partial" matchMode it is HIGHLY
 	 * recommended to set this to false.
 	 * Only applies to data based matches.
 	 */

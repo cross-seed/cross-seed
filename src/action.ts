@@ -73,11 +73,48 @@ function fuzzyLinkOneFile(
 	return join(destinationDir, newMeta.name);
 }
 
+function fuzzyLinkPartial(
+	searchee: Searchee,
+	newMeta: Metafile,
+	destinationDir: string,
+	sourceRoot: string
+): string {
+	let filesToLink: [string, string][] = [];
+	let matchedSizes = 0;
+	let availableFiles = searchee.files.slice();
+	newMeta.files.forEach((newFile) => {
+		let matchedFiles = availableFiles.filter(
+			(file) => file.length === newFile.length
+		);
+		if (matchedFiles.length > 1) {
+			matchedFiles = matchedFiles.filter(
+				(file) => file.name === newFile.name
+			);
+		}
+		if (matchedFiles.length) {
+			matchedSizes += newFile.length;
+			availableFiles.splice(availableFiles.indexOf(matchedFiles[0]), 1);
+			filesToLink.push([matchedFiles[0].path, newFile.path]);
+		}
+	});
+	filesToLink.forEach(([oldPath, newPath]) => {
+		const destFilePath = join(destinationDir, newPath);
+		mkdirSync(dirname(destFilePath), { recursive: true });
+		if (statSync(sourceRoot).isFile())
+		{
+			linkFile(sourceRoot, destFilePath);
+		} else {
+			linkFile(join(dirname(sourceRoot), oldPath), destFilePath);
+		}
+	});
+	return join(destinationDir, newMeta.name);
+}
+
 async function linkAllFilesInMetafile(
 	searchee: Searchee,
 	newMeta: Metafile,
 	tracker: string,
-	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY
+	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL
 ): Promise<
 	Result<
 		string,
@@ -109,23 +146,27 @@ async function linkAllFilesInMetafile(
 
 	if (decision === Decision.MATCH) {
 		return resultOf(linkExactTree(sourceRoot, fullLinkDir));
-	} else {
+	} else if (decision === Decision.MATCH_SIZE_ONLY) {
 		return resultOf(
 			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot)
+		);
+	} else {
+		return resultOf(
+			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot)
 		);
 	}
 }
 
 export async function performAction(
 	newMeta: Metafile,
-	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY,
+	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
 	searchee: Searchee,
 	tracker: string
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 
 	// SAVES FIRST, PREVENTS LINKING THOUGH IN THIS ORDER
-	if (action === Action.SAVE) {
+	if (action === Action.SAVE || (decision === Decision.MATCH_PARTIAL && !linkDir)) {
 		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);

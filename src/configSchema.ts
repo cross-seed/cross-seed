@@ -202,7 +202,8 @@ export const VALIDATION_SCHEMA = z
 		})
 	)
 	.refine((config) => {
-		if (config.skipRecheck && config.matchMode == MatchMode.RISKY) {
+		if (config.skipRecheck && (config.matchMode == MatchMode.RISKY ||
+			config.matchMode == MatchMode.PARTIAL)) {
 			logger.warn(ZodErrorMessages.riskyRecheckWarn);
 		}
 		return true;
