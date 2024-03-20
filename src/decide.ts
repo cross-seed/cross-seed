@@ -143,6 +143,7 @@ async function assessCandidateHelper(
 	if (releaseInBlockList(searchee, blockList)) {
 		return { decision: Decision.BLOCKED_RELEASE };
 	}
+
 	if (size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
@@ -174,7 +175,7 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (matchMode == MatchMode.RISKY && searchee.files.length === 1) {
+	if (matchMode === MatchMode.RISKY && searchee.files.length === 1) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}
 	return { decision: Decision.FILE_TREE_MISMATCH };

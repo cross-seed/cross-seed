@@ -24,6 +24,7 @@ interface FileConfig {
 	matchMode?: MatchMode;
 	linkDir?: string;
 	linkType?: string;
+	legacyLinking?: boolean;
 	skipRecheck?: boolean;
 	maxDataDepth?: number;
 	dataCategory?: string;

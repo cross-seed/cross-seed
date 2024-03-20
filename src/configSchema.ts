@@ -15,11 +15,12 @@ const ZodErrorMessages = {
 	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
-	dataBased:
-		"Data-Based Matching requires linkType, dataDirs, and linkDir to be defined.",
 	riskyRecheckWarn:
 		"It is strongly recommended to not skip rechecking for risky matching mode.",
 	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
+	qBitLegacyLinking:
+		"Using Automatic Torrent Management in qBittorrent without legacyLinking enabled can result in injection path failures.",
+	riskyNeedsLinkDir: "You need to set a linkDir for risky matching to work.",
 };
 
 /**
@@ -90,7 +91,7 @@ function checkValidPathFormat(path: string, ctx) {
 
 export const VALIDATION_SCHEMA = z
 	.object({
-		delay: z.number().positive({
+		delay: z.number().nonnegative({
 			message: ZodErrorMessages.delay,
 		}),
 		torznab: z.array(z.string().url()),
@@ -110,6 +111,10 @@ export const VALIDATION_SCHEMA = z
 		dataCategory: z.string().nullish(),
 		linkDir: z.string().transform(checkValidPathFormat).nullish(),
 		linkType: z.nativeEnum(LinkType),
+		legacyLinking: z
+			.boolean()
+			.nullish()
+			.transform((value) => (typeof value === "boolean" ? value : false)),
 		skipRecheck: z.boolean(),
 		maxDataDepth: z.number().gte(1),
 		torrentDir: z.string(),
@@ -173,38 +178,35 @@ export const VALIDATION_SCHEMA = z
 			.transform((value) => (Array.isArray(value) ? value : [])),
 	})
 	.strict()
+	.refine((config) => {
+		if (
+			config.action === Action.INJECT &&
+			config.qbittorrentUrl &&
+			!config.legacyLinking &&
+			config.linkDir
+		) {
+			logger.warn(ZodErrorMessages.qBitLegacyLinking);
+		}
+		return true;
+	})
 	.refine(
 		(config) =>
 			!(
-				config.action == Action.INJECT &&
+				config.action === Action.INJECT &&
 				!config.rtorrentRpcUrl &&
 				!config.qbittorrentUrl &&
 				!config.transmissionRpcUrl &&
 				!config.delugeRpcUrl
 			),
-		() => ({
-			message: ZodErrorMessages.injectUrl,
-		})
-	)
-	.refine(
-		(config) => {
-			if (
-				(config.dataDirs !== undefined &&
-					config.dataDirs !== null &&
-					config.dataDirs?.length > 0) ||
-				(config.linkDir !== undefined && config.linkDir !== null)
-			) {
-				return config.dataDirs!.length > 0 && config.linkDir;
-			}
-			return true;
-		},
-		() => ({
-			message: ZodErrorMessages.dataBased,
-		})
+		ZodErrorMessages.injectUrl
 	)
 	.refine((config) => {
-		if (config.skipRecheck && config.matchMode == MatchMode.RISKY) {
+		if (config.skipRecheck && config.matchMode === MatchMode.RISKY) {
 			logger.warn(ZodErrorMessages.riskyRecheckWarn);
 		}
 		return true;
-	});
+	})
+	.refine(
+		(config) => config.matchMode !== MatchMode.RISKY || config.linkDir,
+		ZodErrorMessages.riskyNeedsLinkDir
+	);
