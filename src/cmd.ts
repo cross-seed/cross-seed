@@ -58,17 +58,15 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 					: path;
 			logger.error(
 				`${
-					path.length > 0
-						? `\tOption:\t ${optionLine}`
-						: "\tConfiguration:"
-				}\n\t${message}\n\t(https://www.cross-seed.org/docs/basics/options${
+					path.length > 0 ? `Option: ${optionLine}` : "Configuration:"
+				}\n\t\t\t\t${message}\n\t\t\t\t(https://www.cross-seed.org/docs/basics/options${
 					urlPath ? `#${urlPath}` : ""
 				})\n`
 			);
 		});
 		if (errors?.length > 0) {
 			throw new CrossSeedError(
-				`\tYour configuration is invalid, please see the ${
+				`Your configuration is invalid, please see the ${
 					errors.length > 1 ? "errors" : "error"
 				} above for details.`
 			);

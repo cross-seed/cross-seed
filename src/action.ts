@@ -140,7 +140,9 @@ async function linkAllFilesInMetafile(
 	}
 
 	if (!existsSync(sourceRoot)) {
-		logger.error(`Linking failed, ${sourceRoot} not found`);
+		logger.error(
+			`Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`
+		);
 		return resultOfErr("MISSING_DATA");
 	}
 
@@ -165,7 +167,6 @@ export async function performAction(
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 
-	// SAVES FIRST, PREVENTS LINKING THOUGH IN THIS ORDER
 	if (action === Action.SAVE || (decision === Decision.MATCH_PARTIAL && !linkDir)) {
 		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
@@ -186,15 +187,14 @@ export async function performAction(
 		if (linkedFilesRootResult.isOk()) {
 			destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
 		} else if (
-			linkedFilesRootResult.unwrapErrOrThrow() !== "MISSING_DATA"
+			decision === Decision.MATCH &&
+			linkedFilesRootResult.unwrapErrOrThrow() === "MISSING_DATA"
 		) {
+			logger.warn("Falling back to non-linking.");
+		} else {
 			logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
 			saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 			return InjectionResult.FAILURE;
-		} else {
-			logger.warn(
-				"You have inaccessible data required for linking torrents. Consider making the torrent structure available to cross-seed."
-			);
 		}
 	}
 

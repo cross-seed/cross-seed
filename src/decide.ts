@@ -1,4 +1,4 @@
-import { existsSync, statSync, writeFileSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
@@ -215,18 +215,7 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (!searchee.path && !linkDir) {
-		return { decision: Decision.FILE_TREE_MISMATCH };
-	}
-	if (
-		(matchMode == MatchMode.RISKY || matchMode == MatchMode.PARTIAL) &&
-		((searchee.path &&
-			!statSync(searchee.path).isDirectory() &&
-			compareFileTreesIgnoringNames(candidateMeta, searchee)) ||
-			(searchee.infoHash &&
-				linkDir &&
-				compareFileTreesIgnoringNames(candidateMeta, searchee)))
-	) {
+	if ((matchMode == MatchMode.RISKY || matchMode == MatchMode.PARTIAL) && searchee.files.length === 1) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}
 	if (

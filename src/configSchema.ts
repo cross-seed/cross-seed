@@ -139,7 +139,7 @@ export const VALIDATION_SCHEMA = z
 		rtorrentRpcUrl: z.string().url().nullish(),
 		transmissionRpcUrl: z.string().url().nullish(),
 		delugeRpcUrl: z.string().url().nullish(),
-		duplicateCategories: z.boolean().nullish(),
+		duplicateCategories: z.boolean(),
 		notificationWebhookUrl: z.string().url().nullish(),
 		port: z
 			.number()
