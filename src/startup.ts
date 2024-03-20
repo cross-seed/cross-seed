@@ -26,7 +26,7 @@ async function verifyPath(
 	} catch (error) {
 		if (error.code === "ENOENT") {
 			logger.error(
-				`\tYour ${optionName} "${path}" is not a valid directory on the filesystem.\n`
+				`\tYour ${optionName} "${path}" is not a valid directory on the filesystem.`
 			);
 		} else {
 			logger.error(
