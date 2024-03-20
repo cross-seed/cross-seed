@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { Option, program } from "commander";
 import { getApiKeyFromDatabase, resetApiKey } from "./auth.js";
 import { VALIDATION_SCHEMA, zodErrorMap } from "./configSchema.js";
-import { generateConfig, getFileConfig } from "./configuration.js";
+import { FileConfig, generateConfig, getFileConfig } from "./configuration.js";
 import {
 	Action,
 	LinkType,
@@ -30,7 +30,16 @@ import { parseTorrentFromFilename } from "./torrent.js";
 import { fallback } from "./utils.js";
 import { inspect } from "util";
 
-const fileConfig = await getFileConfig();
+let fileConfig: FileConfig;
+try {
+	fileConfig = await getFileConfig();
+} catch (e) {
+	if (e instanceof CrossSeedError) {
+		console.error(e.message);
+		process.exit(1);
+	}
+	throw e;
+}
 
 /**
  * validates and sets RuntimeConfig
