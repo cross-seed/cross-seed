@@ -276,6 +276,10 @@ export async function syncWithDb() {
 				.where({ id: apikeyUpdate.id })
 				.update({ apikey: apikeyUpdate.apikey });
 		}
+		// drop cached UNKNOWN_ERRORs on startup
+		await trx("indexer")
+			.where({ status: IndexerStatus.UNKNOWN_ERROR })
+			.update({ status: IndexerStatus.OK });
 	});
 }
 
