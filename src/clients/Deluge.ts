@@ -281,7 +281,7 @@ export default class Deluge implements TorrentClient {
 		} catch (injectResult) {
 			console.error(injectResult);
 			if (injectResult.includes("label.set_torrent")) {
-				logger.warning({
+				logger.warn({
 					label: Label.DELUGE,
 					message: `Labeling failure: ${newTorrent.name} (${newTorrent.infoHash})`,
 				});
