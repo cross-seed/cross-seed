@@ -305,20 +305,19 @@ export default class RTorrent implements TorrentClient {
 
 		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
 
-		const paused =
+		const loadType =
 			decision === Decision.MATCH_PARTIAL
-				? skipRecheck ? 0 : 1
-				: 0;
+				? skipRecheck ? "load.start" : "load"
+				: "load.start";
 
 		for (let i = 0; i < 5; i++) {
 			try {
-				await this.methodCallP<void>("load.start", [
+				await this.methodCallP<void>(loadType, [
 					"",
 					torrentFilePath,
 					`d.directory_base.set="${directoryBase}"`,
 					`d.custom1.set="${TORRENT_TAG}"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
-					`d.custom2.set=paused,${paused}`,
 				]);
 				break;
 			} catch (e) {
