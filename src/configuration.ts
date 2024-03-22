@@ -44,6 +44,7 @@ export interface FileConfig {
 	searchTimeout?: string;
 	searchLimit?: number;
 	blockList?: string[];
+	apiKey?: string;
 }
 
 interface GenerateConfigParams {
