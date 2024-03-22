@@ -155,6 +155,9 @@ export async function performAction(
 			await saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 			return InjectionResult.FAILURE;
 		}
+	} else if (searchee.path) {
+		// should be a MATCH, as risky requires a linkDir to be set
+		destinationDir = dirname(searchee.path);
 	}
 
 	const result = await getClient().inject(newMeta, searchee, destinationDir);
