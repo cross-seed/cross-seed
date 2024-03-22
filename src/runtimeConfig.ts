@@ -35,6 +35,7 @@ export interface RuntimeConfig {
 	searchTimeout: number;
 	searchLimit: number;
 	blockList: string[];
+	apiKey?: string;
 }
 
 let runtimeConfig: RuntimeConfig;
