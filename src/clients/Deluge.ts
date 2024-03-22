@@ -210,7 +210,11 @@ export default class Deluge implements TorrentClient {
 	 * if Label plugin is loaded, adds (if necessary)
 	 * and sets the label based on torrent hash.
 	 */
-	private async setLabel(infoHash: string, label: string): Promise<void> {
+	private async setLabel(
+		name: string,
+		infoHash: string,
+		label: string
+	): Promise<void> {
 		if (!this.isLabelEnabled) return;
 		try {
 			const setResult = await this.call<void>("label.set_torrent", [
@@ -224,7 +228,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.warn({
 				label: Label.DELUGE,
-				message: `Failed to label ${infoHash} as ${label}`,
+				message: `Failed to label ${name} (${infoHash}) as ${label}`,
 			});
 		}
 	}
@@ -267,6 +271,7 @@ export default class Deluge implements TorrentClient {
 			if (addResult.result) {
 				const { dataCategory } = getRuntimeConfig();
 				await this.setLabel(
+					newTorrent.name,
 					newTorrent.infoHash,
 					searchee.path
 						? dataCategory
