@@ -211,16 +211,21 @@ export default class Deluge implements TorrentClient {
 	 * and sets the label based on torrent hash.
 	 */
 	private async setLabel(infoHash: string, label: string): Promise<void> {
-		if (this.isLabelEnabled) {
+		if (!this.isLabelEnabled) return;
+		try {
 			const setResult = await this.call<void>("label.set_torrent", [
 				infoHash,
 				label,
 			]);
-			console.log(`setResult: ${setResult}`);
 			if (setResult.error?.code === DelugeErrorCode.RPC_FAIL) {
 				await this.call<void>("label.add", [label]);
 				await this.call<void>("label.set_torrent", [infoHash, label]);
 			}
+		} catch (e) {
+			logger.warn({
+				label: Label.DELUGE,
+				message: `Failed to label ${infoHash} as ${label}`,
+			});
 		}
 	}
 
@@ -293,21 +298,13 @@ export default class Deluge implements TorrentClient {
 				});
 				return InjectionResult.FAILURE;
 			}
-		} catch (injectResult) {
-			if (injectResult.message.includes("label.set_torrent")) {
-				logger.warn({
-					label: Label.DELUGE,
-					message: `Labeling failure: ${newTorrent.name} (${newTorrent.infoHash})`,
-				});
-				return InjectionResult.SUCCESS;
-			} else {
-				logger.error({
-					label: Label.DELUGE,
-					message: `Injection failed: ${injectResult}`,
-				});
-				logger.debug(injectResult);
-				return InjectionResult.FAILURE;
-			}
+		} catch (error) {
+			logger.error({
+				label: Label.DELUGE,
+				message: `Injection failed: ${error}`,
+			});
+			logger.debug(error);
+			return InjectionResult.FAILURE;
 		}
 	}
 
