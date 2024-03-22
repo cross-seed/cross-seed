@@ -176,6 +176,7 @@ export const VALIDATION_SCHEMA = z
 			.array(z.string())
 			.nullish()
 			.transform((value) => (Array.isArray(value) ? value : [])),
+		apiKey: z.string().min(24).nullish(),
 	})
 	.strict()
 	.refine((config) => {
