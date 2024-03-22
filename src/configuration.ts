@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { accessSync, copyFileSync, existsSync, mkdirSync } from "fs";
+import { accessSync, copyFileSync, existsSync, mkdirSync, constants } from "fs";
 import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
@@ -67,7 +67,7 @@ export function appDir(): string {
 		(process.platform === "win32"
 			? path.resolve(process.env.LOCALAPPDATA!, packageDotJson.name)
 			: path.resolve(process.env.HOME!, `.${packageDotJson.name}`));
-	accessSync(appDir);
+	accessSync(appDir, constants.R_OK | constants.W_OK);
 	return appDir;
 }
 
