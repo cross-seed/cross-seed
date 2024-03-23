@@ -118,13 +118,16 @@ export function compareFileTreesPartialIgnoringNames(
 			matchedSizes += candidateFile.length;
 		}
 	}
-	return matchedSizes / candidate.length >= 1 - fuzzySizeThreshold;
+	return matchedSizes / candidate.length >= 1-fuzzySizeThreshold;
 }
 
 export function compareFileTreesPartial(
 	candidate: Metafile,
 	searchee: Searchee
 ): boolean {
+	if (candidate.length < candidate.pieceLength) {
+		return false;
+	}
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 	let matchedSizes = 0;
 	for (const candidateFile of candidate.files) {
