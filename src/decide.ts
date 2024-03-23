@@ -125,7 +125,7 @@ export function compareFileTreesPartial(
 	candidate: Metafile,
 	searchee: Searchee
 ): boolean {
-	if (candidate.length < candidate.pieceLength) {
+	if (candidate.length <= candidate.pieceLength) {
 		return false;
 	}
 	const { fuzzySizeThreshold } = getRuntimeConfig();
