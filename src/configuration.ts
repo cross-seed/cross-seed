@@ -67,7 +67,17 @@ export function appDir(): string {
 		(process.platform === "win32"
 			? path.resolve(process.env.LOCALAPPDATA!, packageDotJson.name)
 			: path.resolve(process.env.HOME!, `.${packageDotJson.name}`));
-	accessSync(appDir, constants.R_OK | constants.W_OK);
+	try {
+		accessSync(appDir, constants.R_OK | constants.W_OK);
+	} catch (e) {
+		const dockerMessage =
+			process.env.DOCKER_ENV === "true"
+				? ` Use chown to set the owner to ${process.getuid!()}:${process.getgid!()}`
+				: "";
+		throw new CrossSeedError(
+			`cross-seed does not have R/W permissions on your config directory.${dockerMessage}`
+		);
+	}
 	return appDir;
 }
 

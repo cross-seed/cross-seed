@@ -220,7 +220,7 @@ module.exports = {
 	 * "3 days"
 	 * "0" - this will search everything exactly once, never more.
 	 */
-	excludeOlder: "1 week",
+	excludeOlder: "2 weeks",
 
 	/**
 	 * Exclude torrents which have been searched
@@ -230,7 +230,7 @@ module.exports = {
 	 * "2w"
 	 * "3 days"
 	 */
-	excludeRecentSearch: "2 days",
+	excludeRecentSearch: "3 days",
 
 	/**
 	 * What action to take upon a match being found
@@ -255,7 +255,7 @@ module.exports = {
 	 * "2w"
 	 * "3 days"
 	 */
-	rssCadence: "15 minutes",
+	rssCadence: "30 minutes",
 
 	/**
 	 * Run searches on a schedule. Format: https://github.com/vercel/ms
