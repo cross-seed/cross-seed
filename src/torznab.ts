@@ -1,5 +1,4 @@
 import ms from "ms";
-import fetch from "node-fetch";
 import xml2js from "xml2js";
 import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
@@ -26,7 +25,6 @@ interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
-	offset?: number;
 	apikey?: string;
 	season?: number | string;
 	ep?: number | string;
@@ -66,7 +64,9 @@ interface TorznabResult {
 type TorznabResults = { rss?: { channel?: [] | [{ item?: TorznabResult[] }] } };
 
 function sanitizeUrl(url: string | URL): string {
-	url = new URL(url);
+	if (typeof url === "string") {
+		url = new URL(url);
+	}
 	return url.origin + url.pathname;
 }
 
@@ -108,26 +108,26 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 function createTorznabSearchQuery(name: string, caps: Caps) {
 	const nameWithoutExtension = stripExtension(name);
 	const extractNumber = (str: string): number =>
-		parseInt(str.match(/\d+/)[0]);
+		parseInt(str.match(/\d+/)![0]);
 	const mediaType = getTag(nameWithoutExtension);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
 		return {
 			t: "tvsearch",
-			q: cleanseSeparators(match.groups.title),
-			season: match.groups.season
-				? extractNumber(match.groups.season)
-				: match.groups.year,
-			ep: match.groups.episode
-				? extractNumber(match.groups.episode)
-				: `${match.groups.month}/${match.groups.day}`,
+			q: cleanseSeparators(match!.groups!.title),
+			season: match!.groups!.season
+				? extractNumber(match!.groups!.season)
+				: match!.groups!.year,
+			ep: match!.groups!.episode
+				? extractNumber(match!.groups!.episode)
+				: `${match!.groups!.month}/${match!.groups!.day}`,
 		} as const;
 	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
 		return {
 			t: "tvsearch",
-			q: cleanseSeparators(match.groups.title),
-			season: extractNumber(match.groups.season),
+			q: cleanseSeparators(match!.groups!.title),
+			season: extractNumber(match!.groups!.season),
 		} as const;
 	} else {
 		return {
@@ -240,7 +240,7 @@ export async function syncWithDb() {
 			) {
 				acc.push({
 					id: dbIndexer.id,
-					apikey: getApikey(configIndexer),
+					apikey: getApikey(configIndexer)!,
 				});
 			}
 			return acc;
@@ -276,6 +276,10 @@ export async function syncWithDb() {
 				.where({ id: apikeyUpdate.id })
 				.update({ apikey: apikeyUpdate.apikey });
 		}
+		// drop cached UNKNOWN_ERRORs on startup
+		await trx("indexer")
+			.where({ status: IndexerStatus.UNKNOWN_ERROR })
+			.update({ status: IndexerStatus.OK });
 	});
 }
 
@@ -507,7 +511,7 @@ async function makeRequests(
 
 	for (const [indexerId, reason] of rejected) {
 		logger.warn(
-			`Failed to reach ${indexers.find((i) => i.id === indexerId).url}`
+			`Failed to reach ${indexers.find((i) => i.id === indexerId)!.url}`
 		);
 		logger.debug(reason);
 	}

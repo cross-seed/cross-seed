@@ -2,12 +2,13 @@
 	"compilerOptions": {
 		"outDir": "./dist",
 		"allowJs": true,
-		"target": "es2021",
+		"target": "es2022",
+		"lib": ["es2022"],
 		"module": "nodenext",
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
-		"moduleResolution": "nodenext",
-		"sourceMap": true
+		"sourceMap": true,
+		"strictNullChecks": true
 	},
 	"include": ["./src/**/*"]
 }

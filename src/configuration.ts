@@ -1,16 +1,17 @@
 import chalk from "chalk";
-import { copyFileSync, existsSync, mkdirSync } from "fs";
+import { accessSync, copyFileSync, existsSync, mkdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
 import { Action, MatchMode } from "./constants.js";
+import { CrossSeedError } from "./errors.js";
 
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
-interface FileConfig {
+export interface FileConfig {
 	action?: Action;
-	configVersion?: number;
+	pconfigVersion?: number;
 	delay?: number;
 	includeEpisodes?: boolean;
 	includeSingleEpisodes?: boolean;
@@ -24,6 +25,7 @@ interface FileConfig {
 	matchMode?: MatchMode;
 	linkDir?: string;
 	linkType?: string;
+	legacyLinking?: boolean;
 	skipRecheck?: boolean;
 	maxDataDepth?: number;
 	dataCategory?: string;
@@ -36,12 +38,13 @@ interface FileConfig {
 	notificationWebhookUrl?: string;
 	port?: number;
 	host?: string;
-	apiAuth?: boolean;
 	searchCadence?: string;
 	rssCadence?: string;
 	snatchTimeout?: string;
 	searchTimeout?: string;
 	searchLimit?: number;
+	blockList?: string[];
+	apiKey?: string;
 }
 
 interface GenerateConfigParams {
@@ -49,13 +52,23 @@ interface GenerateConfigParams {
 	docker?: boolean;
 }
 
+export const UNPARSABLE_CONFIG_MESSAGE = `
+Your config file is improperly formatted. The location of the error is above, \
+but you may have to look backwards to see the root cause.
+Make sure that
+  - strings (words, URLs, etc) are wrapped in "quotation marks"
+  - any arrays (lists of things, even one thing) are wrapped in [square brackets]
+  - every entry has a comma after it, including inside arrays
+`.trim();
+
 export function appDir(): string {
-	return (
+	const appDir =
 		process.env.CONFIG_DIR ||
 		(process.platform === "win32"
-			? path.resolve(process.env.LOCALAPPDATA, packageDotJson.name)
-			: path.resolve(process.env.HOME, `.${packageDotJson.name}`))
-	);
+			? path.resolve(process.env.LOCALAPPDATA!, packageDotJson.name)
+			: path.resolve(process.env.HOME!, `.${packageDotJson.name}`));
+	accessSync(appDir);
+	return appDir;
 }
 
 export function createAppDir(): void {
@@ -90,7 +103,15 @@ export async function getFileConfig(): Promise<FileConfig> {
 	try {
 		return (await import(pathToFileURL(configPath).toString())).default;
 	} catch (e) {
-		if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
-		return {};
+		if (e.code === "ERR_MODULE_NOT_FOUND") {
+			return {};
+		} else if (e instanceof SyntaxError) {
+			const location = e.stack!.split("\n").slice(0, 3).join("\n");
+			throw new CrossSeedError(
+				`\n${chalk.red(location)}\n\n${UNPARSABLE_CONFIG_MESSAGE}`
+			);
+		} else {
+			throw e;
+		}
 	}
 }

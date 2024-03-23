@@ -5,6 +5,8 @@ const packageDotJson = require("../package.json");
 export const PROGRAM_NAME = packageDotJson.name;
 export const PROGRAM_VERSION = packageDotJson.version;
 export const USER_AGENT = `CrossSeed/${PROGRAM_VERSION}`;
+export const TORRENT_TAG = "cross-seed";
+export const TORRENT_CATEGORY_SUFFIX = `.cross-seed`;
 
 export const EP_REGEX =
 	/^(?<title>.+?)[_.\s-]+(?:(?<season>S\d+)?[_.\s]?(?<episode>E\d+(?:[\s-]?E?\d+)?(?![ip]))(?!\d+[ip])|(?<date>(?<year>\d{4})[_.\s-](?<month>\d{2})[_.\s-](?<day>\d{2})))/i;
@@ -12,11 +14,13 @@ export const SEASON_REGEX =
 	/^(?<title>.+?)[_.\s-]+(?<season>S\d+)(?:[_.\s-]*?(?<seasonmax>S?\d+))?(?=[_.\s](?!E\d+))/i;
 export const MOVIE_REGEX =
 	/^(?<title>.+?)[_.\s][[(]?(?<year>\d{4})[)\]]?(?![pi])/i;
-export const RELEASE_GROUP_REGEX = /(?<=-)[\w ]+(?=(?:\.\w{1,5})?$)/i;
+export const RELEASE_GROUP_REGEX =
+	/(?<=-)(?<group>[\w ]+)(?:\))?(?=(?:\.\w{1,5})?$)/i;
 
-export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi"];
+export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
 
-export const DATA_EXTENSIONS = [".mkv", ".avi", ".mp4", ".ts", ".flac", ".mp3"];
+export const IGNORED_FOLDERS_REGEX =
+	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 
@@ -48,6 +52,7 @@ export enum Decision {
 	INFO_HASH_ALREADY_EXISTS = "INFO_HASH_ALREADY_EXISTS",
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
 	RELEASE_GROUP_MISMATCH = "RELEASE_GROUP_MISMATCH",
+	BLOCKED_RELEASE = "BLOCKED_RELEASE",
 }
 
 export enum MatchMode {
@@ -59,3 +64,12 @@ export enum LinkType {
 	SYMLINK = "symlink",
 	HARDLINK = "hardlink",
 }
+
+export const IGNORED_FOLDERS_SUBSTRINGS = [
+	"sample",
+	"proof",
+	"bdmv",
+	"bdrom",
+	"certificate",
+	"video_ts",
+];

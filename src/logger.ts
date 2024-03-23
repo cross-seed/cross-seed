@@ -1,8 +1,8 @@
 import { join } from "path";
 import winston from "winston";
-import { appDir, createAppDir } from "./configuration.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
 import DailyRotateFile from "winston-daily-rotate-file";
+import { appDir, createAppDir } from "./configuration.js";
+import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -43,11 +43,11 @@ function redactUrlPassword(message, urlStr) {
 	return message;
 }
 
-function redactMessage(message: string | unknown) {
+function redactMessage(message: string | unknown, options?) {
 	if (typeof message !== "string") {
 		return message;
 	}
-	const runtimeConfig = getRuntimeConfig();
+	const runtimeConfig = options ?? getRuntimeConfig();
 	let ret = message;
 
 	// redact torznab api keys
@@ -72,7 +72,7 @@ export function logOnce(cacheKey: string, cb: () => void) {
 	}
 }
 
-export function initializeLogger(): void {
+export function initializeLogger(options: RuntimeConfig): void {
 	createAppDir();
 	logger = winston.createLogger({
 		level: "info",
@@ -86,7 +86,7 @@ export function initializeLogger(): void {
 			winston.format.printf(({ level, message, label, timestamp }) => {
 				return `${timestamp} ${level}: ${
 					label ? `[${label}] ` : ""
-				}${redactMessage(message)}`;
+				}${redactMessage(message, options)}`;
 			})
 		),
 		transports: [
@@ -114,16 +114,21 @@ export function initializeLogger(): void {
 				level: "silly",
 			}),
 			new winston.transports.Console({
-				level: getRuntimeConfig().verbose ? "silly" : "info",
+				level: options.verbose ? "silly" : "info",
 				format: winston.format.combine(
 					winston.format.errors({ stack: true }),
 					winston.format.splat(),
 					winston.format.colorize(),
-					winston.format.printf(({ level, message, label }) => {
-						return `${level}: ${
-							label ? `[${label}] ` : ""
-						}${redactMessage(message)}`;
-					})
+					winston.format.printf(
+						({ level, message, label, timestamp, stack }) => {
+							return `${timestamp} ${level}: ${
+								label ? `[${label}] ` : ""
+							}${redactMessage(
+								stack ? stack : message,
+								options
+							)}`;
+						}
+					)
 				),
 			}),
 		],

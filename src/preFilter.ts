@@ -10,14 +10,23 @@ import { humanReadable, nMsAgo } from "./utils.js";
 import path from "path";
 
 export function filterByContent(searchee: Searchee): boolean {
-	const { includeEpisodes, includeNonVideos, includeSingleEpisodes } =
-		getRuntimeConfig();
+	const {
+		includeEpisodes,
+		includeNonVideos,
+		includeSingleEpisodes,
+		blockList,
+	} = getRuntimeConfig();
 
 	function logReason(reason): void {
 		logger.verbose({
 			label: Label.PREFILTER,
 			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
 		});
+	}
+
+	if (releaseInBlockList(searchee, blockList)) {
+		logReason("it matched the blocklist");
+		return false;
 	}
 
 	const isSingleEpisodeTorrent =
@@ -53,6 +62,18 @@ export function filterByContent(searchee: Searchee): boolean {
 	return true;
 }
 
+export function releaseInBlockList(
+	searchee: Searchee,
+	blockList: string[]
+): boolean {
+	return blockList.some((blockedStr) => {
+		return (
+			searchee.name.includes(blockedStr) ||
+			blockedStr === searchee.infoHash
+		);
+	});
+}
+
 export function filterDupes(searchees: Searchee[]): Searchee[] {
 	const duplicateMap = searchees.reduce((acc, cur) => {
 		const entry = acc.get(cur.name);
@@ -75,10 +96,15 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 	return filtered;
 }
 
+type TimestampDataSql = {
+	first_searched_any: number;
+	last_searched_all: number;
+};
+
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const enabledIndexers = await getEnabledIndexers();
-	const timestampDataSql = await db("searchee")
+	const timestampDataSql: TimestampDataSql = (await db("searchee")
 		// @ts-expect-error crossJoin supports string
 		.crossJoin("indexer")
 		.leftOuterJoin("timestamp", {
@@ -98,7 +124,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		.min({
 			last_searched_all: db.raw("coalesce(timestamp.last_searched, 0)"),
 		})
-		.first();
+		.first()) as TimestampDataSql;
 
 	const { first_searched_any, last_searched_all } = timestampDataSql;
 	function logReason(reason) {

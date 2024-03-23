@@ -1,11 +1,9 @@
 import fs, { promises as fsPromises } from "fs";
 import Fuse from "fuse.js";
-import fetch, { Response } from "node-fetch";
 import path, { join } from "path";
 import { inspect } from "util";
 import { USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
-import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -39,8 +37,11 @@ function isMagnetRedirectError(error: Error): boolean {
 		// node-fetch
 		error.message.includes('URL scheme "magnet" is not supported.') ||
 		// undici
-		// @ts-expect-error error causes "not supported yet"
-		error?.cause.message.includes("URL scheme must be a HTTP(S) scheme")
+		Boolean(
+			(error.cause as Error | undefined)?.message.includes(
+				"URL scheme must be a HTTP(S) scheme"
+			)
+		)
 	);
 }
 
@@ -175,15 +176,6 @@ export async function getInfoHashesToExclude(): Promise<string[]> {
 	);
 }
 
-export async function validateTorrentDir(): Promise<void> {
-	const { torrentDir } = getRuntimeConfig();
-	try {
-		await fsPromises.readdir(torrentDir);
-	} catch (e) {
-		throw new CrossSeedError(`Torrent dir ${torrentDir} is invalid`);
-	}
-}
-
 export async function loadTorrentDirLight(): Promise<Searchee[]> {
 	const { torrentDir } = getRuntimeConfig();
 	const torrentFilePaths = fs
@@ -207,13 +199,15 @@ export async function loadTorrentDirLight(): Promise<Searchee[]> {
 export async function getTorrentByFuzzyName(
 	name: string
 ): Promise<null | Metafile> {
-	const allNames = await db("torrent").select("name", "file_path");
+	const allNames: { name: string; file_path: string }[] = await db(
+		"torrent"
+	).select("name", "file_path");
 	const fullMatch = reformatTitleForSearching(name)
 		.replace(/[^a-z0-9]/gi, "")
 		.toLowerCase();
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
-	let filteredNames = [];
+	let filteredNames: typeof allNames = [];
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
 			const dbMatch = reformatTitleForSearching(dbName.name)

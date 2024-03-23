@@ -14,6 +14,14 @@ export enum MediaType {
 	OTHER = "unknown",
 }
 
+type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
+
+export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };
+
+export function isTruthy<T>(value: T): value is Truthy<T> {
+	return Boolean(value);
+}
+
 export function stripExtension(filename: string): string {
 	for (const ext of VIDEO_EXTENSIONS) {
 		if (filename.endsWith(ext)) return basename(filename, ext);
@@ -87,7 +95,7 @@ export function formatAsList(strings: string[]) {
 	}).format(strings.sort((a, b) => a.localeCompare(b)));
 }
 
-export function fallback<T>(...args: T[]): T {
+export function fallback<T>(...args: T[]): T | undefined {
 	for (const arg of args) {
 		if (arg !== undefined) return arg;
 	}

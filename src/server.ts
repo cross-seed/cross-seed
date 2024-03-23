@@ -14,7 +14,7 @@ import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
-		const chunks = [];
+		const chunks: string[] = [];
 		req.on("data", (chunk) => {
 			chunks.push(chunk.toString());
 		});
@@ -51,7 +51,7 @@ async function authorize(
 	req: IncomingMessage,
 	res: ServerResponse
 ): Promise<boolean> {
-	const url = new URL(req.url, `http://${req.headers.host}`);
+	const url = new URL(req.url!, `http://${req.headers.host}`);
 	const apiKey =
 		(req.headers["x-api-key"] as string) ?? url.searchParams.get("apikey");
 	const isAuthorized = await checkApiKey(apiKey);
@@ -111,7 +111,7 @@ async function search(
 	await indexNewTorrents();
 
 	try {
-		let numFound = null;
+		let numFound: number | null = null;
 		if (criteria) {
 			numFound = await searchForLocalTorrentByCriteria(criteria);
 		}
@@ -213,7 +213,7 @@ async function handleRequest(
 		return;
 	}
 
-	switch (req.url.split("?")[0]) {
+	switch (req.url!.split("?")[0]) {
 		case "/api/webhook": {
 			logger.verbose({
 				label: Label.SERVER,

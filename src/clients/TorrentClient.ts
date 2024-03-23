@@ -6,10 +6,16 @@ import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
 import Transmission from "./Transmission.js";
 import Deluge from "./Deluge.js";
+import { Result } from "../Result.js";
 
 let activeClient: TorrentClient;
 
 export interface TorrentClient {
+	getDownloadDir: (
+		searchee: Searchee
+	) => Promise<
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
+	>;
 	inject: (
 		newTorrent: Metafile,
 		searchee: Searchee,

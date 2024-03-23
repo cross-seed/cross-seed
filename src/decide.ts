@@ -1,4 +1,4 @@
-import { existsSync, statSync, writeFileSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
@@ -11,6 +11,7 @@ import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
+import { releaseInBlockList } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 import {
@@ -59,6 +60,9 @@ const createReasonLogger =
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
 				reason = "it has a different release group";
+				break;
+			case Decision.BLOCKED_RELEASE:
+				reason = "it matches the blocklist";
 				break;
 			default:
 				reason = decision;
@@ -112,16 +116,22 @@ function releaseGroupDoesMatch(
 	candidateName: string,
 	matchMode: MatchMode
 ) {
-	const searcheeMatch = searcheeName.match(RELEASE_GROUP_REGEX);
-	const candidateMatch = candidateName.match(RELEASE_GROUP_REGEX);
-
+	const searcheeReleaseGroup = searcheeName
+		.match(RELEASE_GROUP_REGEX)?.[0]
+		?.trim()
+		?.toLowerCase();
+	const candidateReleaseGroup = candidateName
+		.match(RELEASE_GROUP_REGEX)?.[0]
+		?.trim()
+		?.toLowerCase();
+	if (searcheeReleaseGroup === candidateReleaseGroup) {
+		return true;
+	}
 	// if we are unsure, pass in risky mode but fail in safe mode
-	if (!searcheeMatch || !candidateMatch) {
+	if (!searcheeReleaseGroup || !candidateReleaseGroup) {
 		return matchMode === MatchMode.RISKY;
 	}
-	return searcheeMatch[0]
-		.toLowerCase()
-		.startsWith(candidateMatch[0].toLowerCase());
+	return searcheeReleaseGroup.startsWith(candidateReleaseGroup);
 }
 
 async function assessCandidateHelper(
@@ -129,7 +139,10 @@ async function assessCandidateHelper(
 	searchee: Searchee,
 	hashesToExclude: string[]
 ): Promise<ResultAssessment> {
-	const { matchMode } = getRuntimeConfig();
+	const { matchMode, blockList } = getRuntimeConfig();
+	if (releaseInBlockList(searchee, blockList)) {
+		return { decision: Decision.BLOCKED_RELEASE };
+	}
 
 	if (size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
@@ -153,18 +166,16 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
+	const sizeMatch = compareFileTreesIgnoringNames(candidateMeta, searchee);
+	if (!sizeMatch) {
+		return { decision: Decision.SIZE_MISMATCH };
+	}
+
 	const perfectMatch = compareFileTrees(candidateMeta, searchee);
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (!searchee.path) {
-		return { decision: Decision.FILE_TREE_MISMATCH };
-	}
-	if (
-		matchMode == MatchMode.RISKY &&
-		!statSync(searchee.path).isDirectory() &&
-		compareFileTreesIgnoringNames(candidateMeta, searchee)
-	) {
+	if (matchMode === MatchMode.RISKY && searchee.files.length === 1) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}
 	return { decision: Decision.FILE_TREE_MISMATCH };
@@ -209,7 +220,7 @@ async function assessAndSaveResults(
 		assessment.decision === Decision.MATCH ||
 		assessment.decision === Decision.MATCH_SIZE_ONLY
 	) {
-		cacheTorrentFile(assessment.metafile);
+		cacheTorrentFile(assessment.metafile!);
 	}
 
 	await db.transaction(async (trx) => {
@@ -225,7 +236,7 @@ async function assessAndSaveResults(
 			info_hash:
 				assessment.decision === Decision.MATCH ||
 				assessment.decision === Decision.MATCH_SIZE_ONLY
-					? assessment.metafile.infoHash
+					? assessment.metafile!.infoHash
 					: null,
 			last_seen: now,
 			first_seen: now,

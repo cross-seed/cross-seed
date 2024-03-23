@@ -19,7 +19,7 @@ delivery into your client.
 
 ## Requirements
 
--   [Node 16+](https://nodejs.org/en/download)
+-   [Node >= 20](https://nodejs.org/en/download)
 -   Any number of indexers that support Torznab (use Jackett or Prowlarr to
     help)
 
