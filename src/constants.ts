@@ -45,6 +45,7 @@ export type ActionResult = InjectionResult | SaveResult;
 export enum Decision {
 	MATCH = "MATCH",
 	MATCH_SIZE_ONLY = "MATCH_SIZE_ONLY",
+	MATCH_PARTIAL = "MATCH_PARTIAL",
 	SIZE_MISMATCH = "SIZE_MISMATCH",
 	NO_DOWNLOAD_LINK = "NO_DOWNLOAD_LINK",
 	DOWNLOAD_FAILED = "DOWNLOAD_FAILED",
@@ -58,6 +59,7 @@ export enum Decision {
 export enum MatchMode {
 	SAFE = "safe",
 	RISKY = "risky",
+	PARTIAL = "partial",
 }
 
 export enum LinkType {
