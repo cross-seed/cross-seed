@@ -9,7 +9,7 @@ import { extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
-type Method = "session-get" | "torrent-add" | "torrent-get";
+type Method = "session-get" | "torrent-add" | "torrent-get" | "torrent-start";
 
 interface Response<T> {
 	result: "success" | string;
@@ -17,13 +17,27 @@ interface Response<T> {
 }
 
 interface TorrentGetResponseArgs {
-	torrents: { downloadDir: string; percentDone: number }[];
+	torrents: {
+		downloadDir?: string;
+		percentDone?: number;
+		status?: TorrentStatus;
+	}[];
 }
 
 interface TorrentMetadata {
 	hashString: string;
 	id: number;
 	name: string;
+}
+
+enum TorrentStatus {
+	Stopped = 0,
+	VerificationQueued,
+	Verifying,
+	DownloadQueued,
+	Downloading,
+	SeedingQueued,
+	Seeding,
 }
 
 type TorrentDuplicateResponse = { "torrent-duplicate": TorrentMetadata };
@@ -38,7 +52,6 @@ function doesAlreadyExist(
 
 export default class Transmission implements TorrentClient {
 	xTransmissionSessionId: string;
-
 	private async request<T>(
 		method: Method,
 		args: unknown = {},
@@ -145,6 +158,9 @@ export default class Transmission implements TorrentClient {
 
 		const [{ downloadDir, percentDone }] = queryResponse.torrents;
 
+		if (downloadDir == undefined || percentDone === undefined) {
+			return resultOfErr(InjectionResult.FAILURE);
+		}
 		if (percentDone < 1) {
 			return resultOfErr(InjectionResult.TORRENT_NOT_COMPLETE);
 		}
@@ -184,10 +200,8 @@ export default class Transmission implements TorrentClient {
 			}
 		}
 
-		let addResponse: TorrentAddResponse;
-
 		try {
-			addResponse = await this.request<TorrentAddResponse>(
+			const addResponse = await this.request<TorrentAddResponse>(
 				"torrent-add",
 				{
 					"download-dir": downloadDir,
@@ -196,14 +210,34 @@ export default class Transmission implements TorrentClient {
 					labels: [TORRENT_TAG],
 				}
 			);
+			if (doesAlreadyExist(addResponse)) {
+				return InjectionResult.ALREADY_EXISTS;
+			}
+
+			const torrentId = addResponse["torrent-added"].id;
+
+			const getResponse = await this.request<TorrentGetResponseArgs>(
+				"torrent-get",
+				{
+					ids: [torrentId],
+					fields: ["percentDone", "status"],
+				}
+			);
+			if (getResponse.torrents.length === 0) {
+				return InjectionResult.FAILURE;
+			}
+
+			const [{ percentDone, status }] = getResponse.torrents;
+			if (status === TorrentStatus.Stopped && percentDone === 1) {
+				await this.request<unknown>("torrent-start", {
+					ids: [torrentId],
+				});
+				return InjectionResult.SUCCESS;
+			} else {
+				return InjectionResult.TORRENT_NOT_COMPLETE;
+			}
 		} catch (e) {
 			return InjectionResult.FAILURE;
 		}
-
-		if (doesAlreadyExist(addResponse)) {
-			return InjectionResult.ALREADY_EXISTS;
-		}
-
-		return InjectionResult.SUCCESS;
 	}
 }
