@@ -216,8 +216,8 @@ module.exports = {
 	excludeOlder: "2 weeks",
 
 	/**
-	 * Exclude torrents which have been searched
-	 * more recently than this long ago.
+	 * Exclude torrents which have been searched more recently than this long ago.
+	 * Doesn't exclude previously failed searches.
 	 * Examples:
 	 * "10min"
 	 * "2w"
