@@ -123,7 +123,7 @@ export const VALIDATION_SCHEMA = z
 			.transform((value) => (typeof value === "boolean" ? value : false)),
 		skipRecheck: z.boolean(),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z.string(),
+		torrentDir: z.string().nullish(),
 		outputDir: z.string(),
 		includeEpisodes: z.boolean(),
 		includeSingleEpisodes: z.boolean(),

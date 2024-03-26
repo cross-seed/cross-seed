@@ -276,7 +276,7 @@ async function findSearchableTorrents() {
 			.map((t) => t.unwrapOrThrow());
 	} else {
 		if (typeof torrentDir === "string") {
-			allSearchees.push(...(await loadTorrentDirLight()));
+			allSearchees.push(...(await loadTorrentDirLight(torrentDir)));
 		}
 		if (Array.isArray(dataDirs)) {
 			const searcheeResults = await Promise.all(

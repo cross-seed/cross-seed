@@ -11,7 +11,7 @@ export interface RuntimeConfig {
 	skipRecheck: boolean;
 	maxDataDepth: number;
 	dataCategory: string;
-	torrentDir: string;
+	torrentDir?: string;
 	outputDir: string;
 	includeEpisodes: boolean;
 	includeSingleEpisodes: boolean;
