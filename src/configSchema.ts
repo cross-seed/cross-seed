@@ -1,8 +1,8 @@
-import { Action, LinkType, MatchMode } from "./constants.js";
-import { logger } from "./logger.js";
-import { z } from "zod";
 import ms from "ms";
 import { sep } from "path";
+import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
+import { Action, LinkType, MatchMode } from "./constants.js";
+import { logger } from "./logger.js";
 
 /**
  * error messages and map returned upon Zod validation failure
@@ -29,13 +29,15 @@ const ZodErrorMessages = {
  * @param ctx ZodError map
  * @returns (the custom error for config display)
  */
-export const zodErrorMap: z.ZodErrorMap = (error, ctx) => {
+export function customizeErrorMessage(
+	error: ZodIssueOptionalMessage,
+	ctx: ErrorMapCtx
+): { message: string } {
 	switch (error.code) {
 		case z.ZodIssueCode.invalid_union:
 			return {
 				message: error.unionErrors
-					.reduce((acc, error) => {
-						// @ts-expect-error avoids type conflict string to never
+					.reduce<string[]>((acc, error) => {
 						error.errors.forEach((x) => acc.push(x.message));
 						return acc;
 					}, [])
@@ -44,7 +46,7 @@ export const zodErrorMap: z.ZodErrorMap = (error, ctx) => {
 	}
 
 	return { message: ctx.defaultError };
-};
+}
 
 /**
  * adds an issue in Zod's error mapped formatting
@@ -52,7 +54,11 @@ export const zodErrorMap: z.ZodErrorMap = (error, ctx) => {
  * @param errorMessage the error message to append on a newline
  * @param ctx ZodError map
  */
-function zodAddIssue(setting: string, errorMessage: string, ctx): void {
+function addZodIssue(
+	setting: string,
+	errorMessage: string,
+	ctx: RefinementCtx
+): void {
 	ctx.addIssue({
 		code: "custom",
 		message: `Setting: "${setting}"\n\t${errorMessage}`,
@@ -64,11 +70,11 @@ function zodAddIssue(setting: string, errorMessage: string, ctx): void {
  * @return transformed duration (string -> milliseconds)
  */
 
-function transformDurationString(durationStr: string, ctx) {
+function transformDurationString(durationStr: string, ctx: RefinementCtx) {
 	const duration = ms(durationStr);
 	if (isNaN(duration)) {
 		// adds the error to the Zod Issues
-		zodAddIssue(durationStr, ZodErrorMessages.vercel, ctx);
+		addZodIssue(durationStr, ZodErrorMessages.vercel, ctx);
 	}
 	return duration;
 }
@@ -77,9 +83,9 @@ function transformDurationString(durationStr: string, ctx) {
  * helper function for directory validation
  * @return path if valid formatting
  */
-function checkValidPathFormat(path: string, ctx) {
+function checkValidPathFormat(path: string, ctx: RefinementCtx) {
 	if (sep === "\\" && !path.includes("\\") && !path.includes("/")) {
-		zodAddIssue(path, ZodErrorMessages.windowsPath, ctx);
+		addZodIssue(path, ZodErrorMessages.windowsPath, ctx);
 	}
 	return path;
 }
@@ -146,7 +152,7 @@ export const VALIDATION_SCHEMA = z
 			.number()
 			.positive()
 			.lte(65535)
-			.or(z.boolean().transform(() => null))
+			.or(z.literal(false).transform(() => null))
 			.nullish(),
 		host: z.string().ip().nullish(),
 		rssCadence: z

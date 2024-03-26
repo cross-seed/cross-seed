@@ -80,7 +80,7 @@ module.exports = {
 	 * Pause at least this much in between each search. Higher is safer.
 	 * It is not recommended to set this to less than 2 seconds.
 	 */
-	delay: 10,
+	delay: 30,
 
 	/**
 	 * To search with downloaded data, you can pass in directories to your downloaded torrent
@@ -90,11 +90,13 @@ module.exports = {
 	 * double backslash in all paths in this config.
 	 *
 	 * example:
-	 * 		dataDirs: ["/path/here"],
-	 * 		dataDirs: ["/path/here", "/other/path/here"],
-	 * 		dataDirs: ["C:\\My Data\\Downloads"]
+	 *     dataDirs: ["/path/here"],
+	 * or
+	 *     dataDirs: ["/downloads/movies", "/downloads/packs"],
+	 * or
+	 *     dataDirs: ["C:\\My Data\\Downloads\\Movies"],
 	 */
-	dataDirs: undefined,
+	dataDirs: [],
 
 	/**
 	 * Determines flexibility of naming during matching. "safe" will allow only perfect name/size matches
@@ -122,9 +124,10 @@ module.exports = {
 
 	/**
 	 * cross-seed will use links of this type to inject data-based matches into your client.
+	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#what-linktype-should-i-use
 	 * Options: "symlink", "hardlink"
 	 */
-	linkType: "symlink",
+	linkType: "hardlink",
 
 	/**
 	 * Enabling this will link files using v5's flat folder style. This option is necessary if
@@ -142,14 +145,14 @@ module.exports = {
 	 * recommended to set this to false.
 	 * Only applies to data based matches.
 	 */
-	skipRecheck: false,
+	skipRecheck: true,
 
 	/**
 	 * Determines how deep into the specified dataDirs to go to generate new searchees.
 	 * Setting this to higher values will result in more searchees and more API hits to
 	 * your indexers.
 	 */
-	maxDataDepth: 2,
+	maxDataDepth: 1,
 
 	/**
 	 * Directory containing .torrent files.
@@ -211,24 +214,25 @@ module.exports = {
 	 * "10min"
 	 * "2w"
 	 * "3 days"
+	 * "0" - this will search everything exactly once, never more.
 	 */
-	excludeOlder: undefined,
+	excludeOlder: "2 weeks",
 
 	/**
-	 * Exclude torrents which have been searched
-	 * more recently than this long ago.
+	 * Exclude torrents which have been searched more recently than this long ago.
+	 * Doesn't exclude previously failed searches.
 	 * Examples:
 	 * "10min"
 	 * "2w"
 	 * "3 days"
 	 */
-	excludeRecentSearch: undefined,
+	excludeRecentSearch: "3 days",
 
 	/**
 	 * What action to take upon a match being found
 	 * Options: "save", "inject"
 	 */
-	action: "save",
+	action: "inject",
 
 	/**
 	 * qBittorrent and Deluge specific
@@ -247,7 +251,7 @@ module.exports = {
 	 * "2w"
 	 * "3 days"
 	 */
-	rssCadence: undefined,
+	rssCadence: "30 minutes",
 
 	/**
 	 * Run searches on a schedule. Format: https://github.com/vercel/ms
@@ -258,7 +262,7 @@ module.exports = {
 	 * "2w"
 	 * "3 days"
 	 */
-	searchCadence: undefined,
+	searchCadence: "1 day",
 
 	/**
 	 * Fail snatch requests that haven't responded after this long.
@@ -287,9 +291,9 @@ module.exports = {
 	/**
 	 * The number of searches to be done before it stops.
 	 * Combine this with "excludeRecentSearch" and "searchCadence" to smooth long-term API usage patterns.
-	 * Default is no limit.
+	 * Set to null for no limit.
 	 */
-	searchLimit: undefined,
+	searchLimit: 100,
 
 	/**
 	 * The list of infohashes or strings which are contained in torrents name that you want to be excluded from cross-seed
