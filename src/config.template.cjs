@@ -92,9 +92,9 @@ module.exports = {
 	 * example:
 	 *     dataDirs: ["/path/here"],
 	 * or
-	 *     dataDirs: ["/path/here", "/other/path/here"],
+	 *     dataDirs: ["/downloads/movies", "/downloads/packs"],
 	 * or
-	 *     dataDirs: ["C:\\My Data\\Downloads"],
+	 *     dataDirs: ["C:\\My Data\\Downloads\\Movies"],
 	 */
 	dataDirs: [],
 
