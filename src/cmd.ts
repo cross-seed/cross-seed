@@ -2,7 +2,7 @@
 import chalk from "chalk";
 import { Option, program } from "commander";
 import { getApiKey, resetApiKey } from "./auth.js";
-import { VALIDATION_SCHEMA, zodErrorMap } from "./configSchema.js";
+import { VALIDATION_SCHEMA, customizeErrorMessage } from "./configSchema.js";
 import { FileConfig, generateConfig, getFileConfig } from "./configuration.js";
 import {
 	Action,
@@ -57,7 +57,7 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 	logger.info("Validating your configuration...");
 	try {
 		options = VALIDATION_SCHEMA.parse(options, {
-			errorMap: zodErrorMap,
+			errorMap: customizeErrorMessage,
 		}) as RuntimeConfig;
 	} catch ({ errors }) {
 		logger.verbose({
@@ -234,7 +234,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 		.option(
 			"--duplicate-categories",
 			"Create and inject using categories with the same save paths as your normal categories",
-			fileConfig.duplicateCategories
+			fallback(fileConfig.duplicateCategories, false)
 		)
 		.option(
 			"--notification-webhook-url <url>",
