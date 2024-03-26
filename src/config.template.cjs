@@ -90,9 +90,11 @@ module.exports = {
 	 * double backslash in all paths in this config.
 	 *
 	 * example:
-	 * 		dataDirs: ["/path/here"],
-	 * 		dataDirs: ["/path/here", "/other/path/here"],
-	 * 		dataDirs: ["C:\\My Data\\Downloads"]
+	 *     dataDirs: ["/path/here"],
+	 * or
+	 *     dataDirs: ["/path/here", "/other/path/here"],
+	 * or
+	 *     dataDirs: ["C:\\My Data\\Downloads"],
 	 */
 	dataDirs: [],
 
