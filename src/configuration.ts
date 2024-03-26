@@ -47,11 +47,6 @@ export interface FileConfig {
 	apiKey?: string;
 }
 
-interface GenerateConfigParams {
-	force?: boolean;
-	docker?: boolean;
-}
-
 export const UNPARSABLE_CONFIG_MESSAGE = `
 Your config file is improperly formatted. The location of the error is above, \
 but you may have to look backwards to see the root cause.
@@ -86,16 +81,11 @@ export function createAppDir(): void {
 	mkdirSync(path.join(appDir(), "logs"), { recursive: true });
 }
 
-export function generateConfig({
-	force = false,
-	docker = false,
-}: GenerateConfigParams): void {
+export function generateConfig(): void {
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
-	const templatePath = path.join(
-		`./config.template${docker ? ".docker" : ""}.cjs`
-	);
-	if (!force && existsSync(dest)) {
+	const templatePath = path.join("./config.template.cjs");
+	if (existsSync(dest)) {
 		console.log("Configuration file already exists.");
 		return;
 	}
@@ -105,7 +95,7 @@ export function generateConfig({
 
 export async function getFileConfig(): Promise<FileConfig> {
 	if (process.env.DOCKER_ENV === "true") {
-		generateConfig({ docker: true });
+		generateConfig();
 	}
 
 	const configPath = path.join(appDir(), "config.js");

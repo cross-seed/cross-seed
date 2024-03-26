@@ -282,9 +282,7 @@ program
 		"-d, --docker",
 		"Generate the docker config instead of the normal one"
 	)
-	.action((options) => {
-		generateConfig(options);
-	});
+	.action(() => void generateConfig());
 
 program
 	.command("clear-cache")
