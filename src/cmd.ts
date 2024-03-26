@@ -149,23 +149,23 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"Skips torrent recheck upon adding to QBittorrent",
 			fallback(fileConfig.skipRecheck, false)
 		)
-		.requiredOption(
+		.option(
 			"--max-data-depth <depth>",
 			"Max depth to look for searchees in dataDirs",
 			(n) => parseInt(n),
 			fallback(fileConfig.maxDataDepth, 2)
 		)
-		.requiredOption(
+		.option(
 			"-i, --torrent-dir <dir>",
 			"Directory with torrent files",
 			fileConfig.torrentDir
 		)
-		.requiredOption(
+		.option(
 			"-s, --output-dir <dir>",
 			"Directory to save results in",
 			fileConfig.outputDir
 		)
-		.requiredOption(
+		.option(
 			"--include-non-videos",
 			"Include torrents which contain non-video files",
 			fallback(fileConfig.includeNonVideos, false)
@@ -185,7 +185,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"Don't include torrents which contain non-videos"
 		)
 		.option("--no-include-episodes", "Don't include episode torrents")
-		.requiredOption(
+		.option(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
 			parseFloat,
@@ -201,7 +201,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"Exclude torrents which have been searched more recently than n minutes ago. Bypasses the -a flag.",
 			fileConfig.excludeRecentSearch
 		)
-		.requiredOption("-v, --verbose", "Log verbose output", false)
+		.option("-v, --verbose", "Log verbose output", false)
 		.addOption(
 			new Option(
 				"-A, --action <action>",
@@ -209,7 +209,6 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			)
 				.default(fallback(fileConfig.action, Action.SAVE))
 				.choices(Object.values(Action))
-				.makeOptionMandatory()
 		)
 		.option(
 			"--rtorrent-rpc-url <url>",
@@ -241,18 +240,18 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
 			fileConfig.notificationWebhookUrl
 		)
-		.requiredOption(
+		.option(
 			"-d, --delay <delay>",
 			"Pause duration (seconds) between searches",
 			parseFloat,
 			fallback(fileConfig.delay, 10)
 		)
-		.requiredOption(
+		.option(
 			"--snatch-timeout <timeout>",
 			"Timeout for unresponsive snatches",
 			fallback(fileConfig.snatchTimeout, "30 seconds")
 		)
-		.requiredOption(
+		.option(
 			"--search-timeout <timeout>",
 			"Timeout for unresponsive searches",
 			fallback(fileConfig.searchTimeout, "30 seconds")
