@@ -1,5 +1,4 @@
-// If you find yourself always using the same command-line flag, you can set
-// it here as a default.
+// If you find yourself always using the same command-line flag, you can set it here as a default.
 
 module.exports = {
 	/**
@@ -14,8 +13,8 @@ module.exports = {
 
 	/**
 	 * List of Torznab URLs.
-	 * For Jackett, click "Copy RSS feed"
-	 * For Prowlarr, click on the indexer name and copy the Torznab Url, then append "?apikey=YOUR_PROWLARR_API_KEY"
+	 * For Jackett, click "Copy RSS feed".
+	 * For Prowlarr, click on the indexer name and copy the Torznab Url, then append "?apikey=YOUR_PROWLARR_API_KEY".
 	 * Wrap each URL in quotation marks, and separate them with commas, and surround the entire set in brackets.
 	 */
 	torznab: [],
@@ -33,8 +32,7 @@ module.exports = {
 	port: 2468,
 
 	/**
-	 * cross-seed will send POST requests to this url
-	 * with a JSON payload of { title, body }.
+	 * cross-seed will send POST requests to this url with a JSON payload of { title, body }.
 	 * Conforms to the caronc/apprise REST API.
 	 */
 	notificationWebhookUrl: undefined,
@@ -67,7 +65,7 @@ module.exports = {
 	 * The url of your Deluge JSON-RPC interface.
 	 * Usually ends with "/json".
 	 * Only relevant with action: "inject".
-	 * Supply your WebUI password as well
+	 * Supply your WebUI password as well like so:
 	 * "http://:password@localhost:8112/json"
 	 */
 	delugeRpcUrl: undefined,
@@ -77,17 +75,16 @@ module.exports = {
 	 */
 
 	/**
-	 * Pause at least this much in between each search. Higher is safer.
-	 * It is not recommended to set this to less than 2 seconds.
+	 * Pause at least this many seconds in between each search. Higher is safer for you and friendlier for trackers.
+	 * Minimum value of 10.
 	 */
 	delay: 30,
 
 	/**
-	 * To search with downloaded data, you can pass in directories to your downloaded torrent
-	 * data to find matches rather using the torrent files themselves for matching.
+	 * To search with downloaded data, you can pass in directories to your downloaded torrent data to find matches rather using the torrent
+	 * files themselves for matching.
 	 *
-	 * If enabled, this needs to be surrounded by brackets. Windows users will need to use
-	 * double backslash in all paths in this config.
+	 * If enabled, this needs to be surrounded by brackets. Windows users will need to use double backslash in all paths in this config.
 	 *
 	 * example:
 	 *     dataDirs: ["/path/here"],
@@ -99,15 +96,15 @@ module.exports = {
 	dataDirs: [],
 
 	/**
-	 * Determines flexibility of naming during matching. "safe" will allow only perfect name/size matches
-	 * using the standard matching algorithm. "risky" uses filesize as its only comparison point.
-	 * Options: "safe", "risky"
+	 * Determines flexibility of naming during matching. "safe" will allow only perfect name/size matches using the standard matching algorithm.
+	 * "risky" uses filesize as its only comparison point.
+	 * Options: "safe", "risky".
 	 */
 	matchMode: "safe",
 
 	/**
 	 * Defines what category torrents injected by data-based matching should use.
-	 * Default is "cross-seed-data"
+	 * Default is "cross-seed-data".
 	 */
 	dataCategory: undefined,
 
@@ -125,42 +122,38 @@ module.exports = {
 	/**
 	 * cross-seed will use links of this type to inject data-based matches into your client.
 	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#what-linktype-should-i-use
-	 * Options: "symlink", "hardlink"
+	 * Options: "symlink", "hardlink".
 	 */
 	linkType: "hardlink",
 
 	/**
-	 * Enabling this will link files using v5's flat folder style. This option is necessary if
-	 * you prefer flat folders of files or use qBittorrent and Automatic Torrent Management.
+	 * Enabling this will link files using v5's flat folder style. This option is necessary if you prefer flat folders of files or use
+	 * qBittorrent and Automatic Torrent Management.
 	 *
-	 * Otherwise each individual Torznab tracker's cross-seeds will have it's own folder with
-	 * the tracker's name and it's links within it.
+	 * Otherwise each individual Torznab tracker's cross-seeds will have it's own folder with the tracker's name and it's links within it.
 	 *
-	 * Default: false
+	 * Default: false.
 	 */
 	legacyLinking: false,
 
 	/**
-	 * Whether to skip recheck in Qbittorrent. If using "risky" matchMode it is HIGHLY
-	 * recommended to set this to false.
+	 * Whether to skip recheck in Qbittorrent. If using "risky" matchMode it is HIGHLY recommended to set this to false.
 	 * Only applies to data based matches.
 	 */
 	skipRecheck: true,
 
 	/**
 	 * Determines how deep into the specified dataDirs to go to generate new searchees.
-	 * Setting this to higher values will result in more searchees and more API hits to
-	 * your indexers.
+	 * Setting this to higher values will result in more searchees and more API hits to your indexers.
 	 */
 	maxDataDepth: 1,
 
 	/**
 	 * Directory containing .torrent files.
-	 * For qBittorrent, this is BT_Backup
-	 * For rtorrent, this is your session directory
-	 * 		as configured in your .rtorrent.rc file.
+	 * For qBittorrent, this is BT_Backup.
+	 * For rtorrent, this is your session directory as configured in your .rtorrent.rc file.
 	 * For Deluge, this is ~/.config/deluge/state.
-	 * For Transmission, this would be ~/.config/transmission/torrents
+	 * For Transmission, this would be ~/.config/transmission/torrents.
 	 */
 	torrentDir: "/path/to/torrent/file/dir",
 
@@ -176,19 +169,20 @@ module.exports = {
 	includeEpisodes: false,
 
 	/**
-	 * Whether to include single episode torrents in the search (not from season packs).
+	 * Whether to include single episode torrents in the search (not those from season packs).
 	 * Like `includeEpisodes` but slightly more restrictive.
 	 */
 	includeSingleEpisodes: false,
 
 	/**
-	 * Include torrents which contain non-video files
+	 * Include torrents which contain non-video files.
 	 * This option does not override includeEpisodes or includeSingleEpisodes.
 	 *
-	 * If this option is set to false, any folders or torrents containing ANY non-video files
-	 * will automatically be excluded from cross-seed searches.
+	 * If this option is set to false, any folders or torrents containing ANY non-video files will automatically be excluded
+	 * from cross-seed searches.
 	 *
 	 * For example, if you have .srt or .nfo files inside your folders/torrents, you will this true.
+  	 * For full disc based folders (not .ISO) you may wish to set this as true.
 	 * You may also want to set this as false to exclude things like music, games, or books.
 	 *
 	 * To search for everything except episodes, use (includeEpisodes: false, includeSingleEpisodes: false, includeNonVideos: true)
@@ -200,20 +194,22 @@ module.exports = {
 
 	/**
 	 * You should NOT modify this unless you have good reason.
-	 * The following option is the preliminary value to compare sizes of releases
-	 * for further comparison.
+	 * The following option is the preliminary value to compare sizes of releases for further comparison.
 	 *
 	 * decimal value (0.02 = 2%)
 	 */
 	fuzzySizeThreshold: 0.02,
 
 	/**
+	* Time based options below use the follwing format: https://github.com/vercel/ms
+	*/	
+	
+	/**
 	 * Exclude torrents first seen by cross-seed more than this long ago.
-	 * Format: https://github.com/vercel/ms
 	 * Examples:
-	 * "10min"
-	 * "2w"
-	 * "3 days"
+	 * "10min".
+	 * "2w".
+	 * "3 days".
 	 * "0" - this will search everything exactly once, never more.
 	 */
 	excludeOlder: "2 weeks",
@@ -222,69 +218,66 @@ module.exports = {
 	 * Exclude torrents which have been searched more recently than this long ago.
 	 * Doesn't exclude previously failed searches.
 	 * Examples:
-	 * "10min"
-	 * "2w"
-	 * "3 days"
+	 * "10min".
+	 * "2w".
+	 * "3 days".
 	 */
 	excludeRecentSearch: "3 days",
 
 	/**
-	 * What action to take upon a match being found
-	 * Options: "save", "inject"
+	 * What action to take upon a match being found.
+	 * Options: "save", "inject".
 	 */
 	action: "inject",
 
 	/**
-	 * qBittorrent and Deluge specific
+	 * qBittorrent and Deluge specific.
 	 * Whether to inject using the same labels/categories as the original torrent.
-	 * qBittorrent: This will apply the category's save path
-	 * Example: if you have a label/category called "Movies",
-	 * this will automatically inject cross-seeds to "Movies.cross-seed"
+	 * qBittorrent: This will apply the category's save path.
+	 * Example: if you have a label/category called "Movies", this will automatically inject cross-seeds to "Movies.cross-seed".
 	 */
 	duplicateCategories: false,
 
 	/**
-	 * Run rss scans on a schedule. Format: https://github.com/vercel/ms
+	 * Run rss scans on a schedule.
 	 * Set to undefined or null to disable. Minimum of 10 minutes.
 	 * Examples:
-	 * "10min"
-	 * "2w"
-	 * "3 days"
+	 * "10min".
+	 * "2w".
+	 * "3 days".
 	 */
 	rssCadence: "30 minutes",
 
 	/**
-	 * Run searches on a schedule. Format: https://github.com/vercel/ms
+	 * Run searches on a schedule.
 	 * Set to undefined or null to disable. Minimum of 1 day.
 	 * If you have RSS enabled, you won't need this to run often (2+ weeks recommended)
 	 * Examples:
-	 * "10min"
-	 * "2w"
-	 * "3 days"
+	 * "10min".
+	 * "2w".
+	 * "3 days".
 	 */
 	searchCadence: "1 day",
 
 	/**
 	 * Fail snatch requests that haven't responded after this long.
 	 * Set to null for an infinite timeout.
-	 * Format: https://github.com/vercel/ms
 	 * Examples:
-	 * "30sec"
-	 * "10s"
-	 * "1min"
-	 * null
+	 * "30sec".
+	 * "10s".
+	 * "1min".
+	 * null.
 	 */
 	snatchTimeout: undefined,
 
 	/**
 	 * Fail search requests that haven't responded after this long.
 	 * Set to null for an infinite timeout.
-	 * Format: https://github.com/vercel/ms
 	 * Examples:
-	 * "30sec"
-	 * "10s"
-	 * "1min"
-	 * null
+	 * "30sec".
+	 * "10s".
+	 * "1min".
+	 * null.
 	 */
 	searchTimeout: undefined,
 
@@ -296,9 +289,9 @@ module.exports = {
 	searchLimit: 100,
 
 	/**
-	 * The list of infohashes or strings which are contained in torrents name that you want to be excluded from cross-seed
-	 * This is the same format as torznab, surround the entire set of quoted strings in square brackets
-	 * Leave as undefined to disable
+	 * The list of infohashes or strings which are contained in torrents name that you want to be excluded from cross-seed.
+	 * This is the same format as torznab, surround the entire set of quoted strings in square brackets.
+	 * Leave as undefined to disable.
 	 *
 	 * example:
 	 * blockList: ["-excludedGroup", "-excludedGroup2", "x265", "3317e6485454354751555555366a8308c1e92093"],
@@ -307,8 +300,8 @@ module.exports = {
 
 	/**
 	 * Provide your own API key here to override the autogenerated one.
-	 * Not recommended - prefer using the autogenerated API key via `cross-seed api-key`
-	 * Must be 24+ characters
+	 * Not recommended - prefer using the autogenerated API key via `cross-seed api-key`.
+	 * Must be 24+ characters.
 	 */
 	apiKey: undefined,
 };
