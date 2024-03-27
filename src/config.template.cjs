@@ -81,10 +81,10 @@ module.exports = {
 	delay: 30,
 
 	/**
-	 * To search with downloaded data, you can pass in directories to your downloaded torrent data to find matches rather using the torrent
-	 * files themselves for matching.
+	 * To search with already downloaded data, you can enter in the directories to your downloaded torrent data to find matches, rather than relying
+	 * entirely on the .torrent files themselves for matching.
 	 *
-	 * If enabled, this needs to be surrounded by brackets. Windows users will need to use double backslash in all paths in this config.
+	 * If directories are entered, they need to be surrounded by brackets. Windows users will need to use double backslash in all paths in this config.
 	 *
 	 * example:
 	 *     dataDirs: ["/path/here"],
