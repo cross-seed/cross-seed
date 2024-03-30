@@ -35,7 +35,7 @@ module.exports = {
 
 	/**
 	 * cross-seed will send POST requests to this url with a JSON payload of
-	 * { title, body }.Conforms to the caronc/apprise REST API.
+	 * { title, body }. Conforms to the caronc/apprise REST API.
 	 */
 	notificationWebhookUrl: undefined,
 
@@ -88,15 +88,14 @@ module.exports = {
 	 * to your downloaded torrent data to find matches, rather than relying
 	 * entirely on the .torrent files themselves for matching.
 	 *
-	 * If directories are entered, they need to be surrounded by brackets.
+	 * If directories are entered, they must all be on the one line and they
+	 * need to be surrounded by brackets.
 	 * Windows users will need to use double backslash in all paths in this 
 	 * config.
 	 *
 	 * example:
-	 *     dataDirs: ["/path/here"],
-	 * or
 	 *     dataDirs: ["/downloads/movies", "/downloads/packs"],
-	 * or
+	 * or for windows users
 	 *     dataDirs: ["C:\\My Data\\Downloads\\Movies"],
 	 */
 	dataDirs: [],
@@ -207,13 +206,23 @@ module.exports = {
 	 * You may also want to set this as false to exclude things like music,
 	 * games, or books.
 	 *
-	 * To search for everything except episodes, use (includeEpisodes: false,
-	 * includeSingleEpisodes: false, includeNonVideos: true)
-	 * To search for everything including episodes, use (includeEpisodes: true,
-	 * includeNonVideos: true)
-	 * To search for everything except season pack episodes (data-based) use
-	 * (includeEpisodes: false, includeSingleEpisodes: true, includeNonVideos:
-	 * true)
+	 * To search for everything except episodes, use:
+	 *
+	 *		includeEpisodes: false
+	 *		includeSingleEpisodes: false
+	 *		includeNonVideos: true
+	 *
+	 * To search for everything including episodes, use:
+	 *
+	 *		includeEpisodes: true
+	 *		includeNonVideos: true
+	 *
+	 * To search for everything except season pack episodes (data-based) use:
+	 *
+	 *		includeEpisodes: false
+	 *		includeSingleEpisodes: true
+	 *		includeNonVideos: true
+	 * 
 	 */
 	includeNonVideos: false,
 
@@ -234,9 +243,9 @@ module.exports = {
 	/**
 	 * Exclude torrents first seen by cross-seed more than this long ago.
 	 * Examples:
-	 * "10min".
-	 * "2w".
 	 * "3 days".
+	 * "2 weeks".
+	 * "2 months".
 	 * "0" - this will search everything exactly once, never more.
 	 */
 	excludeOlder: "2 weeks",
@@ -246,9 +255,9 @@ module.exports = {
 	 * ago.
 	 * Doesn't exclude previously failed searches.
 	 * Examples:
-	 * "10min".
-	 * "2w".
 	 * "3 days".
+	 * "1 week".
+	 * "1 month".
 	 */
 	excludeRecentSearch: "3 days",
 
@@ -272,9 +281,9 @@ module.exports = {
 	 * Run rss scans on a schedule.
 	 * Set to undefined or null to disable. Minimum of 10 minutes.
 	 * Examples:
-	 * "10min".
-	 * "2w".
+	 * "15 minutes".
 	 * "3 days".
+	 * "2 weeks".
 	 */
 	rssCadence: "30 minutes",
 
@@ -284,9 +293,9 @@ module.exports = {
 	 * If you have RSS enabled, you won't need this to run often (2+ weeks
 	 * recommended)
 	 * Examples:
-	 * "10min".
-	 * "2w".
+	 * "1 day".
 	 * "3 days".
+	 * "2 weeks".
 	 */
 	searchCadence: "1 day",
 
@@ -294,9 +303,8 @@ module.exports = {
 	 * Fail snatch requests that haven't responded after this long.
 	 * Set to null for an infinite timeout.
 	 * Examples:
-	 * "30sec".
-	 * "10s".
-	 * "1min".
+	 * "10 seconds".
+	 * "1 minute".
 	 * null.
 	 */
 	snatchTimeout: undefined,
@@ -305,9 +313,8 @@ module.exports = {
 	 * Fail search requests that haven't responded after this long.
 	 * Set to null for an infinite timeout.
 	 * Examples:
-	 * "30sec".
-	 * "10s".
-	 * "1min".
+	 * "30 seconds".
+	 * "1 minute".
 	 * null.
 	 */
 	searchTimeout: undefined,
@@ -321,14 +328,18 @@ module.exports = {
 	searchLimit: 100,
 
 	/**
-	 * The list of infohashes or strings which are contained in torrents name
+	 * The list of infohashes, or strings which are contained in torrents name
 	 * that you want to be excluded from cross-seed. This is the same format
 	 * as torznab, surround the entire set of quoted strings in square brackets
+	 * You can use any combination.
 	 * Leave as undefined to disable.
 	 *
-	 * example:
-	 * blockList: ["-excludedGroup", "-excludedGroup2", "x265",
-	 * "3317e6485454354751555555366a8308c1e92093"],
+	 * examples:
+	 *
+	 *		blockList: ["-excludedGroup", "-excludedGroup2"],
+	 *		blocklist: ["x265"],
+	 *		blocklist: ["Release.Name"],
+	 *		blocklist: ["3317e6485454354751555555366a8308c1e92093"],
 	 */
 	blockList: undefined,
 
