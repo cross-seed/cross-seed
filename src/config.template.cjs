@@ -331,7 +331,7 @@ module.exports = {
 	 * The list of infohashes, or strings which are contained in torrents name
 	 * that you want to be excluded from cross-seed. This is the same format
 	 * as torznab, surround the entire set of quoted strings in square brackets
-	 * You can use any combination.
+	 * You can use any combination which must be entered on the one line.
 	 * Leave as undefined to disable.
 	 *
 	 * examples:
