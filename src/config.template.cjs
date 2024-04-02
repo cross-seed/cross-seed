@@ -151,8 +151,8 @@ module.exports = {
 	legacyLinking: false,
 
 	/**
-	 * Whether to skip recheck in Qbittorrent. If using "risky" matchMode it is
-	 * HIGHLY recommended to set this to false.
+	 * Whether to skip recheck in Deluge or Qbittorrent. If using "risky"
+	 * matchMode it is HIGHLY recommended to set this to false.
 	 * Only applies to data based matches.
 	 */
 	skipRecheck: true,
@@ -328,9 +328,9 @@ module.exports = {
 	searchLimit: 100,
 
 	/**
-	 * The list of infohashes, or strings which are contained in torrents name
-	 * that you want to be excluded from cross-seed. This is the same format
-	 * as torznab, surround the entire set of quoted strings in square brackets
+	 * The list of infohashes or strings which are contained in torrents that
+	 * you want to be excluded from cross-seed. This is the same format as
+	 * torznab, surround the entire set of quoted strings in square brackets
 	 * You can use any combination which must be entered on the one line.
 	 * Leave as undefined to disable.
 	 *
