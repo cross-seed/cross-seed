@@ -127,7 +127,7 @@ export async function performAction(
 	const { action, linkDir } = getRuntimeConfig();
 
 	if (action === Action.SAVE) {
-		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
+		await saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
@@ -152,16 +152,19 @@ export async function performAction(
 			logger.warn("Falling back to non-linking.");
 		} else {
 			logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
-			saveTorrentFile(tracker, getTag(searchee.name), newMeta);
+			await saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 			return InjectionResult.FAILURE;
 		}
+	} else if (searchee.path) {
+		// should be a MATCH, as risky requires a linkDir to be set
+		destinationDir = dirname(searchee.path);
 	}
 
 	const result = await getClient().inject(newMeta, searchee, destinationDir);
 
 	logInjectionResult(result, tracker, newMeta.name);
 	if (result === InjectionResult.FAILURE) {
-		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
+		await saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 	}
 	return result;
 }
