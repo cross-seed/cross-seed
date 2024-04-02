@@ -290,8 +290,6 @@ module.exports = {
 	/**
 	 * Run searches on a schedule.
 	 * Set to undefined or null to disable. Minimum of 1 day.
-	 * If you have RSS enabled, you won't need this to run often (2+ weeks
-	 * recommended)
 	 * Examples:
 	 * "1 day".
 	 * "3 days".
