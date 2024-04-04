@@ -437,7 +437,7 @@ export async function validateTorznabUrls() {
 	const indexersWithSearch = await getEnabledIndexers();
 
 	if (indexersWithSearch.length === 0) {
-		throw new CrossSeedError("no working indexers available");
+		logger.warn("no working indexers available");
 	}
 }
 
