@@ -1,3 +1,4 @@
+import ms from "ms";
 import {
 	InjectionResult,
 	TORRENT_TAG,
@@ -132,6 +133,13 @@ export default class Deluge implements TorrentClient {
 
 		let response: Response, json: DelugeJSON<ResultType>;
 		const id = Math.floor(Math.random() * 0x7fffffff);
+		const abortController = new AbortController();
+
+		setTimeout(
+			() => void abortController.abort(),
+			ms("10 seconds")
+		).unref();
+
 		try {
 			response = await fetch(href, {
 				body: JSON.stringify({
@@ -141,8 +149,14 @@ export default class Deluge implements TorrentClient {
 				}),
 				method: "POST",
 				headers,
+				signal: abortController.signal,
 			});
 		} catch (networkError) {
+			if (networkError.name === "AbortError") {
+				throw new Error(
+					`Deluge method ${method} timed out after 10 seconds`
+				);
+			}
 			throw new Error(`Failed to connect to Deluge at ${href}`, {
 				cause: networkError,
 			});
@@ -196,8 +210,13 @@ export default class Deluge implements TorrentClient {
 	 * if Label plugin is loaded, adds (if necessary)
 	 * and sets the label based on torrent hash.
 	 */
-	private async setLabel(infoHash: string, label: string): Promise<void> {
-		if (this.isLabelEnabled) {
+	private async setLabel(
+		name: string,
+		infoHash: string,
+		label: string
+	): Promise<void> {
+		if (!this.isLabelEnabled) return;
+		try {
 			const setResult = await this.call<void>("label.set_torrent", [
 				infoHash,
 				label,
@@ -206,6 +225,11 @@ export default class Deluge implements TorrentClient {
 				await this.call<void>("label.add", [label]);
 				await this.call<void>("label.set_torrent", [infoHash, label]);
 			}
+		} catch (e) {
+			logger.warn({
+				label: Label.DELUGE,
+				message: `Failed to label ${name} (${infoHash}) as ${label}`,
+			});
 		}
 	}
 
@@ -247,6 +271,7 @@ export default class Deluge implements TorrentClient {
 			if (addResult.result) {
 				const { dataCategory } = getRuntimeConfig();
 				await this.setLabel(
+					newTorrent.name,
 					newTorrent.infoHash,
 					searchee.path
 						? dataCategory
@@ -278,21 +303,13 @@ export default class Deluge implements TorrentClient {
 				});
 				return InjectionResult.FAILURE;
 			}
-		} catch (injectResult) {
-			if (injectResult.includes("label.set_torrent")) {
-				logger.warning({
-					label: Label.DELUGE,
-					message: `Labeling failure: ${newTorrent.name} (${newTorrent.infoHash})`,
-				});
-				return InjectionResult.SUCCESS;
-			} else {
-				logger.error({
-					label: Label.DELUGE,
-					message: `Injection failed: ${injectResult}`,
-				});
-				logger.debug(injectResult);
-				return InjectionResult.FAILURE;
-			}
+		} catch (error) {
+			logger.error({
+				label: Label.DELUGE,
+				message: `Injection failed: ${error}`,
+			});
+			logger.debug(error);
+			return InjectionResult.FAILURE;
 		}
 	}
 
