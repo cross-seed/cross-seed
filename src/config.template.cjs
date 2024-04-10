@@ -310,10 +310,12 @@ module.exports = {
 	searchTimeout: undefined,
 
 	/**
-	 * The number of searches make in one batch.
-	 * Combine this with "excludeRecentSearch" and "searchCadence" to smooth
-	 * long-term API usage patterns. If more than this many searches are queued,
+	 * The number of searches to make in one run/batch.
+	 * If more than this many searches are queued,
 	 * "searchCadence" will determine how long until the next batch.
+	 *
+	 * Combine this with "excludeRecentSearch" and "searchCadence" to smooth
+	 * long-term API usage patterns.
 	 *
 	 * Set to null for no limit.
 	 */
