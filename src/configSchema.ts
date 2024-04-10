@@ -100,7 +100,7 @@ export const VALIDATION_SCHEMA = z
 		delay: z.number().nonnegative({
 			message: ZodErrorMessages.delay,
 		}),
-		torznab: z.array(z.string().url()).nullish(),
+		torznab: z.array(z.string().url()),
 		dataDirs: z
 			.array(
 				z
