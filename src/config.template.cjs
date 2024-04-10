@@ -151,9 +151,7 @@ module.exports = {
 	legacyLinking: false,
 
 	/**
-	 * Whether to skip recheck in Deluge or Qbittorrent. If using "risky"
-	 * matchMode it is HIGHLY recommended to set this to false.
-	 * Only applies to data based matches.
+	 * Whether to skip recheck in qBittorrent or Deluge. Not supported in rTorrent/Transmission.
 	 */
 	skipRecheck: true,
 
@@ -243,9 +241,8 @@ module.exports = {
 	/**
 	 * Exclude torrents first seen by cross-seed more than this long ago.
 	 * Examples:
-	 * "3 days".
-	 * "2 weeks".
-	 * "2 months".
+	 * "10 minutes"
+	 * "1 day"
 	 * "0" - this will search everything exactly once, never more.
 	 */
 	excludeOlder: "2 weeks",
@@ -255,9 +252,8 @@ module.exports = {
 	 * ago.
 	 * Doesn't exclude previously failed searches.
 	 * Examples:
-	 * "3 days".
-	 * "1 week".
-	 * "1 month".
+	 * "2 days"
+	 * "1 year"
 	 */
 	excludeRecentSearch: "3 days",
 
@@ -281,9 +277,8 @@ module.exports = {
 	 * Run rss scans on a schedule.
 	 * Set to undefined or null to disable. Minimum of 10 minutes.
 	 * Examples:
-	 * "15 minutes".
-	 * "3 days".
-	 * "2 weeks".
+	 * "10 minutes"
+	 * "1 hour"
 	 */
 	rssCadence: "30 minutes",
 
@@ -291,9 +286,8 @@ module.exports = {
 	 * Run searches on a schedule.
 	 * Set to undefined or null to disable. Minimum of 1 day.
 	 * Examples:
-	 * "1 day".
-	 * "3 days".
-	 * "2 weeks".
+	 * "2 weeks"
+	 * "3 days"
 	 */
 	searchCadence: "1 day",
 
@@ -301,9 +295,8 @@ module.exports = {
 	 * Fail snatch requests that haven't responded after this long.
 	 * Set to null for an infinite timeout.
 	 * Examples:
-	 * "10 seconds".
-	 * "1 minute".
-	 * null.
+	 * "30 seconds"
+	 * null
 	 */
 	snatchTimeout: undefined,
 
@@ -311,16 +304,17 @@ module.exports = {
 	 * Fail search requests that haven't responded after this long.
 	 * Set to null for an infinite timeout.
 	 * Examples:
-	 * "30 seconds".
-	 * "1 minute".
-	 * null.
+	 * "30 seconds"
+	 * null
 	 */
 	searchTimeout: undefined,
 
 	/**
-	 * The number of searches to be done before it stops.
+	 * The number of searches make in one batch.
 	 * Combine this with "excludeRecentSearch" and "searchCadence" to smooth
-	 * long-term API usage patterns.
+	 * long-term API usage patterns. If more than this many searches are queued,
+	 * "searchCadence" will determine how long until the next batch.
+	 *
 	 * Set to null for no limit.
 	 */
 	searchLimit: 100,
