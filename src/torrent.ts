@@ -1,6 +1,6 @@
-import fs, { promises as fsPromises } from "fs";
+import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
-import path, { join } from "path";
+import { extname, join, resolve } from "path";
 import { inspect } from "util";
 import { USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
@@ -28,7 +28,7 @@ export enum SnatchError {
 export async function parseTorrentFromFilename(
 	filename: string
 ): Promise<Metafile> {
-	const data = await fsPromises.readFile(filename);
+	const data = await readFile(filename);
 	return Metafile.decode(data);
 }
 
@@ -111,30 +111,31 @@ export async function parseTorrentFromURL(
 	}
 }
 
-export function saveTorrentFile(
+export async function saveTorrentFile(
 	tracker: string,
-	tag = "",
+	tag: string,
 	meta: Metafile
-): void {
+): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
 	const buf = meta.encode();
 	const filename = `[${tag}][${tracker}]${stripExtension(
 		meta.getFileSystemSafeName()
 	)}.torrent`;
-	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });
+	await writeFile(join(outputDir, filename), buf, { mode: 0o644 });
 }
 
 export async function findAllTorrentFilesInDir(
 	torrentDir: string
 ): Promise<string[]> {
-	return (await fsPromises.readdir(torrentDir))
-		.filter((fn) => path.extname(fn) === ".torrent")
+	return (await readdir(torrentDir))
+		.filter((fn) => extname(fn) === ".torrent")
 		.sort()
-		.map((fn) => path.resolve(path.join(torrentDir, fn)));
+		.map((fn) => resolve(join(torrentDir, fn)));
 }
 
 export async function indexNewTorrents(): Promise<void> {
 	const { torrentDir } = getRuntimeConfig();
+	if (typeof torrentDir !== "string") return;
 	const dirContents = await findAllTorrentFilesInDir(torrentDir);
 	// index new torrents in the torrentDir
 
@@ -176,13 +177,10 @@ export async function getInfoHashesToExclude(): Promise<string[]> {
 	);
 }
 
-export async function loadTorrentDirLight(): Promise<Searchee[]> {
-	const { torrentDir } = getRuntimeConfig();
-	const torrentFilePaths = fs
-		.readdirSync(torrentDir)
-		.filter((fn) => path.extname(fn) === ".torrent")
-		.sort()
-		.map((filename) => join(getRuntimeConfig().torrentDir, filename));
+export async function loadTorrentDirLight(
+	torrentDir: string
+): Promise<Searchee[]> {
+	const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
 
 	const searchees: Searchee[] = [];
 	for (const torrentFilePath of torrentFilePaths) {

@@ -11,7 +11,7 @@ export interface RuntimeConfig {
 	skipRecheck: boolean;
 	maxDataDepth: number;
 	dataCategory: string;
-	torrentDir: string;
+	torrentDir?: string;
 	outputDir: string;
 	includeEpisodes: boolean;
 	includeSingleEpisodes: boolean;
@@ -29,10 +29,10 @@ export interface RuntimeConfig {
 	notificationWebhookUrl: string;
 	torrents: string[];
 	port: number | null;
-	searchCadence: number;
-	rssCadence: number;
-	snatchTimeout: number;
-	searchTimeout: number;
+	searchCadence?: number;
+	rssCadence?: number;
+	snatchTimeout?: number;
+	searchTimeout?: number;
 	searchLimit: number;
 	blockList: string[];
 	apiKey?: string;
