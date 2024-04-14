@@ -14,9 +14,10 @@ FROM node:20-alpine
 WORKDIR /usr/src/cross-seed
 COPY --from=build-stage /usr/src/cross-seed ./
 RUN apk add --no-cache curl && \
-    npm link
+    catatonit npm link tzdata
 ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
 EXPOSE 2468
 WORKDIR /config
-ENTRYPOINT ["cross-seed"]
+ENTRYPOINT ["/usr/bin/catatonit", "--"]
+CMD ["/usr/local/bin/cross-seed"]
