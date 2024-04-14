@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env node --env-file=.env
 import chalk from "chalk";
 import { Option, program } from "commander";
 import { getApiKey, resetApiKey } from "./auth.js";
