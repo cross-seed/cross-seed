@@ -19,5 +19,4 @@ ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
 EXPOSE 2468
 WORKDIR /config
-ENTRYPOINT ["/usr/bin/catatonit", "--"]
-CMD ["/usr/local/bin/cross-seed"]
+ENTRYPOINT ["/usr/bin/catatonit", "--", "/usr/local/bin/cross-seed"]
