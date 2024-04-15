@@ -36,10 +36,12 @@ class Job {
 }
 
 function getJobs(): Job[] {
-	const { rssCadence, searchCadence } = getRuntimeConfig();
+	const { rssCadence, searchCadence, torznab } = getRuntimeConfig();
 	const jobs: Job[] = [];
-	if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
-	if (searchCadence) jobs.push(new Job("search", searchCadence, main));
+	if (torznab.length > 0) {
+		if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
+		if (searchCadence) jobs.push(new Job("search", searchCadence, main));
+	}
 	return jobs;
 }
 
