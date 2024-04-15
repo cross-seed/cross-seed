@@ -3,6 +3,7 @@ import {
 	EP_REGEX,
 	MOVIE_REGEX,
 	SEASON_REGEX,
+	ANIME_REGEX,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -11,6 +12,7 @@ export enum MediaType {
 	EPISODE = "episode",
 	SEASON = "pack",
 	MOVIE = "movie",
+	ANIME = "anime",
 	OTHER = "unknown",
 }
 
@@ -37,13 +39,15 @@ export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
 
-export function getTag(name: string): MediaType {
+export function getTag(name: string, isVideo?: boolean): MediaType {
 	return EP_REGEX.test(name)
 		? MediaType.EPISODE
 		: SEASON_REGEX.test(name)
 		? MediaType.SEASON
 		: MOVIE_REGEX.test(name)
 		? MediaType.MOVIE
+		: isVideo && ANIME_REGEX.test(name)
+		? MediaType.ANIME
 		: MediaType.OTHER;
 }
 
@@ -58,17 +62,26 @@ export async function time<R>(cb: () => R, times: number[]) {
 
 export function cleanseSeparators(str: string): string {
 	return str
+		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "")
 		.replace(/[._()[\]]/g, " ")
 		.replace(/\s+/g, " ")
 		.trim();
 }
 
-export function reformatTitleForSearching(name: string): string {
+export function reformatTitleForSearching(name: string, isVideo?: boolean): string {
 	const seasonMatch = name.match(SEASON_REGEX);
 	const movieMatch = name.match(MOVIE_REGEX);
 	const episodeMatch = name.match(EP_REGEX);
+	let animeQuery: string | undefined = undefined;
+	if (isVideo) {
+		const { title, altTitle, release } = name.match(ANIME_REGEX)?.groups ?? {};
+		if (title) {
+			animeQuery = altTitle && altTitle.length ? Math.random() > 0.5 ? title : altTitle : title;
+			animeQuery += ` ${release}`;
+		}
+	}
 	const fullMatch =
-		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? name;
+		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? animeQuery ?? name;
 	return cleanseSeparators(fullMatch);
 }
 

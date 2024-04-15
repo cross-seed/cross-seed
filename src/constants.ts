@@ -9,13 +9,15 @@ export const TORRENT_TAG = "cross-seed";
 export const TORRENT_CATEGORY_SUFFIX = `.cross-seed`;
 
 export const EP_REGEX =
-	/^(?<title>.+?)[_.\s-]+(?:(?<season>S\d+)?[_.\s]?(?<episode>E\d+(?:[\s-]?E?\d+)?(?![ip]))(?!\d+[ip])|(?<date>(?<year>\d{4})[_.\s-](?<month>\d{2})[_.\s-](?<day>\d{2})))/i;
+	/^(?<title>.+?)[_.\s-]+(?:(?<season>S\d+)?[_.\s-]{0,3}(?<episode>(?:E|(?<=S\d+[_.\s-]{1,3}))\d+(?:[\s-]?E?\d+)?(?![pix]))(?!\d+[pix])|(?<date>(?<year>(?:19|20)\d{2})[_.\s-](?<month>\d{2})[_.\s-](?<day>\d{2})))/i;
 export const SEASON_REGEX =
-	/^(?<title>.+?)[_.\s-]+(?<season>S\d+)(?:[_.\s-]*?(?<seasonmax>S?\d+))?(?=[_.\s](?!E\d+))/i;
+	/^(?<title>.+?)[_.\s-]+(?<season>S\d+)(?:[_.\s~-]*?(?<seasonmax>S?\d+))?(?=[_.\s](?!E\d+))/i;
 export const MOVIE_REGEX =
-	/^(?<title>.+?)[_.\s][[(]?(?<year>\d{4})[)\]]?(?![pi])/i;
+	/^(?<title>.+?)-?[_.\s][[(]?(?<year>(?:19|20)\d{2})[)\]]?(?![pix])/i;
+export const ANIME_REGEX =
+	/^(?:\[(?<group>.*?)\][_.\s-]?)?(?:\[?(?<title>.+?)[_.\s-]?(?:\(?(?:\d{1,2}(?:st|nd|rd|th))?\s?Season)?[_.\s-]?\]?)(?:[\(\[~/|-]\s?(?!\d{4})(?<altTitle>.+?)[\)\]~-]?\s?)?[_.\s-]?(?:\(?(?<year>(?:19|20)\d{2})\)?)?[[_.\s-](?:S\d{1,2})?[_.\s-]{0,3}(?:#|EP?|(?:SP))?[_.\s-]{0,3}(?<release>\d{1,4})(?:v\d)?[\])_.\s-]/i;
 export const RELEASE_GROUP_REGEX =
-	/(?<=-)(?<group>[\w ]+)(?:\))?(?=(?:\.\w{1,5})?$)/i;
+	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w ]+?)(?:\[.+\])?(?:\))?(?=(?:\.\w{1,5})?$)/i;
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
 

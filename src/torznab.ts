@@ -12,6 +12,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
+import { Searchee, hasVideo } from "./searchee.js";
 import {
 	cleanseSeparators,
 	getTag,
@@ -105,11 +106,11 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	};
 }
 
-function createTorznabSearchQuery(name: string, caps: Caps) {
+function createTorznabSearchQuery(name: string, caps: Caps, isVideo: boolean) {
 	const nameWithoutExtension = stripExtension(name);
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
-	const mediaType = getTag(nameWithoutExtension);
+	const mediaType = getTag(nameWithoutExtension, isVideo);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
 		return {
@@ -132,7 +133,7 @@ function createTorznabSearchQuery(name: string, caps: Caps) {
 	} else {
 		return {
 			t: "search",
-			q: reformatTitleForSearching(nameWithoutExtension),
+			q: reformatTitleForSearching(nameWithoutExtension, isVideo),
 		} as const;
 	}
 }
@@ -147,13 +148,15 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 }
 
 export async function searchTorznab(
-	name: string
+	searchee: Searchee
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
 	const { excludeRecentSearch, excludeOlder, torznab } = getRuntimeConfig();
 	if (torznab.length === 0) {
 		throw new Error("no indexers are available");
 	}
 	const enabledIndexers = await getEnabledIndexers();
+
+	const name = searchee.name;
 
 	// search history for name across all indexers
 	const timestampDataSql = await db("searchee")
@@ -196,7 +199,7 @@ export async function searchTorznab(
 			search: indexer.searchCap,
 			tvSearch: indexer.tvSearchCap,
 			movieSearch: indexer.movieSearchCap,
-		})
+		}, hasVideo(searchee))
 	);
 }
 
