@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 import chalk from "chalk";
 import { Option, program } from "commander";
 import { getApiKey, resetApiKey } from "./auth.js";
