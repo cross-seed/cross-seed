@@ -13,7 +13,7 @@ export const EP_REGEX =
 export const SEASON_REGEX =
 	/^(?<title>.+?)[_.\s-]+(?<season>S\d+)(?:[_.\s~-]*?(?<seasonmax>S?\d+))?(?=[_.\s](?!E\d+))/i;
 export const MOVIE_REGEX =
-	/^(?<title>.+?)-?[_.\s][[(]?(?<year>(?:19|20)\d{2})[)\]]?(?![pix])/i;
+	/^(?<title>.+?)-?[_.\s][[(]?(?<year>(?:18|19|20)\d{2})[)\]]?(?![pix])/i;
 export const ANIME_REGEX =
 	/^(?:\[(?<group>.*?)\][_.\s-]?)?(?:\[?(?<title>.+?)[_.\s-]?(?:\(?(?:\d{1,2}(?:st|nd|rd|th))?\s?Season)?[_.\s-]?\]?)(?:[\(\[~/|-]\s?(?!\d{4})(?<altTitle>.+?)[\)\]~-]?\s?)?[_.\s-]?(?:\(?(?<year>(?:19|20)\d{2})\)?)?[[_.\s-](?:S\d{1,2})?[_.\s-]{0,3}(?:#|EP?|(?:SP))?[_.\s-]{0,3}(?<release>\d{1,4})(?:v\d)?[\])_.\s-]/i;
 export const RELEASE_GROUP_REGEX =
