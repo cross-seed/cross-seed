@@ -276,7 +276,10 @@ export default class RTorrent implements TorrentClient {
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,
-		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
+		decision:
+			| Decision.MATCH
+			| Decision.MATCH_SIZE_ONLY
+			| Decision.MATCH_PARTIAL,
 		path?: string
 	): Promise<InjectionResult> {
 		const { outputDir, skipRecheck } = getRuntimeConfig();
@@ -307,7 +310,9 @@ export default class RTorrent implements TorrentClient {
 
 		const loadType =
 			decision === Decision.MATCH_PARTIAL
-				? skipRecheck ? "load.start" : "load"
+				? skipRecheck
+					? "load.start"
+					: "load"
 				: "load.start";
 
 		for (let i = 0; i < 5; i++) {

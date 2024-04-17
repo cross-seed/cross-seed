@@ -240,7 +240,10 @@ export default class Deluge implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
+		decision:
+			| Decision.MATCH
+			| Decision.MATCH_SIZE_ONLY
+			| Decision.MATCH_PARTIAL,
 		path?: string
 	): Promise<InjectionResult> {
 		try {
@@ -324,13 +327,14 @@ export default class Deluge implements TorrentClient {
 		filedump: string,
 		path: string,
 		isTorrent: boolean,
-		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL
+		decision:
+			| Decision.MATCH
+			| Decision.MATCH_SIZE_ONLY
+			| Decision.MATCH_PARTIAL
 	): InjectData {
 		const { skipRecheck } = getRuntimeConfig();
 		const skipRecheckTorrent =
-			decision === Decision.MATCH_PARTIAL
-				? skipRecheck
-				: true;
+			decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
 		return [
 			filename,
 			filedump,

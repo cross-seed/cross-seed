@@ -118,7 +118,7 @@ export function compareFileTreesPartialIgnoringNames(
 			matchedSizes += candidateFile.length;
 		}
 	}
-	return matchedSizes / candidate.length >= 1-fuzzySizeThreshold;
+	return matchedSizes / candidate.length >= 1 - fuzzySizeThreshold;
 }
 
 export function compareFileTreesPartial(
@@ -143,7 +143,7 @@ export function compareFileTreesPartial(
 			matchedSizes += candidateFile.length;
 		}
 	}
-	return matchedSizes / candidate.length >= 1-fuzzySizeThreshold;
+	return matchedSizes / candidate.length >= 1 - fuzzySizeThreshold;
 }
 
 function sizeDoesMatch(resultSize, searchee) {
@@ -211,7 +211,10 @@ async function assessCandidateHelper(
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
 
-	const partialSizeMatch = compareFileTreesPartialIgnoringNames(candidateMeta, searchee);
+	const partialSizeMatch = compareFileTreesPartialIgnoringNames(
+		candidateMeta,
+		searchee
+	);
 	if (!partialSizeMatch && matchMode === MatchMode.PARTIAL) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
@@ -224,7 +227,11 @@ async function assessCandidateHelper(
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (sizeMatch && matchMode !== MatchMode.SAFE && searchee.files.length === 1) {
+	if (
+		sizeMatch &&
+		matchMode !== MatchMode.SAFE &&
+		searchee.files.length === 1
+	) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
 	}
 	const partialMatch = compareFileTreesPartial(candidateMeta, searchee);

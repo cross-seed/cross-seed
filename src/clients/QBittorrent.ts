@@ -290,7 +290,10 @@ export default class QBittorrent implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
+		decision:
+			| Decision.MATCH
+			| Decision.MATCH_SIZE_ONLY
+			| Decision.MATCH_PARTIAL,
 		path?: string
 	): Promise<InjectionResult> {
 		const { duplicateCategories, skipRecheck, dataCategory } =
@@ -326,11 +329,9 @@ export default class QBittorrent implements TorrentClient {
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";
-			
+
 			const skipRecheckTorrent =
-				decision === Decision.MATCH_PARTIAL
-				  	? skipRecheck
-					: true;
+				decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
 
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);

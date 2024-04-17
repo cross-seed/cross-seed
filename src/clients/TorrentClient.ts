@@ -19,7 +19,10 @@ export interface TorrentClient {
 	inject: (
 		newTorrent: Metafile,
 		searchee: Searchee,
-		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
+		decision:
+			| Decision.MATCH
+			| Decision.MATCH_SIZE_ONLY
+			| Decision.MATCH_PARTIAL,
 		path?: string
 	) => Promise<InjectionResult>;
 	validateConfig: () => Promise<void>;

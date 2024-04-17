@@ -168,7 +168,10 @@ export default class Transmission implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL,
+		decision:
+			| Decision.MATCH
+			| Decision.MATCH_SIZE_ONLY
+			| Decision.MATCH_PARTIAL,
 		path?: string
 	): Promise<InjectionResult> {
 		const { skipRecheck } = getRuntimeConfig();
@@ -190,9 +193,7 @@ export default class Transmission implements TorrentClient {
 		let addResponse: TorrentAddResponse;
 
 		const skipRecheckTorrent =
-			decision === Decision.MATCH_PARTIAL
-				? skipRecheck
-				: true;
+			decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
 
 		try {
 			addResponse = await this.request<TorrentAddResponse>(

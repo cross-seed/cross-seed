@@ -20,7 +20,8 @@ const ZodErrorMessages = {
 	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
 	qBitLegacyLinking:
 		"Using Automatic Torrent Management in qBittorrent without legacyLinking enabled can result in injection path failures.",
-	needsLinkDir: "You need to set a linkDir for risky or partial matching to work.",
+	needsLinkDir:
+		"You need to set a linkDir for risky or partial matching to work.",
 };
 
 /**
