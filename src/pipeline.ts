@@ -338,34 +338,41 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const candidates = await queryRssFeeds();
-	const lastRun =
-		(await db("job_log").select("last_run").where({ name: "rss" }).first())
-			?.last_run ?? 0;
-	const candidatesSinceLastTime = candidates.filter(
-		(c) => c.pubDate > lastRun
-	);
-	logger.verbose({
-		label: Label.RSS,
-		message: `Scan returned ${
-			candidatesSinceLastTime.length
-		} new results, ignoring ${
-			candidates.length - candidatesSinceLastTime.length
-		} already seen`,
-	});
-	logger.verbose({
-		label: Label.RSS,
-		message: "Indexing new torrents...",
-	});
-	await indexNewTorrents();
-	for (const [i, candidate] of candidatesSinceLastTime.entries()) {
+	const { torznab } = getRuntimeConfig();
+	if (torznab.length > 0) {
+		const candidates = await queryRssFeeds();
+		const lastRun =
+			(
+				await db("job_log")
+					.select("last_run")
+					.where({ name: "rss" })
+					.first()
+			)?.last_run ?? 0;
+		const candidatesSinceLastTime = candidates.filter(
+			(c) => c.pubDate > lastRun
+		);
 		logger.verbose({
 			label: Label.RSS,
-			message: `Processing release ${i + 1}/${
+			message: `Scan returned ${
 				candidatesSinceLastTime.length
-			}`,
+			} new results, ignoring ${
+				candidates.length - candidatesSinceLastTime.length
+			} already seen`,
 		});
-		await checkNewCandidateMatch(candidate);
+		logger.verbose({
+			label: Label.RSS,
+			message: "Indexing new torrents...",
+		});
+		await indexNewTorrents();
+		for (const [i, candidate] of candidatesSinceLastTime.entries()) {
+			logger.verbose({
+				label: Label.RSS,
+				message: `Processing release ${i + 1}/${
+					candidatesSinceLastTime.length
+				}`,
+			});
+			await checkNewCandidateMatch(candidate);
+		}
+		logger.info({ label: Label.RSS, message: "Scan complete" });
 	}
-	logger.info({ label: Label.RSS, message: "Scan complete" });
 }

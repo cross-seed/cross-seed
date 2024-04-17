@@ -149,8 +149,10 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 export async function searchTorznab(
 	name: string
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
-	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
-
+	const { excludeRecentSearch, excludeOlder, torznab } = getRuntimeConfig();
+	if (torznab.length === 0) {
+		throw new Error("no indexers are available");
+	}
 	const enabledIndexers = await getEnabledIndexers();
 
 	// search history for name across all indexers
@@ -437,7 +439,7 @@ export async function validateTorznabUrls() {
 	const indexersWithSearch = await getEnabledIndexers();
 
 	if (indexersWithSearch.length === 0) {
-		throw new CrossSeedError("no working indexers available");
+		logger.warn("no working indexers available");
 	}
 }
 
