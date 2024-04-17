@@ -39,7 +39,7 @@ export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
 
-export function getTag(name: string, isVideo?: boolean): MediaType {
+export function getTag(name: string, isVideo: boolean): MediaType {
 	return EP_REGEX.test(name)
 		? MediaType.EPISODE
 		: SEASON_REGEX.test(name)
