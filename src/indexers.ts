@@ -24,6 +24,8 @@ export interface Indexer {
 	searchCap: boolean;
 	tvSearchCap: boolean;
 	movieSearchCap: boolean;
+	tvIdCaps: string;
+	movieIdCaps: string;
 }
 
 export async function getEnabledIndexers() {
@@ -45,6 +47,8 @@ export async function getEnabledIndexers() {
 			searchCap: "search_cap",
 			tvSearchCap: "tv_search_cap",
 			movieSearchCap: "movie_search_cap",
+			tvIdCaps: "tv_id_caps",
+			movieIdCaps: "movie_id_caps",
 		});
 }
 
