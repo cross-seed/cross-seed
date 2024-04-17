@@ -267,7 +267,9 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"The infohashes and/or strings in torrent name to block from cross-seed",
 			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.blockList, []),
-		);
+		)
+		.option("--sonarr-api <url>", "Sonarr API URL", fileConfig.sonarrApi)
+		.option("--radarr-api <url>", "Radarr API URL", fileConfig.radarrApi);
 }
 
 program.name(PROGRAM_NAME);

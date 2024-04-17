@@ -30,6 +30,21 @@ module.exports = {
 	torznab: [],
 
 	/**
+	 * URL to your Sonarr instance, this is the same format as a torznab URL
+	 */
+	sonarrAPI: "",
+
+	/**
+	 * URL to your Radarr instance, this is the same format as a torznab URL
+	 */
+	radarrAPI: "",
+
+	/**
+	 * Whether to use Imdb for the lookup ID for movies ONLY
+	 */
+	useImdb: false,
+
+	/**
 	 * Bind to a specific host address.
 	 * Example: "127.0.0.1"
 	 * Default is "0.0.0.0"
