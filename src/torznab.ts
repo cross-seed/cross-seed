@@ -106,8 +106,9 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	};
 }
 
-function createTorznabSearchQuery(name: string, caps: Caps, isVideo: boolean) {
-	const nameWithoutExtension = stripExtension(name);
+function createTorznabSearchQuery(searchee: Searchee, caps: Caps) {
+	const nameWithoutExtension = stripExtension(searchee.name);
+	const isVideo = hasVideo(searchee);
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
 	const mediaType = getTag(nameWithoutExtension, isVideo);
@@ -140,7 +141,6 @@ function createTorznabSearchQuery(name: string, caps: Caps, isVideo: boolean) {
 
 export async function queryRssFeeds(): Promise<Candidate[]> {
 	const candidatesByUrl = await makeRequests(
-		"",
 		await getEnabledIndexers(),
 		() => ({ t: "search", q: "" })
 	);
@@ -194,12 +194,12 @@ export async function searchTorznab(
 		}`,
 	});
 
-	return makeRequests(name, indexersToUse, (indexer) =>
-		createTorznabSearchQuery(name, {
+	return makeRequests(indexersToUse, (indexer) =>
+		createTorznabSearchQuery(searchee, {
 			search: indexer.searchCap,
 			tvSearch: indexer.tvSearchCap,
 			movieSearch: indexer.movieSearchCap,
-		}, hasVideo(searchee))
+		})
 	);
 }
 
@@ -447,7 +447,6 @@ export async function validateTorznabUrls() {
 }
 
 async function makeRequests(
-	name: string,
 	indexers: Indexer[],
 	getQuery: (indexer: Indexer) => TorznabParams
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
