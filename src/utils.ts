@@ -68,18 +68,22 @@ export function cleanseSeparators(str: string): string {
 		.trim();
 }
 
+function getAnimeQuery(name: string, isVideo: boolean | undefined): string | null {
+	// Must be done after episode, season, and movie regex to be accurate
+	if (!isVideo) return null;
+	const { title, altTitle, release } = name.match(ANIME_REGEX)?.groups ?? {};
+	if (title) {
+		const animeQuery = altTitle && altTitle.length ? Math.random() > 0.5 ? title : altTitle : title;
+		return `${animeQuery} ${release}`;
+	}
+	return null;
+}
+
 export function reformatTitleForSearching(name: string, isVideo?: boolean): string {
 	const seasonMatch = name.match(SEASON_REGEX);
 	const movieMatch = name.match(MOVIE_REGEX);
 	const episodeMatch = name.match(EP_REGEX);
-	let animeQuery: string | undefined = undefined;
-	if (isVideo) {
-		const { title, altTitle, release } = name.match(ANIME_REGEX)?.groups ?? {};
-		if (title) {
-			animeQuery = altTitle && altTitle.length ? Math.random() > 0.5 ? title : altTitle : title;
-			animeQuery += ` ${release}`;
-		}
-	}
+	const animeQuery = getAnimeQuery(name, isVideo);
 	const fullMatch =
 		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? animeQuery ?? name;
 	return cleanseSeparators(fullMatch);
