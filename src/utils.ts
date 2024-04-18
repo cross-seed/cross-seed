@@ -68,24 +68,25 @@ export function cleanseSeparators(str: string): string {
 		.trim();
 }
 
-function getAnimeQuery(name: string, isVideo: boolean | undefined): string | null {
-	// Must be done after episode, season, and movie regex to be accurate
-	if (!isVideo) return null;
+export function getAnimeQueries(name: string): string[] {
+	// Only use if getTag returns anime as it's conditional on a few factors
+	let animeQueries: string[] = [];
 	const { title, altTitle, release } = name.match(ANIME_REGEX)?.groups ?? {};
 	if (title) {
-		const animeQuery = altTitle && altTitle.length ? Math.random() > 0.5 ? title : altTitle : title;
-		return `${animeQuery} ${release}`;
+		animeQueries.push(cleanseSeparators(`${title} ${release}`));
 	}
-	return null;
+	if (altTitle) {
+		animeQueries.push(cleanseSeparators(`${altTitle} ${release}`));
+	}
+	return animeQueries;
 }
 
-export function reformatTitleForSearching(name: string, isVideo?: boolean): string {
+export function reformatTitleForSearching(name: string): string {
 	const seasonMatch = name.match(SEASON_REGEX);
 	const movieMatch = name.match(MOVIE_REGEX);
 	const episodeMatch = name.match(EP_REGEX);
-	const animeQuery = getAnimeQuery(name, isVideo);
 	const fullMatch =
-		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? animeQuery ?? name;
+		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? name;
 	return cleanseSeparators(fullMatch);
 }
 
