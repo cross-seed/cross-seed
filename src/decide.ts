@@ -141,8 +141,8 @@ export function compareFileTreesPartial(
 		}
 	}
 	const totalPieces = Math.ceil(candidate.length / candidate.pieceLength);
-	const missingPieces = Math.ceil(matchedSizes / candidate.pieceLength);
-	return missingPieces / totalPieces <= fuzzySizeThreshold;
+	const availablePieces = Math.ceil(matchedSizes / candidate.pieceLength);
+	return availablePieces / totalPieces >= 1 - fuzzySizeThreshold;
 }
 
 function sizeDoesMatch(resultSize, searchee) {
