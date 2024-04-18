@@ -121,12 +121,6 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	const capsSection = xml?.caps?.searching?.[0];
 	const isAvailable = (searchTechnique) =>
 		searchTechnique?.[0]?.$?.available === "yes";
-	const tvIdCaps = findIdTokens(
-		capsSection?.["tv-search"]?.[0]?.$?.supportedParams
-	);
-	const movieIdCaps = findIdTokens(
-		capsSection?.["movie-search"]?.[0]?.$?.supportedParams
-	);
 	const idCapNames: (keyof IdSearchCaps)[] = ["tvdbId", "tmdbId", "imdbId"];
 	const movieCaps: IdSearchCaps = {
 		tvdbId: false,
@@ -138,17 +132,23 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 		tmdbId: false,
 		imdbId: false,
 	};
+	function setIdCaps(token: string[], caps: IdSearchCaps) {
+		idCapNames.forEach((variableName) => {
+			if (token?.includes(variableName.toLocaleLowerCase())) {
+				caps[variableName] = true;
+			}
+		});
+	}
 
-	idCapNames.forEach((variableName) => {
-		if (tvIdCaps?.includes(String(variableName).toLocaleLowerCase())) {
-			tvCaps[variableName] = true;
-		}
-	});
-	idCapNames.forEach((variableName) => {
-		if (movieIdCaps?.includes(String(variableName).toLocaleLowerCase())) {
-			movieCaps[variableName] = true;
-		}
-	});
+	setIdCaps(
+		findIdTokens(capsSection?.["tv-search"]?.[0]?.$?.supportedParams) || [],
+		tvCaps
+	);
+	setIdCaps(
+		findIdTokens(capsSection?.["movie-search"]?.[0]?.$?.supportedParams) ||
+			[],
+		movieCaps
+	);
 
 	return {
 		search: Boolean(isAvailable(capsSection?.search)),
@@ -166,20 +166,41 @@ async function getTorznabSearchId(
 ): Promise<object> {
 	try {
 		const arrIdData = (await grabArrId(title, mediaType)).unwrapOrThrow();
-		return {
-			tvdbid:
-				caps.tvIdSearch.tvdbId && typeof arrIdData !== "boolean"
-					? arrIdData.tvdbId
-					: undefined,
-			tmdbid:
-				caps.tvIdSearch.tmdbId && typeof arrIdData !== "boolean"
-					? arrIdData.tmdbId
-					: undefined,
-			imdbid:
-				caps.tvIdSearch.imdbId && typeof arrIdData !== "boolean"
-					? arrIdData.imdbId
-					: undefined,
-		};
+
+		return mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
+			? {
+					tvdbid:
+						caps.tvIdSearch.tvdbId && typeof arrIdData !== "boolean"
+							? arrIdData.tvdbId
+							: undefined,
+					tmdbid:
+						caps.tvIdSearch.tmdbId && typeof arrIdData !== "boolean"
+							? arrIdData.tmdbId
+							: undefined,
+					imdbid:
+						caps.tvIdSearch.imdbId && typeof arrIdData !== "boolean"
+							? arrIdData.imdbId
+							: undefined,
+			  }
+			: mediaType === MediaType.MOVIE
+			? {
+					tvdbid:
+						caps.movieIdSearch.tvdbId &&
+						typeof arrIdData !== "boolean"
+							? arrIdData.tvdbId
+							: undefined,
+					tmdbid:
+						caps.movieIdSearch.tmdbId &&
+						typeof arrIdData !== "boolean"
+							? arrIdData.tmdbId
+							: undefined,
+					imdbid:
+						caps.movieIdSearch.imdbId &&
+						typeof arrIdData !== "boolean"
+							? arrIdData.imdbId
+							: undefined,
+			  }
+			: {};
 	} catch (e) {
 		logger.error(`failed to grab arr id data for ${title}`);
 		return {};
