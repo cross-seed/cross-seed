@@ -27,11 +27,13 @@ export interface ResultAssessment {
 
 const createReasonLogger =
 	(Title: string, tracker: string, name: string) =>
-	(decision: Decision, cached): void => {
+	(decision: Decision, cached, note?: string): void => {
 		function logReason(reason): void {
 			logger.verbose({
 				label: Label.DECIDE,
-				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}`,
+				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}${
+					note || ""
+				}`,
 			});
 		}
 		let reason;
@@ -305,7 +307,41 @@ async function assessAndSaveResults(
 	});
 	return assessment;
 }
-
+function calcSizeLoggingNote(size: number): string {
+	const calc = (size: number, convertBytes: boolean) => {
+		return convertBytes
+			? Math.round((size / (1024 * 1024)) * 100) / 100
+			: Math.round((size / 1024) * 100) / 100;
+	};
+	const sizeMB = calc(size, true);
+	const logNote = sizeMB > 1000 ? `${calc(sizeMB, false)}GB` : `${sizeMB}MB`;
+	return logNote;
+}
+function makeDecisionNote(
+	decision: Decision,
+	searchee: Searchee,
+	candidate: Candidate
+): string {
+	const { blockList } = getRuntimeConfig();
+	switch (decision) {
+		case Decision.SIZE_MISMATCH:
+			return ` - (${calcSizeLoggingNote(
+				searchee.length
+			)} -> ${calcSizeLoggingNote(candidate.size)})`;
+		case Decision.RELEASE_GROUP_MISMATCH:
+			return ` - (${searchee.name
+				.match(RELEASE_GROUP_REGEX)?.[0]
+				?.trim()} -> ${candidate.name
+				.match(RELEASE_GROUP_REGEX)?.[0]
+				?.trim()})`;
+		case Decision.BLOCKED_RELEASE:
+			return ` - ("${
+				releaseInBlockList(searchee, blockList) as string
+			}")`;
+		default:
+			return "";
+	}
+}
 async function assessCandidateCaching(
 	candidate: Candidate,
 	searchee: Searchee,
@@ -336,7 +372,11 @@ async function assessCandidateCaching(
 			guid,
 			infoHashesToExclude,
 		);
-		logReason(assessment.decision, false);
+		logReason(
+			assessment.decision,
+			false,
+			makeDecisionNote(assessment.decision, searchee, candidate)
+		);
 	} else if (
 		(cacheEntry.decision === Decision.MATCH ||
 			cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||

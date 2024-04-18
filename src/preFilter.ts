@@ -65,12 +65,12 @@ export function filterByContent(searchee: Searchee): boolean {
 export function releaseInBlockList(
 	searchee: Searchee,
 	blockList: string[],
-): boolean {
+): string | boolean {
 	return blockList.some((blockedStr) => {
-		return (
-			searchee.name.includes(blockedStr) ||
+		return searchee.name.includes(blockedStr) ||
 			blockedStr === searchee.infoHash
-		);
+			? blockedStr
+			: false;
 	});
 }
 
