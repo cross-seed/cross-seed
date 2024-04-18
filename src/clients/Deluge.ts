@@ -279,7 +279,7 @@ export default class Deluge implements TorrentClient {
 						? duplicateCategories
 							? torrentInfo!.label.endsWith(
 									this.delugeLabelSuffix
-							  )
+							  ) || torrentInfo!.label === dataCategory
 								? torrentInfo!.label
 								: `${torrentInfo!.label}${
 										this.delugeLabelSuffix

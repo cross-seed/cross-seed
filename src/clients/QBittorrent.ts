@@ -165,8 +165,12 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async setUpCrossSeedCategory(ogCategoryName: string): Promise<string> {
+		const { dataCategory } = getRuntimeConfig();
 		if (!ogCategoryName) return "";
-		if (ogCategoryName.endsWith(TORRENT_CATEGORY_SUFFIX))
+		if (
+			ogCategoryName.endsWith(TORRENT_CATEGORY_SUFFIX) ||
+			ogCategoryName === dataCategory
+		)
 			return ogCategoryName;
 
 		const categoriesStr = await this.request("/torrents/categories", "");
