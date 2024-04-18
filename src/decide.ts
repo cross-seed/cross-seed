@@ -125,9 +125,6 @@ export function compareFileTreesPartial(
 	candidate: Metafile,
 	searchee: Searchee
 ): boolean {
-	if (candidate.length <= candidate.pieceLength) {
-		return false;
-	}
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 	let matchedSizes = 0;
 	for (const candidateFile of candidate.files) {
@@ -143,7 +140,9 @@ export function compareFileTreesPartial(
 			matchedSizes += candidateFile.length;
 		}
 	}
-	return matchedSizes / candidate.length >= 1 - fuzzySizeThreshold;
+	const totalPieces = Math.ceil(candidate.length / candidate.pieceLength);
+	const missingPieces = Math.ceil(matchedSizes / candidate.pieceLength);
+	return missingPieces / totalPieces <= fuzzySizeThreshold;
 }
 
 function sizeDoesMatch(resultSize, searchee) {
