@@ -30,7 +30,7 @@ import {
 import { grabArrId } from "./arr.js";
 
 interface TorznabParams {
-	t: "caps" | "search" | "tvsearch" | "movie";
+	t?: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
 	apikey?: string;
@@ -121,12 +121,6 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	const capsSection = xml?.caps?.searching?.[0];
 	const isAvailable = (searchTechnique) =>
 		searchTechnique?.[0]?.$?.available === "yes";
-	const tvIdCaps = findIdTokens(
-		capsSection?.["tv-search"]?.[0]?.$?.supportedParams,
-	);
-	const movieIdCaps = findIdTokens(
-		capsSection?.["movie-search"]?.[0]?.$?.supportedParams,
-	);
 	const idCapNames: (keyof IdSearchCaps)[] = ["tvdbId", "tmdbId", "imdbId"];
 	const movieCaps: IdSearchCaps = {
 		tvdbId: false,
@@ -138,17 +132,23 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 		tmdbId: false,
 		imdbId: false,
 	};
+	function setIdCaps(token: string[], caps: IdSearchCaps) {
+		idCapNames.forEach((variableName) => {
+			if (token?.includes(variableName.toLocaleLowerCase())) {
+				caps[variableName] = true;
+			}
+		});
+	}
 
-	idCapNames.forEach((variableName) => {
-		if (tvIdCaps?.includes(String(variableName).toLocaleLowerCase())) {
-			tvCaps[variableName] = true;
-		}
-	});
-	idCapNames.forEach((variableName) => {
-		if (movieIdCaps?.includes(String(variableName).toLocaleLowerCase())) {
-			movieCaps[variableName] = true;
-		}
-	});
+	setIdCaps(
+		findIdTokens(capsSection?.["tv-search"]?.[0]?.$?.supportedParams) || [],
+		tvCaps,
+	);
+	setIdCaps(
+		findIdTokens(capsSection?.["movie-search"]?.[0]?.$?.supportedParams) ||
+			[],
+		movieCaps,
+	);
 
 	return {
 		search: Boolean(isAvailable(capsSection?.search)),
@@ -158,30 +158,82 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 		tvIdSearch: tvCaps,
 	};
 }
-
-async function getTorznabSearchId(
+async function getRelevantArrIds(
+	title,
+	ids: TorznabParams,
 	caps: Caps,
-	title: string,
-	mediaType: MediaType,
-): Promise<object> {
+): Promise<TorznabParams> {
+	const nameWithoutExtension = stripExtension(title);
+	const mediaType = getTag(nameWithoutExtension);
+	return mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
+		? {
+				tvdbid:
+					caps.tvIdSearch.tvdbId && ids.tvdbid
+						? ids.tvdbid
+						: undefined,
+				tmdbid:
+					caps.tvIdSearch.tmdbId && ids.tmdbid
+						? ids.tmdbid
+						: undefined,
+				imdbid:
+					caps.tvIdSearch.tvdbId && ids.imdbid
+						? ids.imdbid
+						: undefined,
+			}
+		: mediaType === MediaType.MOVIE
+			? {
+					tvdbid:
+						caps.movieIdSearch.tvdbId && ids.tvdbid
+							? ids.tvdbid
+							: undefined,
+					tmdbid:
+						caps.movieIdSearch.tmdbId && ids.tmdbid
+							? ids.tmdbid
+							: undefined,
+					imdbid:
+						caps.movieIdSearch.imdbId && ids.imdbid
+							? ids.imdbid
+							: undefined,
+				}
+			: {};
+}
+async function getAvailableArrIds(title: string): Promise<TorznabParams> {
+	const nameWithoutExtension = stripExtension(title);
+	const mediaType = getTag(nameWithoutExtension);
 	try {
 		const arrIdData = (await grabArrId(title, mediaType)).unwrapOrThrow();
-		return {
-			tvdbid:
-				caps.tvIdSearch.tvdbId && typeof arrIdData !== "boolean"
-					? arrIdData.tvdbId
-					: undefined,
-			tmdbid:
-				caps.tvIdSearch.tmdbId && typeof arrIdData !== "boolean"
-					? arrIdData.tmdbId
-					: undefined,
-			imdbid:
-				caps.tvIdSearch.imdbId && typeof arrIdData !== "boolean"
-					? arrIdData.imdbId
-					: undefined,
-		};
+		return mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
+			? {
+					tvdbid:
+						typeof arrIdData !== "boolean"
+							? arrIdData.tvdbId
+							: undefined,
+					tmdbid:
+						typeof arrIdData !== "boolean"
+							? arrIdData.tmdbId
+							: undefined,
+					imdbid:
+						typeof arrIdData !== "boolean"
+							? arrIdData.imdbId
+							: undefined,
+				}
+			: mediaType === MediaType.MOVIE
+				? {
+						tvdbid:
+							typeof arrIdData !== "boolean"
+								? arrIdData.tvdbId
+								: undefined,
+						tmdbid:
+							typeof arrIdData !== "boolean"
+								? arrIdData.tmdbId
+								: undefined,
+						imdbid:
+							typeof arrIdData !== "boolean"
+								? arrIdData.imdbId
+								: undefined,
+					}
+				: {};
 	} catch (e) {
-		logger.error(`failed to grab arr id data for ${title}`);
 		return {};
 	}
 }
@@ -289,10 +341,15 @@ export async function searchTorznab(
 			(entry) => entry.indexerId === indexer.id,
 		);
 		return (
-			!entry ||
-			((!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
-				(!excludeRecentSearch ||
-					entry.lastSearched < nMsAgo(excludeRecentSearch)))
+			shouldSearchIndexer(
+				getTag(searchee),
+				JSON.parse(indexer.categories),
+			) &&
+			(!entry ||
+				((!excludeOlder ||
+					entry.firstSearched > nMsAgo(excludeOlder)) &&
+					(!excludeRecentSearch ||
+						entry.lastSearched < nMsAgo(excludeRecentSearch))))
 		);
 	});
 
