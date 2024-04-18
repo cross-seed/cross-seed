@@ -111,7 +111,7 @@ export function compareFileTreesPartialIgnoringNames(
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 	let matchedSizes = 0;
 	for (const candidateFile of candidate.files) {
-		let searcheeHasFileSize = searchee.files.some(
+		const searcheeHasFileSize = searchee.files.some(
 			(searcheeFile) => searcheeFile.length === candidateFile.length
 		);
 		if (searcheeHasFileSize) {
