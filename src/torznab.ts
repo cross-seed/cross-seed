@@ -1,11 +1,6 @@
 import ms from "ms";
 import xml2js from "xml2js";
-import {
-	EP_REGEX,
-	MOVIE_REGEX,
-	SEASON_REGEX,
-	USER_AGENT,
-} from "./constants.js";
+import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { getAvailableArrIds } from "./arr.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
@@ -33,7 +28,7 @@ import {
 } from "./utils.js";
 
 export interface TorznabParams {
-	t?: "caps" | "search" | "tvsearch" | "movie";
+	t: "caps" | "search" | "tvsearch" | "movie";
 	title?: string;
 	q?: string;
 	limit?: number;
@@ -48,6 +43,11 @@ export interface IdSearchCaps {
 	tvdbId: boolean;
 	tmdbId: boolean;
 	imdbId: boolean;
+}
+export interface IdSearchParams {
+	tvdbid?: string;
+	tmdbid?: string;
+	imdbid?: string;
 }
 export interface Caps {
 	search: boolean;
@@ -143,14 +143,13 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 
 async function createTorznabSearchQueries(
 	searchee: Searchee,
-	ids: TorznabParams,
+	ids: IdSearchParams,
 	caps: Caps
 ): Promise<TorznabParams[]> {
-	const isVideo = hasVideo(searchee);
 	const nameWithoutExtension = stripExtension(searchee.name);
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
-	const mediaType = getTag(nameWithoutExtension, isVideo);
+	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
 		return [
@@ -194,12 +193,11 @@ async function createTorznabSearchQueries(
 			},
 		] as const;
 	} else if (mediaType === MediaType.ANIME) {
-		return [
-			{
-				t: "search",
-				q: animeQuery,
-			},
-		];
+		const animeQueries = getAnimeQueries(nameWithoutExtension);
+		return animeQueries.map((animeQuery) => ({
+			t: "search",
+			q: animeQuery,
+		}));
 	} else {
 		return [
 			{
