@@ -7,6 +7,7 @@ import {
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
+import { TorznabParams } from "./torznab.js";
 
 export enum MediaType {
 	EPISODE = "episode",
@@ -66,7 +67,32 @@ export async function time<R>(cb: () => R, times: number[]) {
 		times.push(performance.now() - before);
 	}
 }
+export function sanitizeUrl(url: string | URL): string {
+	if (typeof url === "string") {
+		url = new URL(url);
+	}
+	return url.origin + url.pathname;
+}
+export function assembleUrl(
+	urlStr: string,
+	apikey: string,
+	params: TorznabParams
+): string {
+	const url = new URL(urlStr);
+	const searchParams = new URLSearchParams();
 
+	searchParams.set("apikey", apikey);
+
+	for (const [key, value] of Object.entries(params)) {
+		if (value != null) searchParams.set(key, value);
+	}
+
+	url.search = searchParams.toString();
+	return url.toString();
+}
+export function getApikey(url: string) {
+	return new URL(url).searchParams.get("apikey");
+}
 export function cleanseSeparators(str: string): string {
 	return str
 		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "")
