@@ -23,9 +23,9 @@ export function filterByContent(searchee: Searchee): boolean {
 			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
 		});
 	}
-
-	if (releaseInBlockList(searchee, blockList)) {
-		logReason("it matched the blocklist");
+	const blockedNote = releaseInBlockList(searchee, blockList);
+	if (blockedNote) {
+		logReason(`it matched the blocklist - ("${blockedNote}")`);
 		return false;
 	}
 
@@ -65,12 +65,12 @@ export function filterByContent(searchee: Searchee): boolean {
 export function releaseInBlockList(
 	searchee: Searchee,
 	blockList: string[],
-): string | boolean {
-	return blockList.some((blockedStr) => {
-		return searchee.name.includes(blockedStr) ||
+): string | undefined {
+	return blockList.find((blockedStr) => {
+		return (
+			searchee.name.includes(blockedStr) ||
 			blockedStr === searchee.infoHash
-			? blockedStr
-			: false;
+		);
 	});
 }
 

@@ -19,6 +19,7 @@ import {
 	parseTorrentFromURL,
 	SnatchError,
 } from "./torrent.js";
+import { humanReadableSize } from "./utils.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -27,13 +28,11 @@ export interface ResultAssessment {
 
 const createReasonLogger =
 	(Title: string, tracker: string, name: string) =>
-	(decision: Decision, cached, note?: string): void => {
+	(decision: Decision, cached, note: string = ""): void => {
 		function logReason(reason): void {
 			logger.verbose({
 				label: Label.DECIDE,
-				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}${
-					note || ""
-				}`,
+				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}${note}`,
 			});
 		}
 		let reason;
@@ -307,16 +306,7 @@ async function assessAndSaveResults(
 	});
 	return assessment;
 }
-function calcSizeLoggingNote(size: number): string {
-	const calc = (size: number, convertBytes: boolean) => {
-		return convertBytes
-			? Math.round((size / (1024 * 1024)) * 100) / 100
-			: Math.round((size / 1024) * 100) / 100;
-	};
-	const sizeMB = calc(size, true);
-	const logNote = sizeMB > 1000 ? `${calc(sizeMB, false)}GB` : `${sizeMB}MB`;
-	return logNote;
-}
+
 function makeDecisionNote(
 	decision: Decision,
 	searchee: Searchee,
@@ -325,9 +315,10 @@ function makeDecisionNote(
 	const { blockList } = getRuntimeConfig();
 	switch (decision) {
 		case Decision.SIZE_MISMATCH:
-			return ` - (${calcSizeLoggingNote(
-				searchee.length
-			)} -> ${calcSizeLoggingNote(candidate.size)})`;
+			return ` - (${humanReadableSize(
+				searchee.length,
+				2
+			)} -> ${humanReadableSize(candidate.size, 2)})`;
 		case Decision.RELEASE_GROUP_MISMATCH:
 			return ` - (${searchee.name
 				.match(RELEASE_GROUP_REGEX)?.[0]
@@ -335,9 +326,7 @@ function makeDecisionNote(
 				.match(RELEASE_GROUP_REGEX)?.[0]
 				?.trim()})`;
 		case Decision.BLOCKED_RELEASE:
-			return ` - ("${
-				releaseInBlockList(searchee, blockList) as string
-			}")`;
+			return ` - ("${releaseInBlockList(searchee, blockList)}")`;
 		default:
 			return "";
 	}

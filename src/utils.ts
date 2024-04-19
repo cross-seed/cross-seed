@@ -38,7 +38,20 @@ export function nMsAgo(n: number): number {
 export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
+export function humanReadableSize(
+	bytes: number,
+	dm: number,
+	ibi: boolean = false
+) {
+	const k = ibi ? 1024 : 1000;
+	const sizes = ibi
+		? ["B", "kiB", "MiB", "GiB", "TiB"]
+		: ["B", "kB", "MB", "GB", "TB"];
 
+	const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
 export function getTag(name: string, isVideo: boolean): MediaType {
 	return EP_REGEX.test(name)
 		? MediaType.EPISODE
