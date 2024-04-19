@@ -27,7 +27,7 @@ module.exports = {
 	 *
 	 * Example: sonarrApi: "http://sonarr:8989/api?apikey=12345",
 	 */
-	sonarrApi: "",
+	sonarrApi: undefined,
 
 	/**
 	 * URL to your Radarr instance, in the same format URL as a torznab URL
@@ -35,7 +35,7 @@ module.exports = {
 	 *
 	 * Example: radarrApi: "http://radarr:7878/api?apikey=12345",
 	 */
-	radarrApi: "",
+	radarrApi: undefined,
 
 	/**
 	 * Bind to a specific host address.

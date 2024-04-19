@@ -185,8 +185,8 @@ export const VALIDATION_SCHEMA = z
 			.transform((value) => (Array.isArray(value) ? value : [])),
 		apiKey: z.string().min(24).nullish(),
 		//	useImdb: z.boolean(),
-		radarrApi: z.string().url(),
-		sonarrApi: z.string().url(),
+		radarrApi: z.string().url().nullish(),
+		sonarrApi: z.string().url().nullish(),
 	})
 	.strict()
 	.refine((config) => {
