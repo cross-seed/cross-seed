@@ -20,6 +20,8 @@ export enum Label {
 	RSS = "rss",
 	PERF = "perf",
 	REVERSE_LOOKUP = "reverselookup",
+	RADARR_API = "radarr-api",
+	SONARR_API = "sonarr-api",
 }
 
 export let logger: winston.Logger;
