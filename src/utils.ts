@@ -5,9 +5,13 @@ import {
 	SEASON_REGEX,
 	ANIME_REGEX,
 	VIDEO_EXTENSIONS,
+	AUDIO_EXTENSIONS,
+	BOOK_EXTENSIONS,
 	Decision,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
+import { IdSearchParams, TorznabParams } from "./torznab.js";
+import { Searchee } from "./searchee.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export enum MediaType {
@@ -15,6 +19,8 @@ export enum MediaType {
 	SEASON = "pack",
 	MOVIE = "movie",
 	ANIME = "anime",
+	AUDIO = "audio",
+	BOOK = "book",
 	OTHER = "unknown",
 }
 
@@ -48,16 +54,24 @@ export function humanReadableSize(bytes: number) {
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
-export function getTag(name: string, isVideo: boolean): MediaType {
-	return EP_REGEX.test(name)
+export function getTag(searchee: Searchee): MediaType {
+	function hasExt(searchee: Searchee, extensions: string[]) {
+		return extensions.includes(path.extname(searchee.name));
+	}
+	const stem = stripExtension(searchee.name);
+	return EP_REGEX.test(stem)
 		? MediaType.EPISODE
-		: SEASON_REGEX.test(name)
+		: SEASON_REGEX.test(stem)
 			? MediaType.SEASON
-			: MOVIE_REGEX.test(name)
+			: MOVIE_REGEX.test(stem)
 				? MediaType.MOVIE
-				: isVideo && ANIME_REGEX.test(name)
+				: hasExt(searchee, VIDEO_EXTENSIONS) && ANIME_REGEX.test(stem)
 					? MediaType.ANIME
-					: MediaType.OTHER;
+					: hasExt(searchee, AUDIO_EXTENSIONS)
+						? MediaType.AUDIO
+						: hasExt(searchee, BOOK_EXTENSIONS)
+							? MediaType.BOOK
+							: MediaType.OTHER;
 }
 export function determineSkipRecheck(decision: Decision): boolean {
 	const { skipRecheck } = getRuntimeConfig();
@@ -79,7 +93,33 @@ export async function time<R>(cb: () => R, times: number[]) {
 		times.push(performance.now() - before);
 	}
 }
+export function sanitizeUrl(url: string | URL): string {
+	if (typeof url === "string") {
+		url = new URL(url);
+	}
+	return url.origin + url.pathname;
+}
 
+export function assembleUrl(
+	urlStr: string,
+	apikey: string,
+	params: TorznabParams | IdSearchParams,
+): string {
+	const url = new URL(urlStr);
+	const searchParams = new URLSearchParams();
+
+	searchParams.set("apikey", apikey);
+
+	for (const [key, value] of Object.entries(params)) {
+		if (value != null) searchParams.set(key, value);
+	}
+
+	url.search = searchParams.toString();
+	return url.toString();
+}
+export function getApikey(url: string) {
+	return new URL(url).searchParams.get("apikey");
+}
 export function cleanseSeparators(str: string): string {
 	return str
 		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "")

@@ -5,6 +5,7 @@ import {
 	Decision,
 	MatchMode,
 	RELEASE_GROUP_REGEX,
+	RES_REGEX,
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -161,13 +162,29 @@ export function compareFileTreesPartial(
 	return availablePieces / totalPieces >= 1 - fuzzySizeThreshold;
 }
 
-function sizeDoesMatch(resultSize, searchee) {
+function sizeDoesMatch(size: number, searchee: Searchee): boolean {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 
 	const { length } = searchee;
 	const lowerBound = length - fuzzySizeThreshold * length;
 	const upperBound = length + fuzzySizeThreshold * length;
-	return resultSize >= lowerBound && resultSize <= upperBound;
+	return size >= lowerBound && size <= upperBound;
+}
+
+function resolutionDoesMatch(
+	name: string,
+	searchee: Searchee,
+	matchMode: MatchMode,
+): boolean {
+	const searcheeRes = searchee.name
+		.match(RES_REGEX)?.[0]
+		?.trim()
+		.toLowerCase();
+	const candidateRes = name.match(RES_REGEX)?.[0]?.trim().toLowerCase();
+	if (!candidateRes || !searcheeRes) {
+		return matchMode !== MatchMode.SAFE;
+	}
+	return searcheeRes === candidateRes;
 }
 
 function releaseGroupDoesMatch(
@@ -194,7 +211,7 @@ function releaseGroupDoesMatch(
 }
 
 async function assessCandidateHelper(
-	{ link, size, name }: Candidate,
+	{ link, size, name, tracker }: Candidate,
 	searchee: Searchee,
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
@@ -202,7 +219,9 @@ async function assessCandidateHelper(
 	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
 		return { decision: Decision.BLOCKED_RELEASE };
 	}
-
+	if (!size && !resolutionDoesMatch(name, searchee, matchMode)) {
+		return { decision: Decision.RES_MISMATCH };
+	}
 	if (size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
@@ -213,7 +232,7 @@ async function assessCandidateHelper(
 		return { decision: Decision.RELEASE_GROUP_MISMATCH };
 	}
 
-	const result = await parseTorrentFromURL(link);
+	const result = await parseTorrentFromURL(link, tracker);
 
 	if (result.isErr()) {
 		return result.unwrapErrOrThrow() === SnatchError.RATE_LIMITED

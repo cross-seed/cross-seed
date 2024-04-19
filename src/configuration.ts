@@ -45,9 +45,8 @@ export interface FileConfig {
 	searchLimit?: number;
 	blockList?: string[];
 	apiKey?: string;
-	sonarrApi?: string;
-	radarrApi?: string;
-	//useImdb?: boolean;
+	sonarr?: string;
+	radarr?: string;
 }
 
 export const UNPARSABLE_CONFIG_MESSAGE = `

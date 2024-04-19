@@ -1,139 +1,194 @@
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
-import { MediaType } from "./utils.js";
-import { getApikey, sanitizeUrl } from "./torznab.js";
+import {
+	assembleUrl,
+	getApikey,
+	getTag,
+	MediaType,
+	sanitizeUrl,
+} from "./utils.js";
 import chalk from "chalk";
-export type ArrJson = {
-	movie?: idData;
-	series?: idData;
+import { Searchee } from "./searchee.js";
+import { Caps, IdSearchParams, TorznabParams } from "./torznab.js";
+
+const keyNames = ["tvdbId", "imdbId", "tmdbId"];
+
+export type ParseResponse = {
+	movie?: IdData;
+	series?: IdData;
 };
-export interface idData {
+export interface IdData {
 	imdbId?: string;
 	tmdbId?: string;
 	tvdbId?: string;
 }
+
 async function fetchArrJSON(
-	searchterm: string,
+	searchTerm: string,
 	url: string,
-	mediaType: MediaType
-): Promise<idData> {
+	mediaType: MediaType,
+): Promise<IdData> {
 	const uarrl = { apikey: getApikey(url), url: sanitizeUrl(url) };
-	const lookupUrl = `${uarrl.url}/v3/parse?apikey=${uarrl.apikey}&title=${searchterm}`;
-	const response = await fetch(lookupUrl);
-	let parsedData: idData;
+	let response;
+	const lookupUrl = assembleUrl(
+		`${uarrl.url}api/v3/parse`,
+		uarrl.apikey as string,
+		{
+			title: searchTerm,
+		} as IdSearchParams,
+	);
+
+	const abortController = new AbortController();
+	setTimeout(() => void abortController.abort(), 10000).unref();
+	try {
+		response = await fetch(lookupUrl, {
+			signal: abortController.signal,
+		});
+	} catch (networkError) {
+		if (networkError.name === "AbortError") {
+			throw new Error(`connection timeout`);
+		}
+		throw new Error(networkError);
+	}
 	if (!response.ok) {
-		logger.warn(
-			`unable to lookup corresponding id for ${searchterm}: Status Code -> ${response.status} `
-		);
-		throw new Error(`HTTP error! Status: ${response.status}`);
+		throw new Error(`${response.status}`);
 	}
-	const arrJson = (await response.json()) as ArrJson;
-	if (mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON) {
-		parsedData = {
-			imdbId: arrJson?.series?.imdbId,
-			tmdbId: arrJson?.series?.tmdbId,
-			tvdbId: arrJson?.series?.tvdbId,
-		};
-	} else if (mediaType === MediaType.MOVIE) {
-		parsedData = {
-			imdbId: arrJson?.movie?.imdbId,
-			tmdbId: arrJson?.movie?.tmdbId,
-			tvdbId: arrJson?.movie?.tvdbId,
-		};
+
+	const arrJson = (await response.json()) as ParseResponse;
+	if (!arrJson) {
+		return {};
+	}
+	const ids =
+		mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
+			? arrJson?.series
+			: arrJson?.movie;
+
+	return Object.fromEntries(
+		keyNames
+			.map((key) => {
+				const arrIds = ids?.[key] as string;
+				return arrIds !== undefined && arrIds !== ""
+					? [key, arrIds]
+					: undefined;
+			})
+			.filter((entry) => entry !== undefined) as [string, string][],
+	);
+}
+
+function formatFoundIds(arrJson: IdData): string {
+	let formattedIds = "";
+	keyNames.forEach((key) => {
+		if (arrJson[key]) {
+			formattedIds += `${chalk.yellow(
+				key.toUpperCase().replace("ID", ""),
+			)}: ${chalk.white(arrJson[key])} `;
+		}
+	});
+	return formattedIds.trim();
+}
+
+function logArrQueryResult(
+	arrJson: IdData,
+	searchTerm: string,
+	mediaType: MediaType,
+) {
+	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
+	if (Object.keys(arrJson).length > 0) {
+		logger.verbose({
+			label: label,
+			message: `Found ${
+				label === Label.RADARR ? "movie" : "series"
+			} for ${chalk.green.bold(searchTerm)} -> ${formatFoundIds(
+				arrJson,
+			)}`,
+		});
 	} else {
-		parsedData = {};
+		logger.verbose({
+			label: label,
+			message: `Lookup failed for ${chalk.yellow(searchTerm)}`,
+		});
+		logger.verbose({
+			label: label,
+			message: `Make sure the ${
+				label === Label.RADARR ? "movie" : "series"
+			} is added to ${label === Label.RADARR ? "Radarr" : "Sonarr"}.`,
+		});
 	}
-	return parsedData;
+}
+
+function logArrQueryFailure(error, searchTerm: string, mediaType: MediaType) {
+	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
+	logger.debug({
+		label: label,
+		message: `Failed to lookup IDs for ${chalk.yellow(
+			searchTerm,
+		)} - (${chalk.red(String(error).split(":").slice(1)[0].trim())})`,
+	});
+	logger.debug(error);
+}
+function searchArrURL(mediaType: MediaType): string | undefined {
+	const { sonarr, radarr } = getRuntimeConfig();
+	switch (mediaType) {
+		case MediaType.SEASON:
+		case MediaType.EPISODE:
+			return sonarr;
+		case MediaType.MOVIE:
+			return radarr;
+		default:
+			return undefined;
+	}
 }
 export async function grabArrId(
-	searchterm: string,
-	mediaType: MediaType
-): Promise<Result<idData, boolean>> {
-	const { sonarrApi, radarrApi } = getRuntimeConfig();
-	if (
-		(!sonarrApi &&
-			(mediaType == MediaType.EPISODE ||
-				mediaType === MediaType.SEASON)) ||
-		(!radarrApi && mediaType === MediaType.MOVIE)
-	) {
+	searchTerm: string,
+	mediaType: MediaType,
+): Promise<Result<IdData, boolean>> {
+	const uArrL = searchArrURL(mediaType);
+	if (!uArrL) {
 		return resultOfErr(false);
 	}
-	if (mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON) {
-		try {
-			const arrJson = (await fetchArrJSON(
-				searchterm,
-				sonarrApi!,
-				mediaType
-			)) as idData;
-			if (!isEmptyObject(arrJson)) {
-				logger.info(
-					`[sonarr-api] ${chalk.cyan(
-						"Found movie"
-					)} -> ${chalk.yellow("TVDB")}: ${chalk.white(
-						arrJson.tvdbId
-					)} ${chalk.yellow("IMDB")}: ${chalk.white(
-						arrJson.imdbId
-					)} ${chalk.yellow("TMDB")}: ${chalk.white(arrJson.tmdbId)}`
-				);
-			} else {
-				logger.error(
-					`[sonarr-api] Lookup for ${chalk.yellow(
-						searchterm
-					)} failed.`
-				);
-				logger.warn(
-					`[sonarr-api] Make sure the series is added to Sonarr.`
-				);
-			}
-			return resultOf(arrJson);
-		} catch (error) {
-			logger.error(
-				`[sonarr-api] Failed to lookup IDs for ${chalk.yellow(
-					searchterm
-				)} - (${chalk.red(
-					String(error).split(":").slice(1)[0].trim()
-				)})`
-			);
-			return resultOfErr(false);
-		}
-	} else if (mediaType === MediaType.MOVIE) {
-		try {
-			const arrJson = (await fetchArrJSON(
-				searchterm,
-				radarrApi!,
-				mediaType
-			)) as idData;
-			if (!isEmptyObject(arrJson)) {
-				logger.info(
-					`[radarr-api] ${chalk.cyan(
-						"Found movie"
-					)} -> ${chalk.yellow("IMDB")}: ${chalk.white(
-						arrJson.imdbId
-					)} ${chalk.yellow("TMDB")}: ${chalk.white(arrJson.tmdbId)}`
-				);
-			} else {
-				logger.error(
-					`[radarr-api] Lookup for ${chalk.yellow(
-						searchterm
-					)} failed.`
-				);
-				logger.warn(
-					`[radarr-api] Make sure the movie is added to Radarr.`
-				);
-			}
-			return resultOf(arrJson);
-		} catch (error) {
-			logger.error(
-				`[radarr-api]  Failed to lookup IDs for ${chalk.yellow(
-					searchterm
-				)} - (${chalk.red(
-					String(error).split(":").slice(1)[0].trim()
-				)})`
-			);
-			return resultOfErr(false);
-		}
-	} else {
+	try {
+		const arrJson = (await fetchArrJSON(
+			searchTerm,
+			uArrL,
+			mediaType,
+		)) as IdData;
+		logArrQueryResult(arrJson, searchTerm, mediaType);
+		return resultOf(arrJson);
+	} catch (error) {
+		logArrQueryFailure(error, searchTerm, mediaType);
 		return resultOfErr(false);
+	}
+}
+export async function getRelevantArrIds(
+	searchee: Searchee,
+	ids,
+	caps: Caps,
+): Promise<IdSearchParams> {
+	const mediaType = getTag(searchee);
+	const idSearchCaps =
+		mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
+			? caps.tvIdSearch
+			: caps.movieIdSearch;
+
+	return Object.keys(idSearchCaps).reduce((acc, key) => {
+		if (idSearchCaps[key] && ids[key]) {
+			acc[String(key).toLowerCase()] = ids[key];
+		}
+		return acc;
+	}, {});
+}
+
+export async function getAvailableArrIds(
+	searchee: Searchee,
+): Promise<IdSearchParams> {
+	const mediaType = getTag(searchee);
+	try {
+		const arrIdData = (
+			await grabArrId(searchee.name, mediaType)
+		).unwrapOrThrow();
+		return arrIdData as TorznabParams;
+	} catch (e) {
+		return {};
 	}
 }

@@ -268,8 +268,8 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.blockList, []),
 		)
-		.option("--sonarr-api <url>", "Sonarr API URL", fileConfig.sonarrApi)
-		.option("--radarr-api <url>", "Radarr API URL", fileConfig.radarrApi);
+		.option("--sonarr <url>", "Sonarr API URL", fileConfig.sonarr)
+		.option("--radarr <url>", "Radarr API URL", fileConfig.radarr);
 }
 
 program.name(PROGRAM_NAME);

@@ -21,7 +21,7 @@ import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee, hasVideo } from "./searchee.js";
+import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
 
@@ -33,26 +33,28 @@ function logInjectionResult(
 ) {
 	const styledName = chalk.green.bold(name);
 	const styledTracker = chalk.bold(tracker);
+	const foundBy = `Found ${styledName} on ${styledTracker} by`;
+
 	switch (result) {
 		case InjectionResult.SUCCESS:
-			logger.info(
-				`Found ${styledName} on ${styledTracker} by ${decision} - injected`,
-			);
+			logger.info(`${foundBy} ${chalk.green.bold(decision)} - injected`);
 			break;
 		case InjectionResult.ALREADY_EXISTS:
-			logger.info(
-				`Found ${styledName} on ${styledTracker} by ${decision} - exists`,
-			);
+			logger.info(`${foundBy} ${chalk.yellow(decision)} - exists`);
 			break;
 		case InjectionResult.TORRENT_NOT_COMPLETE:
 			logger.warn(
-				`Found ${styledName} on ${styledTracker} by ${decision} - skipping incomplete torrent`,
+				`${foundBy} by ${chalk.yellow(
+					decision,
+				)} - skipping incomplete torrent`,
 			);
 			break;
 		case InjectionResult.FAILURE:
 		default:
 			logger.error(
-				`Found ${styledName} on ${styledTracker} by ${decision} - failed to inject, saving instead`,
+				`${foundBy} ${chalk.red(
+					decision,
+				)} - failed to inject, saving...`,
 			);
 			break;
 	}
@@ -131,7 +133,9 @@ async function linkAllFilesInMetafile(
 		const downloadDirResult = await getClient().getDownloadDir(searchee);
 		if (downloadDirResult.isErr()) {
 			return downloadDirResult.mapErr((e) =>
-				e === "NOT_FOUND" ? "TORRENT_NOT_FOUND" : e,
+				e === "NOT_FOUND" || e === "UNKNOWN_ERROR"
+					? "TORRENT_NOT_FOUND"
+					: e,
 			);
 		}
 		sourceRoot = join(downloadDirResult.unwrapOrThrow(), searchee.name);
@@ -167,10 +171,9 @@ export async function performAction(
 	tracker: string,
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
-	const isVideo = hasVideo(searchee);
 
 	if (action === Action.SAVE) {
-		await saveTorrentFile(tracker, getTag(searchee.name, isVideo), newMeta);
+		await saveTorrentFile(tracker, getTag(searchee), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.info(
@@ -202,11 +205,7 @@ export async function performAction(
 				newMeta.name,
 				decision,
 			);
-			await saveTorrentFile(
-				tracker,
-				getTag(searchee.name, isVideo),
-				newMeta,
-			);
+			await saveTorrentFile(tracker, getTag(searchee), newMeta);
 			return InjectionResult.FAILURE;
 		}
 	} else if (searchee.path) {
@@ -222,7 +221,7 @@ export async function performAction(
 
 	logInjectionResult(result, tracker, newMeta.name, decision);
 	if (result === InjectionResult.FAILURE) {
-		await saveTorrentFile(tracker, getTag(searchee.name, isVideo), newMeta);
+		await saveTorrentFile(tracker, getTag(searchee), newMeta);
 	}
 	return result;
 }

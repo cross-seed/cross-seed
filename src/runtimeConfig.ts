@@ -36,9 +36,8 @@ export interface RuntimeConfig {
 	searchLimit: number;
 	blockList: string[];
 	apiKey?: string;
-	sonarrApi?: string;
-	radarrApi?: string;
-	//useImdb: boolean;
+	sonarr?: string;
+	radarr: string;
 }
 
 let runtimeConfig: RuntimeConfig;
