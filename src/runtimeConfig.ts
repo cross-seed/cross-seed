@@ -38,7 +38,6 @@ export interface RuntimeConfig {
 	apiKey?: string;
 	sonarrApi?: string;
 	radarrApi?: string;
-	//useImdb: boolean;
 }
 
 let runtimeConfig: RuntimeConfig;
