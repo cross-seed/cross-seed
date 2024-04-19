@@ -29,30 +29,30 @@ function logInjectionResult(
 	result: InjectionResult,
 	tracker: string,
 	name: string,
-	decision: Decision,
+	decision: Decision
 ) {
 	const styledName = chalk.green.bold(name);
 	const styledTracker = chalk.bold(tracker);
 	switch (result) {
 		case InjectionResult.SUCCESS:
 			logger.info(
-				`Found ${styledName} on ${styledTracker} by ${decision} - injected`,
+				`Found ${styledName} on ${styledTracker} by ${decision} - injected`
 			);
 			break;
 		case InjectionResult.ALREADY_EXISTS:
 			logger.info(
-				`Found ${styledName} on ${styledTracker} by ${decision} - exists`,
+				`Found ${styledName} on ${styledTracker} by ${decision} - exists`
 			);
 			break;
 		case InjectionResult.TORRENT_NOT_COMPLETE:
 			logger.warn(
-				`Found ${styledName} on ${styledTracker} by ${decision} - skipping incomplete torrent`,
+				`Found ${styledName} on ${styledTracker} by ${decision} - skipping incomplete torrent`
 			);
 			break;
 		case InjectionResult.FAILURE:
 		default:
 			logger.error(
-				`Found ${styledName} on ${styledTracker} by ${decision} - failed to inject, saving instead`,
+				`Found ${styledName} on ${styledTracker} by ${decision} - failed to inject, saving instead`
 			);
 			break;
 	}
@@ -66,11 +66,11 @@ function fuzzyLinkOneFile(
 	searchee: Searchee,
 	newMeta: Metafile,
 	destinationDir: string,
-	sourceRoot: string,
+	sourceRoot: string
 ): string {
 	const srcFilePath = join(
 		sourceRoot,
-		relative(searchee.name, searchee.files[0].path),
+		relative(searchee.name, searchee.files[0].path)
 	);
 	const destFilePath = join(destinationDir, newMeta.files[0].path);
 	mkdirSync(dirname(destFilePath), { recursive: true });
@@ -82,15 +82,15 @@ function fuzzyLinkPartial(
 	searchee: Searchee,
 	newMeta: Metafile,
 	destinationDir: string,
-	sourceRoot: string,
+	sourceRoot: string
 ): string {
 	for (const newFile of newMeta.files) {
 		let matchedSearcheeFiles = searchee.files.filter(
-			(searcheeFile) => searcheeFile.length === newFile.length,
+			(searcheeFile) => searcheeFile.length === newFile.length
 		);
 		if (matchedSearcheeFiles.length > 1) {
 			matchedSearcheeFiles = matchedSearcheeFiles.filter(
-				(searcheeFile) => searcheeFile.name === newFile.name,
+				(searcheeFile) => searcheeFile.name === newFile.name
 			);
 		}
 		if (matchedSearcheeFiles.length) {
@@ -109,10 +109,7 @@ async function linkAllFilesInMetafile(
 	searchee: Searchee,
 	newMeta: Metafile,
 	tracker: string,
-	decision:
-		| Decision.MATCH
-		| Decision.MATCH_SIZE_ONLY
-		| Decision.MATCH_PARTIAL,
+	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL
 ): Promise<
 	Result<
 		string,
@@ -131,7 +128,9 @@ async function linkAllFilesInMetafile(
 		const downloadDirResult = await getClient().getDownloadDir(searchee);
 		if (downloadDirResult.isErr()) {
 			return downloadDirResult.mapErr((e) =>
-				e === "NOT_FOUND" ? "TORRENT_NOT_FOUND" : e,
+				e === "NOT_FOUND" || e === "UNKNOWN_ERROR"
+					? "TORRENT_NOT_FOUND"
+					: e
 			);
 		}
 		sourceRoot = join(downloadDirResult.unwrapOrThrow(), searchee.name);
@@ -139,7 +138,7 @@ async function linkAllFilesInMetafile(
 
 	if (!existsSync(sourceRoot)) {
 		logger.error(
-			`Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
+			`Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`
 		);
 		return resultOfErr("MISSING_DATA");
 	}
@@ -148,11 +147,11 @@ async function linkAllFilesInMetafile(
 		return resultOf(linkExactTree(sourceRoot, fullLinkDir));
 	} else if (decision === Decision.MATCH_SIZE_ONLY) {
 		return resultOf(
-			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot),
+			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot)
 		);
 	} else {
 		return resultOf(
-			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot),
+			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot)
 		);
 	}
 }
@@ -164,7 +163,7 @@ export async function performAction(
 		| Decision.MATCH_SIZE_ONLY
 		| Decision.MATCH_PARTIAL,
 	searchee: Searchee,
-	tracker: string,
+	tracker: string
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 	const isVideo = hasVideo(searchee);
@@ -174,7 +173,7 @@ export async function performAction(
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.info(
-			`Found ${styledName} on ${styledTracker} by ${decision} - saved`,
+			`Found ${styledName} on ${styledTracker} by ${decision} - saved`
 		);
 		return SaveResult.SAVED;
 	}
@@ -186,7 +185,7 @@ export async function performAction(
 			searchee,
 			newMeta,
 			tracker,
-			decision,
+			decision
 		);
 		if (linkedFilesRootResult.isOk()) {
 			destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
@@ -200,12 +199,12 @@ export async function performAction(
 				InjectionResult.FAILURE,
 				tracker,
 				newMeta.name,
-				decision,
+				decision
 			);
 			await saveTorrentFile(
 				tracker,
 				getTag(searchee.name, isVideo),
-				newMeta,
+				newMeta
 			);
 			return InjectionResult.FAILURE;
 		}
@@ -218,7 +217,7 @@ export async function performAction(
 		newMeta,
 		searchee,
 		decision,
-		destinationDir,
+		destinationDir
 	);
 
 	logInjectionResult(result, tracker, newMeta.name, decision);
@@ -235,7 +234,7 @@ export async function performActions(searchee, matches) {
 			assessment.metafile,
 			assessment.decision,
 			searchee,
-			tracker,
+			tracker
 		);
 		results.push(result);
 		if (result === InjectionResult.TORRENT_NOT_COMPLETE) break;
