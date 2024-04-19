@@ -69,13 +69,25 @@ export async function grabArrId(
 			if (!isEmptyObject(arrJson)) {
 				logger.info({
 					label: Label.SONARR_API,
-					message: `${chalk.cyan("Found series")} -> ${chalk.yellow(
-						"TVDB"
-					)}: ${chalk.white(arrJson.tvdbId)} ${chalk.yellow(
-						"IMDB"
-					)}: ${chalk.white(arrJson.imdbId)} ${chalk.yellow(
-						"TMDB"
-					)}: ${chalk.white(arrJson.tmdbId)}`,
+					message: `${chalk.cyan("Found series")} -> ${
+						arrJson.tvdbId
+							? `${chalk.yellow("TVDB")}: ${chalk.white(
+									arrJson.tvdbId
+							  )} `
+							: ""
+					}${
+						arrJson.tmdbId
+							? `${chalk.yellow("TMDB")}: ${chalk.white(
+									arrJson.tmdbId
+							  )} `
+							: ""
+					}${
+						arrJson.imdbId
+							? `${chalk.yellow("IMDB")}: ${chalk.white(
+									arrJson.imdbId
+							  )}`
+							: ""
+					}`,
 				});
 			} else {
 				logger.error({
@@ -110,11 +122,25 @@ export async function grabArrId(
 			if (!isEmptyObject(arrJson)) {
 				logger.info({
 					label: Label.RADARR_API,
-					message: `${chalk.cyan("Found movie")} -> ${chalk.yellow(
-						"IMDB"
-					)}: ${chalk.white(arrJson.imdbId)} ${chalk.yellow(
-						"TMDB"
-					)}: ${chalk.white(arrJson.tmdbId)}`,
+					message: `${chalk.cyan("Found movie")} -> ${
+						arrJson.tvdbId
+							? `${chalk.yellow("TVDB")}: ${chalk.white(
+									arrJson.tvdbId
+							  )} `
+							: ""
+					}${
+						arrJson.tmdbId
+							? `${chalk.yellow("TMDB")}: ${chalk.white(
+									arrJson.tmdbId
+							  )} `
+							: ""
+					}${
+						arrJson.imdbId
+							? `${chalk.yellow("IMDB")}: ${chalk.white(
+									arrJson.imdbId
+							  )}`
+							: ""
+					}`,
 				});
 			} else {
 				logger.error({
