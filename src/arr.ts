@@ -23,9 +23,6 @@ async function fetchArrJSON(
 	const response = await fetch(lookupUrl);
 	let parsedData: idData;
 	if (!response.ok) {
-		logger.warn(
-			`unable to lookup corresponding id for ${searchterm}: Status Code -> ${response.status} `
-		);
 		throw new Error(`${response.status}`);
 	}
 	const arrJson = (await response.json()) as ArrJson;
@@ -47,27 +44,26 @@ async function fetchArrJSON(
 	return parsedData;
 }
 
-function formatFoundIds(arrJson: idData): string {
-	return `${
-		arrJson.tvdbId
-			? `${chalk.yellow("TVDB")}: ${chalk.white(arrJson.tvdbId)} `
-			: ""
-	}${
-		arrJson.tmdbId
-			? `${chalk.yellow("TMDB")}: ${chalk.white(arrJson.tmdbId)} `
-			: ""
-	}${
-		arrJson.imdbId
-			? `${chalk.yellow("IMDB")}: ${chalk.white(arrJson.imdbId)}`
-			: ""
-	}`;
-}
-
 export async function grabArrId(
 	searchterm: string,
 	mediaType: MediaType
 ): Promise<Result<idData, boolean>> {
 	const { sonarrApi, radarrApi } = getRuntimeConfig();
+	function formatFoundIds(arrJson: idData): string {
+		return `${
+			arrJson.tvdbId
+				? `${chalk.yellow("TVDB")}: ${chalk.white(arrJson.tvdbId)} `
+				: ""
+		}${
+			arrJson.tmdbId
+				? `${chalk.yellow("TMDB")}: ${chalk.white(arrJson.tmdbId)} `
+				: ""
+		}${
+			arrJson.imdbId
+				? `${chalk.yellow("IMDB")}: ${chalk.white(arrJson.imdbId)}`
+				: ""
+		}`;
+	}
 	if (
 		(!sonarrApi &&
 			(mediaType == MediaType.EPISODE ||
