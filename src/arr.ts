@@ -10,8 +10,8 @@ import {
 	stripExtension,
 } from "./utils.js";
 import chalk from "chalk";
-import { Caps, TorznabParams } from "./torznab.js";
 import { hasVideo, Searchee } from "./searchee.js";
+import { Caps, IdSearchParams, TorznabParams } from "./torznab.js";
 export type ParseResponse = {
 	movie?: IdData;
 	series?: IdData;
@@ -33,7 +33,7 @@ async function fetchArrJSON(
 		uarrl.apikey as string,
 		{
 			title: searchTerm,
-		}
+		} as IdSearchParams
 	);
 
 	const abortController = new AbortController();
@@ -185,7 +185,7 @@ export async function getRelevantArrIds(
 	searchee: Searchee,
 	ids,
 	caps: Caps
-): Promise<TorznabParams> {
+): Promise<IdSearchParams> {
 	const nameWithoutExtension = stripExtension(searchee.name);
 	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
 	const idSearchCaps =
@@ -204,7 +204,7 @@ export async function getRelevantArrIds(
 
 export async function getAvailableArrIds(
 	searchee: Searchee
-): Promise<TorznabParams> {
+): Promise<IdSearchParams> {
 	const nameWithoutExtension = stripExtension(searchee.name);
 	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
 	try {
