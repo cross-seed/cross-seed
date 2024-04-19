@@ -46,6 +46,23 @@ async function fetchArrJSON(
 	}
 	return parsedData;
 }
+
+function formatFoundIds(arrJson: idData): string {
+	return `${
+		arrJson.tvdbId
+			? `${chalk.yellow("TVDB")}: ${chalk.white(arrJson.tvdbId)} `
+			: ""
+	}${
+		arrJson.tmdbId
+			? `${chalk.yellow("TMDB")}: ${chalk.white(arrJson.tmdbId)} `
+			: ""
+	}${
+		arrJson.imdbId
+			? `${chalk.yellow("IMDB")}: ${chalk.white(arrJson.imdbId)}`
+			: ""
+	}`;
+}
+
 export async function grabArrId(
 	searchterm: string,
 	mediaType: MediaType
@@ -69,25 +86,9 @@ export async function grabArrId(
 			if (!isEmptyObject(arrJson)) {
 				logger.info({
 					label: Label.SONARR_API,
-					message: `${chalk.cyan("Found series")} -> ${
-						arrJson.tvdbId
-							? `${chalk.yellow("TVDB")}: ${chalk.white(
-									arrJson.tvdbId
-							  )} `
-							: ""
-					}${
-						arrJson.tmdbId
-							? `${chalk.yellow("TMDB")}: ${chalk.white(
-									arrJson.tmdbId
-							  )} `
-							: ""
-					}${
-						arrJson.imdbId
-							? `${chalk.yellow("IMDB")}: ${chalk.white(
-									arrJson.imdbId
-							  )}`
-							: ""
-					}`,
+					message: `${chalk.cyan("Found series")} -> ${formatFoundIds(
+						arrJson
+					)}`,
 				});
 			} else {
 				logger.error({
@@ -122,25 +123,9 @@ export async function grabArrId(
 			if (!isEmptyObject(arrJson)) {
 				logger.info({
 					label: Label.RADARR_API,
-					message: `${chalk.cyan("Found movie")} -> ${
-						arrJson.tvdbId
-							? `${chalk.yellow("TVDB")}: ${chalk.white(
-									arrJson.tvdbId
-							  )} `
-							: ""
-					}${
-						arrJson.tmdbId
-							? `${chalk.yellow("TMDB")}: ${chalk.white(
-									arrJson.tmdbId
-							  )} `
-							: ""
-					}${
-						arrJson.imdbId
-							? `${chalk.yellow("IMDB")}: ${chalk.white(
-									arrJson.imdbId
-							  )}`
-							: ""
-					}`,
+					message: `${chalk.cyan("Found movie")} -> ${formatFoundIds(
+						arrJson
+					)}`,
 				});
 			} else {
 				logger.error({
