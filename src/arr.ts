@@ -113,14 +113,14 @@ export async function grabArrId(
 			if (Object.keys(arrJson).length > 0) {
 				logger.info({
 					label: Label.SONARR,
-					message: `${chalk.cyan("Found series")} -> ${formatFoundIds(
-						arrJson
-					)}`,
+					message: `Found series ${chalk.green.bold(
+						searchTerm
+					)} -> ${formatFoundIds(arrJson)}`,
 				});
 			} else {
 				logger.verbose({
 					label: Label.SONARR,
-					message: `Lookup for ${chalk.yellow(searchTerm)} failed.`,
+					message: `Lookup failed for ${chalk.yellow(searchTerm)}`,
 				});
 				logger.verbose({
 					label: Label.SONARR,
@@ -150,14 +150,14 @@ export async function grabArrId(
 			if (Object.keys(arrJson).length > 0) {
 				logger.info({
 					label: Label.RADARR,
-					message: `${chalk.cyan("Found movie")} -> ${formatFoundIds(
-						arrJson
-					)}`,
+					message: `Found movie ${chalk.green.bold(
+						searchTerm
+					)} -> ${formatFoundIds(arrJson)}`,
 				});
 			} else {
 				logger.verbose({
 					label: Label.RADARR,
-					message: `Lookup for ${chalk.yellow(searchTerm)} failed.`,
+					message: `Lookup failed for ${chalk.yellow(searchTerm)}`,
 				});
 				logger.verbose({
 					label: Label.RADARR,
