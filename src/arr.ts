@@ -1,4 +1,4 @@
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { MediaType } from "./utils.js";
@@ -26,7 +26,7 @@ async function fetchArrJSON(
 		logger.warn(
 			`unable to lookup corresponding id for ${searchterm}: Status Code -> ${response.status} `
 		);
-		throw new Error(`HTTP error! Status: ${response.status}`);
+		throw new Error(`${response.status}`);
 	}
 	const arrJson = (await response.json()) as ArrJson;
 	if (mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON) {
@@ -67,34 +67,37 @@ export async function grabArrId(
 				mediaType
 			)) as idData;
 			if (!isEmptyObject(arrJson)) {
-				logger.info(
-					`[sonarr-api] ${chalk.cyan(
-						"Found movie"
-					)} -> ${chalk.yellow("TVDB")}: ${chalk.white(
-						arrJson.tvdbId
-					)} ${chalk.yellow("IMDB")}: ${chalk.white(
-						arrJson.imdbId
-					)} ${chalk.yellow("TMDB")}: ${chalk.white(arrJson.tmdbId)}`
-				);
+				logger.info({
+					label: Label.SONARR_API,
+					message: `${chalk.cyan("Found movie")} -> ${chalk.yellow(
+						"TVDB"
+					)}: ${chalk.white(arrJson.tvdbId)} ${chalk.yellow(
+						"IMDB"
+					)}: ${chalk.white(arrJson.imdbId)} ${chalk.yellow(
+						"TMDB"
+					)}: ${chalk.white(arrJson.tmdbId)}`,
+				});
 			} else {
-				logger.error(
-					`[sonarr-api] Lookup for ${chalk.yellow(
-						searchterm
-					)} failed.`
-				);
-				logger.warn(
-					`[sonarr-api] Make sure the series is added to Sonarr.`
-				);
+				logger.error({
+					label: Label.SONARR_API,
+					message: `Lookup for ${chalk.yellow(searchterm)} failed.`,
+				});
+				logger.warn({
+					label: Label.SONARR_API,
+					message: `Make sure the series is added to Sonarr.`,
+				});
 			}
 			return resultOf(arrJson);
 		} catch (error) {
-			logger.error(
-				`[sonarr-api] Failed to lookup IDs for ${chalk.yellow(
+			logger.error({
+				label: Label.SONARR_API,
+				message: `Failed to lookup IDs for ${chalk.yellow(
 					searchterm
 				)} - (${chalk.red(
 					String(error).split(":").slice(1)[0].trim()
-				)})`
-			);
+				)})`,
+			});
+			logger.debug(error);
 			return resultOfErr(false);
 		}
 	} else if (mediaType === MediaType.MOVIE) {
@@ -105,32 +108,35 @@ export async function grabArrId(
 				mediaType
 			)) as idData;
 			if (!isEmptyObject(arrJson)) {
-				logger.info(
-					`[radarr-api] ${chalk.cyan(
-						"Found movie"
-					)} -> ${chalk.yellow("IMDB")}: ${chalk.white(
-						arrJson.imdbId
-					)} ${chalk.yellow("TMDB")}: ${chalk.white(arrJson.tmdbId)}`
-				);
+				logger.info({
+					label: Label.RADARR_API,
+					message: `${chalk.cyan("Found movie")} -> ${chalk.yellow(
+						"IMDB"
+					)}: ${chalk.white(arrJson.imdbId)} ${chalk.yellow(
+						"TMDB"
+					)}: ${chalk.white(arrJson.tmdbId)}`,
+				});
 			} else {
-				logger.error(
-					`[radarr-api] Lookup for ${chalk.yellow(
-						searchterm
-					)} failed.`
-				);
-				logger.warn(
-					`[radarr-api] Make sure the movie is added to Radarr.`
-				);
+				logger.error({
+					label: Label.RADARR_API,
+					message: `Lookup for ${chalk.yellow(searchterm)} failed.`,
+				});
+				logger.warn({
+					label: Label.RADARR_API,
+					message: `Make sure the movie is added to Radarr.`,
+				});
 			}
 			return resultOf(arrJson);
 		} catch (error) {
-			logger.error(
-				`[radarr-api]  Failed to lookup IDs for ${chalk.yellow(
+			logger.error({
+				label: Label.RADARR_API,
+				message: `Failed to lookup IDs for ${chalk.yellow(
 					searchterm
 				)} - (${chalk.red(
 					String(error).split(":").slice(1)[0].trim()
-				)})`
-			);
+				)})`,
+			});
+			logger.debug(error);
 			return resultOfErr(false);
 		}
 	} else {
