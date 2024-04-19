@@ -113,7 +113,7 @@ export async function grabArrId(
 			if (Object.keys(arrJson).length > 0) {
 				logger.info({
 					label: Label.SONARR,
-					message: `Found series ${chalk.green.bold(
+					message: `Found series for ${chalk.green.bold(
 						searchTerm
 					)} -> ${formatFoundIds(arrJson)}`,
 				});
@@ -150,7 +150,7 @@ export async function grabArrId(
 			if (Object.keys(arrJson).length > 0) {
 				logger.info({
 					label: Label.RADARR,
-					message: `Found movie ${chalk.green.bold(
+					message: `Found movie for ${chalk.green.bold(
 						searchTerm
 					)} -> ${formatFoundIds(arrJson)}`,
 				});
