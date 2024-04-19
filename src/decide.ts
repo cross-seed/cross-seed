@@ -28,13 +28,19 @@ export interface ResultAssessment {
 
 const createReasonLogger =
 	(Title: string, tracker: string, name: string) =>
-	(decision: Decision, cached, note: string = ""): void => {
+	(
+		decision: Decision,
+		cached,
+		searchee: Searchee,
+		candidate: Candidate
+	): void => {
 		function logReason(reason): void {
 			logger.verbose({
 				label: Label.DECIDE,
-				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}${note}`,
+				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}`,
 			});
 		}
+
 		let reason;
 		switch (decision) {
 			case Decision.MATCH_PARTIAL:
@@ -44,7 +50,9 @@ const createReasonLogger =
 			case Decision.MATCH:
 				return;
 			case Decision.SIZE_MISMATCH:
-				reason = "its size does not match";
+				reason = `its size does not match - (${humanReadableSize(
+					searchee.length
+				)} -> ${humanReadableSize(candidate.size)})`;
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
@@ -62,10 +70,17 @@ const createReasonLogger =
 				reason = "it has a different file tree";
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
-				reason = "it has a different release group";
+				reason = `it has a different release group - (${searchee.name
+					.match(RELEASE_GROUP_REGEX)?.[0]
+					?.trim()} -> ${candidate.name
+					.match(RELEASE_GROUP_REGEX)?.[0]
+					?.trim()})`;
 				break;
 			case Decision.BLOCKED_RELEASE:
-				reason = "it matches the blocklist";
+				reason = `it matches the blocklist - ("${releaseInBlockList(
+					searchee,
+					getRuntimeConfig().blockList
+				)}")`;
 				break;
 			default:
 				reason = decision;
@@ -307,29 +322,6 @@ async function assessAndSaveResults(
 	return assessment;
 }
 
-function makeDecisionNote(
-	decision: Decision,
-	searchee: Searchee,
-	candidate: Candidate
-): string {
-	const { blockList } = getRuntimeConfig();
-	switch (decision) {
-		case Decision.SIZE_MISMATCH:
-			return ` - (${humanReadableSize(
-				searchee.length
-			)} -> ${humanReadableSize(candidate.size)})`;
-		case Decision.RELEASE_GROUP_MISMATCH:
-			return ` - (${searchee.name
-				.match(RELEASE_GROUP_REGEX)?.[0]
-				?.trim()} -> ${candidate.name
-				.match(RELEASE_GROUP_REGEX)?.[0]
-				?.trim()})`;
-		case Decision.BLOCKED_RELEASE:
-			return ` - ("${releaseInBlockList(searchee, blockList)}")`;
-		default:
-			return "";
-	}
-}
 async function assessCandidateCaching(
 	candidate: Candidate,
 	searchee: Searchee,
@@ -360,11 +352,7 @@ async function assessCandidateCaching(
 			guid,
 			infoHashesToExclude,
 		);
-		logReason(
-			assessment.decision,
-			false,
-			makeDecisionNote(assessment.decision, searchee, candidate)
-		);
+		logReason(assessment.decision, false, searchee, candidate);
 	} else if (
 		(cacheEntry.decision === Decision.MATCH ||
 			cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
@@ -398,11 +386,11 @@ async function assessCandidateCaching(
 			guid,
 			infoHashesToExclude,
 		);
-		logReason(assessment.decision, false);
+		logReason(assessment.decision, false, searchee, candidate);
 	} else {
 		// cached rejection
 		assessment = { decision: cacheEntry.decision };
-		logReason(cacheEntry.decision, true);
+		logReason(cacheEntry.decision, true, searchee, candidate);
 	}
 	// if previously known
 	if (cacheEntry) {
