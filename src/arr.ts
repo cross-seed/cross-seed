@@ -51,16 +51,28 @@ async function fetchArrJSON(
 	if (!response.ok) {
 		throw new Error(`${response.status}`);
 	}
+
 	const arrJson = (await response.json()) as ParseResponse;
+	if (!arrJson) {
+		return {};
+	}
 	const ids =
 		mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
 			? arrJson?.series
 			: arrJson?.movie;
-	return {
-		imdbId: ids?.imdbId,
-		tmdbId: ids?.tmdbId,
-		tvdbId: ids?.tvdbId,
-	};
+	const keyNames = ["imdbId", "tmdbId", "tvdbId"];
+
+	const x: { [key: string]: string } = Object.fromEntries(
+		keyNames
+			.map((key) => {
+				const arrIds = ids?.[key] as string;
+				return arrIds !== undefined && arrIds !== ""
+					? [key, arrIds]
+					: undefined;
+			})
+			.filter((entry) => entry !== undefined) as [string, string][]
+	);
+	return x;
 }
 
 export async function grabArrId(
