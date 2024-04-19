@@ -2,8 +2,8 @@ import Knex from "knex";
 
 async function up(knex: Knex.Knex): Promise<void> {
 	await knex.schema.alterTable("indexer", (table) => {
-		table.text("tv_id_caps");
-		table.text("movie_id_caps");
+		table.json("tv_id_caps");
+		table.json("movie_id_caps");
 	});
 }
 

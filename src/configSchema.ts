@@ -184,8 +184,8 @@ export const VALIDATION_SCHEMA = z
 			.nullish()
 			.transform((value) => (Array.isArray(value) ? value : [])),
 		apiKey: z.string().min(24).nullish(),
-		radarrApi: z.string().url().nullish(),
-		sonarrApi: z.string().url().nullish(),
+		radarr: z.string().url().nullish(),
+		sonarr: z.string().url().nullish(),
 	})
 	.strict()
 	.refine((config) => {
