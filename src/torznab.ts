@@ -30,7 +30,7 @@ import {
 import { grabArrId } from "./arr.js";
 
 interface TorznabParams {
-	t: "caps" | "search" | "tvsearch" | "movie";
+	t?: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
 	apikey?: string;
@@ -158,51 +158,82 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 		tvIdSearch: tvCaps,
 	};
 }
-
-async function getTorznabSearchId(
-	caps: Caps,
-	title: string,
-	mediaType: MediaType
-): Promise<object> {
+async function getRelevantArrIds(
+	title,
+	ids: TorznabParams,
+	caps: Caps
+): Promise<TorznabParams> {
+	const nameWithoutExtension = stripExtension(title);
+	const mediaType = getTag(nameWithoutExtension);
+	return mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
+		? {
+				tvdbid:
+					caps.tvIdSearch.tvdbId && ids.tvdbid
+						? ids.tvdbid
+						: undefined,
+				tmdbid:
+					caps.tvIdSearch.tmdbId && ids.tmdbid
+						? ids.tmdbid
+						: undefined,
+				imdbid:
+					caps.tvIdSearch.tvdbId && ids.imdbid
+						? ids.imdbid
+						: undefined,
+		  }
+		: mediaType === MediaType.MOVIE
+		? {
+				tvdbid:
+					caps.movieIdSearch.tvdbId && ids.tvdbid
+						? ids.tvdbid
+						: undefined,
+				tmdbid:
+					caps.movieIdSearch.tmdbId && ids.tmdbid
+						? ids.tmdbid
+						: undefined,
+				imdbid:
+					caps.movieIdSearch.imdbId && ids.imdbid
+						? ids.imdbid
+						: undefined,
+		  }
+		: {};
+}
+async function getAvailableArrIds(title: string): Promise<TorznabParams> {
+	const nameWithoutExtension = stripExtension(title);
+	const mediaType = getTag(nameWithoutExtension);
 	try {
 		const arrIdData = (await grabArrId(title, mediaType)).unwrapOrThrow();
-
 		return mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
 			? {
 					tvdbid:
-						caps.tvIdSearch.tvdbId && typeof arrIdData !== "boolean"
+						typeof arrIdData !== "boolean"
 							? arrIdData.tvdbId
 							: undefined,
 					tmdbid:
-						caps.tvIdSearch.tmdbId && typeof arrIdData !== "boolean"
+						typeof arrIdData !== "boolean"
 							? arrIdData.tmdbId
 							: undefined,
 					imdbid:
-						caps.tvIdSearch.imdbId && typeof arrIdData !== "boolean"
+						typeof arrIdData !== "boolean"
 							? arrIdData.imdbId
 							: undefined,
 			  }
 			: mediaType === MediaType.MOVIE
 			? {
 					tvdbid:
-						caps.movieIdSearch.tvdbId &&
 						typeof arrIdData !== "boolean"
 							? arrIdData.tvdbId
 							: undefined,
 					tmdbid:
-						caps.movieIdSearch.tmdbId &&
 						typeof arrIdData !== "boolean"
 							? arrIdData.tmdbId
 							: undefined,
 					imdbid:
-						caps.movieIdSearch.imdbId &&
 						typeof arrIdData !== "boolean"
 							? arrIdData.imdbId
 							: undefined,
 			  }
 			: {};
 	} catch (e) {
-		logger.error(`failed to grab arr id data for ${title}`);
 		return {};
 	}
 }
@@ -325,11 +356,12 @@ export async function searchTorznab(
 				? timestampCallout
 				: ""
 		}`,
-	});
+	});	const arrIds = await getAvailableArrIds(name);
+
 	return await makeRequests(
 		indexersToUse,
 		async (indexer) =>
-			await createTorznabSearchQueries(searchee, {
+			await createTorznabSearchQueries(searchee, arrIds {
 				search: indexer.searchCap,
 				tvSearch: indexer.tvSearchCap,
 				movieSearch: indexer.movieSearchCap,
@@ -337,6 +369,7 @@ export async function searchTorznab(
 				movieIdSearch: JSON.parse(indexer.movieIdCaps),
 			})
 	);
+	
 }
 
 export async function syncWithDb() {
