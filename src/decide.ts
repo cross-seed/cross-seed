@@ -194,7 +194,7 @@ function releaseGroupDoesMatch(
 }
 
 async function assessCandidateHelper(
-	{ link, size, name }: Candidate,
+	{ link, size, name, tracker }: Candidate,
 	searchee: Searchee,
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
@@ -212,7 +212,7 @@ async function assessCandidateHelper(
 	if (!releaseGroupDoesMatch(searchee.name, name, matchMode))
 		return { decision: Decision.RELEASE_GROUP_MISMATCH };
 
-	const result = await parseTorrentFromURL(link);
+	const result = await parseTorrentFromURL(link, tracker);
 
 	if (result.isErr()) {
 		return result.unwrapErrOrThrow() === SnatchError.RATE_LIMITED
