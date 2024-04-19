@@ -69,7 +69,7 @@ export async function grabArrId(
 			if (!isEmptyObject(arrJson)) {
 				logger.info({
 					label: Label.SONARR_API,
-					message: `${chalk.cyan("Found movie")} -> ${chalk.yellow(
+					message: `${chalk.cyan("Found series")} -> ${chalk.yellow(
 						"TVDB"
 					)}: ${chalk.white(arrJson.tvdbId)} ${chalk.yellow(
 						"IMDB"
