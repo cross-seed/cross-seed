@@ -316,9 +316,8 @@ function makeDecisionNote(
 	switch (decision) {
 		case Decision.SIZE_MISMATCH:
 			return ` - (${humanReadableSize(
-				searchee.length,
-				2
-			)} -> ${humanReadableSize(candidate.size, 2)})`;
+				searchee.length
+			)} -> ${humanReadableSize(candidate.size)})`;
 		case Decision.RELEASE_GROUP_MISMATCH:
 			return ` - (${searchee.name
 				.match(RELEASE_GROUP_REGEX)?.[0]

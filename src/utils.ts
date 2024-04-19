@@ -40,7 +40,7 @@ export function wait(n: number): Promise<void> {
 }
 export function humanReadableSize(
 	bytes: number,
-	dm: number,
+	dm: number = 2,
 	ibi: boolean = false
 ) {
 	const k = ibi ? 1024 : 1000;
