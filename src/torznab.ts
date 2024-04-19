@@ -19,7 +19,10 @@ import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee, hasVideo } from "./searchee.js";
 import {
+<<<<<<< HEAD
 	getAnimeQueries,
+=======
+>>>>>>> ffabaf1 (cleanup(torznab): housekeeping)
 	cleanseSeparators,
 	getTag,
 	MediaType,
@@ -249,50 +252,42 @@ async function createTorznabSearchQueries(
 	const mediaType = getTag(nameWithoutExtension, isVideo);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
-		const cleansedTitle = cleanseSeparators(match!.groups!.title);
-		const ids = await getTorznabSearchId(caps, cleansedTitle, mediaType);
-		return [
-			{
-				t: "tvsearch",
-				q: Object.keys(ids).length === 0 ? cleansedTitle : undefined,
-				season: match!.groups!.season
-					? extractNumber(match!.groups!.season)
-					: match!.groups!.year,
-				ep: match!.groups!.episode
-					? extractNumber(match!.groups!.episode)
-					: `${match!.groups!.month}/${match!.groups!.day}`,
-				...ids,
-			},
-		] as const;
+		return {
+			t: "tvsearch",
+			q: isEmptyObject(ids)
+				? cleanseSeparators(match!.groups!.title)
+				: undefined,
+			season: match!.groups!.season
+				? extractNumber(match!.groups!.season)
+				: match!.groups!.year,
+			ep: match!.groups!.episode
+				? extractNumber(match!.groups!.episode)
+				: `${match!.groups!.month}/${match!.groups!.day}`,
+			...ids,
+		} as const;
 	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
-		const cleansedTitle = cleanseSeparators(match!.groups!.title);
-		const ids = await getTorznabSearchId(caps, cleansedTitle, mediaType);
-		return [
-			{
-				t: "tvsearch",
-				q: Object.keys(ids).length === 0 ? cleansedTitle : undefined,
-				season: extractNumber(match!.groups!.season),
-				...ids,
-			},
-		] as const;
+		return {
+			t: "tvsearch",
+			q: isEmptyObject(ids)
+				? cleanseSeparators(match!.groups!.title)
+				: undefined,
+			season: extractNumber(match!.groups!.season),
+			...ids,
+		} as const;
 	} else if (mediaType === MediaType.MOVIE) {
-		const match = nameWithoutExtension.match(MOVIE_REGEX);
-		const cleansedTitle = cleanseSeparators(match!.groups!.title);
-		const ids = await getTorznabSearchId(caps, cleansedTitle, mediaType);
-		return [
-			{
-				t: "movie",
-				q: Object.keys(ids).length === 0 ? cleansedTitle : undefined,
-				...ids,
-			},
-		] as const;
-	} else if (mediaType === MediaType.ANIME) {
-		const animeQueries = getAnimeQueries(nameWithoutExtension);
-		return animeQueries.map((animeQuery) => ({
+		return {
+			t: "movie",
+			q: isEmptyObject(ids)
+				? reformatTitleForSearching(nameWithoutExtension)
+				: undefined,
+			...ids,
+		} as const;
+	} else {
+		return {
 			t: "search",
 			q: animeQuery,
-		}));
+		};
 	} else {
 		return [
 			{
@@ -459,11 +454,11 @@ export async function syncWithDb() {
 	});
 }
 
-async function assembleUrl(
+function assembleUrl(
 	urlStr: string,
 	apikey: string,
 	params: TorznabParams
-): Promise<string> {
+): string {
 	const url = new URL(urlStr);
 	const searchParams = new URLSearchParams();
 
@@ -485,7 +480,7 @@ async function fetchCaps(indexer: {
 	let response;
 	try {
 		response = await fetch(
-			await assembleUrl(indexer.url, indexer.apikey, { t: "caps" })
+			assembleUrl(indexer.url, indexer.apikey, { t: "caps" })
 		);
 	} catch (e) {
 		const error = new Error(
