@@ -606,3 +606,4 @@ async function makeRequests(
 		candidates: results,
 	}));
 }
+export { sanitizeUrl, getApikey };

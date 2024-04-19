@@ -1,8 +1,6 @@
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
-import { MediaType } from "./utils.js";
-import { getApikey, sanitizeUrl } from "./torznab.js";
 import {
 	assembleUrl,
 	getApikey,
