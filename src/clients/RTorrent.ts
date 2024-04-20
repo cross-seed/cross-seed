@@ -1,16 +1,19 @@
-import { promises as fs, Stats } from "fs";
+import type { Stats } from "fs";
+import { stat, unlink, writeFile } from "fs/promises";
 import { dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
-import { InjectionResult } from "../constants.js";
+import { Decision, InjectionResult, TORRENT_TAG } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { File, Searchee } from "../searchee.js";
+import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { extractCredentialsFromUrl, wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
+
+const COULD_NOT_FIND_INFO_HASH = "Could not find info-hash.";
 
 interface LibTorrentResumeFileEntry {
 	completed: number;
@@ -33,12 +36,14 @@ interface DownloadLocation {
 	downloadDir: string;
 }
 
+type Fault = { faultCode: number; faultString: string };
+
 async function createLibTorrentResumeTree(
 	meta: Metafile,
-	basePath: string
+	basePath: string,
 ): Promise<LibTorrentResume> {
 	async function getFileResumeData(
-		file: File
+		file: File,
 	): Promise<LibTorrentResumeFileEntry> {
 		const filePathWithoutFirstSegment = file.path
 			.split(sep)
@@ -46,9 +51,9 @@ async function createLibTorrentResumeTree(
 			.join(sep);
 
 		const resolvedFilePath = resolve(basePath, filePathWithoutFirstSegment);
-		const fileStat = await fs
-			.stat(resolvedFilePath)
-			.catch(() => ({ isFile: () => false } as Stats));
+		const fileStat = await stat(resolvedFilePath).catch(
+			() => ({ isFile: () => false }) as Stats,
+		);
 		if (!fileStat.isFile() || fileStat.size !== file.length) {
 			logger.debug({
 				label: Label.RTORRENT,
@@ -71,7 +76,7 @@ async function createLibTorrentResumeTree(
 	return {
 		bitfield: Math.ceil(meta.length / meta.pieceLength),
 		files: await Promise.all<LibTorrentResumeFileEntry>(
-			meta.files.map(getFileResumeData)
+			meta.files.map(getFileResumeData),
 		),
 	};
 }
@@ -79,16 +84,13 @@ async function createLibTorrentResumeTree(
 async function saveWithLibTorrentResume(
 	meta: Metafile,
 	savePath: string,
-	basePath: string
+	basePath: string,
 ): Promise<void> {
 	const rawWithLibtorrentResume = {
 		...meta.raw,
 		libtorrent_resume: await createLibTorrentResumeTree(meta, basePath),
 	};
-	await fs.writeFile(
-		savePath,
-		new Metafile(rawWithLibtorrentResume).encode()
-	);
+	await writeFile(savePath, new Metafile(rawWithLibtorrentResume).encode());
 }
 
 export default class RTorrent implements TorrentClient {
@@ -97,9 +99,9 @@ export default class RTorrent implements TorrentClient {
 		const { rtorrentRpcUrl } = getRuntimeConfig();
 
 		const { href, username, password } = extractCredentialsFromUrl(
-			rtorrentRpcUrl
+			rtorrentRpcUrl,
 		).unwrapOrThrow(
-			new CrossSeedError("rTorrent url must be percent-encoded")
+			new CrossSeedError("rTorrent url must be percent-encoded"),
 		);
 
 		const clientCreator =
@@ -136,24 +138,27 @@ export default class RTorrent implements TorrentClient {
 	async checkForInfoHashInClient(infoHash: string): Promise<boolean> {
 		const downloadList = await this.methodCallP<string[]>(
 			"download_list",
-			[]
+			[],
 		);
 		return downloadList.includes(infoHash.toUpperCase());
 	}
 
 	private async checkOriginalTorrent(
-		searchee: Searchee
+		searchee: SearcheeWithInfoHash,
 	): Promise<
 		Result<
-			{ directoryBase: string },
-			InjectionResult.FAILURE | InjectionResult.TORRENT_NOT_COMPLETE
+			{ directoryBase: string; isMultiFile: boolean },
+			"FAILURE" | "TORRENT_NOT_COMPLETE" | "NOT_FOUND"
 		>
 	> {
 		const infoHash = searchee.infoHash.toUpperCase();
-		type ReturnType = [[string], ["0" | "1"]];
-		let result;
+		type ReturnType =
+			| [[string], ["0" | "1"], ["0" | "1"]]
+			| [Fault, Fault, Fault];
+
+		let response: ReturnType;
 		try {
-			result = await this.methodCallP<ReturnType>("system.multicall", [
+			response = await this.methodCallP<ReturnType>("system.multicall", [
 				[
 					{
 						methodName: "d.directory",
@@ -163,37 +168,59 @@ export default class RTorrent implements TorrentClient {
 						methodName: "d.complete",
 						params: [infoHash],
 					},
+					{
+						methodName: "d.is_multi_file",
+						params: [infoHash],
+					},
 				],
 			]);
 		} catch (e) {
 			logger.debug(e);
-			return resultOfErr(InjectionResult.FAILURE);
+			return resultOfErr("FAILURE");
 		}
 
-		// temp diag for #154
+		function isFault(
+			response: ReturnType,
+		): response is [Fault, Fault, Fault] {
+			return "faultString" in response[0];
+		}
+
 		try {
-			const [[directoryBase], [isCompleteStr]] = result;
+			if (isFault(response)) {
+				if (response[0].faultString === COULD_NOT_FIND_INFO_HASH) {
+					return resultOfErr("NOT_FOUND");
+				} else {
+					throw new Error(
+						"Unknown rTorrent fault while checking original torrent",
+					);
+				}
+			}
+			const [[directoryBase], [isCompleteStr], [isMultiFileStr]] =
+				response;
 			const isComplete = Boolean(Number(isCompleteStr));
 			if (!isComplete) {
-				return resultOfErr(InjectionResult.TORRENT_NOT_COMPLETE);
+				return resultOfErr("TORRENT_NOT_COMPLETE");
 			}
-			return resultOf({ directoryBase });
+			return resultOf({
+				directoryBase,
+				isMultiFile: Boolean(Number(isMultiFileStr)),
+			});
 		} catch (e) {
 			logger.error(e);
 			logger.debug("Failure caused by server response below:");
-			logger.debug(inspect(result));
-			return resultOfErr(InjectionResult.FAILURE);
+			logger.debug(inspect(response));
+			return resultOfErr("FAILURE");
 		}
 	}
 
 	private async getDownloadLocation(
 		meta: Metafile,
 		searchee: Searchee,
-		path?: string
+		path?: string,
 	): Promise<
 		Result<
 			DownloadLocation,
-			InjectionResult.FAILURE | InjectionResult.TORRENT_NOT_COMPLETE
+			"NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "FAILURE"
 		>
 	> {
 		if (path) {
@@ -201,7 +228,9 @@ export default class RTorrent implements TorrentClient {
 			const directoryBase = meta.isSingleFileTorrent ? path : basePath;
 			return resultOf({ downloadDir: path, basePath, directoryBase });
 		} else {
-			const result = await this.checkOriginalTorrent(searchee);
+			const result = await this.checkOriginalTorrent(
+				searchee as SearcheeWithInfoHash,
+			);
 			return result.mapOk(({ directoryBase }) => ({
 				directoryBase,
 				downloadDir: meta.isSingleFileTorrent
@@ -224,40 +253,75 @@ export default class RTorrent implements TorrentClient {
 		} catch (e) {
 			logger.debug(e);
 			throw new CrossSeedError(
-				`Failed to reach rTorrent at ${rtorrentRpcUrl}`
+				`Failed to reach rTorrent at ${rtorrentRpcUrl}`,
 			);
 		}
+	}
+
+	async getDownloadDir(
+		searchee: Searchee,
+	): Promise<
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
+	> {
+		const result = await this.checkOriginalTorrent(
+			searchee as SearcheeWithInfoHash,
+		);
+		return result
+			.mapOk(({ directoryBase, isMultiFile }) => {
+				return isMultiFile ? dirname(directoryBase) : directoryBase;
+			})
+			.mapErr((error) => (error === "FAILURE" ? "UNKNOWN_ERROR" : error));
 	}
 
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,
-		path?: string
+		decision:
+			| Decision.MATCH
+			| Decision.MATCH_SIZE_ONLY
+			| Decision.MATCH_PARTIAL,
+		path?: string,
 	): Promise<InjectionResult> {
-		const { outputDir } = getRuntimeConfig();
+		const { outputDir, skipRecheck } = getRuntimeConfig();
 
 		if (await this.checkForInfoHashInClient(meta.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
 
 		const result = await this.getDownloadLocation(meta, searchee, path);
-		if (result.isErr()) return result.unwrapErrOrThrow();
+		if (result.isErr()) {
+			switch (result.unwrapErrOrThrow()) {
+				case "NOT_FOUND":
+					return InjectionResult.FAILURE;
+				case "TORRENT_NOT_COMPLETE":
+					return InjectionResult.TORRENT_NOT_COMPLETE;
+				case "FAILURE":
+					return InjectionResult.FAILURE;
+			}
+		}
 		const { directoryBase, basePath } = result.unwrapOrThrow();
 
 		const torrentFilePath = resolve(
 			outputDir,
-			`${meta.name}.tmp.${Date.now()}.torrent`
+			`${meta.name}.tmp.${Date.now()}.torrent`,
 		);
 
 		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
 
+		const loadType =
+			decision === Decision.MATCH_PARTIAL
+				? skipRecheck
+					? "load.start"
+					: "load"
+				: "load.start";
+
 		for (let i = 0; i < 5; i++) {
 			try {
-				await this.methodCallP<void>("load.start", [
+				await this.methodCallP<void>(loadType, [
 					"",
 					torrentFilePath,
 					`d.directory_base.set="${directoryBase}"`,
-					`d.custom1.set="cross-seed"`,
+					`d.custom1.set="${TORRENT_TAG}"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
 				]);
 				break;
@@ -268,12 +332,12 @@ export default class RTorrent implements TorrentClient {
 
 		for (let i = 0; i < 5; i++) {
 			if (await this.checkForInfoHashInClient(meta.infoHash)) {
-				setTimeout(() => fs.unlink(torrentFilePath), 1000);
+				setTimeout(() => unlink(torrentFilePath), 1000);
 				return InjectionResult.SUCCESS;
 			}
 			await wait(100 * Math.pow(2, i));
 		}
-		setTimeout(() => fs.unlink(torrentFilePath), 1000);
+		setTimeout(() => unlink(torrentFilePath), 1000);
 		return InjectionResult.FAILURE;
 	}
 }

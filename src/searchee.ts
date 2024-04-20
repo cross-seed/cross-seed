@@ -1,9 +1,11 @@
 import { readdirSync, statSync } from "fs";
-import { basename, join, relative } from "path";
+import { basename, extname, join, relative } from "path";
+import { VIDEO_EXTENSIONS } from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { parseTorrentFromFilename } from "./torrent.js";
+import { WithRequired } from "./utils.js";
 
 export interface File {
 	length: number;
@@ -12,11 +14,27 @@ export interface File {
 }
 
 export interface Searchee {
-	infoHash?: string; // if searchee is torrent based
-	path?: string; // if searchee is data based
+	// if searchee is torrent based
+	infoHash?: string;
+	// if searchee is data based
+	path?: string;
 	files: File[];
 	name: string;
 	length: number;
+}
+
+export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
+
+export function hasInfoHash(
+	searchee: Searchee,
+): searchee is SearcheeWithInfoHash {
+	return searchee.infoHash != null;
+}
+
+export function hasVideo(searchee: Searchee): boolean {
+	return searchee.files.some((file) =>
+		VIDEO_EXTENSIONS.includes(extname(file.name)),
+	);
 }
 
 function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {
@@ -26,8 +44,8 @@ function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {
 		return readdirSync(root, { withFileTypes: true }).flatMap((dirent) =>
 			getFileNamesFromRootRec(
 				join(root, dirent.name),
-				dirent.isDirectory()
-			)
+				dirent.isDirectory(),
+			),
 		);
 	} else {
 		return [root];
@@ -53,7 +71,7 @@ export function createSearcheeFromMetafile(meta: Metafile): Searchee {
 }
 
 export async function createSearcheeFromTorrentFile(
-	filepath: string
+	filepath: string,
 ): Promise<Result<Searchee, Error>> {
 	try {
 		const meta = await parseTorrentFromFilename(filepath);
@@ -66,11 +84,11 @@ export async function createSearcheeFromTorrentFile(
 }
 
 export async function createSearcheeFromPath(
-	filepath: string
+	filepath: string,
 ): Promise<Result<Searchee, Error>> {
 	const totalLength = getFilesFromDataRoot(filepath).reduce<number>(
 		(runningTotal, file) => runningTotal + file.length,
-		0
+		0,
 	);
 	return resultOf({
 		files: getFilesFromDataRoot(filepath),

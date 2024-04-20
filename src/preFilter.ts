@@ -6,18 +6,27 @@ import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { humanReadable, nMsAgo } from "./utils.js";
+import { humanReadableDate, nMsAgo } from "./utils.js";
 import path from "path";
 
 export function filterByContent(searchee: Searchee): boolean {
-	const { includeEpisodes, includeNonVideos, includeSingleEpisodes } =
-		getRuntimeConfig();
+	const {
+		includeEpisodes,
+		includeNonVideos,
+		includeSingleEpisodes,
+		blockList,
+	} = getRuntimeConfig();
 
 	function logReason(reason): void {
 		logger.verbose({
 			label: Label.PREFILTER,
 			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
 		});
+	}
+	const blockedNote = findBlockedStringInReleaseMaybe(searchee, blockList);
+	if (blockedNote) {
+		logReason(`it matched the blocklist - ("${blockedNote}")`);
+		return false;
 	}
 
 	const isSingleEpisodeTorrent =
@@ -42,7 +51,7 @@ export function filterByContent(searchee: Searchee): boolean {
 		return false;
 	}
 	const allFilesAreVideos = searchee.files.every((file) =>
-		VIDEO_EXTENSIONS.includes(extname(file.name))
+		VIDEO_EXTENSIONS.includes(extname(file.name)),
 	);
 
 	if (!includeNonVideos && !allFilesAreVideos) {
@@ -51,6 +60,18 @@ export function filterByContent(searchee: Searchee): boolean {
 	}
 
 	return true;
+}
+
+export function findBlockedStringInReleaseMaybe(
+	searchee: Searchee,
+	blockList: string[],
+): string | undefined {
+	return blockList.find((blockedStr) => {
+		return (
+			searchee.name.includes(blockedStr) ||
+			blockedStr === searchee.infoHash
+		);
+	});
 }
 
 export function filterDupes(searchees: Searchee[]): Searchee[] {
@@ -75,10 +96,15 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 	return filtered;
 }
 
+type TimestampDataSql = {
+	first_searched_any: number;
+	last_searched_all: number;
+};
+
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const enabledIndexers = await getEnabledIndexers();
-	const timestampDataSql = await db("searchee")
+	const timestampDataSql: TimestampDataSql = (await db("searchee")
 		// @ts-expect-error crossJoin supports string
 		.crossJoin("indexer")
 		.leftOuterJoin("timestamp", {
@@ -88,17 +114,17 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		.where("searchee.name", searchee.name)
 		.whereIn(
 			"indexer.id",
-			enabledIndexers.map((i) => i.id)
+			enabledIndexers.map((i) => i.id),
 		)
 		.min({
 			first_searched_any: db.raw(
-				"coalesce(timestamp.first_searched, 9223372036854775807)"
+				"coalesce(timestamp.first_searched, 9223372036854775807)",
 			),
 		})
 		.min({
 			last_searched_all: db.raw("coalesce(timestamp.last_searched, 0)"),
 		})
-		.first();
+		.first()) as TimestampDataSql;
 
 	const { first_searched_any, last_searched_all } = timestampDataSql;
 	function logReason(reason) {
@@ -114,9 +140,9 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		first_searched_any < nMsAgo(excludeOlder)
 	) {
 		logReason(
-			`its first search timestamp ${humanReadable(
-				first_searched_any
-			)} is older than ${ms(excludeOlder, { long: true })} ago`
+			`its first search timestamp ${humanReadableDate(
+				first_searched_any,
+			)} is older than ${ms(excludeOlder, { long: true })} ago`,
 		);
 		return false;
 	}
@@ -127,9 +153,9 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		last_searched_all > nMsAgo(excludeRecentSearch)
 	) {
 		logReason(
-			`its last search timestamp ${humanReadable(
-				last_searched_all
-			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`
+			`its last search timestamp ${humanReadableDate(
+				last_searched_all,
+			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`,
 		);
 		return false;
 	}

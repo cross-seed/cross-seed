@@ -1,10 +1,10 @@
-import { fileFrom } from "fetch-blob/from.js";
-import { FormData } from "formdata-polyfill/esm.min.js";
-import { unlink, writeFile } from "fs/promises";
-import fetch, { BodyInit, Response } from "node-fetch";
-import { join, posix } from "path";
-import { appDir } from "../configuration.js";
-import { InjectionResult, TORRENT_CACHE_FOLDER } from "../constants.js";
+import { posix } from "path";
+import {
+	Decision,
+	InjectionResult,
+	TORRENT_TAG,
+	TORRENT_CATEGORY_SUFFIX,
+} from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger, logOnce } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -12,6 +12,8 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
+import { Result, resultOf, resultOfErr } from "../Result.js";
+import { BodyInit } from "undici-types";
 
 const X_WWW_FORM_URLENCODED = {
 	"Content-Type": "application/x-www-form-urlencoded",
@@ -84,6 +86,12 @@ interface Category {
 	name: string;
 	savePath: string;
 }
+interface TorrentConfiguration {
+	save_path: string;
+	isComplete: boolean;
+	autoTMM: boolean;
+	category: string;
+}
 
 export default class QBittorrent implements TorrentClient {
 	cookie: string;
@@ -93,9 +101,9 @@ export default class QBittorrent implements TorrentClient {
 		const { qbittorrentUrl } = getRuntimeConfig();
 		this.url = extractCredentialsFromUrl(
 			qbittorrentUrl,
-			"/api/v2"
+			"/api/v2",
 		).unwrapOrThrow(
-			new CrossSeedError("qBittorrent url must be percent-encoded")
+			new CrossSeedError("qBittorrent url must be percent-encoded"),
 		);
 	}
 
@@ -113,16 +121,14 @@ export default class QBittorrent implements TorrentClient {
 
 		if (response.status !== 200) {
 			throw new CrossSeedError(
-				`qBittorrent login failed with code ${response.status}`
+				`qBittorrent login failed with code ${response.status}`,
 			);
 		}
 
-		const cookieArray = response.headers.raw()["set-cookie"];
-		if (cookieArray) {
-			this.cookie = cookieArray[0].split(";")[0];
-		} else {
+		this.cookie = response.headers.getSetCookie()[0];
+		if (!this.cookie) {
 			throw new CrossSeedError(
-				`qBittorrent login failed: Invalid username or password`
+				`qBittorrent login failed: Invalid username or password`,
 			);
 		}
 	}
@@ -136,11 +142,11 @@ export default class QBittorrent implements TorrentClient {
 		path: string,
 		body: BodyInit,
 		headers: Record<string, string> = {},
-		retries = 1
+		retries = 1,
 	): Promise<string> {
 		logger.verbose({
 			label: Label.QBITTORRENT,
-			message: `Making request to ${path} with body ${body.toString()}`,
+			message: `Making request to ${path} with body ${body!.toString()}`,
 		});
 
 		const response = await fetch(`${this.url.href}${path}`, {
@@ -160,19 +166,24 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async setUpCrossSeedCategory(ogCategoryName: string): Promise<string> {
+		const { dataCategory } = getRuntimeConfig();
 		if (!ogCategoryName) return "";
-		if (ogCategoryName.endsWith(".cross-seed")) return ogCategoryName;
+		if (
+			ogCategoryName.endsWith(TORRENT_CATEGORY_SUFFIX) ||
+			ogCategoryName === dataCategory
+		)
+			return ogCategoryName;
 
 		const categoriesStr = await this.request("/torrents/categories", "");
 		const categories: Record<string, Category> = JSON.parse(categoriesStr);
 		const ogCategory = categories[ogCategoryName];
-		const newCategoryName = `${ogCategoryName}.cross-seed`;
+		const newCategoryName = `${ogCategoryName}${TORRENT_CATEGORY_SUFFIX}`;
 		const maybeNewCategory = categories[newCategoryName];
 
 		if (!ogCategory.savePath) {
 			logOnce(`qbit/cat/no-save-path/${ogCategoryName}`, () => {
 				logger.warn(
-					`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`
+					`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`,
 				);
 			});
 		}
@@ -183,13 +194,13 @@ export default class QBittorrent implements TorrentClient {
 			await this.request(
 				"/torrents/editCategory",
 				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
-				X_WWW_FORM_URLENCODED
+				X_WWW_FORM_URLENCODED,
 			);
 		} else {
 			await this.request(
 				"/torrents/createCategory",
 				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
-				X_WWW_FORM_URLENCODED
+				X_WWW_FORM_URLENCODED,
 			);
 		}
 		return newCategoryName;
@@ -198,8 +209,8 @@ export default class QBittorrent implements TorrentClient {
 	async createTag(): Promise<void> {
 		await this.request(
 			"/torrents/createTags",
-			"tags=cross-seed",
-			X_WWW_FORM_URLENCODED
+			`tags=${TORRENT_TAG}`,
+			X_WWW_FORM_URLENCODED,
 		);
 	}
 
@@ -207,7 +218,7 @@ export default class QBittorrent implements TorrentClient {
 		const responseText = await this.request(
 			"/torrents/properties",
 			`hash=${infoHash}`,
-			X_WWW_FORM_URLENCODED
+			X_WWW_FORM_URLENCODED,
 		);
 		try {
 			const properties = JSON.parse(responseText);
@@ -216,24 +227,42 @@ export default class QBittorrent implements TorrentClient {
 			return false;
 		}
 	}
+	async getDownloadDir(
+		searchee: Searchee,
+	): Promise<
+		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
+	> {
+		let torrentInfo: TorrentConfiguration;
+		try {
+			if (await this.isInfoHashInClient(searchee.infoHash!)) {
+				torrentInfo = await this.getTorrentConfiguration(searchee);
+				if (torrentInfo.save_path === undefined) {
+					return resultOfErr("NOT_FOUND");
+				}
+			}
+		} catch (e) {
+			if (e.includes("retrieve")) {
+				return resultOfErr("NOT_FOUND");
+			}
+			return resultOfErr("UNKNOWN_ERROR");
+		}
+		return resultOf(torrentInfo!.save_path);
+	}
 
-	async getTorrentConfiguration(searchee: Searchee): Promise<{
-		save_path: string;
-		isComplete: boolean;
-		autoTMM: boolean;
-		category: string;
-	}> {
+	async getTorrentConfiguration(
+		searchee: Searchee,
+	): Promise<TorrentConfiguration> {
 		const responseText = await this.request(
 			"/torrents/info",
 			`hashes=${searchee.infoHash}`,
-			X_WWW_FORM_URLENCODED
+			X_WWW_FORM_URLENCODED,
 		);
 		const searchResult = JSON.parse(responseText).find(
-			(e) => e.hash === searchee.infoHash
+			(e) => e.hash === searchee.infoHash,
 		) as TorrentInfo;
 		if (searchResult === undefined) {
 			throw new Error(
-				"Failed to retrieve data dir; torrent not found in client"
+				"Failed to retrieve data dir; torrent not found in client",
 			);
 		}
 
@@ -250,7 +279,7 @@ export default class QBittorrent implements TorrentClient {
 		const response = await this.request(
 			"/torrents/files",
 			`hash=${searchee.infoHash}`,
-			X_WWW_FORM_URLENCODED
+			X_WWW_FORM_URLENCODED,
 		);
 
 		const files: TorrentFiles[] = JSON.parse(response);
@@ -261,25 +290,30 @@ export default class QBittorrent implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		path?: string
+		decision:
+			| Decision.MATCH
+			| Decision.MATCH_SIZE_ONLY
+			| Decision.MATCH_PARTIAL,
+		path?: string,
 	): Promise<InjectionResult> {
 		const { duplicateCategories, skipRecheck, dataCategory } =
 			getRuntimeConfig();
-		const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
-		const tempFilepath = join(appDir(), TORRENT_CACHE_FOLDER, filename);
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
 			}
-			const buf = newTorrent.encode();
-			await writeFile(tempFilepath, buf, { mode: 0o600 });
+
+			const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
+			const buffer = new Blob([newTorrent.encode()], {
+				type: "application/x-bittorrent",
+			});
 			const { save_path, isComplete, autoTMM, category } = path
 				? {
 						save_path: path,
 						isComplete: true,
 						autoTMM: false,
 						category: dataCategory,
-				  }
+					}
 				: await this.getTorrentConfiguration(searchee);
 
 			const newCategoryName =
@@ -296,13 +330,12 @@ export default class QBittorrent implements TorrentClient {
 					? "Subfolder"
 					: "Original";
 
-			const file = await fileFrom(
-				tempFilepath,
-				"application/x-bittorrent"
-			);
+			const skipRecheckTorrent =
+				decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
+
 			const formData = new FormData();
-			formData.append("torrents", file, filename);
-			formData.append("tags", "cross-seed");
+			formData.append("torrents", buffer, filename);
+			formData.append("tags", TORRENT_TAG);
 			formData.append("category", newCategoryName);
 
 			if (autoTMM) {
@@ -317,8 +350,8 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("paused", (!skipRecheck).toString());
 			} else {
 				formData.append("contentLayout", contentLayout);
-				formData.append("skip_checking", "true");
-				formData.append("paused", "false");
+				formData.append("skip_checking", skipRecheckTorrent.toString());
+				formData.append("paused", (!skipRecheckTorrent).toString());
 			}
 
 			// for some reason the parser parses the last kv pair incorrectly
@@ -332,7 +365,7 @@ export default class QBittorrent implements TorrentClient {
 				await this.request(
 					"/torrents/recheck",
 					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED
+					X_WWW_FORM_URLENCODED,
 				);
 			}
 
@@ -343,10 +376,6 @@ export default class QBittorrent implements TorrentClient {
 				message: `injection failed: ${e.message}`,
 			});
 			return InjectionResult.FAILURE;
-		} finally {
-			await unlink(tempFilepath).catch((error) => {
-				logger.debug(error);
-			});
 		}
 	}
 }

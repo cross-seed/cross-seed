@@ -2,7 +2,9 @@ import Knex from "knex";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 
 function sanitizeUrl(url: string | URL): string {
-	url = new URL(url);
+	if (typeof url === "string") {
+		url = new URL(url);
+	}
 	return url.origin + url.pathname;
 }
 
@@ -20,7 +22,7 @@ async function backfill(knex: Knex.Knex) {
 					url: sanitizeUrl(url),
 					apikey: getApikey(url),
 					active: true,
-				}))
+				})),
 			)
 			.onConflict("url")
 			.merge(["active", "apikey"]);
@@ -30,7 +32,7 @@ async function backfill(knex: Knex.Knex) {
 				"searchee.id as searchee_id",
 				"indexer.id as indexer_id",
 				"searchee.first_searched as first_searched",
-				"searchee.last_searched as last_searched"
+				"searchee.last_searched as last_searched",
 			)
 			.from("searchee")
 			// @ts-expect-error crossJoin supports string
