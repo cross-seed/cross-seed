@@ -11,7 +11,7 @@ import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
-import { releaseInBlockList } from "./preFilter.js";
+import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 import {
@@ -19,6 +19,7 @@ import {
 	parseTorrentFromURL,
 	SnatchError,
 } from "./torrent.js";
+import { humanReadableSize } from "./utils.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -27,13 +28,19 @@ export interface ResultAssessment {
 
 const createReasonLogger =
 	(Title: string, tracker: string, name: string) =>
-	(decision: Decision, cached): void => {
+	(
+		decision: Decision,
+		cached,
+		searchee: Searchee,
+		candidate: Candidate
+	): void => {
 		function logReason(reason): void {
 			logger.verbose({
 				label: Label.DECIDE,
 				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}`,
 			});
 		}
+
 		let reason;
 		switch (decision) {
 			case Decision.MATCH_PARTIAL:
@@ -43,7 +50,9 @@ const createReasonLogger =
 			case Decision.MATCH:
 				return;
 			case Decision.SIZE_MISMATCH:
-				reason = "its size does not match";
+				reason = `its size does not match - (${humanReadableSize(
+					searchee.length
+				)} -> ${humanReadableSize(candidate.size)})`;
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
@@ -61,10 +70,17 @@ const createReasonLogger =
 				reason = "it has a different file tree";
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
-				reason = "it has a different release group";
+				reason = `it has a different release group - (${searchee.name
+					.match(RELEASE_GROUP_REGEX)?.[0]
+					?.trim()} -> ${candidate.name
+					.match(RELEASE_GROUP_REGEX)?.[0]
+					?.trim()})`;
 				break;
 			case Decision.BLOCKED_RELEASE:
-				reason = "it matches the blocklist";
+				reason = `it matches the blocklist - ("${findBlockedStringInReleaseMaybe(
+					searchee,
+					getRuntimeConfig().blockList
+				)}")`;
 				break;
 			default:
 				reason = decision;
@@ -183,7 +199,7 @@ async function assessCandidateHelper(
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { matchMode, blockList } = getRuntimeConfig();
-	if (releaseInBlockList(searchee, blockList)) {
+	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
 		return { decision: Decision.BLOCKED_RELEASE };
 	}
 
@@ -336,7 +352,7 @@ async function assessCandidateCaching(
 			guid,
 			infoHashesToExclude,
 		);
-		logReason(assessment.decision, false);
+		logReason(assessment.decision, false, searchee, candidate);
 	} else if (
 		(cacheEntry.decision === Decision.MATCH ||
 			cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
@@ -370,11 +386,11 @@ async function assessCandidateCaching(
 			guid,
 			infoHashesToExclude,
 		);
-		logReason(assessment.decision, false);
+		logReason(assessment.decision, false, searchee, candidate);
 	} else {
 		// cached rejection
 		assessment = { decision: cacheEntry.decision };
-		logReason(cacheEntry.decision, true);
+		logReason(cacheEntry.decision, true, searchee, candidate);
 	}
 	// if previously known
 	if (cacheEntry) {
