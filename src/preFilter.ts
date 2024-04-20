@@ -51,7 +51,7 @@ export function filterByContent(searchee: Searchee): boolean {
 		return false;
 	}
 	const allFilesAreVideos = searchee.files.every((file) =>
-		VIDEO_EXTENSIONS.includes(extname(file.name))
+		VIDEO_EXTENSIONS.includes(extname(file.name)),
 	);
 
 	if (!includeNonVideos && !allFilesAreVideos) {
@@ -64,7 +64,7 @@ export function filterByContent(searchee: Searchee): boolean {
 
 export function releaseInBlockList(
 	searchee: Searchee,
-	blockList: string[]
+	blockList: string[],
 ): boolean {
 	return blockList.some((blockedStr) => {
 		return (
@@ -114,11 +114,11 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		.where("searchee.name", searchee.name)
 		.whereIn(
 			"indexer.id",
-			enabledIndexers.map((i) => i.id)
+			enabledIndexers.map((i) => i.id),
 		)
 		.min({
 			first_searched_any: db.raw(
-				"coalesce(timestamp.first_searched, 9223372036854775807)"
+				"coalesce(timestamp.first_searched, 9223372036854775807)",
 			),
 		})
 		.min({
@@ -141,8 +141,8 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	) {
 		logReason(
 			`its first search timestamp ${humanReadable(
-				first_searched_any
-			)} is older than ${ms(excludeOlder, { long: true })} ago`
+				first_searched_any,
+			)} is older than ${ms(excludeOlder, { long: true })} ago`,
 		);
 		return false;
 	}
@@ -154,8 +154,8 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	) {
 		logReason(
 			`its last search timestamp ${humanReadable(
-				last_searched_all
-			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`
+				last_searched_all,
+			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`,
 		);
 		return false;
 	}

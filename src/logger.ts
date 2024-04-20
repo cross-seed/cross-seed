@@ -54,7 +54,7 @@ function redactMessage(message: string | unknown, options?) {
 	ret = ret.replace(/apikey=[a-zA-Z0-9]+/g, `apikey=${redactionMsg}`);
 	ret = ret.replace(
 		/\/notification\/crossSeed\/[a-zA-Z-0-9_-]+/g,
-		`/notification/crossSeed/${redactionMsg}`
+		`/notification/crossSeed/${redactionMsg}`,
 	);
 	for (const [key, urlStr] of Object.entries(runtimeConfig)) {
 		if (key.endsWith("Url") && urlStr) {
@@ -87,7 +87,7 @@ export function initializeLogger(options: RuntimeConfig): void {
 				return `${timestamp} ${level}: ${
 					label ? `[${label}] ` : ""
 				}${redactMessage(message, options)}`;
-			})
+			}),
 		),
 		transports: [
 			new DailyRotateFile({
@@ -125,10 +125,10 @@ export function initializeLogger(options: RuntimeConfig): void {
 								label ? `[${label}] ` : ""
 							}${redactMessage(
 								stack ? stack : message,
-								options
+								options,
 							)}`;
-						}
-					)
+						},
+					),
 				),
 			}),
 		],

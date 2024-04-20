@@ -89,7 +89,7 @@ export class Metafile {
 				.map((file) => {
 					const rawPathSegments: Buffer[] = fallback(
 						file["path.utf-8"],
-						file.path
+						file.path,
 					)!;
 					const pathSegments = rawPathSegments.map((buf) => {
 						const seg = buf.toString();
