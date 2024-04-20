@@ -6,7 +6,7 @@ import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { humanReadable, nMsAgo } from "./utils.js";
+import { humanReadableDate, nMsAgo } from "./utils.js";
 import path from "path";
 
 export function filterByContent(searchee: Searchee): boolean {
@@ -23,9 +23,9 @@ export function filterByContent(searchee: Searchee): boolean {
 			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
 		});
 	}
-
-	if (releaseInBlockList(searchee, blockList)) {
-		logReason("it matched the blocklist");
+	const blockedNote = findBlockedStringInReleaseMaybe(searchee, blockList);
+	if (blockedNote) {
+		logReason(`it matched the blocklist - ("${blockedNote}")`);
 		return false;
 	}
 
@@ -62,11 +62,11 @@ export function filterByContent(searchee: Searchee): boolean {
 	return true;
 }
 
-export function releaseInBlockList(
+export function findBlockedStringInReleaseMaybe(
 	searchee: Searchee,
 	blockList: string[],
-): boolean {
-	return blockList.some((blockedStr) => {
+): string | undefined {
+	return blockList.find((blockedStr) => {
 		return (
 			searchee.name.includes(blockedStr) ||
 			blockedStr === searchee.infoHash
@@ -140,7 +140,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		first_searched_any < nMsAgo(excludeOlder)
 	) {
 		logReason(
-			`its first search timestamp ${humanReadable(
+			`its first search timestamp ${humanReadableDate(
 				first_searched_any,
 			)} is older than ${ms(excludeOlder, { long: true })} ago`,
 		);
@@ -153,7 +153,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		last_searched_all > nMsAgo(excludeRecentSearch)
 	) {
 		logReason(
-			`its last search timestamp ${humanReadable(
+			`its last search timestamp ${humanReadableDate(
 				last_searched_all,
 			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`,
 		);
