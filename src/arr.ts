@@ -28,7 +28,7 @@ export interface IdData {
 async function fetchArrJSON(
 	searchTerm: string,
 	url: string,
-	mediaType: MediaType
+	mediaType: MediaType,
 ): Promise<IdData> {
 	const uarrl = { apikey: getApikey(url), url: sanitizeUrl(url) };
 	let response;
@@ -37,7 +37,7 @@ async function fetchArrJSON(
 		uarrl.apikey as string,
 		{
 			title: searchTerm,
-		} as IdSearchParams
+		} as IdSearchParams,
 	);
 
 	const abortController = new AbortController();
@@ -65,7 +65,7 @@ async function fetchArrJSON(
 			? arrJson?.series
 			: arrJson?.movie;
 
-	const x: { [key: string]: string } = Object.fromEntries(
+	return Object.fromEntries(
 		keyNames
 			.map((key) => {
 				const arrIds = ids?.[key] as string;
@@ -73,9 +73,8 @@ async function fetchArrJSON(
 					? [key, arrIds]
 					: undefined;
 			})
-			.filter((entry) => entry !== undefined) as [string, string][]
+			.filter((entry) => entry !== undefined) as [string, string][],
 	);
-	return x;
 }
 
 function formatFoundIds(arrJson: IdData): string {
@@ -83,7 +82,7 @@ function formatFoundIds(arrJson: IdData): string {
 	keyNames.forEach((key) => {
 		if (arrJson[key]) {
 			formattedIds += `${chalk.yellow(
-				key.toUpperCase().replace("ID", "")
+				key.toUpperCase().replace("ID", ""),
 			)}: ${chalk.white(arrJson[key])} `;
 		}
 	});
@@ -93,7 +92,7 @@ function formatFoundIds(arrJson: IdData): string {
 function logArrQueryResult(
 	arrJson: IdData,
 	searchTerm: string,
-	mediaType: MediaType
+	mediaType: MediaType,
 ) {
 	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
 	if (Object.keys(arrJson).length > 0) {
@@ -102,7 +101,7 @@ function logArrQueryResult(
 			message: `Found ${
 				label === Label.RADARR ? "movie" : "series"
 			} for ${chalk.green.bold(searchTerm)} -> ${formatFoundIds(
-				arrJson
+				arrJson,
 			)}`,
 		});
 	} else {
@@ -124,7 +123,7 @@ function logArrQueryFailure(error, searchTerm: string, mediaType: MediaType) {
 	logger.debug({
 		label: label,
 		message: `Failed to lookup IDs for ${chalk.yellow(
-			searchTerm
+			searchTerm,
 		)} - (${chalk.red(String(error).split(":").slice(1)[0].trim())})`,
 	});
 	logger.debug(error);
@@ -132,7 +131,7 @@ function logArrQueryFailure(error, searchTerm: string, mediaType: MediaType) {
 
 export async function grabArrId(
 	searchTerm: string,
-	mediaType: MediaType
+	mediaType: MediaType,
 ): Promise<Result<IdData, boolean>> {
 	const { sonarr, radarr } = getRuntimeConfig();
 	if (
@@ -147,7 +146,7 @@ export async function grabArrId(
 		const arrJson = (await fetchArrJSON(
 			searchTerm,
 			mediaType === MediaType.MOVIE ? radarr! : sonarr!,
-			mediaType
+			mediaType,
 		)) as IdData;
 		logArrQueryResult(arrJson, searchTerm, mediaType);
 		return resultOf(arrJson);
@@ -159,7 +158,7 @@ export async function grabArrId(
 export async function getRelevantArrIds(
 	searchee: Searchee,
 	ids,
-	caps: Caps
+	caps: Caps,
 ): Promise<IdSearchParams> {
 	const nameWithoutExtension = stripExtension(searchee.name);
 	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
@@ -169,16 +168,15 @@ export async function getRelevantArrIds(
 			: caps.movieIdSearch;
 
 	return Object.keys(idSearchCaps).reduce((acc, key) => {
-		const lowerKey = String(key).toLowerCase();
 		if (idSearchCaps[key] && ids[key]) {
-			acc[lowerKey] = ids[key];
+			acc[String(key).toLowerCase()] = ids[key];
 		}
 		return acc;
 	}, {});
 }
 
 export async function getAvailableArrIds(
-	searchee: Searchee
+	searchee: Searchee,
 ): Promise<IdSearchParams> {
 	const nameWithoutExtension = stripExtension(searchee.name);
 	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
