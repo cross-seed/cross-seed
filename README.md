@@ -20,7 +20,7 @@ delivery into your client.
 ## 🚨🚨🚨 Breaking changes in cross-seed v6 🚨🚨🚨
 
 Head on over to the
-[v6 migration guide](https://www.cross-seed.org/docs/v6-migration-guide)
+[v6 migration guide](https://www.cross-seed.org/docs/v6-migration)
 to see the steps required for migration.
  
 ## Requirements
