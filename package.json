@@ -59,18 +59,7 @@
 	"prettier": {
 		"tabWidth": 4,
 		"useTabs": true,
-		"proseWrap": "always",
-		"overrides": [
-			{
-				"files": [
-					"*.yaml",
-					"*.yml"
-				],
-				"options": {
-					"tabWidth": 2
-				}
-			}
-		]
+		"proseWrap": "always"
 	},
 	"lint-staged": {
 		"*.{js,ts}": "eslint --cache",
