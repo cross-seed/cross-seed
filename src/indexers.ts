@@ -49,6 +49,7 @@ export async function getEnabledIndexers() {
 			movieSearchCap: "movie_search_cap",
 			tvIdCaps: "tv_id_caps",
 			movieIdCaps: "movie_id_caps",
+			categories: "cat_caps",
 		});
 }
 

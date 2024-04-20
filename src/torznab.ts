@@ -26,7 +26,11 @@ import {
 	sanitizeUrl,
 	stripExtension,
 } from "./utils.js";
-
+interface TorznabCats {
+	tv?: boolean;
+	movie?: boolean;
+	anime?: boolean;
+}
 export interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	title?: string;
@@ -51,6 +55,7 @@ export interface IdSearchParams {
 }
 export interface Caps {
 	search: boolean;
+	categories?: TorznabCats;
 	tvSearch: boolean;
 	movieSearch: boolean;
 	movieIdSearch: IdSearchCaps;
@@ -63,6 +68,7 @@ type TorznabSearchTechnique =
 
 type TorznabCaps = {
 	caps?: {
+		categories?: object;
 		searching?: [
 			{
 				search?: TorznabSearchTechnique;
@@ -106,10 +112,25 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 	}));
 }
 function parseTorznabCaps(xml: TorznabCaps): Caps {
-	const capsSection = xml?.caps?.searching?.[0];
+	const categoryCaps = xml?.caps?.categories?.[0]?.category;
+	const searchCaps = xml?.caps?.searching?.[0];
+
 	const isAvailable = (section) => section?.[0]?.$.available === "yes";
 	const findIdTokens = (capTags: string | undefined) =>
 		capTags?.split(",").filter((token) => token.includes("id"));
+
+	function getCapCats(item): TorznabCats {
+		const categoryNames: string[] = item.map((category) => category.$.name);
+
+		function checkCategory(x: string): boolean {
+			return categoryNames.some((cat) => cat.toLowerCase().includes(x));
+		}
+		return {
+			movie: checkCategory("movie"),
+			tv: checkCategory("tv"),
+			anime: checkCategory("anime"),
+		};
+	}
 
 	function setIdCaps(section): IdSearchCaps {
 		const idCapNames: (keyof IdSearchCaps)[] = [
@@ -128,11 +149,12 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	}
 
 	return {
-		search: Boolean(isAvailable(capsSection?.search)),
-		tvSearch: Boolean(isAvailable(capsSection?.["tv-search"])),
-		movieSearch: Boolean(isAvailable(capsSection?.["movie-search"])),
-		movieIdSearch: setIdCaps(capsSection?.["movie-search"]?.[0]),
-		tvIdSearch: setIdCaps(capsSection?.["tv-search"]?.[0]),
+		search: Boolean(isAvailable(searchCaps?.search)),
+		tvSearch: Boolean(isAvailable(searchCaps?.["tv-search"])),
+		movieSearch: Boolean(isAvailable(searchCaps?.["movie-search"])),
+		movieIdSearch: setIdCaps(searchCaps?.["movie-search"]?.[0]),
+		tvIdSearch: setIdCaps(searchCaps?.["tv-search"]?.[0]),
+		categories: getCapCats(categoryCaps),
 	};
 }
 
@@ -288,6 +310,7 @@ export async function syncWithDb() {
 			tvIdCaps: "tv_id_caps",
 			movieSearchCap: "movie_search_cap",
 			movieIdCaps: "movie_id_caps",
+			categories: "cat_caps",
 		});
 
 	const inConfigButNotInDb = torznab.filter(
@@ -451,6 +474,7 @@ async function updateCaps(
 				movie_search_cap: caps.movieSearch,
 				movie_id_caps: JSON.stringify(caps.movieIdSearch),
 				tv_id_caps: JSON.stringify(caps.tvIdSearch),
+				cat_caps: JSON.stringify(caps.categories),
 			});
 	}
 }
