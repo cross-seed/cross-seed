@@ -48,7 +48,7 @@ function getJobs(): Job[] {
 function logNextRun(
 	name: string,
 	cadence: number,
-	lastRun: number | undefined | null
+	lastRun: number | undefined | null,
 ) {
 	const now = Date.now();
 

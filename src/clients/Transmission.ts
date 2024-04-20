@@ -31,7 +31,7 @@ type TorrentAddedResponse = { "torrent-added": TorrentMetadata };
 type TorrentAddResponse = TorrentAddedResponse | TorrentDuplicateResponse;
 
 function doesAlreadyExist(
-	args: TorrentAddResponse
+	args: TorrentAddResponse,
 ): args is TorrentDuplicateResponse {
 	return "torrent-duplicate" in args;
 }
@@ -42,14 +42,14 @@ export default class Transmission implements TorrentClient {
 	private async request<T>(
 		method: Method,
 		args: unknown = {},
-		retries = 1
+		retries = 1,
 	): Promise<T> {
 		const { transmissionRpcUrl } = getRuntimeConfig();
 
 		const { username, password, href } = extractCredentialsFromUrl(
-			transmissionRpcUrl
+			transmissionRpcUrl,
 		).unwrapOrThrow(
-			new CrossSeedError("Transmission rpc url must be percent-encoded")
+			new CrossSeedError("Transmission rpc url must be percent-encoded"),
 		);
 
 		const headers = new Headers();
@@ -59,7 +59,7 @@ export default class Transmission implements TorrentClient {
 		}
 		if (username && password) {
 			const credentials = Buffer.from(`${username}:${password}`).toString(
-				"base64"
+				"base64",
 			);
 			headers.set("Authorization", `Basic ${credentials}`);
 		}
@@ -71,7 +71,7 @@ export default class Transmission implements TorrentClient {
 		});
 		if (response.status === 409) {
 			this.xTransmissionSessionId = response.headers.get(
-				XTransmissionSessionId
+				XTransmissionSessionId,
 			)!;
 			return this.request(method, args, retries - 1);
 		}
@@ -84,7 +84,7 @@ export default class Transmission implements TorrentClient {
 				return responseBody.arguments;
 			} else {
 				throw new Error(
-					`Transmission responded with error: "${responseBody.result}"`
+					`Transmission responded with error: "${responseBody.result}"`,
 				);
 			}
 		} catch (e) {
@@ -114,13 +114,13 @@ export default class Transmission implements TorrentClient {
 		} catch (e) {
 			const { transmissionRpcUrl } = getRuntimeConfig();
 			throw new CrossSeedError(
-				`Failed to reach Transmission at ${transmissionRpcUrl}`
+				`Failed to reach Transmission at ${transmissionRpcUrl}`,
 			);
 		}
 	}
 
 	async checkOriginalTorrent(
-		searchee: SearcheeWithInfoHash
+		searchee: SearcheeWithInfoHash,
 	): Promise<
 		Result<
 			{ downloadDir: string },
@@ -134,7 +134,7 @@ export default class Transmission implements TorrentClient {
 				{
 					fields: ["downloadDir", "percentDone"],
 					ids: [searchee.infoHash],
-				}
+				},
 			);
 		} catch (e) {
 			return resultOfErr(InjectionResult.FAILURE);
@@ -153,12 +153,12 @@ export default class Transmission implements TorrentClient {
 	}
 
 	async getDownloadDir(
-		searchee: Searchee
+		searchee: Searchee,
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
 		const result = await this.checkOriginalTorrent(
-			searchee as SearcheeWithInfoHash
+			searchee as SearcheeWithInfoHash,
 		);
 		return result
 			.mapOk((r) => r.downloadDir)
@@ -172,7 +172,7 @@ export default class Transmission implements TorrentClient {
 			| Decision.MATCH
 			| Decision.MATCH_SIZE_ONLY
 			| Decision.MATCH_PARTIAL,
-		path?: string
+		path?: string,
 	): Promise<InjectionResult> {
 		const { skipRecheck } = getRuntimeConfig();
 
@@ -181,7 +181,7 @@ export default class Transmission implements TorrentClient {
 			downloadDir = path;
 		} else {
 			const result = await this.getDownloadDir(
-				searchee as SearcheeWithInfoHash
+				searchee as SearcheeWithInfoHash,
 			);
 			if (result.isErr()) {
 				return InjectionResult.FAILURE;
@@ -203,7 +203,7 @@ export default class Transmission implements TorrentClient {
 					metainfo: newTorrent.encode().toString("base64"),
 					paused: !skipRecheckTorrent,
 					labels: [TORRENT_TAG],
-				}
+				},
 			);
 		} catch (e) {
 			return InjectionResult.FAILURE;

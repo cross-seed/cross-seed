@@ -16,7 +16,7 @@ import { stat, access, constants } from "fs/promises";
 async function verifyPath(
 	path: string,
 	optionName: string,
-	permissions: number
+	permissions: number,
 ): Promise<boolean> {
 	try {
 		if ((await stat(path)).isDirectory()) {
@@ -26,11 +26,11 @@ async function verifyPath(
 	} catch (error) {
 		if (error.code === "ENOENT") {
 			logger.error(
-				`\tYour ${optionName} "${path}" is not a valid directory on the filesystem.`
+				`\tYour ${optionName} "${path}" is not a valid directory on the filesystem.`,
 			);
 		} else {
 			logger.error(
-				`\tYour ${optionName} "${path}" has invalid permissions.`
+				`\tYour ${optionName} "${path}" has invalid permissions.`,
 			);
 		}
 	}
@@ -76,7 +76,7 @@ async function checkConfigPaths(): Promise<void> {
 		throw new CrossSeedError(
 			`\tYour configuration is invalid, please see the ${
 				pathFailure > 1 ? "errors" : "error"
-			} above for details.`
+			} above for details.`,
 		);
 	}
 }

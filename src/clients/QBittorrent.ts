@@ -101,9 +101,9 @@ export default class QBittorrent implements TorrentClient {
 		const { qbittorrentUrl } = getRuntimeConfig();
 		this.url = extractCredentialsFromUrl(
 			qbittorrentUrl,
-			"/api/v2"
+			"/api/v2",
 		).unwrapOrThrow(
-			new CrossSeedError("qBittorrent url must be percent-encoded")
+			new CrossSeedError("qBittorrent url must be percent-encoded"),
 		);
 	}
 
@@ -121,14 +121,14 @@ export default class QBittorrent implements TorrentClient {
 
 		if (response.status !== 200) {
 			throw new CrossSeedError(
-				`qBittorrent login failed with code ${response.status}`
+				`qBittorrent login failed with code ${response.status}`,
 			);
 		}
 
 		this.cookie = response.headers.getSetCookie()[0];
 		if (!this.cookie) {
 			throw new CrossSeedError(
-				`qBittorrent login failed: Invalid username or password`
+				`qBittorrent login failed: Invalid username or password`,
 			);
 		}
 	}
@@ -142,7 +142,7 @@ export default class QBittorrent implements TorrentClient {
 		path: string,
 		body: BodyInit,
 		headers: Record<string, string> = {},
-		retries = 1
+		retries = 1,
 	): Promise<string> {
 		logger.verbose({
 			label: Label.QBITTORRENT,
@@ -183,7 +183,7 @@ export default class QBittorrent implements TorrentClient {
 		if (!ogCategory.savePath) {
 			logOnce(`qbit/cat/no-save-path/${ogCategoryName}`, () => {
 				logger.warn(
-					`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`
+					`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`,
 				);
 			});
 		}
@@ -194,13 +194,13 @@ export default class QBittorrent implements TorrentClient {
 			await this.request(
 				"/torrents/editCategory",
 				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
-				X_WWW_FORM_URLENCODED
+				X_WWW_FORM_URLENCODED,
 			);
 		} else {
 			await this.request(
 				"/torrents/createCategory",
 				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
-				X_WWW_FORM_URLENCODED
+				X_WWW_FORM_URLENCODED,
 			);
 		}
 		return newCategoryName;
@@ -210,7 +210,7 @@ export default class QBittorrent implements TorrentClient {
 		await this.request(
 			"/torrents/createTags",
 			`tags=${TORRENT_TAG}`,
-			X_WWW_FORM_URLENCODED
+			X_WWW_FORM_URLENCODED,
 		);
 	}
 
@@ -218,7 +218,7 @@ export default class QBittorrent implements TorrentClient {
 		const responseText = await this.request(
 			"/torrents/properties",
 			`hash=${infoHash}`,
-			X_WWW_FORM_URLENCODED
+			X_WWW_FORM_URLENCODED,
 		);
 		try {
 			const properties = JSON.parse(responseText);
@@ -228,7 +228,7 @@ export default class QBittorrent implements TorrentClient {
 		}
 	}
 	async getDownloadDir(
-		searchee: Searchee
+		searchee: Searchee,
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
@@ -250,19 +250,19 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async getTorrentConfiguration(
-		searchee: Searchee
+		searchee: Searchee,
 	): Promise<TorrentConfiguration> {
 		const responseText = await this.request(
 			"/torrents/info",
 			`hashes=${searchee.infoHash}`,
-			X_WWW_FORM_URLENCODED
+			X_WWW_FORM_URLENCODED,
 		);
 		const searchResult = JSON.parse(responseText).find(
-			(e) => e.hash === searchee.infoHash
+			(e) => e.hash === searchee.infoHash,
 		) as TorrentInfo;
 		if (searchResult === undefined) {
 			throw new Error(
-				"Failed to retrieve data dir; torrent not found in client"
+				"Failed to retrieve data dir; torrent not found in client",
 			);
 		}
 
@@ -279,7 +279,7 @@ export default class QBittorrent implements TorrentClient {
 		const response = await this.request(
 			"/torrents/files",
 			`hash=${searchee.infoHash}`,
-			X_WWW_FORM_URLENCODED
+			X_WWW_FORM_URLENCODED,
 		);
 
 		const files: TorrentFiles[] = JSON.parse(response);
@@ -294,7 +294,7 @@ export default class QBittorrent implements TorrentClient {
 			| Decision.MATCH
 			| Decision.MATCH_SIZE_ONLY
 			| Decision.MATCH_PARTIAL,
-		path?: string
+		path?: string,
 	): Promise<InjectionResult> {
 		const { duplicateCategories, skipRecheck, dataCategory } =
 			getRuntimeConfig();
@@ -313,7 +313,7 @@ export default class QBittorrent implements TorrentClient {
 						isComplete: true,
 						autoTMM: false,
 						category: dataCategory,
-				  }
+					}
 				: await this.getTorrentConfiguration(searchee);
 
 			const newCategoryName =
@@ -365,7 +365,7 @@ export default class QBittorrent implements TorrentClient {
 				await this.request(
 					"/torrents/recheck",
 					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED
+					X_WWW_FORM_URLENCODED,
 				);
 			}
 

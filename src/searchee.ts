@@ -26,14 +26,14 @@ export interface Searchee {
 export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
 
 export function hasInfoHash(
-	searchee: Searchee
+	searchee: Searchee,
 ): searchee is SearcheeWithInfoHash {
 	return searchee.infoHash != null;
 }
 
 export function hasVideo(searchee: Searchee): boolean {
 	return searchee.files.some((file) =>
-		VIDEO_EXTENSIONS.includes(extname(file.name))
+		VIDEO_EXTENSIONS.includes(extname(file.name)),
 	);
 }
 
@@ -44,8 +44,8 @@ function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {
 		return readdirSync(root, { withFileTypes: true }).flatMap((dirent) =>
 			getFileNamesFromRootRec(
 				join(root, dirent.name),
-				dirent.isDirectory()
-			)
+				dirent.isDirectory(),
+			),
 		);
 	} else {
 		return [root];
@@ -71,7 +71,7 @@ export function createSearcheeFromMetafile(meta: Metafile): Searchee {
 }
 
 export async function createSearcheeFromTorrentFile(
-	filepath: string
+	filepath: string,
 ): Promise<Result<Searchee, Error>> {
 	try {
 		const meta = await parseTorrentFromFilename(filepath);
@@ -84,11 +84,11 @@ export async function createSearcheeFromTorrentFile(
 }
 
 export async function createSearcheeFromPath(
-	filepath: string
+	filepath: string,
 ): Promise<Result<Searchee, Error>> {
 	const totalLength = getFilesFromDataRoot(filepath).reduce<number>(
 		(runningTotal, file) => runningTotal + file.length,
-		0
+		0,
 	);
 	return resultOf({
 		files: getFilesFromDataRoot(filepath),

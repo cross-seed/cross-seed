@@ -70,7 +70,7 @@ export function appDir(): string {
 				? ` Use chown to set the owner to ${process.getuid!()}:${process.getgid!()}`
 				: "";
 		throw new CrossSeedError(
-			`cross-seed does not have R/W permissions on your config directory.${dockerMessage}`
+			`cross-seed does not have R/W permissions on your config directory.${dockerMessage}`,
 		);
 	}
 	return appDir;
@@ -108,7 +108,7 @@ export async function getFileConfig(): Promise<FileConfig> {
 		} else if (e instanceof SyntaxError) {
 			const location = e.stack!.split("\n").slice(0, 3).join("\n");
 			throw new CrossSeedError(
-				`\n${chalk.red(location)}\n\n${UNPARSABLE_CONFIG_MESSAGE}`
+				`\n${chalk.red(location)}\n\n${UNPARSABLE_CONFIG_MESSAGE}`,
 			);
 		} else {
 			throw e;
