@@ -32,7 +32,7 @@ const createReasonLogger =
 		decision: Decision,
 		cached,
 		searchee: Searchee,
-		candidate: Candidate
+		candidate: Candidate,
 	): void => {
 		function logReason(reason): void {
 			logger.verbose({
@@ -51,7 +51,7 @@ const createReasonLogger =
 				return;
 			case Decision.SIZE_MISMATCH:
 				reason = `its size does not match - (${humanReadableSize(
-					searchee.length
+					searchee.length,
 				)} -> ${humanReadableSize(candidate.size)})`;
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
@@ -79,7 +79,7 @@ const createReasonLogger =
 			case Decision.BLOCKED_RELEASE:
 				reason = `it matches the blocklist - ("${findBlockedStringInReleaseMaybe(
 					searchee,
-					getRuntimeConfig().blockList
+					getRuntimeConfig().blockList,
 				)}")`;
 				break;
 			default:
