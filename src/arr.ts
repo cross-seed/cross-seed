@@ -12,6 +12,9 @@ import {
 import chalk from "chalk";
 import { hasVideo, Searchee } from "./searchee.js";
 import { Caps, IdSearchParams, TorznabParams } from "./torznab.js";
+
+const keyNames = ["tvdbId", "imdbId", "tmdbId"];
+
 export type ParseResponse = {
 	movie?: IdData;
 	series?: IdData;
@@ -21,6 +24,7 @@ export interface IdData {
 	tmdbId?: string;
 	tvdbId?: string;
 }
+
 async function fetchArrJSON(
 	searchTerm: string,
 	url: string,
@@ -28,8 +32,6 @@ async function fetchArrJSON(
 ): Promise<IdData> {
 	const uarrl = { apikey: getApikey(url), url: sanitizeUrl(url) };
 	let response;
-	const urlpath = `${uarrl.url}api/v3/parse`;
-	console.log(urlpath);
 	const lookupUrl = assembleUrl(
 		`${uarrl.url}api/v3/parse`,
 		uarrl.apikey as string,
@@ -62,7 +64,6 @@ async function fetchArrJSON(
 		mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
 			? arrJson?.series
 			: arrJson?.movie;
-	const keyNames = ["imdbId", "tmdbId", "tvdbId"];
 
 	const x: { [key: string]: string } = Object.fromEntries(
 		keyNames
@@ -77,26 +78,63 @@ async function fetchArrJSON(
 	return x;
 }
 
+function formatFoundIds(arrJson: IdData): string {
+	let formattedIds = "";
+	keyNames.forEach((key) => {
+		if (arrJson[key]) {
+			formattedIds += `${chalk.yellow(
+				key.toUpperCase().replace("ID", "")
+			)}: ${chalk.white(arrJson[key])} `;
+		}
+	});
+	return formattedIds.trim();
+}
+
+function logArrQueryResult(
+	arrJson: IdData,
+	searchTerm: string,
+	mediaType: MediaType
+) {
+	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
+	if (Object.keys(arrJson).length > 0) {
+		logger.verbose({
+			label: label,
+			message: `Found ${
+				label === Label.RADARR ? "movie" : "series"
+			} for ${chalk.green.bold(searchTerm)} -> ${formatFoundIds(
+				arrJson
+			)}`,
+		});
+	} else {
+		logger.verbose({
+			label: label,
+			message: `Lookup failed for ${chalk.yellow(searchTerm)}`,
+		});
+		logger.verbose({
+			label: label,
+			message: `Make sure the ${
+				label === Label.RADARR ? "movie" : "series"
+			} is added to ${label === Label.RADARR ? "Radarr" : "Sonarr"}.`,
+		});
+	}
+}
+
+function logArrQueryFailure(error, searchTerm: string, mediaType: MediaType) {
+	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
+	logger.debug({
+		label: label,
+		message: `Failed to lookup IDs for ${chalk.yellow(
+			searchTerm
+		)} - (${chalk.red(String(error).split(":").slice(1)[0].trim())})`,
+	});
+	logger.debug(error);
+}
+
 export async function grabArrId(
 	searchTerm: string,
 	mediaType: MediaType
 ): Promise<Result<IdData, boolean>> {
 	const { sonarr, radarr } = getRuntimeConfig();
-	function formatFoundIds(arrJson: IdData): string {
-		return `${
-			arrJson.tvdbId
-				? `${chalk.yellow("TVDB")}: ${chalk.white(arrJson.tvdbId)} `
-				: ""
-		}${
-			arrJson.tmdbId
-				? `${chalk.yellow("TMDB")}: ${chalk.white(arrJson.tmdbId)} `
-				: ""
-		}${
-			arrJson.imdbId
-				? `${chalk.yellow("IMDB")}: ${chalk.white(arrJson.imdbId)}`
-				: ""
-		}`;
-	}
 	if (
 		(!sonarr &&
 			(mediaType == MediaType.EPISODE ||
@@ -105,81 +143,16 @@ export async function grabArrId(
 	) {
 		return resultOfErr(false);
 	}
-	if (mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON) {
-		try {
-			const arrJson = (await fetchArrJSON(
-				searchTerm,
-				sonarr!,
-				mediaType
-			)) as IdData;
-			if (Object.keys(arrJson).length > 0) {
-				logger.verbose({
-					label: Label.SONARR,
-					message: `Found series for ${chalk.green.bold(
-						searchTerm
-					)} -> ${formatFoundIds(arrJson)}`,
-				});
-			} else {
-				logger.verbose({
-					label: Label.SONARR,
-					message: `Lookup failed for ${chalk.yellow(searchTerm)}`,
-				});
-				logger.verbose({
-					label: Label.SONARR,
-					message: `Make sure the series is added to Sonarr.`,
-				});
-			}
-			return resultOf(arrJson);
-		} catch (error) {
-			logger.debug({
-				label: Label.SONARR,
-				message: `Failed to lookup IDs for ${chalk.yellow(
-					searchTerm
-				)} - (${chalk.red(
-					String(error).split(":").slice(1)[0].trim()
-				)})`,
-			});
-			logger.debug(error);
-			return resultOfErr(false);
-		}
-	} else if (mediaType === MediaType.MOVIE) {
-		try {
-			const arrJson = (await fetchArrJSON(
-				searchTerm,
-				radarr!,
-				mediaType
-			)) as IdData;
-			if (Object.keys(arrJson).length > 0) {
-				logger.verbose({
-					label: Label.RADARR,
-					message: `Found movie for ${chalk.green.bold(
-						searchTerm
-					)} -> ${formatFoundIds(arrJson)}`,
-				});
-			} else {
-				logger.verbose({
-					label: Label.RADARR,
-					message: `Lookup failed for ${chalk.yellow(searchTerm)}`,
-				});
-				logger.verbose({
-					label: Label.RADARR,
-					message: `Make sure the movie is added to Radarr.`,
-				});
-			}
-			return resultOf(arrJson);
-		} catch (error) {
-			logger.debug({
-				label: Label.RADARR,
-				message: `Failed to lookup IDs for ${chalk.yellow(
-					searchTerm
-				)} - (${chalk.red(
-					String(error).split(":").slice(1)[0].trim()
-				)})`,
-			});
-			logger.debug(error);
-			return resultOfErr(false);
-		}
-	} else {
+	try {
+		const arrJson = (await fetchArrJSON(
+			searchTerm,
+			mediaType === MediaType.MOVIE ? radarr! : sonarr!,
+			mediaType
+		)) as IdData;
+		logArrQueryResult(arrJson, searchTerm, mediaType);
+		return resultOf(arrJson);
+	} catch (error) {
+		logArrQueryFailure(error, searchTerm, mediaType);
 		return resultOfErr(false);
 	}
 }
