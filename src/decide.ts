@@ -1,4 +1,4 @@
-import { existsSync, statSync, writeFileSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
@@ -11,6 +11,7 @@ import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
+import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 import {
@@ -18,6 +19,7 @@ import {
 	parseTorrentFromURL,
 	SnatchError,
 } from "./torrent.js";
+import { humanReadableSize } from "./utils.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -26,21 +28,31 @@ export interface ResultAssessment {
 
 const createReasonLogger =
 	(Title: string, tracker: string, name: string) =>
-	(decision: Decision, cached): void => {
+	(
+		decision: Decision,
+		cached,
+		searchee: Searchee,
+		candidate: Candidate,
+	): void => {
 		function logReason(reason): void {
 			logger.verbose({
 				label: Label.DECIDE,
 				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}`,
 			});
 		}
+
 		let reason;
 		switch (decision) {
+			case Decision.MATCH_PARTIAL:
+				return;
 			case Decision.MATCH_SIZE_ONLY:
 				return;
 			case Decision.MATCH:
 				return;
 			case Decision.SIZE_MISMATCH:
-				reason = "its size does not match";
+				reason = `its size does not match - (${humanReadableSize(
+					searchee.length,
+				)} -> ${humanReadableSize(candidate.size)})`;
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
@@ -58,7 +70,17 @@ const createReasonLogger =
 				reason = "it has a different file tree";
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
-				reason = "it has a different release group";
+				reason = `it has a different release group - (${searchee.name
+					.match(RELEASE_GROUP_REGEX)?.[0]
+					?.trim()} -> ${candidate.name
+					.match(RELEASE_GROUP_REGEX)?.[0]
+					?.trim()})`;
+				break;
+			case Decision.BLOCKED_RELEASE:
+				reason = `it matches the blocklist - ("${findBlockedStringInReleaseMaybe(
+					searchee,
+					getRuntimeConfig().blockList,
+				)}")`;
 				break;
 			default:
 				reason = decision;
@@ -71,7 +93,7 @@ const createReasonLogger =
 
 export function compareFileTrees(
 	candidate: Metafile,
-	searchee: Searchee
+	searchee: Searchee,
 ): boolean {
 	const cmp = (elOfA: File, elOfB: File) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
@@ -81,21 +103,62 @@ export function compareFileTrees(
 	};
 
 	return candidate.files.every((elOfA) =>
-		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
+		searchee.files.some((elOfB) => cmp(elOfA, elOfB)),
 	);
 }
 
 export function compareFileTreesIgnoringNames(
 	candidate: Metafile,
-	searchee: Searchee
+	searchee: Searchee,
 ): boolean {
 	const cmp = (candidate, searchee) => {
 		return searchee.length === candidate.length;
 	};
 
 	return candidate.files.every((elOfA) =>
-		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
+		searchee.files.some((elOfB) => cmp(elOfA, elOfB)),
 	);
+}
+
+export function compareFileTreesPartialIgnoringNames(
+	candidate: Metafile,
+	searchee: Searchee,
+): boolean {
+	const { fuzzySizeThreshold } = getRuntimeConfig();
+	let matchedSizes = 0;
+	for (const candidateFile of candidate.files) {
+		const searcheeHasFileSize = searchee.files.some(
+			(searcheeFile) => searcheeFile.length === candidateFile.length,
+		);
+		if (searcheeHasFileSize) {
+			matchedSizes += candidateFile.length;
+		}
+	}
+	return matchedSizes / candidate.length >= 1 - fuzzySizeThreshold;
+}
+
+export function compareFileTreesPartial(
+	candidate: Metafile,
+	searchee: Searchee,
+): boolean {
+	const { fuzzySizeThreshold } = getRuntimeConfig();
+	let matchedSizes = 0;
+	for (const candidateFile of candidate.files) {
+		let matchedSearcheeFiles = searchee.files.filter(
+			(searcheeFile) => searcheeFile.length === candidateFile.length,
+		);
+		if (matchedSearcheeFiles.length > 1) {
+			matchedSearcheeFiles = matchedSearcheeFiles.filter(
+				(searcheeFile) => searcheeFile.name === candidateFile.name,
+			);
+		}
+		if (matchedSearcheeFiles.length) {
+			matchedSizes += candidateFile.length;
+		}
+	}
+	const totalPieces = Math.ceil(candidate.length / candidate.pieceLength);
+	const availablePieces = Math.floor(matchedSizes / candidate.pieceLength);
+	return availablePieces / totalPieces >= 1 - fuzzySizeThreshold;
 }
 
 function sizeDoesMatch(resultSize, searchee) {
@@ -110,26 +173,35 @@ function sizeDoesMatch(resultSize, searchee) {
 function releaseGroupDoesMatch(
 	searcheeName: string,
 	candidateName: string,
-	matchMode: MatchMode
+	matchMode: MatchMode,
 ) {
-	const searcheeMatch = searcheeName.match(RELEASE_GROUP_REGEX);
-	const candidateMatch = candidateName.match(RELEASE_GROUP_REGEX);
-
-	// if we are unsure, pass in risky mode but fail in safe mode
-	if (!searcheeMatch || !candidateMatch) {
-		return matchMode === MatchMode.RISKY;
+	const searcheeReleaseGroup = searcheeName
+		.match(RELEASE_GROUP_REGEX)?.[0]
+		?.trim()
+		?.toLowerCase();
+	const candidateReleaseGroup = candidateName
+		.match(RELEASE_GROUP_REGEX)?.[0]
+		?.trim()
+		?.toLowerCase();
+	if (searcheeReleaseGroup === candidateReleaseGroup) {
+		return true;
 	}
-	return searcheeMatch[0]
-		.toLowerCase()
-		.startsWith(candidateMatch[0].toLowerCase());
+	// if we are unsure, pass in risky or partial mode but fail in safe mode
+	if (!searcheeReleaseGroup || !candidateReleaseGroup) {
+		return matchMode !== MatchMode.SAFE;
+	}
+	return searcheeReleaseGroup.startsWith(candidateReleaseGroup);
 }
 
 async function assessCandidateHelper(
 	{ link, size, name }: Candidate,
 	searchee: Searchee,
-	hashesToExclude: string[]
+	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
-	const { matchMode } = getRuntimeConfig();
+	const { matchMode, blockList } = getRuntimeConfig();
+	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
+		return { decision: Decision.BLOCKED_RELEASE };
+	}
 
 	if (size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
@@ -153,32 +225,46 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
+
+	const partialSizeMatch = compareFileTreesPartialIgnoringNames(
+		candidateMeta,
+		searchee,
+	);
+	if (!partialSizeMatch && matchMode === MatchMode.PARTIAL) {
+		return { decision: Decision.SIZE_MISMATCH };
+	}
+	const sizeMatch = compareFileTreesIgnoringNames(candidateMeta, searchee);
+	if (!sizeMatch && matchMode !== MatchMode.PARTIAL) {
+		return { decision: Decision.SIZE_MISMATCH };
+	}
+
 	const perfectMatch = compareFileTrees(candidateMeta, searchee);
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
-	if (!searchee.path) {
-		return { decision: Decision.FILE_TREE_MISMATCH };
-	}
 	if (
-		matchMode == MatchMode.RISKY &&
-		!statSync(searchee.path).isDirectory() &&
-		compareFileTreesIgnoringNames(candidateMeta, searchee)
+		sizeMatch &&
+		matchMode !== MatchMode.SAFE &&
+		searchee.files.length === 1
 	) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
+	}
+	const partialMatch = compareFileTreesPartial(candidateMeta, searchee);
+	if (partialMatch && matchMode === MatchMode.PARTIAL) {
+		return { decision: Decision.MATCH_PARTIAL, metafile: candidateMeta };
 	}
 	return { decision: Decision.FILE_TREE_MISMATCH };
 }
 
 function existsInTorrentCache(infoHash: string): boolean {
 	return existsSync(
-		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`)
+		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`),
 	);
 }
 
 async function getCachedTorrentFile(infoHash: string): Promise<Metafile> {
 	return parseTorrentFromFilename(
-		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`)
+		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`),
 	);
 }
 
@@ -187,9 +273,9 @@ function cacheTorrentFile(meta: Metafile): void {
 		path.join(
 			appDir(),
 			TORRENT_CACHE_FOLDER,
-			`${meta.infoHash}.cached.torrent`
+			`${meta.infoHash}.cached.torrent`,
 		),
-		meta.encode()
+		meta.encode(),
 	);
 }
 
@@ -197,19 +283,20 @@ async function assessAndSaveResults(
 	result: Candidate,
 	searchee: Searchee,
 	guid: string,
-	infoHashesToExclude: string[]
+	infoHashesToExclude: string[],
 ) {
 	const assessment = await assessCandidateHelper(
 		result,
 		searchee,
-		infoHashesToExclude
+		infoHashesToExclude,
 	);
 
 	if (
 		assessment.decision === Decision.MATCH ||
-		assessment.decision === Decision.MATCH_SIZE_ONLY
+		assessment.decision === Decision.MATCH_SIZE_ONLY ||
+		assessment.decision === Decision.MATCH_PARTIAL
 	) {
-		cacheTorrentFile(assessment.metafile);
+		cacheTorrentFile(assessment.metafile!);
 	}
 
 	await db.transaction(async (trx) => {
@@ -224,8 +311,9 @@ async function assessAndSaveResults(
 			decision: assessment.decision,
 			info_hash:
 				assessment.decision === Decision.MATCH ||
-				assessment.decision === Decision.MATCH_SIZE_ONLY
-					? assessment.metafile.infoHash
+				assessment.decision === Decision.MATCH_SIZE_ONLY ||
+				assessment.decision === Decision.MATCH_PARTIAL
+					? assessment.metafile!.infoHash
 					: null,
 			last_seen: now,
 			first_seen: now,
@@ -237,7 +325,7 @@ async function assessAndSaveResults(
 async function assessCandidateCaching(
 	candidate: Candidate,
 	searchee: Searchee,
-	infoHashesToExclude: string[]
+	infoHashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { guid, name, tracker } = candidate;
 	const logReason = createReasonLogger(name, tracker, searchee.name);
@@ -262,12 +350,13 @@ async function assessCandidateCaching(
 			candidate,
 			searchee,
 			guid,
-			infoHashesToExclude
+			infoHashesToExclude,
 		);
-		logReason(assessment.decision, false);
+		logReason(assessment.decision, false, searchee, candidate);
 	} else if (
 		(cacheEntry.decision === Decision.MATCH ||
-			cacheEntry.decision === Decision.MATCH_SIZE_ONLY) &&
+			cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
+			cacheEntry.decision === Decision.MATCH_PARTIAL) &&
 		infoHashesToExclude.includes(cacheEntry.infoHash)
 	) {
 		// has been added since the last run
@@ -277,7 +366,8 @@ async function assessCandidateCaching(
 			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
 	} else if (
 		(cacheEntry.decision === Decision.MATCH ||
-			cacheEntry.decision === Decision.MATCH_SIZE_ONLY) &&
+			cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
+			cacheEntry.decision === Decision.MATCH_PARTIAL) &&
 		existsInTorrentCache(cacheEntry.infoHash)
 	) {
 		// cached match
@@ -287,19 +377,20 @@ async function assessCandidateCaching(
 		};
 	} else if (
 		cacheEntry.decision === Decision.MATCH ||
-		cacheEntry.decision === Decision.MATCH_SIZE_ONLY
+		cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
+		cacheEntry.decision === Decision.MATCH_PARTIAL
 	) {
 		assessment = await assessAndSaveResults(
 			candidate,
 			searchee,
 			guid,
-			infoHashesToExclude
+			infoHashesToExclude,
 		);
-		logReason(assessment.decision, false);
+		logReason(assessment.decision, false, searchee, candidate);
 	} else {
 		// cached rejection
 		assessment = { decision: cacheEntry.decision };
-		logReason(cacheEntry.decision, true);
+		logReason(cacheEntry.decision, true, searchee, candidate);
 	}
 	// if previously known
 	if (cacheEntry) {

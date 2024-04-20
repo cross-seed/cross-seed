@@ -7,7 +7,7 @@ import {
 	statSync,
 	symlinkSync,
 } from "fs";
-import { join, resolve, dirname, basename } from "path";
+import { basename, dirname, join, relative, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -19,88 +19,213 @@ import {
 } from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
+import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
+import { Searchee, hasVideo } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
-import { CrossSeedError } from "./errors.js";
 
-export async function validateAction(): Promise<void> {
-	const { action } = getRuntimeConfig();
-	if (action !== Action.INJECT && action !== Action.SAVE) {
-		throw new CrossSeedError(
-			`Action method "${action}" is invalid. Allowed choices are "save" and "inject".`
+function logInjectionResult(
+	result: InjectionResult,
+	tracker: string,
+	name: string,
+	decision: Decision,
+) {
+	const styledName = chalk.green.bold(name);
+	const styledTracker = chalk.bold(tracker);
+	switch (result) {
+		case InjectionResult.SUCCESS:
+			logger.info(
+				`Found ${styledName} on ${styledTracker} by ${decision} - injected`,
+			);
+			break;
+		case InjectionResult.ALREADY_EXISTS:
+			logger.info(
+				`Found ${styledName} on ${styledTracker} by ${decision} - exists`,
+			);
+			break;
+		case InjectionResult.TORRENT_NOT_COMPLETE:
+			logger.warn(
+				`Found ${styledName} on ${styledTracker} by ${decision} - skipping incomplete torrent`,
+			);
+			break;
+		case InjectionResult.FAILURE:
+		default:
+			logger.error(
+				`Found ${styledName} on ${styledTracker} by ${decision} - failed to inject, saving instead`,
+			);
+			break;
+	}
+}
+
+/**
+ * this may not work with subfolder content layout
+ * @return the root of linked file. most likely "destinationDir/name". Not necessarily a file, it can be a directory
+ */
+function fuzzyLinkOneFile(
+	searchee: Searchee,
+	newMeta: Metafile,
+	destinationDir: string,
+	sourceRoot: string,
+): string {
+	const srcFilePath = join(
+		sourceRoot,
+		relative(searchee.name, searchee.files[0].path),
+	);
+	const destFilePath = join(destinationDir, newMeta.files[0].path);
+	mkdirSync(dirname(destFilePath), { recursive: true });
+	linkFile(srcFilePath, destFilePath);
+	return join(destinationDir, newMeta.name);
+}
+
+function fuzzyLinkPartial(
+	searchee: Searchee,
+	newMeta: Metafile,
+	destinationDir: string,
+	sourceRoot: string,
+): string {
+	for (const newFile of newMeta.files) {
+		let matchedSearcheeFiles = searchee.files.filter(
+			(searcheeFile) => searcheeFile.length === newFile.length,
+		);
+		if (matchedSearcheeFiles.length > 1) {
+			matchedSearcheeFiles = matchedSearcheeFiles.filter(
+				(searcheeFile) => searcheeFile.name === newFile.name,
+			);
+		}
+		if (matchedSearcheeFiles.length) {
+			const srcFilePath = statSync(sourceRoot).isFile()
+				? sourceRoot
+				: join(dirname(sourceRoot), matchedSearcheeFiles[0].path);
+			const destFilePath = join(destinationDir, newFile.path);
+			mkdirSync(dirname(destFilePath), { recursive: true });
+			linkFile(srcFilePath, destFilePath);
+		}
+	}
+	return join(destinationDir, newMeta.name);
+}
+
+async function linkAllFilesInMetafile(
+	searchee: Searchee,
+	newMeta: Metafile,
+	tracker: string,
+	decision:
+		| Decision.MATCH
+		| Decision.MATCH_SIZE_ONLY
+		| Decision.MATCH_PARTIAL,
+): Promise<
+	Result<
+		string,
+		| "MISSING_DATA"
+		| "TORRENT_NOT_FOUND"
+		| "TORRENT_NOT_COMPLETE"
+		| "UNKNOWN_ERROR"
+	>
+> {
+	const { linkDir, legacyLinking } = getRuntimeConfig();
+	const fullLinkDir = legacyLinking ? linkDir : join(linkDir, tracker);
+	let sourceRoot: string;
+	if (searchee.path) {
+		sourceRoot = searchee.path;
+	} else {
+		const downloadDirResult = await getClient().getDownloadDir(searchee);
+		if (downloadDirResult.isErr()) {
+			return downloadDirResult.mapErr((e) =>
+				e === "NOT_FOUND" ? "TORRENT_NOT_FOUND" : e,
+			);
+		}
+		sourceRoot = join(downloadDirResult.unwrapOrThrow(), searchee.name);
+	}
+
+	if (!existsSync(sourceRoot)) {
+		logger.error(
+			`Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
+		);
+		return resultOfErr("MISSING_DATA");
+	}
+
+	if (decision === Decision.MATCH) {
+		return resultOf(linkExactTree(sourceRoot, fullLinkDir));
+	} else if (decision === Decision.MATCH_SIZE_ONLY) {
+		return resultOf(
+			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot),
+		);
+	} else {
+		return resultOf(
+			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot),
 		);
 	}
 }
 
 export async function performAction(
 	newMeta: Metafile,
-	decision: Decision,
+	decision:
+		| Decision.MATCH
+		| Decision.MATCH_SIZE_ONLY
+		| Decision.MATCH_PARTIAL,
 	searchee: Searchee,
-	tracker: string
+	tracker: string,
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
+	const isVideo = hasVideo(searchee);
 
-	if (searchee.path) {
-		if (decision == Decision.MATCH) {
-			await linkExact(searchee.path, linkDir);
-		} else if (decision == Decision.MATCH_SIZE_ONLY) {
-			// Size only matching is only supported for single file or
-			// single, nested file torrents.
-			const candidateParentDir = dirname(newMeta.files[0].path);
-			let correctedlinkDir = linkDir;
-
-			// Candidate is single, nested file
-			if (candidateParentDir !== ".") {
-				mkdirSync(join(linkDir, candidateParentDir), {
-					recursive: true,
-				});
-				correctedlinkDir = join(linkDir, candidateParentDir);
-			}
-			linkFile(
-				searchee.path,
-				join(correctedlinkDir, newMeta.files[0].name)
-			);
-		}
-	}
-
-	const styledName = chalk.green.bold(newMeta.name);
-	const styledTracker = chalk.bold(tracker);
-	if (action === Action.INJECT) {
-		const result = await getClient().inject(
-			newMeta,
-			searchee,
-			searchee.path ? linkDir : undefined
+	if (action === Action.SAVE) {
+		await saveTorrentFile(tracker, getTag(searchee.name, isVideo), newMeta);
+		const styledName = chalk.green.bold(newMeta.name);
+		const styledTracker = chalk.bold(tracker);
+		logger.info(
+			`Found ${styledName} on ${styledTracker} by ${decision} - saved`,
 		);
-		switch (result) {
-			case InjectionResult.SUCCESS:
-				logger.info(
-					`Found ${styledName} on ${styledTracker} - injected`
-				);
-				break;
-			case InjectionResult.ALREADY_EXISTS:
-				logger.info(`Found ${styledName} on ${styledTracker} - exists`);
-				break;
-			case InjectionResult.TORRENT_NOT_COMPLETE:
-				logger.warn(
-					`Found ${styledName} on ${styledTracker} - skipping incomplete torrent`
-				);
-				break;
-			case InjectionResult.FAILURE:
-			default:
-				logger.error(
-					`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
-				);
-				saveTorrentFile(tracker, getTag(searchee.name), newMeta);
-				break;
-		}
-		return result;
-	} else {
-		saveTorrentFile(tracker, getTag(searchee.name), newMeta);
-		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
 		return SaveResult.SAVED;
 	}
+
+	let destinationDir: string | undefined;
+
+	if (linkDir) {
+		const linkedFilesRootResult = await linkAllFilesInMetafile(
+			searchee,
+			newMeta,
+			tracker,
+			decision,
+		);
+		if (linkedFilesRootResult.isOk()) {
+			destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
+		} else if (
+			decision === Decision.MATCH &&
+			linkedFilesRootResult.unwrapErrOrThrow() === "MISSING_DATA"
+		) {
+			logger.warn("Falling back to non-linking.");
+		} else {
+			logInjectionResult(
+				InjectionResult.FAILURE,
+				tracker,
+				newMeta.name,
+				decision,
+			);
+			await saveTorrentFile(
+				tracker,
+				getTag(searchee.name, isVideo),
+				newMeta,
+			);
+			return InjectionResult.FAILURE;
+		}
+	} else if (searchee.path) {
+		// should be a MATCH, as risky requires a linkDir to be set
+		destinationDir = dirname(searchee.path);
+	}
+
+	const result = await getClient().inject(
+		newMeta,
+		searchee,
+		decision,
+		destinationDir,
+	);
+
+	logInjectionResult(result, tracker, newMeta.name, decision);
+	if (result === InjectionResult.FAILURE) {
+		await saveTorrentFile(tracker, getTag(searchee.name, isVideo), newMeta);
+	}
+	return result;
 }
 
 export async function performActions(searchee, matches) {
@@ -110,7 +235,7 @@ export async function performActions(searchee, matches) {
 			assessment.metafile,
 			assessment.decision,
 			searchee,
-			tracker
+			tracker,
 		);
 		results.push(result);
 		if (result === InjectionResult.TORRENT_NOT_COMPLETE) break;
@@ -118,20 +243,22 @@ export async function performActions(searchee, matches) {
 	return results;
 }
 
-function linkExact(oldPath: string, newPath: string) {
-	if (!newPath) {
-		return;
-	}
+/**
+ * @return the root of linked files.
+ */
+
+function linkExactTree(oldPath: string, dest: string): string {
+	const newPath = join(dest, basename(oldPath));
 	if (statSync(oldPath).isFile()) {
-		if (!existsSync(join(newPath, basename(oldPath)))) {
-			linkFile(oldPath, join(newPath, basename(oldPath)));
+		mkdirSync(dirname(newPath), { recursive: true });
+		linkFile(oldPath, newPath);
+	} else {
+		mkdirSync(newPath, { recursive: true });
+		for (const dirent of readdirSync(oldPath)) {
+			linkExactTree(join(oldPath, dirent), newPath);
 		}
-		return;
 	}
-	mkdirSync(join(newPath, basename(oldPath)), { recursive: true });
-	readdirSync(oldPath).forEach((file) => {
-		linkExact(join(oldPath, file), join(newPath, basename(oldPath)));
-	});
+	return newPath;
 }
 
 function linkFile(oldPath: string, newPath: string) {

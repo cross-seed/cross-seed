@@ -1,8 +1,8 @@
-import fetch from "node-fetch";
 import {
 	ActionResult,
 	InjectionResult,
 	SaveResult,
+	PROGRAM_NAME,
 	USER_AGENT,
 } from "./constants.js";
 import { ResultAssessment } from "./decide.js";
@@ -30,7 +30,7 @@ export class PushNotifier {
 	}
 
 	async notify({
-		title = "cross-seed",
+		title = PROGRAM_NAME,
 		body,
 		...rest
 	}: PushNotification): Promise<void> {
@@ -68,21 +68,21 @@ export class PushNotifier {
 export function sendResultsNotification(
 	searchee: Searchee,
 	results: [ResultAssessment, TrackerName, ActionResult][],
-	source: Label.REVERSE_LOOKUP | Label.SEARCH
+	source: Label.REVERSE_LOOKUP | Label.SEARCH,
 ) {
 	const name = searchee.name;
 	const notableSuccesses = results.filter(
 		([, , actionResult]) =>
 			actionResult === InjectionResult.SUCCESS ||
-			actionResult === SaveResult.SAVED
+			actionResult === SaveResult.SAVED,
 	);
 	const failures = results.filter(
-		([, , actionResult]) => actionResult === InjectionResult.FAILURE
+		([, , actionResult]) => actionResult === InjectionResult.FAILURE,
 	);
 	if (notableSuccesses.length) {
 		const numTrackers = notableSuccesses.length;
 		const infoHashes = notableSuccesses.map(
-			([assessment]) => assessment.metafile.infoHash
+			([assessment]) => assessment.metafile!.infoHash,
 		);
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
 		const trackersListStr = formatAsList(trackers);
@@ -106,7 +106,7 @@ export function sendResultsNotification(
 	if (failures.length) {
 		const numTrackers = failures.length;
 		const infoHashes = failures.map(
-			([assessment]) => assessment.metafile.infoHash
+			([assessment]) => assessment.metafile!.infoHash,
 		);
 		const trackers = failures.map(([, tracker]) => tracker);
 		const trackersListStr = formatAsList(trackers);

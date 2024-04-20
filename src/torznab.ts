@@ -1,5 +1,4 @@
 import ms from "ms";
-import fetch from "node-fetch";
 import xml2js from "xml2js";
 import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
@@ -13,7 +12,9 @@ import {
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
+import { Searchee, hasVideo } from "./searchee.js";
 import {
+	getAnimeQueries,
 	cleanseSeparators,
 	getTag,
 	MediaType,
@@ -26,7 +27,6 @@ interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
-	offset?: number;
 	apikey?: string;
 	season?: number | string;
 	ep?: number | string;
@@ -47,7 +47,7 @@ type TorznabCaps = {
 				search?: TorznabSearchTechnique;
 				"tv-search"?: TorznabSearchTechnique;
 				"movie-search"?: TorznabSearchTechnique;
-			}
+			},
 		];
 	};
 };
@@ -66,7 +66,9 @@ interface TorznabResult {
 type TorznabResults = { rss?: { channel?: [] | [{ item?: TorznabResult[] }] } };
 
 function sanitizeUrl(url: string | URL): string {
-	url = new URL(url);
+	if (typeof url === "string") {
+		url = new URL(url);
+	}
 	return url.origin + url.pathname;
 }
 
@@ -105,53 +107,72 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	};
 }
 
-function createTorznabSearchQuery(name: string, caps: Caps) {
-	const nameWithoutExtension = stripExtension(name);
+function createTorznabSearchQueries(
+	searchee: Searchee,
+	caps: Caps,
+): TorznabParams[] {
+	const nameWithoutExtension = stripExtension(searchee.name);
+	const isVideo = hasVideo(searchee);
 	const extractNumber = (str: string): number =>
-		parseInt(str.match(/\d+/)[0]);
-	const mediaType = getTag(nameWithoutExtension);
+		parseInt(str.match(/\d+/)![0]);
+	const mediaType = getTag(nameWithoutExtension, isVideo);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
-		return {
-			t: "tvsearch",
-			q: cleanseSeparators(match.groups.title),
-			season: match.groups.season
-				? extractNumber(match.groups.season)
-				: match.groups.year,
-			ep: match.groups.episode
-				? extractNumber(match.groups.episode)
-				: `${match.groups.month}/${match.groups.day}`,
-		} as const;
+		return [
+			{
+				t: "tvsearch",
+				q: cleanseSeparators(match!.groups!.title),
+				season: match!.groups!.season
+					? extractNumber(match!.groups!.season)
+					: match!.groups!.year,
+				ep: match!.groups!.episode
+					? extractNumber(match!.groups!.episode)
+					: `${match!.groups!.month}/${match!.groups!.day}`,
+			},
+		] as const;
 	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
-		return {
-			t: "tvsearch",
-			q: cleanseSeparators(match.groups.title),
-			season: extractNumber(match.groups.season),
-		} as const;
-	} else {
-		return {
+		return [
+			{
+				t: "tvsearch",
+				q: cleanseSeparators(match!.groups!.title),
+				season: extractNumber(match!.groups!.season),
+			},
+		] as const;
+	} else if (mediaType === MediaType.ANIME) {
+		const animeQueries = getAnimeQueries(nameWithoutExtension);
+		return animeQueries.map((animeQuery) => ({
 			t: "search",
-			q: reformatTitleForSearching(nameWithoutExtension),
-		} as const;
+			q: animeQuery,
+		}));
+	} else {
+		return [
+			{
+				t: "search",
+				q: reformatTitleForSearching(nameWithoutExtension),
+			},
+		] as const;
 	}
 }
 
 export async function queryRssFeeds(): Promise<Candidate[]> {
 	const candidatesByUrl = await makeRequests(
-		"",
 		await getEnabledIndexers(),
-		() => ({ t: "search", q: "" })
+		() => [{ t: "search", q: "" }],
 	);
 	return candidatesByUrl.flatMap((e) => e.candidates);
 }
 
 export async function searchTorznab(
-	name: string
+	searchee: Searchee,
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
-	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
-
+	const { excludeRecentSearch, excludeOlder, torznab } = getRuntimeConfig();
+	if (torznab.length === 0) {
+		throw new Error("no indexers are available");
+	}
 	const enabledIndexers = await getEnabledIndexers();
+
+	const name = searchee.name;
 
 	// search history for name across all indexers
 	const timestampDataSql = await db("searchee")
@@ -159,7 +180,7 @@ export async function searchTorznab(
 		.join("indexer", "timestamp.indexer_id", "indexer.id")
 		.whereIn(
 			"indexer.id",
-			enabledIndexers.map((i) => i.id)
+			enabledIndexers.map((i) => i.id),
 		)
 		.andWhere({ name })
 		.select({
@@ -169,7 +190,7 @@ export async function searchTorznab(
 		});
 	const indexersToUse = enabledIndexers.filter((indexer) => {
 		const entry = timestampDataSql.find(
-			(entry) => entry.indexerId === indexer.id
+			(entry) => entry.indexerId === indexer.id,
 		);
 		return (
 			!entry ||
@@ -189,12 +210,12 @@ export async function searchTorznab(
 		}`,
 	});
 
-	return makeRequests(name, indexersToUse, (indexer) =>
-		createTorznabSearchQuery(name, {
+	return makeRequests(indexersToUse, (indexer) =>
+		createTorznabSearchQueries(searchee, {
 			search: indexer.searchCap,
 			tvSearch: indexer.tvSearchCap,
 			movieSearch: indexer.movieSearchCap,
-		})
+		}),
 	);
 }
 
@@ -218,21 +239,21 @@ export async function syncWithDb() {
 	const inConfigButNotInDb = torznab.filter(
 		(configIndexer) =>
 			!dbIndexers.some(
-				(dbIndexer) => dbIndexer.url === sanitizeUrl(configIndexer)
-			)
+				(dbIndexer) => dbIndexer.url === sanitizeUrl(configIndexer),
+			),
 	);
 
 	const inDbButNotInConfig = dbIndexers.filter(
 		(dbIndexer) =>
 			!torznab.some(
-				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url
-			)
+				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url,
+			),
 	);
 
 	const apikeyUpdates = dbIndexers.reduce<{ id: number; apikey: string }[]>(
 		(acc, dbIndexer) => {
 			const configIndexer = torznab.find(
-				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url
+				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url,
 			);
 			if (
 				configIndexer &&
@@ -240,19 +261,19 @@ export async function syncWithDb() {
 			) {
 				acc.push({
 					id: dbIndexer.id,
-					apikey: getApikey(configIndexer),
+					apikey: getApikey(configIndexer)!,
 				});
 			}
 			return acc;
 		},
-		[]
+		[],
 	);
 
 	if (inDbButNotInConfig.length > 0) {
 		await db("indexer")
 			.whereIn(
 				"url",
-				inDbButNotInConfig.map((indexer) => indexer.url)
+				inDbButNotInConfig.map((indexer) => indexer.url),
 			)
 			.update({ active: false });
 	}
@@ -264,7 +285,7 @@ export async function syncWithDb() {
 					url: sanitizeUrl(url),
 					apikey: getApikey(url),
 					active: true,
-				}))
+				})),
 			)
 			.onConflict("url")
 			.merge(["active", "apikey"]);
@@ -276,13 +297,17 @@ export async function syncWithDb() {
 				.where({ id: apikeyUpdate.id })
 				.update({ apikey: apikeyUpdate.apikey });
 		}
+		// drop cached UNKNOWN_ERRORs on startup
+		await trx("indexer")
+			.where({ status: IndexerStatus.UNKNOWN_ERROR })
+			.update({ status: IndexerStatus.OK });
 	});
 }
 
 function assembleUrl(
 	urlStr: string,
 	apikey: string,
-	params: TorznabParams
+	params: TorznabParams,
 ): string {
 	const url = new URL(urlStr);
 	const searchParams = new URLSearchParams();
@@ -305,11 +330,11 @@ async function fetchCaps(indexer: {
 	let response;
 	try {
 		response = await fetch(
-			assembleUrl(indexer.url, indexer.apikey, { t: "caps" })
+			assembleUrl(indexer.url, indexer.apikey, { t: "caps" }),
 		);
 	} catch (e) {
 		const error = new Error(
-			`Indexer ${indexer.url} failed to respond, check verbose logs`
+			`Indexer ${indexer.url} failed to respond, check verbose logs`,
 		);
 		logger.error(error);
 		logger.debug(e);
@@ -319,14 +344,14 @@ async function fetchCaps(indexer: {
 	const responseText = await response.text();
 	if (!response.ok) {
 		const error = new Error(
-			`Indexer ${indexer.url} responded with code ${response.status} when fetching caps, check verbose logs`
+			`Indexer ${indexer.url} responded with code ${response.status} when fetching caps, check verbose logs`,
 		);
 		logger.error(error);
 		logger.debug(
 			`Response body first 1000 characters: ${responseText.substring(
 				0,
-				1000
-			)}`
+				1000,
+			)}`,
 		);
 		throw error;
 	}
@@ -335,14 +360,14 @@ async function fetchCaps(indexer: {
 		return parseTorznabCaps(parsedXml);
 	} catch (_) {
 		const error = new Error(
-			`Indexer ${indexer.url} responded with invalid XML when fetching caps, check verbose logs`
+			`Indexer ${indexer.url} responded with invalid XML when fetching caps, check verbose logs`,
 		);
 		logger.error(error);
 		logger.debug(
 			`Response body first 1000 characters: ${responseText.substring(
 				0,
-				1000
-			)}`
+				1000,
+			)}`,
 		);
 		throw error;
 	}
@@ -350,7 +375,7 @@ async function fetchCaps(indexer: {
 
 function collateOutcomes<Correlator, SuccessReturnType>(
 	correlators: Correlator[],
-	outcomes: PromiseSettledResult<SuccessReturnType>[]
+	outcomes: PromiseSettledResult<SuccessReturnType>[],
 ): {
 	rejected: [Correlator, PromiseRejectedResult["reason"]][];
 	fulfilled: [Correlator, SuccessReturnType][];
@@ -367,19 +392,19 @@ function collateOutcomes<Correlator, SuccessReturnType>(
 			}
 			return { rejected, fulfilled };
 		},
-		{ rejected: [], fulfilled: [] }
+		{ rejected: [], fulfilled: [] },
 	);
 }
 
 async function updateCaps(
-	indexers: { id: number; url: string; apikey: string }[]
+	indexers: { id: number; url: string; apikey: string }[],
 ): Promise<void> {
 	const outcomes = await Promise.allSettled<Caps>(
-		indexers.map((indexer) => fetchCaps(indexer))
+		indexers.map((indexer) => fetchCaps(indexer)),
 	);
 	const { fulfilled } = collateOutcomes<number, Caps>(
 		indexers.map((i) => i.id),
-		outcomes
+		outcomes,
 	);
 
 	for (const [indexerId, caps] of fulfilled) {
@@ -399,12 +424,12 @@ export async function validateTorznabUrls() {
 	for (const url of urls) {
 		if (!url.pathname.endsWith("/api")) {
 			throw new CrossSeedError(
-				`Torznab url ${url} must have a path ending in /api`
+				`Torznab url ${url} must have a path ending in /api`,
 			);
 		}
 		if (!url.searchParams.has("apikey")) {
 			throw new CrossSeedError(
-				`Torznab url ${url} does not specify an apikey`
+				`Torznab url ${url} does not specify an apikey`,
 			);
 		}
 	}
@@ -426,28 +451,29 @@ export async function validateTorznabUrls() {
 
 	for (const indexer of indexersWithoutSearch) {
 		logger.warn(
-			`Ignoring indexer that doesn't support searching: ${indexer.url}`
+			`Ignoring indexer that doesn't support searching: ${indexer.url}`,
 		);
 	}
 
 	const indexersWithSearch = await getEnabledIndexers();
 
 	if (indexersWithSearch.length === 0) {
-		throw new CrossSeedError("no working indexers available");
+		logger.warn("no working indexers available");
 	}
 }
 
 async function makeRequests(
-	name: string,
 	indexers: Indexer[],
-	getQuery: (indexer: Indexer) => TorznabParams
+	getQueries: (indexer: Indexer) => TorznabParams[],
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
 	const { searchTimeout } = getRuntimeConfig();
-	const searchUrls = indexers.map((indexer: Indexer) =>
-		assembleUrl(indexer.url, indexer.apikey, getQuery(indexer))
+	const searchUrls = indexers.flatMap((indexer: Indexer) =>
+		getQueries(indexer).map((query) =>
+			assembleUrl(indexer.url, indexer.apikey, query),
+		),
 	);
 	searchUrls.forEach(
-		(message) => void logger.verbose({ label: Label.TORZNAB, message })
+		(message) => void logger.verbose({ label: Label.TORZNAB, message }),
 	);
 	const abortControllers = searchUrls.map(() => new AbortController());
 	if (typeof searchTimeout === "number") {
@@ -467,7 +493,7 @@ async function makeRequests(
 				.then((response) => {
 					if (!response.ok) {
 						const retryAfterSeconds = Number(
-							response.headers.get("Retry-After")
+							response.headers.get("Retry-After"),
 						);
 
 						if (!Number.isNaN(retryAfterSeconds)) {
@@ -476,7 +502,7 @@ async function makeRequests(
 									? IndexerStatus.RATE_LIMITED
 									: IndexerStatus.UNKNOWN_ERROR,
 								Date.now() + ms(`${retryAfterSeconds} seconds`),
-								[indexers[i].id]
+								[indexers[i].id],
 							);
 						} else {
 							updateIndexerStatus(
@@ -486,28 +512,28 @@ async function makeRequests(
 								response.status === 429
 									? Date.now() + ms("1 hour")
 									: Date.now() + ms("10 minutes"),
-								[indexers[i].id]
+								[indexers[i].id],
 							);
 						}
 						throw new Error(
-							`request failed with code: ${response.status}`
+							`request failed with code: ${response.status}`,
 						);
 					}
 					return response.text();
 				})
 				.then(xml2js.parseStringPromise)
-				.then(parseTorznabResults)
-		)
+				.then(parseTorznabResults),
+		),
 	);
 
 	const { rejected, fulfilled } = collateOutcomes<number, Candidate[]>(
 		indexers.map((indexer) => indexer.id),
-		outcomes
+		outcomes,
 	);
 
 	for (const [indexerId, reason] of rejected) {
 		logger.warn(
-			`Failed to reach ${indexers.find((i) => i.id === indexerId).url}`
+			`Failed to reach ${indexers.find((i) => i.id === indexerId)!.url}`,
 		);
 		logger.debug(reason);
 	}
