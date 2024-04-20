@@ -33,7 +33,7 @@ export async function getEnabledIndexers() {
 		.orWhere((b) =>
 			b
 				.where({ active: true, search_cap: true })
-				.where("retry_after", "<", Date.now())
+				.where("retry_after", "<", Date.now()),
 		)
 		.select({
 			id: "id",
@@ -51,13 +51,13 @@ export async function getEnabledIndexers() {
 export async function updateIndexerStatus(
 	status: IndexerStatus,
 	retryAfter: number,
-	indexerIds: number[]
+	indexerIds: number[],
 ) {
 	if (indexerIds.length > 0) {
 		logger.verbose({
 			label: Label.TORZNAB,
 			message: `Snoozing indexers ${indexerIds} with ${status} until ${humanReadable(
-				retryAfter
+				retryAfter,
 			)}`,
 		});
 
@@ -70,7 +70,7 @@ export async function updateIndexerStatus(
 
 export async function updateSearchTimestamps(
 	name: string,
-	indexerIds: number[]
+	indexerIds: number[],
 ) {
 	for (const indexerId of indexerIds) {
 		await db.transaction(async (trx) => {

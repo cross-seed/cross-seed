@@ -49,7 +49,7 @@ function parseData(data: string) {
 
 async function authorize(
 	req: IncomingMessage,
-	res: ServerResponse
+	res: ServerResponse,
 ): Promise<boolean> {
 	const url = new URL(req.url!, `http://${req.headers.host}`);
 	const apiKey =
@@ -65,7 +65,7 @@ async function authorize(
 		});
 		res.writeHead(401, "Unauthorized");
 		res.end(
-			"Specify the API key in an X-Api-Key header or an apikey query param."
+			"Specify the API key in an X-Api-Key header or an apikey query param.",
 		);
 	}
 	return isAuthorized;
@@ -73,7 +73,7 @@ async function authorize(
 
 async function search(
 	req: IncomingMessage,
-	res: ServerResponse
+	res: ServerResponse,
 ): Promise<void> {
 	const dataStr = await getData(req);
 	let data;
@@ -135,7 +135,7 @@ async function search(
 
 async function announce(
 	req: IncomingMessage,
-	res: ServerResponse
+	res: ServerResponse,
 ): Promise<void> {
 	const dataStr = await getData(req);
 	let data;
@@ -203,7 +203,7 @@ async function announce(
 
 async function handleRequest(
 	req: IncomingMessage,
-	res: ServerResponse
+	res: ServerResponse,
 ): Promise<void> {
 	if (!(await authorize(req, res))) return;
 

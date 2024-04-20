@@ -77,7 +77,7 @@ const createReasonLogger =
 
 export function compareFileTrees(
 	candidate: Metafile,
-	searchee: Searchee
+	searchee: Searchee,
 ): boolean {
 	const cmp = (elOfA: File, elOfB: File) => {
 		const lengthsAreEqual = elOfB.length === elOfA.length;
@@ -87,32 +87,32 @@ export function compareFileTrees(
 	};
 
 	return candidate.files.every((elOfA) =>
-		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
+		searchee.files.some((elOfB) => cmp(elOfA, elOfB)),
 	);
 }
 
 export function compareFileTreesIgnoringNames(
 	candidate: Metafile,
-	searchee: Searchee
+	searchee: Searchee,
 ): boolean {
 	const cmp = (candidate, searchee) => {
 		return searchee.length === candidate.length;
 	};
 
 	return candidate.files.every((elOfA) =>
-		searchee.files.some((elOfB) => cmp(elOfA, elOfB))
+		searchee.files.some((elOfB) => cmp(elOfA, elOfB)),
 	);
 }
 
 export function compareFileTreesPartialIgnoringNames(
 	candidate: Metafile,
-	searchee: Searchee
+	searchee: Searchee,
 ): boolean {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 	let matchedSizes = 0;
 	for (const candidateFile of candidate.files) {
 		const searcheeHasFileSize = searchee.files.some(
-			(searcheeFile) => searcheeFile.length === candidateFile.length
+			(searcheeFile) => searcheeFile.length === candidateFile.length,
 		);
 		if (searcheeHasFileSize) {
 			matchedSizes += candidateFile.length;
@@ -123,17 +123,17 @@ export function compareFileTreesPartialIgnoringNames(
 
 export function compareFileTreesPartial(
 	candidate: Metafile,
-	searchee: Searchee
+	searchee: Searchee,
 ): boolean {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 	let matchedSizes = 0;
 	for (const candidateFile of candidate.files) {
 		let matchedSearcheeFiles = searchee.files.filter(
-			(searcheeFile) => searcheeFile.length === candidateFile.length
+			(searcheeFile) => searcheeFile.length === candidateFile.length,
 		);
 		if (matchedSearcheeFiles.length > 1) {
 			matchedSearcheeFiles = matchedSearcheeFiles.filter(
-				(searcheeFile) => searcheeFile.name === candidateFile.name
+				(searcheeFile) => searcheeFile.name === candidateFile.name,
 			);
 		}
 		if (matchedSearcheeFiles.length) {
@@ -157,7 +157,7 @@ function sizeDoesMatch(resultSize, searchee) {
 function releaseGroupDoesMatch(
 	searcheeName: string,
 	candidateName: string,
-	matchMode: MatchMode
+	matchMode: MatchMode,
 ) {
 	const searcheeReleaseGroup = searcheeName
 		.match(RELEASE_GROUP_REGEX)?.[0]
@@ -180,7 +180,7 @@ function releaseGroupDoesMatch(
 async function assessCandidateHelper(
 	{ link, size, name }: Candidate,
 	searchee: Searchee,
-	hashesToExclude: string[]
+	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { matchMode, blockList } = getRuntimeConfig();
 	if (releaseInBlockList(searchee, blockList)) {
@@ -212,7 +212,7 @@ async function assessCandidateHelper(
 
 	const partialSizeMatch = compareFileTreesPartialIgnoringNames(
 		candidateMeta,
-		searchee
+		searchee,
 	);
 	if (!partialSizeMatch && matchMode === MatchMode.PARTIAL) {
 		return { decision: Decision.SIZE_MISMATCH };
@@ -242,13 +242,13 @@ async function assessCandidateHelper(
 
 function existsInTorrentCache(infoHash: string): boolean {
 	return existsSync(
-		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`)
+		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`),
 	);
 }
 
 async function getCachedTorrentFile(infoHash: string): Promise<Metafile> {
 	return parseTorrentFromFilename(
-		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`)
+		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`),
 	);
 }
 
@@ -257,9 +257,9 @@ function cacheTorrentFile(meta: Metafile): void {
 		path.join(
 			appDir(),
 			TORRENT_CACHE_FOLDER,
-			`${meta.infoHash}.cached.torrent`
+			`${meta.infoHash}.cached.torrent`,
 		),
-		meta.encode()
+		meta.encode(),
 	);
 }
 
@@ -267,12 +267,12 @@ async function assessAndSaveResults(
 	result: Candidate,
 	searchee: Searchee,
 	guid: string,
-	infoHashesToExclude: string[]
+	infoHashesToExclude: string[],
 ) {
 	const assessment = await assessCandidateHelper(
 		result,
 		searchee,
-		infoHashesToExclude
+		infoHashesToExclude,
 	);
 
 	if (
@@ -309,7 +309,7 @@ async function assessAndSaveResults(
 async function assessCandidateCaching(
 	candidate: Candidate,
 	searchee: Searchee,
-	infoHashesToExclude: string[]
+	infoHashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { guid, name, tracker } = candidate;
 	const logReason = createReasonLogger(name, tracker, searchee.name);
@@ -334,7 +334,7 @@ async function assessCandidateCaching(
 			candidate,
 			searchee,
 			guid,
-			infoHashesToExclude
+			infoHashesToExclude,
 		);
 		logReason(assessment.decision, false);
 	} else if (
@@ -368,7 +368,7 @@ async function assessCandidateCaching(
 			candidate,
 			searchee,
 			guid,
-			infoHashesToExclude
+			infoHashesToExclude,
 		);
 		logReason(assessment.decision, false);
 	} else {

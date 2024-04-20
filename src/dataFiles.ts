@@ -21,7 +21,7 @@ function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
 export function findPotentialNestedRoots(
 	root: string,
 	depth: number,
-	isDirHint?: boolean
+	isDirHint?: boolean,
 ): string[] {
 	const isDir =
 		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
@@ -35,8 +35,8 @@ export function findPotentialNestedRoots(
 			findPotentialNestedRoots(
 				join(root, dirent.name),
 				depth - 1,
-				dirent.isDirectory()
-			)
+				dirent.isDirectory(),
+			),
 		);
 		return [root, ...allDescendants];
 	} else {
@@ -49,6 +49,6 @@ export function findSearcheesFromAllDataDirs(): string[] {
 	return dataDirs.flatMap((dataDir) =>
 		readdirSync(dataDir)
 			.map((dirent) => join(dataDir, dirent))
-			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth))
+			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth)),
 	);
 }

@@ -32,7 +32,7 @@ const ZodErrorMessages = {
  */
 export function customizeErrorMessage(
 	error: ZodIssueOptionalMessage,
-	ctx: ErrorMapCtx
+	ctx: ErrorMapCtx,
 ): { message: string } {
 	switch (error.code) {
 		case z.ZodIssueCode.invalid_union:
@@ -58,7 +58,7 @@ export function customizeErrorMessage(
 function addZodIssue(
 	setting: string,
 	errorMessage: string,
-	ctx: RefinementCtx
+	ctx: RefinementCtx,
 ): void {
 	ctx.addIssue({
 		code: "custom",
@@ -109,8 +109,8 @@ export const VALIDATION_SCHEMA = z
 					.transform((value, ctx) =>
 						value && value.length > 0
 							? checkValidPathFormat(value, ctx)
-							: null
-					)
+							: null,
+					),
 			)
 
 			.nullish(),
@@ -206,7 +206,7 @@ export const VALIDATION_SCHEMA = z
 				!config.transmissionRpcUrl &&
 				!config.delugeRpcUrl
 			),
-		ZodErrorMessages.injectUrl
+		ZodErrorMessages.injectUrl,
 	)
 	.refine((config) => {
 		if (config.skipRecheck && config.matchMode !== MatchMode.SAFE) {
@@ -216,5 +216,5 @@ export const VALIDATION_SCHEMA = z
 	})
 	.refine(
 		(config) => config.matchMode === MatchMode.SAFE || config.linkDir,
-		ZodErrorMessages.needsLinkDir
+		ZodErrorMessages.needsLinkDir,
 	);

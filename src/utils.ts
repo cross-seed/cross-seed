@@ -43,12 +43,12 @@ export function getTag(name: string, isVideo: boolean): MediaType {
 	return EP_REGEX.test(name)
 		? MediaType.EPISODE
 		: SEASON_REGEX.test(name)
-		? MediaType.SEASON
-		: MOVIE_REGEX.test(name)
-		? MediaType.MOVIE
-		: isVideo && ANIME_REGEX.test(name)
-		? MediaType.ANIME
-		: MediaType.OTHER;
+			? MediaType.SEASON
+			: MOVIE_REGEX.test(name)
+				? MediaType.MOVIE
+				: isVideo && ANIME_REGEX.test(name)
+					? MediaType.ANIME
+					: MediaType.OTHER;
 }
 
 export async function time<R>(cb: () => R, times: number[]) {
@@ -122,7 +122,7 @@ export function fallback<T>(...args: T[]): T | undefined {
 
 export function extractCredentialsFromUrl(
 	url: string,
-	basePath?: string
+	basePath?: string,
 ): Result<{ username: string; password: string; href: string }, "invalid URL"> {
 	try {
 		const { origin, pathname, username, password } = new URL(url);
@@ -132,8 +132,8 @@ export function extractCredentialsFromUrl(
 			href: basePath
 				? origin + path.posix.join(pathname, basePath)
 				: pathname === "/"
-				? origin
-				: origin + pathname,
+					? origin
+					: origin + pathname,
 		});
 	} catch (e) {
 		return resultOfErr("invalid URL");

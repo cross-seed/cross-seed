@@ -34,7 +34,7 @@ type InjectData = [
 		add_paused: boolean;
 		seed_mode: boolean;
 		download_location: string;
-	}
+	},
 ];
 type WebHostList = [string, string, number, string][];
 type ErrorType = { message?: string; code?: DelugeErrorCode };
@@ -65,24 +65,24 @@ export default class Deluge implements TorrentClient {
 	private async authenticate(): Promise<void> {
 		const { delugeRpcUrl } = getRuntimeConfig();
 		const { href, password } = extractCredentialsFromUrl(
-			delugeRpcUrl
+			delugeRpcUrl,
 		).unwrapOrThrow(
-			new CrossSeedError("delugeRpcUrl must be percent-encoded")
+			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
 		);
 		if (!password) {
 			throw new CrossSeedError(
-				"You need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)"
+				"You need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)",
 			);
 		}
 		try {
 			const authResponse = await this.call<boolean>(
 				"auth.login",
 				[password],
-				0
+				0,
 			);
 			if (!authResponse.result) {
 				throw new CrossSeedError(
-					`Reached Deluge, but failed to authenticate: ${href}`
+					`Reached Deluge, but failed to authenticate: ${href}`,
 				);
 			}
 		} catch (networkError) {
@@ -91,28 +91,28 @@ export default class Deluge implements TorrentClient {
 		const connectedResponse = await this.call<boolean>(
 			"web.connected",
 			[],
-			0
+			0,
 		);
 
 		if (!connectedResponse.result) {
 			logger.warn(
-				"Deluge WebUI disconnected from daemon...attempting to reconnect."
+				"Deluge WebUI disconnected from daemon...attempting to reconnect.",
 			);
 			const webuiHostList = await this.call<WebHostList>(
 				"web.get_hosts",
 				[],
-				0
+				0,
 			);
 			const connectResponse = await this.call<undefined>(
 				"web.connect",
 				[webuiHostList.result![0][0]],
-				0
+				0,
 			);
 			if (!connectResponse.error) {
 				logger.info("Deluge WebUI connected to the daemon.");
 			} else {
 				throw new CrossSeedError(
-					"Unable to connect WebUI to Deluge daemon. Connect to the WebUI to resolve this."
+					"Unable to connect WebUI to Deluge daemon. Connect to the WebUI to resolve this.",
 				);
 			}
 		}
@@ -124,7 +124,7 @@ export default class Deluge implements TorrentClient {
 	private async call<ResultType>(
 		method: string,
 		params: unknown[],
-		retries = 1
+		retries = 1,
 	): Promise<DelugeJSON<ResultType>> {
 		const { delugeRpcUrl } = getRuntimeConfig();
 		const { href } =
@@ -138,7 +138,7 @@ export default class Deluge implements TorrentClient {
 
 		setTimeout(
 			() => void abortController.abort(),
-			ms("10 seconds")
+			ms("10 seconds"),
 		).unref();
 
 		try {
@@ -155,7 +155,7 @@ export default class Deluge implements TorrentClient {
 		} catch (networkError) {
 			if (networkError.name === "AbortError") {
 				throw new Error(
-					`Deluge method ${method} timed out after 10 seconds`
+					`Deluge method ${method} timed out after 10 seconds`,
 				);
 			}
 			throw new Error(`Failed to connect to Deluge at ${href}`, {
@@ -166,7 +166,7 @@ export default class Deluge implements TorrentClient {
 			json = (await response.json()) as DelugeJSON<ResultType>;
 		} catch (jsonParseError) {
 			throw new Error(
-				`Deluge method ${method} response was non-JSON ${jsonParseError}`
+				`Deluge method ${method} response was non-JSON ${jsonParseError}`,
 			);
 		}
 		if (json.error?.code === DelugeErrorCode.NO_AUTH && retries > 0) {
@@ -176,7 +176,7 @@ export default class Deluge implements TorrentClient {
 				return this.call<ResultType>(method, params, 0);
 			} else {
 				throw new Error(
-					"Connection lost with Deluge. Reauthentication failed."
+					"Connection lost with Deluge. Reauthentication failed.",
 				);
 			}
 		}
@@ -200,7 +200,7 @@ export default class Deluge implements TorrentClient {
 	private async labelEnabled() {
 		const enabledPlugins = await this.call<string>(
 			"core.get_enabled_plugins",
-			[]
+			[],
 		);
 		return enabledPlugins.error
 			? false
@@ -214,7 +214,7 @@ export default class Deluge implements TorrentClient {
 	private async setLabel(
 		name: string,
 		infoHash: string,
-		label: string
+		label: string,
 	): Promise<void> {
 		if (!this.isLabelEnabled) return;
 		try {
@@ -244,7 +244,7 @@ export default class Deluge implements TorrentClient {
 			| Decision.MATCH
 			| Decision.MATCH_SIZE_ONLY
 			| Decision.MATCH_PARTIAL,
-		path?: string
+		path?: string,
 	): Promise<InjectionResult> {
 		try {
 			const { duplicateCategories } = getRuntimeConfig();
@@ -268,11 +268,11 @@ export default class Deluge implements TorrentClient {
 				newTorrent.encode().toString("base64"),
 				path ? path : torrentInfo!.save_path,
 				!!searchee.infoHash,
-				decision
+				decision,
 			);
 			const addResult = await this.call<string>(
 				"core.add_torrent_file",
-				params
+				params,
 			);
 			if (addResult.result) {
 				const { dataCategory } = getRuntimeConfig();
@@ -282,16 +282,16 @@ export default class Deluge implements TorrentClient {
 					searchee.path
 						? dataCategory
 						: torrentInfo!.label
-						? duplicateCategories
-							? torrentInfo!.label.endsWith(
-									this.delugeLabelSuffix
-							  ) || torrentInfo!.label === dataCategory
-								? torrentInfo!.label
-								: `${torrentInfo!.label}${
-										this.delugeLabelSuffix
-								  }`
-							: torrentInfo!.label
-						: this.delugeLabel
+							? duplicateCategories
+								? torrentInfo!.label.endsWith(
+										this.delugeLabelSuffix,
+									) || torrentInfo!.label === dataCategory
+									? torrentInfo!.label
+									: `${torrentInfo!.label}${
+											this.delugeLabelSuffix
+										}`
+								: torrentInfo!.label
+							: this.delugeLabel,
 				);
 				return InjectionResult.SUCCESS;
 			} else if (addResult.error!.message!.includes("already")) {
@@ -330,7 +330,7 @@ export default class Deluge implements TorrentClient {
 		decision:
 			| Decision.MATCH
 			| Decision.MATCH_SIZE_ONLY
-			| Decision.MATCH_PARTIAL
+			| Decision.MATCH_PARTIAL,
 	): InjectData {
 		const { skipRecheck } = getRuntimeConfig();
 		const skipRecheckTorrent =
@@ -350,7 +350,7 @@ export default class Deluge implements TorrentClient {
 	 * returns directory of a infohash in deluge as a string
 	 */
 	async getDownloadDir(
-		searchee: Searchee
+		searchee: Searchee,
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
@@ -393,19 +393,19 @@ export default class Deluge implements TorrentClient {
 
 			const response = await this.call<TorrentStatus>(
 				"web.update_ui",
-				params
+				params,
 			);
 
 			if (response.result!.torrents) {
 				torrent = response.result!.torrents?.[searchee.infoHash];
 			} else {
 				throw new Error(
-					"Client returned unexpected response (object missing)"
+					"Client returned unexpected response (object missing)",
 				);
 			}
 			if (torrent === undefined) {
 				throw new Error(
-					`Torrent not found in client (${searchee.infoHash})`
+					`Torrent not found in client (${searchee.infoHash})`,
 				);
 			}
 

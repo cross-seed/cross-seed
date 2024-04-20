@@ -12,7 +12,7 @@ let activeClient: TorrentClient;
 
 export interface TorrentClient {
 	getDownloadDir: (
-		searchee: Searchee
+		searchee: Searchee,
 	) => Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	>;
@@ -23,7 +23,7 @@ export interface TorrentClient {
 			| Decision.MATCH
 			| Decision.MATCH_SIZE_ONLY
 			| Decision.MATCH_PARTIAL,
-		path?: string
+		path?: string,
 	) => Promise<InjectionResult>;
 	validateConfig: () => Promise<void>;
 }
