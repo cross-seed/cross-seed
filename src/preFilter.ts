@@ -6,7 +6,7 @@ import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { humanReadable, nMsAgo } from "./utils.js";
+import { humanReadableDate, nMsAgo } from "./utils.js";
 import path from "path";
 
 export function filterByContent(searchee: Searchee): boolean {
@@ -140,7 +140,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		first_searched_any < nMsAgo(excludeOlder)
 	) {
 		logReason(
-			`its first search timestamp ${humanReadable(
+			`its first search timestamp ${humanReadableDate(
 				first_searched_any,
 			)} is older than ${ms(excludeOlder, { long: true })} ago`,
 		);
@@ -153,7 +153,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		last_searched_all > nMsAgo(excludeRecentSearch)
 	) {
 		logReason(
-			`its last search timestamp ${humanReadable(
+			`its last search timestamp ${humanReadableDate(
 				last_searched_all,
 			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`,
 		);

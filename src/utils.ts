@@ -38,19 +38,13 @@ export function nMsAgo(n: number): number {
 export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
-export function humanReadableSize(
-	bytes: number,
-	dm: number = 2,
-	ibi: boolean = false
-) {
-	const k = ibi ? 1024 : 1000;
-	const sizes = ibi
-		? ["B", "kiB", "MiB", "GiB", "TiB"]
-		: ["B", "kB", "MB", "GB", "TB"];
-
-	const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+export function humanReadableSize(bytes: number) {
+	const k = 1000;
+	const sizes = ["B", "kB", "MB", "GB", "TB"];
+	// engineering notation: (coefficient) * 1000 ^ (exponent)
+	const exponent = Math.floor(Math.log(bytes) / Math.log(k));
+	const coefficient = bytes / Math.pow(k, exponent);
+	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
 export function getTag(name: string, isVideo: boolean): MediaType {
 	return EP_REGEX.test(name)
@@ -114,7 +108,7 @@ export async function filterAsync(arr, predicate) {
 	return arr.filter((_, index) => results[index]);
 }
 
-export function humanReadable(timestamp: number): string {
+export function humanReadableDate(timestamp: number): string {
 	// swedish conventions roughly follow the iso format!
 	return new Date(timestamp).toLocaleString("sv");
 }

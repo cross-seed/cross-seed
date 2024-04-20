@@ -1,6 +1,6 @@
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
-import { humanReadable } from "./utils.js";
+import { humanReadableDate } from "./utils.js";
 
 export enum IndexerStatus {
 	/**
@@ -56,7 +56,7 @@ export async function updateIndexerStatus(
 	if (indexerIds.length > 0) {
 		logger.verbose({
 			label: Label.TORZNAB,
-			message: `Snoozing indexers ${indexerIds} with ${status} until ${humanReadable(
+			message: `Snoozing indexers ${indexerIds} with ${status} until ${humanReadableDate(
 				retryAfter,
 			)}`,
 		});
