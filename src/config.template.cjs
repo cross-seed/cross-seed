@@ -27,7 +27,7 @@ module.exports = {
 	 *
 	 * This apikey parameter comes from Sonarr
 	 *
-	 * Example: sonarr: "http://sonarr:8989/api?apikey=12345",
+	 * Example: sonarr: "http://sonarr:8989/?apikey=12345",
 	 */
 	sonarr: undefined,
 
@@ -37,7 +37,7 @@ module.exports = {
 	 *
 	 * This apikey parameter comes from Radarr
 	 *
-	 * Example: radarr: "http://radarr:7878/api?apikey=12345",
+	 * Example: radarr: "http://radarr:7878/?apikey=12345",
 	 */
 	radarr: undefined,
 
