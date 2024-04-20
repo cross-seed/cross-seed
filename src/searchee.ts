@@ -1,5 +1,6 @@
 import { readdirSync, statSync } from "fs";
-import { basename, join, relative } from "path";
+import { basename, extname, join, relative } from "path";
+import { VIDEO_EXTENSIONS } from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -28,6 +29,12 @@ export function hasInfoHash(
 	searchee: Searchee
 ): searchee is SearcheeWithInfoHash {
 	return searchee.infoHash != null;
+}
+
+export function hasVideo(searchee: Searchee): boolean {
+	return searchee.files.some((file) =>
+		VIDEO_EXTENSIONS.includes(extname(file.name))
+	);
 }
 
 function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {

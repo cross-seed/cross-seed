@@ -12,7 +12,9 @@ import {
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
+import { Searchee, hasVideo } from "./searchee.js";
 import {
+	getAnimeQueries,
 	cleanseSeparators,
 	getTag,
 	MediaType,
@@ -105,55 +107,72 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	};
 }
 
-function createTorznabSearchQuery(name: string, caps: Caps) {
-	const nameWithoutExtension = stripExtension(name);
+function createTorznabSearchQueries(
+	searchee: Searchee,
+	caps: Caps
+): TorznabParams[] {
+	const nameWithoutExtension = stripExtension(searchee.name);
+	const isVideo = hasVideo(searchee);
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
-	const mediaType = getTag(nameWithoutExtension);
+	const mediaType = getTag(nameWithoutExtension, isVideo);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
-		return {
-			t: "tvsearch",
-			q: cleanseSeparators(match!.groups!.title),
-			season: match!.groups!.season
-				? extractNumber(match!.groups!.season)
-				: match!.groups!.year,
-			ep: match!.groups!.episode
-				? extractNumber(match!.groups!.episode)
-				: `${match!.groups!.month}/${match!.groups!.day}`,
-		} as const;
+		return [
+			{
+				t: "tvsearch",
+				q: cleanseSeparators(match!.groups!.title),
+				season: match!.groups!.season
+					? extractNumber(match!.groups!.season)
+					: match!.groups!.year,
+				ep: match!.groups!.episode
+					? extractNumber(match!.groups!.episode)
+					: `${match!.groups!.month}/${match!.groups!.day}`,
+			},
+		] as const;
 	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
-		return {
-			t: "tvsearch",
-			q: cleanseSeparators(match!.groups!.title),
-			season: extractNumber(match!.groups!.season),
-		} as const;
-	} else {
-		return {
+		return [
+			{
+				t: "tvsearch",
+				q: cleanseSeparators(match!.groups!.title),
+				season: extractNumber(match!.groups!.season),
+			},
+		] as const;
+	} else if (mediaType === MediaType.ANIME) {
+		const animeQueries = getAnimeQueries(nameWithoutExtension);
+		return animeQueries.map((animeQuery) => ({
 			t: "search",
-			q: reformatTitleForSearching(nameWithoutExtension),
-		} as const;
+			q: animeQuery,
+		}));
+	} else {
+		return [
+			{
+				t: "search",
+				q: reformatTitleForSearching(nameWithoutExtension),
+			},
+		] as const;
 	}
 }
 
 export async function queryRssFeeds(): Promise<Candidate[]> {
 	const candidatesByUrl = await makeRequests(
-		"",
 		await getEnabledIndexers(),
-		() => ({ t: "search", q: "" })
+		() => [{ t: "search", q: "" }]
 	);
 	return candidatesByUrl.flatMap((e) => e.candidates);
 }
 
 export async function searchTorznab(
-	name: string
+	searchee: Searchee
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
 	const { excludeRecentSearch, excludeOlder, torznab } = getRuntimeConfig();
 	if (torznab.length === 0) {
 		throw new Error("no indexers are available");
 	}
 	const enabledIndexers = await getEnabledIndexers();
+
+	const name = searchee.name;
 
 	// search history for name across all indexers
 	const timestampDataSql = await db("searchee")
@@ -191,8 +210,8 @@ export async function searchTorznab(
 		}`,
 	});
 
-	return makeRequests(name, indexersToUse, (indexer) =>
-		createTorznabSearchQuery(name, {
+	return makeRequests(indexersToUse, (indexer) =>
+		createTorznabSearchQueries(searchee, {
 			search: indexer.searchCap,
 			tvSearch: indexer.tvSearchCap,
 			movieSearch: indexer.movieSearchCap,
@@ -444,13 +463,14 @@ export async function validateTorznabUrls() {
 }
 
 async function makeRequests(
-	name: string,
 	indexers: Indexer[],
-	getQuery: (indexer: Indexer) => TorznabParams
+	getQueries: (indexer: Indexer) => TorznabParams[]
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
 	const { searchTimeout } = getRuntimeConfig();
-	const searchUrls = indexers.map((indexer: Indexer) =>
-		assembleUrl(indexer.url, indexer.apikey, getQuery(indexer))
+	const searchUrls = indexers.flatMap((indexer: Indexer) =>
+		getQueries(indexer).map((query) =>
+			assembleUrl(indexer.url, indexer.apikey, query)
+		)
 	);
 	searchUrls.forEach(
 		(message) => void logger.verbose({ label: Label.TORZNAB, message })
