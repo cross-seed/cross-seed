@@ -76,13 +76,18 @@ module.exports = {
 	 * 		as configured in your .rtorrent.rc file.
 	 * For Deluge, this is ~/.config/deluge/state.
 	 * For Transmission, this would be ~/.config/transmission/torrents
+	 *
+	 * Don't change this for Docker.
+	 * Instead set the volume mapping on your docker container.
 	 */
-	torrentDir: "/path/to/torrent/file/dir",
+	torrentDir: "/torrents",
 
 	/**
 	 * Where to put the torrent files that cross-seed finds for you.
+	 * Don't change this for Docker.
+	 * Instead set the volume mapping on your docker container.
 	 */
-	outputDir: ".",
+	outputDir: "/cross-seeds",
 
 	/**
 	 * Whether to search for all episode torrents, including those from season packs. This option overrides includeSingleEpisodes.

@@ -32,7 +32,7 @@ function sumLength(sum: number, file: { length: number }): number {
 	return sum + file.length;
 }
 
-function ensure(bool: unknown, fieldName: string) {
+function ensure(bool, fieldName) {
 	if (!bool)
 		throw new Error(`Torrent is missing required field: ${fieldName}`);
 }
@@ -69,28 +69,26 @@ export class Metafile {
 
 		this.raw = raw;
 		this.infoHash = sha1(bencode.encode(raw.info));
-		this.name = fallback(raw.info["name.utf-8"], raw.info.name)!.toString();
+		this.name = fallback(raw.info["name.utf-8"], raw.info.name).toString();
 		this.pieceLength = raw.info["piece length"];
 
 		if (!raw.info.files) {
-			// length exists if files doesn't exist
-			const length = raw.info.length!;
 			this.files = [
 				{
 					name: this.name,
 					path: this.name,
-					length: length,
+					length: raw.info.length,
 				},
 			];
-			this.length = length;
+			this.length = raw.info.length;
 			this.isSingleFileTorrent = true;
 		} else {
 			this.files = raw.info.files
 				.map((file) => {
 					const rawPathSegments: Buffer[] = fallback(
 						file["path.utf-8"],
-						file.path,
-					)!;
+						file.path
+					);
 					const pathSegments = rawPathSegments.map((buf) => {
 						const seg = buf.toString();
 						// convention for zero-length path segments is to treat them as underscores

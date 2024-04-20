@@ -1,9 +1,11 @@
-import { readdir, readFile, writeFile } from "fs/promises";
+import fs, { promises as fsPromises } from "fs";
 import Fuse from "fuse.js";
-import { extname, join, resolve } from "path";
+import fetch, { Response } from "node-fetch";
+import path, { join } from "path";
 import { inspect } from "util";
 import { USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
+import { CrossSeedError } from "./errors.js";
 import { logger, logOnce } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -26,9 +28,9 @@ export enum SnatchError {
 }
 
 export async function parseTorrentFromFilename(
-	filename: string,
+	filename: string
 ): Promise<Metafile> {
-	const data = await readFile(filename);
+	const data = await fsPromises.readFile(filename);
 	return Metafile.decode(data);
 }
 
@@ -37,16 +39,13 @@ function isMagnetRedirectError(error: Error): boolean {
 		// node-fetch
 		error.message.includes('URL scheme "magnet" is not supported.') ||
 		// undici
-		Boolean(
-			(error.cause as Error | undefined)?.message.includes(
-				"URL scheme must be a HTTP(S) scheme",
-			),
-		)
+		// @ts-expect-error error causes "not supported yet"
+		error?.cause.message.includes("URL scheme must be a HTTP(S) scheme")
 	);
 }
 
 export async function parseTorrentFromURL(
-	url: string,
+	url: string
 ): Promise<Result<Metafile, SnatchError>> {
 	const abortController = new AbortController();
 	const { snatchTimeout } = getRuntimeConfig();
@@ -78,7 +77,7 @@ export async function parseTorrentFromURL(
 		return resultOfErr(SnatchError.RATE_LIMITED);
 	} else if (!response.ok) {
 		logger.error(
-			`error downloading torrent at ${url}: ${response.status} ${response.statusText}`,
+			`error downloading torrent at ${url}: ${response.status} ${response.statusText}`
 		);
 		logger.debug("response: %s", await response.text());
 		return resultOfErr(SnatchError.UNKNOWN_ERROR);
@@ -91,15 +90,15 @@ export async function parseTorrentFromURL(
 		logger.debug(
 			`contents: "${responseText.slice(0, 100)}${
 				responseText.length > 100 ? "..." : ""
-			}"`,
+			}"`
 		);
 		return resultOfErr(SnatchError.INVALID_CONTENTS);
 	}
 	try {
 		return resultOf(
 			Metafile.decode(
-				Buffer.from(new Uint8Array(await response.arrayBuffer())),
-			),
+				Buffer.from(new Uint8Array(await response.arrayBuffer()))
+			)
 		);
 	} catch (e) {
 		logger.error(`invalid torrent contents at ${url}`);
@@ -111,31 +110,30 @@ export async function parseTorrentFromURL(
 	}
 }
 
-export async function saveTorrentFile(
+export function saveTorrentFile(
 	tracker: string,
-	tag: string,
-	meta: Metafile,
-): Promise<void> {
+	tag = "",
+	meta: Metafile
+): void {
 	const { outputDir } = getRuntimeConfig();
 	const buf = meta.encode();
 	const filename = `[${tag}][${tracker}]${stripExtension(
-		meta.getFileSystemSafeName(),
+		meta.getFileSystemSafeName()
 	)}.torrent`;
-	await writeFile(join(outputDir, filename), buf, { mode: 0o644 });
+	fs.writeFileSync(path.join(outputDir, filename), buf, { mode: 0o644 });
 }
 
 export async function findAllTorrentFilesInDir(
-	torrentDir: string,
+	torrentDir: string
 ): Promise<string[]> {
-	return (await readdir(torrentDir))
-		.filter((fn) => extname(fn) === ".torrent")
+	return (await fsPromises.readdir(torrentDir))
+		.filter((fn) => path.extname(fn) === ".torrent")
 		.sort()
-		.map((fn) => resolve(join(torrentDir, fn)));
+		.map((fn) => path.resolve(path.join(torrentDir, fn)));
 }
 
 export async function indexNewTorrents(): Promise<void> {
 	const { torrentDir } = getRuntimeConfig();
-	if (typeof torrentDir !== "string") return;
 	const dirContents = await findAllTorrentFilesInDir(torrentDir);
 	// index new torrents in the torrentDir
 
@@ -173,19 +171,32 @@ export async function indexNewTorrents(): Promise<void> {
 
 export async function getInfoHashesToExclude(): Promise<string[]> {
 	return (await db("torrent").select({ infoHash: "info_hash" })).map(
-		(t) => t.infoHash,
+		(t) => t.infoHash
 	);
 }
 
-export async function loadTorrentDirLight(
-	torrentDir: string,
-): Promise<Searchee[]> {
-	const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
+export async function validateTorrentDir(): Promise<void> {
+	const { torrentDir } = getRuntimeConfig();
+	try {
+		await fsPromises.readdir(torrentDir);
+	} catch (e) {
+		throw new CrossSeedError(`Torrent dir ${torrentDir} is invalid`);
+	}
+}
+
+export async function loadTorrentDirLight(): Promise<Searchee[]> {
+	const { torrentDir } = getRuntimeConfig();
+	const torrentFilePaths = fs
+		.readdirSync(torrentDir)
+		.filter((fn) => path.extname(fn) === ".torrent")
+		.sort()
+		.map((filename) => join(getRuntimeConfig().torrentDir, filename));
 
 	const searchees: Searchee[] = [];
 	for (const torrentFilePath of torrentFilePaths) {
-		const searcheeResult =
-			await createSearcheeFromTorrentFile(torrentFilePath);
+		const searcheeResult = await createSearcheeFromTorrentFile(
+			torrentFilePath
+		);
 		if (searcheeResult.isOk()) {
 			searchees.push(searcheeResult.unwrapOrThrow());
 		}
@@ -194,17 +205,15 @@ export async function loadTorrentDirLight(
 }
 
 export async function getTorrentByFuzzyName(
-	name: string,
+	name: string
 ): Promise<null | Metafile> {
-	const allNames: { name: string; file_path: string }[] = await db(
-		"torrent",
-	).select("name", "file_path");
+	const allNames = await db("torrent").select("name", "file_path");
 	const fullMatch = reformatTitleForSearching(name)
 		.replace(/[^a-z0-9]/gi, "")
 		.toLowerCase();
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
-	let filteredNames: typeof allNames = [];
+	let filteredNames = [];
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
 			const dbMatch = reformatTitleForSearching(dbName.name)
@@ -233,7 +242,7 @@ export async function getTorrentByFuzzyName(
 }
 
 export async function getTorrentByCriteria(
-	criteria: TorrentLocator,
+	criteria: TorrentLocator
 ): Promise<Metafile> {
 	const findResult = await db("torrent")
 		.where((b) => {
@@ -250,7 +259,7 @@ export async function getTorrentByCriteria(
 
 	if (findResult === undefined) {
 		const message = `torrentDir does not have any torrent with criteria ${inspect(
-			criteria,
+			criteria
 		)}`;
 		throw new Error(message);
 	}

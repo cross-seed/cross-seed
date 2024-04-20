@@ -1,10 +1,11 @@
-import { Decision, InjectionResult, TORRENT_TAG } from "../constants.js";
+import fetch, { Headers } from "node-fetch";
+import { InjectionResult } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import { Searchee } from "../searchee.js";
 import { extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
@@ -31,7 +32,7 @@ type TorrentAddedResponse = { "torrent-added": TorrentMetadata };
 type TorrentAddResponse = TorrentAddedResponse | TorrentDuplicateResponse;
 
 function doesAlreadyExist(
-	args: TorrentAddResponse,
+	args: TorrentAddResponse
 ): args is TorrentDuplicateResponse {
 	return "torrent-duplicate" in args;
 }
@@ -42,14 +43,14 @@ export default class Transmission implements TorrentClient {
 	private async request<T>(
 		method: Method,
 		args: unknown = {},
-		retries = 1,
+		retries = 1
 	): Promise<T> {
 		const { transmissionRpcUrl } = getRuntimeConfig();
 
 		const { username, password, href } = extractCredentialsFromUrl(
-			transmissionRpcUrl,
+			transmissionRpcUrl
 		).unwrapOrThrow(
-			new CrossSeedError("Transmission rpc url must be percent-encoded"),
+			new CrossSeedError("Transmission rpc url must be percent-encoded")
 		);
 
 		const headers = new Headers();
@@ -59,7 +60,7 @@ export default class Transmission implements TorrentClient {
 		}
 		if (username && password) {
 			const credentials = Buffer.from(`${username}:${password}`).toString(
-				"base64",
+				"base64"
 			);
 			headers.set("Authorization", `Basic ${credentials}`);
 		}
@@ -71,8 +72,8 @@ export default class Transmission implements TorrentClient {
 		});
 		if (response.status === 409) {
 			this.xTransmissionSessionId = response.headers.get(
-				XTransmissionSessionId,
-			)!;
+				XTransmissionSessionId
+			);
 			return this.request(method, args, retries - 1);
 		}
 		try {
@@ -84,7 +85,7 @@ export default class Transmission implements TorrentClient {
 				return responseBody.arguments;
 			} else {
 				throw new Error(
-					`Transmission responded with error: "${responseBody.result}"`,
+					`Transmission responded with error: "${responseBody.result}"`
 				);
 			}
 		} catch (e) {
@@ -114,13 +115,13 @@ export default class Transmission implements TorrentClient {
 		} catch (e) {
 			const { transmissionRpcUrl } = getRuntimeConfig();
 			throw new CrossSeedError(
-				`Failed to reach Transmission at ${transmissionRpcUrl}`,
+				`Failed to reach Transmission at ${transmissionRpcUrl}`
 			);
 		}
 	}
 
 	async checkOriginalTorrent(
-		searchee: SearcheeWithInfoHash,
+		searchee: Searchee
 	): Promise<
 		Result<
 			{ downloadDir: string },
@@ -134,7 +135,7 @@ export default class Transmission implements TorrentClient {
 				{
 					fields: ["downloadDir", "percentDone"],
 					ids: [searchee.infoHash],
-				},
+				}
 			);
 		} catch (e) {
 			return resultOfErr(InjectionResult.FAILURE);
@@ -152,48 +153,24 @@ export default class Transmission implements TorrentClient {
 		return resultOf({ downloadDir });
 	}
 
-	async getDownloadDir(
-		searchee: Searchee,
-	): Promise<
-		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
-	> {
-		const result = await this.checkOriginalTorrent(
-			searchee as SearcheeWithInfoHash,
-		);
-		return result
-			.mapOk((r) => r.downloadDir)
-			.mapErr((err) => (err === "FAILURE" ? "UNKNOWN_ERROR" : err));
-	}
-
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		decision:
-			| Decision.MATCH
-			| Decision.MATCH_SIZE_ONLY
-			| Decision.MATCH_PARTIAL,
-		path?: string,
+		path?: string
 	): Promise<InjectionResult> {
-		const { skipRecheck } = getRuntimeConfig();
-
 		let downloadDir: string;
+
 		if (path) {
 			downloadDir = path;
 		} else {
-			const result = await this.getDownloadDir(
-				searchee as SearcheeWithInfoHash,
-			);
+			const result = await this.checkOriginalTorrent(searchee);
 			if (result.isErr()) {
-				return InjectionResult.FAILURE;
-			} else {
-				downloadDir = result.unwrapOrThrow();
+				return result.unwrapErrOrThrow();
 			}
+			downloadDir = result.unwrapOrThrow().downloadDir;
 		}
 
 		let addResponse: TorrentAddResponse;
-
-		const skipRecheckTorrent =
-			decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
 
 		try {
 			addResponse = await this.request<TorrentAddResponse>(
@@ -201,9 +178,9 @@ export default class Transmission implements TorrentClient {
 				{
 					"download-dir": downloadDir,
 					metainfo: newTorrent.encode().toString("base64"),
-					paused: !skipRecheckTorrent,
-					labels: [TORRENT_TAG],
-				},
+					paused: false,
+					labels: ["cross-seed"],
+				}
 			);
 		} catch (e) {
 			return InjectionResult.FAILURE;

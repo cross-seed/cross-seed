@@ -35,20 +35,18 @@ class Job {
 	}
 }
 
-function getJobs(): Job[] {
-	const { rssCadence, searchCadence, torznab } = getRuntimeConfig();
-	const jobs: Job[] = [];
-	if (torznab.length > 0) {
-		if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
-		if (searchCadence) jobs.push(new Job("search", searchCadence, main));
-	}
-	return jobs;
-}
+const getJobs = () => {
+	const { rssCadence, searchCadence } = getRuntimeConfig();
+	return [
+		rssCadence && new Job("rss", rssCadence, scanRssFeeds),
+		searchCadence && new Job("search", searchCadence, main),
+	].filter(Boolean);
+};
 
 function logNextRun(
 	name: string,
 	cadence: number,
-	lastRun: number | undefined | null,
+	lastRun: number | undefined | null
 ) {
 	const now = Date.now();
 

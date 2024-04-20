@@ -14,7 +14,7 @@ import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
-		const chunks: string[] = [];
+		const chunks = [];
 		req.on("data", (chunk) => {
 			chunks.push(chunk.toString());
 		});
@@ -49,9 +49,9 @@ function parseData(data: string) {
 
 async function authorize(
 	req: IncomingMessage,
-	res: ServerResponse,
+	res: ServerResponse
 ): Promise<boolean> {
-	const url = new URL(req.url!, `http://${req.headers.host}`);
+	const url = new URL(req.url, `http://${req.headers.host}`);
 	const apiKey =
 		(req.headers["x-api-key"] as string) ?? url.searchParams.get("apikey");
 	const isAuthorized = await checkApiKey(apiKey);
@@ -65,7 +65,7 @@ async function authorize(
 		});
 		res.writeHead(401, "Unauthorized");
 		res.end(
-			"Specify the API key in an X-Api-Key header or an apikey query param.",
+			"Specify the API key in an X-Api-Key header or an apikey query param."
 		);
 	}
 	return isAuthorized;
@@ -73,7 +73,7 @@ async function authorize(
 
 async function search(
 	req: IncomingMessage,
-	res: ServerResponse,
+	res: ServerResponse
 ): Promise<void> {
 	const dataStr = await getData(req);
 	let data;
@@ -111,7 +111,7 @@ async function search(
 	await indexNewTorrents();
 
 	try {
-		let numFound: number | null = null;
+		let numFound = null;
 		if (criteria) {
 			numFound = await searchForLocalTorrentByCriteria(criteria);
 		}
@@ -135,7 +135,7 @@ async function search(
 
 async function announce(
 	req: IncomingMessage,
-	res: ServerResponse,
+	res: ServerResponse
 ): Promise<void> {
 	const dataStr = await getData(req);
 	let data;
@@ -203,7 +203,7 @@ async function announce(
 
 async function handleRequest(
 	req: IncomingMessage,
-	res: ServerResponse,
+	res: ServerResponse
 ): Promise<void> {
 	if (!(await authorize(req, res))) return;
 
@@ -213,7 +213,7 @@ async function handleRequest(
 		return;
 	}
 
-	switch (req.url!.split("?")[0]) {
+	switch (req.url.split("?")[0]) {
 		case "/api/webhook": {
 			logger.verbose({
 				label: Label.SERVER,
