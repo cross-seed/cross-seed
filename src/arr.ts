@@ -28,8 +28,10 @@ async function fetchArrJSON(
 ): Promise<IdData> {
 	const uarrl = { apikey: getApikey(url), url: sanitizeUrl(url) };
 	let response;
+	const urlpath = `${uarrl.url}api/v3/parse`;
+	console.log(urlpath);
 	const lookupUrl = assembleUrl(
-		`${uarrl.url}/v3/parse`,
+		`${uarrl.url}api/v3/parse`,
 		uarrl.apikey as string,
 		{
 			title: searchTerm,
