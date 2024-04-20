@@ -15,12 +15,13 @@ const ZodErrorMessages = {
 	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
-	riskyRecheckWarn:
-		"It is strongly recommended to not skip rechecking for risky matching mode.",
+	recheckWarn:
+		"It is strongly recommended to not skip rechecking for risky or partial matching mode.",
 	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
 	qBitLegacyLinking:
 		"Using Automatic Torrent Management in qBittorrent without legacyLinking enabled can result in injection path failures.",
-	riskyNeedsLinkDir: "You need to set a linkDir for risky matching to work.",
+	needsLinkDir:
+		"You need to set a linkDir for risky or partial matching to work.",
 };
 
 /**
@@ -208,12 +209,12 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.injectUrl
 	)
 	.refine((config) => {
-		if (config.skipRecheck && config.matchMode === MatchMode.RISKY) {
-			logger.warn(ZodErrorMessages.riskyRecheckWarn);
+		if (config.skipRecheck && config.matchMode !== MatchMode.SAFE) {
+			logger.warn(ZodErrorMessages.recheckWarn);
 		}
 		return true;
 	})
 	.refine(
-		(config) => config.matchMode !== MatchMode.RISKY || config.linkDir,
-		ZodErrorMessages.riskyNeedsLinkDir
+		(config) => config.matchMode === MatchMode.SAFE || config.linkDir,
+		ZodErrorMessages.needsLinkDir
 	);
