@@ -232,11 +232,11 @@ export default class QBittorrent implements TorrentClient {
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		let torrentInfo: TorrentConfiguration;
+		let torrentInfo: TorrentConfiguration | undefined;
 		try {
 			if (await this.isInfoHashInClient(searchee.infoHash!)) {
 				torrentInfo = await this.getTorrentConfiguration(searchee);
-				if (torrentInfo.save_path === undefined) {
+				if (torrentInfo?.save_path === undefined) {
 					return resultOfErr("NOT_FOUND");
 				}
 			}
