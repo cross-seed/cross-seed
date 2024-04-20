@@ -90,7 +90,7 @@ async function findOnOtherSites(
 
 	let response: { indexerId: number; candidates: Candidate[] }[];
 	try {
-		response = await searchTorznab(searchee.name);
+		response = await searchTorznab(searchee);
 	} catch (e) {
 		logger.error(`error searching for ${searchee.name}`);
 		logger.debug(e);

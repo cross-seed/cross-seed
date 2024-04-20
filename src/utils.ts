@@ -3,6 +3,7 @@ import {
 	EP_REGEX,
 	MOVIE_REGEX,
 	SEASON_REGEX,
+	ANIME_REGEX,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -11,6 +12,7 @@ export enum MediaType {
 	EPISODE = "episode",
 	SEASON = "pack",
 	MOVIE = "movie",
+	ANIME = "anime",
 	OTHER = "unknown",
 }
 
@@ -37,13 +39,15 @@ export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
 
-export function getTag(name: string): MediaType {
+export function getTag(name: string, isVideo: boolean): MediaType {
 	return EP_REGEX.test(name)
 		? MediaType.EPISODE
 		: SEASON_REGEX.test(name)
 		? MediaType.SEASON
 		: MOVIE_REGEX.test(name)
 		? MediaType.MOVIE
+		: isVideo && ANIME_REGEX.test(name)
+		? MediaType.ANIME
 		: MediaType.OTHER;
 }
 
@@ -58,9 +62,23 @@ export async function time<R>(cb: () => R, times: number[]) {
 
 export function cleanseSeparators(str: string): string {
 	return str
+		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "")
 		.replace(/[._()[\]]/g, " ")
 		.replace(/\s+/g, " ")
 		.trim();
+}
+
+export function getAnimeQueries(name: string): string[] {
+	// Only use if getTag returns anime as it's conditional on a few factors
+	const animeQueries: string[] = [];
+	const { title, altTitle, release } = name.match(ANIME_REGEX)?.groups ?? {};
+	if (title) {
+		animeQueries.push(cleanseSeparators(`${title} ${release}`));
+	}
+	if (altTitle) {
+		animeQueries.push(cleanseSeparators(`${altTitle} ${release}`));
+	}
+	return animeQueries;
 }
 
 export function reformatTitleForSearching(name: string): string {
