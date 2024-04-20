@@ -111,7 +111,7 @@ export async function grabArrId(
 				mediaType
 			)) as IdData;
 			if (Object.keys(arrJson).length > 0) {
-				logger.info({
+				logger.verbose({
 					label: Label.SONARR,
 					message: `Found series for ${chalk.green.bold(
 						searchTerm
@@ -148,7 +148,7 @@ export async function grabArrId(
 				mediaType
 			)) as IdData;
 			if (Object.keys(arrJson).length > 0) {
-				logger.info({
+				logger.verbose({
 					label: Label.RADARR,
 					message: `Found movie for ${chalk.green.bold(
 						searchTerm
