@@ -241,7 +241,7 @@ export default class QBittorrent implements TorrentClient {
 				}
 			}
 		} catch (e) {
-			if (e.includes("retrieve")) {
+			if (e.message.includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
 			}
 			return resultOfErr("UNKNOWN_ERROR");
