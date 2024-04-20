@@ -23,7 +23,7 @@ export function filterByContent(searchee: Searchee): boolean {
 			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
 		});
 	}
-	const blockedNote = releaseInBlockList(searchee, blockList);
+	const blockedNote = findBlockedStringInReleaseMaybe(searchee, blockList);
 	if (blockedNote) {
 		logReason(`it matched the blocklist - ("${blockedNote}")`);
 		return false;
@@ -62,7 +62,7 @@ export function filterByContent(searchee: Searchee): boolean {
 	return true;
 }
 
-export function releaseInBlockList(
+export function findBlockedStringInReleaseMaybe(
 	searchee: Searchee,
 	blockList: string[],
 ): string | undefined {

@@ -11,7 +11,7 @@ import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
-import { releaseInBlockList } from "./preFilter.js";
+import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 import {
@@ -77,7 +77,7 @@ const createReasonLogger =
 					?.trim()})`;
 				break;
 			case Decision.BLOCKED_RELEASE:
-				reason = `it matches the blocklist - ("${releaseInBlockList(
+				reason = `it matches the blocklist - ("${findBlockedStringInReleaseMaybe(
 					searchee,
 					getRuntimeConfig().blockList
 				)}")`;
@@ -199,7 +199,7 @@ async function assessCandidateHelper(
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { matchMode, blockList } = getRuntimeConfig();
-	if (releaseInBlockList(searchee, blockList)) {
+	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
 		return { decision: Decision.BLOCKED_RELEASE };
 	}
 
