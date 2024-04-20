@@ -1,25 +1,25 @@
 import { Action, LinkType, MatchMode } from "./constants.js";
 
 export interface RuntimeConfig {
+	offset: number;
 	delay: number;
 	torznab: string[];
 	dataDirs: string[];
 	matchMode: MatchMode;
 	linkDir: string;
 	linkType: LinkType;
-	legacyLinking: boolean;
 	skipRecheck: boolean;
 	maxDataDepth: number;
 	dataCategory: string;
-	torrentDir?: string;
+	torrentDir: string;
 	outputDir: string;
 	includeEpisodes: boolean;
 	includeSingleEpisodes: boolean;
 	verbose: boolean;
 	includeNonVideos: boolean;
 	fuzzySizeThreshold: number;
-	excludeOlder?: number;
-	excludeRecentSearch?: number;
+	excludeOlder: number;
+	excludeRecentSearch: number;
 	action: Action;
 	rtorrentRpcUrl: string;
 	qbittorrentUrl: string;
@@ -28,14 +28,13 @@ export interface RuntimeConfig {
 	duplicateCategories: boolean;
 	notificationWebhookUrl: string;
 	torrents: string[];
-	port: number | null;
-	searchCadence?: number;
-	rssCadence?: number;
-	snatchTimeout?: number;
-	searchTimeout?: number;
+	port: number | false | null;
+	searchCadence: number;
+	rssCadence: number;
+	snatchTimeout: number;
+	searchTimeout: number;
 	searchLimit: number;
-	blockList: string[];
-	apiKey?: string;
+	apiAuth: boolean;
 }
 
 let runtimeConfig: RuntimeConfig;

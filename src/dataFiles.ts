@@ -1,46 +1,34 @@
 import { readdirSync, statSync } from "fs";
-import { basename, extname, join } from "path";
-import {
-	IGNORED_FOLDERS_SUBSTRINGS,
-	IGNORED_FOLDERS_REGEX,
-	VIDEO_EXTENSIONS,
-} from "./constants.js";
+import { extname, join } from "path";
+import { DATA_EXTENSIONS } from "./constants.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
-function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
-	const folderBaseName = basename(root);
-	if (isDir) {
-		return (
-			IGNORED_FOLDERS_SUBSTRINGS.includes(folderBaseName.toLowerCase()) ||
-			IGNORED_FOLDERS_REGEX.test(folderBaseName)
-		);
-	} else {
-		return !VIDEO_EXTENSIONS.includes(extname(folderBaseName));
-	}
-}
 export function findPotentialNestedRoots(
 	root: string,
 	depth: number,
-	isDirHint?: boolean,
+	isDirHint?: boolean
 ): string[] {
 	const isDir =
 		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
-	if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir)) {
-		return [];
-	}
+
 	// if depth is 0, don't look at children
-	else if (depth > 0 && isDir) {
+	if (depth > 0 && isDir) {
 		const directChildren = readdirSync(root, { withFileTypes: true });
 		const allDescendants = directChildren.flatMap((dirent) =>
 			findPotentialNestedRoots(
 				join(root, dirent.name),
 				depth - 1,
-				dirent.isDirectory(),
-			),
+				dirent.isDirectory()
+			)
 		);
 		return [root, ...allDescendants];
-	} else {
+	} else if (
+		DATA_EXTENSIONS.includes(extname(root)) &&
+		!root.includes("sample")
+	) {
 		return [root];
+	} else {
+		return [];
 	}
 }
 
@@ -49,6 +37,6 @@ export function findSearcheesFromAllDataDirs(): string[] {
 	return dataDirs.flatMap((dataDir) =>
 		readdirSync(dataDir)
 			.map((dirent) => join(dataDir, dirent))
-			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth)),
+			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth))
 	);
 }

@@ -12,16 +12,15 @@ export async function resetApiKey(): Promise<string> {
 	return apikey;
 }
 
-export async function getApiKey(): Promise<string> {
-	const { apiKey: runtimeConfigApiKey } = getRuntimeConfig();
-	if (runtimeConfigApiKey) return runtimeConfigApiKey;
-
+export async function getApiKeyFromDatabase(): Promise<string> {
 	const { apikey } = await db("settings").select("apikey").first();
 	if (!apikey) return resetApiKey();
 	return apikey;
 }
 
 export async function checkApiKey(keyToCheck: string): Promise<boolean> {
-	const apikey = await getApiKey();
+	const { apiAuth } = getRuntimeConfig();
+	if (!apiAuth) return true;
+	const apikey = await getApiKeyFromDatabase();
 	return apikey === keyToCheck;
 }

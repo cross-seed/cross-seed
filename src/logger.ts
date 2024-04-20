@@ -1,8 +1,8 @@
 import { join } from "path";
 import winston from "winston";
-import DailyRotateFile from "winston-daily-rotate-file";
 import { appDir, createAppDir } from "./configuration.js";
-import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
+import DailyRotateFile from "winston-daily-rotate-file";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -43,18 +43,18 @@ function redactUrlPassword(message, urlStr) {
 	return message;
 }
 
-function redactMessage(message: string | unknown, options?) {
+function redactMessage(message: string | unknown) {
 	if (typeof message !== "string") {
 		return message;
 	}
-	const runtimeConfig = options ?? getRuntimeConfig();
+	const runtimeConfig = getRuntimeConfig();
 	let ret = message;
 
 	// redact torznab api keys
 	ret = ret.replace(/apikey=[a-zA-Z0-9]+/g, `apikey=${redactionMsg}`);
 	ret = ret.replace(
 		/\/notification\/crossSeed\/[a-zA-Z-0-9_-]+/g,
-		`/notification/crossSeed/${redactionMsg}`,
+		`/notification/crossSeed/${redactionMsg}`
 	);
 	for (const [key, urlStr] of Object.entries(runtimeConfig)) {
 		if (key.endsWith("Url") && urlStr) {
@@ -72,7 +72,7 @@ export function logOnce(cacheKey: string, cb: () => void) {
 	}
 }
 
-export function initializeLogger(options: RuntimeConfig): void {
+export function initializeLogger(): void {
 	createAppDir();
 	logger = winston.createLogger({
 		level: "info",
@@ -86,8 +86,8 @@ export function initializeLogger(options: RuntimeConfig): void {
 			winston.format.printf(({ level, message, label, timestamp }) => {
 				return `${timestamp} ${level}: ${
 					label ? `[${label}] ` : ""
-				}${redactMessage(message, options)}`;
-			}),
+				}${redactMessage(message)}`;
+			})
 		),
 		transports: [
 			new DailyRotateFile({
@@ -114,21 +114,16 @@ export function initializeLogger(options: RuntimeConfig): void {
 				level: "silly",
 			}),
 			new winston.transports.Console({
-				level: options.verbose ? "silly" : "info",
+				level: getRuntimeConfig().verbose ? "silly" : "info",
 				format: winston.format.combine(
 					winston.format.errors({ stack: true }),
 					winston.format.splat(),
 					winston.format.colorize(),
-					winston.format.printf(
-						({ level, message, label, timestamp, stack }) => {
-							return `${timestamp} ${level}: ${
-								label ? `[${label}] ` : ""
-							}${redactMessage(
-								stack ? stack : message,
-								options,
-							)}`;
-						},
-					),
+					winston.format.printf(({ level, message, label }) => {
+						return `${level}: ${
+							label ? `[${label}] ` : ""
+						}${redactMessage(message)}`;
+					})
 				),
 			}),
 		],

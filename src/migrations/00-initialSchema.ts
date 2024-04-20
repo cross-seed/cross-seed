@@ -35,7 +35,7 @@ async function up(knex: Knex.Knex): Promise<void> {
 				name,
 				first_searched: firstSearched,
 				last_searched: lastSearched,
-			}),
+			})
 		);
 		await trx.batchInsert("searchee", searcheeRows, chunkSize);
 
@@ -46,7 +46,7 @@ async function up(knex: Knex.Knex): Promise<void> {
 					// searchee may not exist if cache contains decisions
 					// from early versions of the cache
 					const searchee = dbSearchees.find(
-						(searchee) => searchee.name === searcheeName,
+						(searchee) => searchee.name === searcheeName
 					);
 					return searchee
 						? [
@@ -58,16 +58,16 @@ async function up(knex: Knex.Knex): Promise<void> {
 									first_seen: decisionEntry.firstSeen,
 									info_hash: decisionEntry.infoHash,
 								},
-							]
+						  ]
 						: [];
-				}),
+				})
 		);
 		const torrentRows = uniqBy(cacheData.indexedTorrents, "file_path").map(
 			(e) => ({
 				info_hash: e.infoHash,
 				name: e.name,
 				file_path: e.filepath,
-			}),
+			})
 		);
 		await trx.batchInsert("decision", normalizedDecisions, chunkSize);
 		await trx.batchInsert("torrent", torrentRows, chunkSize);
