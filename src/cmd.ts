@@ -114,7 +114,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 		.addOption(
 			new Option(
 				"--match-mode <mode>",
-				"Safe will only download torrents with perfect matches. Risky will allow for renames and more matches, but might cause false positives"
+				"Safe will only download torrents with perfect matches. Risky will allow for renames and more matches, but might cause false positives. Partial is like risky but it ignores small files like .nfo/.srt if missing."
 			)
 				.default(fallback(fileConfig.matchMode, MatchMode.SAFE))
 				.choices(Object.values(MatchMode))

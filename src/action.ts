@@ -28,26 +28,31 @@ import { getTag } from "./utils.js";
 function logInjectionResult(
 	result: InjectionResult,
 	tracker: string,
-	name: string
+	name: string,
+	decision: Decision
 ) {
 	const styledName = chalk.green.bold(name);
 	const styledTracker = chalk.bold(tracker);
 	switch (result) {
 		case InjectionResult.SUCCESS:
-			logger.info(`Found ${styledName} on ${styledTracker} - injected`);
+			logger.info(
+				`Found ${styledName} on ${styledTracker} by ${decision} - injected`
+			);
 			break;
 		case InjectionResult.ALREADY_EXISTS:
-			logger.info(`Found ${styledName} on ${styledTracker} - exists`);
+			logger.info(
+				`Found ${styledName} on ${styledTracker} by ${decision} - exists`
+			);
 			break;
 		case InjectionResult.TORRENT_NOT_COMPLETE:
 			logger.warn(
-				`Found ${styledName} on ${styledTracker} - skipping incomplete torrent`
+				`Found ${styledName} on ${styledTracker} by ${decision} - skipping incomplete torrent`
 			);
 			break;
 		case InjectionResult.FAILURE:
 		default:
 			logger.error(
-				`Found ${styledName} on ${styledTracker} - failed to inject, saving instead`
+				`Found ${styledName} on ${styledTracker} by ${decision} - failed to inject, saving instead`
 			);
 			break;
 	}
@@ -73,11 +78,38 @@ function fuzzyLinkOneFile(
 	return join(destinationDir, newMeta.name);
 }
 
+function fuzzyLinkPartial(
+	searchee: Searchee,
+	newMeta: Metafile,
+	destinationDir: string,
+	sourceRoot: string
+): string {
+	for (const newFile of newMeta.files) {
+		let matchedSearcheeFiles = searchee.files.filter(
+			(searcheeFile) => searcheeFile.length === newFile.length
+		);
+		if (matchedSearcheeFiles.length > 1) {
+			matchedSearcheeFiles = matchedSearcheeFiles.filter(
+				(searcheeFile) => searcheeFile.name === newFile.name
+			);
+		}
+		if (matchedSearcheeFiles.length) {
+			const srcFilePath = statSync(sourceRoot).isFile()
+				? sourceRoot
+				: join(dirname(sourceRoot), matchedSearcheeFiles[0].path);
+			const destFilePath = join(destinationDir, newFile.path);
+			mkdirSync(dirname(destFilePath), { recursive: true });
+			linkFile(srcFilePath, destFilePath);
+		}
+	}
+	return join(destinationDir, newMeta.name);
+}
+
 async function linkAllFilesInMetafile(
 	searchee: Searchee,
 	newMeta: Metafile,
 	tracker: string,
-	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY
+	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY | Decision.MATCH_PARTIAL
 ): Promise<
 	Result<
 		string,
@@ -111,16 +143,23 @@ async function linkAllFilesInMetafile(
 
 	if (decision === Decision.MATCH) {
 		return resultOf(linkExactTree(sourceRoot, fullLinkDir));
-	} else {
+	} else if (decision === Decision.MATCH_SIZE_ONLY) {
 		return resultOf(
 			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot)
+		);
+	} else {
+		return resultOf(
+			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot)
 		);
 	}
 }
 
 export async function performAction(
 	newMeta: Metafile,
-	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY,
+	decision:
+		| Decision.MATCH
+		| Decision.MATCH_SIZE_ONLY
+		| Decision.MATCH_PARTIAL,
 	searchee: Searchee,
 	tracker: string
 ): Promise<ActionResult> {
@@ -130,7 +169,9 @@ export async function performAction(
 		await saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);
-		logger.info(`Found ${styledName} on ${styledTracker} - saved`);
+		logger.info(
+			`Found ${styledName} on ${styledTracker} by ${decision} - saved`
+		);
 		return SaveResult.SAVED;
 	}
 
@@ -151,7 +192,12 @@ export async function performAction(
 		) {
 			logger.warn("Falling back to non-linking.");
 		} else {
-			logInjectionResult(InjectionResult.FAILURE, tracker, newMeta.name);
+			logInjectionResult(
+				InjectionResult.FAILURE,
+				tracker,
+				newMeta.name,
+				decision
+			);
 			await saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 			return InjectionResult.FAILURE;
 		}
@@ -160,9 +206,14 @@ export async function performAction(
 		destinationDir = dirname(searchee.path);
 	}
 
-	const result = await getClient().inject(newMeta, searchee, destinationDir);
+	const result = await getClient().inject(
+		newMeta,
+		searchee,
+		decision,
+		destinationDir
+	);
 
-	logInjectionResult(result, tracker, newMeta.name);
+	logInjectionResult(result, tracker, newMeta.name, decision);
 	if (result === InjectionResult.FAILURE) {
 		await saveTorrentFile(tracker, getTag(searchee.name), newMeta);
 	}

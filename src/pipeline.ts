@@ -128,7 +128,8 @@ async function findOnOtherSites(
 	const matches = assessments.filter(
 		(e) =>
 			e.assessment.decision === Decision.MATCH ||
-			e.assessment.decision === Decision.MATCH_SIZE_ONLY
+			e.assessment.decision === Decision.MATCH_SIZE_ONLY ||
+			e.assessment.decision === Decision.MATCH_PARTIAL
 	);
 	const actionResults = await performActions(searchee, matches);
 	if (actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
@@ -245,7 +246,8 @@ export async function checkNewCandidateMatch(
 
 	if (
 		assessment.decision !== Decision.MATCH &&
-		assessment.decision !== Decision.MATCH_SIZE_ONLY
+		assessment.decision !== Decision.MATCH_SIZE_ONLY &&
+		assessment.decision !== Decision.MATCH_PARTIAL
 	) {
 		return null;
 	}
