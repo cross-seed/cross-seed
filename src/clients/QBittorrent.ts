@@ -234,11 +234,9 @@ export default class QBittorrent implements TorrentClient {
 	> {
 		let torrentInfo: TorrentConfiguration;
 		try {
-			if (await this.isInfoHashInClient(searchee.infoHash!)) {
-				torrentInfo = await this.getTorrentConfiguration(searchee);
-				if (torrentInfo.save_path === undefined) {
-					return resultOfErr("NOT_FOUND");
-				}
+			torrentInfo = await this.getTorrentConfiguration(searchee);
+			if (torrentInfo.save_path === undefined) {
+				return resultOfErr("NOT_FOUND");
 			}
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
