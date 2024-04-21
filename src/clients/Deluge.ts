@@ -11,7 +11,7 @@ import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
-import { extractCredentialsFromUrl } from "../utils.js";
+import { determineSkipRecheck, extractCredentialsFromUrl } from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 interface TorrentInfo {
 	complete?: boolean;
@@ -262,12 +262,10 @@ export default class Deluge implements TorrentClient {
 				});
 				return InjectionResult.FAILURE;
 			}
-
 			const params = this.formatData(
 				`${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`,
 				newTorrent.encode().toString("base64"),
 				path ? path : torrentInfo!.save_path,
-				!!searchee.infoHash,
 				decision,
 			);
 			const addResult = await this.call<string>(
@@ -276,23 +274,32 @@ export default class Deluge implements TorrentClient {
 			);
 			if (addResult.result) {
 				const { linkCategory } = getRuntimeConfig();
+				//if webui is desyncd just use linkCat
+				const ogLabel =
+					searchee.infoHash && torrentInfo!.label
+						? torrentInfo!.label
+						: this.delugeLabel;
+
+				const shouldSuffixLabel =
+					searchee.infoHash &&
+					duplicateCategories &&
+					!ogLabel.endsWith(this.delugeLabelSuffix) &&
+					ogLabel !== linkCategory;
+
+				const label = searchee.path
+					? linkCategory
+					: torrentInfo!.label
+						? shouldSuffixLabel
+							? `${torrentInfo!.label}${this.delugeLabelSuffix}`
+							: torrentInfo!.label
+						: ogLabel;
+
 				await this.setLabel(
 					newTorrent.name,
 					newTorrent.infoHash,
-					searchee.path
-						? linkCategory
-						: torrentInfo!.label
-							? duplicateCategories
-								? torrentInfo!.label.endsWith(
-										this.delugeLabelSuffix,
-									) || torrentInfo!.label === linkCategory
-									? torrentInfo!.label
-									: `${torrentInfo!.label}${
-											this.delugeLabelSuffix
-										}`
-								: torrentInfo!.label
-							: this.delugeLabel,
+					label,
 				);
+
 				return InjectionResult.SUCCESS;
 			} else if (addResult.error!.message!.includes("already")) {
 				return InjectionResult.ALREADY_EXISTS;
@@ -326,21 +333,17 @@ export default class Deluge implements TorrentClient {
 		filename: string,
 		filedump: string,
 		path: string,
-		isTorrent: boolean,
 		decision:
 			| Decision.MATCH
 			| Decision.MATCH_SIZE_ONLY
 			| Decision.MATCH_PARTIAL,
 	): InjectData {
-		const { skipRecheck } = getRuntimeConfig();
-		const skipRecheckTorrent =
-			decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
 		return [
 			filename,
 			filedump,
 			{
-				add_paused: isTorrent ? !skipRecheckTorrent : !skipRecheck,
-				seed_mode: isTorrent ? skipRecheckTorrent : skipRecheck,
+				add_paused: !determineSkipRecheck(decision),
+				seed_mode: determineSkipRecheck(decision),
 				download_location: path,
 			},
 		];

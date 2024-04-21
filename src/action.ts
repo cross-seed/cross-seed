@@ -213,7 +213,6 @@ export async function performAction(
 		// should be a MATCH, as risky requires a linkDir to be set
 		destinationDir = dirname(searchee.path);
 	}
-
 	const result = await getClient().inject(
 		newMeta,
 		searchee,
