@@ -182,11 +182,7 @@ export async function performAction(
 	let destinationDir: string | undefined;
 
 	if (linkDir) {
-		if (
-			!qbittorrentUrl ||
-			(qbittorrentUrl && searchee.path) ||
-			(v5Linking && searchee.path)
-		) {
+		if (!v5Linking || (qbittorrentUrl && searchee.path)) {
 			const linkedFilesRootResult = await linkAllFilesInMetafile(
 				searchee,
 				newMeta,

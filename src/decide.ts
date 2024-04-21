@@ -210,8 +210,9 @@ async function assessCandidateHelper(
 
 	if (!link) return { decision: Decision.NO_DOWNLOAD_LINK };
 
-	if (!releaseGroupDoesMatch(searchee.name, name, matchMode))
+	if (!releaseGroupDoesMatch(searchee.name, name, matchMode)) {
 		return { decision: Decision.RELEASE_GROUP_MISMATCH };
+	}
 
 	const result = await parseTorrentFromURL(link);
 
@@ -227,25 +228,8 @@ async function assessCandidateHelper(
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
 	const sizeMatch = compareFileTreesIgnoringNames(candidateMeta, searchee);
-
-	if (
-		(v5Linking && searchee.path) || //its data
-		(qbittorrentUrl && searchee.path) || // only partial on qbit data
-		!qbittorrentUrl // not qbittorrent
-	) {
-		const partialSizeMatch = compareFileTreesPartialIgnoringNames(
-			candidateMeta,
-			searchee,
-		);
-		if (!partialSizeMatch && matchMode === MatchMode.PARTIAL) {
-			return { decision: Decision.SIZE_MISMATCH };
-		}
-
-		if (!sizeMatch && matchMode !== MatchMode.PARTIAL) {
-			return { decision: Decision.SIZE_MISMATCH };
-		}
-	}
 	const perfectMatch = compareFileTrees(candidateMeta, searchee);
+
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
@@ -259,18 +243,31 @@ async function assessCandidateHelper(
 			metafile: candidateMeta,
 		};
 	}
-	const partialMatch = compareFileTreesPartial(candidateMeta, searchee);
+
 	if (
-		partialMatch &&
-		matchMode === MatchMode.PARTIAL &&
-		((v5Linking && searchee.path) || //its data
-			(qbittorrentUrl && searchee.path) || // only partial on qbit data
-			!qbittorrentUrl) // not qbittorrent
+		(v5Linking && searchee.path) || //its data
+		!v5Linking ||
+		(qbittorrentUrl && searchee.path) || // only partial on qbit data
+		(!qbittorrentUrl && matchMode === MatchMode.PARTIAL) // not qbittorrent
 	) {
-		return {
-			decision: Decision.MATCH_PARTIAL,
-			metafile: candidateMeta,
-		};
+		const partialSizeMatch = compareFileTreesPartialIgnoringNames(
+			candidateMeta,
+			searchee,
+		);
+		if (!partialSizeMatch) {
+			return { decision: Decision.SIZE_MISMATCH };
+		}
+
+		const partialMatch = compareFileTreesPartial(candidateMeta, searchee);
+		if (partialMatch) {
+			return {
+				decision: Decision.MATCH_PARTIAL,
+				metafile: candidateMeta,
+			};
+		}
+	}
+	if (!sizeMatch && matchMode !== MatchMode.PARTIAL) {
+		return { decision: Decision.SIZE_MISMATCH };
 	}
 
 	return { decision: Decision.FILE_TREE_MISMATCH };

@@ -347,9 +347,10 @@ export default class QBittorrent implements TorrentClient {
 			// searchee was linked
 			if (path) {
 				// tag category if using v5Linking
-				if (v5Linking) {
-					formData.append("tags", `${TORRENT_TAG}, ${category}`);
-				}
+				formData.append(
+					"tags",
+					`${TORRENT_TAG}${v5Linking ? `,${newCategoryName}` : ""}`,
+				);
 				//because it was a linked file, turn off autotmm
 				//and set a save path and datacat
 				formData.append(
