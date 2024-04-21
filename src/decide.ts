@@ -198,7 +198,8 @@ async function assessCandidateHelper(
 	searchee: Searchee,
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
-	const { matchMode, blockList } = getRuntimeConfig();
+	const { matchMode, blockList, v5Linking, qbittorrentUrl } =
+		getRuntimeConfig();
 	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
 		return { decision: Decision.BLOCKED_RELEASE };
 	}
@@ -225,19 +226,25 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
-
-	const partialSizeMatch = compareFileTreesPartialIgnoringNames(
-		candidateMeta,
-		searchee,
-	);
-	if (!partialSizeMatch && matchMode === MatchMode.PARTIAL) {
-		return { decision: Decision.SIZE_MISMATCH };
-	}
 	const sizeMatch = compareFileTreesIgnoringNames(candidateMeta, searchee);
-	if (!sizeMatch && matchMode !== MatchMode.PARTIAL) {
-		return { decision: Decision.SIZE_MISMATCH };
-	}
 
+	if (
+		(v5Linking && searchee.path) || //its data
+		(qbittorrentUrl && searchee.path) || // only partial on qbit data
+		!qbittorrentUrl // not qbittorrent
+	) {
+		const partialSizeMatch = compareFileTreesPartialIgnoringNames(
+			candidateMeta,
+			searchee,
+		);
+		if (!partialSizeMatch && matchMode === MatchMode.PARTIAL) {
+			return { decision: Decision.SIZE_MISMATCH };
+		}
+
+		if (!sizeMatch && matchMode !== MatchMode.PARTIAL) {
+			return { decision: Decision.SIZE_MISMATCH };
+		}
+	}
 	const perfectMatch = compareFileTrees(candidateMeta, searchee);
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
@@ -247,12 +254,25 @@ async function assessCandidateHelper(
 		matchMode !== MatchMode.SAFE &&
 		searchee.files.length === 1
 	) {
-		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
+		return {
+			decision: Decision.MATCH_SIZE_ONLY,
+			metafile: candidateMeta,
+		};
 	}
 	const partialMatch = compareFileTreesPartial(candidateMeta, searchee);
-	if (partialMatch && matchMode === MatchMode.PARTIAL) {
-		return { decision: Decision.MATCH_PARTIAL, metafile: candidateMeta };
+	if (
+		partialMatch &&
+		matchMode === MatchMode.PARTIAL &&
+		((v5Linking && searchee.path) || //its data
+			(qbittorrentUrl && searchee.path) || // only partial on qbit data
+			!qbittorrentUrl) // not qbittorrent
+	) {
+		return {
+			decision: Decision.MATCH_PARTIAL,
+			metafile: candidateMeta,
+		};
 	}
+
 	return { decision: Decision.FILE_TREE_MISMATCH };
 }
 

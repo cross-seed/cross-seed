@@ -25,10 +25,11 @@ export interface FileConfig {
 	matchMode?: MatchMode;
 	linkDir?: string;
 	linkType?: string;
-	legacyLinking?: boolean;
+	flatLinking?: boolean;
+	v5Linking?: boolean;
 	skipRecheck?: boolean;
 	maxDataDepth?: number;
-	dataCategory?: string;
+	linkCategory?: string;
 	torrentDir?: string;
 	torznab?: string[];
 	qbittorrentUrl?: string;

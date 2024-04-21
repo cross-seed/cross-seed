@@ -122,8 +122,8 @@ async function linkAllFilesInMetafile(
 		| "UNKNOWN_ERROR"
 	>
 > {
-	const { linkDir, legacyLinking } = getRuntimeConfig();
-	const fullLinkDir = legacyLinking ? linkDir : join(linkDir, tracker);
+	const { linkDir, flatLinking } = getRuntimeConfig();
+	const fullLinkDir = flatLinking ? linkDir : join(linkDir, tracker);
 	let sourceRoot: string;
 	if (searchee.path) {
 		sourceRoot = searchee.path;
@@ -166,7 +166,7 @@ export async function performAction(
 	searchee: Searchee,
 	tracker: string,
 ): Promise<ActionResult> {
-	const { action, linkDir } = getRuntimeConfig();
+	const { action, linkDir, qbittorrentUrl, v5Linking } = getRuntimeConfig();
 	const isVideo = hasVideo(searchee);
 
 	if (action === Action.SAVE) {
@@ -182,38 +182,43 @@ export async function performAction(
 	let destinationDir: string | undefined;
 
 	if (linkDir) {
-		const linkedFilesRootResult = await linkAllFilesInMetafile(
-			searchee,
-			newMeta,
-			tracker,
-			decision,
-		);
-		if (linkedFilesRootResult.isOk()) {
-			destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
-		} else if (
-			decision === Decision.MATCH &&
-			linkedFilesRootResult.unwrapErrOrThrow() === "MISSING_DATA"
+		if (
+			!qbittorrentUrl ||
+			(qbittorrentUrl && searchee.path) ||
+			(v5Linking && searchee.path)
 		) {
-			logger.warn("Falling back to non-linking.");
-		} else {
-			logInjectionResult(
-				InjectionResult.FAILURE,
+			const linkedFilesRootResult = await linkAllFilesInMetafile(
+				searchee,
+				newMeta,
 				tracker,
-				newMeta.name,
 				decision,
 			);
-			await saveTorrentFile(
-				tracker,
-				getTag(searchee.name, isVideo),
-				newMeta,
-			);
-			return InjectionResult.FAILURE;
+			if (linkedFilesRootResult.isOk()) {
+				destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
+			} else if (
+				decision === Decision.MATCH &&
+				linkedFilesRootResult.unwrapErrOrThrow() === "MISSING_DATA"
+			) {
+				logger.warn("Falling back to non-linking.");
+			} else {
+				logInjectionResult(
+					InjectionResult.FAILURE,
+					tracker,
+					newMeta.name,
+					decision,
+				);
+				await saveTorrentFile(
+					tracker,
+					getTag(searchee.name, isVideo),
+					newMeta,
+				);
+				return InjectionResult.FAILURE;
+			}
+		} else if (searchee.path) {
+			// should be a MATCH, as risky requires a linkDir to be set
+			destinationDir = dirname(searchee.path);
 		}
-	} else if (searchee.path) {
-		// should be a MATCH, as risky requires a linkDir to be set
-		destinationDir = dirname(searchee.path);
 	}
-
 	const result = await getClient().inject(
 		newMeta,
 		searchee,

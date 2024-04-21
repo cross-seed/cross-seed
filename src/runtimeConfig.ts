@@ -7,10 +7,11 @@ export interface RuntimeConfig {
 	matchMode: MatchMode;
 	linkDir: string;
 	linkType: LinkType;
-	legacyLinking: boolean;
+	flatLinking: boolean;
+	v5Linking: boolean;
 	skipRecheck: boolean;
 	maxDataDepth: number;
-	dataCategory: string;
+	linkCategory: string;
 	torrentDir?: string;
 	outputDir: string;
 	includeEpisodes: boolean;

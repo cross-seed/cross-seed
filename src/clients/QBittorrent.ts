@@ -166,11 +166,11 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async setUpCrossSeedCategory(ogCategoryName: string): Promise<string> {
-		const { dataCategory } = getRuntimeConfig();
+		const { linkCategory } = getRuntimeConfig();
 		if (!ogCategoryName) return "";
 		if (
 			ogCategoryName.endsWith(TORRENT_CATEGORY_SUFFIX) ||
-			ogCategoryName === dataCategory
+			ogCategoryName === linkCategory
 		)
 			return ogCategoryName;
 
@@ -296,8 +296,13 @@ export default class QBittorrent implements TorrentClient {
 			| Decision.MATCH_PARTIAL,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { duplicateCategories, skipRecheck, dataCategory } =
-			getRuntimeConfig();
+		const {
+			duplicateCategories,
+			skipRecheck,
+			linkCategory,
+			flatLinking,
+			v5Linking,
+		} = getRuntimeConfig();
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
@@ -312,7 +317,7 @@ export default class QBittorrent implements TorrentClient {
 						save_path: path,
 						isComplete: true,
 						autoTMM: false,
-						category: dataCategory,
+						category: linkCategory,
 					}
 				: await this.getTorrentConfiguration(searchee);
 
@@ -329,38 +334,49 @@ export default class QBittorrent implements TorrentClient {
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";
-
-			const skipRecheckTorrent =
-				decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
-
+			// if it was linked check if partial match
+			const skipRechecking = searchee.infoHash
+				? true
+				: path
+					? decision === Decision.MATCH_PARTIAL // partial with v5, can assume its data/linked
+						? false //recheck partials
+						: skipRecheck // size or perfect
+					: true; // not linked (perfect match?)
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
-			formData.append("tags", TORRENT_TAG);
-			formData.append("category", newCategoryName);
-
-			if (autoTMM) {
-				formData.append("autoTMM", "true");
-			} else {
-				formData.append("autoTMM", "false");
-				formData.append("savepath", save_path);
-			}
+			// searchee was linked
 			if (path) {
-				formData.append("contentLayout", "Original");
-				formData.append("skip_checking", skipRecheck.toString());
-				formData.append("paused", (!skipRecheck).toString());
+				// tag category if using v5Linking
+				if (v5Linking) {
+					formData.append("tags", `${TORRENT_TAG}, ${category}`);
+				}
+				//because it was a linked file, turn off autotmm
+				//and set a save path and datacat
+				formData.append(
+					"autoTMM",
+					flatLinking && searchee.infoHash ? autoTMM : "false",
+				);
+				formData.append("savepath", save_path);
+				formData.append("category", linkCategory);
 			} else {
-				formData.append("contentLayout", contentLayout);
-				formData.append("skip_checking", skipRecheckTorrent.toString());
-				formData.append("paused", (!skipRecheckTorrent).toString());
+				// torrent-backed with v5Linking enabled
+				// use searchee's autoTMM if v5Linking
+				// we infer this based on no path (linking) being done
+				formData.append("autoTMM", autoTMM);
+				//set category and tags like v5 perfectMatch
+				formData.append("category", newCategoryName);
+				formData.append("tags", TORRENT_TAG);
 			}
-
+			formData.append("contentLayout", path ? "Original" : contentLayout);
+			formData.append("skip_checking", skipRechecking.toString());
+			formData.append("paused", (!skipRechecking).toString());
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
 
 			await this.request("/torrents/add", formData);
-
-			if (path && !skipRecheck) {
+			//if we have a linked file and skiprecheck is false
+			if (!skipRechecking) {
 				await new Promise((resolve) => setTimeout(resolve, 100));
 				await this.request(
 					"/torrents/recheck",

@@ -116,7 +116,7 @@ module.exports = {
 	 * use.
 	 * Default is "cross-seed-data".
 	 */
-	dataCategory: undefined,
+	linkCategory: undefined,
 
 	/**
 	 * If this is specified, cross-seed will create links to matched files in
@@ -141,19 +141,28 @@ module.exports = {
 	linkType: "hardlink",
 
 	/**
-	 * Enabling this will link files using v5's flat folder style. This option
-	 * is necessary if you prefer flat folders of files or use qBittorrent and
-	 * Automatic Torrent Management.
+	 * Enabling this will link files using v5's flat folder style.
+	 *
+	 * If you are using qBittorrent with Auto Torrent Management in any capacity
+	 * it is recommended to enable this to avoid issues.
 	 *
 	 * Otherwise each individual Torznab tracker's cross-seeds will have it's
 	 * own folder with the tracker's name and it's links within it.
 	 *
 	 * Default: false.
 	 */
-	legacyLinking: false,
+	flatLinking: false,
 
 	/**
-	 * Whether to skip recheck in qBittorrent or Deluge. Not supported in rTorrent/Transmission.
+	 * Enabling this will link files using v5's linking behavior (only links
+	 * data-based matches)
+	 *
+	 **/
+	v5Linking: false,
+
+	/**
+	 * Whether to skip recheck in qBittorrent or Deluge. Not supported in
+	 * rTorrent/Transmission.
 	 */
 	skipRecheck: true,
 

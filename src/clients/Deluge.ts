@@ -275,17 +275,17 @@ export default class Deluge implements TorrentClient {
 				params,
 			);
 			if (addResult.result) {
-				const { dataCategory } = getRuntimeConfig();
+				const { linkCategory } = getRuntimeConfig();
 				await this.setLabel(
 					newTorrent.name,
 					newTorrent.infoHash,
 					searchee.path
-						? dataCategory
+						? linkCategory
 						: torrentInfo!.label
 							? duplicateCategories
 								? torrentInfo!.label.endsWith(
 										this.delugeLabelSuffix,
-									) || torrentInfo!.label === dataCategory
+									) || torrentInfo!.label === linkCategory
 									? torrentInfo!.label
 									: `${torrentInfo!.label}${
 											this.delugeLabelSuffix
@@ -334,7 +334,7 @@ export default class Deluge implements TorrentClient {
 	): InjectData {
 		const { skipRecheck } = getRuntimeConfig();
 		const skipRecheckTorrent =
-			decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
+			decision === Decision.MATCH_PARTIAL ? false : skipRecheck;
 		return [
 			filename,
 			filedump,
