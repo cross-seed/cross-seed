@@ -26,9 +26,10 @@ export interface Indexer {
 	movieSearchCap: boolean;
 	tvIdCaps: string;
 	movieIdCaps: string;
+	categories: string;
 }
 
-export async function getEnabledIndexers() {
+export async function getEnabledIndexers(): Promise<Indexer[]> {
 	return db("indexer")
 		.where({ active: true, search_cap: true, status: null })
 		.orWhere({ active: true, search_cap: true, status: IndexerStatus.OK })
