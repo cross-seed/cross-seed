@@ -40,9 +40,9 @@ export interface TorznabParams {
 	imdbid?: string;
 }
 export interface IdSearchCaps {
-	tvdbId: boolean;
-	tmdbId: boolean;
-	imdbId: boolean;
+	tvdbId?: boolean;
+	tmdbId?: boolean;
+	imdbId?: boolean;
 }
 export interface IdSearchParams {
 	tvdbid?: string;
@@ -117,11 +117,7 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 			"tmdbId",
 			"imdbId",
 		];
-		const caps: IdSearchCaps = {
-			tvdbId: false,
-			tmdbId: false,
-			imdbId: false,
-		};
+		const caps: IdSearchCaps = {};
 		const foundId = findIdTokens(section?.$?.supportedParams) || [];
 		idCapNames.forEach((keyName) => {
 			if (foundId.includes(keyName.toLocaleLowerCase())) {
