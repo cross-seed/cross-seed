@@ -342,7 +342,7 @@ export default class QBittorrent implements TorrentClient {
 			formData.append("category", newCategoryName);
 
 			formData.append("autoTMM", linkDir ? "false" : qbitParams.autoTMM);
-			if (linkDir) {
+			if (linkDir || !qbitParams.autoTMM) {
 				formData.append("savepath", qbitParams.save_path);
 			}
 			if (path) {
