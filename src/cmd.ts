@@ -297,7 +297,20 @@ program
 		});
 		await db.destroy();
 	});
-
+program
+	.command("clear-indexer-failures")
+	.description("Clear the cached details of indexers (failures and caps)")
+	.action(async () => {
+		await db("indexer").update({
+			active: true,
+			status: null,
+			retry_after: null,
+			search_cap: null,
+			tv_search_cap: null,
+			movie_search_cap: null,
+		});
+		await db.destroy();
+	});
 program
 	.command("test-notification")
 	.description("Send a test notification")
