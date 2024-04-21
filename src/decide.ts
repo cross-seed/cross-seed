@@ -245,10 +245,8 @@ async function assessCandidateHelper(
 	}
 
 	if (
-		(v5Linking && searchee.path) || //its data
-		!v5Linking ||
-		(qbittorrentUrl && searchee.path) || // only partial on qbit data
-		(!qbittorrentUrl && matchMode === MatchMode.PARTIAL) // not qbittorrent
+		matchMode === MatchMode.PARTIAL &&
+		(!v5Linking || searchee.path)
 	) {
 		const partialSizeMatch = compareFileTreesPartialIgnoringNames(
 			candidateMeta,
@@ -265,8 +263,7 @@ async function assessCandidateHelper(
 				metafile: candidateMeta,
 			};
 		}
-	}
-	if (!sizeMatch && matchMode !== MatchMode.PARTIAL) {
+	} else if (!sizeMatch) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
 
