@@ -307,21 +307,24 @@ export default class QBittorrent implements TorrentClient {
 			const buffer = new Blob([newTorrent.encode()], {
 				type: "application/x-bittorrent",
 			});
-			const { save_path, isComplete, autoTMM, category } = path
-				? {
-						save_path: path,
-						isComplete: true,
-						autoTMM: false,
-						category: dataCategory,
-					}
-				: await this.getTorrentConfiguration(searchee);
+			const qbitParams = {
+				save_path: path,
+				isComplete: true,
+				autoTMM: false,
+				category:
+					linkDir || searchee.infoHash
+						? (await this.getTorrentConfiguration(searchee))
+								.category
+						: dataCategory,
+			};
 
 			const newCategoryName =
 				duplicateCategories && searchee.infoHash
-					? await this.setUpCrossSeedCategory(category)
-					: category;
+					? await this.setUpCrossSeedCategory(qbitParams.category)
+					: qbitParams.category;
 
-			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
+			if (!qbitParams.isComplete)
+				return InjectionResult.TORRENT_NOT_COMPLETE;
 
 			const contentLayout =
 				!path &&
@@ -338,9 +341,9 @@ export default class QBittorrent implements TorrentClient {
 			formData.append("tags", TORRENT_TAG);
 			formData.append("category", newCategoryName);
 
-			formData.append("autoTMM", linkDir ? "false" : autoTMM);
+			formData.append("autoTMM", linkDir ? "false" : qbitParams.autoTMM);
 			if (linkDir) {
-				formData.append("savepath", save_path);
+				formData.append("savepath", qbitParams.save_path);
 			}
 			if (path) {
 				formData.append("contentLayout", "Original");
