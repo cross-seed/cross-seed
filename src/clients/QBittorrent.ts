@@ -10,7 +10,7 @@ import { Label, logger, logOnce } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
-import { extractCredentialsFromUrl } from "../utils.js";
+import { determineSkipRecheck, extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
@@ -234,11 +234,9 @@ export default class QBittorrent implements TorrentClient {
 	> {
 		let torrentInfo: TorrentConfiguration;
 		try {
-			if (await this.isInfoHashInClient(searchee.infoHash!)) {
-				torrentInfo = await this.getTorrentConfiguration(searchee);
-				if (torrentInfo.save_path === undefined) {
-					return resultOfErr("NOT_FOUND");
-				}
+			torrentInfo = await this.getTorrentConfiguration(searchee);
+			if (torrentInfo.save_path === undefined) {
+				return resultOfErr("NOT_FOUND");
 			}
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
@@ -296,7 +294,7 @@ export default class QBittorrent implements TorrentClient {
 			| Decision.MATCH_PARTIAL,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { duplicateCategories, skipRecheck, linkCategory } =
+		const { duplicateCategories, flatLinking, linkCategory } =
 			getRuntimeConfig();
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
@@ -329,38 +327,55 @@ export default class QBittorrent implements TorrentClient {
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";
-
-			const skipRecheckTorrent =
-				decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
-
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
-			formData.append("tags", TORRENT_TAG);
-			formData.append("category", newCategoryName);
-
-			if (autoTMM) {
-				formData.append("autoTMM", "true");
-			} else {
-				formData.append("autoTMM", "false");
-				formData.append("savepath", save_path);
-			}
+			// searchee was linked
 			if (path) {
-				formData.append("contentLayout", "Original");
-				formData.append("skip_checking", skipRecheck.toString());
-				formData.append("paused", (!skipRecheck).toString());
+				//because it was a linked file, turn off autotmm
+				//and set a save path and datacat
+				formData.append(
+					"autoTMM",
+					flatLinking && searchee.infoHash ? autoTMM : "false",
+				);
+				formData.append("savepath", save_path);
+				formData.append("category", linkCategory);
+				// tag category
+				formData.append(
+					"tags",
+					searchee.infoHash
+						? `${TORRENT_TAG},${newCategoryName}`
+						: category,
+				);
 			} else {
-				formData.append("contentLayout", contentLayout);
-				formData.append("skip_checking", skipRecheckTorrent.toString());
-				formData.append("paused", (!skipRecheckTorrent).toString());
+				// torrent-backed
+				// use searchee's autoTMM
+				// we infer this based on no path (linking) being done
+				formData.append("autoTMM", autoTMM.toString());
+				//set category and tags like v5 perfectMatch
+				formData.append("category", newCategoryName);
+				formData.append(
+					"tags",
+					searchee.infoHash
+						? TORRENT_TAG
+						: `${TORRENT_TAG},${newCategoryName}`,
+				);
 			}
-
+			formData.append("contentLayout", path ? "Original" : contentLayout);
+			formData.append(
+				"skip_checking",
+				determineSkipRecheck(decision).toString(),
+			);
+			formData.append(
+				"paused",
+				!determineSkipRecheck(decision).toString(),
+			);
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
 
 			await this.request("/torrents/add", formData);
-
-			if (path && !skipRecheck) {
+			//if we have a linked file and skiprecheck is false
+			if (determineSkipRecheck(decision)) {
 				await new Promise((resolve) => setTimeout(resolve, 100));
 				await this.request(
 					"/torrents/recheck",
