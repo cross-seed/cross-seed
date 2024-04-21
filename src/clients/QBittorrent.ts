@@ -334,14 +334,13 @@ export default class QBittorrent implements TorrentClient {
 				(await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";
-			// if it was linked check if partial match
-			const skipRechecking = searchee.infoHash
-				? true
-				: path
-					? decision === Decision.MATCH_PARTIAL // partial with v5, can assume its data/linked
-						? false //recheck partials
-						: skipRecheck // size or perfect
-					: true; // not linked (perfect match?)
+			const skipRechecking = searchee.path
+				? skipRecheck
+				: decision === Decision.MATCH
+					? true
+					: decision === Decision.MATCH_PARTIAL
+						? false
+						: skipRecheck;
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
 			// searchee was linked

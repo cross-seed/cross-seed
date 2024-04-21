@@ -166,7 +166,7 @@ export async function performAction(
 	searchee: Searchee,
 	tracker: string,
 ): Promise<ActionResult> {
-	const { action, linkDir, qbittorrentUrl, v5Linking } = getRuntimeConfig();
+	const { action, linkDir, v5Linking } = getRuntimeConfig();
 	const isVideo = hasVideo(searchee);
 
 	if (action === Action.SAVE) {
@@ -182,7 +182,7 @@ export async function performAction(
 	let destinationDir: string | undefined;
 
 	if (linkDir) {
-		if (!v5Linking || (qbittorrentUrl && searchee.path)) {
+		if (!v5Linking || searchee.path) {
 			const linkedFilesRootResult = await linkAllFilesInMetafile(
 				searchee,
 				newMeta,
@@ -210,10 +210,10 @@ export async function performAction(
 				);
 				return InjectionResult.FAILURE;
 			}
-		} else if (searchee.path) {
-			// should be a MATCH, as risky requires a linkDir to be set
-			destinationDir = dirname(searchee.path);
 		}
+	} else if (searchee.path) {
+		// should be a MATCH, as risky requires a linkDir to be set
+		destinationDir = dirname(searchee.path);
 	}
 	const result = await getClient().inject(
 		newMeta,
