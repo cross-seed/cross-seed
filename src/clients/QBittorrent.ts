@@ -296,7 +296,7 @@ export default class QBittorrent implements TorrentClient {
 			| Decision.MATCH_PARTIAL,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { duplicateCategories, skipRecheck, dataCategory } =
+		const { duplicateCategories, skipRecheck, dataCategory, linkDir } =
 			getRuntimeConfig();
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
@@ -338,10 +338,8 @@ export default class QBittorrent implements TorrentClient {
 			formData.append("tags", TORRENT_TAG);
 			formData.append("category", newCategoryName);
 
-			if (autoTMM) {
-				formData.append("autoTMM", "true");
-			} else {
-				formData.append("autoTMM", "false");
+			formData.append("autoTMM", linkDir ? "false" : autoTMM);
+			if (linkDir) {
 				formData.append("savepath", save_path);
 			}
 			if (path) {
