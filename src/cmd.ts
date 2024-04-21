@@ -301,6 +301,14 @@ program
 	.command("clear-indexer-failures")
 	.description("Clear the cached details of indexers (failures and caps)")
 	.action(async () => {
+		console.log(
+			"\nIf you've received a '429' (rate-limiting), continuing to hammer",
+			"your indexers may result in negative consequences.",
+		);
+		console.log(
+			"If you have to do this more than once in a short",
+			"period of time, you have bigger issue that need to be addressed.",
+		);
 		await db("indexer").update({
 			active: true,
 			status: null,
