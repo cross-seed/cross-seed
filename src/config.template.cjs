@@ -142,8 +142,7 @@ module.exports = {
 
 	/**
 	 * Enabling this will link files using v5's flat folder style. This option
-	 * is necessary if you prefer flat folders of files or use qBittorrent and
-	 * Automatic Torrent Management.
+	 * is necessary if you prefer flat folders of files.
 	 *
 	 * Otherwise each individual Torznab tracker's cross-seeds will have it's
 	 * own folder with the tracker's name and it's links within it.
