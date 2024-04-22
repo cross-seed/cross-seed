@@ -13,7 +13,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee, hasVideo } from "./searchee.js";
+import { Searchee } from "./searchee.js";
 import {
 	getAnimeQueries,
 	assembleUrl,
@@ -26,7 +26,11 @@ import {
 	sanitizeUrl,
 	stripExtension,
 } from "./utils.js";
-
+export interface TorznabCats {
+	tv: boolean;
+	movie: boolean;
+	anime: boolean;
+}
 export interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	title?: string;
@@ -51,6 +55,7 @@ export interface IdSearchParams {
 }
 export interface Caps {
 	search: boolean;
+	categories: TorznabCats;
 	tvSearch: boolean;
 	movieSearch: boolean;
 	movieIdSearch: IdSearchCaps;
@@ -63,6 +68,7 @@ type TorznabSearchTechnique =
 
 type TorznabCaps = {
 	caps?: {
+		categories?: object;
 		searching?: [
 			{
 				search?: TorznabSearchTechnique;
@@ -106,10 +112,25 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 	}));
 }
 function parseTorznabCaps(xml: TorznabCaps): Caps {
-	const capsSection = xml?.caps?.searching?.[0];
+	const categoryCaps = xml?.caps?.categories?.[0]?.category;
+	const searchCaps = xml?.caps?.searching?.[0];
+
 	const isAvailable = (section) => section?.[0]?.$.available === "yes";
 	const findIdTokens = (capTags: string | undefined) =>
 		capTags?.split(",").filter((token) => token.includes("id"));
+
+	function getCatCaps(item) {
+		const categoryNames: string[] = item.map((category) => category.$.name);
+
+		function checkCategory(x: string): boolean {
+			return categoryNames.some((cat) => cat.toLowerCase().includes(x));
+		}
+		return {
+			movie: checkCategory("movie"),
+			tv: checkCategory("tv"),
+			anime: checkCategory("anime"),
+		};
+	}
 
 	function setIdCaps(section): IdSearchCaps {
 		const idCapNames: (keyof IdSearchCaps)[] = [
@@ -128,11 +149,12 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	}
 
 	return {
-		search: Boolean(isAvailable(capsSection?.search)),
-		tvSearch: Boolean(isAvailable(capsSection?.["tv-search"])),
-		movieSearch: Boolean(isAvailable(capsSection?.["movie-search"])),
-		movieIdSearch: setIdCaps(capsSection?.["movie-search"]?.[0]),
-		tvIdSearch: setIdCaps(capsSection?.["tv-search"]?.[0]),
+		search: Boolean(isAvailable(searchCaps?.search)),
+		tvSearch: Boolean(isAvailable(searchCaps?.["tv-search"])),
+		movieSearch: Boolean(isAvailable(searchCaps?.["movie-search"])),
+		movieIdSearch: setIdCaps(searchCaps?.["movie-search"]?.[0]),
+		tvIdSearch: setIdCaps(searchCaps?.["tv-search"]?.[0]),
+		categories: getCatCaps(categoryCaps),
 	};
 }
 
@@ -145,8 +167,12 @@ async function createTorznabSearchQueries(
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
 	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
-	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
-	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
+	const mediaType = getTag(searchee);
+	if (
+		mediaType === MediaType.EPISODE &&
+		caps.tvSearch &&
+		shouldSearchIndexer(mediaType, caps.categories)
+	) {
 		const match = nameWithoutExtension.match(EP_REGEX);
 		return [
 			{
@@ -164,7 +190,11 @@ async function createTorznabSearchQueries(
 				...relevantIds,
 			},
 		] as const;
-	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
+	} else if (
+		mediaType === MediaType.SEASON &&
+		caps.tvSearch &&
+		shouldSearchIndexer(mediaType, caps.categories)
+	) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
 		return [
 			{
@@ -177,7 +207,11 @@ async function createTorznabSearchQueries(
 				...relevantIds,
 			},
 		] as const;
-	} else if (mediaType === MediaType.MOVIE && caps.movieSearch) {
+	} else if (
+		mediaType === MediaType.MOVIE &&
+		caps.movieSearch &&
+		shouldSearchIndexer(mediaType, caps.categories)
+	) {
 		return [
 			{
 				t: "movie",
@@ -188,7 +222,10 @@ async function createTorznabSearchQueries(
 				...relevantIds,
 			},
 		] as const;
-	} else if (mediaType === MediaType.ANIME) {
+	} else if (
+		mediaType === MediaType.ANIME &&
+		shouldSearchIndexer(mediaType, caps.categories)
+	) {
 		const animeQueries = getAnimeQueries(nameWithoutExtension);
 		return animeQueries.map((animeQuery) => ({
 			t: "search",
@@ -203,7 +240,19 @@ async function createTorznabSearchQueries(
 		] as const;
 	}
 }
-
+function shouldSearchIndexer(mediaType: MediaType, caps: TorznabCats) {
+	switch (mediaType) {
+		case MediaType.EPISODE:
+		case MediaType.SEASON:
+			return caps.tv;
+		case MediaType.MOVIE:
+			return caps.movie;
+		case MediaType.ANIME:
+			return caps.anime;
+		case MediaType.OTHER:
+			return true;
+	}
+}
 export async function queryRssFeeds(): Promise<Candidate[]> {
 	const candidatesByUrl = await makeRequests(
 		await getEnabledIndexers(),
@@ -245,16 +294,20 @@ export async function searchTorznab(
 			!entry ||
 			((!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
 				(!excludeRecentSearch ||
-					entry.lastSearched < nMsAgo(excludeRecentSearch)))
+					entry.lastSearched < nMsAgo(excludeRecentSearch)) &&
+				shouldSearchIndexer(
+					getTag(searchee),
+					JSON.parse(indexer.categories),
+				))
 		);
 	});
 
-	const timestampCallout = " (filtered by timestamps)";
+	const timeOrCatCallout = " (filtered by category/timestamps)";
 	logger.info({
 		label: Label.TORZNAB,
 		message: `Searching ${indexersToUse.length} indexers for ${name}${
 			indexersToUse.length < enabledIndexers.length
-				? timestampCallout
+				? timeOrCatCallout
 				: ""
 		}`,
 	});
@@ -266,6 +319,7 @@ export async function searchTorznab(
 			movieSearch: indexer.movieSearchCap,
 			tvIdSearch: JSON.parse(indexer.tvIdCaps),
 			movieIdSearch: JSON.parse(indexer.movieIdCaps),
+			categories: JSON.parse(indexer.categories),
 		};
 		return await createTorznabSearchQueries(searchee, searcheeIds, caps);
 	});
@@ -288,6 +342,7 @@ export async function syncWithDb() {
 			tvIdCaps: "tv_id_caps",
 			movieSearchCap: "movie_search_cap",
 			movieIdCaps: "movie_id_caps",
+			categories: "cat_caps",
 		});
 
 	const inConfigButNotInDb = torznab.filter(
@@ -451,6 +506,7 @@ async function updateCaps(
 				movie_search_cap: caps.movieSearch,
 				movie_id_caps: JSON.stringify(caps.movieIdSearch),
 				tv_id_caps: JSON.stringify(caps.tvIdSearch),
+				cat_caps: JSON.stringify(caps.categories),
 			});
 	}
 }
@@ -483,6 +539,7 @@ export async function validateTorznabUrls() {
 		.orWhere({ search_cap: false, active: true })
 		.orWhere({ movie_id_caps: null, active: true })
 		.orWhere({ tv_id_caps: null, active: true })
+		.orWhere({ cat_caps: null, active: true })
 		.select({ id: "id", url: "url", apikey: "apikey" });
 	await updateCaps(enabledIndexersWithoutCaps);
 

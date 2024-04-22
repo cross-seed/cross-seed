@@ -3,7 +3,7 @@ import jobs from "./01-jobs.js";
 import timestamps from "./02-timestamps.js";
 import rateLimits from "./03-rateLimits.js";
 import auth from "./04-auth.js";
-import idcaps from "./05-idcaps.js";
+import caps from "./05-caps.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -13,7 +13,7 @@ export const migrations = {
 			timestamps,
 			rateLimits,
 			auth,
-			idcaps,
+			caps,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,
