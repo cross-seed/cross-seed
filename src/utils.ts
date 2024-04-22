@@ -8,12 +8,20 @@ import {
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { IdSearchParams, TorznabParams } from "./torznab.js";
+import {
+	hasAudio,
+	hasBook,
+	hasVideo,
+	Searchee
+} from "./searchee.js";
 
 export enum MediaType {
 	EPISODE = "episode",
 	SEASON = "pack",
 	MOVIE = "movie",
 	ANIME = "anime",
+	AUDIO = "audio",
+	BOOK = "book",
 	OTHER = "unknown",
 }
 
@@ -47,16 +55,20 @@ export function humanReadableSize(bytes: number) {
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
-export function getTag(name: string, isVideo: boolean): MediaType {
+export function getTag(name: string, searchee: Searchee): MediaType {
 	return EP_REGEX.test(name)
 		? MediaType.EPISODE
 		: SEASON_REGEX.test(name)
 			? MediaType.SEASON
 			: MOVIE_REGEX.test(name)
 				? MediaType.MOVIE
-				: isVideo && ANIME_REGEX.test(name)
+				: hasVideo(searchee) && ANIME_REGEX.test(name)
 					? MediaType.ANIME
-					: MediaType.OTHER;
+					: hasAudio(searchee)
+						? MediaType.AUDIO
+						: hasBook(searchee)
+							? MediaType.BOOK
+							: MediaType.OTHER;
 }
 
 export async function time<R>(cb: () => R, times: number[]) {

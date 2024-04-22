@@ -1,6 +1,10 @@
 import { readdirSync, statSync } from "fs";
 import { basename, extname, join, relative } from "path";
-import { VIDEO_EXTENSIONS } from "./constants.js";
+import { 
+	AUDIO_EXTENSIONS,
+	BOOK_EXTENSIONS,
+	VIDEO_EXTENSIONS,
+} from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -29,6 +33,18 @@ export function hasInfoHash(
 	searchee: Searchee,
 ): searchee is SearcheeWithInfoHash {
 	return searchee.infoHash != null;
+}
+
+export function hasAudio(searchee: Searchee): boolean {
+	return searchee.files.some((file) =>
+		AUDIO_EXTENSIONS.includes(extname(file.name)),
+	);
+}
+
+export function hasBook(searchee: Searchee): boolean {
+	return searchee.files.some((file) =>
+		BOOK_EXTENSIONS.includes(extname(file.name)),
+	);
 }
 
 export function hasVideo(searchee: Searchee): boolean {

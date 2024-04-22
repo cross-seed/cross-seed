@@ -13,7 +13,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee, hasVideo } from "./searchee.js";
+import { Searchee } from "./searchee.js";
 import {
 	getAnimeQueries,
 	assembleUrl,
@@ -30,6 +30,8 @@ export interface TorznabCats {
 	tv: boolean;
 	movie: boolean;
 	anime: boolean;
+	audio: boolean;
+	book: boolean;
 }
 export interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
@@ -129,6 +131,8 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 			movie: checkCategory("movie"),
 			tv: checkCategory("tv"),
 			anime: checkCategory("anime"),
+			audio: checkCategory("audio"),
+			book: checkCategory("book"),
 		};
 	}
 
@@ -167,7 +171,7 @@ async function createTorznabSearchQueries(
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
 	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
-	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
+	const mediaType = getTag(nameWithoutExtension, searchee);
 	if (
 		mediaType === MediaType.EPISODE &&
 		caps.tvSearch &&
@@ -249,6 +253,10 @@ function shouldSearchIndexer(mediaType: MediaType, caps: TorznabCats) {
 			return caps.movie;
 		case MediaType.ANIME:
 			return caps.anime;
+		case MediaType.AUDIO:
+			return caps.audio;
+		case MediaType.BOOK:
+			return caps.book;
 		case MediaType.OTHER:
 			return true;
 	}
@@ -296,7 +304,7 @@ export async function searchTorznab(
 				(!excludeRecentSearch ||
 					entry.lastSearched < nMsAgo(excludeRecentSearch)) &&
 				shouldSearchIndexer(
-					getTag(searchee.name, hasVideo(searchee)),
+					getTag(searchee.name, searchee),
 					JSON.parse(indexer.categories),
 				))
 		);

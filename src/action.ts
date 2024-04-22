@@ -171,10 +171,9 @@ export async function performAction(
 	tracker: string,
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
-	const isVideo = hasVideo(searchee);
 
 	if (action === Action.SAVE) {
-		await saveTorrentFile(tracker, getTag(searchee.name, isVideo), newMeta);
+		await saveTorrentFile(tracker, getTag(searchee.name, searchee), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.info(
@@ -208,7 +207,7 @@ export async function performAction(
 			);
 			await saveTorrentFile(
 				tracker,
-				getTag(searchee.name, isVideo),
+				getTag(searchee.name, searchee),
 				newMeta,
 			);
 			return InjectionResult.FAILURE;
@@ -227,7 +226,7 @@ export async function performAction(
 
 	logInjectionResult(result, tracker, newMeta.name, decision);
 	if (result === InjectionResult.FAILURE) {
-		await saveTorrentFile(tracker, getTag(searchee.name, isVideo), newMeta);
+		await saveTorrentFile(tracker, getTag(searchee.name, searchee), newMeta);
 	}
 	return result;
 }

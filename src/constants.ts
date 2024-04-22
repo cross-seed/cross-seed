@@ -20,6 +20,8 @@ export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w ]+?)(?:\[.+\])?(?:\))?(?=(?:\.\w{1,5})?$)/i;
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
+export const AUDIO_EXTENSIONS = [".wav", ".aiff", ".flac", ".mp3", ".aac", ".m4a", ".m4b", ".ogg", ".wma"];
+export const BOOK_EXTENSIONS = [".epub", ".mobi", ".azw", ".azw3", ".azw4", ".pdf", ".djvu", ".html", ".chm", ".cbr", ".cbz", ".cb7"];
 
 export const IGNORED_FOLDERS_REGEX =
 	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;
