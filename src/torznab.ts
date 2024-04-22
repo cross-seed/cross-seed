@@ -168,11 +168,7 @@ async function createTorznabSearchQueries(
 		parseInt(str.match(/\d+/)![0]);
 	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
 	const mediaType = getTag(searchee);
-	if (
-		mediaType === MediaType.EPISODE &&
-		caps.tvSearch &&
-		shouldSearchIndexer(mediaType, caps.categories)
-	) {
+	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
 		return [
 			{
@@ -190,11 +186,7 @@ async function createTorznabSearchQueries(
 				...relevantIds,
 			},
 		] as const;
-	} else if (
-		mediaType === MediaType.SEASON &&
-		caps.tvSearch &&
-		shouldSearchIndexer(mediaType, caps.categories)
-	) {
+	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
 		return [
 			{
@@ -207,11 +199,7 @@ async function createTorznabSearchQueries(
 				...relevantIds,
 			},
 		] as const;
-	} else if (
-		mediaType === MediaType.MOVIE &&
-		caps.movieSearch &&
-		shouldSearchIndexer(mediaType, caps.categories)
-	) {
+	} else if (mediaType === MediaType.MOVIE && caps.movieSearch) {
 		return [
 			{
 				t: "movie",
@@ -222,10 +210,7 @@ async function createTorznabSearchQueries(
 				...relevantIds,
 			},
 		] as const;
-	} else if (
-		mediaType === MediaType.ANIME &&
-		shouldSearchIndexer(mediaType, caps.categories)
-	) {
+	} else if (mediaType === MediaType.ANIME) {
 		const animeQueries = getAnimeQueries(nameWithoutExtension);
 		return animeQueries.map((animeQuery) => ({
 			t: "search",
