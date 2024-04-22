@@ -243,7 +243,7 @@ function shouldSearchIndexer(mediaType: MediaType, caps: TorznabCats) {
 		case MediaType.BOOK:
 			return caps.book;
 		case MediaType.OTHER:
-			return true;
+			return false;
 	}
 }
 export async function queryRssFeeds(): Promise<Candidate[]> {
