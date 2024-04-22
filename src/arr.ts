@@ -7,10 +7,9 @@ import {
 	getTag,
 	MediaType,
 	sanitizeUrl,
-	stripExtension,
 } from "./utils.js";
 import chalk from "chalk";
-import { hasVideo, Searchee } from "./searchee.js";
+import { Searchee } from "./searchee.js";
 import { Caps, IdSearchParams, TorznabParams } from "./torznab.js";
 
 const keyNames = ["tvdbId", "imdbId", "tmdbId"];
@@ -160,8 +159,7 @@ export async function getRelevantArrIds(
 	ids,
 	caps: Caps,
 ): Promise<IdSearchParams> {
-	const nameWithoutExtension = stripExtension(searchee.name);
-	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
+	const mediaType = getTag(searchee);
 	const idSearchCaps =
 		mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
 			? caps.tvIdSearch
@@ -178,8 +176,7 @@ export async function getRelevantArrIds(
 export async function getAvailableArrIds(
 	searchee: Searchee,
 ): Promise<IdSearchParams> {
-	const nameWithoutExtension = stripExtension(searchee.name);
-	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
+	const mediaType = getTag(searchee);
 	try {
 		const arrIdData = (
 			await grabArrId(searchee.name, mediaType)

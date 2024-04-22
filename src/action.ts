@@ -21,7 +21,7 @@ import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee, hasVideo } from "./searchee.js";
+import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getTag } from "./utils.js";
 
@@ -171,10 +171,9 @@ export async function performAction(
 	tracker: string,
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
-	const isVideo = hasVideo(searchee);
 
 	if (action === Action.SAVE) {
-		await saveTorrentFile(tracker, getTag(searchee.name, isVideo), newMeta);
+		await saveTorrentFile(tracker, getTag(searchee), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.info(
@@ -206,11 +205,7 @@ export async function performAction(
 				newMeta.name,
 				decision,
 			);
-			await saveTorrentFile(
-				tracker,
-				getTag(searchee.name, isVideo),
-				newMeta,
-			);
+			await saveTorrentFile(tracker, getTag(searchee), newMeta);
 			return InjectionResult.FAILURE;
 		}
 	} else if (searchee.path) {
@@ -227,7 +222,7 @@ export async function performAction(
 
 	logInjectionResult(result, tracker, newMeta.name, decision);
 	if (result === InjectionResult.FAILURE) {
-		await saveTorrentFile(tracker, getTag(searchee.name, isVideo), newMeta);
+		await saveTorrentFile(tracker, getTag(searchee), newMeta);
 	}
 	return result;
 }

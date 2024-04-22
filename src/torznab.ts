@@ -13,7 +13,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee, hasVideo } from "./searchee.js";
+import { Searchee } from "./searchee.js";
 import {
 	getAnimeQueries,
 	assembleUrl,
@@ -167,7 +167,7 @@ async function createTorznabSearchQueries(
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
 	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
-	const mediaType = getTag(nameWithoutExtension, hasVideo(searchee));
+	const mediaType = getTag(searchee);
 	if (
 		mediaType === MediaType.EPISODE &&
 		caps.tvSearch &&
@@ -296,7 +296,7 @@ export async function searchTorznab(
 				(!excludeRecentSearch ||
 					entry.lastSearched < nMsAgo(excludeRecentSearch)) &&
 				shouldSearchIndexer(
-					getTag(searchee.name, hasVideo(searchee)),
+					getTag(searchee),
 					JSON.parse(indexer.categories),
 				))
 		);
