@@ -30,6 +30,8 @@ export interface TorznabCats {
 	tv: boolean;
 	movie: boolean;
 	anime: boolean;
+	audio: boolean;
+	book: boolean;
 }
 export interface TorznabParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
@@ -129,6 +131,8 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 			movie: checkCategory("movie"),
 			tv: checkCategory("tv"),
 			anime: checkCategory("anime"),
+			audio: checkCategory("audio"),
+			book: checkCategory("book"),
 		};
 	}
 
@@ -234,6 +238,10 @@ function shouldSearchIndexer(mediaType: MediaType, caps: TorznabCats) {
 			return caps.movie;
 		case MediaType.ANIME:
 			return caps.anime;
+		case MediaType.AUDIO:
+			return caps.audio;
+		case MediaType.BOOK:
+			return caps.book;
 		case MediaType.OTHER:
 			return true;
 	}

@@ -5,16 +5,20 @@ import {
 	SEASON_REGEX,
 	ANIME_REGEX,
 	VIDEO_EXTENSIONS,
+	AUDIO_EXTENSIONS,
+	BOOK_EXTENSIONS,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { IdSearchParams, TorznabParams } from "./torznab.js";
-import { hasVideo, Searchee } from "./searchee.js";
+import { Searchee } from "./searchee.js";
 
 export enum MediaType {
 	EPISODE = "episode",
 	SEASON = "pack",
 	MOVIE = "movie",
 	ANIME = "anime",
+	AUDIO = "audio",
+	BOOK = "book",
 	OTHER = "unknown",
 }
 
@@ -49,16 +53,23 @@ export function humanReadableSize(bytes: number) {
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
 export function getTag(searchee: Searchee): MediaType {
-	const nameWithoutExtension = stripExtension(searchee.name);
-	return EP_REGEX.test(nameWithoutExtension)
+	function hasExt(searchee: Searchee, extensions: string[]) {
+		return extensions.includes(path.extname(searchee.name));
+	}
+	const stem = stripExtension(searchee.name);
+	return EP_REGEX.test(stem)
 		? MediaType.EPISODE
-		: SEASON_REGEX.test(nameWithoutExtension)
+		: SEASON_REGEX.test(stem)
 			? MediaType.SEASON
-			: MOVIE_REGEX.test(nameWithoutExtension)
+			: MOVIE_REGEX.test(stem)
 				? MediaType.MOVIE
-				: hasVideo(searchee) && ANIME_REGEX.test(nameWithoutExtension)
+				: hasExt(searchee, VIDEO_EXTENSIONS) && ANIME_REGEX.test(stem)
 					? MediaType.ANIME
-					: MediaType.OTHER;
+					: hasExt(searchee, AUDIO_EXTENSIONS)
+						? MediaType.AUDIO
+						: hasExt(searchee, BOOK_EXTENSIONS)
+							? MediaType.BOOK
+							: MediaType.OTHER;
 }
 
 export async function time<R>(cb: () => R, times: number[]) {
