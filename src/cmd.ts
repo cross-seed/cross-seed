@@ -307,7 +307,7 @@ program
 		);
 		console.log(
 			"If you have to do this more than once in a short",
-			"period of time, you have bigger issue that need to be addressed.",
+			"period of time, you have bigger issues that need to be addressed.",
 		);
 		await db("indexer").update({
 			status: null,
