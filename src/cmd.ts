@@ -302,7 +302,7 @@ program
 	.description("Clear the cached details of indexers (failures and caps)")
 	.action(async () => {
 		console.log(
-			"\nIf you've received a '429' (rate-limiting), continuing to hammer",
+			"If you've received a '429' (rate-limiting), continuing to hammer",
 			"your indexers may result in negative consequences.",
 		);
 		console.log(
