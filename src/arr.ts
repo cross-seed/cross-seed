@@ -161,7 +161,7 @@ export async function getRelevantArrIds(
 	caps: Caps,
 ): Promise<IdSearchParams> {
 	const nameWithoutExtension = stripExtension(searchee.name);
-	const mediaType = getTag(nameWithoutExtension, searchee);
+	const mediaType = getTag(searchee);
 	const idSearchCaps =
 		mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
 			? caps.tvIdSearch
@@ -179,7 +179,7 @@ export async function getAvailableArrIds(
 	searchee: Searchee,
 ): Promise<IdSearchParams> {
 	const nameWithoutExtension = stripExtension(searchee.name);
-	const mediaType = getTag(nameWithoutExtension, searchee);
+	const mediaType = getTag(searchee);
 	try {
 		const arrIdData = (
 			await grabArrId(searchee.name, mediaType)

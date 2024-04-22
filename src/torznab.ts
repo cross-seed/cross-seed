@@ -171,7 +171,7 @@ async function createTorznabSearchQueries(
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
 	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
-	const mediaType = getTag(nameWithoutExtension, searchee);
+	const mediaType = getTag(searchee);
 	if (
 		mediaType === MediaType.EPISODE &&
 		caps.tvSearch &&
@@ -304,7 +304,7 @@ export async function searchTorznab(
 				(!excludeRecentSearch ||
 					entry.lastSearched < nMsAgo(excludeRecentSearch)) &&
 				shouldSearchIndexer(
-					getTag(searchee.name, searchee),
+					getTag(searchee),
 					JSON.parse(indexer.categories),
 				))
 		);
