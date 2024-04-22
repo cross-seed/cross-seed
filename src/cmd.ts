@@ -297,7 +297,24 @@ program
 		});
 		await db.destroy();
 	});
-
+program
+	.command("clear-indexer-failures")
+	.description("Clear the cached details of indexers (failures and caps)")
+	.action(async () => {
+		console.log(
+			"If you've received a '429' (rate-limiting), continuing to hammer",
+			"your indexers may result in negative consequences.",
+		);
+		console.log(
+			"If you have to do this more than once in a short",
+			"period of time, you have bigger issues that need to be addressed.",
+		);
+		await db("indexer").update({
+			status: null,
+			retry_after: null,
+		});
+		await db.destroy();
+	});
 program
 	.command("test-notification")
 	.description("Send a test notification")
