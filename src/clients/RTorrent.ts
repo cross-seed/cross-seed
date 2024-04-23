@@ -120,7 +120,7 @@ export default class RTorrent implements TorrentClient {
 			basic_auth: shouldUseAuth
 				? { user: username, pass: password }
 				: undefined,
-			headers: headers, // Include headers option
+			headers: headers,
 		});
 	}
 
