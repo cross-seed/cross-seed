@@ -111,11 +111,16 @@ export default class RTorrent implements TorrentClient {
 
 		const shouldUseAuth = Boolean(username && password);
 
+		const headers = {
+			"Content-Type": "text/xml",
+		};
+
 		this.client = clientCreator({
 			url: href,
 			basic_auth: shouldUseAuth
 				? { user: username, pass: password }
 				: undefined,
+			headers: headers, // Include headers option
 		});
 	}
 
