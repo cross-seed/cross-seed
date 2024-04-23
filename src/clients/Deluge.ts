@@ -1,4 +1,3 @@
-import ms from "ms";
 import {
 	Decision,
 	InjectionResult,
@@ -13,6 +12,7 @@ import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { determineSkipRecheck, extractCredentialsFromUrl } from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
+import ms from "ms";
 interface TorrentInfo {
 	complete?: boolean;
 	save_path: string;
@@ -176,7 +176,7 @@ export default class Deluge implements TorrentClient {
 				return this.call<ResultType>(method, params, 0);
 			} else {
 				throw new Error(
-					"Connection lost with Deluge. Reauthentication failed.",
+					"Connection lost with Deluge. Re-authentication failed.",
 				);
 			}
 		}
@@ -207,6 +207,29 @@ export default class Deluge implements TorrentClient {
 			: enabledPlugins.result!.includes("Label");
 	}
 
+	// generates the label (string) for injection based on searchee and torrentInfo
+	private calculateLabel(
+		searchee: Searchee,
+		torrentInfo: TorrentInfo,
+	): string {
+		const { linkCategory, duplicateCategories } = getRuntimeConfig();
+		if (!searchee.infoHash || !torrentInfo!.label) {
+			return this.delugeLabel;
+		}
+		const ogLabel = torrentInfo!.label;
+		if (!duplicateCategories) {
+			return ogLabel;
+		}
+		const shouldSuffixLabel =
+			!ogLabel.endsWith(this.delugeLabelSuffix) && // no .cross-seed
+			ogLabel !== linkCategory; // not data
+
+		return searchee.path
+			? linkCategory
+			: shouldSuffixLabel
+				? `${ogLabel}${this.delugeLabelSuffix}`
+				: ogLabel;
+	}
 	/**
 	 * if Label plugin is loaded, adds (if necessary)
 	 * and sets the label based on torrent hash.
@@ -247,7 +270,6 @@ export default class Deluge implements TorrentClient {
 		path?: string,
 	): Promise<InjectionResult> {
 		try {
-			const { duplicateCategories } = getRuntimeConfig();
 			let torrentInfo: TorrentInfo;
 			if (searchee.infoHash) {
 				torrentInfo = await this.getTorrentInfo(searchee);
@@ -272,41 +294,24 @@ export default class Deluge implements TorrentClient {
 				"core.add_torrent_file",
 				params,
 			);
-			if (addResult.result) {
-				const { linkCategory } = getRuntimeConfig();
-				//if webui is desyncd just use linkCat
-				const ogLabel =
-					searchee.infoHash && torrentInfo!.label
-						? torrentInfo!.label
-						: this.delugeLabel;
 
-				const shouldSuffixLabel =
-					searchee.infoHash &&
-					duplicateCategories &&
-					!ogLabel.endsWith(this.delugeLabelSuffix) &&
-					ogLabel !== linkCategory;
-
-				const label = searchee.path
-					? linkCategory
-					: torrentInfo!.label
-						? shouldSuffixLabel
-							? `${torrentInfo!.label}${this.delugeLabelSuffix}`
-							: torrentInfo!.label
-						: ogLabel;
-
+			const addResponse =
+				typeof addResult.result === "string"
+					? addResult.result
+					: addResult.error;
+			if (typeof addResponse === "string") {
 				await this.setLabel(
 					newTorrent.name,
 					newTorrent.infoHash,
-					label,
+					this.calculateLabel(searchee, torrentInfo!),
 				);
-
 				return InjectionResult.SUCCESS;
-			} else if (addResult.error!.message!.includes("already")) {
+			} else if (addResponse?.message!.includes("already")) {
 				return InjectionResult.ALREADY_EXISTS;
-			} else if (addResult.error!.message) {
+			} else if (addResponse) {
 				logger.debug({
 					label: Label.DELUGE,
-					message: `Injection failed: ${addResult.error!.message}`,
+					message: `Injection failed: ${addResponse}`,
 				});
 				return InjectionResult.FAILURE;
 			} else {
@@ -338,19 +343,20 @@ export default class Deluge implements TorrentClient {
 			| Decision.MATCH_SIZE_ONLY
 			| Decision.MATCH_PARTIAL,
 	): InjectData {
+		const skipRecheck = determineSkipRecheck(decision);
 		return [
 			filename,
 			filedump,
 			{
-				add_paused: !determineSkipRecheck(decision),
-				seed_mode: determineSkipRecheck(decision),
+				add_paused: !skipRecheck,
+				seed_mode: skipRecheck,
 				download_location: path,
 			},
 		];
 	}
 
 	/**
-	 * returns directory of a infohash in deluge as a string
+	 * returns directory of an infohash in deluge as a string
 	 */
 	async getDownloadDir(
 		searchee: Searchee,

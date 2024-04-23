@@ -238,13 +238,13 @@ export default class QBittorrent implements TorrentClient {
 			if (torrentInfo.save_path === undefined) {
 				return resultOfErr("NOT_FOUND");
 			}
+			return resultOf(torrentInfo!.save_path);
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
 			}
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		return resultOf(torrentInfo!.save_path);
 	}
 
 	async getTorrentConfiguration(
@@ -314,10 +314,13 @@ export default class QBittorrent implements TorrentClient {
 					}
 				: await this.getTorrentConfiguration(searchee);
 
-			const newCategoryName =
+			const ogCategoryForTag =
 				duplicateCategories && searchee.infoHash
 					? await this.setUpCrossSeedCategory(category)
 					: category;
+			const newTag = searchee.infoHash
+				? `${TORRENT_TAG},${ogCategoryForTag}`
+				: ogCategoryForTag;
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 
@@ -330,6 +333,7 @@ export default class QBittorrent implements TorrentClient {
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
 			// searchee was linked
+
 			if (path) {
 				//because it was a linked file, turn off autotmm
 				//and set a save path and datacat
@@ -338,37 +342,23 @@ export default class QBittorrent implements TorrentClient {
 					flatLinking && searchee.infoHash ? autoTMM : "false",
 				);
 				formData.append("savepath", save_path);
-				formData.append("category", linkCategory);
+				formData.append("category", category);
 				// tag category
-				formData.append(
-					"tags",
-					searchee.infoHash
-						? `${TORRENT_TAG},${newCategoryName}`
-						: category,
-				);
+				formData.append("tags", newTag);
 			} else {
-				// torrent-backed
+				// non-linked (direct referencing og data)
 				// use searchee's autoTMM
 				// we infer this based on no path (linking) being done
 				formData.append("autoTMM", autoTMM.toString());
 				//set category and tags like v5 perfectMatch
-				formData.append("category", newCategoryName);
-				formData.append(
-					"tags",
-					searchee.infoHash
-						? TORRENT_TAG
-						: `${TORRENT_TAG},${newCategoryName}`,
-				);
+				formData.append("category", ogCategoryForTag);
+				formData.append("tags", TORRENT_TAG);
 			}
 			formData.append("contentLayout", path ? "Original" : contentLayout);
-			formData.append(
-				"skip_checking",
-				determineSkipRecheck(decision).toString(),
-			);
-			formData.append(
-				"paused",
-				!determineSkipRecheck(decision).toString(),
-			);
+
+			const skipRecheck = determineSkipRecheck(decision);
+			formData.append("skip_checking", skipRecheck.toString());
+			formData.append("paused", !skipRecheck.toString());
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
