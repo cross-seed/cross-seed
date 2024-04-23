@@ -116,7 +116,7 @@ module.exports = {
 	 * use.
 	 * Default is "cross-seed-data".
 	 */
-	dataCategory: undefined,
+	linkingCategory: undefined,
 
 	/**
 	 * If this is specified, cross-seed will create links to matched files in

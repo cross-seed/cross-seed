@@ -28,7 +28,7 @@ export interface FileConfig {
 	legacyLinking?: boolean;
 	skipRecheck?: boolean;
 	maxDataDepth?: number;
-	dataCategory?: string;
+	linkingCategory?: string;
 	torrentDir?: string;
 	torznab?: string[];
 	qbittorrentUrl?: string;

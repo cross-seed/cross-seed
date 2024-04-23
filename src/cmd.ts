@@ -121,9 +121,9 @@ function createCommandWithSharedOptions(name: string, description: string) {
 				.makeOptionMandatory(),
 		)
 		.option(
-			"--data-category <cat>",
+			"--linking-category <cat>",
 			"Category to assign torrents from data-based matching",
-			fallback(fileConfig.dataCategory, "cross-seed-data"),
+			fallback(fileConfig.linkingCategory, "cross-seed-data"),
 		)
 		.option(
 			"--link-dir <dir>",

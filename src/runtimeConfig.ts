@@ -10,7 +10,7 @@ export interface RuntimeConfig {
 	legacyLinking: boolean;
 	skipRecheck: boolean;
 	maxDataDepth: number;
-	dataCategory: string;
+	linkingCategory: string;
 	torrentDir?: string;
 	outputDir: string;
 	includeEpisodes: boolean;

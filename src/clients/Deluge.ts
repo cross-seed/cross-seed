@@ -275,17 +275,17 @@ export default class Deluge implements TorrentClient {
 				params,
 			);
 			if (addResult.result) {
-				const { dataCategory } = getRuntimeConfig();
+				const { linkingCategory } = getRuntimeConfig();
 				await this.setLabel(
 					newTorrent.name,
 					newTorrent.infoHash,
 					searchee.path
-						? dataCategory
+						? linkingCategory
 						: torrentInfo!.label
 							? duplicateCategories
 								? torrentInfo!.label.endsWith(
 										this.delugeLabelSuffix,
-									) || torrentInfo!.label === dataCategory
+									) || torrentInfo!.label === linkingCategory
 									? torrentInfo!.label
 									: `${torrentInfo!.label}${
 											this.delugeLabelSuffix
