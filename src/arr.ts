@@ -24,18 +24,14 @@ export interface IdData {
 	tvdbId?: string;
 }
 
-async function fetchArrJSON(
-	searchTerm: string,
-	url: string,
-	mediaType: MediaType,
-): Promise<IdData> {
+async function fetchArrJSON(searchee: Searchee, url: string): Promise<IdData> {
 	const uarrl = { apikey: getApikey(url), url: sanitizeUrl(url) };
 	let response;
 	const lookupUrl = assembleUrl(
 		`${uarrl.url}api/v3/parse`,
 		uarrl.apikey as string,
 		{
-			title: searchTerm,
+			title: searchee.name,
 		} as IdSearchParams,
 	);
 
@@ -59,15 +55,22 @@ async function fetchArrJSON(
 	if (!arrJson) {
 		return {};
 	}
-	const ids =
-		mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
-			? arrJson?.series
-			: arrJson?.movie;
+	function whichArr(searchee: Searchee) {
+		const mediaType = getTag(searchee);
+		switch (mediaType) {
+			case MediaType.SEASON:
+			case MediaType.EPISODE:
+				return arrJson?.series;
+			case MediaType.MOVIE:
+				return arrJson?.movie;
+			default:
+		}
+	}
 
 	return Object.fromEntries(
 		keyNames
 			.map((key) => {
-				const arrIds = ids?.[key] as string;
+				const arrIds = whichArr(searchee)?.[key];
 				return arrIds !== undefined && arrIds !== ""
 					? [key, arrIds]
 					: undefined;
@@ -127,7 +130,7 @@ function logArrQueryFailure(error, searchTerm: string, mediaType: MediaType) {
 	});
 	logger.debug(error);
 }
-function searchArrURL(mediaType: MediaType): string | undefined {
+function searchUArrL(mediaType: MediaType): string | undefined {
 	const { sonarr, radarr } = getRuntimeConfig();
 	switch (mediaType) {
 		case MediaType.SEASON:
@@ -140,23 +143,19 @@ function searchArrURL(mediaType: MediaType): string | undefined {
 	}
 }
 export async function grabArrId(
-	searchTerm: string,
+	searchee: Searchee,
 	mediaType: MediaType,
 ): Promise<Result<IdData, boolean>> {
-	const uArrL = searchArrURL(mediaType);
+	const uArrL = searchUArrL(mediaType);
 	if (!uArrL) {
 		return resultOfErr(false);
 	}
 	try {
-		const arrJson = (await fetchArrJSON(
-			searchTerm,
-			uArrL,
-			mediaType,
-		)) as IdData;
-		logArrQueryResult(arrJson, searchTerm, mediaType);
+		const arrJson = (await fetchArrJSON(searchee, uArrL)) as IdData;
+		logArrQueryResult(arrJson, searchee.name, mediaType);
 		return resultOf(arrJson);
 	} catch (error) {
-		logArrQueryFailure(error, searchTerm, mediaType);
+		logArrQueryFailure(error, searchee.name, mediaType);
 		return resultOfErr(false);
 	}
 }
@@ -185,7 +184,7 @@ export async function getAvailableArrIds(
 	const mediaType = getTag(searchee);
 	try {
 		const arrIdData = (
-			await grabArrId(searchee.name, mediaType)
+			await grabArrId(searchee, mediaType)
 		).unwrapOrThrow();
 		return arrIdData as TorznabParams;
 	} catch (e) {

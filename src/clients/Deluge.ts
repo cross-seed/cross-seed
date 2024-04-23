@@ -1,3 +1,4 @@
+import ms from "ms";
 import {
 	Decision,
 	InjectionResult,
@@ -12,7 +13,7 @@ import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { determineSkipRecheck, extractCredentialsFromUrl } from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
-import ms from "ms";
+
 interface TorrentInfo {
 	complete?: boolean;
 	save_path: string;
