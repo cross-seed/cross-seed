@@ -112,11 +112,10 @@ module.exports = {
 	matchMode: "safe",
 
 	/**
-	 * Defines what category torrents injected by data-based matching should
-	 * use.
-	 * Default is "cross-seed-data".
+	 * Defines what qBittorrent or Deluge category to set on linked torrents
+	 * Default is "cross-seed-link".
 	 */
-	dataCategory: undefined,
+	linkingCategory: "cross-seed-link",
 
 	/**
 	 * If this is specified, cross-seed will create links to matched files in
@@ -150,7 +149,7 @@ module.exports = {
 	 *
 	 * Default: false.
 	 */
-	legacyLinking: false,
+	flatLinking: false,
 
 	/**
 	 * Whether to skip recheck in qBittorrent or Deluge. Not supported in rTorrent/Transmission.

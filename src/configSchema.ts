@@ -18,8 +18,8 @@ const ZodErrorMessages = {
 	recheckWarn:
 		"It is strongly recommended to not skip rechecking for risky or partial matching mode.",
 	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
-	qBitLegacyLinking:
-		"Using Automatic Torrent Management in qBittorrent without legacyLinking enabled can result in injection path failures.",
+	qBitFlatLinking:
+		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in injection path failures.",
 	needsLinkDir:
 		"You need to set a linkDir for risky or partial matching to work.",
 };
@@ -115,10 +115,10 @@ export const VALIDATION_SCHEMA = z
 
 			.nullish(),
 		matchMode: z.nativeEnum(MatchMode),
-		dataCategory: z.string().nullish(),
+		linkingCategory: z.string().nullish(),
 		linkDir: z.string().transform(checkValidPathFormat).nullish(),
 		linkType: z.nativeEnum(LinkType),
-		legacyLinking: z
+		flatLinking: z
 			.boolean()
 			.nullish()
 			.transform((value) => (typeof value === "boolean" ? value : false)),
@@ -190,10 +190,10 @@ export const VALIDATION_SCHEMA = z
 		if (
 			config.action === Action.INJECT &&
 			config.qbittorrentUrl &&
-			!config.legacyLinking &&
+			!config.flatLinking &&
 			config.linkDir
 		) {
-			logger.warn(ZodErrorMessages.qBitLegacyLinking);
+			logger.warn(ZodErrorMessages.qBitFlatLinking);
 		}
 		return true;
 	})

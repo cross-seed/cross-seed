@@ -122,8 +122,8 @@ async function linkAllFilesInMetafile(
 		| "UNKNOWN_ERROR"
 	>
 > {
-	const { linkDir, legacyLinking } = getRuntimeConfig();
-	const fullLinkDir = legacyLinking ? linkDir : join(linkDir, tracker);
+	const { linkDir, flatLinking } = getRuntimeConfig();
+	const fullLinkDir = flatLinking ? linkDir : join(linkDir, tracker);
 	let sourceRoot: string;
 	if (searchee.path) {
 		sourceRoot = searchee.path;

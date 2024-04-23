@@ -121,9 +121,9 @@ function createCommandWithSharedOptions(name: string, description: string) {
 				.makeOptionMandatory(),
 		)
 		.option(
-			"--data-category <cat>",
-			"Category to assign torrents from data-based matching",
-			fallback(fileConfig.dataCategory, "cross-seed-data"),
+			"--linking-category <cat>",
+			"Torrent client category to set on linked torrents",
+			fallback(fileConfig.linkingCategory, "cross-seed-link"),
 		)
 		.option(
 			"--link-dir <dir>",
@@ -131,9 +131,9 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			fileConfig.linkDir,
 		)
 		.option(
-			"--legacy-linking",
+			"--flat-linking",
 			"Use flat linking directory structure (without individual tracker folders)",
-			fallback(fileConfig.legacyLinking, false),
+			fallback(fileConfig.flatLinking, false),
 		)
 		.addOption(
 			new Option(
