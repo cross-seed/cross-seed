@@ -115,7 +115,7 @@ export const VALIDATION_SCHEMA = z
 
 			.nullish(),
 		matchMode: z.nativeEnum(MatchMode),
-		linkingCategory: z.string().nullish(),
+		linkCategory: z.string().nullish(),
 		linkDir: z.string().transform(checkValidPathFormat).nullish(),
 		linkType: z.nativeEnum(LinkType),
 		flatLinking: z

@@ -123,7 +123,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 		.option(
 			"--linking-category <cat>",
 			"Torrent client category to set on linked torrents",
-			fallback(fileConfig.linkingCategory, "cross-seed-link"),
+			fallback(fileConfig.linkCategory, "cross-seed-link"),
 		)
 		.option(
 			"--link-dir <dir>",
