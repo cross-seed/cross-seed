@@ -25,7 +25,7 @@ export interface FileConfig {
 	matchMode?: MatchMode;
 	linkDir?: string;
 	linkType?: string;
-	legacyLinking?: boolean;
+	flatLinking?: boolean;
 	skipRecheck?: boolean;
 	maxDataDepth?: number;
 	linkingCategory?: string;

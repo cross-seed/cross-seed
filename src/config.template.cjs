@@ -150,7 +150,7 @@ module.exports = {
 	 *
 	 * Default: false.
 	 */
-	legacyLinking: false,
+	flatLinking: false,
 
 	/**
 	 * Whether to skip recheck in qBittorrent or Deluge. Not supported in rTorrent/Transmission.

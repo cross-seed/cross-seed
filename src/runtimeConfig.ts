@@ -7,7 +7,7 @@ export interface RuntimeConfig {
 	matchMode: MatchMode;
 	linkDir: string;
 	linkType: LinkType;
-	legacyLinking: boolean;
+	flatLinking: boolean;
 	skipRecheck: boolean;
 	maxDataDepth: number;
 	linkingCategory: string;
