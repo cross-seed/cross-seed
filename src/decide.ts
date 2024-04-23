@@ -55,6 +55,11 @@ const createReasonLogger =
 					searchee.length,
 				)} -> ${humanReadableSize(candidate.size)})`;
 				break;
+			case Decision.RES_MISMATCH:
+				reason = `its resolution does not match - (${searchee.name
+					.match(RES_REGEX)?.[0]
+					?.trim()} -> ${candidate.name.match(RES_REGEX)?.[0]?.trim()})`;
+				break;
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
 				break;
