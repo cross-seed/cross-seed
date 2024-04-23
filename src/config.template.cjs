@@ -115,7 +115,7 @@ module.exports = {
 	 * Defines what qBittorrent or Deluge category to set on linked torrents
 	 * Default is "cross-seed-link".
 	 */
-	linkingCategory: "cross-seed-link",
+	linkCategory: "cross-seed-link",
 
 	/**
 	 * If this is specified, cross-seed will create links to matched files in

@@ -166,11 +166,11 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async setUpCrossSeedCategory(ogCategoryName: string): Promise<string> {
-		const { linkingCategory } = getRuntimeConfig();
+		const { linkCategory } = getRuntimeConfig();
 		if (!ogCategoryName) return "";
 		if (
 			ogCategoryName.endsWith(TORRENT_CATEGORY_SUFFIX) ||
-			ogCategoryName === linkingCategory
+			ogCategoryName === linkCategory
 		)
 			return ogCategoryName;
 
@@ -296,7 +296,7 @@ export default class QBittorrent implements TorrentClient {
 			| Decision.MATCH_PARTIAL,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { duplicateCategories, skipRecheck, linkingCategory } =
+		const { duplicateCategories, skipRecheck, linkCategory } =
 			getRuntimeConfig();
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
@@ -312,7 +312,7 @@ export default class QBittorrent implements TorrentClient {
 						save_path: path,
 						isComplete: true,
 						autoTMM: false,
-						category: linkingCategory,
+						category: linkCategory,
 					}
 				: await this.getTorrentConfiguration(searchee);
 

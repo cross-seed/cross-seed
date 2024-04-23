@@ -10,7 +10,7 @@ export interface RuntimeConfig {
 	flatLinking: boolean;
 	skipRecheck: boolean;
 	maxDataDepth: number;
-	linkingCategory: string;
+	linkCategory: string;
 	torrentDir?: string;
 	outputDir: string;
 	includeEpisodes: boolean;

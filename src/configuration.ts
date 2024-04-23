@@ -28,7 +28,7 @@ export interface FileConfig {
 	flatLinking?: boolean;
 	skipRecheck?: boolean;
 	maxDataDepth?: number;
-	linkingCategory?: string;
+	linkCategory?: string;
 	torrentDir?: string;
 	torznab?: string[];
 	qbittorrentUrl?: string;
