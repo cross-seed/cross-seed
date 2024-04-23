@@ -6,11 +6,15 @@ import {
 	TORRENT_CATEGORY_SUFFIX,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
-import { Label, logger, logOnce } from "../logger.js";
+import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
-import { determineSkipRecheck, extractCredentialsFromUrl } from "../utils.js";
+import {
+	determineSkipRecheck,
+	extractCredentialsFromUrl,
+	stripExtension,
+} from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
@@ -82,10 +86,6 @@ interface TorrentFiles {
 	size: number;
 }
 
-interface Category {
-	name: string;
-	savePath: string;
-}
 interface TorrentConfiguration {
 	save_path: string;
 	isComplete: boolean;
@@ -165,45 +165,24 @@ export default class QBittorrent implements TorrentClient {
 		return response.text();
 	}
 
-	async setUpCrossSeedCategory(ogCategoryName: string): Promise<string> {
-		const { linkCategory } = getRuntimeConfig();
-		if (!ogCategoryName) return "";
-		if (
-			ogCategoryName.endsWith(TORRENT_CATEGORY_SUFFIX) ||
-			ogCategoryName === linkCategory
-		)
-			return ogCategoryName;
+	private determineTagging(
+		searchee: Searchee,
+		injectionConfiguration: TorrentConfiguration,
+	): string {
+		const { linkCategory, duplicateCategories } = getRuntimeConfig();
+		const { category } = injectionConfiguration;
 
-		const categoriesStr = await this.request("/torrents/categories", "");
-		const categories: Record<string, Category> = JSON.parse(categoriesStr);
-		const ogCategory = categories[ogCategoryName];
-		const newCategoryName = `${ogCategoryName}${TORRENT_CATEGORY_SUFFIX}`;
-		const maybeNewCategory = categories[newCategoryName];
-
-		if (!ogCategory.savePath) {
-			logOnce(`qbit/cat/no-save-path/${ogCategoryName}`, () => {
-				logger.warn(
-					`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`,
-				);
-			});
+		if (!category) {
+			return TORRENT_TAG;
 		}
-
-		if (maybeNewCategory?.savePath === ogCategory.savePath) {
-			// setup is already complete
-		} else if (maybeNewCategory) {
-			await this.request(
-				"/torrents/editCategory",
-				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
-				X_WWW_FORM_URLENCODED,
-			);
-		} else {
-			await this.request(
-				"/torrents/createCategory",
-				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
-				X_WWW_FORM_URLENCODED,
-			);
+		if (category === linkCategory) {
+			return `${TORRENT_TAG}-data,${TORRENT_TAG}`;
 		}
-		return newCategoryName;
+		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
+			return `${category},${TORRENT_TAG}`;
+		}
+		const suffix = duplicateCategories ? TORRENT_CATEGORY_SUFFIX : "";
+		return `${category}${suffix},${TORRENT_TAG}`;
 	}
 
 	async createTag(): Promise<void> {
@@ -282,7 +261,10 @@ export default class QBittorrent implements TorrentClient {
 
 		const files: TorrentFiles[] = JSON.parse(response);
 		const [{ name }] = files;
-		return files.length === 1 && name !== posix.basename(name);
+		return (
+			files.length === 1 &&
+			stripExtension(searchee.name) === posix.basename(name)
+		);
 	}
 
 	async inject(
@@ -294,14 +276,12 @@ export default class QBittorrent implements TorrentClient {
 			| Decision.MATCH_PARTIAL,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { duplicateCategories, flatLinking, linkCategory } =
-			getRuntimeConfig();
+		const { flatLinking, linkCategory } = getRuntimeConfig();
 		try {
 			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
 			}
-
-			const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
+			const filename = `${newTorrent.getFileSystemSafeName()}.${TORRENT_TAG}.torrent`;
 			const buffer = new Blob([newTorrent.encode()], {
 				type: "application/x-bittorrent",
 			});
@@ -313,49 +293,37 @@ export default class QBittorrent implements TorrentClient {
 						category: linkCategory,
 					}
 				: await this.getTorrentConfiguration(searchee);
-
-			const ogCategoryForTag =
-				duplicateCategories && searchee.infoHash
-					? await this.setUpCrossSeedCategory(category)
-					: category;
-			const newTag = searchee.infoHash
-				? `${TORRENT_TAG},${ogCategoryForTag}`
-				: ogCategoryForTag;
+			const letsPlayAGame_nameThisVariable = this.determineTagging(
+				searchee,
+				{
+					save_path,
+					isComplete,
+					autoTMM,
+					category,
+				},
+			);
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
-
-			const contentLayout =
-				!path &&
-				newTorrent.isSingleFileTorrent &&
-				(await this.isSubfolderContentLayout(searchee))
+			const contentLayout = path
+				? "Original"
+				: (await this.isSubfolderContentLayout(searchee))
 					? "Subfolder"
 					: "Original";
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
-			// searchee was linked
 
 			if (path) {
-				//because it was a linked file, turn off autotmm
-				//and set a save path and datacat
-				formData.append(
-					"autoTMM",
-					flatLinking && searchee.infoHash ? autoTMM : "false",
-				);
+				// we were provided a path, so set it
 				formData.append("savepath", save_path);
-				formData.append("category", category);
-				// tag category
-				formData.append("tags", newTag);
-			} else {
-				// non-linked (direct referencing og data)
-				// use searchee's autoTMM
-				// we infer this based on no path (linking) being done
-				formData.append("autoTMM", autoTMM.toString());
-				//set category and tags like v5 perfectMatch
-				formData.append("category", ogCategoryForTag);
-				formData.append("tags", TORRENT_TAG);
 			}
-			formData.append("contentLayout", path ? "Original" : contentLayout);
 
+			formData.append(
+				"autoTMM",
+				flatLinking && searchee.infoHash ? autoTMM.toString() : "false",
+			);
+			formData.append("contentLayout", path ? "Original" : contentLayout);
+			formData.append("category", linkCategory);
+			formData.append("tags", letsPlayAGame_nameThisVariable);
 			const skipRecheck = determineSkipRecheck(decision);
 			formData.append("skip_checking", skipRecheck.toString());
 			formData.append("paused", !skipRecheck.toString());
