@@ -238,13 +238,13 @@ export default class QBittorrent implements TorrentClient {
 			if (torrentInfo.save_path === undefined) {
 				return resultOfErr("NOT_FOUND");
 			}
+			return resultOf(torrentInfo!.save_path);
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
 			}
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		return resultOf(torrentInfo!.save_path);
 	}
 
 	async getTorrentConfiguration(
@@ -356,19 +356,15 @@ export default class QBittorrent implements TorrentClient {
 				formData.append(
 					"tags",
 					searchee.infoHash
-						? TORRENT_TAG
-						: `${TORRENT_TAG},${newCategoryName}`,
+						? `${TORRENT_TAG},${newCategoryName}`
+						: category,
 				);
 			}
 			formData.append("contentLayout", path ? "Original" : contentLayout);
-			formData.append(
-				"skip_checking",
-				determineSkipRecheck(decision).toString(),
-			);
-			formData.append(
-				"paused",
-				!determineSkipRecheck(decision).toString(),
-			);
+
+			const skipRecheck = determineSkipRecheck(decision);
+			formData.append("skip_checking", skipRecheck.toString());
+			formData.append("paused", !skipRecheck.toString());
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
