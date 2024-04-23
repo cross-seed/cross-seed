@@ -11,6 +11,7 @@ import { stat, access, constants } from "fs/promises";
  * validates existence, permission, and that a path is a directory
  * @param path string of path to validate
  * @param optionName name of the configuration key
+ * @param permissions const of the permissions to check
  * @returns true if path exists and has required permission
  */
 async function verifyPath(

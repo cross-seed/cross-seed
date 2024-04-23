@@ -96,180 +96,184 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
  */
 
 function createCommandWithSharedOptions(name: string, description: string) {
-	return program
-		.command(name)
-		.description(description)
-		.option(
-			"-T, --torznab <urls...>",
-			"Torznab urls with apikey included (separated by spaces)",
-			// @ts-expect-error commander supports non-string defaults
-			fallback(fileConfig.torznab),
-		)
-		.option(
-			"--data-dirs <dirs...>",
-			"Directories to use if searching by data instead of torrents (separated by spaces)",
-			// @ts-expect-error commander supports non-string defaults
-			fallback(fileConfig.dataDirs),
-		)
-		.addOption(
-			new Option(
-				"--match-mode <mode>",
-				"Safe will only download torrents with perfect matches. Risky will allow for renames and more matches, but might cause false positives. Partial is like risky but it ignores small files like .nfo/.srt if missing.",
+	return (
+		program
+			.command(name)
+			.description(description)
+			.option(
+				"-T, --torznab <urls...>",
+				"Torznab urls with apikey included (separated by spaces)",
+				// @ts-expect-error commander supports non-string defaults
+				fallback(fileConfig.torznab),
 			)
-				.default(fallback(fileConfig.matchMode, MatchMode.SAFE))
-				.choices(Object.values(MatchMode))
-				.makeOptionMandatory(),
-		)
-		.option(
-			"--link-category <cat>",
-			"Torrent client category to set on linked torrents",
-			fallback(fileConfig.linkCategory, "cross-seed-link"),
-		)
-		.option(
-			"--link-dir <dir>",
-			"Directory to output data-matched hardlinks to",
-			fileConfig.linkDir,
-		)
-		.option(
-			"--flat-linking",
-			"Use flat linking directory structure (without individual tracker folders)",
-			fallback(fileConfig.flatLinking, false),
-		)
-		.addOption(
-			new Option(
-				"--link-type <type>",
-				"Use links of this type to inject data-based matches into your client",
+			.option(
+				"--data-dirs <dirs...>",
+				"Directories to use if searching by data instead of torrents (separated by spaces)",
+				// @ts-expect-error commander supports non-string defaults
+				fallback(fileConfig.dataDirs),
 			)
-				.default(fallback(fileConfig.linkType, LinkType.SYMLINK))
-				.choices(Object.values(LinkType))
-				.makeOptionMandatory(),
-		)
-		.option(
-			"--skip-recheck",
-			"Skips torrent recheck upon adding to QBittorrent",
-			fallback(fileConfig.skipRecheck, false),
-		)
-		.option(
-			"--max-data-depth <depth>",
-			"Max depth to look for searchees in dataDirs",
-			(n) => parseInt(n),
-			fallback(fileConfig.maxDataDepth, 2),
-		)
-		.option(
-			"-i, --torrent-dir <dir>",
-			"Directory with torrent files",
-			fileConfig.torrentDir,
-		)
-		.option(
-			"-s, --output-dir <dir>",
-			"Directory to save results in",
-			fileConfig.outputDir,
-		)
-		.option(
-			"--include-non-videos",
-			"Include torrents which contain non-video files",
-			fallback(fileConfig.includeNonVideos, false),
-		)
-		.option(
-			"-e, --include-episodes",
-			"Include all episode torrents in the search (including from season packs)",
-			fallback(fileConfig.includeEpisodes, false),
-		)
-		.option(
-			"--include-single-episodes",
-			"Include single episode torrents in the search",
-			fallback(fileConfig.includeSingleEpisodes, false),
-		)
-		.option(
-			"--no-include-non-videos",
-			"Don't include torrents which contain non-videos",
-		)
-		.option("--no-include-episodes", "Don't include episode torrents")
-		.option(
-			"--fuzzy-size-threshold <decimal>",
-			"The size difference allowed to be considered a match.",
-			parseFloat,
-			fallback(fileConfig.fuzzySizeThreshold, 0.02),
-		)
-		.option(
-			"-x, --exclude-older <cutoff>",
-			"Exclude torrents first seen more than n minutes ago. Bypasses the -a flag.",
-			fileConfig.excludeOlder,
-		)
-		.option(
-			"-r, --exclude-recent-search <cutoff>",
-			"Exclude torrents which have been searched more recently than n minutes ago. Bypasses the -a flag.",
-			fileConfig.excludeRecentSearch,
-		)
-		.option("-v, --verbose", "Log verbose output", false)
-		.addOption(
-			new Option(
-				"-A, --action <action>",
-				"If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client.",
+			.addOption(
+				new Option(
+					"--match-mode <mode>",
+					"Safe will only download torrents with perfect matches. Risky will allow for renames and more matches, but might cause false positives. Partial is like risky but it ignores small files like .nfo/.srt if missing.",
+				)
+					.default(fallback(fileConfig.matchMode, MatchMode.SAFE))
+					.choices(Object.values(MatchMode))
+					.makeOptionMandatory(),
 			)
-				.default(fallback(fileConfig.action, Action.SAVE))
-				.choices(Object.values(Action)),
-		)
-		.option(
-			"--rtorrent-rpc-url <url>",
-			"The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.",
-			fileConfig.rtorrentRpcUrl,
-		)
-		.option(
-			"--qbittorrent-url <url>",
-			"The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.",
-			fileConfig.qbittorrentUrl,
-		)
-		.option(
-			"--transmission-rpc-url <url>",
-			"The url of your Transmission RPC interface. Requires '-A inject'. See the docs for more information.",
-			fileConfig.transmissionRpcUrl,
-		)
-		.option(
-			"--deluge-rpc-url <url>",
-			"The url of your Deluge JSON-RPC interface. Requires '-A inject'. See the docs for more information.",
-			fileConfig.delugeRpcUrl,
-		)
-		.option(
-			"--duplicate-categories",
-			"Create and inject using categories with the same save paths as your normal categories",
-			fallback(fileConfig.duplicateCategories, false),
-		)
-		.option(
-			"--notification-webhook-url <url>",
-			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
-			fileConfig.notificationWebhookUrl,
-		)
-		.option(
-			"-d, --delay <delay>",
-			"Pause duration (seconds) between searches",
-			parseFloat,
-			fallback(fileConfig.delay, 10),
-		)
-		.option(
-			"--snatch-timeout <timeout>",
-			"Timeout for unresponsive snatches",
-			fallback(fileConfig.snatchTimeout, "30 seconds"),
-		)
-		.option(
-			"--search-timeout <timeout>",
-			"Timeout for unresponsive searches",
-			fallback(fileConfig.searchTimeout, "30 seconds"),
-		)
-		.option(
-			"--search-limit <number>",
-			"The number of searches before stops",
-			parseInt,
-			fallback(fileConfig.searchLimit, 0),
-		)
-		.option(
-			"--block-list <strings>",
-			"The infohashes and/or strings in torrent name to block from cross-seed",
+			.option(
+				"--link-category <cat>",
+				"Torrent client category to set on linked torrents",
+				fallback(fileConfig.linkCategory, "cross-seed-link"),
+			)
+			.option(
+				"--link-dir <dir>",
+				"Directory to output data-matched hardlinks to",
+				fileConfig.linkDir,
+			)
+			.option(
+				"--flat-linking",
+				"Use flat linking directory structure (without individual tracker folders)",
+				fallback(fileConfig.flatLinking, false),
+			)
+			.addOption(
+				new Option(
+					"--link-type <type>",
+					"Use links of this type to inject data-based matches into your client",
+				)
+					.default(fallback(fileConfig.linkType, LinkType.SYMLINK))
+					.choices(Object.values(LinkType))
+					.makeOptionMandatory(),
+			)
+			.option(
+				"--skip-recheck",
+				"Skips torrent recheck upon adding to QBittorrent",
+				fallback(fileConfig.skipRecheck, false),
+			)
+			.option(
+				"--max-data-depth <depth>",
+				"Max depth to look for searchees in dataDirs",
+				(n) => parseInt(n),
+				fallback(fileConfig.maxDataDepth, 2),
+			)
+			.option(
+				"-i, --torrent-dir <dir>",
+				"Directory with torrent files",
+				fileConfig.torrentDir,
+			)
+			.option(
+				"-s, --output-dir <dir>",
+				"Directory to save results in",
+				fileConfig.outputDir,
+			)
+			.option(
+				"--include-non-videos",
+				"Include torrents which contain non-video files",
+				fallback(fileConfig.includeNonVideos, false),
+			)
+			.option(
+				"-e, --include-episodes",
+				"Include all episode torrents in the search (including from season packs)",
+				fallback(fileConfig.includeEpisodes, false),
+			)
+			.option(
+				"--include-single-episodes",
+				"Include single episode torrents in the search",
+				fallback(fileConfig.includeSingleEpisodes, false),
+			)
+			.option(
+				"--no-include-non-videos",
+				"Don't include torrents which contain non-videos",
+			)
+			.option("--no-include-episodes", "Don't include episode torrents")
+			.option(
+				"--fuzzy-size-threshold <decimal>",
+				"The size difference allowed to be considered a match.",
+				parseFloat,
+				fallback(fileConfig.fuzzySizeThreshold, 0.02),
+			)
+			.option(
+				"-x, --exclude-older <cutoff>",
+				"Exclude torrents first seen more than n minutes ago. Bypasses the -a flag.",
+				fileConfig.excludeOlder,
+			)
+			.option(
+				"-r, --exclude-recent-search <cutoff>",
+				"Exclude torrents which have been searched more recently than n minutes ago. Bypasses the -a flag.",
+				fileConfig.excludeRecentSearch,
+			)
+			.option("-v, --verbose", "Log verbose output", false)
+			.addOption(
+				new Option(
+					"-A, --action <action>",
+					"If set to 'inject', cross-seed will attempt to add the found torrents to your torrent client.",
+				)
+					.default(fallback(fileConfig.action, Action.SAVE))
+					.choices(Object.values(Action)),
+			)
+			.option(
+				"--rtorrent-rpc-url <url>",
+				"The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.",
+				fileConfig.rtorrentRpcUrl,
+			)
+			.option(
+				"--qbittorrent-url <url>",
+				"The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.",
+				fileConfig.qbittorrentUrl,
+			)
+			.option(
+				"--transmission-rpc-url <url>",
+				"The url of your Transmission RPC interface. Requires '-A inject'. See the docs for more information.",
+				fileConfig.transmissionRpcUrl,
+			)
+			.option(
+				"--deluge-rpc-url <url>",
+				"The url of your Deluge JSON-RPC interface. Requires '-A inject'. See the docs for more information.",
+				fileConfig.delugeRpcUrl,
+			)
+			.option(
+				"--duplicate-categories",
+				"Create and inject using categories with the same save paths as your normal categories",
+				fallback(fileConfig.duplicateCategories, false),
+			)
+			.option(
+				"--notification-webhook-url <url>",
+				"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
+				fileConfig.notificationWebhookUrl,
+			)
+			.option(
+				"-d, --delay <delay>",
+				"Pause duration (seconds) between searches",
+				parseFloat,
+				fallback(fileConfig.delay, 10),
+			)
+			.option(
+				"--snatch-timeout <timeout>",
+				"Timeout for unresponsive snatches",
+				fallback(fileConfig.snatchTimeout, "30 seconds"),
+			)
+			.option(
+				"--search-timeout <timeout>",
+				"Timeout for unresponsive searches",
+				fallback(fileConfig.searchTimeout, "30 seconds"),
+			)
+			.option(
+				"--search-limit <number>",
+				"The number of searches before stops",
+				parseInt,
+				fallback(fileConfig.searchLimit, 0),
+			)
+			.option(
+				"--block-list <strings>",
+				"The infohashes and/or strings in torrent name to block from cross-seed",
+				// @ts-expect-error commander supports non-string defaults
+				fallback(fileConfig.blockList, []),
+			)
 			// @ts-expect-error commander supports non-string defaults
-			fallback(fileConfig.blockList, []),
-		)
-		.option("--sonarr <url>", "Sonarr API URL", fileConfig.sonarr)
-		.option("--radarr <url>", "Radarr API URL", fileConfig.radarr);
+			.option("--sonarr <url(s)>", "Sonarr API URL(s)", fileConfig.sonarr)
+			// @ts-expect-error commander supports non-string defaults
+			.option("--radarr <url(s)>", "Radarr API URL(s)", fileConfig.radarr)
+	);
 }
 
 program.name(PROGRAM_NAME);

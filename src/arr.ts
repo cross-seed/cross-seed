@@ -1,3 +1,4 @@
+import ms from "ms";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -36,7 +37,7 @@ async function fetchArrJSON(searchee: Searchee, url: string): Promise<IdData> {
 	);
 
 	const abortController = new AbortController();
-	setTimeout(() => void abortController.abort(), 10000).unref();
+	setTimeout(() => void abortController.abort(), ms("5 seconds")).unref();
 	try {
 		response = await fetch(lookupUrl, {
 			signal: abortController.signal,
@@ -130,7 +131,7 @@ function logArrQueryFailure(error, searchTerm: string, mediaType: MediaType) {
 	});
 	logger.debug(error);
 }
-function searchUArrL(mediaType: MediaType): string | undefined {
+function searchUArrLs(mediaType: MediaType): string[] | undefined {
 	const { sonarr, radarr } = getRuntimeConfig();
 	switch (mediaType) {
 		case MediaType.SEASON:
@@ -146,14 +147,20 @@ export async function grabArrId(
 	searchee: Searchee,
 	mediaType: MediaType,
 ): Promise<Result<IdData, boolean>> {
-	const uArrL = searchUArrL(mediaType);
-	if (!uArrL) {
+	const UArrLs = searchUArrLs(mediaType);
+	if (!UArrLs) {
 		return resultOfErr(false);
 	}
 	try {
-		const arrJson = (await fetchArrJSON(searchee, uArrL)) as IdData;
-		logArrQueryResult(arrJson, searchee.name, mediaType);
-		return resultOf(arrJson);
+		let arrJson: IdData;
+		for (let i = 0; i < UArrLs.length; i++) {
+			arrJson = (await fetchArrJSON(searchee, UArrLs[i])) as IdData;
+			if (Object.keys(arrJson).length > 0) {
+				logArrQueryResult(arrJson, searchee.name, mediaType);
+				return resultOf(arrJson);
+			}
+		}
+		throw new Error();
 	} catch (error) {
 		logArrQueryFailure(error, searchee.name, mediaType);
 		return resultOfErr(false);
