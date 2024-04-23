@@ -18,7 +18,7 @@ const ZodErrorMessages = {
 	recheckWarn:
 		"It is strongly recommended to not skip rechecking for risky or partial matching mode.",
 	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
-	qBitLegacyLinking:
+	qBitFlatLinking:
 		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in injection path failures.",
 	needsLinkDir:
 		"You need to set a linkDir for risky or partial matching to work.",
@@ -193,7 +193,7 @@ export const VALIDATION_SCHEMA = z
 			!config.flatLinking &&
 			config.linkDir
 		) {
-			logger.warn(ZodErrorMessages.qBitLegacyLinking);
+			logger.warn(ZodErrorMessages.qBitFlatLinking);
 		}
 		return true;
 	})
