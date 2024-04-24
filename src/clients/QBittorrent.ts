@@ -1,4 +1,4 @@
-import { posix } from "path";
+import { join, posix } from "path";
 import {
 	Decision,
 	InjectionResult,
@@ -165,7 +165,7 @@ export default class QBittorrent implements TorrentClient {
 		return response.text();
 	}
 
-	private determineTagging(
+	private getTagsForNewTorrent(
 		searchee: Searchee,
 		injectionConfiguration: TorrentConfiguration,
 	): string {
@@ -208,18 +208,32 @@ export default class QBittorrent implements TorrentClient {
 			return false;
 		}
 	}
+
+	/*
+	@param searchee the Searchee we are generating off (in client)
+	@return either a string containing the path or a error mesage
+	*/
 	async getDownloadDir(
 		searchee: Searchee,
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		let torrentInfo: TorrentConfiguration;
+		let torrentInfo;
 		try {
 			torrentInfo = await this.getTorrentConfiguration(searchee);
 			if (torrentInfo.save_path === undefined) {
 				return resultOfErr("NOT_FOUND");
 			}
-			return resultOf(torrentInfo!.save_path);
+
+			if (await this.isSubfolderContentLayout(searchee)) {
+				// because both previous calls succeeded at this point
+				// we can assume that this will also succeed
+				torrentInfo = await this.generateCorrectSavePath(
+					searchee,
+					torrentInfo,
+				);
+			}
+			return resultOf(torrentInfo.save_path);
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
@@ -228,6 +242,43 @@ export default class QBittorrent implements TorrentClient {
 		}
 	}
 
+	/*
+	@param searchee the Searchee we are generating off (in client)
+	@param subfolderLayout whether it is subfolder layout or not
+	@return string absolute location from client with content layout considered
+	 */
+	async generateCorrectSavePath(
+		searchee: Searchee,
+		{ save_path },
+	): Promise<{ save_path: string }> {
+		const response = await this.request(
+			"/torrents/files",
+			`hash=${searchee.infoHash}`,
+			X_WWW_FORM_URLENCODED,
+		);
+		const files: TorrentFiles[] = JSON.parse(response);
+		const [{ name }] = files;
+		const subfolderContentLayout =
+			files.length === 1 &&
+			stripExtension(searchee.name) === posix.basename(name);
+		if (!save_path) {
+			//two previous calls in parent function who called generate
+			// worked but this call failed
+			//should have been less than a second ago
+			throw new Error("UNKNOWN_ERROR");
+		}
+		// unwrap the gift
+		if (subfolderContentLayout) {
+			return {
+				save_path: join(save_path, stripExtension(searchee.name)),
+			};
+		}
+		return { save_path };
+	}
+	/*
+	@param searchee the searchee we are querying about
+	@return object with save_path, autoTMM, isComplete, and category from qBit
+	 */
 	async getTorrentConfiguration(
 		searchee: Searchee,
 	): Promise<TorrentConfiguration> {
@@ -295,15 +346,12 @@ export default class QBittorrent implements TorrentClient {
 						category: linkCategory,
 					}
 				: await this.getTorrentConfiguration(searchee);
-			const letsPlayAGame_nameThisVariable = this.determineTagging(
-				searchee,
-				{
-					save_path,
-					isComplete,
-					autoTMM,
-					category,
-				},
-			);
+			const tags = this.getTagsForNewTorrent(searchee, {
+				save_path,
+				isComplete,
+				autoTMM,
+				category,
+			});
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 			const contentLayout = path
@@ -325,7 +373,7 @@ export default class QBittorrent implements TorrentClient {
 			);
 			formData.append("contentLayout", path ? "Original" : contentLayout);
 			formData.append("category", linkCategory);
-			formData.append("tags", letsPlayAGame_nameThisVariable);
+			formData.append("tags", tags);
 			const skipRecheck = determineSkipRecheck(decision);
 			formData.append("skip_checking", skipRecheck.toString());
 			formData.append("paused", !skipRecheck.toString());
