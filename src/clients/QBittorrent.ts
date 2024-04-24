@@ -169,20 +169,22 @@ export default class QBittorrent implements TorrentClient {
 		searchee: Searchee,
 		injectionConfiguration: TorrentConfiguration,
 	): string {
-		const { linkCategory, duplicateCategories } = getRuntimeConfig();
+		const { duplicateCategories } = getRuntimeConfig();
 		const { category } = injectionConfiguration;
 
 		if (!category) {
 			return TORRENT_TAG;
 		}
-		if (category === linkCategory) {
-			return `${TORRENT_TAG}-data,${TORRENT_TAG}`;
-		}
 		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
 			return `${category},${TORRENT_TAG}`;
 		}
-		const suffix = duplicateCategories ? TORRENT_CATEGORY_SUFFIX : "";
-		return `${category}${suffix},${TORRENT_TAG}`;
+
+		if (searchee.path) {
+			return `${TORRENT_TAG}-data,${TORRENT_TAG}`;
+		} else {
+			const suffix = duplicateCategories ? TORRENT_CATEGORY_SUFFIX : "";
+			return `${category}${suffix},${TORRENT_TAG}`;
+		}
 	}
 
 	async createTag(): Promise<void> {
