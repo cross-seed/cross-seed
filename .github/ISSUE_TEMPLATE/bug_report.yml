@@ -1,0 +1,109 @@
+name: report a bug
+description:
+    "please be prepared to see us through understanding and troubleshooting
+    steps, providing configurations and verbose log files, and context and
+    behavior experienced."
+labels: ["bug", "triage"]
+body:
+    - type: checkboxes
+      attributes:
+          label:
+              have you checked for any existing open/closed tickets that are the
+              same or similar to your issue?
+          description:
+              use search to see if an open or closed issue already exists for
+              yor bug. if a closed ticket exists, please link to it in your
+              ticket.
+          options:
+              - label: i've searched far and wide!
+                required: true
+    - type: checkboxes
+      attributes:
+          label:
+              i have gone to the Discord server for support and/or acknowledge
+              that this is a bug and not a support issue
+          description:
+              if this behavior is a result of not being able to properly
+              configure something, for example, please visit our Discord
+              (https://discord.gg/jpbUFzS5Wb) prior to making any GitHub Issues.
+              these issues are strictly for bugs and feature requests.
+          options:
+              - label: i've tried to solve this already
+                required: true
+    - type: textarea
+      attributes:
+          label: what's happening surrounding the bug? (context)
+          description:
+              details about your setup, relevant config options, and which
+              clients you are using.
+      validations:
+          required: true
+    - type: textarea
+      attributes:
+          label: reproducing the bug
+          description: how can we reliably get the bug to present itself
+          placeholder: |
+              1. deploy to docker
+              2. set these options in config.js
+              3. trigger a 'search'
+      validations:
+          required: false
+    - type: textarea
+      attributes:
+          label: what should be happening?
+          description: tell us the behavior you think should be occurring.
+      validations:
+          required: true
+    - type: textarea
+      attributes:
+          label: your setup
+          description: |
+              examples:
+                - Debian 12.5
+                - Torznab via Prowlarr 1.17.0.4440
+                - Docker | node | yarn
+                - more/misc details here
+          value: |
+              - os: 
+              - prowlarr/jackett: 
+              - docker: 
+              - misc:
+          render: markdown
+      validations:
+          required: true
+    - type: textarea
+      attributes:
+          label: config.js (REDACT SENSITIVE INFORMATION)
+          description: |
+              please provide us with the config.js you are using when the bug presented itself. 
+
+              **MAKE SURE YOU REDACT ALL SENSITIVE PASSWORDS, PUBLIC IP ADDRESSES, AND APIKEYS.**
+      validations:
+          required: true
+    - type: textarea
+      attributes:
+          label: verbose logs
+          description: |
+              in order to facilitate fixing your bug, we need the context and logs surrounding the issue
+              Tip: You can attach images or log files by clicking this area to highlight it and then dragging files in.
+              Additionally, any additional info? Screenshots? References? Anything that will give us more context about the issue you are encountering!
+      validations:
+          required: true
+    - type: checkboxes
+      attributes:
+          label:
+              failure or refusal to provide the information we require to
+              address bugs will result in potential closure of the issue.
+          description:
+              we require verbose logs and your config.js in order to get a full
+              picture of the issue. if you are unable to copy paste text and
+              describe what is occurring to resolve it, please do not open a
+              ticket. if you require help with any of this please visit our
+              discord. (https://discord.gg/jpbUFzS5Wb)
+          options:
+              - label:
+                    i acknowledge that i have searched existing issues, read the
+                    documentation and faq, read the logs to see if the answer
+                    was provided in error messaging, and attempted to get
+                    support via the Discord prior to submitting this issue.
+                required: true
