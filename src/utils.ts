@@ -55,8 +55,8 @@ export function humanReadableSize(bytes: number) {
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
 export function getTag(searchee: Searchee): MediaType {
-	function hasExt(searchee: Searchee, extensions: string[]) {
-		return extensions.includes(path.extname(searchee.name));
+	function hasExt(searchee: Searchee, exts: string[]) {
+		return searchee.files.some((f) => exts.includes(path.extname(f.name)));
 	}
 	const stem = stripExtension(searchee.name);
 	return EP_REGEX.test(stem)
