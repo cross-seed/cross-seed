@@ -245,7 +245,7 @@ function shouldSearchIndexer(mediaType: MediaType, caps: TorznabCats) {
 		case MediaType.BOOK:
 			return caps.book;
 		case MediaType.OTHER:
-			return false;
+			return true;
 	}
 }
 export async function queryRssFeeds(): Promise<Candidate[]> {

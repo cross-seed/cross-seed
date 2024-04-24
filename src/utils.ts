@@ -63,7 +63,7 @@ export function getTag(searchee: Searchee): MediaType {
 		? MediaType.EPISODE
 		: SEASON_REGEX.test(stem)
 			? MediaType.SEASON
-			: MOVIE_REGEX.test(stem)
+			: MOVIE_REGEX.test(stem) && hasExt(searchee, VIDEO_EXTENSIONS)
 				? MediaType.MOVIE
 				: hasExt(searchee, VIDEO_EXTENSIONS) && ANIME_REGEX.test(stem)
 					? MediaType.ANIME
