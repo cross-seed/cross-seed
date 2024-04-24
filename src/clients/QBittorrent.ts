@@ -372,7 +372,7 @@ export default class QBittorrent implements TorrentClient {
 				flatLinking && searchee.infoHash ? autoTMM.toString() : "false",
 			);
 			formData.append("contentLayout", path ? "Original" : contentLayout);
-			formData.append("category", linkCategory);
+			formData.append("category", category);
 			formData.append("tags", tags);
 			const skipRecheck = determineSkipRecheck(decision);
 			formData.append("skip_checking", skipRecheck.toString());
