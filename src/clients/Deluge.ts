@@ -50,6 +50,7 @@ export default class Deluge implements TorrentClient {
 	private delugeLabel = TORRENT_TAG;
 	private delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
 	private isLabelEnabled: boolean;
+	private delugeRequestId: number = 0;
 
 	/**
 	 * validates the login and host for deluge webui
@@ -133,7 +134,6 @@ export default class Deluge implements TorrentClient {
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
 		let response: Response, json: DelugeJSON<ResultType>;
-		const id = Math.floor(Math.random() * 0x7fffffff);
 		const abortController = new AbortController();
 
 		setTimeout(
@@ -146,7 +146,7 @@ export default class Deluge implements TorrentClient {
 				body: JSON.stringify({
 					method,
 					params,
-					id,
+					id: this.delugeRequestId++,
 				}),
 				method: "POST",
 				headers,
