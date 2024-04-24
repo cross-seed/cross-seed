@@ -224,15 +224,10 @@ export default class QBittorrent implements TorrentClient {
 			if (torrentInfo.save_path === undefined) {
 				return resultOfErr("NOT_FOUND");
 			}
-
-			if (await this.isSubfolderContentLayout(searchee)) {
-				// because both previous calls succeeded at this point
-				// we can assume that this will also succeed
-				torrentInfo = await this.generateCorrectSavePath(
-					searchee,
-					torrentInfo,
-				);
-			}
+			torrentInfo = await this.generateCorrectSavePath(
+				searchee,
+				torrentInfo,
+			);
 			return resultOf(torrentInfo.save_path);
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
@@ -251,23 +246,8 @@ export default class QBittorrent implements TorrentClient {
 		searchee: Searchee,
 		{ save_path },
 	): Promise<{ save_path: string }> {
-		const response = await this.request(
-			"/torrents/files",
-			`hash=${searchee.infoHash}`,
-			X_WWW_FORM_URLENCODED,
-		);
-		const files: TorrentFiles[] = JSON.parse(response);
-		const [{ name }] = files;
 		const subfolderContentLayout =
-			files.length === 1 &&
-			stripExtension(searchee.name) === posix.basename(name);
-		if (!save_path) {
-			//two previous calls in parent function who called generate
-			// worked but this call failed
-			//should have been less than a second ago
-			throw new Error("UNKNOWN_ERROR");
-		}
-		// unwrap the gift
+			await this.isSubfolderContentLayout(searchee);
 		if (subfolderContentLayout) {
 			return {
 				save_path: join(save_path, stripExtension(searchee.name)),
@@ -314,10 +294,7 @@ export default class QBittorrent implements TorrentClient {
 
 		const files: TorrentFiles[] = JSON.parse(response);
 		const [{ name }] = files;
-		return (
-			files.length === 1 &&
-			stripExtension(searchee.name) === posix.basename(name)
-		);
+		return files.length === 1 && posix.dirname(name) !== ".";
 	}
 
 	async inject(
