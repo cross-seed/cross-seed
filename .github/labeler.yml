@@ -1,0 +1,45 @@
+"documentation":
+    - "README.md"
+"config":
+    - "src/config.template.cjs"
+    - "src/cmd.ts"
+    - "src/configSchema.ts"
+    - "src/configuration.ts"
+    - "src/runtimeConfig.ts"
+"dependencies":
+    - "package.json"
+    - "package-lock.json"
+    - "Dockerfile"
+    - "tsconfig.json"
+    - "renovate.json"
+    - ".eslintrc.json"
+    - changed-files:
+          - any-glob-to-any-file: ["src/migrations/**"]
+"bt client":
+    - changed-files:
+          - any-glob-to-any-file: ["src/clients/**"]
+"logging":
+    - "src/logger.ts"
+    - "src/pushNotifier.ts"
+"search":
+    - "src/dataFile.ts"
+    - "src/indexers.ts"
+    - "src/parseTorrent.ts"
+    - "src/preFilter.ts"
+    - "src/searchee.ts"
+    - "src/decide.ts"
+    - "src/torznab.ts"
+    - "src/torrent.ts"
+    - "src/action.ts"
+"daemon":
+    - "src/server.ts"
+    - "src/jobs.ts"
+    - "src/cmd.ts"
+    - "src/server.ts"
+    - "src/auth.ts"
+    - "src/decide.ts"
+"security":
+    - "src/auth.ts"
+"workflow":
+    - changed-files:
+          - any-glob-to-any-file: [".github/**"]
