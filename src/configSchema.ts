@@ -21,7 +21,7 @@ const ZodErrorMessages = {
 	qBitAutoTMM:
 		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in unintended behavior.",
 	needsLinkDir:
-		"You need to set a linkDir for risky or partial matching to work.",
+		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
 };
 
 /**
@@ -40,6 +40,7 @@ export function customizeErrorMessage(
 				message: error.unionErrors
 					.reduce<string[]>((acc, error) => {
 						error.errors.forEach((x) => acc.push(x.message));
+						console.log(acc);
 						return acc;
 					}, [])
 					.join("; "),
@@ -85,7 +86,7 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
  * @return path if valid formatting
  */
 function checkValidPathFormat(path: string, ctx: RefinementCtx) {
-	if (sep === "\\" && !path.includes("\\") && !path.includes("/")) {
+	if (!path.includes(sep)) {
 		addZodIssue(path, ZodErrorMessages.windowsPath, ctx);
 	}
 	return path;
@@ -116,7 +117,10 @@ export const VALIDATION_SCHEMA = z
 			.nullish(),
 		matchMode: z.nativeEnum(MatchMode),
 		linkCategory: z.string().nullish(),
-		linkDir: z.string().transform(checkValidPathFormat).nullish(),
+		linkDir: z
+			.string()
+			.transform(await checkValidPathFormat)
+			.nullish(),
 		linkType: z.nativeEnum(LinkType),
 		flatLinking: z
 			.boolean()
@@ -124,7 +128,10 @@ export const VALIDATION_SCHEMA = z
 			.transform((value) => (typeof value === "boolean" ? value : false)),
 		skipRecheck: z.boolean(),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z.string().nullish(),
+		torrentDir: z
+			.string()
+			.transform(await checkValidPathFormat)
+			.nullish(),
 		outputDir: z.string(),
 		includeEpisodes: z.boolean(),
 		includeSingleEpisodes: z.boolean(),

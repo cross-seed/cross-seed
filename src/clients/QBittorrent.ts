@@ -360,7 +360,7 @@ export default class QBittorrent implements TorrentClient {
 
 			await this.request("/torrents/add", formData);
 			//if we have a linked file and skiprecheck is false
-			if (determineSkipRecheck(decision)) {
+			if (skipRecheck) {
 				await new Promise((resolve) => setTimeout(resolve, 100));
 				await this.request(
 					"/torrents/recheck",
