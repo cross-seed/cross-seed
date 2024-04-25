@@ -88,7 +88,7 @@ module.exports = {
 	 * to your downloaded torrent data to find matches, rather than relying
 	 * entirely on the .torrent files themselves for matching.
 	 *
-	 * If directories are entered, they must all be on the one line and they
+	 * If directories are entered, they must all be on one line, and they
 	 * need to be surrounded by brackets.
 	 * Windows users will need to use double backslash in all paths in this
 	 * config.
@@ -145,7 +145,7 @@ module.exports = {
 	 * Automatic Torrent Management.
 	 *
 	 * Otherwise each individual Torznab tracker's cross-seeds will have it's
-	 * own folder with the tracker's name and it's links within it.
+	 * own folder with the tracker's name and its links within it.
 	 *
 	 * Default: false.
 	 */
@@ -170,6 +170,9 @@ module.exports = {
 	 * .rtorrent.rc file.
 	 * For Deluge, this is ~/.config/deluge/state.
 	 * For Transmission, this would be ~/.config/transmission/torrents.
+  	 *
+    	 * Note: use the same formatting for paths as dataDirs. This means Windows
+      	 * installs will require double slashes: "C:\\My Data\\torrent\\file\\dir"
 	 */
 	torrentDir: "/path/to/torrent/file/dir",
 
@@ -226,7 +229,7 @@ module.exports = {
 	includeNonVideos: false,
 
 	/**
-	 * You should NOT modify this unless you have good reason.
+	 * You should NOT modify this unless you have a good reason.
 	 * The following option is the preliminary value to compare sizes of
 	 * releases for further comparison.
 	 *
