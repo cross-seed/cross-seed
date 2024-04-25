@@ -59,20 +59,35 @@ export function getTag(searchee: Searchee): MediaType {
 		return searchee.files.some((f) => exts.includes(path.extname(f.name)));
 	}
 	const stem = stripExtension(searchee.name);
-	return EP_REGEX.test(stem)
-		? MediaType.EPISODE
-		: SEASON_REGEX.test(stem)
-			? MediaType.SEASON
-			: MOVIE_REGEX.test(stem) && hasExt(searchee, VIDEO_EXTENSIONS)
-				? MediaType.MOVIE
-				: hasExt(searchee, VIDEO_EXTENSIONS) && ANIME_REGEX.test(stem)
-					? MediaType.ANIME
-					: hasExt(searchee, AUDIO_EXTENSIONS)
-						? MediaType.AUDIO
-						: hasExt(searchee, BOOK_EXTENSIONS)
-							? MediaType.BOOK
-							: MediaType.OTHER;
+	const hasVideoExtensions = hasExt(searchee, VIDEO_EXTENSIONS);
+
+	function unsupportedMediaType(searchee: Searchee): MediaType {
+		//any unsupported media that needs to be identified goes here
+		switch (true) {
+			case hasExt(searchee, AUDIO_EXTENSIONS):
+				return MediaType.AUDIO;
+			case hasExt(searchee, BOOK_EXTENSIONS):
+				return MediaType.BOOK;
+			// add more unsupported media here and on MediaType
+			default:
+				return MediaType.OTHER;
+		}
+	}
+	// put new  supported media type cases in this switch
+	switch (true) {
+		case EP_REGEX.test(stem):
+			return MediaType.EPISODE;
+		case SEASON_REGEX.test(stem):
+			return MediaType.SEASON;
+		case hasVideoExtensions:
+			if (MOVIE_REGEX.test(stem)) return MediaType.MOVIE;
+			if (ANIME_REGEX.test(stem)) return MediaType.ANIME;
+		// eslint-disable-next-line no-fallthrough
+		default:
+			return unsupportedMediaType(searchee);
+	}
 }
+
 export function determineSkipRecheck(decision: Decision): boolean {
 	const { skipRecheck } = getRuntimeConfig();
 	switch (decision) {
@@ -142,11 +157,12 @@ export function getAnimeQueries(name: string): string[] {
 }
 
 export function reformatTitleForSearching(name: string): string {
-	const seasonMatch = name.match(SEASON_REGEX);
-	const movieMatch = name.match(MOVIE_REGEX);
-	const episodeMatch = name.match(EP_REGEX);
+	// use lazy regex evaluation
 	const fullMatch =
-		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? name;
+		name.match(EP_REGEX)?.[0] ??
+		name.match(SEASON_REGEX)?.[0] ??
+		name.match(MOVIE_REGEX)?.[0] ??
+		name;
 	return cleanseSeparators(fullMatch);
 }
 
