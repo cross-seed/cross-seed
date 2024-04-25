@@ -5,15 +5,21 @@ import {
 	SEASON_REGEX,
 	ANIME_REGEX,
 	VIDEO_EXTENSIONS,
+	AUDIO_EXTENSIONS,
+	BOOK_EXTENSIONS,
 	Decision,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
+import { IdSearchParams, TorznabParams } from "./torznab.js";
+import { Searchee } from "./searchee.js";
 
 export enum MediaType {
 	EPISODE = "episode",
 	SEASON = "pack",
 	MOVIE = "movie",
 	ANIME = "anime",
+	AUDIO = "audio",
+	BOOK = "book",
 	OTHER = "unknown",
 }
 
@@ -47,16 +53,38 @@ export function humanReadableSize(bytes: number) {
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
-export function getTag(name: string, isVideo: boolean): MediaType {
-	return EP_REGEX.test(name)
-		? MediaType.EPISODE
-		: SEASON_REGEX.test(name)
-			? MediaType.SEASON
-			: MOVIE_REGEX.test(name)
-				? MediaType.MOVIE
-				: isVideo && ANIME_REGEX.test(name)
-					? MediaType.ANIME
-					: MediaType.OTHER;
+export function getTag(searchee: Searchee): MediaType {
+	function hasExt(searchee: Searchee, exts: string[]) {
+		return searchee.files.some((f) => exts.includes(path.extname(f.name)));
+	}
+	const stem = stripExtension(searchee.name);
+	const hasVideoExtensions = hasExt(searchee, VIDEO_EXTENSIONS);
+
+	function unsupportedMediaType(searchee: Searchee): MediaType {
+		//any unsupported media that needs to be identified goes here
+		switch (true) {
+			case hasExt(searchee, AUDIO_EXTENSIONS):
+				return MediaType.AUDIO;
+			case hasExt(searchee, BOOK_EXTENSIONS):
+				return MediaType.BOOK;
+			// add more unsupported media here and on MediaType
+			default:
+				return MediaType.OTHER;
+		}
+	}
+	// put new  supported media type cases in this switch
+	switch (true) {
+		case EP_REGEX.test(stem):
+			return MediaType.EPISODE;
+		case SEASON_REGEX.test(stem):
+			return MediaType.SEASON;
+		case hasVideoExtensions:
+			if (MOVIE_REGEX.test(stem)) return MediaType.MOVIE;
+			if (ANIME_REGEX.test(stem)) return MediaType.ANIME;
+		// eslint-disable-next-line no-fallthrough
+		default:
+			return unsupportedMediaType(searchee);
+	}
 }
 export function shouldRecheck(decision: Decision): boolean {
 	switch (decision) {
@@ -76,7 +104,33 @@ export async function time<R>(cb: () => R, times: number[]) {
 		times.push(performance.now() - before);
 	}
 }
+export function sanitizeUrl(url: string | URL): string {
+	if (typeof url === "string") {
+		url = new URL(url);
+	}
+	return url.origin + url.pathname;
+}
 
+export function assembleUrl(
+	urlStr: string,
+	apikey: string,
+	params: TorznabParams | IdSearchParams,
+): string {
+	const url = new URL(urlStr);
+	const searchParams = new URLSearchParams();
+
+	searchParams.set("apikey", apikey);
+
+	for (const [key, value] of Object.entries(params)) {
+		if (value != null) searchParams.set(key, value);
+	}
+
+	url.search = searchParams.toString();
+	return url.toString();
+}
+export function getApikey(url: string) {
+	return new URL(url).searchParams.get("apikey");
+}
 export function cleanseSeparators(str: string): string {
 	return str
 		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "")
@@ -99,11 +153,12 @@ export function getAnimeQueries(name: string): string[] {
 }
 
 export function reformatTitleForSearching(name: string): string {
-	const seasonMatch = name.match(SEASON_REGEX);
-	const movieMatch = name.match(MOVIE_REGEX);
-	const episodeMatch = name.match(EP_REGEX);
+	// use lazy regex evaluation
 	const fullMatch =
-		episodeMatch?.[0] ?? seasonMatch?.[0] ?? movieMatch?.[0] ?? name;
+		name.match(EP_REGEX)?.[0] ??
+		name.match(SEASON_REGEX)?.[0] ??
+		name.match(MOVIE_REGEX)?.[0] ??
+		name;
 	return cleanseSeparators(fullMatch);
 }
 
