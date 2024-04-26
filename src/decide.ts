@@ -5,6 +5,7 @@ import {
 	Decision,
 	MatchMode,
 	RELEASE_GROUP_REGEX,
+	RP_REGEX,
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -75,6 +76,11 @@ const createReasonLogger =
 					?.trim()} -> ${candidate.name
 					.match(RELEASE_GROUP_REGEX)?.[0]
 					?.trim()})`;
+				break;
+			case Decision.PROPER_REPACK_MISMATCH:
+				reason = `one is a different subsequent release - (${
+					searchee.name.match(RP_REGEX)?.groups?.type ?? "INITIAL"
+				} -> ${candidate.name.match(RP_REGEX)?.groups?.type ?? "INITIAL"})`;
 				break;
 			case Decision.BLOCKED_RELEASE:
 				reason = `it matches the blocklist - ("${findBlockedStringInReleaseMaybe(
@@ -169,7 +175,22 @@ function sizeDoesMatch(resultSize, searchee) {
 	const upperBound = length + fuzzySizeThreshold * length;
 	return resultSize >= lowerBound && resultSize <= upperBound;
 }
-
+function releaseVersionDoesMatch(
+	searcheeName: string,
+	candidateName: string,
+	matchMode: MatchMode,
+) {
+	const searcheeVersionType = searcheeName.match(RP_REGEX)?.[0];
+	const candidateVersionType = candidateName.match(RP_REGEX)?.[0];
+	if (!searcheeVersionType || !candidateVersionType) {
+		return matchMode !== MatchMode.SAFE;
+	}
+	return (
+		searcheeVersionType === candidateVersionType ||
+		(matchMode !== MatchMode.SAFE &&
+			searcheeVersionType !== candidateVersionType)
+	);
+}
 function releaseGroupDoesMatch(
 	searcheeName: string,
 	candidateName: string,
@@ -212,7 +233,9 @@ async function assessCandidateHelper(
 	if (!releaseGroupDoesMatch(searchee.name, name, matchMode)) {
 		return { decision: Decision.RELEASE_GROUP_MISMATCH };
 	}
-
+	if (!releaseVersionDoesMatch(searchee.name, name, matchMode)) {
+		return { decision: Decision.PROPER_REPACK_MISMATCH };
+	}
 	const result = await parseTorrentFromURL(link);
 
 	if (result.isErr()) {

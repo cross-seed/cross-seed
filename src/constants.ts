@@ -18,6 +18,7 @@ export const ANIME_REGEX =
 	/^(?:\[(?<group>.*?)\][_.\s-]?)?(?:\[?(?<title>.+?)[_.\s-]?(?:\(?(?:\d{1,2}(?:st|nd|rd|th))?\s?Season)?[_.\s-]?\]?)(?:[([~/|-]\s?(?!\d{4})(?<altTitle>.+?)[)\]~-]?\s?)?[_.\s-]?(?:\(?(?<year>(?:19|20)\d{2})\)?)?[[_.\s-](?:S\d{1,2})?[_.\s-]{0,3}(?:#|EP?|(?:SP))?[_.\s-]{0,3}(?<release>\d{1,4})(?:v\d)?[\])_.\s-]/i;
 export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w ]+?)(?:\[.+\])?(?:\))?(?=(?:\.\w{1,5})?$)/i;
+export const RP_REGEX = /\b(?<type>(REPACK|PROPER)\d?)\b/i;
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
 
@@ -56,6 +57,7 @@ export enum Decision {
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
 	RELEASE_GROUP_MISMATCH = "RELEASE_GROUP_MISMATCH",
 	BLOCKED_RELEASE = "BLOCKED_RELEASE",
+	PROPER_REPACK_MISMATCH = "PROPER_REPACK_MISMATCH",
 }
 
 export enum MatchMode {
