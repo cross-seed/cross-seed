@@ -311,6 +311,7 @@ export default class QBittorrent implements TorrentClient {
 		const isComplete = [
 			"uploading",
 			"pausedUP",
+			"stoppedUP",
 			"queuedUP",
 			"stalledUP",
 			"checkingUP",
