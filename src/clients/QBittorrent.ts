@@ -268,7 +268,9 @@ export default class QBittorrent implements TorrentClient {
 		const torrents = await this.getAllTorrentInfo();
 		return torrents.filter(
 			(torrent) =>
-				hash === torrent.infohash_v1 || hash === torrent.infohash_v2,
+				hash === torrent.hash ||
+				hash === torrent.infohash_v1 ||
+				hash === torrent.infohash_v2,
 		);
 	}
 
