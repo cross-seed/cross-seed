@@ -70,7 +70,7 @@ interface TorrentInfo {
 	uploaded_session: number;
 	upspeed: number;
 }
-
+/* Unused variable - removed for build.
 interface TorrentFiles {
 	availability: number;
 	index: number;
@@ -81,7 +81,7 @@ interface TorrentFiles {
 	progress: number;
 	size: number;
 }
-
+*/
 interface TorrentConfiguration {
 	save_path: string;
 	isComplete: boolean;
