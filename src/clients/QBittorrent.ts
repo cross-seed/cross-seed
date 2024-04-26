@@ -138,25 +138,36 @@ export default class QBittorrent implements TorrentClient {
 		path: string,
 		body: BodyInit,
 		headers: Record<string, string> = {},
-		retries = 1,
+		retries = 3,
 	): Promise<string> {
 		logger.verbose({
 			label: Label.QBITTORRENT,
-			message: `Making request to ${path} with body ${body!.toString()}`,
+			message: `Making request (${retries}) to ${path} with body ${body!.toString()}`,
 		});
 
-		const response = await fetch(`${this.url.href}${path}`, {
-			method: "post",
-			headers: { Cookie: this.cookie, ...headers },
-			body,
-		});
-		if (response.status === 403 && retries > 0) {
+		let response: Response = new Response();
+		try {
+			response = await fetch(`${this.url.href}${path}`, {
+				method: "post",
+				headers: { Cookie: this.cookie, ...headers },
+				body,
+			});
+			if (response.status === 403 && retries > 0) {
+				logger.verbose({
+					label: Label.QBITTORRENT,
+					message: "Received 403 from API. Logging in again and retrying",
+				});
+				await this.login();
+				return this.request(path, body, headers, retries - 1);
+			}
+		} catch (e) {
 			logger.verbose({
 				label: Label.QBITTORRENT,
-				message: "received 403 from API. Logging in again and retrying",
+				message: `Request failed: ${e.message}`,
 			});
-			await this.login();
-			return this.request(path, body, headers, retries - 1);
+			if (retries > 0) {
+				return this.request(path, body, headers, retries - 1);
+			}
 		}
 		return response.text();
 	}
