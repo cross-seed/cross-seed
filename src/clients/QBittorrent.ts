@@ -155,7 +155,8 @@ export default class QBittorrent implements TorrentClient {
 			if (response.status === 403 && retries > 0) {
 				logger.verbose({
 					label: Label.QBITTORRENT,
-					message: "Received 403 from API. Logging in again and retrying",
+					message:
+						"Received 403 from API. Logging in again and retrying",
 				});
 				await this.login();
 				return this.request(path, body, headers, retries - 1);
@@ -306,10 +307,18 @@ export default class QBittorrent implements TorrentClient {
 			);
 		}
 
-		const { progress, save_path, auto_tmm, category } = searchResult[0];
+		const { save_path, state, auto_tmm, category } = searchResult[0];
+		const isComplete = [
+			"uploading",
+			"pausedUP",
+			"queuedUP",
+			"stalledUP",
+			"checkingUP",
+			"forcedUP",
+		].includes(state);
 		return {
 			save_path,
-			isComplete: progress === 1,
+			isComplete: isComplete,
 			autoTMM: auto_tmm,
 			category,
 		};
