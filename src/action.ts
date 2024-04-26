@@ -134,9 +134,13 @@ async function linkAllFilesInMetafile(
 				e === "NOT_FOUND" ? "TORRENT_NOT_FOUND" : e,
 			);
 		}
-		sourceRoot = searchee.files.length === 1
-			? join(downloadDirResult.unwrapOrThrow(), searchee.files[0].path)
-			: join(downloadDirResult.unwrapOrThrow(), searchee.name);
+		sourceRoot =
+			searchee.files.length === 1
+				? join(
+						downloadDirResult.unwrapOrThrow(),
+						searchee.files[0].path,
+					)
+				: join(downloadDirResult.unwrapOrThrow(), searchee.name);
 	}
 
 	if (!existsSync(sourceRoot)) {

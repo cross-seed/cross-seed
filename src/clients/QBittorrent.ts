@@ -10,10 +10,7 @@ import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import {
-	determineSkipRecheck,
-	extractCredentialsFromUrl,
-} from "../utils.js";
+import { determineSkipRecheck, extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
@@ -245,8 +242,10 @@ export default class QBittorrent implements TorrentClient {
 		searchee: Searchee,
 		torrentInfo: TorrentInfo,
 	): Promise<string> {
-		const subfolderContentLayout =
-			await this.isSubfolderContentLayout(searchee, torrentInfo);
+		const subfolderContentLayout = await this.isSubfolderContentLayout(
+			searchee,
+			torrentInfo,
+		);
 		if (subfolderContentLayout) {
 			return dirname(torrentInfo.content_path);
 		}
@@ -261,9 +260,11 @@ export default class QBittorrent implements TorrentClient {
 		const responseText = await this.request("/torrents/info", "");
 		const torrents = JSON.parse(responseText);
 		if (hash) {
-			return torrents.filter((torrent) => 
-				hash === torrent.infoHash_v1 ||
-				hash === torrent.infoHash_v2);
+			return torrents.filter(
+				(torrent) =>
+					hash === torrent.infoHash_v1 ||
+					hash === torrent.infoHash_v2,
+			);
 		}
 		return torrents;
 	}
@@ -291,7 +292,10 @@ export default class QBittorrent implements TorrentClient {
 		};
 	}
 
-	async isSubfolderContentLayout(searchee: Searchee, torrentInfo: TorrentInfo): Promise<boolean> {
+	async isSubfolderContentLayout(
+		searchee: Searchee,
+		torrentInfo: TorrentInfo,
+	): Promise<boolean> {
 		if (searchee.files.length > 1) return false;
 		if (dirname(searchee.files[0].path) !== ".") return false;
 		return dirname(torrentInfo.content_path) !== torrentInfo.save_path;
