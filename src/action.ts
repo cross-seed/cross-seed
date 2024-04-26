@@ -195,6 +195,9 @@ export async function performAction(
 			linkedFilesRootResult.unwrapErrOrThrow() === "MISSING_DATA"
 		) {
 			logger.warn("Falling back to non-linking.");
+			if (searchee.path) {
+				destinationDir = dirname(searchee.path);
+			}
 		} else {
 			logInjectionResult(
 				InjectionResult.FAILURE,
