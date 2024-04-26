@@ -187,7 +187,7 @@ function releaseVersionDoesMatch(
 	if (
 		searcheeVersionType?.[0].toLowerCase() !==
 			candidateVersionType?.[0].toLowerCase() ||
-		searcheeVersionType?.groups?.arrtype
+		(searcheeVersionType?.groups?.arrtype && candidateVersionType)
 	) {
 		return matchMode !== MatchMode.SAFE;
 	}
