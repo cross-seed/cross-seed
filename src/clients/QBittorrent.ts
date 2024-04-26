@@ -192,17 +192,24 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async isInfoHashInClient(infoHash: string): Promise<boolean> {
-		const responseText = await this.request(
-			"/torrents/properties",
-			`hash=${infoHash}`,
+		const torrent = await this.getTorrentInfo(infoHash);
+		return torrent.length > 0;
+	}
+
+	async addTorrent(formData: FormData): Promise<void> {
+		await this.request("/torrents/add", formData);
+	}
+
+	async recheckTorrent(infoHash: string): Promise<void> {
+		const torrent = await this.getTorrentInfo(infoHash);
+		if (torrent.length === 0) {
+			throw new Error("Torrent not found in client");
+		}
+		await this.request(
+			"/torrents/recheck",
+			`hashes=${torrent[0].hash}`,
 			X_WWW_FORM_URLENCODED,
 		);
-		try {
-			const properties = JSON.parse(responseText);
-			return properties && typeof properties === "object";
-		} catch (e) {
-			return false;
-		}
 	}
 
 	/*
@@ -372,15 +379,11 @@ export default class QBittorrent implements TorrentClient {
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
 
-			await this.request("/torrents/add", formData);
+			await this.addTorrent(formData);
 			//if we have a linked file and skiprecheck is false
 			if (skipRecheck) {
 				await new Promise((resolve) => setTimeout(resolve, 100));
-				await this.request(
-					"/torrents/recheck",
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED,
-				);
+				await this.recheckTorrent(newTorrent.infoHash);
 			}
 
 			return InjectionResult.SUCCESS;
