@@ -180,16 +180,18 @@ function releaseVersionDoesMatch(
 	candidateName: string,
 	matchMode: MatchMode,
 ) {
-	const searcheeVersionType = searcheeName.match(RP_REGEX)?.[0];
-	const candidateVersionType = candidateName.match(RP_REGEX)?.[0];
-	if (!searcheeVersionType || !candidateVersionType) {
+	const searcheeVersionType = searcheeName.match(RP_REGEX);
+	const candidateVersionType = candidateName.match(RP_REGEX);
+	//sets either match arrtype or type to corresponding VersionType
+
+	if (
+		searcheeVersionType?.[0].toLowerCase() !==
+			candidateVersionType?.[0].toLowerCase() ||
+		searcheeVersionType?.groups?.arrtype
+	) {
 		return matchMode !== MatchMode.SAFE;
 	}
-	return (
-		searcheeVersionType === candidateVersionType ||
-		(matchMode !== MatchMode.SAFE &&
-			searcheeVersionType !== candidateVersionType)
-	);
+	return searcheeVersionType === candidateVersionType;
 }
 function releaseGroupDoesMatch(
 	searcheeName: string,
