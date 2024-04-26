@@ -253,20 +253,23 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	/*
+	@return array of query results
+	 */
+	async getAllTorrentInfo(): Promise<TorrentInfo[]> {
+		const responseText = await this.request("/torrents/info", "");
+		return JSON.parse(responseText);
+	}
+
+	/*
 	@param hash the hash of the torrent or undefined for all torrents
 	@return array of query results
 	 */
-	async getTorrentInfo(hash?: string): Promise<TorrentInfo[]> {
-		const responseText = await this.request("/torrents/info", "");
-		const torrents = JSON.parse(responseText);
-		if (hash) {
-			return torrents.filter(
-				(torrent) =>
-					hash === torrent.infoHash_v1 ||
-					hash === torrent.infoHash_v2,
-			);
-		}
-		return torrents;
+	async getTorrentInfo(hash: string): Promise<TorrentInfo[]> {
+		const torrents = await this.getAllTorrentInfo();
+		return torrents.filter(
+			(torrent) =>
+				hash === torrent.infohash_v1 || hash === torrent.infohash_v2,
+		);
 	}
 
 	/*
@@ -274,7 +277,7 @@ export default class QBittorrent implements TorrentClient {
 	@return object with save_path, autoTMM, isComplete, and category from qBit
 	 */
 	async getTorrentConfiguration(
-		searchee: Searchee,
+		searchee: SearcheeWithInfoHash,
 	): Promise<TorrentConfiguration> {
 		const searchResult = await this.getTorrentInfo(searchee.infoHash);
 		if (searchResult.length === 0) {
@@ -326,7 +329,9 @@ export default class QBittorrent implements TorrentClient {
 						autoTMM: false,
 						category: linkCategory,
 					}
-				: await this.getTorrentConfiguration(searchee);
+				: await this.getTorrentConfiguration(
+						searchee as SearcheeWithInfoHash,
+					);
 			const tags = this.getTagsForNewTorrent(searchee, {
 				save_path,
 				isComplete,
@@ -335,10 +340,12 @@ export default class QBittorrent implements TorrentClient {
 			});
 
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
-			const info = await this.getTorrentInfo(searchee.infoHash);
 			const contentLayout = path
 				? "Original"
-				: (await this.isSubfolderContentLayout(searchee, info[0]))
+				: (await this.isSubfolderContentLayout(
+							searchee,
+							(await this.getTorrentInfo(searchee.infoHash!))[0],
+					  ))
 					? "Subfolder"
 					: "Original";
 			const formData = new FormData();
