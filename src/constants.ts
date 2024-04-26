@@ -19,6 +19,9 @@ export const ANIME_REGEX =
 export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w ]+?)(?:\[.+\])?(?:\))?(?=(?:\.\w{1,5})?$)/i;
 
+export const RP_REGEX =
+	/(\b(?<type>(REPACK|PROPER|\d\v\d)\d?))|(?<arrtype>(Proper|v\d))\b/;
+
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
 
 export const IGNORED_FOLDERS_REGEX =
@@ -56,6 +59,7 @@ export enum Decision {
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
 	RELEASE_GROUP_MISMATCH = "RELEASE_GROUP_MISMATCH",
 	BLOCKED_RELEASE = "BLOCKED_RELEASE",
+	PROPER_REPACK_MISMATCH = "PROPER_REPACK_MISMATCH",
 }
 
 export enum MatchMode {
