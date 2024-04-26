@@ -316,7 +316,7 @@ export default class Deluge implements TorrentClient {
 					// when paused, libtorrent doesnt start rechecking
 					// leaves torrent ready to download - ~99%
 					await this.call<string>("core.force_recheck", [
-						searchee.infoHash,
+						newTorrent.infoHash,
 					]);
 				}
 				return InjectionResult.SUCCESS;
