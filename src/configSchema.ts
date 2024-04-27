@@ -117,10 +117,7 @@ export const VALIDATION_SCHEMA = z
 			.nullish(),
 		matchMode: z.nativeEnum(MatchMode),
 		linkCategory: z.string().nullish(),
-		linkDir: z
-			.string()
-			.transform(await checkValidPathFormat)
-			.nullish(),
+		linkDir: z.string().transform(checkValidPathFormat).nullish(),
 		linkType: z.nativeEnum(LinkType),
 		flatLinking: z
 			.boolean()
@@ -128,10 +125,7 @@ export const VALIDATION_SCHEMA = z
 			.transform((value) => (typeof value === "boolean" ? value : false)),
 		skipRecheck: z.boolean(),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z
-			.string()
-			.transform(await checkValidPathFormat)
-			.nullish(),
+		torrentDir: z.string().transform(checkValidPathFormat).nullish(),
 		outputDir: z.string(),
 		includeEpisodes: z.boolean(),
 		includeSingleEpisodes: z.boolean(),
