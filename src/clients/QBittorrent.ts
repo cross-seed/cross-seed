@@ -184,14 +184,19 @@ export default class QBittorrent implements TorrentClient {
 			return TORRENT_TAG;
 		}
 		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
-			return `${category},${TORRENT_TAG}`;
+			if (duplicateCategories) {
+				return `${TORRENT_TAG},${category}`;
+			} else {
+				return TORRENT_TAG;
+			}
 		}
 
 		if (searchee.path) {
-			return `${TORRENT_TAG}-data,${TORRENT_TAG}`;
+			return `${TORRENT_TAG},${TORRENT_TAG}-data`;
+		} else if (duplicateCategories) {
+			return `${TORRENT_TAG},${category}${TORRENT_CATEGORY_SUFFIX}`;
 		} else {
-			const suffix = duplicateCategories ? TORRENT_CATEGORY_SUFFIX : "";
-			return `${category}${suffix},${TORRENT_TAG}`;
+			return TORRENT_TAG;
 		}
 	}
 
