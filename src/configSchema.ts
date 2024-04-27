@@ -17,7 +17,9 @@ const ZodErrorMessages = {
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	recheckWarn:
 		"It is strongly recommended to not skip rechecking for risky or partial matching mode.",
-	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
+	//TODO for some reason this is not tabbed right? needs \t to align. - I think it's because its refined outside of a primitive
+	// I KNOW YOU HATE THIS IM SORRY MG :(
+	windowsPath: `\t\t\tYour path is not formatted properly for Windows. \n\t\t\t\tPlease use "\\\\" or "/" for directory separators.`,
 	qBitAutoTMM:
 		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in unintended behavior.",
 	needsLinkDir:
@@ -86,7 +88,10 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
  * @return path if valid formatting
  */
 function checkValidPathFormat(path: string, ctx: RefinementCtx) {
-	if (!path.includes(sep)) {
+	if (
+		(sep === "\\" && !path.includes(`\x5C`) && !path.includes("/")) ||
+		path === "."
+	) {
 		addZodIssue(path, ZodErrorMessages.windowsPath, ctx);
 	}
 	return path;
@@ -125,8 +130,8 @@ export const VALIDATION_SCHEMA = z
 			.transform((value) => (typeof value === "boolean" ? value : false)),
 		skipRecheck: z.boolean(),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z.string().transform(checkValidPathFormat).nullish(),
-		outputDir: z.string(),
+		torrentDir: z.string().transform(checkValidPathFormat),
+		outputDir: z.string().transform(checkValidPathFormat),
 		includeEpisodes: z.boolean(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),

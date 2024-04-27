@@ -74,7 +74,7 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 				`${
 					path.length > 0 ? `Option: ${optionLine}` : "Configuration:"
 				}\n\t\t\t\t${message}\n\t\t\t\t(https://www.cross-seed.org/docs/basics/options${
-					urlPath ? `#${urlPath.toLower}` : ""
+					urlPath ? `#${urlPath.toLowerCase()}` : ""
 				})\n`,
 			);
 		});

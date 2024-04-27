@@ -5,7 +5,7 @@ import {
 	Decision,
 	MatchMode,
 	RELEASE_GROUP_REGEX,
-	RP_REGEX,
+	REPACK_PROPER_REGEX,
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -79,8 +79,9 @@ const createReasonLogger =
 				break;
 			case Decision.PROPER_REPACK_MISMATCH:
 				reason = `one is a different subsequent release - (${
-					searchee.name.match(RP_REGEX)?.groups?.type ?? "INITIAL"
-				} -> ${candidate.name.match(RP_REGEX)?.groups?.type ?? "INITIAL"})`;
+					searchee.name.match(REPACK_PROPER_REGEX)?.groups?.type ??
+					"INITIAL"
+				} -> ${candidate.name.match(REPACK_PROPER_REGEX)?.groups?.type ?? "INITIAL"})`;
 				break;
 			case Decision.BLOCKED_RELEASE:
 				reason = `it matches the blocklist - ("${findBlockedStringInReleaseMaybe(
@@ -180,8 +181,8 @@ function releaseVersionDoesMatch(
 	candidateName: string,
 	matchMode: MatchMode,
 ) {
-	const searcheeVersionType = searcheeName.match(RP_REGEX);
-	const candidateVersionType = candidateName.match(RP_REGEX);
+	const searcheeVersionType = searcheeName.match(REPACK_PROPER_REGEX);
+	const candidateVersionType = candidateName.match(REPACK_PROPER_REGEX);
 	//sets either match arrtype or type to corresponding VersionType
 
 	if (
