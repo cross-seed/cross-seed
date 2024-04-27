@@ -1,13 +1,6 @@
 import chalk from "chalk";
-import {
-	existsSync,
-	linkSync,
-	mkdirSync,
-	readdirSync,
-	statSync,
-	symlinkSync,
-} from "fs";
-import { basename, dirname, join, relative, resolve } from "path";
+import { existsSync, linkSync, mkdirSync, statSync, symlinkSync } from "fs";
+import { dirname, join, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -61,7 +54,6 @@ function logInjectionResult(
 /**
  * @return the root of linked files.
  */
-
 function linkExactTree(
 	newMeta: Metafile,
 	destinationDir: string,
