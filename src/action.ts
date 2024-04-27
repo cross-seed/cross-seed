@@ -161,13 +161,9 @@ async function linkAllFilesInMetafile(
 	}
 
 	if (decision === Decision.MATCH) {
-		return resultOf(
-			linkExactTree(newMeta, fullLinkDir, sourceRoot)
-		);
+		return resultOf(linkExactTree(newMeta, fullLinkDir, sourceRoot));
 	} else if (decision === Decision.MATCH_SIZE_ONLY) {
-		return resultOf(
-			fuzzyLinkOneFile(newMeta, fullLinkDir, sourceRoot),
-		);
+		return resultOf(fuzzyLinkOneFile(newMeta, fullLinkDir, sourceRoot));
 	} else {
 		return resultOf(
 			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot),
