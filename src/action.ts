@@ -134,7 +134,12 @@ async function linkAllFilesInMetafile(
 				e === "NOT_FOUND" ? "TORRENT_NOT_FOUND" : e,
 			);
 		}
-		sourceRoot = join(downloadDirResult.unwrapOrThrow(), searchee.name);
+		sourceRoot = join(
+			downloadDirResult.unwrapOrThrow(),
+			searchee.files.length === 1
+				? searchee.files[0].path
+				: searchee.name,
+		);
 	}
 
 	if (!existsSync(sourceRoot)) {
@@ -195,6 +200,9 @@ export async function performAction(
 			linkedFilesRootResult.unwrapErrOrThrow() === "MISSING_DATA"
 		) {
 			logger.warn("Falling back to non-linking.");
+			if (searchee.path) {
+				destinationDir = dirname(searchee.path);
+			}
 		} else {
 			logInjectionResult(
 				InjectionResult.FAILURE,

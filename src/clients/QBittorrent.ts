@@ -1,4 +1,4 @@
-import { join, posix } from "path";
+import { dirname } from "path";
 import {
 	Decision,
 	InjectionResult,
@@ -9,12 +9,8 @@ import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee } from "../searchee.js";
-import {
-	determineSkipRecheck,
-	extractCredentialsFromUrl,
-	stripExtension,
-} from "../utils.js";
+import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import { determineSkipRecheck, extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
@@ -74,7 +70,7 @@ interface TorrentInfo {
 	uploaded_session: number;
 	upspeed: number;
 }
-
+/* Unused variable - removed for build.
 interface TorrentFiles {
 	availability: number;
 	index: number;
@@ -85,7 +81,7 @@ interface TorrentFiles {
 	progress: number;
 	size: number;
 }
-
+*/
 interface TorrentConfiguration {
 	save_path: string;
 	isComplete: boolean;
@@ -142,25 +138,37 @@ export default class QBittorrent implements TorrentClient {
 		path: string,
 		body: BodyInit,
 		headers: Record<string, string> = {},
-		retries = 1,
+		retries = 3,
 	): Promise<string> {
 		logger.verbose({
 			label: Label.QBITTORRENT,
-			message: `Making request to ${path} with body ${body!.toString()}`,
+			message: `Making request (${retries}) to ${path} with body ${body!.toString()}`,
 		});
 
-		const response = await fetch(`${this.url.href}${path}`, {
-			method: "post",
-			headers: { Cookie: this.cookie, ...headers },
-			body,
-		});
-		if (response.status === 403 && retries > 0) {
+		let response: Response = new Response();
+		try {
+			response = await fetch(`${this.url.href}${path}`, {
+				method: "post",
+				headers: { Cookie: this.cookie, ...headers },
+				body,
+			});
+			if (response.status === 403 && retries > 0) {
+				logger.verbose({
+					label: Label.QBITTORRENT,
+					message:
+						"Received 403 from API. Logging in again and retrying",
+				});
+				await this.login();
+				return this.request(path, body, headers, retries - 1);
+			}
+		} catch (e) {
 			logger.verbose({
 				label: Label.QBITTORRENT,
-				message: "received 403 from API. Logging in again and retrying",
+				message: `Request failed: ${e.message}`,
 			});
-			await this.login();
-			return this.request(path, body, headers, retries - 1);
+			if (retries > 0) {
+				return this.request(path, body, headers, retries - 1);
+			}
 		}
 		return response.text();
 	}
@@ -176,14 +184,19 @@ export default class QBittorrent implements TorrentClient {
 			return TORRENT_TAG;
 		}
 		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
-			return `${category},${TORRENT_TAG}`;
+			if (duplicateCategories) {
+				return `${TORRENT_TAG},${category}`;
+			} else {
+				return TORRENT_TAG;
+			}
 		}
 
 		if (searchee.path) {
-			return `${TORRENT_TAG}-data,${TORRENT_TAG}`;
+			return `${TORRENT_TAG},${TORRENT_TAG}-data`;
+		} else if (duplicateCategories) {
+			return `${TORRENT_TAG},${category}${TORRENT_CATEGORY_SUFFIX}`;
 		} else {
-			const suffix = duplicateCategories ? TORRENT_CATEGORY_SUFFIX : "";
-			return `${category}${suffix},${TORRENT_TAG}`;
+			return TORRENT_TAG;
 		}
 	}
 
@@ -196,17 +209,24 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async isInfoHashInClient(infoHash: string): Promise<boolean> {
-		const responseText = await this.request(
-			"/torrents/properties",
-			`hash=${infoHash}`,
+		const torrent = await this.getTorrentInfo(infoHash);
+		return torrent.length > 0;
+	}
+
+	async addTorrent(formData: FormData): Promise<void> {
+		await this.request("/torrents/add", formData);
+	}
+
+	async recheckTorrent(infoHash: string): Promise<void> {
+		const torrent = await this.getTorrentInfo(infoHash);
+		if (torrent.length === 0) {
+			throw new Error("Torrent not found in client");
+		}
+		await this.request(
+			"/torrents/recheck",
+			`hashes=${torrent[0].hash}`,
 			X_WWW_FORM_URLENCODED,
 		);
-		try {
-			const properties = JSON.parse(responseText);
-			return properties && typeof properties === "object";
-		} catch (e) {
-			return false;
-		}
 	}
 
 	/*
@@ -214,21 +234,21 @@ export default class QBittorrent implements TorrentClient {
 	@return either a string containing the path or a error mesage
 	*/
 	async getDownloadDir(
-		searchee: Searchee,
+		searchee: SearcheeWithInfoHash,
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		let torrentInfo;
 		try {
-			torrentInfo = await this.getTorrentConfiguration(searchee);
-			if (torrentInfo.save_path === undefined) {
+			const result = await this.getTorrentInfo(searchee.infoHash);
+			if (result.length === 0) {
 				return resultOfErr("NOT_FOUND");
 			}
-			torrentInfo = await this.generateCorrectSavePath(
+			const torrentInfo = result[0];
+			const savePath = await this.generateCorrectSavePath(
 				searchee,
 				torrentInfo,
 			);
-			return resultOf(torrentInfo.save_path);
+			return resultOf(savePath);
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
@@ -244,57 +264,79 @@ export default class QBittorrent implements TorrentClient {
 	 */
 	async generateCorrectSavePath(
 		searchee: Searchee,
-		{ save_path },
-	): Promise<{ save_path: string }> {
-		const subfolderContentLayout =
-			await this.isSubfolderContentLayout(searchee);
+		torrentInfo: TorrentInfo,
+	): Promise<string> {
+		const subfolderContentLayout = await this.isSubfolderContentLayout(
+			searchee,
+			torrentInfo,
+		);
 		if (subfolderContentLayout) {
-			return {
-				save_path: join(save_path, stripExtension(searchee.name)),
-			};
+			return dirname(torrentInfo.content_path);
 		}
-		return { save_path };
+		return torrentInfo.save_path;
 	}
+
+	/*
+	@return array of query results
+	 */
+	async getAllTorrentInfo(): Promise<TorrentInfo[]> {
+		const responseText = await this.request("/torrents/info", "");
+		return JSON.parse(responseText);
+	}
+
+	/*
+	@param hash the hash of the torrent or undefined for all torrents
+	@return array of query results
+	 */
+	async getTorrentInfo(hash: string): Promise<TorrentInfo[]> {
+		const torrents = await this.getAllTorrentInfo();
+		return torrents.filter(
+			(torrent) =>
+				hash === torrent.hash ||
+				hash === torrent.infohash_v1 ||
+				hash === torrent.infohash_v2,
+		);
+	}
+
 	/*
 	@param searchee the searchee we are querying about
 	@return object with save_path, autoTMM, isComplete, and category from qBit
 	 */
 	async getTorrentConfiguration(
-		searchee: Searchee,
+		searchee: SearcheeWithInfoHash,
 	): Promise<TorrentConfiguration> {
-		const responseText = await this.request(
-			"/torrents/info",
-			`hashes=${searchee.infoHash}`,
-			X_WWW_FORM_URLENCODED,
-		);
-		const searchResult = JSON.parse(responseText).find(
-			(e) => e.hash === searchee.infoHash,
-		) as TorrentInfo;
-		if (searchResult === undefined) {
+		const searchResult = await this.getTorrentInfo(searchee.infoHash);
+		if (searchResult.length === 0) {
 			throw new Error(
 				"Failed to retrieve data dir; torrent not found in client",
 			);
 		}
 
-		const { progress, save_path, auto_tmm, category } = searchResult;
+		const { save_path, state, auto_tmm, category } = searchResult[0];
+		const isComplete = [
+			"uploading",
+			"pausedUP",
+			"stoppedUP",
+			"queuedUP",
+			"stalledUP",
+			"checkingUP",
+			"forcedUP",
+		].includes(state);
 		return {
 			save_path,
-			isComplete: progress === 1,
+			isComplete: isComplete,
 			autoTMM: auto_tmm,
 			category,
 		};
 	}
 
-	async isSubfolderContentLayout(searchee: Searchee): Promise<boolean> {
-		const response = await this.request(
-			"/torrents/files",
-			`hash=${searchee.infoHash}`,
-			X_WWW_FORM_URLENCODED,
-		);
-
-		const files: TorrentFiles[] = JSON.parse(response);
-		const [{ name }] = files;
-		return files.length === 1 && posix.dirname(name) !== ".";
+	async isSubfolderContentLayout(
+		searchee: Searchee,
+		torrentInfo: TorrentInfo,
+	): Promise<boolean> {
+		if (searchee.files.length > 1) return false;
+		if (dirname(searchee.files[0].path) !== ".") return false;
+		return dirname(torrentInfo.content_path) !== torrentInfo.save_path;
 	}
 
 	async inject(
@@ -322,7 +364,9 @@ export default class QBittorrent implements TorrentClient {
 						autoTMM: false,
 						category: linkCategory,
 					}
-				: await this.getTorrentConfiguration(searchee);
+				: await this.getTorrentConfiguration(
+						searchee as SearcheeWithInfoHash,
+					);
 			const tags = this.getTagsForNewTorrent(searchee, {
 				save_path,
 				isComplete,
@@ -333,7 +377,10 @@ export default class QBittorrent implements TorrentClient {
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
 			const contentLayout = path
 				? "Original"
-				: (await this.isSubfolderContentLayout(searchee))
+				: (await this.isSubfolderContentLayout(
+							searchee,
+							(await this.getTorrentInfo(searchee.infoHash!))[0],
+					  ))
 					? "Subfolder"
 					: "Original";
 			const formData = new FormData();
@@ -358,15 +405,11 @@ export default class QBittorrent implements TorrentClient {
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
 
-			await this.request("/torrents/add", formData);
+			await this.addTorrent(formData);
 			//if we have a linked file and skiprecheck is false
-			if (skipRecheck) {
+			if (!skipRecheck) {
 				await new Promise((resolve) => setTimeout(resolve, 100));
-				await this.request(
-					"/torrents/recheck",
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED,
-				);
+				await this.recheckTorrent(newTorrent.infoHash);
 			}
 
 			return InjectionResult.SUCCESS;
