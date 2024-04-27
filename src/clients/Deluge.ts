@@ -315,6 +315,7 @@ export default class Deluge implements TorrentClient {
 				if (!determineSkipRecheck(decision)) {
 					// when paused, libtorrent doesnt start rechecking
 					// leaves torrent ready to download - ~99%
+					await new Promise((resolve) => setTimeout(resolve, 1000));
 					await this.call<string>("core.force_recheck", [
 						newTorrent.infoHash,
 					]);

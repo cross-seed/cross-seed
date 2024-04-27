@@ -142,7 +142,7 @@ export default class QBittorrent implements TorrentClient {
 	): Promise<string> {
 		logger.verbose({
 			label: Label.QBITTORRENT,
-			message: `Making request (${retries}) to ${path} with body ${body!.toString()}`,
+			message: `Making request (${retries}) to ${path} with body ${JSON.stringify(body)}`,
 		});
 
 		let response: Response = new Response();
@@ -408,7 +408,7 @@ export default class QBittorrent implements TorrentClient {
 			await this.addTorrent(formData);
 			//if we have a linked file and skiprecheck is false
 			if (!skipRecheck) {
-				await new Promise((resolve) => setTimeout(resolve, 100));
+				await new Promise((resolve) => setTimeout(resolve, 1000));
 				await this.recheckTorrent(newTorrent.infoHash);
 			}
 
