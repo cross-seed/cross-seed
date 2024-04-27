@@ -42,7 +42,6 @@ export function customizeErrorMessage(
 				message: error.unionErrors
 					.reduce<string[]>((acc, error) => {
 						error.errors.forEach((x) => acc.push(x.message));
-						console.log(acc);
 						return acc;
 					}, [])
 					.join("; "),
