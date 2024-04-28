@@ -173,19 +173,31 @@ export default class QBittorrent implements TorrentClient {
 		return response.text();
 	}
 
-	private getTagsForNewTorrent(
+	private async getTagsForNewTorrent(
 		searchee: Searchee,
 		injectionConfiguration: TorrentConfiguration,
-	): string {
+	): Promise<string> {
 		const { duplicateCategories } = getRuntimeConfig();
 		const { category } = injectionConfiguration;
 
-		if (!category) {
+		/* get the original category if torrent based - cuz otherwise we
+		 * use 'category'. this addresses path being truthy but still being
+		 * torrent searchee
+		 */
+		const categoryForTagging = searchee.infoHash
+			? (
+					await this.getTorrentConfiguration(
+						searchee as SearcheeWithInfoHash,
+					)
+				).category
+			: category;
+
+		if (!categoryForTagging) {
 			return TORRENT_TAG;
 		}
 		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
 			if (duplicateCategories) {
-				return `${TORRENT_TAG},${category}`;
+				return `${TORRENT_TAG},${categoryForTagging}`;
 			} else {
 				return TORRENT_TAG;
 			}
@@ -194,7 +206,7 @@ export default class QBittorrent implements TorrentClient {
 		if (searchee.path) {
 			return `${TORRENT_TAG},${TORRENT_TAG}-data`;
 		} else if (duplicateCategories) {
-			return `${TORRENT_TAG},${category}${TORRENT_CATEGORY_SUFFIX}`;
+			return `${TORRENT_TAG},${categoryForTagging}${TORRENT_CATEGORY_SUFFIX}`;
 		} else {
 			return TORRENT_TAG;
 		}
@@ -367,7 +379,8 @@ export default class QBittorrent implements TorrentClient {
 				: await this.getTorrentConfiguration(
 						searchee as SearcheeWithInfoHash,
 					);
-			const tags = this.getTagsForNewTorrent(searchee, {
+
+			const tags = await this.getTagsForNewTorrent(searchee, {
 				save_path,
 				isComplete,
 				autoTMM,
