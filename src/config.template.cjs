@@ -129,6 +129,8 @@ module.exports = {
 	 *
 	 * Unlike dataDirs, this is just a quoted string WITHOUT []'s around it.
 	 *
+	 * If you are a Windows user you need to put double '\' (e.g. "C:\\links")
+	 *
 	 * IF YOU ARE USING HARDLINKS, THIS MUST BE UNDER THE SAME VOLUME AS YOUR
 	 * DATADIRS. THIS PATH MUST ALSO BE ACCESSIBLE VIA YOUR TORRENT CLIENT
 	 * USING THE SAME PATH.
@@ -187,11 +189,15 @@ module.exports = {
 	 * .rtorrent.rc file.
 	 * For Deluge, this is ~/.config/deluge/state.
 	 * For Transmission, this would be ~/.config/transmission/torrents.
+	 *
+	 * If you are a Windows user you need to put double '\' (e.g. "C:\\torrents")
 	 */
 	torrentDir: "/path/to/torrent/file/dir",
 
 	/**
 	 * Where to save the torrent files that cross-seed finds for you.
+	 *
+	 * If you are a Windows user you need to put double '\' (e.g. "C:\\output")
 	 */
 	outputDir: ".",
 

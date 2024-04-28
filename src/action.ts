@@ -1,13 +1,6 @@
 import chalk from "chalk";
-import {
-	existsSync,
-	linkSync,
-	mkdirSync,
-	readdirSync,
-	statSync,
-	symlinkSync,
-} from "fs";
-import { basename, dirname, join, relative, resolve } from "path";
+import { existsSync, linkSync, mkdirSync, statSync, symlinkSync } from "fs";
+import { dirname, join, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -59,25 +52,43 @@ function logInjectionResult(
 }
 
 /**
- * this may not work with subfolder content layout
- * @return the root of linked file. most likely "destinationDir/name". Not necessarily a file, it can be a directory
+ * @return the root of linked files.
  */
-function fuzzyLinkOneFile(
-	searchee: Searchee,
+function linkExactTree(
 	newMeta: Metafile,
 	destinationDir: string,
 	sourceRoot: string,
 ): string {
-	const srcFilePath = join(
-		sourceRoot,
-		relative(searchee.name, searchee.files[0].path),
-	);
+	if (newMeta.files.length === 1) {
+		return fuzzyLinkOneFile(newMeta, destinationDir, sourceRoot);
+	}
+	for (const newFile of newMeta.files) {
+		const srcFilePath = join(dirname(sourceRoot), newFile.path);
+		const destFilePath = join(destinationDir, newFile.path);
+		mkdirSync(dirname(destFilePath), { recursive: true });
+		linkFile(srcFilePath, destFilePath);
+	}
+	return join(destinationDir, newMeta.name);
+}
+
+/**
+ * @return the root of linked file.
+ */
+function fuzzyLinkOneFile(
+	newMeta: Metafile,
+	destinationDir: string,
+	sourceRoot: string,
+): string {
+	const srcFilePath = sourceRoot;
 	const destFilePath = join(destinationDir, newMeta.files[0].path);
 	mkdirSync(dirname(destFilePath), { recursive: true });
 	linkFile(srcFilePath, destFilePath);
 	return join(destinationDir, newMeta.name);
 }
 
+/**
+ * @return the root of linked files.
+ */
 function fuzzyLinkPartial(
 	searchee: Searchee,
 	newMeta: Metafile,
@@ -134,7 +145,12 @@ async function linkAllFilesInMetafile(
 				e === "NOT_FOUND" ? "TORRENT_NOT_FOUND" : e,
 			);
 		}
-		sourceRoot = join(downloadDirResult.unwrapOrThrow(), searchee.name);
+		sourceRoot = join(
+			downloadDirResult.unwrapOrThrow(),
+			searchee.files.length === 1
+				? searchee.files[0].path
+				: searchee.name,
+		);
 	}
 
 	if (!existsSync(sourceRoot)) {
@@ -145,11 +161,9 @@ async function linkAllFilesInMetafile(
 	}
 
 	if (decision === Decision.MATCH) {
-		return resultOf(linkExactTree(sourceRoot, fullLinkDir));
+		return resultOf(linkExactTree(newMeta, fullLinkDir, sourceRoot));
 	} else if (decision === Decision.MATCH_SIZE_ONLY) {
-		return resultOf(
-			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot),
-		);
+		return resultOf(fuzzyLinkOneFile(newMeta, fullLinkDir, sourceRoot));
 	} else {
 		return resultOf(
 			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot),
@@ -195,6 +209,9 @@ export async function performAction(
 			linkedFilesRootResult.unwrapErrOrThrow() === "MISSING_DATA"
 		) {
 			logger.warn("Falling back to non-linking.");
+			if (searchee.path) {
+				destinationDir = dirname(searchee.path);
+			}
 		} else {
 			logInjectionResult(
 				InjectionResult.FAILURE,
@@ -240,24 +257,6 @@ export async function performActions(searchee, matches) {
 		if (result === InjectionResult.TORRENT_NOT_COMPLETE) break;
 	}
 	return results;
-}
-
-/**
- * @return the root of linked files.
- */
-
-function linkExactTree(oldPath: string, dest: string): string {
-	const newPath = join(dest, basename(oldPath));
-	if (statSync(oldPath).isFile()) {
-		mkdirSync(dirname(newPath), { recursive: true });
-		linkFile(oldPath, newPath);
-	} else {
-		mkdirSync(newPath, { recursive: true });
-		for (const dirent of readdirSync(oldPath)) {
-			linkExactTree(join(oldPath, dirent), newPath);
-		}
-	}
-	return newPath;
 }
 
 function linkFile(oldPath: string, newPath: string) {

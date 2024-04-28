@@ -284,27 +284,42 @@ export default class Deluge implements TorrentClient {
 				});
 				return InjectionResult.FAILURE;
 			}
+
+			const torrentFileName = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
+			const encodedTorrentData = newTorrent.encode().toString("base64");
+			const torrentPath = path ? path : torrentInfo!.save_path;
 			const params = this.formatData(
-				`${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`,
-				newTorrent.encode().toString("base64"),
-				path ? path : torrentInfo!.save_path,
+				torrentFileName,
+				encodedTorrentData,
+				torrentPath,
 				decision,
 			);
+
 			const addResult = await this.call<string>(
 				"core.add_torrent_file",
 				params,
 			);
 
 			const addResponse =
-				typeof addResult.result === "string"
-					? addResult.result
-					: addResult.error;
+				typeof addResult.error?.message === "string"
+					? addResult.error
+					: addResult.result;
+
 			if (typeof addResponse === "string") {
 				await this.setLabel(
 					newTorrent.name,
 					newTorrent.infoHash,
 					this.calculateLabel(searchee, torrentInfo!),
 				);
+
+				if (!determineSkipRecheck(decision)) {
+					// when paused, libtorrent doesnt start rechecking
+					// leaves torrent ready to download - ~99%
+					await new Promise((resolve) => setTimeout(resolve, 1000));
+					await this.call<string>("core.force_recheck", [
+						newTorrent.infoHash,
+					]);
+				}
 				return InjectionResult.SUCCESS;
 			} else if (addResponse?.message!.includes("already")) {
 				return InjectionResult.ALREADY_EXISTS;
