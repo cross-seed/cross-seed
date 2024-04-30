@@ -1,40 +1,40 @@
 name: feature request
-description: "i have an idea for cross-seed"
+description: "I have an idea for cross-seed"
 labels: ["feature", "triage"]
 body:
     - type: checkboxes
       attributes:
-          label: does an existing issue/feature request already exist?
+          label: Does an existing issue/feature request already exist?
           description:
-              use the search to see if an open or closed issue already exists
-              for the feature you are requesting. if a request exists and is
+              Use the search to see if an open or closed issue already exists
+              for the feature you are requesting. If a request exists and is
               closed please read the existing issue to see why, and if you still
               wish to make an issue link to it in your issue.
           options:
-              - label: i've searched far and wide!
+              - label: I've searched far and wide!
                 required: true
     - type: textarea
       attributes:
-          label: does your feature request solve a problem you're facing?
+          label: Does your feature request solve a problem you're facing?
           description:
-              tell us about the problem or use-case it solves. be sure to
+              Tell us about the problem or use-case it solves. Be sure to
               include relevant options, version information if relevant (latest
               is not a version), and any necessary context to the request.
       validations:
           required: true
     - type: textarea
       attributes:
-          label: what would you like for cross-seed to do?
-          description: tell us your desired behavior we should implement
+          label: What would you like for cross-seed to do?
+          description: Tell us your desired behavior we should implement
       validations:
           required: true
     - type: textarea
       attributes:
           label:
-              what are you currently doing, if anything, to solve or work around
+              What are you currently doing, if anything, to solve or work around
               the issue?
           description:
-              if there are workarounds, even incomplete ones, please tell us
+              If there are workarounds, even incomplete ones, please tell us
               what they are.
       validations:
           required: true
@@ -42,8 +42,8 @@ body:
       attributes:
           label: additional comments
           description: |
-              please provide us with any resources or context that may help us understand this situation and the proposed solution better.
+              Please provide us with any resources or context that may help us understand this situation and the proposed solution better.
 
-              Tip: you can attach images or log files by clicking this area to highlight it and then dragging files in.
+              Tip: You can attach images or log files by clicking this area to highlight it and then dragging files in.
       validations:
           required: true
