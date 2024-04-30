@@ -256,6 +256,9 @@ export default class QBittorrent implements TorrentClient {
 				return resultOfErr("NOT_FOUND");
 			}
 			const torrentInfo = result[0];
+			if (!this.isTorrentComplete(torrentInfo.state)) {
+				return resultOfErr("TORRENT_NOT_COMPLETE");
+			}
 			const savePath = await this.generateCorrectSavePath(
 				searchee,
 				torrentInfo,
@@ -325,7 +328,16 @@ export default class QBittorrent implements TorrentClient {
 		}
 
 		const { save_path, state, auto_tmm, category } = searchResult[0];
-		const isComplete = [
+		return {
+			save_path,
+			isComplete: this.isTorrentComplete(state),
+			autoTMM: auto_tmm,
+			category,
+		};
+	}
+
+	isTorrentComplete(state: string): boolean {
+		return [
 			"uploading",
 			"pausedUP",
 			"stoppedUP",
@@ -334,12 +346,6 @@ export default class QBittorrent implements TorrentClient {
 			"checkingUP",
 			"forcedUP",
 		].includes(state);
-		return {
-			save_path,
-			isComplete: isComplete,
-			autoTMM: auto_tmm,
-			category,
-		};
 	}
 
 	async isSubfolderContentLayout(
