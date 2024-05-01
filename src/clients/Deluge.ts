@@ -317,7 +317,7 @@ export default class Deluge implements TorrentClient {
 					// leaves torrent ready to download - ~99%
 					await wait(1000);
 					await this.call<string>("core.force_recheck", [
-						newTorrent.infoHash,
+						[newTorrent.infoHash],
 					]);
 				}
 				return InjectionResult.SUCCESS;

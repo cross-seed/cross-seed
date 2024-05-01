@@ -86,7 +86,7 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
  */
 function checkValidPathFormat(path: string, ctx: RefinementCtx) {
 	if (
-		(sep === "\\" && !path.includes(`\x5C`) && !path.includes("/")) ||
+		(sep === "\\" && !path.includes(`\\`) && !path.includes("/")) ||
 		path === "."
 	) {
 		addZodIssue(path, ZodErrorMessages.windowsPath, ctx);
