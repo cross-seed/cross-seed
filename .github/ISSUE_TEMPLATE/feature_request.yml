@@ -1,4 +1,4 @@
-name: feature request
+name: Feature request
 description: "I have an idea for cross-seed"
 labels: ["feature", "triage"]
 body:
@@ -40,7 +40,7 @@ body:
           required: true
     - type: textarea
       attributes:
-          label: additional comments
+          label: Additional comments
           description: |
               Please provide us with any resources or context that may help us understand this situation and the proposed solution better.
 
