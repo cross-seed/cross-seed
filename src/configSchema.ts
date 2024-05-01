@@ -126,7 +126,7 @@ export const VALIDATION_SCHEMA = z
 			.nullish()
 			.transform((value) => (typeof value === "boolean" ? value : false)),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z.string().transform(checkValidPathFormat),
+		torrentDir: z.string().transform(checkValidPathFormat).nullable(),
 		outputDir: z.string().transform(checkValidPathFormat),
 		includeEpisodes: z.boolean(),
 		includeSingleEpisodes: z.boolean(),
