@@ -10,7 +10,7 @@ import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
-import { determineSkipRecheck, extractCredentialsFromUrl } from "../utils.js";
+import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import ms from "ms";
 interface TorrentInfo {
@@ -312,10 +312,10 @@ export default class Deluge implements TorrentClient {
 					this.calculateLabel(searchee, torrentInfo!),
 				);
 
-				if (!determineSkipRecheck(decision)) {
+				if (shouldRecheck(decision)) {
 					// when paused, libtorrent doesnt start rechecking
 					// leaves torrent ready to download - ~99%
-					await new Promise((resolve) => setTimeout(resolve, 1000));
+					await wait(1000);
 					await this.call<string>("core.force_recheck", [
 						newTorrent.infoHash,
 					]);
@@ -358,13 +358,13 @@ export default class Deluge implements TorrentClient {
 			| Decision.MATCH_SIZE_ONLY
 			| Decision.MATCH_PARTIAL,
 	): InjectData {
-		const skipRecheck = determineSkipRecheck(decision);
+		const toRecheck = shouldRecheck(decision);
 		return [
 			filename,
 			filedump,
 			{
-				add_paused: !skipRecheck,
-				seed_mode: skipRecheck,
+				add_paused: toRecheck,
+				seed_mode: !toRecheck,
 				download_location: path,
 			},
 		];

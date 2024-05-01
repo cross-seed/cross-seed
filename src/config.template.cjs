@@ -170,12 +170,6 @@ module.exports = {
 	matchMode: "safe",
 
 	/**
-	 * Whether to skip recheck in qBittorrent or Deluge. Not supported in
-	 * rTorrent/Transmission.
-	 */
-	skipRecheck: true,
-
-	/**
 	 * Determines how deep into the specified dataDirs to go to generate new
 	 * searchees. Setting this to higher values will result in more searchees
 	 * and more API hits to your indexers.

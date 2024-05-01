@@ -8,7 +8,6 @@ import {
 	Decision,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export enum MediaType {
 	EPISODE = "episode",
@@ -59,16 +58,14 @@ export function getTag(name: string, isVideo: boolean): MediaType {
 					? MediaType.ANIME
 					: MediaType.OTHER;
 }
-export function determineSkipRecheck(decision: Decision): boolean {
-	const { skipRecheck } = getRuntimeConfig();
+export function shouldRecheck(decision: Decision): boolean {
 	switch (decision) {
 		case Decision.MATCH:
-			return true;
+			return false;
 		case Decision.MATCH_SIZE_ONLY:
-			return skipRecheck;
 		case Decision.MATCH_PARTIAL:
 		default:
-			return false;
+			return true;
 	}
 }
 export async function time<R>(cb: () => R, times: number[]) {

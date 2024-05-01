@@ -10,7 +10,7 @@ import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { determineSkipRecheck, extractCredentialsFromUrl } from "../utils.js";
+import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
@@ -417,17 +417,16 @@ export default class QBittorrent implements TorrentClient {
 			formData.append("contentLayout", path ? "Original" : contentLayout);
 			formData.append("category", category);
 			formData.append("tags", tags);
-			const skipRecheck = determineSkipRecheck(decision);
-			formData.append("skip_checking", skipRecheck.toString());
-			formData.append("paused", !skipRecheck.toString());
+			const toRecheck = shouldRecheck(decision);
+			formData.append("skip_checking", !toRecheck.toString());
+			formData.append("paused", toRecheck.toString());
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
 
 			await this.addTorrent(formData);
-			//if we have a linked file and skiprecheck is false
-			if (!skipRecheck) {
-				await new Promise((resolve) => setTimeout(resolve, 1000));
+			if (toRecheck) {
+				await wait(1000);
 				await this.recheckTorrent(newTorrent.infoHash);
 			}
 

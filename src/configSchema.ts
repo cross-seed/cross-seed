@@ -15,8 +15,6 @@ const ZodErrorMessages = {
 	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
-	recheckWarn:
-		"It is strongly recommended to not skip rechecking for risky or partial matching mode.",
 	//TODO for some reason this is not tabbed right? needs \t to align. - I think it's because its refined outside of a primitive
 	// I KNOW YOU HATE THIS IM SORRY MG :(
 	windowsPath: `\t\t\tYour path is not formatted properly for Windows. \n\t\t\t\tPlease use "\\\\" or "/" for directory separators.`,
@@ -127,7 +125,6 @@ export const VALIDATION_SCHEMA = z
 			.boolean()
 			.nullish()
 			.transform((value) => (typeof value === "boolean" ? value : false)),
-		skipRecheck: z.boolean(),
 		maxDataDepth: z.number().gte(1),
 		torrentDir: z.string().transform(checkValidPathFormat),
 		outputDir: z.string().transform(checkValidPathFormat),
@@ -213,12 +210,6 @@ export const VALIDATION_SCHEMA = z
 			),
 		ZodErrorMessages.injectUrl,
 	)
-	.refine((config) => {
-		if (config.skipRecheck && config.matchMode !== MatchMode.SAFE) {
-			logger.warn(ZodErrorMessages.recheckWarn);
-		}
-		return true;
-	})
 	.refine(
 		(config) => config.matchMode === MatchMode.SAFE || config.linkDir,
 		ZodErrorMessages.needsLinkDir,

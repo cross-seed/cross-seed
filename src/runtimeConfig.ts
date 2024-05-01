@@ -8,7 +8,6 @@ export interface RuntimeConfig {
 	linkDir: string;
 	linkType: LinkType;
 	flatLinking: boolean;
-	skipRecheck: boolean;
 	maxDataDepth: number;
 	linkCategory: string;
 	torrentDir?: string;

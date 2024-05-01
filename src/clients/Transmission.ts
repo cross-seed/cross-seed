@@ -5,7 +5,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { extractCredentialsFromUrl } from "../utils.js";
+import { shouldRecheck, extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
@@ -174,8 +174,6 @@ export default class Transmission implements TorrentClient {
 			| Decision.MATCH_PARTIAL,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { skipRecheck } = getRuntimeConfig();
-
 		let downloadDir: string;
 		if (path) {
 			downloadDir = path;
@@ -192,16 +190,13 @@ export default class Transmission implements TorrentClient {
 
 		let addResponse: TorrentAddResponse;
 
-		const skipRecheckTorrent =
-			decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
-
 		try {
 			addResponse = await this.request<TorrentAddResponse>(
 				"torrent-add",
 				{
 					"download-dir": downloadDir,
 					metainfo: newTorrent.encode().toString("base64"),
-					paused: !skipRecheckTorrent,
+					paused: shouldRecheck(decision),
 					labels: [TORRENT_TAG],
 				},
 			);

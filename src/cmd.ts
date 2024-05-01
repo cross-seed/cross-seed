@@ -145,11 +145,6 @@ function createCommandWithSharedOptions(name: string, description: string) {
 				.makeOptionMandatory(),
 		)
 		.option(
-			"--skip-recheck",
-			"Skips torrent recheck upon adding to QBittorrent",
-			fallback(fileConfig.skipRecheck, false),
-		)
-		.option(
 			"--max-data-depth <depth>",
 			"Max depth to look for searchees in dataDirs",
 			(n) => parseInt(n),

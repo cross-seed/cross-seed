@@ -10,7 +10,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { extractCredentialsFromUrl, wait } from "../utils.js";
+import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const COULD_NOT_FIND_INFO_HASH = "Could not find info-hash.";
@@ -282,7 +282,7 @@ export default class RTorrent implements TorrentClient {
 			| Decision.MATCH_PARTIAL,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { outputDir, skipRecheck } = getRuntimeConfig();
+		const { outputDir } = getRuntimeConfig();
 
 		if (await this.checkForInfoHashInClient(meta.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
@@ -308,12 +308,9 @@ export default class RTorrent implements TorrentClient {
 
 		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
 
-		const loadType =
-			decision === Decision.MATCH_PARTIAL
-				? skipRecheck
-					? "load.start"
-					: "load"
-				: "load.start";
+		const loadType = shouldRecheck(decision)
+			? "load"
+			: "load.start";
 
 		for (let i = 0; i < 5; i++) {
 			try {
