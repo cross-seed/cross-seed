@@ -1,4 +1,4 @@
-name: report a bug
+name: Report a bug
 description:
     "Please be prepared to see us through understanding and troubleshooting
     steps, providing configurations and verbose log files, and context and
@@ -28,7 +28,7 @@ body:
               (https://discord.gg/jpbUFzS5Wb) prior to making any GitHub Issues.
               these issues are strictly for bugs and feature requests.
           options:
-              - label: i've tried to solve this already
+              - label: I've tried to solve this already
                 required: true
     - type: textarea
       attributes:
