@@ -2,11 +2,12 @@
 FROM node:20-alpine AS build-stage
 WORKDIR /usr/src/cross-seed
 COPY package*.json ./
-RUN npm ci
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+RUN npm ci --no-fund
 COPY tsconfig.json ./
 COPY src src
 RUN npm run build && \
-    npm prune --production && \
+    npm prune --omit=dev && \
     rm -rf src tsconfig.json
 
 # Production Stage
