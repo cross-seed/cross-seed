@@ -21,7 +21,11 @@ export const RELEASE_GROUP_REGEX =
 export const RES_REGEX = /\b(?<res>\d{3,4}[ipx])\b/i;
 
 export const REPACK_PROPER_REGEX =
-	/(\b(?<type>(REPACK|PROPER|\d\v\d)\d?))|(?<arrtype>(Proper|v\d))\b/;
+	/(?:\b(?<type>(?:REPACK|PROPER|\d\v\d)\d?))|(?<arrtype>(?:Proper|v\d))\b/;
+export const SCENE_TITLE_REGEX = /^(?:\w{0,5}-)?(?<title>.*)/i;
+
+export const ARR_DIR_REGEX =
+	/^(?!.*(?:(\d{3,4}[ipx])|([xh]26[4-6])|(?:(he)|a)vc))[\p{L}\s:\w'’!().,&–+-]+(?:\(\d{4}\))?\s?(?:\{(?:tm|tv|im)db(?:id)?-\w+\})?$/iu;
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
 export const AUDIO_EXTENSIONS = [

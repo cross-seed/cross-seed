@@ -8,6 +8,7 @@ import {
 	AUDIO_EXTENSIONS,
 	BOOK_EXTENSIONS,
 	Decision,
+	SCENE_TITLE_REGEX,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { IdSearchParams, TorznabParams } from "./torznab.js";
@@ -158,7 +159,7 @@ export function reformatTitleForSearching(name: string): string {
 		name.match(SEASON_REGEX)?.[0] ??
 		name.match(MOVIE_REGEX)?.[0] ??
 		name;
-	return cleanseSeparators(fullMatch);
+	return cleanseSeparators(fullMatch).match(SCENE_TITLE_REGEX)!.groups!.title;
 }
 
 export const tap = (fn) => (value) => {

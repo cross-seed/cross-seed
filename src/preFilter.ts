@@ -1,6 +1,12 @@
 import ms from "ms";
 import { extname } from "path";
-import { EP_REGEX, SEASON_REGEX, VIDEO_EXTENSIONS } from "./constants.js";
+import { statSync } from "fs";
+import {
+	ARR_DIR_REGEX,
+	EP_REGEX,
+	SEASON_REGEX,
+	VIDEO_EXTENSIONS,
+} from "./constants.js";
 import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
@@ -58,7 +64,14 @@ export function filterByContent(searchee: Searchee): boolean {
 		logReason("not all files are videos");
 		return false;
 	}
-
+	if (
+		searchee.path &&
+		statSync(searchee.path).isDirectory() &&
+		ARR_DIR_REGEX.test(path.basename(searchee.path))
+	) {
+		logReason("it is a arr movie/series directory");
+		return false;
+	}
 	return true;
 }
 
