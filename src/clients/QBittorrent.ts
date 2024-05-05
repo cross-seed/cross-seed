@@ -199,7 +199,7 @@ export default class QBittorrent implements TorrentClient {
 			}
 		}
 		if (searchee.path) {
-			return `${TORRENT_TAG},${TORRENT_TAG}-data`;
+			return TORRENT_TAG;
 		} else if (duplicateCategories) {
 			return `${TORRENT_TAG},${categoryForTagging}${TORRENT_CATEGORY_SUFFIX}`;
 		} else {
@@ -358,7 +358,7 @@ export default class QBittorrent implements TorrentClient {
 			}
 			// This is never possible, being made explicit here
 			if (!searcheeInfo && !path) {
-				throw new CrossSeedError(
+				throw new Error(
 					`Searchee torrent may have been deleted: ${searchee.infoHash}`,
 				);
 			}
@@ -412,9 +412,7 @@ export default class QBittorrent implements TorrentClient {
 			await wait(1000);
 			const newInfo = await this.getTorrentInfo(newTorrent.infoHash);
 			if (!newInfo) {
-				throw new CrossSeedError(
-					`Failed to retrieve torrent after adding`,
-				);
+				throw new Error(`Failed to retrieve torrent after adding`);
 			}
 			if (toRecheck) {
 				await this.recheckTorrent(newInfo);

@@ -15,8 +15,6 @@ const ZodErrorMessages = {
 	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
-	//TODO for some reason this is not tabbed right? needs \t to align. - I think it's because its refined outside of a primitive
-	// I KNOW YOU HATE THIS IM SORRY MG :(
 	windowsPath: `\t\t\tYour path is not formatted properly for Windows. \n\t\t\t\tPlease use "\\\\" or "/" for directory separators.`,
 	qBitAutoTMM:
 		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in unintended behavior.",
