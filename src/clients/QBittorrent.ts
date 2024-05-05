@@ -30,17 +30,19 @@ interface TorrentInfo {
 	content_path: string;
 	dl_limit: number;
 	dlspeed: number;
-	download_path: string;
+	download_path?: string;
 	downloaded: number;
 	downloaded_session: number;
 	eta: number;
 	f_l_piece_prio: boolean;
 	force_start: boolean;
 	hash: string;
-	infohash_v1: string;
-	infohash_v2: string;
+	inactive_seeding_time_limit?: number;
+	infohash_v1?: string;
+	infohash_v2?: string;
 	last_activity: number;
 	magnet_uri: string;
+	max_inactive_seeding_time?: number;
 	max_ratio: number;
 	max_seeding_time: number;
 	name: string;
@@ -64,7 +66,7 @@ interface TorrentInfo {
 	time_active: number;
 	total_size: number;
 	tracker: string;
-	trackers_count: number;
+	trackers_count?: number;
 	up_limit: number;
 	uploaded: number;
 	uploaded_session: number;
@@ -287,6 +289,21 @@ export default class QBittorrent implements TorrentClient {
 		hash: string | undefined,
 	): Promise<TorrentInfo | undefined> {
 		if (!hash) return undefined;
+		const responseText = await this.request(
+			"/torrents/info",
+			`hashes=${hash}`,
+			X_WWW_FORM_URLENCODED,
+		);
+		if (responseText) {
+			const torrents = JSON.parse(responseText) as TorrentInfo[];
+			if (torrents.length > 0) {
+				return torrents[0];
+			}
+		}
+		logger.verbose({
+			label: Label.QBITTORRENT,
+			message: `Failed to retrieve torrent info using infohash_v1 ${hash}, checking all hashes`,
+		});
 		const torrents = await this.getAllTorrentInfo();
 		return torrents.find(
 			(torrent) =>
