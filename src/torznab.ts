@@ -1,6 +1,6 @@
 import ms from "ms";
 import xml2js from "xml2js";
-import { getAvailableArrIds, getRelevantArrIds } from "./arr.js";
+import { getAvailableArrIds, getRelevantArrIds, IdData } from "./arr.js";
 import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
@@ -56,6 +56,7 @@ export interface IdSearchParams {
 	tmdbid?: string;
 	imdbid?: string;
 }
+
 export interface Caps {
 	search: boolean;
 	categories: TorznabCats;
@@ -170,7 +171,7 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 
 async function createTorznabSearchQueries(
 	searchee: Searchee,
-	ids: IdSearchParams,
+	ids: IdData,
 	caps: Caps,
 ): Promise<TorznabParams[]> {
 	const nameWithoutExtension = stripExtension(searchee.name);

@@ -1,7 +1,10 @@
+import chalk from "chalk";
 import ms from "ms";
 import { Label, logger } from "./logger.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
+import { Searchee } from "./searchee.js";
+import { Caps, IdSearchParams } from "./torznab.js";
 import {
 	assembleUrl,
 	getApikey,
@@ -9,14 +12,6 @@ import {
 	MediaType,
 	sanitizeUrl,
 } from "./utils.js";
-import chalk from "chalk";
-import { Searchee } from "./searchee.js";
-import {
-	Caps,
-	IdSearchCaps,
-	IdSearchParams,
-	TorznabParams,
-} from "./torznab.js";
 
 const keyNames = ["tvdbId", "imdbId", "tmdbId"];
 
@@ -161,7 +156,7 @@ export async function grabArrId(
 	try {
 		let arrJson: IdData;
 		for (let i = 0; i < UArrLs.length; i++) {
-			arrJson = (await fetchArrJSON(searchee, UArrLs[i])) as IdData;
+			arrJson = await fetchArrJSON(searchee, UArrLs[i]);
 			if (Object.keys(arrJson).length > 0) {
 				logArrQueryResult(arrJson, searchee.name, mediaType);
 				return resultOf(arrJson);
@@ -175,7 +170,7 @@ export async function grabArrId(
 }
 export async function getRelevantArrIds(
 	searchee: Searchee,
-	ids: IdSearchCaps,
+	ids: IdData,
 	caps: Caps,
 ): Promise<IdSearchParams> {
 	const mediaType = getTag(searchee);
@@ -184,23 +179,17 @@ export async function getRelevantArrIds(
 			? caps.tvIdSearch
 			: caps.movieIdSearch;
 
-	const newVar = {
+	return {
 		tvdbid: idSearchCaps.tvdbId ? ids.tvdbId : undefined,
 		tmdbid: idSearchCaps.tvdbId ? ids.tmdbId : undefined,
 		imdbid: idSearchCaps.imdbId ? ids.imdbId : undefined,
 	};
-	return newVar;
 }
 
-export async function getAvailableArrIds(
-	searchee: Searchee,
-): Promise<IdSearchParams> {
+export async function getAvailableArrIds(searchee: Searchee): Promise<IdData> {
 	const mediaType = getTag(searchee);
 	try {
-		const arrIdData = (
-			await grabArrId(searchee, mediaType)
-		).unwrapOrThrow();
-		return arrIdData as TorznabParams;
+		return (await grabArrId(searchee, mediaType)).unwrapOrThrow();
 	} catch (e) {
 		return {};
 	}
