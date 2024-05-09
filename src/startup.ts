@@ -32,7 +32,7 @@ async function verifyPath(
 			if (sep === "\\" && !path.includes("\\") && !path.includes("/")) {
 				logger.error(
 					"\tIt may not be formatted properly for Windows.\n" +
-						'Please use "\\\\"or "/" for directory separators.',
+						'Make sure to use "\\\\" or "/" for directory separators.',
 				);
 			}
 		} else {
