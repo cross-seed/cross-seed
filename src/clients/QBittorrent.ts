@@ -402,7 +402,7 @@ export default class QBittorrent implements TorrentClient {
 				"contentLayout",
 				this.getLayoutForNewTorrent(searchee, searcheeInfo, path),
 			);
-			formData.append("skip_checking", !toRecheck.toString());
+			formData.append("skip_checking", (!toRecheck).toString());
 			formData.append("paused", toRecheck.toString());
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
