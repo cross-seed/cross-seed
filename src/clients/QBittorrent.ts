@@ -1,4 +1,4 @@
-import { posix } from "path";
+import { dirname } from "path";
 import {
 	Decision,
 	InjectionResult,
@@ -6,11 +6,11 @@ import {
 	TORRENT_CATEGORY_SUFFIX,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
-import { Label, logger, logOnce } from "../logger.js";
+import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee } from "../searchee.js";
-import { extractCredentialsFromUrl } from "../utils.js";
+import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
@@ -30,17 +30,19 @@ interface TorrentInfo {
 	content_path: string;
 	dl_limit: number;
 	dlspeed: number;
-	download_path: string;
+	download_path?: string;
 	downloaded: number;
 	downloaded_session: number;
 	eta: number;
 	f_l_piece_prio: boolean;
 	force_start: boolean;
 	hash: string;
-	infohash_v1: string;
-	infohash_v2: string;
+	inactive_seeding_time_limit?: number;
+	infohash_v1?: string;
+	infohash_v2?: string;
 	last_activity: number;
 	magnet_uri: string;
+	max_inactive_seeding_time?: number;
 	max_ratio: number;
 	max_seeding_time: number;
 	name: string;
@@ -64,33 +66,11 @@ interface TorrentInfo {
 	time_active: number;
 	total_size: number;
 	tracker: string;
-	trackers_count: number;
+	trackers_count?: number;
 	up_limit: number;
 	uploaded: number;
 	uploaded_session: number;
 	upspeed: number;
-}
-
-interface TorrentFiles {
-	availability: number;
-	index: number;
-	is_seed: boolean;
-	name: string;
-	piece_range: [number, number];
-	priority: number;
-	progress: number;
-	size: number;
-}
-
-interface Category {
-	name: string;
-	savePath: string;
-}
-interface TorrentConfiguration {
-	save_path: string;
-	isComplete: boolean;
-	autoTMM: boolean;
-	category: string;
 }
 
 export default class QBittorrent implements TorrentClient {
@@ -142,68 +122,89 @@ export default class QBittorrent implements TorrentClient {
 		path: string,
 		body: BodyInit,
 		headers: Record<string, string> = {},
-		retries = 1,
-	): Promise<string> {
+		retries = 3,
+	): Promise<string | undefined> {
 		logger.verbose({
 			label: Label.QBITTORRENT,
-			message: `Making request to ${path} with body ${body!.toString()}`,
+			message: `Making request (${retries}) to ${path} with body ${JSON.stringify(body)}`,
 		});
 
-		const response = await fetch(`${this.url.href}${path}`, {
-			method: "post",
-			headers: { Cookie: this.cookie, ...headers },
-			body,
-		});
-		if (response.status === 403 && retries > 0) {
+		let response: Response | undefined;
+		try {
+			response = await fetch(`${this.url.href}${path}`, {
+				method: "post",
+				headers: { Cookie: this.cookie, ...headers },
+				body,
+			});
+			if (response.status === 403 && retries > 0) {
+				logger.verbose({
+					label: Label.QBITTORRENT,
+					message:
+						"Received 403 from API. Logging in again and retrying",
+				});
+				await this.login();
+				return this.request(path, body, headers, retries - 1);
+			}
+		} catch (e) {
+			if (retries > 0) {
+				logger.verbose({
+					label: Label.QBITTORRENT,
+					message: `Request failed, ${retries} retries remaining: ${e.message}`,
+				});
+				return this.request(path, body, headers, retries - 1);
+			}
 			logger.verbose({
 				label: Label.QBITTORRENT,
-				message: "received 403 from API. Logging in again and retrying",
+				message: `Request failed after ${retries} retries: ${e.message}`,
 			});
-			await this.login();
-			return this.request(path, body, headers, retries - 1);
 		}
-		return response.text();
+		return response?.text();
 	}
 
-	async setUpCrossSeedCategory(ogCategoryName: string): Promise<string> {
-		const { linkingCategory } = getRuntimeConfig();
-		if (!ogCategoryName) return "";
-		if (
-			ogCategoryName.endsWith(TORRENT_CATEGORY_SUFFIX) ||
-			ogCategoryName === linkingCategory
-		)
-			return ogCategoryName;
+	private getLayoutForNewTorrent(
+		searchee: Searchee,
+		searcheeInfo: TorrentInfo | undefined,
+		path: string | undefined,
+	): string {
+		return path
+			? "Original"
+			: this.isSubfolderContentLayout(searchee, searcheeInfo!)
+				? "Subfolder"
+				: "Original";
+	}
 
-		const categoriesStr = await this.request("/torrents/categories", "");
-		const categories: Record<string, Category> = JSON.parse(categoriesStr);
-		const ogCategory = categories[ogCategoryName];
-		const newCategoryName = `${ogCategoryName}${TORRENT_CATEGORY_SUFFIX}`;
-		const maybeNewCategory = categories[newCategoryName];
+	private getTagsForNewTorrent(
+		searchee: Searchee,
+		searcheeInfo: TorrentInfo | undefined,
+		category: string,
+	): string {
+		const { duplicateCategories } = getRuntimeConfig();
 
-		if (!ogCategory.savePath) {
-			logOnce(`qbit/cat/no-save-path/${ogCategoryName}`, () => {
-				logger.warn(
-					`qBittorrent category "${ogCategoryName}" has no save path. Set a save path to prevent Missing Files errors.`,
-				);
-			});
+		/* get the original category if torrent based - cuz otherwise we
+		 * use 'category'. this addresses path being truthy but still being
+		 * torrent searchee
+		 */
+		const categoryForTagging = searcheeInfo
+			? searcheeInfo.category
+			: category;
+
+		if (!categoryForTagging || categoryForTagging.length === 0) {
+			return TORRENT_TAG;
 		}
-
-		if (maybeNewCategory?.savePath === ogCategory.savePath) {
-			// setup is already complete
-		} else if (maybeNewCategory) {
-			await this.request(
-				"/torrents/editCategory",
-				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
-				X_WWW_FORM_URLENCODED,
-			);
+		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
+			if (duplicateCategories) {
+				return `${TORRENT_TAG},${categoryForTagging}`;
+			} else {
+				return TORRENT_TAG;
+			}
+		}
+		if (searchee.path) {
+			return TORRENT_TAG;
+		} else if (duplicateCategories) {
+			return `${TORRENT_TAG},${categoryForTagging}${TORRENT_CATEGORY_SUFFIX}`;
 		} else {
-			await this.request(
-				"/torrents/createCategory",
-				`category=${newCategoryName}&savePath=${ogCategory.savePath}`,
-				X_WWW_FORM_URLENCODED,
-			);
+			return TORRENT_TAG;
 		}
-		return newCategoryName;
 	}
 
 	async createTag(): Promise<void> {
@@ -214,77 +215,123 @@ export default class QBittorrent implements TorrentClient {
 		);
 	}
 
-	async isInfoHashInClient(infoHash: string): Promise<boolean> {
-		const responseText = await this.request(
-			"/torrents/properties",
-			`hash=${infoHash}`,
+	async addTorrent(formData: FormData): Promise<void> {
+		await this.request("/torrents/add", formData);
+	}
+
+	async recheckTorrent(torrentInfo: TorrentInfo): Promise<void> {
+		await this.request(
+			"/torrents/recheck",
+			`hashes=${torrentInfo.hash}`,
 			X_WWW_FORM_URLENCODED,
 		);
-		try {
-			const properties = JSON.parse(responseText);
-			return properties && typeof properties === "object";
-		} catch (e) {
-			return false;
-		}
 	}
+
+	/*
+	@param searchee the Searchee we are generating off (in client)
+	@return either a string containing the path or a error mesage
+	*/
 	async getDownloadDir(
-		searchee: Searchee,
+		searchee: SearcheeWithInfoHash,
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		let torrentInfo: TorrentConfiguration;
 		try {
-			if (await this.isInfoHashInClient(searchee.infoHash!)) {
-				torrentInfo = await this.getTorrentConfiguration(searchee);
-				if (torrentInfo.save_path === undefined) {
-					return resultOfErr("NOT_FOUND");
-				}
+			const torrentInfo = await this.getTorrentInfo(searchee.infoHash);
+			if (!torrentInfo) {
+				return resultOfErr("NOT_FOUND");
 			}
+			if (!this.isTorrentComplete(torrentInfo)) {
+				return resultOfErr("TORRENT_NOT_COMPLETE");
+			}
+			const savePath = this.getCorrectSavePath(searchee, torrentInfo);
+			return resultOf(savePath);
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
 			}
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		return resultOf(torrentInfo!.save_path);
 	}
 
-	async getTorrentConfiguration(
-		searchee: Searchee,
-	): Promise<TorrentConfiguration> {
+	/*
+	@param searchee the Searchee we are generating off (in client)
+	@param torrentInfo the torrent info from the searchee
+	@return string absolute location from client with content layout considered
+	 */
+	getCorrectSavePath(searchee: Searchee, torrentInfo: TorrentInfo): string {
+		const subfolderContentLayout = this.isSubfolderContentLayout(
+			searchee,
+			torrentInfo,
+		);
+		if (subfolderContentLayout) {
+			return dirname(torrentInfo.content_path);
+		}
+		return torrentInfo.save_path;
+	}
+
+	/*
+	@return array of query results
+	 */
+	async getAllTorrentInfo(): Promise<TorrentInfo[]> {
+		const responseText = await this.request("/torrents/info", "");
+		if (!responseText) {
+			return [];
+		}
+		return JSON.parse(responseText);
+	}
+
+	/*
+	@param hash the hash of the torrent or undefined for all torrents
+	@return array of query results
+	 */
+	async getTorrentInfo(
+		hash: string | undefined,
+	): Promise<TorrentInfo | undefined> {
+		if (!hash) return undefined;
 		const responseText = await this.request(
 			"/torrents/info",
-			`hashes=${searchee.infoHash}`,
+			`hashes=${hash}`,
 			X_WWW_FORM_URLENCODED,
 		);
-		const searchResult = JSON.parse(responseText).find(
-			(e) => e.hash === searchee.infoHash,
-		) as TorrentInfo;
-		if (searchResult === undefined) {
-			throw new Error(
-				"Failed to retrieve data dir; torrent not found in client",
-			);
+		if (responseText) {
+			const torrents = JSON.parse(responseText) as TorrentInfo[];
+			if (torrents.length > 0) {
+				return torrents[0];
+			}
 		}
-
-		const { progress, save_path, auto_tmm, category } = searchResult;
-		return {
-			save_path,
-			isComplete: progress === 1,
-			autoTMM: auto_tmm,
-			category,
-		};
+		logger.verbose({
+			label: Label.QBITTORRENT,
+			message: `Failed to retrieve torrent info using infohash_v1 ${hash}, checking all hashes`,
+		});
+		const torrents = await this.getAllTorrentInfo();
+		return torrents.find(
+			(torrent) =>
+				hash === torrent.hash ||
+				hash === torrent.infohash_v1 ||
+				hash === torrent.infohash_v2,
+		);
 	}
 
-	async isSubfolderContentLayout(searchee: Searchee): Promise<boolean> {
-		const response = await this.request(
-			"/torrents/files",
-			`hash=${searchee.infoHash}`,
-			X_WWW_FORM_URLENCODED,
-		);
+	isTorrentComplete(torrentInfo: TorrentInfo): boolean {
+		return [
+			"uploading",
+			"pausedUP",
+			"stoppedUP",
+			"queuedUP",
+			"stalledUP",
+			"checkingUP",
+			"forcedUP",
+		].includes(torrentInfo.state);
+	}
 
-		const files: TorrentFiles[] = JSON.parse(response);
-		const [{ name }] = files;
-		return files.length === 1 && name !== posix.basename(name);
+	isSubfolderContentLayout(
+		searchee: Searchee,
+		searcheeInfo: TorrentInfo,
+	): boolean {
+		if (searchee.files.length > 1) return false;
+		if (dirname(searchee.files[0].path) !== ".") return false;
+		return dirname(searcheeInfo.content_path) !== searcheeInfo.save_path;
 	}
 
 	async inject(
@@ -296,84 +343,86 @@ export default class QBittorrent implements TorrentClient {
 			| Decision.MATCH_PARTIAL,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { duplicateCategories, skipRecheck, linkingCategory } =
-			getRuntimeConfig();
+		const { flatLinking, linkCategory } = getRuntimeConfig();
 		try {
-			if (await this.isInfoHashInClient(newTorrent.infoHash)) {
+			if (await this.getTorrentInfo(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
 			}
+			const searcheeInfo = await this.getTorrentInfo(searchee.infoHash);
+			// This should be extremly rare as we just linked successfully
+			if (searchee.infoHash && !searcheeInfo && path) {
+				logger.warning({
+					label: Label.QBITTORRENT,
+					message: `Searchee torrent may have been deleted, tagging may not meet expectations: ${searchee.infoHash}`,
+				});
+			}
+			// This is never possible, being made explicit here
+			if (!searcheeInfo && !path) {
+				throw new Error(
+					`Searchee torrent may have been deleted: ${searchee.infoHash}`,
+				);
+			}
 
-			const filename = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
+			const { savePath, isComplete, autoTMM, category } = path
+				? {
+						savePath: path,
+						isComplete: true,
+						autoTMM: false,
+						category: linkCategory,
+					}
+				: {
+						savePath: searcheeInfo!.save_path,
+						isComplete: this.isTorrentComplete(searcheeInfo!),
+						autoTMM: searcheeInfo!.auto_tmm,
+						category: searcheeInfo!.category,
+					};
+			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
+			const filename = `${newTorrent.getFileSystemSafeName()}.${TORRENT_TAG}.torrent`;
 			const buffer = new Blob([newTorrent.encode()], {
 				type: "application/x-bittorrent",
 			});
-			const { save_path, isComplete, autoTMM, category } = path
-				? {
-						save_path: path,
-						isComplete: true,
-						autoTMM: false,
-						category: linkingCategory,
-					}
-				: await this.getTorrentConfiguration(searchee);
+			const toRecheck = shouldRecheck(decision);
 
-			const newCategoryName =
-				duplicateCategories && searchee.infoHash
-					? await this.setUpCrossSeedCategory(category)
-					: category;
-
-			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
-
-			const contentLayout =
-				!path &&
-				newTorrent.isSingleFileTorrent &&
-				(await this.isSubfolderContentLayout(searchee))
-					? "Subfolder"
-					: "Original";
-
-			const skipRecheckTorrent =
-				decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
-
+			// ---------------------- Building form data ----------------------
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
-			formData.append("tags", TORRENT_TAG);
-			formData.append("category", newCategoryName);
-
-			if (autoTMM) {
-				formData.append("autoTMM", "true");
-			} else {
-				formData.append("autoTMM", "false");
-				formData.append("savepath", save_path);
-			}
 			if (path) {
-				formData.append("contentLayout", "Original");
-				formData.append("skip_checking", skipRecheck.toString());
-				formData.append("paused", (!skipRecheck).toString());
-			} else {
-				formData.append("contentLayout", contentLayout);
-				formData.append("skip_checking", skipRecheckTorrent.toString());
-				formData.append("paused", (!skipRecheckTorrent).toString());
+				formData.append("savepath", savePath);
 			}
-
+			formData.append(
+				"autoTMM",
+				flatLinking && searchee.infoHash ? autoTMM.toString() : "false",
+			);
+			formData.append("category", category);
+			formData.append(
+				"tags",
+				this.getTagsForNewTorrent(searchee, searcheeInfo, category),
+			);
+			formData.append(
+				"contentLayout",
+				this.getLayoutForNewTorrent(searchee, searcheeInfo, path),
+			);
+			formData.append("skip_checking", !toRecheck.toString());
+			formData.append("paused", toRecheck.toString());
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
+			await this.addTorrent(formData);
 
-			await this.request("/torrents/add", formData);
-
-			if (path && !skipRecheck) {
-				await new Promise((resolve) => setTimeout(resolve, 100));
-				await this.request(
-					"/torrents/recheck",
-					`hashes=${newTorrent.infoHash}`,
-					X_WWW_FORM_URLENCODED,
-				);
+			await wait(1000);
+			const newInfo = await this.getTorrentInfo(newTorrent.infoHash);
+			if (!newInfo) {
+				throw new Error(`Failed to retrieve torrent after adding`);
+			}
+			if (toRecheck) {
+				await this.recheckTorrent(newInfo);
 			}
 
 			return InjectionResult.SUCCESS;
 		} catch (e) {
 			logger.debug({
 				label: Label.QBITTORRENT,
-				message: `injection failed: ${e.message}`,
+				message: `Injection failed: ${e.message}`,
 			});
 			return InjectionResult.FAILURE;
 		}

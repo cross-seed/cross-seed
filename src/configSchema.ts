@@ -15,13 +15,11 @@ const ZodErrorMessages = {
 	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
-	recheckWarn:
-		"It is strongly recommended to not skip rechecking for risky or partial matching mode.",
-	windowsPath: `Your path is not formatted properly for Windows. Please use "\\\\" or "/" for directory separators.`,
-	qBitFlatLinking:
-		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in injection path failures.",
+	windowsPath: `\t\t\tYour path is not formatted properly for Windows. \n\t\t\t\tPlease use "\\\\" or "/" for directory separators.`,
+	qBitAutoTMM:
+		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in unintended behavior.",
 	needsLinkDir:
-		"You need to set a linkDir for risky or partial matching to work.",
+		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
 };
 
 /**
@@ -85,7 +83,10 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
  * @return path if valid formatting
  */
 function checkValidPathFormat(path: string, ctx: RefinementCtx) {
-	if (sep === "\\" && !path.includes("\\") && !path.includes("/")) {
+	if (
+		(sep === "\\" && !path.includes(`\\`) && !path.includes("/")) ||
+		path === "."
+	) {
 		addZodIssue(path, ZodErrorMessages.windowsPath, ctx);
 	}
 	return path;
@@ -115,17 +116,16 @@ export const VALIDATION_SCHEMA = z
 
 			.nullish(),
 		matchMode: z.nativeEnum(MatchMode),
-		linkingCategory: z.string().nullish(),
+		linkCategory: z.string().nullish(),
 		linkDir: z.string().transform(checkValidPathFormat).nullish(),
 		linkType: z.nativeEnum(LinkType),
 		flatLinking: z
 			.boolean()
 			.nullish()
 			.transform((value) => (typeof value === "boolean" ? value : false)),
-		skipRecheck: z.boolean(),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z.string().nullish(),
-		outputDir: z.string(),
+		torrentDir: z.string().transform(checkValidPathFormat).nullable(),
+		outputDir: z.string().transform(checkValidPathFormat),
 		includeEpisodes: z.boolean(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
@@ -193,7 +193,7 @@ export const VALIDATION_SCHEMA = z
 			!config.flatLinking &&
 			config.linkDir
 		) {
-			logger.warn(ZodErrorMessages.qBitFlatLinking);
+			logger.warn(ZodErrorMessages.qBitAutoTMM);
 		}
 		return true;
 	})
@@ -208,12 +208,6 @@ export const VALIDATION_SCHEMA = z
 			),
 		ZodErrorMessages.injectUrl,
 	)
-	.refine((config) => {
-		if (config.skipRecheck && config.matchMode !== MatchMode.SAFE) {
-			logger.warn(ZodErrorMessages.recheckWarn);
-		}
-		return true;
-	})
 	.refine(
 		(config) => config.matchMode === MatchMode.SAFE || config.linkDir,
 		ZodErrorMessages.needsLinkDir,

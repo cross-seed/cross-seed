@@ -1,4 +1,3 @@
-import ms from "ms";
 import {
 	Decision,
 	InjectionResult,
@@ -11,8 +10,9 @@ import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
-import { extractCredentialsFromUrl } from "../utils.js";
+import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
+import ms from "ms";
 interface TorrentInfo {
 	complete?: boolean;
 	save_path: string;
@@ -50,6 +50,7 @@ export default class Deluge implements TorrentClient {
 	private delugeLabel = TORRENT_TAG;
 	private delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
 	private isLabelEnabled: boolean;
+	private delugeRequestId: number = 0;
 
 	/**
 	 * validates the login and host for deluge webui
@@ -133,7 +134,6 @@ export default class Deluge implements TorrentClient {
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
 		let response: Response, json: DelugeJSON<ResultType>;
-		const id = Math.floor(Math.random() * 0x7fffffff);
 		const abortController = new AbortController();
 
 		setTimeout(
@@ -146,7 +146,7 @@ export default class Deluge implements TorrentClient {
 				body: JSON.stringify({
 					method,
 					params,
-					id,
+					id: this.delugeRequestId++,
 				}),
 				method: "POST",
 				headers,
@@ -176,7 +176,7 @@ export default class Deluge implements TorrentClient {
 				return this.call<ResultType>(method, params, 0);
 			} else {
 				throw new Error(
-					"Connection lost with Deluge. Reauthentication failed.",
+					"Connection lost with Deluge. Re-authentication failed.",
 				);
 			}
 		}
@@ -207,6 +207,29 @@ export default class Deluge implements TorrentClient {
 			: enabledPlugins.result!.includes("Label");
 	}
 
+	// generates the label (string) for injection based on searchee and torrentInfo
+	private calculateLabel(
+		searchee: Searchee,
+		torrentInfo: TorrentInfo,
+	): string {
+		const { linkCategory, duplicateCategories } = getRuntimeConfig();
+		if (!searchee.infoHash || !torrentInfo!.label) {
+			return this.delugeLabel;
+		}
+		const ogLabel = torrentInfo!.label;
+		if (!duplicateCategories) {
+			return ogLabel;
+		}
+		const shouldSuffixLabel =
+			!ogLabel.endsWith(this.delugeLabelSuffix) && // no .cross-seed
+			ogLabel !== linkCategory; // not data
+
+		return searchee.path
+			? linkCategory
+			: shouldSuffixLabel
+				? `${ogLabel}${this.delugeLabelSuffix}`
+				: ogLabel;
+	}
 	/**
 	 * if Label plugin is loaded, adds (if necessary)
 	 * and sets the label based on torrent hash.
@@ -247,7 +270,6 @@ export default class Deluge implements TorrentClient {
 		path?: string,
 	): Promise<InjectionResult> {
 		try {
-			const { duplicateCategories } = getRuntimeConfig();
 			let torrentInfo: TorrentInfo;
 			if (searchee.infoHash) {
 				torrentInfo = await this.getTorrentInfo(searchee);
@@ -263,43 +285,48 @@ export default class Deluge implements TorrentClient {
 				return InjectionResult.FAILURE;
 			}
 
+			const torrentFileName = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
+			const encodedTorrentData = newTorrent.encode().toString("base64");
+			const torrentPath = path ? path : torrentInfo!.save_path;
 			const params = this.formatData(
-				`${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`,
-				newTorrent.encode().toString("base64"),
-				path ? path : torrentInfo!.save_path,
-				!!searchee.infoHash,
+				torrentFileName,
+				encodedTorrentData,
+				torrentPath,
 				decision,
 			);
+
 			const addResult = await this.call<string>(
 				"core.add_torrent_file",
 				params,
 			);
-			if (addResult.result) {
-				const { linkingCategory } = getRuntimeConfig();
+
+			const addResponse =
+				typeof addResult.error?.message === "string"
+					? addResult.error
+					: addResult.result;
+
+			if (typeof addResponse === "string") {
 				await this.setLabel(
 					newTorrent.name,
 					newTorrent.infoHash,
-					searchee.path
-						? linkingCategory
-						: torrentInfo!.label
-							? duplicateCategories
-								? torrentInfo!.label.endsWith(
-										this.delugeLabelSuffix,
-									) || torrentInfo!.label === linkingCategory
-									? torrentInfo!.label
-									: `${torrentInfo!.label}${
-											this.delugeLabelSuffix
-										}`
-								: torrentInfo!.label
-							: this.delugeLabel,
+					this.calculateLabel(searchee, torrentInfo!),
 				);
+
+				if (shouldRecheck(decision)) {
+					// when paused, libtorrent doesnt start rechecking
+					// leaves torrent ready to download - ~99%
+					await wait(1000);
+					await this.call<string>("core.force_recheck", [
+						[newTorrent.infoHash],
+					]);
+				}
 				return InjectionResult.SUCCESS;
-			} else if (addResult.error!.message!.includes("already")) {
+			} else if (addResponse?.message!.includes("already")) {
 				return InjectionResult.ALREADY_EXISTS;
-			} else if (addResult.error!.message) {
+			} else if (addResponse) {
 				logger.debug({
 					label: Label.DELUGE,
-					message: `Injection failed: ${addResult.error!.message}`,
+					message: `Injection failed: ${addResponse}`,
 				});
 				return InjectionResult.FAILURE;
 			} else {
@@ -326,28 +353,25 @@ export default class Deluge implements TorrentClient {
 		filename: string,
 		filedump: string,
 		path: string,
-		isTorrent: boolean,
 		decision:
 			| Decision.MATCH
 			| Decision.MATCH_SIZE_ONLY
 			| Decision.MATCH_PARTIAL,
 	): InjectData {
-		const { skipRecheck } = getRuntimeConfig();
-		const skipRecheckTorrent =
-			decision === Decision.MATCH_PARTIAL ? skipRecheck : true;
+		const toRecheck = shouldRecheck(decision);
 		return [
 			filename,
 			filedump,
 			{
-				add_paused: isTorrent ? !skipRecheckTorrent : !skipRecheck,
-				seed_mode: isTorrent ? skipRecheckTorrent : skipRecheck,
+				add_paused: toRecheck,
+				seed_mode: !toRecheck,
 				download_location: path,
 			},
 		];
 	}
 
 	/**
-	 * returns directory of a infohash in deluge as a string
+	 * returns directory of an infohash in deluge as a string
 	 */
 	async getDownloadDir(
 		searchee: Searchee,

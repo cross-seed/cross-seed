@@ -74,7 +74,7 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 				`${
 					path.length > 0 ? `Option: ${optionLine}` : "Configuration:"
 				}\n\t\t\t\t${message}\n\t\t\t\t(https://www.cross-seed.org/docs/basics/options${
-					urlPath ? `#${urlPath}` : ""
+					urlPath ? `#${urlPath.toLowerCase()}` : ""
 				})\n`,
 			);
 		});
@@ -121,9 +121,9 @@ function createCommandWithSharedOptions(name: string, description: string) {
 				.makeOptionMandatory(),
 		)
 		.option(
-			"--linking-category <cat>",
+			"--link-category <cat>",
 			"Torrent client category to set on linked torrents",
-			fallback(fileConfig.linkingCategory, "cross-seed-link"),
+			fallback(fileConfig.linkCategory, "cross-seed-link"),
 		)
 		.option(
 			"--link-dir <dir>",
@@ -143,11 +143,6 @@ function createCommandWithSharedOptions(name: string, description: string) {
 				.default(fallback(fileConfig.linkType, LinkType.SYMLINK))
 				.choices(Object.values(LinkType))
 				.makeOptionMandatory(),
-		)
-		.option(
-			"--skip-recheck",
-			"Skips torrent recheck upon adding to QBittorrent",
-			fallback(fileConfig.skipRecheck, false),
 		)
 		.option(
 			"--max-data-depth <depth>",

@@ -5,6 +5,7 @@ import {
 	Decision,
 	MatchMode,
 	RELEASE_GROUP_REGEX,
+	REPACK_PROPER_REGEX,
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -75,6 +76,12 @@ const createReasonLogger =
 					?.trim()} -> ${candidate.name
 					.match(RELEASE_GROUP_REGEX)?.[0]
 					?.trim()})`;
+				break;
+			case Decision.PROPER_REPACK_MISMATCH:
+				reason = `one is a different subsequent release - (${
+					searchee.name.match(REPACK_PROPER_REGEX)?.groups?.type ??
+					"INITIAL"
+				} -> ${candidate.name.match(REPACK_PROPER_REGEX)?.groups?.type ?? "INITIAL"})`;
 				break;
 			case Decision.BLOCKED_RELEASE:
 				reason = `it matches the blocklist - ("${findBlockedStringInReleaseMaybe(
@@ -169,7 +176,24 @@ function sizeDoesMatch(resultSize, searchee) {
 	const upperBound = length + fuzzySizeThreshold * length;
 	return resultSize >= lowerBound && resultSize <= upperBound;
 }
+function releaseVersionDoesMatch(
+	searcheeName: string,
+	candidateName: string,
+	matchMode: MatchMode,
+) {
+	const searcheeVersionType = searcheeName.match(REPACK_PROPER_REGEX);
+	const candidateVersionType = candidateName.match(REPACK_PROPER_REGEX);
+	//sets either match arrtype or type to corresponding VersionType
 
+	if (
+		searcheeVersionType?.[0].toLowerCase() !==
+			candidateVersionType?.[0].toLowerCase() ||
+		(searcheeVersionType?.groups?.arrtype && candidateVersionType)
+	) {
+		return matchMode !== MatchMode.SAFE;
+	}
+	return searcheeVersionType === candidateVersionType;
+}
 function releaseGroupDoesMatch(
 	searcheeName: string,
 	candidateName: string,
@@ -209,9 +233,12 @@ async function assessCandidateHelper(
 
 	if (!link) return { decision: Decision.NO_DOWNLOAD_LINK };
 
-	if (!releaseGroupDoesMatch(searchee.name, name, matchMode))
+	if (!releaseGroupDoesMatch(searchee.name, name, matchMode)) {
 		return { decision: Decision.RELEASE_GROUP_MISMATCH };
-
+	}
+	if (!releaseVersionDoesMatch(searchee.name, name, matchMode)) {
+		return { decision: Decision.PROPER_REPACK_MISMATCH };
+	}
 	const result = await parseTorrentFromURL(link);
 
 	if (result.isErr()) {
@@ -225,20 +252,9 @@ async function assessCandidateHelper(
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 	}
-
-	const partialSizeMatch = compareFileTreesPartialIgnoringNames(
-		candidateMeta,
-		searchee,
-	);
-	if (!partialSizeMatch && matchMode === MatchMode.PARTIAL) {
-		return { decision: Decision.SIZE_MISMATCH };
-	}
 	const sizeMatch = compareFileTreesIgnoringNames(candidateMeta, searchee);
-	if (!sizeMatch && matchMode !== MatchMode.PARTIAL) {
-		return { decision: Decision.SIZE_MISMATCH };
-	}
-
 	const perfectMatch = compareFileTrees(candidateMeta, searchee);
+
 	if (perfectMatch) {
 		return { decision: Decision.MATCH, metafile: candidateMeta };
 	}
@@ -247,12 +263,32 @@ async function assessCandidateHelper(
 		matchMode !== MatchMode.SAFE &&
 		searchee.files.length === 1
 	) {
-		return { decision: Decision.MATCH_SIZE_ONLY, metafile: candidateMeta };
+		return {
+			decision: Decision.MATCH_SIZE_ONLY,
+			metafile: candidateMeta,
+		};
 	}
-	const partialMatch = compareFileTreesPartial(candidateMeta, searchee);
-	if (partialMatch && matchMode === MatchMode.PARTIAL) {
-		return { decision: Decision.MATCH_PARTIAL, metafile: candidateMeta };
+
+	if (matchMode === MatchMode.PARTIAL) {
+		const partialSizeMatch = compareFileTreesPartialIgnoringNames(
+			candidateMeta,
+			searchee,
+		);
+		if (!partialSizeMatch) {
+			return { decision: Decision.SIZE_MISMATCH };
+		}
+
+		const partialMatch = compareFileTreesPartial(candidateMeta, searchee);
+		if (partialMatch) {
+			return {
+				decision: Decision.MATCH_PARTIAL,
+				metafile: candidateMeta,
+			};
+		}
+	} else if (!sizeMatch) {
+		return { decision: Decision.SIZE_MISMATCH };
 	}
+
 	return { decision: Decision.FILE_TREE_MISMATCH };
 }
 

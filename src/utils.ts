@@ -5,6 +5,7 @@ import {
 	SEASON_REGEX,
 	ANIME_REGEX,
 	VIDEO_EXTENSIONS,
+	Decision,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 
@@ -57,7 +58,16 @@ export function getTag(name: string, isVideo: boolean): MediaType {
 					? MediaType.ANIME
 					: MediaType.OTHER;
 }
-
+export function shouldRecheck(decision: Decision): boolean {
+	switch (decision) {
+		case Decision.MATCH:
+			return false;
+		case Decision.MATCH_SIZE_ONLY:
+		case Decision.MATCH_PARTIAL:
+		default:
+			return true;
+	}
+}
 export async function time<R>(cb: () => R, times: number[]) {
 	const before = performance.now();
 	try {
