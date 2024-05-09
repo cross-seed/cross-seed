@@ -178,7 +178,7 @@ export default class QBittorrent implements TorrentClient {
 		searcheeInfo: TorrentInfo | undefined,
 		category: string,
 	): string {
-		const { duplicateCategories } = getRuntimeConfig();
+		const { duplicateCategories, linkCategory } = getRuntimeConfig();
 
 		/* get the original category if torrent based - cuz otherwise we
 		 * use 'category'. this addresses path being truthy but still being
@@ -187,18 +187,21 @@ export default class QBittorrent implements TorrentClient {
 		const categoryForTagging = searcheeInfo
 			? searcheeInfo.category
 			: category;
-
-		if (!categoryForTagging || categoryForTagging.length === 0) {
+		if (
+			!categoryForTagging?.length ||
+			categoryForTagging === linkCategory
+		) {
 			return TORRENT_TAG;
 		}
-		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
+
+		if (categoryForTagging.endsWith(TORRENT_CATEGORY_SUFFIX)) {
 			if (duplicateCategories) {
 				return `${TORRENT_TAG},${categoryForTagging}`;
 			} else {
 				return TORRENT_TAG;
 			}
 		}
-		if (searchee.path) {
+		if (!searchee.infoHash) {
 			return TORRENT_TAG;
 		} else if (duplicateCategories) {
 			return `${TORRENT_TAG},${categoryForTagging}${TORRENT_CATEGORY_SUFFIX}`;
@@ -271,7 +274,7 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	/*
-	@return array of query results
+	@return array of all torrents in the client
 	 */
 	async getAllTorrentInfo(): Promise<TorrentInfo[]> {
 		const responseText = await this.request("/torrents/info", "");
@@ -282,8 +285,8 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	/*
-	@param hash the hash of the torrent or undefined for all torrents
-	@return array of query results
+	@param hash the hash of the torrent
+	@return the torrent if it exists
 	 */
 	async getTorrentInfo(
 		hash: string | undefined,
@@ -349,18 +352,18 @@ export default class QBittorrent implements TorrentClient {
 				return InjectionResult.ALREADY_EXISTS;
 			}
 			const searcheeInfo = await this.getTorrentInfo(searchee.infoHash);
-			// This should be extremly rare as we just linked successfully
-			if (searchee.infoHash && !searcheeInfo && path) {
-				logger.warning({
-					label: Label.QBITTORRENT,
-					message: `Searchee torrent may have been deleted, tagging may not meet expectations: ${searchee.infoHash}`,
-				});
-			}
-			// This is never possible, being made explicit here
-			if (!searcheeInfo && !path) {
-				throw new Error(
-					`Searchee torrent may have been deleted: ${searchee.infoHash}`,
-				);
+			if (!searcheeInfo) {
+				if (!path) {
+					// This is never possible, being made explicit here
+					throw new Error(
+						`Searchee torrent may have been deleted: ${searchee.name} [${searchee.infoHash}]`,
+					);
+				} else if (searchee.infoHash) {
+					logger.warning({
+						label: Label.QBITTORRENT,
+						message: `Searchee torrent may have been deleted, tagging may not meet expectations: ${searchee.name} [${searchee.infoHash}]`,
+					});
+				}
 			}
 
 			const { savePath, isComplete, autoTMM, category } = path
