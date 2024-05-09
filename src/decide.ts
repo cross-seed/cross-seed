@@ -168,7 +168,7 @@ export function compareFileTreesPartial(
 	return availablePieces / totalPieces >= 1 - fuzzySizeThreshold;
 }
 
-function sizeDoesMatch(resultSize, searchee) {
+function sizeDoesMatch(resultSize: number, searchee: Searchee) {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 
 	const { length } = searchee;
@@ -183,16 +183,20 @@ function releaseVersionDoesMatch(
 ) {
 	const searcheeVersionType = searcheeName.match(REPACK_PROPER_REGEX);
 	const candidateVersionType = candidateName.match(REPACK_PROPER_REGEX);
-	//sets either match arrtype or type to corresponding VersionType
+	const searcheeTypeStr = searcheeVersionType?.groups?.type
+		?.trim()
+		?.toLowerCase();
+	const candidateTypeStr = candidateVersionType?.groups?.type
+		?.trim()
+		?.toLowerCase();
 
 	if (
-		searcheeVersionType?.[0].toLowerCase() !==
-			candidateVersionType?.[0].toLowerCase() ||
-		(searcheeVersionType?.groups?.arrtype && candidateVersionType)
+		searcheeTypeStr !== candidateTypeStr ||
+		searcheeVersionType?.groups?.arrtype
 	) {
 		return matchMode !== MatchMode.SAFE;
 	}
-	return searcheeVersionType === candidateVersionType;
+	return true;
 }
 function releaseGroupDoesMatch(
 	searcheeName: string,
