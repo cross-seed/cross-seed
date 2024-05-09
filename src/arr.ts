@@ -11,7 +11,12 @@ import {
 } from "./utils.js";
 import chalk from "chalk";
 import { Searchee } from "./searchee.js";
-import { Caps, IdSearchParams, TorznabParams } from "./torznab.js";
+import {
+	Caps,
+	IdSearchCaps,
+	IdSearchParams,
+	TorznabParams,
+} from "./torznab.js";
 
 const keyNames = ["tvdbId", "imdbId", "tmdbId"];
 
@@ -170,7 +175,7 @@ export async function grabArrId(
 }
 export async function getRelevantArrIds(
 	searchee: Searchee,
-	ids: IdSearchParams,
+	ids: IdSearchCaps,
 	caps: Caps,
 ): Promise<IdSearchParams> {
 	const mediaType = getTag(searchee);
@@ -179,11 +184,12 @@ export async function getRelevantArrIds(
 			? caps.tvIdSearch
 			: caps.movieIdSearch;
 
-	return {
-		tvdbid: idSearchCaps.tvdbId ? ids.tvdbid : undefined,
-		tmdbid: idSearchCaps.tvdbId ? ids.tmdbid : undefined,
-		imdbid: idSearchCaps.imdbId ? ids.imdbid : undefined,
+	const newVar = {
+		tvdbid: idSearchCaps.tvdbId ? ids.tvdbId : undefined,
+		tmdbid: idSearchCaps.tvdbId ? ids.tmdbId : undefined,
+		imdbid: idSearchCaps.imdbId ? ids.imdbId : undefined,
 	};
+	return newVar;
 }
 
 export async function getAvailableArrIds(
