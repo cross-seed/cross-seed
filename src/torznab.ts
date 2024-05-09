@@ -235,7 +235,8 @@ async function createTorznabSearchQueries(
 		] as const;
 	}
 }
-function shouldSearchIndexer(mediaType: MediaType, caps: TorznabCats) {
+
+function indexerDoesSupportMediaType(mediaType: MediaType, caps: TorznabCats) {
 	switch (mediaType) {
 		case MediaType.EPISODE:
 		case MediaType.SEASON:
@@ -252,6 +253,7 @@ function shouldSearchIndexer(mediaType: MediaType, caps: TorznabCats) {
 			return true;
 	}
 }
+
 export async function queryRssFeeds(): Promise<Candidate[]> {
 	const candidatesByUrl = await makeRequests(
 		await getEnabledIndexers(),
@@ -290,7 +292,7 @@ export async function searchTorznab(
 			(entry) => entry.indexerId === indexer.id,
 		);
 		return (
-			shouldSearchIndexer(
+			indexerDoesSupportMediaType(
 				getTag(searchee),
 				JSON.parse(indexer.categories),
 			) &&
@@ -584,9 +586,10 @@ async function makeRequests(
 			}
 		}, searchTimeout).unref();
 	}
+
 	const outcomes = await Promise.allSettled<Candidate[]>(
-		searchUrls.map((url, i) => {
-			return fetch(url, {
+		searchUrls.map((url, i) =>
+			fetch(url, {
 				headers: { "User-Agent": USER_AGENT },
 				signal: abortControllers[i].signal,
 			})
@@ -622,8 +625,8 @@ async function makeRequests(
 					return response.text();
 				})
 				.then(xml2js.parseStringPromise)
-				.then(parseTorznabResults);
-		}),
+				.then(parseTorznabResults),
+		),
 	);
 
 	const { rejected, fulfilled } = collateOutcomes<number, Candidate[]>(
@@ -643,4 +646,3 @@ async function makeRequests(
 		candidates: results,
 	}));
 }
-export { sanitizeUrl, getApikey };
