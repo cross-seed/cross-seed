@@ -1,3 +1,4 @@
+import { sep } from "path";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Action } from "./constants.js";
@@ -28,6 +29,12 @@ async function verifyPath(
 			logger.error(
 				`\tYour ${optionName} "${path}" is not a valid directory on the filesystem.`,
 			);
+			if (sep === "\\" && !path.includes("\\") && !path.includes("/")) {
+				logger.error(
+					"\tIt may not be formatted properly for Windows.\n" +
+						'Please use "\\\\"or "/" for directory separators.',
+				);
+			}
 		} else {
 			logger.error(
 				`\tYour ${optionName} "${path}" has invalid permissions.`,
