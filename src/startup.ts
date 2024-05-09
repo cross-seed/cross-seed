@@ -1,3 +1,4 @@
+import { sep } from "path";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Action } from "./constants.js";
@@ -11,6 +12,7 @@ import { stat, access, constants } from "fs/promises";
  * validates existence, permission, and that a path is a directory
  * @param path string of path to validate
  * @param optionName name of the configuration key
+ * @param permissions number (see constants in calling function) of permission
  * @returns true if path exists and has required permission
  */
 async function verifyPath(
@@ -28,6 +30,12 @@ async function verifyPath(
 			logger.error(
 				`\tYour ${optionName} "${path}" is not a valid directory on the filesystem.`,
 			);
+			if (sep === "\\" && !path.includes("\\") && !path.includes("/")) {
+				logger.error(
+					"\tIt may not be formatted properly for Windows.\n" +
+						'\t\t\t\tMake sure to use "\\\\" or "/" for directory separators.',
+				);
+			}
 		} else {
 			logger.error(
 				`\tYour ${optionName} "${path}" has invalid permissions.`,

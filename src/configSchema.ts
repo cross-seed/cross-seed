@@ -1,5 +1,4 @@
 import ms from "ms";
-import { sep } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
 import { Action, LinkType, MatchMode } from "./constants.js";
 import { logger } from "./logger.js";
@@ -15,7 +14,6 @@ const ZodErrorMessages = {
 	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
-	windowsPath: `\t\t\tYour path is not formatted properly for Windows. \n\t\t\t\tPlease use "\\\\" or "/" for directory separators.`,
 	qBitAutoTMM:
 		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in unintended behavior.",
 	needsLinkDir:
@@ -79,20 +77,6 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
 }
 
 /**
- * helper function for directory validation
- * @return path if valid formatting
- */
-function checkValidPathFormat(path: string, ctx: RefinementCtx) {
-	if (
-		(sep === "\\" && !path.includes(`\\`) && !path.includes("/")) ||
-		path === "."
-	) {
-		addZodIssue(path, ZodErrorMessages.windowsPath, ctx);
-	}
-	return path;
-}
-
-/**
  * an object of the zod schema
  * each are named after what they are intended to validate
  */
@@ -103,29 +87,18 @@ export const VALIDATION_SCHEMA = z
 			message: ZodErrorMessages.delay,
 		}),
 		torznab: z.array(z.string().url()),
-		dataDirs: z
-			.array(
-				z
-					.string()
-					.transform((value, ctx) =>
-						value && value.length > 0
-							? checkValidPathFormat(value, ctx)
-							: null,
-					),
-			)
-
-			.nullish(),
+		dataDirs: z.array(z.string()).nullish(),
 		matchMode: z.nativeEnum(MatchMode),
 		linkCategory: z.string().nullish(),
-		linkDir: z.string().transform(checkValidPathFormat).nullish(),
+		linkDir: z.string().nullish(),
 		linkType: z.nativeEnum(LinkType),
 		flatLinking: z
 			.boolean()
 			.nullish()
 			.transform((value) => (typeof value === "boolean" ? value : false)),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z.string().transform(checkValidPathFormat).nullable(),
-		outputDir: z.string().transform(checkValidPathFormat),
+		torrentDir: z.string().nullable(),
+		outputDir: z.string(),
 		includeEpisodes: z.boolean(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
