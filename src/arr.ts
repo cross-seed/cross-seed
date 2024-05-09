@@ -19,6 +19,7 @@ export type ParseResponse = {
 	movie?: IdData;
 	series?: IdData;
 };
+
 export interface IdData {
 	imdbId?: string;
 	tmdbId?: string;
@@ -131,6 +132,7 @@ function logArrQueryFailure(error, searchTerm: string, mediaType: MediaType) {
 	});
 	logger.debug(error);
 }
+
 function searchUArrLs(mediaType: MediaType): string[] | undefined {
 	const { sonarr, radarr } = getRuntimeConfig();
 	switch (mediaType) {

@@ -15,8 +15,9 @@ import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import {
-	getAnimeQueries,
+	assembleUrl,
 	cleanseSeparators,
+	getAnimeQueries,
 	getApikey,
 	getTag,
 	MediaType,
@@ -24,8 +25,8 @@ import {
 	reformatTitleForSearching,
 	sanitizeUrl,
 	stripExtension,
-	assembleUrl,
 } from "./utils.js";
+
 export interface TorznabCats {
 	tv: boolean;
 	movie: boolean;
@@ -66,12 +67,13 @@ export interface Caps {
 
 type TorznabSearchTechnique =
 	| []
-	| [{ $?: { available: "yes" | "no"; supportedParams: string } }];
+	| [{ $: { available: "yes" | "no"; supportedParams: string } }];
 
+type CategoryXmlElement = { $: { id: string; name: string } };
 type TorznabCaps = {
 	caps?: {
-		categories?: object;
-		searching?: [
+		categories: { category: CategoryXmlElement[] }[];
+		searching: [
 			{
 				search?: TorznabSearchTechnique;
 				"tv-search"?: TorznabSearchTechnique;
@@ -115,51 +117,53 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 }
 
 function parseTorznabCaps(xml: TorznabCaps): Caps {
-	const capsSection = xml?.caps?.searching?.[0];
-	const isAvailable = (searchTechnique) =>
+	const searchingSection = xml?.caps?.searching?.[0];
+	const isAvailable = (searchTechnique: TorznabSearchTechnique | undefined) =>
 		searchTechnique?.[0]?.$?.available === "yes";
-	const categoryCaps = xml?.caps?.categories?.[0]?.category;
 
-	const findIdTokens = (capTags: string | undefined) =>
-		capTags?.split(",").filter((token) => token.includes("id"));
+	function getSupportedIds(
+		searchTechnique: TorznabSearchTechnique | undefined,
+	): IdSearchCaps {
+		const supportedParamsStr = searchTechnique?.[0]?.$?.supportedParams;
+		const supportedIds =
+			supportedParamsStr
+				?.split(",")
+				?.filter((token) => token.includes("id")) ?? [];
 
-	function getCatCaps(item) {
-		const categoryNames: string[] = item.map((category) => category.$.name);
-
-		function checkCategory(x: string): boolean {
-			return categoryNames.some((cat) => cat.toLowerCase().includes(x));
-		}
 		return {
-			movie: checkCategory("movie"),
-			tv: checkCategory("tv"),
-			anime: checkCategory("anime"),
-			audio: checkCategory("audio"),
-			book: checkCategory("book"),
+			tvdbId: supportedIds.includes("tvdbid"),
+			tmdbId: supportedIds.includes("tmdbid"),
+			imdbId: supportedIds.includes("imdbid"),
 		};
 	}
 
-	function setIdCaps(section): IdSearchCaps {
-		const idCapNames: (keyof IdSearchCaps)[] = [
-			"tvdbId",
-			"tmdbId",
-			"imdbId",
-		];
-		const caps: IdSearchCaps = {};
-		const foundId = findIdTokens(section?.$?.supportedParams) || [];
-		idCapNames.forEach((keyName) => {
-			if (foundId.includes(keyName.toLocaleLowerCase())) {
-				caps[keyName] = true;
-			}
-		});
-		return caps;
+	const categoryCaps = xml?.caps?.categories?.[0]?.category;
+
+	function getCatCaps(item: CategoryXmlElement[] | undefined) {
+		const categoryNames: string[] = (item ?? []).map(
+			(category) => category.$.name,
+		);
+
+		function indexerDoesSupportCat(category: string): boolean {
+			return categoryNames.some((cat) =>
+				cat.toLowerCase().includes(category),
+			);
+		}
+		return {
+			movie: indexerDoesSupportCat("movie"),
+			tv: indexerDoesSupportCat("tv"),
+			anime: indexerDoesSupportCat("anime"),
+			audio: indexerDoesSupportCat("audio"),
+			book: indexerDoesSupportCat("book"),
+		};
 	}
 
 	return {
-		search: Boolean(isAvailable(capsSection?.search)),
-		tvSearch: Boolean(isAvailable(capsSection?.["tv-search"])),
-		movieSearch: Boolean(isAvailable(capsSection?.["movie-search"])),
-		movieIdSearch: setIdCaps(capsSection?.["movie-search"]?.[0]),
-		tvIdSearch: setIdCaps(capsSection?.["tv-search"]?.[0]),
+		search: Boolean(isAvailable(searchingSection?.search)),
+		tvSearch: Boolean(isAvailable(searchingSection?.["tv-search"])),
+		movieSearch: Boolean(isAvailable(searchingSection?.["movie-search"])),
+		movieIdSearch: getSupportedIds(searchingSection?.["movie-search"]),
+		tvIdSearch: getSupportedIds(searchingSection?.["tv-search"]),
 		categories: getCatCaps(categoryCaps),
 	};
 }
