@@ -62,28 +62,26 @@ export function getTag(searchee: Searchee): MediaType {
 
 	function unsupportedMediaType(searchee: Searchee): MediaType {
 		//any unsupported media that needs to be identified goes here
-		switch (true) {
-			case hasExt(searchee, AUDIO_EXTENSIONS):
-				return MediaType.AUDIO;
-			case hasExt(searchee, BOOK_EXTENSIONS):
-				return MediaType.BOOK;
-			// add more unsupported media here and on MediaType
-			default:
-				return MediaType.OTHER;
+		if (hasExt(searchee, AUDIO_EXTENSIONS)) {
+			return MediaType.AUDIO;
+		} else if (hasExt(searchee, BOOK_EXTENSIONS)) {
+			return MediaType.BOOK;
+		} else {
+			return MediaType.OTHER;
 		}
 	}
+
 	// put new  supported media type cases in this switch
-	switch (true) {
-		case EP_REGEX.test(stem):
-			return MediaType.EPISODE;
-		case SEASON_REGEX.test(stem):
-			return MediaType.SEASON;
-		case hasVideoExtensions:
-			if (MOVIE_REGEX.test(stem)) return MediaType.MOVIE;
-			if (ANIME_REGEX.test(stem)) return MediaType.ANIME;
-		// eslint-disable-next-line no-fallthrough
-		default:
-			return unsupportedMediaType(searchee);
+	if (EP_REGEX.test(stem)) {
+		return MediaType.EPISODE;
+	} else if (SEASON_REGEX.test(stem)) {
+		return MediaType.SEASON;
+	} else if (hasVideoExtensions) {
+		if (MOVIE_REGEX.test(stem)) return MediaType.MOVIE;
+		if (ANIME_REGEX.test(stem)) return MediaType.ANIME;
+		return unsupportedMediaType(searchee);
+	} else {
+		return unsupportedMediaType(searchee);
 	}
 }
 export function shouldRecheck(decision: Decision): boolean {
@@ -128,6 +126,7 @@ export function assembleUrl(
 	url.search = searchParams.toString();
 	return url.toString();
 }
+
 export function getApikey(url: string) {
 	return new URL(url).searchParams.get("apikey");
 }

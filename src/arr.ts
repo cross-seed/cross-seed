@@ -162,7 +162,7 @@ export async function grabArrId(
 				return resultOf(arrJson);
 			}
 		}
-		throw new Error();
+		throw new Error("fall through to catch");
 	} catch (error) {
 		logArrQueryFailure(error, searchee.name, mediaType);
 		return resultOfErr(false);
@@ -170,7 +170,7 @@ export async function grabArrId(
 }
 export async function getRelevantArrIds(
 	searchee: Searchee,
-	ids,
+	ids: IdSearchParams,
 	caps: Caps,
 ): Promise<IdSearchParams> {
 	const mediaType = getTag(searchee);
@@ -179,12 +179,11 @@ export async function getRelevantArrIds(
 			? caps.tvIdSearch
 			: caps.movieIdSearch;
 
-	return Object.keys(idSearchCaps).reduce((acc, key) => {
-		if (idSearchCaps[key] && ids[key]) {
-			acc[String(key).toLowerCase()] = ids[key];
-		}
-		return acc;
-	}, {});
+	return {
+		tvdbid: idSearchCaps.tvdbId ? ids.tvdbid : undefined,
+		tmdbid: idSearchCaps.tvdbId ? ids.tmdbid : undefined,
+		imdbid: idSearchCaps.imdbId ? ids.imdbid : undefined,
+	};
 }
 
 export async function getAvailableArrIds(
