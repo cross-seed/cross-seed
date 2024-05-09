@@ -264,13 +264,13 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			fallback(fileConfig.blockList, []),
 		)
 		.option(
-			"--sonarr <url(s)>",
+			"--sonarr <urls>",
 			"Sonarr API URL(s)",
 			// @ts-expect-error commander supports non-string defaults
 			fileConfig.sonarr,
 		)
 		.option(
-			"--radarr <url(s)>",
+			"--radarr <urls>",
 			"Radarr API URL(s)",
 			// @ts-expect-error commander supports non-string defaults
 			fileConfig.radarr,
