@@ -41,6 +41,7 @@ const createReasonLogger =
 				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}`,
 			});
 		}
+		const sizeDiff = candidate.size - searchee.length;
 
 		let reason;
 		switch (decision) {
@@ -51,9 +52,11 @@ const createReasonLogger =
 			case Decision.MATCH:
 				return;
 			case Decision.SIZE_MISMATCH:
-				reason = `its size does not match - (${humanReadableSize(
-					searchee.length,
-				)} -> ${humanReadableSize(candidate.size)})`;
+				reason = `its size does not match - (${
+					Math.abs(sizeDiff) > 10000000 // 10MB is the rounding error
+						? `${humanReadableSize(searchee.length)} -> ${humanReadableSize(candidate.size)}`
+						: `${sizeDiff > 0 ? "+" : ""}${sizeDiff} bytes`
+				})`;
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
