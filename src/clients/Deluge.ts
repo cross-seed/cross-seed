@@ -78,7 +78,7 @@ export default class Deluge implements TorrentClient {
 		try {
 			const authResponse = (
 				await this.call<boolean>("auth.login", [password], 0)
-			).unwrapOrThrow();
+			).unwrapOrThrow(new Error("failed to connect for authentication"));
 
 			if (!authResponse) {
 				throw new CrossSeedError(
@@ -102,7 +102,7 @@ export default class Deluge implements TorrentClient {
 			);
 			const webuiHostList = (
 				await this.call<WebHostList>("web.get_hosts", [], 0)
-			).unwrapOrThrow();
+			).unwrapOrThrow(new Error("failed to get host-list for reconnect"));
 			const connectResponse = await this.call<undefined>(
 				"web.connect",
 				[webuiHostList[0][0]],
@@ -188,7 +188,7 @@ export default class Deluge implements TorrentClient {
 		if (json.error) {
 			return resultOfErr(json.error);
 		}
-		return resultOf(json.result as ResultType);
+		return resultOf(json.result!);
 	}
 
 	/**
@@ -276,7 +276,7 @@ export default class Deluge implements TorrentClient {
 				]);
 			}
 			if (setResult.isErr()) {
-				throw new Error("Labeling Failure");
+				throw new Error(setResult.unwrapErrOrThrow().message);
 			}
 		} catch (e) {
 			logger.debug(e);
@@ -336,7 +336,7 @@ export default class Deluge implements TorrentClient {
 			);
 			if (addResponse.isErr()) {
 				const addResponseError = addResponse.unwrapErrOrThrow();
-				if (addResponseError.message?.includes("already")) {
+				if (addResponseError.message!.includes("already")) {
 					return InjectionResult.ALREADY_EXISTS;
 				} else if (addResponseError) {
 					logger.debug({
@@ -424,10 +424,11 @@ export default class Deluge implements TorrentClient {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
 		if (response.isOk()) {
-			if (!response.unwrapOrThrow().torrents) {
+			const torrentResponse = response.unwrapOrThrow().torrents;
+			if (!torrentResponse) {
 				return resultOfErr("UNKNOWN_ERROR");
 			}
-			torrent = response.unwrapOrThrow().torrents![searchee.infoHash!];
+			torrent = torrentResponse![searchee.infoHash!];
 			if (!torrent) {
 				return resultOfErr("NOT_FOUND");
 			}
@@ -458,7 +459,7 @@ export default class Deluge implements TorrentClient {
 
 			const response = (
 				await this.call<TorrentStatus>("web.update_ui", params)
-			).unwrapOrThrow();
+			).unwrapOrThrow(new Error("failed to fetch the torrent list"));
 
 			if (response.torrents) {
 				torrent = response.torrents?.[searchee.infoHash];
