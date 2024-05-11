@@ -178,7 +178,7 @@ async function createTorznabSearchQueries(
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
 	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
-	const shouldUseQuerySearch = Object.keys(relevantIds).length === 0;
+	const shouldUseIdSearch = Object.values(relevantIds).some((id) => id);
 	const mediaType = getTag(searchee);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
@@ -186,9 +186,9 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "tvsearch",
-				q: shouldUseQuerySearch
-					? cleanseSeparators(groups.title)
-					: undefined,
+				q: shouldUseIdSearch
+					? undefined
+					: cleanseSeparators(groups.title),
 				season: groups.season
 					? extractNumber(groups.season)
 					: groups.year,
@@ -204,9 +204,9 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "tvsearch",
-				q: shouldUseQuerySearch
-					? cleanseSeparators(groups.title)
-					: undefined,
+				q: shouldUseIdSearch
+					? undefined
+					: cleanseSeparators(groups.title),
 				season: extractNumber(groups.season),
 				...relevantIds,
 			},
@@ -215,9 +215,9 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "movie",
-				q: shouldUseQuerySearch
-					? reformatTitleForSearching(nameWithoutExtension)
-					: undefined,
+				q: shouldUseIdSearch
+					? undefined
+					: reformatTitleForSearching(nameWithoutExtension),
 				...relevantIds,
 			},
 		] as const;
