@@ -37,7 +37,7 @@ type InjectData = [
 	},
 ];
 type WebHostList = [string, string, number, string][];
-type ErrorType = { message?: string; code?: DelugeErrorCode };
+type ErrorType = { message: string; code?: DelugeErrorCode };
 type TorrentStatus = { torrents?: Record<string, TorrentInfo> };
 
 type DelugeJSON<ResultType> = {
@@ -336,7 +336,7 @@ export default class Deluge implements TorrentClient {
 			);
 			if (addResponse.isErr()) {
 				const addResponseError = addResponse.unwrapErrOrThrow();
-				if (addResponseError.message!.includes("already")) {
+				if (addResponseError.message.includes("already")) {
 					return InjectionResult.ALREADY_EXISTS;
 				} else if (addResponseError) {
 					logger.debug({
