@@ -37,11 +37,9 @@ async function fetchArrJSON(searchee: Searchee, url: string): Promise<IdData> {
 		} as IdSearchParams,
 	);
 
-	const abortController = new AbortController();
-	setTimeout(() => void abortController.abort(), ms("5 seconds")).unref();
 	try {
 		response = await fetch(lookupUrl, {
-			signal: abortController.signal,
+			signal: AbortSignal.timeout(ms("5 seconds")),
 		});
 	} catch (networkError) {
 		if (networkError.name === "AbortError") {

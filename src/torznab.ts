@@ -34,27 +34,26 @@ export interface TorznabCats {
 	audio: boolean;
 	book: boolean;
 }
-export interface TorznabParams {
+
+export interface IdSearchParams {
+	tvdbid?: string;
+	tmdbid?: string;
+	imdbid?: string;
+}
+
+export interface TorznabParams extends IdSearchParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
-	title?: string;
 	q?: string;
 	limit?: number;
 	apikey?: string;
 	season?: number | string;
 	ep?: number | string;
-	tvdbid?: string;
-	tmdbid?: string;
-	imdbid?: string;
 }
+
 export interface IdSearchCaps {
 	tvdbId?: boolean;
 	tmdbId?: boolean;
 	imdbId?: boolean;
-}
-export interface IdSearchParams {
-	tvdbid?: string;
-	tmdbid?: string;
-	imdbid?: string;
 }
 
 export interface Caps {
