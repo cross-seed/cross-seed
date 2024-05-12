@@ -59,7 +59,7 @@ const createReasonLogger =
 						: `${sizeDiff > 0 ? "+" : ""}${sizeDiff} bytes`
 				})`;
 				break;
-			case Decision.RES_MISMATCH:
+			case Decision.RESOLUTION_MISMATCH:
 				reason = `its resolution does not match - (${searchee.name
 					.match(RES_REGEX)?.[0]
 					?.trim()} -> ${candidate.name.match(RES_REGEX)?.[0]?.trim()})`;
