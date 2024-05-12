@@ -199,7 +199,9 @@ export async function searchForLocalTorrentByCriteria(
 				createSearcheeFromPath,
 			),
 		);
-		searchees = searcheeResults.map((t) => t.unwrapOrThrow());
+		searchees = searcheeResults.map((t) =>
+			t.unwrapOrThrow(new Error("Failed to unwrap error searchee")),
+		);
 	} else {
 		searchees = [await getTorrentByCriteria(criteria)];
 	}
@@ -273,9 +275,7 @@ async function findSearchableTorrents() {
 		const searcheeResults = await Promise.all(
 			torrents.map(createSearcheeFromTorrentFile), //also create searchee from path
 		);
-		allSearchees = searcheeResults
-			.filter((t) => t.isOk())
-			.map((t) => t.unwrapOrThrow());
+		allSearchees = searcheeResults.flatMap((r) => r.toArray());
 	} else {
 		if (typeof torrentDir === "string") {
 			allSearchees.push(...(await loadTorrentDirLight(torrentDir)));
@@ -284,11 +284,7 @@ async function findSearchableTorrents() {
 			const searcheeResults = await Promise.all(
 				findSearcheesFromAllDataDirs().map(createSearcheeFromPath),
 			);
-			allSearchees.push(
-				...searcheeResults
-					.filter((t) => t.isOk())
-					.map((t) => t.unwrapOrThrow()),
-			);
+			allSearchees.push(...searcheeResults.flatMap((t) => t.toArray()));
 		}
 	}
 

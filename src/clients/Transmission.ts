@@ -184,7 +184,7 @@ export default class Transmission implements TorrentClient {
 			if (result.isErr()) {
 				return InjectionResult.FAILURE;
 			} else {
-				downloadDir = result.unwrapOrThrow();
+				downloadDir = result.unwrap();
 			}
 		}
 

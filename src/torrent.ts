@@ -190,7 +190,7 @@ export async function loadTorrentDirLight(
 		const searcheeResult =
 			await createSearcheeFromTorrentFile(torrentFilePath);
 		if (searcheeResult.isOk()) {
-			searchees.push(searcheeResult.unwrapOrThrow());
+			searchees.push(searcheeResult.unwrap());
 		}
 	}
 	return searchees;
