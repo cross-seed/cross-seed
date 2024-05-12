@@ -16,11 +16,7 @@ import { Candidate } from "./pipeline.js";
 import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
-import {
-	parseTorrentFromFilename,
-	parseTorrentFromURL,
-	SnatchError,
-} from "./torrent.js";
+import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
 import { humanReadableSize } from "./utils.js";
 
 export interface ResultAssessment {
@@ -252,7 +248,7 @@ async function assessCandidateHelper(
 	if (!releaseVersionDoesMatch(searchee.name, name, matchMode)) {
 		return { decision: Decision.PROPER_REPACK_MISMATCH };
 	}
-	const result = await parseTorrentFromURL(link, tracker);
+	const result = await snatch(link, tracker);
 
 	if (result.isErr()) {
 		return result.unwrapErrOrThrow() === SnatchError.RATE_LIMITED

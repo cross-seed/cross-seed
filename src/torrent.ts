@@ -45,7 +45,7 @@ function isMagnetRedirectError(error: Error): boolean {
 	);
 }
 
-export async function parseTorrentFromURL(
+export async function snatch(
 	url: string,
 	tracker: string,
 ): Promise<Result<Metafile, SnatchError>> {
