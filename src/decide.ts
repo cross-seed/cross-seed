@@ -6,7 +6,7 @@ import {
 	MatchMode,
 	RELEASE_GROUP_REGEX,
 	REPACK_PROPER_REGEX,
-	RES_REGEX,
+	RESOLUTION_REGEX,
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -61,8 +61,8 @@ const createReasonLogger =
 				break;
 			case Decision.RESOLUTION_MISMATCH:
 				reason = `its resolution does not match - (${searchee.name
-					.match(RES_REGEX)?.[0]
-					?.trim()} -> ${candidate.name.match(RES_REGEX)?.[0]?.trim()})`;
+					.match(RESOLUTION_REGEX)?.[0]
+					?.trim()} -> ${candidate.name.match(RESOLUTION_REGEX)?.[0]?.trim()})`;
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
