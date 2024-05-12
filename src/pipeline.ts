@@ -23,6 +23,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
+import { isOk } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromMetafile,
@@ -275,7 +276,7 @@ async function findSearchableTorrents() {
 		const searcheeResults = await Promise.all(
 			torrents.map(createSearcheeFromTorrentFile), //also create searchee from path
 		);
-		allSearchees = searcheeResults.flatMap((r) => r.toArray());
+		allSearchees = searcheeResults.filter(isOk).map((r) => r.unwrap());
 	} else {
 		if (typeof torrentDir === "string") {
 			allSearchees.push(...(await loadTorrentDirLight(torrentDir)));
@@ -284,7 +285,9 @@ async function findSearchableTorrents() {
 			const searcheeResults = await Promise.all(
 				findSearcheesFromAllDataDirs().map(createSearcheeFromPath),
 			);
-			allSearchees.push(...searcheeResults.flatMap((t) => t.toArray()));
+			allSearchees.push(
+				...searcheeResults.filter(isOk).map((r) => r.unwrap()),
+			);
 		}
 	}
 

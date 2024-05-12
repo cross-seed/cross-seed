@@ -32,10 +32,6 @@ class OkResult<T> {
 	orElse(): T {
 		return this.contents;
 	}
-
-	toArray(): [T] {
-		return [this.contents];
-	}
 }
 
 class ErrResult<U> {
@@ -72,10 +68,6 @@ class ErrResult<U> {
 	orElse<T>(t: T): T {
 		return t;
 	}
-
-	toArray(): [] {
-		return [];
-	}
 }
 
 export type Result<T, U> = OkResult<T> | ErrResult<U>;
@@ -86,4 +78,8 @@ export function resultOf<T, U>(value: T): Result<T, U> {
 
 export function resultOfErr<T, U>(value: U): Result<T, U> {
 	return new ErrResult(value);
+}
+
+export function isOk<T, U>(result: Result<T, U>): result is OkResult<T> {
+	return result.isOk();
 }
