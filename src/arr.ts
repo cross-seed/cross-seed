@@ -1,45 +1,36 @@
 import chalk from "chalk";
 import ms from "ms";
+import { join } from "path";
 import { Label, logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { Caps, IdSearchParams } from "./torznab.js";
-import {
-	assembleUrl,
-	getApikey,
-	getTag,
-	MediaType,
-	sanitizeUrl,
-} from "./utils.js";
+import { getApikey, getTag, MediaType, sanitizeUrl } from "./utils.js";
 
-const keyNames = ["tvdbId", "imdbId", "tmdbId"];
-
-export type ParseResponse = {
-	movie?: IdData;
-	series?: IdData;
-};
-
-export interface IdData {
+export interface ExternalIds {
 	imdbId?: string;
 	tmdbId?: string;
 	tvdbId?: string;
 }
 
-async function fetchArrJSON(searchee: Searchee, url: string): Promise<IdData> {
-	const uarrl = { apikey: getApikey(url), url: sanitizeUrl(url) };
-	let response;
-	const lookupUrl = assembleUrl(
-		`${uarrl.url}api/v3/parse`,
-		uarrl.apikey as string,
-		{
-			title: searchee.name,
-		} as IdSearchParams,
-	);
+export type ParseResponse = { movie: ExternalIds } | { series: ExternalIds };
 
+async function getExternalIdsFromArr(
+	searchee: Searchee,
+	uArrL: string,
+): Promise<ExternalIds> {
+	const apikey = getApikey(uArrL)!;
+	const url = new URL(sanitizeUrl(uArrL));
+
+	url.pathname = join(url.pathname, "/api/v3/parse");
+	url.searchParams.append("title", searchee.name);
+
+	let response: Response;
 	try {
-		response = await fetch(lookupUrl, {
+		response = await fetch(url, {
 			signal: AbortSignal.timeout(ms("5 seconds")),
+			headers: { "X-Api-Key": apikey },
 		});
 	} catch (networkError) {
 		if (networkError.name === "AbortError") {
@@ -51,48 +42,32 @@ async function fetchArrJSON(searchee: Searchee, url: string): Promise<IdData> {
 		throw new Error(`${response.status}`);
 	}
 
-	const arrJson = (await response.json()) as ParseResponse;
-	if (!arrJson) {
+	const responseBody = (await response.json()) as ParseResponse;
+	if (!responseBody) {
 		return {};
 	}
-	function whichArr(searchee: Searchee) {
-		const mediaType = getTag(searchee);
-		switch (mediaType) {
-			case MediaType.SEASON:
-			case MediaType.EPISODE:
-				return arrJson?.series;
-			case MediaType.MOVIE:
-				return arrJson?.movie;
-			default:
-		}
-	}
 
-	return Object.fromEntries(
-		keyNames
-			.map((key) => {
-				const arrIds = whichArr(searchee)?.[key];
-				return arrIds !== undefined && arrIds !== ""
-					? [key, arrIds]
-					: undefined;
-			})
-			.filter((entry) => entry !== undefined) as [string, string][],
-	);
+	if ("movie" in responseBody) {
+		const { tvdbId, tmdbId, imdbId } = responseBody.movie;
+		return { tvdbId, imdbId, tmdbId };
+	} else {
+		const { tvdbId, tmdbId, imdbId } = responseBody.series;
+		return { tvdbId, imdbId, tmdbId };
+	}
 }
 
-function formatFoundIds(arrJson: IdData): string {
-	let formattedIds = "";
-	keyNames.forEach((key) => {
-		if (arrJson[key]) {
-			formattedIds += `${chalk.yellow(
-				key.toUpperCase().replace("ID", ""),
-			)}: ${chalk.white(arrJson[key])} `;
-		}
-	});
-	return formattedIds.trim();
+function formatFoundIds(foundIds: ExternalIds): string {
+	return Object.entries(foundIds)
+		.filter(([, idValue]) => idValue)
+		.map(([idName, idValue]) => {
+			const externalProvider = idName.toUpperCase().replace("ID", "");
+			return `${chalk.yellow(externalProvider)}: ${chalk.white(idValue)}`;
+		})
+		.join(" ");
 }
 
 function logArrQueryResult(
-	arrJson: IdData,
+	arrJson: ExternalIds,
 	searchTerm: string,
 	mediaType: MediaType,
 ) {
@@ -146,15 +121,15 @@ function searchUArrLs(mediaType: MediaType): string[] | undefined {
 export async function grabArrId(
 	searchee: Searchee,
 	mediaType: MediaType,
-): Promise<Result<IdData, boolean>> {
+): Promise<Result<ExternalIds, boolean>> {
 	const UArrLs = searchUArrLs(mediaType);
 	if (!UArrLs) {
 		return resultOfErr(false);
 	}
 	try {
-		let arrJson: IdData;
+		let arrJson: ExternalIds;
 		for (let i = 0; i < UArrLs.length; i++) {
-			arrJson = await fetchArrJSON(searchee, UArrLs[i]);
+			arrJson = await getExternalIdsFromArr(searchee, UArrLs[i]);
 			if (Object.keys(arrJson).length > 0) {
 				logArrQueryResult(arrJson, searchee.name, mediaType);
 				return resultOf(arrJson);
@@ -168,7 +143,7 @@ export async function grabArrId(
 }
 export async function getRelevantArrIds(
 	searchee: Searchee,
-	ids: IdData,
+	ids: ExternalIds,
 	caps: Caps,
 ): Promise<IdSearchParams> {
 	const mediaType = getTag(searchee);
@@ -184,7 +159,9 @@ export async function getRelevantArrIds(
 	};
 }
 
-export async function getAvailableArrIds(searchee: Searchee): Promise<IdData> {
+export async function getAvailableArrIds(
+	searchee: Searchee,
+): Promise<ExternalIds> {
 	const mediaType = getTag(searchee);
 	try {
 		return (await grabArrId(searchee, mediaType)).unwrapOrThrow();
