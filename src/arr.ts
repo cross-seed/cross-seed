@@ -6,7 +6,13 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { Caps, IdSearchParams } from "./torznab.js";
-import { getApikey, getTag, MediaType, sanitizeUrl } from "./utils.js";
+import {
+	capitalizeFirstLetter,
+	getApikey,
+	getTag,
+	MediaType,
+	sanitizeUrl,
+} from "./utils.js";
 
 export interface ExternalIds {
 	imdbId?: string;
@@ -67,19 +73,17 @@ function formatFoundIds(foundIds: ExternalIds): string {
 }
 
 function logArrQueryResult(
-	arrJson: ExternalIds,
+	externalIds: ExternalIds,
 	searchTerm: string,
 	mediaType: MediaType,
 ) {
 	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
-	if (Object.keys(arrJson).length > 0) {
+	const mediaTypeStr = mediaType === MediaType.MOVIE ? "movie" : "series";
+	const foundIdsStr = formatFoundIds(externalIds);
+	if (Object.values(externalIds).length > 0) {
 		logger.verbose({
 			label: label,
-			message: `Found ${
-				label === Label.RADARR ? "movie" : "series"
-			} for ${chalk.green.bold(searchTerm)} -> ${formatFoundIds(
-				arrJson,
-			)}`,
+			message: `Found ${mediaTypeStr} for ${chalk.green.bold(searchTerm)} -> ${foundIdsStr}`,
 		});
 	} else {
 		logger.verbose({
@@ -88,9 +92,7 @@ function logArrQueryResult(
 		});
 		logger.verbose({
 			label: label,
-			message: `Make sure the ${
-				label === Label.RADARR ? "movie" : "series"
-			} is added to ${label === Label.RADARR ? "Radarr" : "Sonarr"}.`,
+			message: `Make sure the ${mediaTypeStr} is added to ${capitalizeFirstLetter(label)}.`,
 		});
 	}
 }
