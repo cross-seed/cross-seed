@@ -10,6 +10,7 @@ import {
 	capitalizeFirstLetter,
 	getApikey,
 	getTag,
+	isTruthy,
 	MediaType,
 	sanitizeUrl,
 } from "./utils.js";
@@ -108,33 +109,30 @@ function logArrQueryFailure(error, searchTerm: string, mediaType: MediaType) {
 	logger.debug(error);
 }
 
-function searchUArrLs(mediaType: MediaType): string[] | undefined {
+function getRelevantArrInstances(mediaType: MediaType): string[] {
 	const { sonarr, radarr } = getRuntimeConfig();
 	switch (mediaType) {
 		case MediaType.SEASON:
 		case MediaType.EPISODE:
-			return sonarr;
+			return sonarr ?? [];
 		case MediaType.MOVIE:
-			return radarr;
+			return radarr ?? [];
 		default:
-			return undefined;
+			return [];
 	}
 }
-export async function grabArrId(
+
+export async function scanAllArrsForExternalIds(
 	searchee: Searchee,
 	mediaType: MediaType,
 ): Promise<Result<ExternalIds, boolean>> {
-	const UArrLs = searchUArrLs(mediaType);
-	if (!UArrLs) {
-		return resultOfErr(false);
-	}
+	const uArrLs = getRelevantArrInstances(mediaType);
 	try {
-		let arrJson: ExternalIds;
-		for (let i = 0; i < UArrLs.length; i++) {
-			arrJson = await getExternalIdsFromArr(searchee, UArrLs[i]);
-			if (Object.keys(arrJson).length > 0) {
-				logArrQueryResult(arrJson, searchee.name, mediaType);
-				return resultOf(arrJson);
+		for (const uArrL of uArrLs) {
+			const externalIds = await getExternalIdsFromArr(searchee, uArrL);
+			if (Object.values(externalIds).some(isTruthy)) {
+				logArrQueryResult(externalIds, searchee.name, mediaType);
+				return resultOf(externalIds);
 			}
 		}
 		throw new Error("fall through to catch");
@@ -143,6 +141,7 @@ export async function grabArrId(
 		return resultOfErr(false);
 	}
 }
+
 export async function getRelevantArrIds(
 	searchee: Searchee,
 	ids: ExternalIds,
@@ -166,7 +165,8 @@ export async function getAvailableArrIds(
 ): Promise<ExternalIds> {
 	const mediaType = getTag(searchee);
 	try {
-		return (await grabArrId(searchee, mediaType)).unwrapOrThrow();
+		const result = await scanAllArrsForExternalIds(searchee, mediaType);
+		return result.unwrapOrThrow();
 	} catch (e) {
 		return {};
 	}
