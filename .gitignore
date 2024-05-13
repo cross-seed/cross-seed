@@ -41,5 +41,3 @@ cache.json
 docker-compose.yml
 utils.zsh
 test.db
-.idea/vcs.xml
-.idea/prettier.xml
