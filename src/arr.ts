@@ -47,7 +47,7 @@ export async function validateUArrLs() {
 		for (const url of urls) {
 			if (!url.searchParams.has("apikey")) {
 				throw new CrossSeedError(
-					`Sonarr url ${url} does not specify an apikey`,
+					`Radarr url ${url} does not specify an apikey`,
 				);
 			}
 			await checkArrIsActive(url, "Radarr");
@@ -122,7 +122,7 @@ async function getExternalIdsFromArr(
 			return { tvdbId, imdbId, tmdbId };
 		}
 	}
-	throw new Error(response.unwrapErrOrThrow().message);
+	return {};
 }
 
 function formatFoundIds(foundIds: ExternalIds): string {
@@ -139,36 +139,36 @@ function logArrQueryResult(
 	externalIds: ExternalIds,
 	searchTerm: string,
 	mediaType: MediaType,
+	error?: Error,
 ) {
-	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
 	const mediaTypeStr = mediaType === MediaType.MOVIE ? "movie" : "series";
-	const foundIdsStr = formatFoundIds(externalIds);
-	if (Object.values(externalIds).length > 0) {
+	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
+	if (error) {
+		if (!Object.values(externalIds).some(isTruthy)) {
+			logger.verbose({
+				label: label,
+				message: `Lookup failed for ${chalk.yellow(searchTerm)}`,
+			});
+			logger.verbose({
+				label: label,
+				message: `Make sure the ${mediaTypeStr} is added to ${capitalizeFirstLetter(label)}.`,
+			});
+			return;
+		}
+		logger.debug({
+			label: label,
+			message: `Failed to lookup IDs for ${chalk.yellow(
+				searchTerm,
+			)} - (${chalk.red(String(error).split(":").slice(1)[0].trim())})`,
+		});
+		logger.debug(error);
+	} else {
+		const foundIdsStr = formatFoundIds(externalIds);
 		logger.verbose({
 			label: label,
 			message: `Found ${mediaTypeStr} for ${chalk.green.bold(searchTerm)} -> ${foundIdsStr}`,
 		});
-	} else {
-		logger.verbose({
-			label: label,
-			message: `Lookup failed for ${chalk.yellow(searchTerm)}`,
-		});
-		logger.verbose({
-			label: label,
-			message: `Make sure the ${mediaTypeStr} is added to ${capitalizeFirstLetter(label)}.`,
-		});
 	}
-}
-
-function logArrQueryFailure(error, searchTerm: string, mediaType: MediaType) {
-	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
-	logger.debug({
-		label: label,
-		message: `Failed to lookup IDs for ${chalk.yellow(
-			searchTerm,
-		)} - (${chalk.red(String(error).split(":").slice(1)[0].trim())})`,
-	});
-	logger.debug(error);
 }
 
 function getRelevantArrInstances(mediaType: MediaType): string[] {
@@ -199,7 +199,7 @@ export async function scanAllArrsForExternalIds(
 		}
 		throw new Error("fall through to catch");
 	} catch (error) {
-		logArrQueryFailure(error, searchee.name, mediaType);
+		logArrQueryResult({}, searchee.name, mediaType, error);
 		return resultOfErr(false);
 	}
 }
