@@ -7,6 +7,7 @@ import { getClient } from "./clients/TorrentClient.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { inspect } from "util";
 import { stat, access, constants } from "fs/promises";
+import { validateUArrLs } from "./arr.js";
 
 /**
  * validates existence, permission, and that a path is a directory
@@ -94,6 +95,7 @@ export async function doStartupValidation(): Promise<void> {
 	await Promise.all<void>([
 		checkConfigPaths(),
 		validateTorznabUrls(),
+		validateUArrLs(),
 		downloadClient?.validateConfig(),
 	]);
 	logger.verbose({

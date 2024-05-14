@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import ms from "ms";
 import { join } from "path";
+import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -21,7 +22,83 @@ export interface ExternalIds {
 	tvdbId?: string;
 }
 
-export type ParseResponse = { movie: ExternalIds } | { series: ExternalIds };
+export type ParseResponse =
+	| { movie: ExternalIds }
+	| { series: ExternalIds }
+	| { status: string };
+
+export async function validateUArrLs() {
+	const { sonarr, radarr } = getRuntimeConfig();
+	if (!sonarr && !radarr) return;
+
+	if (sonarr) {
+		const urls: URL[] = sonarr.map((str) => new URL(str));
+		for (const url of urls) {
+			if (!url.searchParams.has("apikey")) {
+				throw new CrossSeedError(
+					`Sonarr url ${url} does not specify an apikey`,
+				);
+			}
+			await checkArrIsActive(url, "Sonarr");
+		}
+	}
+	if (radarr) {
+		const urls: URL[] = radarr.map((str) => new URL(str));
+		for (const url of urls) {
+			if (!url.searchParams.has("apikey")) {
+				throw new CrossSeedError(
+					`Sonarr url ${url} does not specify an apikey`,
+				);
+			}
+			await checkArrIsActive(url, "Radarr");
+		}
+	}
+}
+
+async function checkArrIsActive(url: URL, arrInstance: string) {
+	const apikey = getApikey(url.toString())!;
+	url.pathname = join(url.pathname, "/ping");
+	const arrPingCheck = await makeArrApiCall(url, apikey);
+	if (arrPingCheck.isOk()) {
+		const arrPingResponse = arrPingCheck.unwrapOrThrow();
+		if (arrPingResponse["status"] !== "OK") {
+			throw new CrossSeedError(
+				`Failed to establish an "OK" from ${arrInstance} URL: ${url}`,
+			);
+		}
+	} else {
+		throw new CrossSeedError(
+			`Could not contact ${arrInstance} URL: ${url} - ${arrPingCheck.unwrapErrOrThrow().message}`,
+		);
+	}
+}
+
+async function makeArrApiCall(
+	url: URL,
+	apikey: string,
+): Promise<Result<ParseResponse, Error>> {
+	let response: Response;
+	try {
+		response = await fetch(url, {
+			signal: AbortSignal.timeout(ms("5 seconds")),
+			headers: { "X-Api-Key": apikey },
+		});
+	} catch (networkError) {
+		if (networkError.name === "AbortError") {
+			return resultOfErr(new Error(`connection timeout`));
+		}
+		return resultOfErr(new Error(networkError));
+	}
+	if (!response.ok) {
+		return resultOfErr(new Error(`${response.status}`));
+	}
+
+	const responseBody = (await response.json()) as ParseResponse;
+	if (!responseBody) {
+		return resultOfErr(new Error("Response was empty"));
+	}
+	return resultOf(responseBody);
+}
 
 async function getExternalIdsFromArr(
 	searchee: Searchee,
@@ -33,34 +110,19 @@ async function getExternalIdsFromArr(
 	url.pathname = join(url.pathname, "/api/v3/parse");
 	url.searchParams.append("title", searchee.name);
 
-	let response: Response;
-	try {
-		response = await fetch(url, {
-			signal: AbortSignal.timeout(ms("5 seconds")),
-			headers: { "X-Api-Key": apikey },
-		});
-	} catch (networkError) {
-		if (networkError.name === "AbortError") {
-			throw new Error(`connection timeout`);
+	const response = await makeArrApiCall(url, apikey);
+
+	if (response.isOk()) {
+		const responseBody = response.unwrapOrThrow() as ParseResponse;
+		if ("movie" in responseBody) {
+			const { tvdbId, tmdbId, imdbId } = responseBody.movie;
+			return { tvdbId, imdbId, tmdbId };
+		} else if ("series" in responseBody) {
+			const { tvdbId, tmdbId, imdbId } = responseBody.series;
+			return { tvdbId, imdbId, tmdbId };
 		}
-		throw new Error(networkError);
 	}
-	if (!response.ok) {
-		throw new Error(`${response.status}`);
-	}
-
-	const responseBody = (await response.json()) as ParseResponse;
-	if (!responseBody) {
-		return {};
-	}
-
-	if ("movie" in responseBody) {
-		const { tvdbId, tmdbId, imdbId } = responseBody.movie;
-		return { tvdbId, imdbId, tmdbId };
-	} else {
-		const { tvdbId, tmdbId, imdbId } = responseBody.series;
-		return { tvdbId, imdbId, tmdbId };
-	}
+	throw new Error(response.unwrapErrOrThrow().message);
 }
 
 function formatFoundIds(foundIds: ExternalIds): string {
