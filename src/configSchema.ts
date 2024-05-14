@@ -2,6 +2,7 @@ import ms from "ms";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
 import { Action, LinkType, MatchMode } from "./constants.js";
 import { logger } from "./logger.js";
+import { resolve, relative, isAbsolute } from "path";
 
 /**
  * error messages and map returned upon Zod validation failure
@@ -18,6 +19,8 @@ const ZodErrorMessages = {
 		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in unintended behavior.",
 	needsLinkDir:
 		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
+	linkDirInDataDir:
+		"You cannot have your linkDir inside of your dataDirs. Please adjust your paths to correct this.",
 };
 
 /**
@@ -74,6 +77,22 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
 		addZodIssue(durationStr, ZodErrorMessages.vercel, ctx);
 	}
 	return duration;
+}
+
+/**
+ * check a `potential` path is inside the `parentPath` directory at any depth.
+ * @param linkDir path of the potential child (linkDir)
+ * @param dataDirs array of dataDir paths
+ * @returns true if `linkDir` is inside any dataDir at any nesting level, false otherwise.
+ */
+function isPathInside(linkDir: string, dataDirs: string[]): boolean {
+	return dataDirs.some((datadir) => {
+		const resolvedParent = resolve(datadir);
+		const resolvedChild = resolve(linkDir);
+		const relativePath = relative(resolvedParent, resolvedChild);
+		// if the path does not start with '..' and is not absolute
+		return relativePath.startsWith("..") || isAbsolute(relativePath);
+	});
 }
 
 /**
@@ -184,4 +203,11 @@ export const VALIDATION_SCHEMA = z
 	.refine(
 		(config) => config.matchMode === MatchMode.SAFE || config.linkDir,
 		ZodErrorMessages.needsLinkDir,
+	)
+	.refine(
+		(config) =>
+			config.linkDir &&
+			config.dataDirs &&
+			isPathInside(config.linkDir, config.dataDirs),
+		ZodErrorMessages.linkDirInDataDir,
 	);
