@@ -80,18 +80,18 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
 }
 
 /**
- * check a `potential` path is inside the `parentPath` directory at any depth.
+ * check a potential child path being inside a array of parent paths
  * @param linkDir path of the potential child (linkDir)
  * @param dataDirs array of dataDir paths
  * @returns true if `linkDir` is inside any dataDir at any nesting level, false otherwise.
  */
-function isPathInside(linkDir: string, dataDirs: string[]): boolean {
+function isChildPath(linkDir: string, dataDirs: string[]): boolean {
 	return dataDirs.some((datadir) => {
 		const resolvedParent = resolve(datadir);
 		const resolvedChild = resolve(linkDir);
 		const relativePath = relative(resolvedParent, resolvedChild);
 		// if the path does not start with '..' and is not absolute
-		return relativePath.startsWith("..") || isAbsolute(relativePath);
+		return !(relativePath.startsWith("..") || isAbsolute(relativePath));
 	});
 }
 
@@ -204,10 +204,9 @@ export const VALIDATION_SCHEMA = z
 		(config) => config.matchMode === MatchMode.SAFE || config.linkDir,
 		ZodErrorMessages.needsLinkDir,
 	)
-	.refine(
-		(config) =>
-			config.linkDir &&
-			config.dataDirs &&
-			isPathInside(config.linkDir, config.dataDirs),
-		ZodErrorMessages.linkDirInDataDir,
-	);
+	.refine((config) => {
+		if (config.linkDir && config.dataDirs) {
+			return !isChildPath(config.linkDir, config.dataDirs);
+		}
+		return true;
+	}, ZodErrorMessages.linkDirInDataDir);
