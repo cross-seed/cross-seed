@@ -86,12 +86,16 @@ export async function createSearcheeFromTorrentFile(
 export async function createSearcheeFromPath(
 	filepath: string,
 ): Promise<Result<Searchee, Error>> {
-	const totalLength = getFilesFromDataRoot(filepath).reduce<number>(
+	const files = getFilesFromDataRoot(filepath);
+	if (files.length === 0) {
+		return resultOfErr(new Error("No files found"));
+	}
+	const totalLength = files.reduce<number>(
 		(runningTotal, file) => runningTotal + file.length,
 		0,
 	);
 	return resultOf({
-		files: getFilesFromDataRoot(filepath),
+		files: files,
 		path: filepath,
 		name: basename(filepath),
 		length: totalLength,
