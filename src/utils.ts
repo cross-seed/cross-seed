@@ -61,8 +61,8 @@ export function getTag(name: string, isVideo: boolean): MediaType {
 export function shouldRecheck(decision: Decision): boolean {
 	switch (decision) {
 		case Decision.MATCH:
-			return false;
 		case Decision.MATCH_SIZE_ONLY:
+			return false;
 		case Decision.MATCH_PARTIAL:
 		default:
 			return true;
