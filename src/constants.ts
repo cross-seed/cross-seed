@@ -60,6 +60,11 @@ export const BOOK_EXTENSIONS = [
 	".cbt",
 	".cba",
 ];
+export const ALL_EXTENSIONS = [
+	...VIDEO_EXTENSIONS,
+	...AUDIO_EXTENSIONS,
+	...BOOK_EXTENSIONS,
+];
 
 export const IGNORED_FOLDERS_REGEX =
 	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;

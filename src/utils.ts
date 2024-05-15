@@ -7,6 +7,7 @@ import {
 	VIDEO_EXTENSIONS,
 	AUDIO_EXTENSIONS,
 	BOOK_EXTENSIONS,
+	ALL_EXTENSIONS,
 	Decision,
 	SCENE_TITLE_REGEX,
 } from "./constants.js";
@@ -33,7 +34,7 @@ export function isTruthy<T>(value: T): value is Truthy<T> {
 }
 
 export function stripExtension(filename: string): string {
-	for (const ext of VIDEO_EXTENSIONS) {
+	for (const ext of ALL_EXTENSIONS) {
 		if (filename.endsWith(ext)) return basename(filename, ext);
 	}
 	return filename;

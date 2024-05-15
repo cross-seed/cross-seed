@@ -29,6 +29,23 @@ export interface Indexer {
 	categories: string;
 }
 
+export async function getAllIndexers(): Promise<Indexer[]> {
+	return db("indexer").where({ active: true }).select({
+		id: "id",
+		url: "url",
+		apikey: "apikey",
+		active: "active",
+		status: "status",
+		retryAfter: "retry_after",
+		searchCap: "search_cap",
+		tvSearchCap: "tv_search_cap",
+		movieSearchCap: "movie_search_cap",
+		tvIdCaps: "tv_id_caps",
+		movieIdCaps: "movie_id_caps",
+		categories: "cat_caps",
+	});
+}
+
 export async function getEnabledIndexers(): Promise<Indexer[]> {
 	return db("indexer")
 		.where({ active: true, search_cap: true, status: null })

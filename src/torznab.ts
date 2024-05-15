@@ -5,6 +5,7 @@ import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
+	getAllIndexers,
 	getEnabledIndexers,
 	Indexer,
 	IndexerStatus,
@@ -430,7 +431,7 @@ async function fetchCaps(indexer: {
 		const error = new Error(
 			`Indexer ${indexer.url} failed to respond, check verbose logs`,
 		);
-		logger.error(error);
+		logger.error(error.message);
 		logger.debug(e);
 		throw error;
 	}
@@ -440,7 +441,7 @@ async function fetchCaps(indexer: {
 		const error = new Error(
 			`Indexer ${indexer.url} responded with code ${response.status} when fetching caps, check verbose logs`,
 		);
-		logger.error(error);
+		logger.error(error.message);
 		logger.debug(
 			`Response body first 1000 characters: ${responseText.substring(
 				0,
@@ -456,7 +457,7 @@ async function fetchCaps(indexer: {
 		const error = new Error(
 			`Indexer ${indexer.url} responded with invalid XML when fetching caps, check verbose logs`,
 		);
-		logger.error(error);
+		logger.error(error.message);
 		logger.debug(
 			`Response body first 1000 characters: ${responseText.substring(
 				0,
@@ -532,19 +533,8 @@ export async function validateTorznabUrls() {
 		}
 	}
 	await syncWithDb();
-	const enabledIndexersWithoutCaps = await db("indexer")
-		.where({
-			active: true,
-			search_cap: null,
-			tv_search_cap: null,
-			movie_search_cap: null,
-		})
-		.orWhere({ search_cap: false, active: true })
-		.orWhere({ movie_id_caps: null, active: true })
-		.orWhere({ tv_id_caps: null, active: true })
-		.orWhere({ cat_caps: null, active: true })
-		.select({ id: "id", url: "url", apikey: "apikey" });
-	await updateCaps(enabledIndexersWithoutCaps);
+	const allIndexers = await getAllIndexers();
+	await updateCaps(allIndexers);
 
 	const indexersWithoutSearch = await db("indexer")
 		.where({ search_cap: false, active: true })
