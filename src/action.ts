@@ -55,12 +55,13 @@ function logInjectionResult(
  * @return the root of linked files.
  */
 function linkExactTree(
+	searchee: Searchee,
 	newMeta: Metafile,
 	destinationDir: string,
 	sourceRoot: string,
 ): string {
-	if (newMeta.files.length === 1) {
-		return fuzzyLinkOneFile(newMeta, destinationDir, sourceRoot);
+	if (searchee.files.length === 1) {
+		return fuzzyLinkOneFile(searchee, newMeta, destinationDir, sourceRoot);
 	}
 	for (const newFile of newMeta.files) {
 		const srcFilePath = join(dirname(sourceRoot), newFile.path);
@@ -75,11 +76,14 @@ function linkExactTree(
  * @return the root of linked file.
  */
 function fuzzyLinkOneFile(
+	searchee: Searchee,
 	newMeta: Metafile,
 	destinationDir: string,
 	sourceRoot: string,
 ): string {
-	const srcFilePath = sourceRoot;
+	const srcFilePath = statSync(sourceRoot).isFile()
+		? sourceRoot
+		: join(dirname(sourceRoot), searchee.files[0].path);
 	const destFilePath = join(destinationDir, newMeta.files[0].path);
 	mkdirSync(dirname(destFilePath), { recursive: true });
 	linkFile(srcFilePath, destFilePath);
@@ -161,9 +165,13 @@ async function linkAllFilesInMetafile(
 	}
 
 	if (decision === Decision.MATCH) {
-		return resultOf(linkExactTree(newMeta, fullLinkDir, sourceRoot));
+		return resultOf(
+			linkExactTree(searchee, newMeta, fullLinkDir, sourceRoot),
+		);
 	} else if (decision === Decision.MATCH_SIZE_ONLY) {
-		return resultOf(fuzzyLinkOneFile(newMeta, fullLinkDir, sourceRoot));
+		return resultOf(
+			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot),
+		);
 	} else {
 		return resultOf(
 			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot),
