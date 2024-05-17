@@ -55,7 +55,7 @@ export function humanReadableSize(bytes: number) {
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
-export function getTag(searchee: Searchee): MediaType {
+export function getMediaType(searchee: Searchee): MediaType {
 	function hasExt(searchee: Searchee, exts: string[]) {
 		return searchee.files.some((f) => exts.includes(path.extname(f.name)));
 	}
@@ -141,7 +141,7 @@ export function cleanseSeparators(str: string): string {
 }
 
 export function getAnimeQueries(name: string): string[] {
-	// Only use if getTag returns anime as it's conditional on a few factors
+	// Only use if getMediaType returns anime as it's conditional on a few factors
 	const animeQueries: string[] = [];
 	const { title, altTitle, release } = name.match(ANIME_REGEX)?.groups ?? {};
 	if (title) {

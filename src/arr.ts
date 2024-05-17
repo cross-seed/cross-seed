@@ -10,7 +10,7 @@ import { Caps, IdSearchParams } from "./torznab.js";
 import {
 	capitalizeFirstLetter,
 	getApikey,
-	getTag,
+	getMediaType,
 	isTruthy,
 	MediaType,
 	sanitizeUrl,
@@ -209,7 +209,7 @@ export async function getRelevantArrIds(
 	ids: ExternalIds,
 	caps: Caps,
 ): Promise<IdSearchParams> {
-	const mediaType = getTag(searchee);
+	const mediaType = getMediaType(searchee);
 	const idSearchCaps =
 		mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
 			? caps.tvIdSearch
@@ -225,7 +225,7 @@ export async function getRelevantArrIds(
 export async function getAvailableArrIds(
 	searchee: Searchee,
 ): Promise<ExternalIds> {
-	const mediaType = getTag(searchee);
+	const mediaType = getMediaType(searchee);
 	try {
 		const result = await scanAllArrsForExternalIds(searchee, mediaType);
 		return result.unwrapOrThrow();

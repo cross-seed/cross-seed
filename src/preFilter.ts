@@ -12,7 +12,8 @@ import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
-import { humanReadableDate, nMsAgo } from "./utils.js";
+import { indexerDoesSupportMediaType } from "./torznab.js";
+import { getMediaType, humanReadableDate, nMsAgo } from "./utils.js";
 import path from "path";
 
 export function filterByContent(searchee: Searchee): boolean {
@@ -117,6 +118,7 @@ type TimestampDataSql = {
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const enabledIndexers = await getEnabledIndexers();
+	const mediaType = getMediaType(searchee);
 	const timestampDataSql: TimestampDataSql = (await db("searchee")
 		// @ts-expect-error crossJoin supports string
 		.crossJoin("indexer")
@@ -127,7 +129,14 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		.where("searchee.name", searchee.name)
 		.whereIn(
 			"indexer.id",
-			enabledIndexers.map((i) => i.id),
+			enabledIndexers
+				.filter((indexer) =>
+					indexerDoesSupportMediaType(
+						mediaType,
+						JSON.parse(indexer.categories),
+					),
+				)
+				.map((indexer) => indexer.id),
 		)
 		.min({
 			first_searched_any: db.raw(

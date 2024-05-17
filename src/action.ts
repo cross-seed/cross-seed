@@ -16,7 +16,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
-import { getTag } from "./utils.js";
+import { getMediaType } from "./utils.js";
 
 function logInjectionResult(
 	result: InjectionResult,
@@ -195,7 +195,7 @@ export async function performAction(
 	const { action, linkDir } = getRuntimeConfig();
 
 	if (action === Action.SAVE) {
-		await saveTorrentFile(tracker, getTag(searchee), newMeta);
+		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.info(
@@ -230,7 +230,7 @@ export async function performAction(
 				newMeta.name,
 				decision,
 			);
-			await saveTorrentFile(tracker, getTag(searchee), newMeta);
+			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 			return InjectionResult.FAILURE;
 		}
 	} else if (searchee.path) {
@@ -246,7 +246,7 @@ export async function performAction(
 
 	logInjectionResult(result, tracker, newMeta.name, decision);
 	if (result === InjectionResult.FAILURE) {
-		await saveTorrentFile(tracker, getTag(searchee), newMeta);
+		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 	}
 	return result;
 }

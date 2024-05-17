@@ -20,7 +20,7 @@ import {
 	cleanseSeparators,
 	getAnimeQueries,
 	getApikey,
-	getTag,
+	getMediaType,
 	MediaType,
 	nMsAgo,
 	reformatTitleForSearching,
@@ -179,7 +179,7 @@ async function createTorznabSearchQueries(
 		parseInt(str.match(/\d+/)![0]);
 	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
 	const shouldUseIdSearch = Object.values(relevantIds).some((id) => id);
-	const mediaType = getTag(searchee);
+	const mediaType = getMediaType(searchee);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
 		const groups = match!.groups!;
@@ -237,7 +237,10 @@ async function createTorznabSearchQueries(
 	}
 }
 
-function indexerDoesSupportMediaType(mediaType: MediaType, caps: TorznabCats) {
+export function indexerDoesSupportMediaType(
+	mediaType: MediaType,
+	caps: TorznabCats,
+) {
 	switch (mediaType) {
 		case MediaType.EPISODE:
 		case MediaType.SEASON:
@@ -294,7 +297,7 @@ export async function searchTorznab(
 		);
 		return (
 			indexerDoesSupportMediaType(
-				getTag(searchee),
+				getMediaType(searchee),
 				JSON.parse(indexer.categories),
 			) &&
 			(!entry ||
