@@ -50,6 +50,11 @@ export async function parseTorrentFromURL(
 ): Promise<Result<Metafile, SnatchError>> {
 	const abortController = new AbortController();
 	const { snatchTimeout } = getRuntimeConfig();
+	const parsedUrl = new URL(url);
+	parsedUrl.pathname = parsedUrl.pathname
+		.split("/")
+		.map(encodeURIComponent)
+		.join("/");
 
 	if (typeof snatchTimeout === "number") {
 		setTimeout(() => void abortController.abort(), snatchTimeout).unref();
@@ -57,19 +62,19 @@ export async function parseTorrentFromURL(
 
 	let response: Response;
 	try {
-		response = await fetch(url, {
+		response = await fetch(parsedUrl, {
 			headers: { "User-Agent": USER_AGENT },
 			signal: abortController.signal,
 		});
 	} catch (e) {
 		if (e.name === "AbortError") {
-			logger.error(`snatching ${url} timed out`);
+			logger.error(`snatching ${url} -> ${parsedUrl.toString()} timed out`);
 			return resultOfErr(SnatchError.ABORTED);
 		} else if (isMagnetRedirectError(e)) {
 			logger.error(`Unsupported: magnet link detected at ${url}`);
 			return resultOfErr(SnatchError.MAGNET_LINK);
 		}
-		logger.error(`failed to access ${url}`);
+		logger.error(`failed to access ${url} -> ${parsedUrl.toString()}`);
 		logger.debug(e);
 		return resultOfErr(SnatchError.UNKNOWN_ERROR);
 	}
@@ -78,7 +83,7 @@ export async function parseTorrentFromURL(
 		return resultOfErr(SnatchError.RATE_LIMITED);
 	} else if (!response.ok) {
 		logger.error(
-			`error downloading torrent at ${url}: ${response.status} ${response.statusText}`,
+			`error downloading torrent at ${url} -> ${parsedUrl.toString()}: ${response.status} ${response.statusText}`,
 		);
 		logger.debug("response: %s", await response.text());
 		return resultOfErr(SnatchError.UNKNOWN_ERROR);
@@ -87,7 +92,7 @@ export async function parseTorrentFromURL(
 		if (responseText.includes("429")) {
 			return resultOfErr(SnatchError.RATE_LIMITED);
 		}
-		logger.error(`invalid torrent contents at ${url}`);
+		logger.error(`invalid torrent contents at ${url} -> ${parsedUrl.toString()}`);
 		logger.debug(
 			`contents: "${responseText.slice(0, 100)}${
 				responseText.length > 100 ? "..." : ""
@@ -102,7 +107,7 @@ export async function parseTorrentFromURL(
 			),
 		);
 	} catch (e) {
-		logger.error(`invalid torrent contents at ${url}`);
+		logger.error(`invalid torrent contents at ${url} -> ${parsedUrl.toString()}`);
 		const contentType = response.headers.get("Content-Type");
 		const contentLength = response.headers.get("Content-Length");
 		logger.debug(`Content-Type: ${contentType}`);
