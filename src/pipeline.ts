@@ -3,12 +3,7 @@ import fs from "fs";
 import { zip } from "lodash-es";
 import ms from "ms";
 import { performAction, performActions } from "./action.js";
-import {
-	ActionResult,
-	Decision,
-	InjectionResult,
-	SaveResult,
-} from "./constants.js";
+import { ActionResult, Decision, InjectionResult } from "./constants.js";
 import {
 	findPotentialNestedRoots,
 	findSearcheesFromAllDataDirs,
@@ -54,6 +49,11 @@ export interface Candidate {
 interface AssessmentWithTracker {
 	assessment: ResultAssessment;
 	tracker: string;
+}
+
+interface DecisionAction {
+	decision: Decision;
+	action?: ActionResult;
 }
 
 interface FoundOnOtherSites {
@@ -218,7 +218,7 @@ export async function searchForLocalTorrentByCriteria(
 
 export async function checkNewCandidateMatch(
 	candidate: Candidate,
-): Promise<InjectionResult | SaveResult | null> {
+): Promise<DecisionAction | null> {
 	const meta = await getTorrentByFuzzyName(candidate.name);
 	if (meta === null) {
 		logger.verbose({
@@ -249,7 +249,7 @@ export async function checkNewCandidateMatch(
 		assessment.decision !== Decision.MATCH_SIZE_ONLY &&
 		assessment.decision !== Decision.MATCH_PARTIAL
 	) {
-		return null;
+		return { decision: assessment.decision };
 	}
 
 	const result = await performAction(
@@ -263,7 +263,7 @@ export async function checkNewCandidateMatch(
 		[[assessment, candidate.tracker, result]],
 		Label.REVERSE_LOOKUP,
 	);
-	return result;
+	return { decision: assessment.decision, action: result };
 }
 
 async function findSearchableTorrents() {

@@ -9,7 +9,7 @@ import {
 	checkNewCandidateMatch,
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
-import { InjectionResult, SaveResult } from "./constants.js";
+import { Decision, InjectionResult, SaveResult } from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 
 function getData(req: IncomingMessage): Promise<string> {
@@ -179,9 +179,13 @@ async function announce(
 		await indexNewTorrents();
 		const result = await checkNewCandidateMatch(candidate);
 		const isOk =
-			result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
+			result?.action &&
+			[InjectionResult.SUCCESS, SaveResult.SAVED].includes(result.action);
 		if (!isOk) {
-			if (result === InjectionResult.TORRENT_NOT_COMPLETE) {
+			if (
+				result?.action === InjectionResult.TORRENT_NOT_COMPLETE ||
+				result?.decision === Decision.DOWNLOAD_FAILED
+			) {
 				res.writeHead(202);
 			} else {
 				res.writeHead(204);
