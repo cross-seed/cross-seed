@@ -19,7 +19,7 @@ export const ANIME_REGEX =
 export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w ]+?)(?:\[.+\])?(?:\))?(?=(?:\.\w{1,5})?$)/i;
 export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[ipx])\b/i;
-export const RES_STRICT_REGEX = /(?<resolution>(?:2160|1080|720)[pi])/;
+export const RES_STRICT_REGEX = /(?<res>(?:2160|1080|720)[pi])/;
 export const SOURCE_REGEX =
 	/(?<source>\b(amzn|amazon(hd)?)\b|\b(atvp|aptv)\b|\b(dsnp|dsny|disney)\b|\b(hbo)(?![ ._-]max)\b|\b(hmax|hbom|hbo[ ._-]max)\b|\b((?<!hbo[ ._-])max)\b|\b(nf|netflix(u?hd)?)\b|\b(pcok|peacock)\b|\b(pmtp|Paramount Plus)\b|\b(hulu)\b)/i;
 
@@ -103,9 +103,12 @@ export enum Decision {
 	MATCH = "MATCH",
 	MATCH_SIZE_ONLY = "MATCH_SIZE_ONLY",
 	MATCH_PARTIAL = "MATCH_PARTIAL",
+	FUZZY_SIZE_MISMATCH = "FUZZY_SIZE_MISMATCH",
 	SIZE_MISMATCH = "SIZE_MISMATCH",
+	PARTIAL_SIZE_MISMATCH = "PARTIAL_SIZE_MISMATCH",
 	NO_DOWNLOAD_LINK = "NO_DOWNLOAD_LINK",
 	DOWNLOAD_FAILED = "DOWNLOAD_FAILED",
+	MAGNET_LINK = "MAGNET_LINK",
 	RATE_LIMITED = "RATE_LIMITED",
 	INFO_HASH_ALREADY_EXISTS = "INFO_HASH_ALREADY_EXISTS",
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
@@ -114,6 +117,22 @@ export enum Decision {
 	PROPER_REPACK_MISMATCH = "PROPER_REPACK_MISMATCH",
 	RESOLUTION_MISMATCH = "RESOLUTION_MISMATCH",
 }
+
+export type DecisionAllMatch =
+	| Decision.MATCH
+	| Decision.MATCH_SIZE_ONLY
+	| Decision.MATCH_PARTIAL;
+export const DECISION_ALL_MATCH = [
+	Decision.MATCH,
+	Decision.MATCH_SIZE_ONLY,
+	Decision.MATCH_PARTIAL,
+];
+export const DECISION_NEVER_RETRY = [
+	Decision.MAGNET_LINK,
+	Decision.RELEASE_GROUP_MISMATCH,
+	Decision.PROPER_REPACK_MISMATCH,
+	Decision.RESOLUTION_MISMATCH,
+];
 
 export enum MatchMode {
 	SAFE = "safe",

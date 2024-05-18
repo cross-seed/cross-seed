@@ -6,6 +6,8 @@ import { performAction, performActions } from "./action.js";
 import {
 	ActionResult,
 	Decision,
+	DECISION_ALL_MATCH,
+	DecisionAllMatch,
 	InjectionResult,
 	SaveResult,
 	UNKNOWN_TRACKER,
@@ -54,7 +56,7 @@ import {
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
-import { humanReadableSize, isTruthy, stripExtension } from "./utils.js";
+import { humanReadableSize, isTruthy } from "./utils.js";
 import { Metafile } from "./parseTorrent.js";
 import { getClient } from "./clients/TorrentClient.js";
 
@@ -97,6 +99,7 @@ async function assessCandidates(
 
 async function findOnOtherSites(
 	searchee: Searchee,
+	searcheeLog: string,
 	hashesToExclude: string[],
 	prevCandidates: Map<string, IndexerCandidates[]>,
 ): Promise<FoundOnOtherSites> {
@@ -120,7 +123,7 @@ async function findOnOtherSites(
 		prevCandidates.set(searchStr, response);
 	} catch (e) {
 		if (!e.message.includes("SKIPPED")) {
-			logger.error(`error searching for ${searchee.name}`);
+			logger.error(`Error searching for ${searcheeLog}`);
 			logger.debug(e);
 		}
 		return { searchedIndexers: 0, matches: 0 };
@@ -155,11 +158,8 @@ async function findOnOtherSites(
 		},
 	);
 
-	const matches = assessments.filter(
-		(e) =>
-			e.assessment.decision === Decision.MATCH ||
-			e.assessment.decision === Decision.MATCH_SIZE_ONLY ||
-			e.assessment.decision === Decision.MATCH_PARTIAL,
+	const matches = assessments.filter((e) =>
+		DECISION_ALL_MATCH.includes(e.assessment.decision),
 	);
 	const actionResults = await performActions(searchee, matches);
 	if (actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
@@ -194,7 +194,12 @@ async function findMatchesBatch(
 	let totalFound = 0;
 	let prevSearchTime = 0;
 	const prevCandidates = new Map<string, IndexerCandidates[]>();
-	for (const [i, sample] of samples.entries()) {
+	for (const [i, searchee] of samples.entries()) {
+		const searcheeLog = searchee.infoHash
+			? `${chalk.bold.white(searchee.name)} ${chalk.dim(`[${searchee.infoHash.slice(0, 8)}...]`)}`
+			: searchee.path
+				? chalk.bold.white(searchee.path)
+				: chalk.bold.white(searchee.name);
 		try {
 			const sleepTime = delay * 1000 - (Date.now() - prevSearchTime);
 			if (sleepTime > 0) {
@@ -203,11 +208,11 @@ async function findMatchesBatch(
 			const searchTime = Date.now();
 
 			const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
-			const name = stripExtension(sample.name);
-			logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
+			logger.info(`${progress} Searching for ${searcheeLog}`);
 
 			const { searchedIndexers, matches } = await findOnOtherSites(
-				sample,
+				searchee,
+				searcheeLog,
 				hashesToExclude,
 				prevCandidates,
 			);
@@ -217,7 +222,7 @@ async function findMatchesBatch(
 			if (searchedIndexers === 0) continue;
 			prevSearchTime = searchTime;
 		} catch (e) {
-			logger.error(`error searching for ${sample.name}`);
+			logger.error(`Error searching for ${searcheeLog}`);
 			logger.debug(e);
 		}
 	}
@@ -243,10 +248,16 @@ export async function searchForLocalTorrentByCriteria(
 	const hashesToExclude = await getInfoHashesToExclude();
 	let matches = 0;
 	const prevCandidates = new Map<string, IndexerCandidates[]>();
-	for (let i = 0; i < searchees.length; i++) {
-		if (!filterByContent(searchees[i])) return null;
+	for (const searchee of searchees) {
+		if (!filterByContent(searchee)) return null;
+		const searcheeLog = searchee.infoHash
+			? `${chalk.bold.white(searchee.name)} ${chalk.dim(`[${searchee.infoHash.slice(0, 8)}...]`)}`
+			: searchee.path
+				? chalk.bold.white(searchee.path)
+				: chalk.bold.white(searchee.name);
 		const foundOnOtherSites = await findOnOtherSites(
-			searchees[i],
+			searchee,
+			searcheeLog,
 			hashesToExclude,
 			prevCandidates,
 		);
@@ -329,17 +340,13 @@ export async function checkNewCandidateMatch(
 		hashesToExclude,
 	);
 
-	if (
-		assessment.decision !== Decision.MATCH &&
-		assessment.decision !== Decision.MATCH_SIZE_ONLY &&
-		assessment.decision !== Decision.MATCH_PARTIAL
-	) {
+	if (!DECISION_ALL_MATCH.includes(assessment.decision)) {
 		return null;
 	}
 
 	const result = await performAction(
 		assessment.metafile!,
-		assessment.decision,
+		assessment.decision as DecisionAllMatch,
 		searchee,
 		candidate.tracker,
 	);

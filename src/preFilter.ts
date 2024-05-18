@@ -13,7 +13,12 @@ import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
-import { getMediaType, humanReadableDate, nMsAgo } from "./utils.js";
+import {
+	getNewestFileAge,
+	getMediaType,
+	humanReadableDate,
+	nMsAgo,
+} from "./utils.js";
 import path from "path";
 
 export function filterByContent(searchee: Searchee): boolean {
@@ -116,10 +121,8 @@ type TimestampDataSql = {
 };
 
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
-	if (!searchee.infoHash && !searchee.path) {
-		return true; // Ensemble does it's own timestamp filtering
-	}
-	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
+	const { excludeOlder, excludeRecentSearch, seasonFromEpisodes } =
+		getRuntimeConfig();
 	const enabledIndexers = await getEnabledIndexers();
 	const mediaType = getMediaType(searchee);
 	const timestampDataSql: TimestampDataSql = (await db("searchee")
@@ -157,6 +160,15 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			label: Label.PREFILTER,
 			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
 		});
+	}
+
+	if (
+		seasonFromEpisodes &&
+		!searchee.infoHash &&
+		!searchee.path &&
+		last_searched_all < getNewestFileAge(searchee)
+	) {
+		return true;
 	}
 
 	if (

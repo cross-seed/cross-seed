@@ -1,4 +1,8 @@
-import { Decision, InjectionResult, TORRENT_TAG } from "../constants.js";
+import {
+	DecisionAllMatch,
+	InjectionResult,
+	TORRENT_TAG,
+} from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -202,10 +206,7 @@ export default class Transmission implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		decision:
-			| Decision.MATCH
-			| Decision.MATCH_SIZE_ONLY
-			| Decision.MATCH_PARTIAL,
+		decision: DecisionAllMatch,
 		path?: string,
 	): Promise<InjectionResult> {
 		let downloadDir: string;

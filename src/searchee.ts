@@ -118,7 +118,7 @@ export async function getSeasonKey(name: string): Promise<string | null> {
 	if (!match) return null;
 	const title = match.groups!.title;
 	const season = match.groups!.season;
-	const resolution = stem.match(RES_STRICT_REGEX)?.groups?.resolution;
+	const resolution = stem.match(RES_STRICT_REGEX)?.groups?.res;
 	const source = stem.match(SOURCE_REGEX)?.groups?.source;
 	const group = stem.match(RELEASE_GROUP_REGEX)?.groups?.group;
 	return `${reformatTitleForSearching(title)}.${season}.${resolution ? resolution : ""}.${source ? source : ""}-${group ? group : ""}`.toLowerCase();
@@ -134,7 +134,7 @@ export async function getEpisodeAndKeys(
 	if (!episode) return null; // Date based shows
 	const title = episodeMatch!.groups!.title;
 	const season = episodeMatch!.groups!.season;
-	const resolution = stem.match(RES_STRICT_REGEX)?.groups?.resolution;
+	const resolution = stem.match(RES_STRICT_REGEX)?.groups?.res;
 	const source = stem.match(SOURCE_REGEX)?.groups?.source;
 	const group = stem.match(RELEASE_GROUP_REGEX)?.groups?.group;
 	const key =
@@ -151,7 +151,7 @@ export async function getReleaseAndKeys(
 	const firstTitle = animeMatch!.groups!.title;
 	const altTitle = animeMatch!.groups!.altTitle;
 	const release = animeMatch!.groups!.release;
-	const resolution = stem.match(RES_STRICT_REGEX)?.groups?.resolution;
+	const resolution = stem.match(RES_STRICT_REGEX)?.groups?.res;
 	const source = stem.match(SOURCE_REGEX)?.groups?.source;
 	let group = stem.match(RELEASE_GROUP_REGEX)?.groups?.group;
 	group = group ? group : animeMatch!.groups!.group;

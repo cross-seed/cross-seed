@@ -723,9 +723,8 @@ async function getAndLogIndexers(
 				: "and supported category)";
 	}
 
-	// Invalidate cache if unrelated searchee
 	if (!prevCandidates.has(searchStr)) {
-		prevCandidates.clear();
+		prevCandidates.clear(); // Invalidate cache if unrelated searchee
 	}
 	const cachedCandidates = prevCandidates.get(searchStr) ?? [];
 	const indexersToSearch = indexersToUse.filter((indexer) => {
@@ -751,4 +750,3 @@ async function getAndLogIndexers(
 
 	return indexersToSearch;
 }
-export { sanitizeUrl, getApikey };

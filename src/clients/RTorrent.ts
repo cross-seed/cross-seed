@@ -3,7 +3,11 @@ import { stat, unlink, writeFile } from "fs/promises";
 import { dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
-import { Decision, InjectionResult, TORRENT_TAG } from "../constants.js";
+import {
+	DecisionAllMatch,
+	InjectionResult,
+	TORRENT_TAG,
+} from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -308,10 +312,7 @@ export default class RTorrent implements TorrentClient {
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,
-		decision:
-			| Decision.MATCH
-			| Decision.MATCH_SIZE_ONLY
-			| Decision.MATCH_PARTIAL,
+		decision: DecisionAllMatch,
 		path?: string,
 	): Promise<InjectionResult> {
 		const { outputDir } = getRuntimeConfig();

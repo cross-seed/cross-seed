@@ -1,6 +1,6 @@
 import { dirname } from "path";
 import {
-	Decision,
+	DecisionAllMatch,
 	InjectionResult,
 	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
@@ -390,10 +390,7 @@ export default class QBittorrent implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		decision:
-			| Decision.MATCH
-			| Decision.MATCH_SIZE_ONLY
-			| Decision.MATCH_PARTIAL,
+		decision: DecisionAllMatch,
 		path?: string,
 	): Promise<InjectionResult> {
 		const { flatLinking, linkCategory } = getRuntimeConfig();
