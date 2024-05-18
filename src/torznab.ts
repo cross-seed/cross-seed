@@ -275,15 +275,13 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 export async function searchTorznab(
 	searchee: Searchee,
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
-	const { excludeRecentSearch, excludeOlder, seasonFromEpisodes, torznab } =
-		getRuntimeConfig();
+	const { torznab } = getRuntimeConfig();
 	if (torznab.length === 0) {
 		throw new Error("no indexers are available");
 	}
 	const enabledIndexers = await getEnabledIndexers();
 
 	const name = searchee.name;
-	const mediaType = getMediaType(searchee);
 
 	// search history for name across all indexers
 	const timestampDataSql = await db("searchee")
@@ -299,58 +297,34 @@ export async function searchTorznab(
 			firstSearched: "timestamp.first_searched",
 			lastSearched: "timestamp.last_searched",
 		});
-	const indexersToUse = enabledIndexers.filter((indexer) => {
-		const entry = timestampDataSql.find(
-			(entry) => entry.indexerId === indexer.id,
+	try {
+		const indexersToUse = await getAndLogIndexers(
+			enabledIndexers,
+			timestampDataSql,
+			name,
+			searchee,
 		);
-		if (
-			!indexerDoesSupportMediaType(
-				mediaType,
-				JSON.parse(indexer.categories),
-			)
-		) {
-			return false;
-		}
-		if (!entry) {
-			return true;
-		}
-		if (
-			seasonFromEpisodes &&
-			!searchee.infoHash &&
-			!searchee.path &&
-			entry.lastSearched < getNewestFileAge(searchee)
-		) {
-			return true;
-		}
-		return (
-			(!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
-			(!excludeRecentSearch ||
-				entry.lastSearched < nMsAgo(excludeRecentSearch))
-		);
-	});
 
-	const timeOrCatCallout = " (filtered by category/timestamps)";
-	logger.info({
-		label: Label.TORZNAB,
-		message: `(${mediaType.toUpperCase()}) Searching ${indexersToUse.length} indexers for ${name}${
-			indexersToUse.length < enabledIndexers.length
-				? timeOrCatCallout
-				: ""
-		}`,
-	});
-	const searcheeIds =
-		indexersToUse.length > 0 ? await getAvailableArrIds(searchee) : {};
-	return await makeRequests(indexersToUse, async (indexer) => {
-		const caps = {
-			search: indexer.searchCap,
-			tvSearch: indexer.tvSearchCap,
-			movieSearch: indexer.movieSearchCap,
-			tvIdSearch: JSON.parse(indexer.tvIdCaps),
-			movieIdSearch: JSON.parse(indexer.movieIdCaps),
-			categories: JSON.parse(indexer.categories),
-		};
-		return await createTorznabSearchQueries(searchee, searcheeIds, caps);
-	});
+		const searcheeIds =
+			indexersToUse.length > 0 ? await getAvailableArrIds(searchee) : {};
+		return await makeRequests(indexersToUse, async (indexer) => {
+			const caps = {
+				search: indexer.searchCap,
+				tvSearch: indexer.tvSearchCap,
+				movieSearch: indexer.movieSearchCap,
+				tvIdSearch: JSON.parse(indexer.tvIdCaps),
+				movieIdSearch: JSON.parse(indexer.movieIdCaps),
+				categories: JSON.parse(indexer.categories),
+			};
+			return await createTorznabSearchQueries(
+				searchee,
+				searcheeIds,
+				caps,
+			);
+		});
+	} catch (e) {
+		throw new Error(e);
+	}
 }
 
 export async function syncWithDb() {
@@ -660,3 +634,77 @@ async function makeRequests(
 		candidates: results,
 	}));
 }
+async function getAndLogIndexers(
+	enabledIndexers: Indexer[],
+	timestampDataSql,
+	name: string,
+	searchee: Searchee,
+) {
+	const { excludeRecentSearch, excludeOlder, seasonFromEpisodes } =
+		getRuntimeConfig();
+	const mediaType = getMediaType(searchee);
+	const mediaTypeStr = mediaType.toUpperCase();
+
+	const indexersToUseByTimestamp = enabledIndexers.filter((indexer) => {
+		const entry = timestampDataSql.find(
+			(entry) => entry.indexerId === indexer.id,
+		);
+		if (!entry) {
+			return true;
+		}
+		if (
+			seasonFromEpisodes &&
+			!searchee.infoHash &&
+			!searchee.path &&
+			entry.lastSearched < getNewestFileAge(searchee)
+		) {
+			return true;
+		}
+		return (
+			(!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
+			(!excludeRecentSearch ||
+				entry.lastSearched < nMsAgo(excludeRecentSearch))
+		);
+	});
+
+	const indexersToUse = indexersToUseByTimestamp.filter((indexer) => {
+		return indexerDoesSupportMediaType(
+			mediaType,
+			JSON.parse(indexer.categories),
+		);
+	});
+	const skippingSearching = (reason: string) =>
+		`(${mediaTypeStr}) Skipped searching on indexers for ${name} ${reason}`;
+
+	let skippingIndexersCallout =
+		enabledIndexers.length > indexersToUse.length ? " (filtered by " : "";
+
+	if (enabledIndexers.length > indexersToUseByTimestamp.length) {
+		skippingIndexersCallout +=
+			indexersToUseByTimestamp.length === indexersToUse.length
+				? "timestamps)"
+				: "timestamps ";
+	}
+	if (indexersToUseByTimestamp.length > indexersToUse.length) {
+		skippingIndexersCallout +=
+			enabledIndexers.length === indexersToUseByTimestamp.length
+				? "supported category)"
+				: "and supported category)";
+	}
+	if (indexersToUse.length === 0) {
+		logger.info({
+			label: Label.TORZNAB,
+			message: `${skippingSearching(skippingIndexersCallout)}`,
+		});
+		throw new Error("SKIPPED");
+	}
+	const skippingIndexers = `(${mediaTypeStr}) Searching ${indexersToUse.length} indexers for ${name}${skippingIndexersCallout}`;
+
+	logger.info({
+		label: Label.TORZNAB,
+		message: skippingIndexers,
+	});
+
+	return indexersToUse;
+}
+export { sanitizeUrl, getApikey };

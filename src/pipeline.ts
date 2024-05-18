@@ -109,8 +109,10 @@ async function findOnOtherSites(
 	try {
 		response = await searchTorznab(searchee);
 	} catch (e) {
-		logger.error(`error searching for ${searchee.name}`);
-		logger.debug(e);
+		if (!e.message.includes("SKIPPED")) {
+			logger.error(`error searching for ${searchee.name}`);
+			logger.debug(e);
+		}
 		return { searchedIndexers: 0, matches: 0 };
 	}
 
@@ -237,6 +239,7 @@ export async function checkNewCandidateMatch(
 	candidate: Candidate,
 	seasonFromEpisodes: boolean,
 ): Promise<InjectionResult | SaveResult | null> {
+	const candidateLog = `${candidate.tracker}: ${candidate.name}`;
 	let searchee: Searchee;
 	if (seasonFromEpisodes) {
 		const key = await getSeasonKey(candidate.name);
@@ -245,7 +248,7 @@ export async function checkNewCandidateMatch(
 		if (ensemble.length === 0) {
 			logger.verbose({
 				label: Label.REVERSE_LOOKUP,
-				message: `Did not find an ensemble for ${candidate.name} - ${key}`,
+				message: `Did not find an ensemble from ${candidateLog} - ${key}`,
 			});
 			return null;
 		}
@@ -259,7 +262,7 @@ export async function checkNewCandidateMatch(
 		if (files.length === 0) {
 			logger.verbose({
 				label: Label.REVERSE_LOOKUP,
-				message: `Did not find any files for ensemble ${key} from ${candidate.name} - sources may be incomplete or missing`,
+				message: `Did not find any files for ensemble ${key} from ${candidateLog} - sources may be incomplete or missing`,
 			});
 			return null;
 		}
@@ -277,14 +280,14 @@ export async function checkNewCandidateMatch(
 		searchee = { name: key, files: files, length: totalLength };
 		logger.verbose({
 			label: Label.REVERSE_LOOKUP,
-			message: `Found ensemble for ${candidate.name} (${key}) - ${humanReadableSize(totalLength)} - ${files.length} files`,
+			message: `Found ensemble from ${candidateLog} (${key}) - ${humanReadableSize(totalLength)} - ${files.length} files`,
 		});
 	} else {
 		const meta = await getTorrentByFuzzyName(candidate.name);
 		if (meta === null) {
 			logger.verbose({
 				label: Label.REVERSE_LOOKUP,
-				message: `Did not find an existing entry for ${candidate.name}`,
+				message: `Did not find an existing entry from ${candidateLog}`,
 			});
 			return null;
 		}
