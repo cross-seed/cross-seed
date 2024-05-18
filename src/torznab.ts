@@ -1,7 +1,12 @@
 import ms from "ms";
 import xml2js from "xml2js";
 import { getAvailableArrIds, getRelevantArrIds, ExternalIds } from "./arr.js";
-import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
+import {
+	EP_REGEX,
+	SEASON_REGEX,
+	UNKNOWN_TRACKER,
+	USER_AGENT,
+} from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
@@ -111,7 +116,7 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 			item?.prowlarrindexer?.[0]?._ ??
 			item?.jackettindexer?.[0]?._ ??
 			item?.indexer?.[0]?._ ??
-			"Unknown tracker",
+			UNKNOWN_TRACKER,
 		link: item.link[0],
 		size: Number(item.size[0]),
 		pubDate: new Date(item.pubDate[0]).getTime(),

@@ -245,7 +245,7 @@ export default class QBittorrent implements TorrentClient {
 			if (!torrentInfo) {
 				return resultOfErr("NOT_FOUND");
 			}
-			if (onlyCompleted && !this.isTorrentComplete(torrentInfo)) {
+			if (onlyCompleted && !this.isTorrentInfoComplete(torrentInfo)) {
 				return resultOfErr("TORRENT_NOT_COMPLETE");
 			}
 			const savePath = this.getCorrectSavePath(meta, torrentInfo);
@@ -265,7 +265,7 @@ export default class QBittorrent implements TorrentClient {
 		const torrents = await this.getAllTorrentInfo();
 		const torrentSavePaths = new Map<string, string>();
 		for (const torrent of torrents) {
-			if (onlyCompleted && !this.isTorrentComplete(torrent)) continue;
+			if (onlyCompleted && !this.isTorrentInfoComplete(torrent)) continue;
 			const meta = metas.find(
 				(e) =>
 					e.infoHash === torrent.hash ||
@@ -352,7 +352,21 @@ export default class QBittorrent implements TorrentClient {
 		);
 	}
 
-	isTorrentComplete(torrentInfo: TorrentInfo): boolean {
+	/**
+	 * @param infoHash the infohash of the torrent
+	 * @returns whether the torrent is complete
+	 */
+	async isTorrentComplete(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		const torrentInfo = await this.getTorrentInfo(infoHash);
+		if (!torrentInfo) {
+			return resultOfErr("NOT_FOUND");
+		}
+		return resultOf(this.isTorrentInfoComplete(torrentInfo));
+	}
+
+	isTorrentInfoComplete(torrentInfo: TorrentInfo): boolean {
 		return [
 			"uploading",
 			"pausedUP",
@@ -411,7 +425,7 @@ export default class QBittorrent implements TorrentClient {
 					}
 				: {
 						savePath: searcheeInfo!.save_path,
-						isComplete: this.isTorrentComplete(searcheeInfo!),
+						isComplete: this.isTorrentInfoComplete(searcheeInfo!),
 						autoTMM: searcheeInfo!.auto_tmm,
 						category: searcheeInfo!.category,
 					};

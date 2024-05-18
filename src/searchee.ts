@@ -170,19 +170,27 @@ export async function getReleaseAndKeys(
 
 export async function createEnsembleSearchees(
 	allSearchees: Searchee[],
+	useFilters: boolean,
 ): Promise<Searchee[]> {
 	const { seasonFromEpisodes } = getRuntimeConfig();
 	if (!seasonFromEpisodes) return [];
 
-	logger.verbose(`Creating virtual searchees for seasons...`);
+	function logReason(reason): void {
+		if (!useFilters) return;
+		logger.verbose(reason);
+	}
+
+	logReason(`Creating virtual searchees for seasons...`);
 	const seasonsMap = new Map<string, Searchee[]>();
-	for (const searchee of allSearchees) {
-		const key = await getSeasonKey(searchee.name);
-		if (key) {
-			if (seasonsMap.has(key)) {
-				seasonsMap.get(key)!.push(searchee);
-			} else {
-				seasonsMap.set(key, [searchee]);
+	if (useFilters) {
+		for (const searchee of allSearchees) {
+			const key = await getSeasonKey(searchee.name);
+			if (key) {
+				if (seasonsMap.has(key)) {
+					seasonsMap.get(key)!.push(searchee);
+				} else {
+					seasonsMap.set(key, [searchee]);
+				}
 			}
 		}
 	}
@@ -214,9 +222,9 @@ export async function createEnsembleSearchees(
 					episodesMap.set(key, new Map([[episode, [searchee]]]));
 				}
 			}
-			continue;
+			if (useFilters) continue;
 		}
-		if (SEASON_REGEX.test(searchee.name)) continue;
+		if (useFilters && SEASON_REGEX.test(searchee.name)) continue;
 		const releaseAndKeys = await getReleaseAndKeys(searchee.name);
 		if (releaseAndKeys) {
 			const [episode, ...keys] = releaseAndKeys;
@@ -242,7 +250,7 @@ export async function createEnsembleSearchees(
 					episodesMap.set(key, new Map([[episode, [searchee]]]));
 				}
 			}
-			continue;
+			if (useFilters) continue;
 		}
 	}
 
@@ -253,7 +261,7 @@ export async function createEnsembleSearchees(
 
 	const seasonSearchees: Searchee[] = [];
 	for (const [key, episodeSearchees] of episodesMap) {
-		if (episodeSearchees.size < 3) {
+		if (useFilters && episodeSearchees.size < 3) {
 			continue;
 		}
 		const episodes = Array.from(episodeSearchees.keys()).map((e) =>
@@ -261,8 +269,11 @@ export async function createEnsembleSearchees(
 		);
 		const highestEpisode = Math.max(...episodes);
 		const missingEpisodes = highestEpisode - episodes.length;
-		if (missingEpisodes / highestEpisode > 1 - seasonFromEpisodes) {
-			logger.verbose(
+		if (
+			useFilters &&
+			missingEpisodes / highestEpisode > 1 - seasonFromEpisodes
+		) {
+			logReason(
 				`Skipping virtual searchee for ${key} episodes as there are too many missing: ${missingEpisodes}/${highestEpisode}`,
 			);
 			continue;
@@ -311,25 +322,23 @@ export async function createEnsembleSearchees(
 			);
 		}
 		if (seasonSearchee.files.length === 0) {
-			logger.verbose(
+			logReason(
 				`Skipping virtual searchee for ${key} episodes as no files were found`,
 			);
 			continue;
 		}
-		if (Date.now() - newestFileAge < ms("8 days")) {
-			logger.verbose(
+		if (useFilters && Date.now() - newestFileAge < ms("8 days")) {
+			logReason(
 				`Skipping virtual searchee for ${key} episodes as some are too new: ${new Date(newestFileAge).toISOString()}`,
 			);
 			continue;
 		}
-		logger.verbose(
+		logReason(
 			`Created virtual searchee for ${key} ${episodeSearchees.size} episodes (${seasonSearchee.files.length} files) [${humanReadableSize(seasonSearchee.length)}]`,
 		);
 		seasonSearchees.push(seasonSearchee);
 	}
-	logger.verbose(
-		`Created ${seasonSearchees.length} virtual season searchees...`,
-	);
+	logReason(`Created ${seasonSearchees.length} virtual season searchees...`);
 
 	return seasonSearchees;
 }

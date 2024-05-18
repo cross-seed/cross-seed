@@ -1,9 +1,10 @@
 import ms from "ms";
 import { db } from "./db.js";
-import { main, scanRssFeeds } from "./pipeline.js";
+import { injectSavedTorrents, main, scanRssFeeds } from "./pipeline.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
+import { Action } from "./constants.js";
 
 class Job {
 	name: string;
@@ -36,11 +37,14 @@ class Job {
 }
 
 function getJobs(): Job[] {
-	const { rssCadence, searchCadence, torznab } = getRuntimeConfig();
+	const { action, rssCadence, searchCadence, torznab } = getRuntimeConfig();
 	const jobs: Job[] = [];
 	if (torznab.length > 0) {
 		if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
 		if (searchCadence) jobs.push(new Job("search", searchCadence, main));
+	}
+	if (action === Action.INJECT) {
+		jobs.push(new Job("inject", ms("1 hour"), injectSavedTorrents));
 	}
 	return jobs;
 }

@@ -9,6 +9,7 @@ export enum Label {
 	RTORRENT = "rtorrent",
 	TRANSMISSION = "transmission",
 	DELUGE = "deluge",
+	INJECT = "inject",
 	DECIDE = "decide",
 	PREFILTER = "prefilter",
 	CONFIGDUMP = "configdump",

@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { existsSync, linkSync, mkdirSync, statSync, symlinkSync } from "fs";
+import { existsSync, linkSync, mkdirSync, rm, statSync, symlinkSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
@@ -23,18 +23,32 @@ import {
 import { saveTorrentFile } from "./torrent.js";
 import { getMediaType } from "./utils.js";
 
-function logInjectionResult(
-	result: InjectionResult,
+function logActionResult(
+	result: ActionResult,
+	newMeta: Metafile,
+	searchee: Searchee,
 	tracker: string,
-	name: string,
 	decision: Decision,
-	source: SearcheeSource,
 ) {
-	const styledName = chalk.green.bold(name);
-	const styledTracker = chalk.bold(tracker);
-	const foundBy = `Found ${styledName} on ${styledTracker} by`;
+	const metaLog = `${chalk.green.bold(newMeta.name)} ${chalk.dim(`[${newMeta.infoHash.slice(0, 8)}...]`)}`;
+	const searcheeLog = searchee.infoHash
+		? `${chalk.magenta.bold(searchee.name)} ${chalk.dim(`[${searchee.infoHash.slice(0, 8)}...]`)}`
+		: searchee.path
+			? chalk.magenta.bold(searchee.path)
+			: chalk.magenta.bold(searchee.name);
+	const source = searchee.infoHash
+		? `${SearcheeSource.TORRENT} (${searcheeLog})`
+		: searchee.path
+			? `${SearcheeSource.DATA} (${searcheeLog})`
+			: `${SearcheeSource.VIRTUAL} (${searcheeLog})`;
+	const foundBy = `Found ${metaLog} on ${chalk.bold(tracker)} by`;
 
 	switch (result) {
+		case SaveResult.SAVED:
+			logger.info(
+				`${foundBy} ${chalk.green.bold(decision)} from ${source} - saved`,
+			);
+			break;
 		case InjectionResult.SUCCESS:
 			logger.info(
 				`${foundBy} ${chalk.green.bold(decision)} from ${source} - injected`,
@@ -49,7 +63,7 @@ function logInjectionResult(
 			logger.warn(
 				`${foundBy} ${chalk.yellow(
 					decision,
-				)} from ${source} - skipping incomplete torrent`,
+				)} from ${source} - incomplete torrent, saving...`,
 			);
 			break;
 		case InjectionResult.FAILURE:
@@ -156,6 +170,21 @@ function linkVirtualSearchee(
 	return join(destinationDir, newMeta.name);
 }
 
+function unlinkMetafile(meta: Metafile, destinationDir: string) {
+	const file = meta.files[0];
+	let rootFolder = file.path;
+	let parent = dirname(rootFolder);
+	while (parent !== ".") {
+		rootFolder = parent;
+		parent = dirname(rootFolder);
+	}
+	const fullPath = join(destinationDir, rootFolder);
+	if (fullPath === destinationDir) return; // Should never happen
+	if (!existsSync(fullPath)) return;
+	logger.verbose(`Unlinking ${fullPath}`);
+	rm(fullPath, { recursive: true }, () => {});
+}
+
 async function linkAllFilesInMetafile(
 	searchee: Searchee,
 	newMeta: Metafile,
@@ -255,26 +284,18 @@ export async function performAction(
 		| Decision.MATCH_PARTIAL,
 	searchee: Searchee,
 	tracker: string,
+	unlinkOk = true,
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 
-	const source = searchee.infoHash
-		? SearcheeSource.TORRENT
-		: searchee.path
-			? SearcheeSource.DATA
-			: SearcheeSource.VIRTUAL;
-
 	if (action === Action.SAVE) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
-		const styledName = chalk.green.bold(newMeta.name);
-		const styledTracker = chalk.bold(tracker);
-		logger.info(
-			`Found ${styledName} on ${styledTracker} by ${decision} from ${source} - saved`,
-		);
+		logActionResult(SaveResult.SAVED, newMeta, searchee, tracker, decision);
 		return SaveResult.SAVED;
 	}
 
 	let destinationDir: string | undefined;
+	let wasLinked = false;
 
 	if (linkDir) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
@@ -285,6 +306,7 @@ export async function performAction(
 		);
 		if (linkedFilesRootResult.isOk()) {
 			destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
+			wasLinked = true;
 		} else if (
 			decision === Decision.MATCH &&
 			(searchee.path || searchee.infoHash) &&
@@ -295,18 +317,21 @@ export async function performAction(
 				destinationDir = dirname(searchee.path);
 			}
 		} else {
-			logger.error(
-				`Failed to link files for ${newMeta.name}: ${linkedFilesRootResult.unwrapErrOrThrow()}`,
-			);
-			logInjectionResult(
-				InjectionResult.FAILURE,
+			const result = linkedFilesRootResult.unwrapErrOrThrow();
+			logger.error(`Failed to link files for ${newMeta.name}: ${result}`);
+			const injectionResult =
+				result === "TORRENT_NOT_COMPLETE"
+					? InjectionResult.TORRENT_NOT_COMPLETE
+					: InjectionResult.FAILURE;
+			logActionResult(
+				injectionResult,
+				newMeta,
+				searchee,
 				tracker,
-				newMeta.name,
 				decision,
-				source,
 			);
 			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
-			return InjectionResult.FAILURE;
+			return injectionResult;
 		}
 	} else if (searchee.path) {
 		// should be a MATCH, as risky requires a linkDir to be set
@@ -319,8 +344,22 @@ export async function performAction(
 		destinationDir,
 	);
 
-	logInjectionResult(result, tracker, newMeta.name, decision, source);
-	if (result === InjectionResult.FAILURE) {
+	logActionResult(result, newMeta, searchee, tracker, decision);
+	if (
+		[
+			InjectionResult.FAILURE,
+			InjectionResult.TORRENT_NOT_COMPLETE,
+		].includes(result)
+	) {
+		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
+		if (unlinkOk && wasLinked && destinationDir) {
+			unlinkMetafile(newMeta, destinationDir);
+		}
+	} else if (
+		result === InjectionResult.SUCCESS &&
+		decision === Decision.MATCH_PARTIAL
+	) {
+		// For an easy re-injection user workflow when multiple MATCH_PARTIAL
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 	}
 	return result;

@@ -81,10 +81,10 @@ const createReasonLogger =
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
 				reason = `it has a different release group - (${searchee.name
-					.match(RELEASE_GROUP_REGEX)?.[0]
-					?.trim()} -> ${candidate.name
-					.match(RELEASE_GROUP_REGEX)?.[0]
-					?.trim()})`;
+					.match(RELEASE_GROUP_REGEX)
+					?.groups?.group?.trim()} -> ${candidate.name
+					.match(RELEASE_GROUP_REGEX)
+					?.groups?.group?.trim()})`;
 				break;
 			case Decision.PROPER_REPACK_MISMATCH:
 				reason = `one is a different subsequent release - (${
@@ -220,12 +220,12 @@ function releaseGroupDoesMatch(
 	matchMode: MatchMode,
 ) {
 	const searcheeReleaseGroup = searcheeName
-		.match(RELEASE_GROUP_REGEX)?.[0]
-		?.trim()
+		.match(RELEASE_GROUP_REGEX)
+		?.groups?.group?.trim()
 		?.toLowerCase();
 	const candidateReleaseGroup = candidateName
-		.match(RELEASE_GROUP_REGEX)?.[0]
-		?.trim()
+		.match(RELEASE_GROUP_REGEX)
+		?.groups?.group?.trim()
 		?.toLowerCase();
 	if (searcheeReleaseGroup === candidateReleaseGroup) {
 		return true;
@@ -237,37 +237,59 @@ function releaseGroupDoesMatch(
 	return searcheeReleaseGroup.startsWith(candidateReleaseGroup);
 }
 
-async function assessCandidateHelper(
-	{ link, size, name, tracker }: Candidate,
+export async function assessCandidateHelper(
+	metaOrCandidate: Candidate | Metafile,
 	searchee: Searchee,
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { matchMode, blockList } = getRuntimeConfig();
+
+	// When metaOrCandidate is a Metafile, skip straight to the
+	// main matching algorithms as we don't need pre-download filtering.
+	let name: string;
+	let size: number;
+	const isMeta = metaOrCandidate instanceof Metafile;
+	if (isMeta) {
+		name = metaOrCandidate.name;
+		size = metaOrCandidate.length;
+	} else {
+		name = metaOrCandidate.name;
+		size = metaOrCandidate.size;
+	}
+
 	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
 		return { decision: Decision.BLOCKED_RELEASE };
 	}
 
-	if (size && !sizeDoesMatch(size, searchee)) {
+	if (!isMeta && size && !sizeDoesMatch(size, searchee)) {
 		return { decision: Decision.SIZE_MISMATCH };
 	}
 
-	if (!link) return { decision: Decision.NO_DOWNLOAD_LINK };
+	if (!isMeta && !metaOrCandidate.link)
+		return { decision: Decision.NO_DOWNLOAD_LINK };
 
-	if (!releaseGroupDoesMatch(searchee.name, name, matchMode)) {
+	if (!isMeta && !releaseGroupDoesMatch(searchee.name, name, matchMode)) {
 		return { decision: Decision.RELEASE_GROUP_MISMATCH };
 	}
-	if (!releaseVersionDoesMatch(searchee.name, name, matchMode)) {
+	if (!isMeta && !releaseVersionDoesMatch(searchee.name, name, matchMode)) {
 		return { decision: Decision.PROPER_REPACK_MISMATCH };
 	}
-	const result = await snatch(link, tracker);
 
-	if (result.isErr()) {
-		return result.unwrapErrOrThrow() === SnatchError.RATE_LIMITED
-			? { decision: Decision.RATE_LIMITED }
-			: { decision: Decision.DOWNLOAD_FAILED };
+	let candidateMeta: Metafile;
+	if (isMeta) {
+		candidateMeta = metaOrCandidate;
+	} else {
+		const result = await snatch(
+			metaOrCandidate.link,
+			metaOrCandidate.tracker,
+		);
+		if (result.isErr()) {
+			return result.unwrapErrOrThrow() === SnatchError.RATE_LIMITED
+				? { decision: Decision.RATE_LIMITED }
+				: { decision: Decision.DOWNLOAD_FAILED };
+		}
+		candidateMeta = result.unwrapOrThrow();
 	}
-
-	const candidateMeta = result.unwrapOrThrow();
 
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };

@@ -1,6 +1,6 @@
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
-import { dirname, extname, join, resolve } from "path";
+import { basename, dirname, extname, join, resolve } from "path";
 import { inspect } from "util";
 import { USER_AGENT } from "./constants.js";
 import { db, memDB } from "./db.js";
@@ -15,15 +15,23 @@ import {
 } from "./searchee.js";
 import {
 	getLargestFile,
+	MediaType,
 	reformatTitleForSearching,
 	stripExtension,
 } from "./utils.js";
 import { getClient } from "./clients/TorrentClient.js";
+import { existsSync, utimesSync } from "fs";
 
 export interface TorrentLocator {
 	infoHash?: string;
 	name?: string;
 	path?: string;
+}
+
+export interface TorrentNameInfo {
+	name?: string;
+	mediaType?: MediaType;
+	tracker?: string;
 }
 
 export enum SnatchError {
@@ -130,10 +138,40 @@ export async function saveTorrentFile(
 ): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
 	const buf = meta.encode();
-	const filename = `[${tag}][${tracker}]${stripExtension(
-		meta.getFileSystemSafeName(),
-	)}.torrent`;
-	await writeFile(join(outputDir, filename), buf, { mode: 0o644 });
+	// Be sure to update parseInfoFromSavedTorrent if changing the format
+	const filePath = join(
+		outputDir,
+		`[${tag}][${tracker}]${stripExtension(
+			meta.getFileSystemSafeName(),
+		)}[${meta.infoHash}].torrent`,
+	);
+	if (existsSync(filePath)) {
+		utimesSync(filePath, new Date(), new Date());
+		return;
+	}
+	await writeFile(filePath, buf, { mode: 0o644 });
+}
+
+export async function parseInfoFromSavedTorrent(
+	filename: string,
+): Promise<TorrentNameInfo> {
+	try {
+		const baseName = basename(filename);
+		const name = baseName.split("]")[2].split(".torrent")[0];
+		const mediaType = baseName
+			.split("[")[1]
+			.split("]")[0]
+			.toLowerCase() as MediaType;
+		const tracker = baseName.split("[")[2].split("]")[0];
+		if (!Object.values(MediaType).includes(mediaType)) {
+			throw new Error(`Invalid media type: ${mediaType}`);
+		}
+		return { name, mediaType, tracker };
+	} catch (e) {
+		logger.error(`Failed to parse info from filename: ${filename}`);
+		logger.debug(e);
+		return {};
+	}
 }
 
 export async function findAllTorrentFilesInDir(

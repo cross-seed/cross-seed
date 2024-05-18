@@ -121,6 +121,7 @@ export const VALIDATION_SCHEMA = z
 		maxDataDepth: z.number().gte(1),
 		torrentDir: z.string().nullable(),
 		outputDir: z.string(),
+		injectDir: z.string().optional(),
 		includeEpisodes: z.boolean(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),

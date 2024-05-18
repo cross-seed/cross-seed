@@ -289,6 +289,22 @@ export default class RTorrent implements TorrentClient {
 		return dirs;
 	}
 
+	async isTorrentComplete(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		try {
+			const response = await this.methodCallP<string[]>("d.complete", [
+				infoHash,
+			]);
+			if (response.length === 0) {
+				return resultOfErr("NOT_FOUND");
+			}
+			return resultOf(response[0] === "1");
+		} catch (e) {
+			return resultOfErr("NOT_FOUND");
+		}
+	}
+
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,

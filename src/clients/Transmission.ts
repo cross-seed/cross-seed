@@ -182,6 +182,23 @@ export default class Transmission implements TorrentClient {
 		return downloadDirs;
 	}
 
+	async isTorrentComplete(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		const queryResponse = await this.request<TorrentGetResponseArgs>(
+			"torrent-get",
+			{
+				fields: ["percentDone"],
+				ids: [infoHash],
+			},
+		);
+		if (queryResponse.torrents.length === 0) {
+			return resultOfErr("NOT_FOUND");
+		}
+		const [{ percentDone }] = queryResponse.torrents;
+		return resultOf(percentDone === 1);
+	}
+
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,

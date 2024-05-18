@@ -73,6 +73,7 @@ export const IGNORED_FOLDERS_REGEX =
 	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
+export const UNKNOWN_TRACKER = "UnknownTracker";
 
 export enum Action {
 	SAVE = "save",

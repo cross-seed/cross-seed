@@ -68,7 +68,7 @@ export class PushNotifier {
 export function sendResultsNotification(
 	searchee: Searchee,
 	results: [ResultAssessment, TrackerName, ActionResult][],
-	source: Label.REVERSE_LOOKUP | Label.SEARCH,
+	source: Label.REVERSE_LOOKUP | Label.SEARCH | Label.INJECT,
 ) {
 	const name = searchee.name;
 	const notableSuccesses = results.filter(
