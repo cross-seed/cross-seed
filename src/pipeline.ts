@@ -48,13 +48,13 @@ import {
 	parseTorrentFromFilename,
 	TorrentLocator,
 } from "./torrent.js";
-import { queryRssFeeds, searchTorznab } from "./torznab.js";
 import {
-	filterAsync,
-	humanReadableSize,
-	isTruthy,
-	stripExtension,
-} from "./utils.js";
+	getSearchString,
+	IndexerCandidates,
+	queryRssFeeds,
+	searchTorznab,
+} from "./torznab.js";
+import { humanReadableSize, isTruthy, stripExtension } from "./utils.js";
 import { Metafile } from "./parseTorrent.js";
 import { getClient } from "./clients/TorrentClient.js";
 
@@ -98,6 +98,7 @@ async function assessCandidates(
 async function findOnOtherSites(
 	searchee: Searchee,
 	hashesToExclude: string[],
+	prevCandidates: Map<string, IndexerCandidates[]>,
 ): Promise<FoundOnOtherSites> {
 	// make sure searchee is in database
 	await db("searchee")
@@ -105,9 +106,18 @@ async function findOnOtherSites(
 		.onConflict("name")
 		.ignore();
 
-	let response: { indexerId: number; candidates: Candidate[] }[];
+	let response: IndexerCandidates[];
+	let searchedCacheOnly = false;
 	try {
-		response = await searchTorznab(searchee);
+		const searchStr = await getSearchString(searchee);
+		response = await searchTorznab(searchee, prevCandidates, searchStr);
+		if (
+			response.length > 0 &&
+			response.length === prevCandidates.get(searchStr)?.length
+		) {
+			searchedCacheOnly = true;
+		}
+		prevCandidates.set(searchStr, response);
 	} catch (e) {
 		if (!e.message.includes("SKIPPED")) {
 			logger.error(`error searching for ${searchee.name}`);
@@ -115,6 +125,7 @@ async function findOnOtherSites(
 		}
 		return { searchedIndexers: 0, matches: 0 };
 	}
+	const searchedIndexers = searchedCacheOnly ? 0 : response.length;
 
 	const results: Candidate[] = response.flatMap((e) =>
 		e.candidates.map((candidate) => ({
@@ -153,7 +164,7 @@ async function findOnOtherSites(
 	const actionResults = await performActions(searchee, matches);
 	if (actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
 		// If the torrent is not complete, "cancel the search"
-		return { matches: 0, searchedIndexers: 0 };
+		return { searchedIndexers: 0, matches: 0 };
 	}
 
 	await updateSearchTimestamps(searchee.name, Array.from(notRateLimited));
@@ -171,7 +182,7 @@ async function findOnOtherSites(
 	);
 	sendResultsNotification(searchee, zipped, Label.SEARCH);
 
-	return { matches: matches.length, searchedIndexers: response.length };
+	return { searchedIndexers, matches: matches.length };
 }
 
 async function findMatchesBatch(
@@ -181,23 +192,30 @@ async function findMatchesBatch(
 	const { delay } = getRuntimeConfig();
 
 	let totalFound = 0;
+	let prevSearchTime = 0;
+	const prevCandidates = new Map<string, IndexerCandidates[]>();
 	for (const [i, sample] of samples.entries()) {
 		try {
-			const sleep = new Promise((r) => setTimeout(r, delay * 1000));
+			const sleepTime = delay * 1000 - (Date.now() - prevSearchTime);
+			if (sleepTime > 0) {
+				await new Promise((r) => setTimeout(r, sleepTime));
+			}
+			const searchTime = Date.now();
 
 			const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
 			const name = stripExtension(sample.name);
 			logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
 
-			const { matches, searchedIndexers } = await findOnOtherSites(
+			const { searchedIndexers, matches } = await findOnOtherSites(
 				sample,
 				hashesToExclude,
+				prevCandidates,
 			);
 			totalFound += matches;
 
-			// if all indexers were rate limited, don't sleep
+			// if all indexers were rate limited or cached, don't sleep
 			if (searchedIndexers === 0) continue;
-			await sleep;
+			prevSearchTime = searchTime;
 		} catch (e) {
 			logger.error(`error searching for ${sample.name}`);
 			logger.debug(e);
@@ -224,11 +242,13 @@ export async function searchForLocalTorrentByCriteria(
 	}
 	const hashesToExclude = await getInfoHashesToExclude();
 	let matches = 0;
+	const prevCandidates = new Map<string, IndexerCandidates[]>();
 	for (let i = 0; i < searchees.length; i++) {
 		if (!filterByContent(searchees[i])) return null;
 		const foundOnOtherSites = await findOnOtherSites(
 			searchees[i],
 			hashesToExclude,
+			prevCandidates,
 		);
 		matches += foundOnOtherSites.matches;
 	}
@@ -367,19 +387,48 @@ async function findSearchableTorrents(useFilters: boolean) {
 		useFilters,
 	);
 	if (useFilters) {
-		const filteredTorrents = await filterAsync(
-			filterDupes(allSearchees).filter(filterByContent),
-			filterTimestamps,
-		);
+		const filteredTorrents =
+			filterDupes(allSearchees).filter(filterByContent);
 		finalSearchees.push(...filteredTorrents);
 	} else {
 		finalSearchees.unshift(...allSearchees); // Check actual torrents first
 		return { samples: finalSearchees, hashesToExclude };
 	}
 
+	// Group the exact same search queries together for easy cache use later
+	const grouping = new Map<string, Searchee[]>();
+	for (const searchee of finalSearchees) {
+		const key = await getSearchString(searchee);
+		if (!grouping.has(key)) {
+			grouping.set(key, []);
+		}
+		grouping.get(key)!.push(searchee);
+	}
+	const keysToDelete: string[] = [];
+	for (const [key, searchees] of grouping) {
+		// If one searchee needs to be searched, use the candidates for all
+		const results = await Promise.all(searchees.map(filterTimestamps));
+		if (!results.some(isTruthy)) {
+			keysToDelete.push(key);
+			continue;
+		}
+		// Sort by most number files (less chance of partial) then if infoHash
+		searchees.sort((a, b) => {
+			if (a.files.length !== b.files.length) {
+				return b.files.length - a.files.length;
+			}
+			if (a.infoHash) return -1;
+			return 1;
+		});
+	}
+	for (const key of keysToDelete) {
+		grouping.delete(key);
+	}
+	finalSearchees = Array.from(grouping.values()).flat();
+
 	logger.info({
 		label: Label.SEARCH,
-		message: `Found ${allSearchees.length} torrents, ${finalSearchees.length} suitable to search for matches`,
+		message: `Found ${allSearchees.length} torrents, ${finalSearchees.length} suitable to search for matches using ${grouping.size} unique queries`,
 	});
 
 	if (searchLimit && finalSearchees.length > searchLimit) {

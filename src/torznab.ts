@@ -103,6 +103,8 @@ interface TorznabResult {
 
 type TorznabResults = { rss?: { channel?: [] | [{ item?: TorznabResult[] }] } };
 
+export type IndexerCandidates = { indexerId: number; candidates: Candidate[] };
+
 function parseTorznabResults(xml: TorznabResults): Candidate[] {
 	const items = xml?.rss?.channel?.[0]?.item;
 	if (!items || !Array.isArray(items)) {
@@ -177,16 +179,19 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 
 async function createTorznabSearchQueries(
 	searchee: Searchee,
-	ids: ExternalIds,
-	caps: Caps,
+	ids?: ExternalIds,
+	caps?: Caps,
 ): Promise<TorznabParams[]> {
 	const nameWithoutExtension = stripExtension(searchee.name);
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
-	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
+	let relevantIds: IdSearchParams = {};
+	if (ids && caps) {
+		relevantIds = await getRelevantArrIds(searchee, ids, caps);
+	}
 	const shouldUseIdSearch = Object.values(relevantIds).some((id) => id);
 	const mediaType = getMediaType(searchee);
-	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
+	if (mediaType === MediaType.EPISODE && (!caps || caps.tvSearch)) {
 		const match = nameWithoutExtension.match(EP_REGEX);
 		const groups = match!.groups!;
 		return [
@@ -204,7 +209,7 @@ async function createTorznabSearchQueries(
 				...relevantIds,
 			},
 		] as const;
-	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
+	} else if (mediaType === MediaType.SEASON && (!caps || caps.tvSearch)) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
 		const groups = match!.groups!;
 		return [
@@ -217,7 +222,7 @@ async function createTorznabSearchQueries(
 				...relevantIds,
 			},
 		] as const;
-	} else if (mediaType === MediaType.MOVIE && caps.movieSearch) {
+	} else if (mediaType === MediaType.MOVIE && (!caps || caps.movieSearch)) {
 		return [
 			{
 				t: "movie",
@@ -229,10 +234,17 @@ async function createTorznabSearchQueries(
 		] as const;
 	} else if (mediaType === MediaType.ANIME) {
 		const animeQueries = getAnimeQueries(nameWithoutExtension);
-		return animeQueries.map((animeQuery) => ({
-			t: "search",
-			q: animeQuery,
-		}));
+		return animeQueries.length > 0
+			? animeQueries.map((animeQuery) => ({
+					t: "search",
+					q: animeQuery,
+				}))
+			: ([
+					{
+						t: "search",
+						q: reformatTitleForSearching(nameWithoutExtension),
+					},
+				] as const);
 	} else {
 		return [
 			{
@@ -241,6 +253,13 @@ async function createTorznabSearchQueries(
 			},
 		] as const;
 	}
+}
+
+export async function getSearchString(searchee: Searchee): Promise<string> {
+	const params = (await createTorznabSearchQueries(searchee))[0];
+	const season = params.season !== undefined ? `.S${params.season}` : "";
+	const ep = params.ep !== undefined ? `.E${params.ep}` : "";
+	return `${params.q}${season}${ep}`.toLowerCase();
 }
 
 export function indexerDoesSupportMediaType(
@@ -274,7 +293,9 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 
 export async function searchTorznab(
 	searchee: Searchee,
-): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+	prevCandidates: Map<string, IndexerCandidates[]>,
+	searchStr: string,
+): Promise<IndexerCandidates[]> {
 	const { torznab } = getRuntimeConfig();
 	if (torznab.length === 0) {
 		throw new Error("no indexers are available");
@@ -298,30 +319,38 @@ export async function searchTorznab(
 			lastSearched: "timestamp.last_searched",
 		});
 	try {
-		const indexersToUse = await getAndLogIndexers(
+		const indexersToSearch = await getAndLogIndexers(
 			enabledIndexers,
 			timestampDataSql,
 			name,
 			searchee,
+			prevCandidates,
+			searchStr,
 		);
 
 		const searcheeIds =
-			indexersToUse.length > 0 ? await getAvailableArrIds(searchee) : {};
-		return await makeRequests(indexersToUse, async (indexer) => {
-			const caps = {
-				search: indexer.searchCap,
-				tvSearch: indexer.tvSearchCap,
-				movieSearch: indexer.movieSearchCap,
-				tvIdSearch: JSON.parse(indexer.tvIdCaps),
-				movieIdSearch: JSON.parse(indexer.movieIdCaps),
-				categories: JSON.parse(indexer.categories),
-			};
-			return await createTorznabSearchQueries(
-				searchee,
-				searcheeIds,
-				caps,
-			);
-		});
+			indexersToSearch.length > 0
+				? await getAvailableArrIds(searchee)
+				: {};
+		const indexerCandidates = await makeRequests(
+			indexersToSearch,
+			async (indexer) => {
+				const caps = {
+					search: indexer.searchCap,
+					tvSearch: indexer.tvSearchCap,
+					movieSearch: indexer.movieSearchCap,
+					tvIdSearch: JSON.parse(indexer.tvIdCaps),
+					movieIdSearch: JSON.parse(indexer.movieIdCaps),
+					categories: JSON.parse(indexer.categories),
+				};
+				return await createTorznabSearchQueries(
+					searchee,
+					searcheeIds,
+					caps,
+				);
+			},
+		);
+		return [...(prevCandidates.get(searchStr) ?? []), ...indexerCandidates];
 	} catch (e) {
 		throw new Error(e);
 	}
@@ -554,7 +583,7 @@ export async function validateTorznabUrls() {
 async function makeRequests(
 	indexers: Indexer[],
 	getQueries: (indexer: Indexer) => Promise<TorznabParams[]>,
-): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+): Promise<IndexerCandidates[]> {
 	const { searchTimeout } = getRuntimeConfig();
 	const searchUrls = await Promise.all(
 		indexers.flatMap(async (indexer: Indexer) =>
@@ -639,6 +668,8 @@ async function getAndLogIndexers(
 	timestampDataSql,
 	name: string,
 	searchee: Searchee,
+	prevCandidates: Map<string, IndexerCandidates[]>,
+	searchStr: string,
 ) {
 	const { excludeRecentSearch, excludeOlder, seasonFromEpisodes } =
 		getRuntimeConfig();
@@ -691,20 +722,33 @@ async function getAndLogIndexers(
 				? "supported category)"
 				: "and supported category)";
 	}
-	if (indexersToUse.length === 0) {
+
+	// Invalidate cache if unrelated searchee
+	if (!prevCandidates.has(searchStr)) {
+		prevCandidates.clear();
+	}
+	const cachedCandidates = prevCandidates.get(searchStr) ?? [];
+	const indexersToSearch = indexersToUse.filter((indexer) => {
+		return !cachedCandidates.some(
+			(candidates) => candidates.indexerId === indexer.id,
+		);
+	});
+
+	if (indexersToSearch.length === 0 && cachedCandidates.length === 0) {
 		logger.info({
 			label: Label.TORZNAB,
 			message: `${skippingSearching(skippingIndexersCallout)}`,
 		});
 		throw new Error("SKIPPED");
 	}
-	const skippingIndexers = `(${mediaTypeStr}) Searching ${indexersToUse.length} indexers for ${name}${skippingIndexersCallout}`;
+
+	const skippingIndexers = `(${mediaTypeStr}) Using ${indexersToSearch.length}|${cachedCandidates.length} indexers by search|cache for ${name}${skippingIndexersCallout}`;
 
 	logger.info({
 		label: Label.TORZNAB,
 		message: skippingIndexers,
 	});
 
-	return indexersToUse;
+	return indexersToSearch;
 }
 export { sanitizeUrl, getApikey };

@@ -151,6 +151,8 @@ export function getAnimeQueries(name: string): string[] {
 		animeQueries.push(cleanseSeparators(`${title} ${release}`));
 	}
 	if (altTitle) {
+		if (altTitle.toLowerCase() === "season") return animeQueries;
+		if (altTitle.toLowerCase() === "ep") return animeQueries;
 		animeQueries.push(cleanseSeparators(`${altTitle} ${release}`));
 	}
 	return animeQueries;

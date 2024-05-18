@@ -116,6 +116,9 @@ type TimestampDataSql = {
 };
 
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
+	if (!searchee.infoHash && !searchee.path) {
+		return true; // Ensemble does it's own timestamp filtering
+	}
 	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
 	const enabledIndexers = await getEnabledIndexers();
 	const mediaType = getMediaType(searchee);
