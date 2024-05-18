@@ -17,7 +17,11 @@ import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
-import { humanReadableSize } from "./utils.js";
+import {
+	getFuzzySizeFactor,
+	getMinSizeRatio,
+	humanReadableSize,
+} from "./utils.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -107,12 +111,21 @@ export function compareFileTrees(
 	candidate: Metafile,
 	searchee: Searchee,
 ): boolean {
-	const cmp = (elOfA: File, elOfB: File) => {
-		const lengthsAreEqual = elOfB.length === elOfA.length;
-		const pathsAreEqual = elOfB.path === elOfA.path;
-
-		return lengthsAreEqual && pathsAreEqual;
-	};
+	let cmp: (elOfA: File, elOfB: File) => boolean;
+	if (!searchee.infoHash && !searchee.path) {
+		// Absolute path so need name
+		cmp = (elOfA: File, elOfB: File) => {
+			const lengthsAreEqual = elOfB.length === elOfA.length;
+			const namesAreEqual = elOfB.name === elOfA.name;
+			return lengthsAreEqual && namesAreEqual;
+		};
+	} else {
+		cmp = (elOfA: File, elOfB: File) => {
+			const lengthsAreEqual = elOfB.length === elOfA.length;
+			const pathsAreEqual = elOfB.path === elOfA.path;
+			return lengthsAreEqual && pathsAreEqual;
+		};
+	}
 
 	return candidate.files.every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB)),
@@ -136,7 +149,6 @@ export function compareFileTreesPartialIgnoringNames(
 	candidate: Metafile,
 	searchee: Searchee,
 ): boolean {
-	const { fuzzySizeThreshold } = getRuntimeConfig();
 	let matchedSizes = 0;
 	for (const candidateFile of candidate.files) {
 		const searcheeHasFileSize = searchee.files.some(
@@ -146,14 +158,13 @@ export function compareFileTreesPartialIgnoringNames(
 			matchedSizes += candidateFile.length;
 		}
 	}
-	return matchedSizes / candidate.length >= 1 - fuzzySizeThreshold;
+	return matchedSizes / candidate.length >= getMinSizeRatio(searchee);
 }
 
 export function compareFileTreesPartial(
 	candidate: Metafile,
 	searchee: Searchee,
 ): boolean {
-	const { fuzzySizeThreshold } = getRuntimeConfig();
 	let matchedSizes = 0;
 	for (const candidateFile of candidate.files) {
 		let matchedSearcheeFiles = searchee.files.filter(
@@ -170,15 +181,15 @@ export function compareFileTreesPartial(
 	}
 	const totalPieces = Math.ceil(candidate.length / candidate.pieceLength);
 	const availablePieces = Math.floor(matchedSizes / candidate.pieceLength);
-	return availablePieces / totalPieces >= 1 - fuzzySizeThreshold;
+	return availablePieces / totalPieces >= getMinSizeRatio(searchee);
 }
 
 function sizeDoesMatch(resultSize: number, searchee: Searchee) {
-	const { fuzzySizeThreshold } = getRuntimeConfig();
+	const fuzzySizeFactor = getFuzzySizeFactor(searchee);
 
 	const { length } = searchee;
-	const lowerBound = length - fuzzySizeThreshold * length;
-	const upperBound = length + fuzzySizeThreshold * length;
+	const lowerBound = length - fuzzySizeFactor * length;
+	const upperBound = length + fuzzySizeFactor * length;
 	return resultSize >= lowerBound && resultSize <= upperBound;
 }
 function releaseVersionDoesMatch(

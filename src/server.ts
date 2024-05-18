@@ -11,6 +11,7 @@ import {
 } from "./pipeline.js";
 import { InjectionResult, SaveResult } from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -137,6 +138,7 @@ async function announce(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	const { seasonFromEpisodes } = getRuntimeConfig();
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -177,7 +179,16 @@ async function announce(
 	const candidate = data as Candidate;
 	try {
 		await indexNewTorrents();
-		const result = await checkNewCandidateMatch(candidate);
+		let result = await checkNewCandidateMatch(candidate, false);
+		if (seasonFromEpisodes) {
+			const res = await checkNewCandidateMatch(candidate, true);
+			if (
+				result !== InjectionResult.SUCCESS &&
+				(res === InjectionResult.SUCCESS || res === SaveResult.SAVED)
+			) {
+				result = res;
+			}
+		}
 		const isOk =
 			result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
 		if (!isOk) {

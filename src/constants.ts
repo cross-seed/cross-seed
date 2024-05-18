@@ -19,6 +19,9 @@ export const ANIME_REGEX =
 export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w ]+?)(?:\[.+\])?(?:\))?(?=(?:\.\w{1,5})?$)/i;
 export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[ipx])\b/i;
+export const RES_STRICT_REGEX = /(?<resolution>(?:2160|1080|720)[pi])/;
+export const SOURCE_REGEX =
+	/(?<source>\b(amzn|amazon(hd)?)\b|\b(atvp|aptv)\b|\b(dsnp|dsny|disney)\b|\b(hbo)(?![ ._-]max)\b|\b(hmax|hbom|hbo[ ._-]max)\b|\b((?<!hbo[ ._-])max)\b|\b(nf|netflix(u?hd)?)\b|\b(pcok|peacock)\b|\b(pmtp|Paramount Plus)\b|\b(hulu)\b)/i;
 
 export const REPACK_PROPER_REGEX =
 	/(?:\b(?<type>(?:REPACK|PROPER|\d\v\d)\d?))|(?<arrtype>(?:Proper|v\d))\b/;
@@ -85,6 +88,12 @@ export enum InjectionResult {
 
 export enum SaveResult {
 	SAVED = "SAVED",
+}
+
+export enum SearcheeSource {
+	TORRENT = "torrentDir",
+	DATA = "dataDir",
+	VIRTUAL = "virtual",
 }
 
 export type ActionResult = InjectionResult | SaveResult;

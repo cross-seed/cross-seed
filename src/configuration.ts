@@ -18,6 +18,7 @@ export interface FileConfig {
 	outputDir?: string;
 	rtorrentRpcUrl?: string;
 	includeNonVideos?: boolean;
+	seasonFromEpisodes?: number;
 	fuzzySizeThreshold?: number;
 	excludeOlder?: string;
 	excludeRecentSearch?: string;

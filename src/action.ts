@@ -9,12 +9,17 @@ import {
 	InjectionResult,
 	LinkType,
 	SaveResult,
+	SearcheeSource,
 } from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
+import {
+	createSearcheeFromPath,
+	Searchee,
+	SearcheeWithInfoHash,
+} from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getMediaType } from "./utils.js";
 
@@ -23,6 +28,7 @@ function logInjectionResult(
 	tracker: string,
 	name: string,
 	decision: Decision,
+	source: SearcheeSource,
 ) {
 	const styledName = chalk.green.bold(name);
 	const styledTracker = chalk.bold(tracker);
@@ -30,16 +36,20 @@ function logInjectionResult(
 
 	switch (result) {
 		case InjectionResult.SUCCESS:
-			logger.info(`${foundBy} ${chalk.green.bold(decision)} - injected`);
+			logger.info(
+				`${foundBy} ${chalk.green.bold(decision)} from ${source} - injected`,
+			);
 			break;
 		case InjectionResult.ALREADY_EXISTS:
-			logger.info(`${foundBy} ${chalk.yellow(decision)} - exists`);
+			logger.info(
+				`${foundBy} ${chalk.yellow(decision)} from ${source} - exists`,
+			);
 			break;
 		case InjectionResult.TORRENT_NOT_COMPLETE:
 			logger.warn(
-				`${foundBy} by ${chalk.yellow(
+				`${foundBy} ${chalk.yellow(
 					decision,
-				)} - skipping incomplete torrent`,
+				)} from ${source} - skipping incomplete torrent`,
 			);
 			break;
 		case InjectionResult.FAILURE:
@@ -47,7 +57,7 @@ function logInjectionResult(
 			logger.error(
 				`${foundBy} ${chalk.red(
 					decision,
-				)} - failed to inject, saving...`,
+				)} from ${source} - failed to inject, saving...`,
 			);
 			break;
 	}
@@ -122,6 +132,30 @@ function fuzzyLinkPartial(
 	return join(destinationDir, newMeta.name);
 }
 
+function linkVirtualSearchee(
+	searchee: Searchee,
+	newMeta: Metafile,
+	destinationDir: string,
+): string {
+	for (const newFile of newMeta.files) {
+		let matchedSearcheeFiles = searchee.files.filter(
+			(searcheeFile) => searcheeFile.length === newFile.length,
+		);
+		if (matchedSearcheeFiles.length > 1) {
+			matchedSearcheeFiles = matchedSearcheeFiles.filter(
+				(searcheeFile) => searcheeFile.name === newFile.name,
+			);
+		}
+		if (matchedSearcheeFiles.length) {
+			const srcFilePath = matchedSearcheeFiles[0].path; // Absolute path
+			const destFilePath = join(destinationDir, newFile.path);
+			mkdirSync(dirname(destFilePath), { recursive: true });
+			linkFile(srcFilePath, destFilePath);
+		}
+	}
+	return join(destinationDir, newMeta.name);
+}
+
 async function linkAllFilesInMetafile(
 	searchee: Searchee,
 	newMeta: Metafile,
@@ -141,11 +175,28 @@ async function linkAllFilesInMetafile(
 > {
 	const { linkDir, flatLinking } = getRuntimeConfig();
 	const fullLinkDir = flatLinking ? linkDir : join(linkDir, tracker);
-	let sourceRoot: string;
+	let sourceRoot: string | undefined;
 	if (searchee.path) {
+		if (!existsSync(searchee.path)) {
+			logger.error(
+				`Linking failed, ${searchee.path} not found. Make sure Docker volume mounts are set up properly.`,
+			);
+			return resultOfErr("MISSING_DATA");
+		}
+		const result = await createSearcheeFromPath(searchee.path);
+		if (result.isErr()) {
+			return resultOfErr("TORRENT_NOT_FOUND");
+		}
+		const refreshedSearchee = result.unwrapOrThrow();
+		if (searchee.length !== refreshedSearchee.length) {
+			return resultOfErr("TORRENT_NOT_COMPLETE");
+		}
 		sourceRoot = searchee.path;
-	} else {
-		const downloadDirResult = await getClient().getDownloadDir(searchee);
+	} else if (searchee.infoHash) {
+		const downloadDirResult = await getClient().getDownloadDir(
+			searchee as SearcheeWithInfoHash,
+			true,
+		);
 		if (downloadDirResult.isErr()) {
 			return downloadDirResult.mapErr((e) =>
 				e === "NOT_FOUND" || e === "UNKNOWN_ERROR"
@@ -159,16 +210,29 @@ async function linkAllFilesInMetafile(
 				? searchee.files[0].path
 				: searchee.name,
 		);
+		if (!existsSync(sourceRoot)) {
+			logger.error(
+				`Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
+			);
+			return resultOfErr("MISSING_DATA");
+		}
+	} else {
+		for (const file of searchee.files) {
+			if (!existsSync(file.path)) {
+				logger.error(
+					`Linking failed, ${file.path} not found. Make sure Docker volume mounts are set up properly.`,
+				);
+				return resultOfErr("MISSING_DATA");
+			}
+			if (file.length !== statSync(file.path).size) {
+				return resultOfErr("TORRENT_NOT_COMPLETE");
+			}
+		}
 	}
 
-	if (!existsSync(sourceRoot)) {
-		logger.error(
-			`Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
-		);
-		return resultOfErr("MISSING_DATA");
-	}
-
-	if (decision === Decision.MATCH) {
+	if (!sourceRoot) {
+		return resultOf(linkVirtualSearchee(searchee, newMeta, fullLinkDir));
+	} else if (decision === Decision.MATCH) {
 		return resultOf(
 			linkExactTree(searchee, newMeta, fullLinkDir, sourceRoot),
 		);
@@ -194,12 +258,18 @@ export async function performAction(
 ): Promise<ActionResult> {
 	const { action, linkDir } = getRuntimeConfig();
 
+	const source = searchee.infoHash
+		? SearcheeSource.TORRENT
+		: searchee.path
+			? SearcheeSource.DATA
+			: SearcheeSource.VIRTUAL;
+
 	if (action === Action.SAVE) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 		const styledName = chalk.green.bold(newMeta.name);
 		const styledTracker = chalk.bold(tracker);
 		logger.info(
-			`Found ${styledName} on ${styledTracker} by ${decision} - saved`,
+			`Found ${styledName} on ${styledTracker} by ${decision} from ${source} - saved`,
 		);
 		return SaveResult.SAVED;
 	}
@@ -217,6 +287,7 @@ export async function performAction(
 			destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
 		} else if (
 			decision === Decision.MATCH &&
+			(searchee.path || searchee.infoHash) &&
 			linkedFilesRootResult.unwrapErrOrThrow() === "MISSING_DATA"
 		) {
 			logger.warn("Falling back to non-linking.");
@@ -224,11 +295,15 @@ export async function performAction(
 				destinationDir = dirname(searchee.path);
 			}
 		} else {
+			logger.error(
+				`Failed to link files for ${newMeta.name}: ${linkedFilesRootResult.unwrapErrOrThrow()}`,
+			);
 			logInjectionResult(
 				InjectionResult.FAILURE,
 				tracker,
 				newMeta.name,
 				decision,
+				source,
 			);
 			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 			return InjectionResult.FAILURE;
@@ -244,7 +319,7 @@ export async function performAction(
 		destinationDir,
 	);
 
-	logInjectionResult(result, tracker, newMeta.name, decision);
+	logInjectionResult(result, tracker, newMeta.name, decision, source);
 	if (result === InjectionResult.FAILURE) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 	}

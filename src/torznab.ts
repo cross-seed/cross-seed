@@ -20,6 +20,7 @@ import {
 	cleanseSeparators,
 	getAnimeQueries,
 	getApikey,
+	getNewestFileAge,
 	getMediaType,
 	MediaType,
 	nMsAgo,
@@ -269,13 +270,15 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 export async function searchTorznab(
 	searchee: Searchee,
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
-	const { excludeRecentSearch, excludeOlder, torznab } = getRuntimeConfig();
+	const { excludeRecentSearch, excludeOlder, seasonFromEpisodes, torznab } =
+		getRuntimeConfig();
 	if (torznab.length === 0) {
 		throw new Error("no indexers are available");
 	}
 	const enabledIndexers = await getEnabledIndexers();
 
 	const name = searchee.name;
+	const mediaType = getMediaType(searchee);
 
 	// search history for name across all indexers
 	const timestampDataSql = await db("searchee")
@@ -295,23 +298,36 @@ export async function searchTorznab(
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id,
 		);
-		return (
-			indexerDoesSupportMediaType(
-				getMediaType(searchee),
+		if (
+			!indexerDoesSupportMediaType(
+				mediaType,
 				JSON.parse(indexer.categories),
-			) &&
-			(!entry ||
-				((!excludeOlder ||
-					entry.firstSearched > nMsAgo(excludeOlder)) &&
-					(!excludeRecentSearch ||
-						entry.lastSearched < nMsAgo(excludeRecentSearch))))
+			)
+		) {
+			return false;
+		}
+		if (!entry) {
+			return true;
+		}
+		if (
+			seasonFromEpisodes &&
+			!searchee.infoHash &&
+			!searchee.path &&
+			entry.lastSearched < getNewestFileAge(searchee)
+		) {
+			return true;
+		}
+		return (
+			(!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
+			(!excludeRecentSearch ||
+				entry.lastSearched < nMsAgo(excludeRecentSearch))
 		);
 	});
 
 	const timeOrCatCallout = " (filtered by category/timestamps)";
 	logger.info({
 		label: Label.TORZNAB,
-		message: `Searching ${indexersToUse.length} indexers for ${name}${
+		message: `(${mediaType.toUpperCase()}) Searching ${indexersToUse.length} indexers for ${name}${
 			indexersToUse.length < enabledIndexers.length
 				? timeOrCatCallout
 				: ""

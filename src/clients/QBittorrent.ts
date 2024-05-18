@@ -235,19 +235,20 @@ export default class QBittorrent implements TorrentClient {
 	@return either a string containing the path or a error mesage
 	*/
 	async getDownloadDir(
-		searchee: SearcheeWithInfoHash,
+		meta: SearcheeWithInfoHash | Metafile,
+		onlyCompleted: boolean,
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
 		try {
-			const torrentInfo = await this.getTorrentInfo(searchee.infoHash);
+			const torrentInfo = await this.getTorrentInfo(meta.infoHash);
 			if (!torrentInfo) {
 				return resultOfErr("NOT_FOUND");
 			}
-			if (!this.isTorrentComplete(torrentInfo)) {
+			if (onlyCompleted && !this.isTorrentComplete(torrentInfo)) {
 				return resultOfErr("TORRENT_NOT_COMPLETE");
 			}
-			const savePath = this.getCorrectSavePath(searchee, torrentInfo);
+			const savePath = this.getCorrectSavePath(meta, torrentInfo);
 			return resultOf(savePath);
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
@@ -257,14 +258,49 @@ export default class QBittorrent implements TorrentClient {
 		}
 	}
 
+	async getAllDownloadDirs(
+		onlyCompleted: boolean,
+		metas: SearcheeWithInfoHash[] | Metafile[],
+	): Promise<Map<string, string>> {
+		const torrents = await this.getAllTorrentInfo();
+		const torrentSavePaths = new Map<string, string>();
+		for (const torrent of torrents) {
+			if (onlyCompleted && !this.isTorrentComplete(torrent)) continue;
+			const meta = metas.find(
+				(e) =>
+					e.infoHash === torrent.hash ||
+					e.infoHash === torrent.infohash_v1 ||
+					e.infoHash === torrent.infohash_v2,
+			);
+			let savePath = dirname(torrent.content_path);
+			if (
+				!meta ||
+				!(await this.isSubfolderContentLayout(meta, torrent))
+			) {
+				savePath = torrent.save_path;
+			}
+			torrentSavePaths.set(torrent.hash, savePath);
+			if (torrent.infohash_v1?.length) {
+				torrentSavePaths.set(torrent.infohash_v1, savePath);
+			}
+			if (torrent.infohash_v2?.length) {
+				torrentSavePaths.set(torrent.infohash_v2, savePath);
+			}
+		}
+		return torrentSavePaths;
+	}
+
 	/*
 	@param searchee the Searchee we are generating off (in client)
 	@param torrentInfo the torrent info from the searchee
 	@return string absolute location from client with content layout considered
 	 */
-	getCorrectSavePath(searchee: Searchee, torrentInfo: TorrentInfo): string {
+	getCorrectSavePath(
+		data: Searchee | Metafile,
+		torrentInfo: TorrentInfo,
+	): string {
 		const subfolderContentLayout = this.isSubfolderContentLayout(
-			searchee,
+			data,
 			torrentInfo,
 		);
 		if (subfolderContentLayout) {
@@ -329,12 +365,12 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	isSubfolderContentLayout(
-		searchee: Searchee,
-		searcheeInfo: TorrentInfo,
+		data: Searchee | Metafile,
+		dataInfo: TorrentInfo,
 	): boolean {
-		if (searchee.files.length > 1) return false;
-		if (dirname(searchee.files[0].path) !== ".") return false;
-		return dirname(searcheeInfo.content_path) !== searcheeInfo.save_path;
+		if (data.files.length > 1) return false;
+		if (dirname(data.files[0].path) !== ".") return false;
+		return dirname(dataInfo.content_path) !== dataInfo.save_path;
 	}
 
 	async inject(

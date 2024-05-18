@@ -1,10 +1,27 @@
-import { readdirSync, statSync } from "fs";
-import { basename, join, relative } from "path";
+import ms from "ms";
+import { existsSync, readdirSync, statSync } from "fs";
+import { basename, dirname, join, relative } from "path";
+import { getClient } from "./clients/TorrentClient.js";
+import {
+	ANIME_REGEX,
+	EP_REGEX,
+	RELEASE_GROUP_REGEX,
+	SEASON_REGEX,
+	RES_STRICT_REGEX,
+	SOURCE_REGEX,
+} from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import { parseTorrentFromFilename } from "./torrent.js";
-import { WithRequired } from "./utils.js";
+import {
+	getLargestFile,
+	humanReadableSize,
+	reformatTitleForSearching,
+	stripExtension,
+	WithRequired,
+} from "./utils.js";
 
 export interface File {
 	length: number;
@@ -93,4 +110,226 @@ export async function createSearcheeFromPath(
 		name: basename(filepath),
 		length: totalLength,
 	});
+}
+
+export async function getSeasonKey(name: string): Promise<string | null> {
+	const stem = stripExtension(name);
+	const match = stem.match(SEASON_REGEX);
+	if (!match) return null;
+	const title = match.groups!.title;
+	const season = match.groups!.season;
+	const resolution = stem.match(RES_STRICT_REGEX)?.groups?.resolution;
+	const source = stem.match(SOURCE_REGEX)?.groups?.source;
+	const group = stem.match(RELEASE_GROUP_REGEX)?.groups?.group;
+	return `${reformatTitleForSearching(title)}.${season}.${resolution ? resolution : ""}.${source ? source : ""}-${group ? group : ""}`.toLowerCase();
+}
+
+export async function getEpisodeAndKeys(
+	name: string,
+): Promise<string[] | null> {
+	const stem = stripExtension(name);
+	const episodeMatch = stem.match(EP_REGEX);
+	if (!episodeMatch) return null;
+	const episode = episodeMatch!.groups!.episode;
+	if (!episode) return null; // Date based shows
+	const title = episodeMatch!.groups!.title;
+	const season = episodeMatch!.groups!.season;
+	const resolution = stem.match(RES_STRICT_REGEX)?.groups?.resolution;
+	const source = stem.match(SOURCE_REGEX)?.groups?.source;
+	const group = stem.match(RELEASE_GROUP_REGEX)?.groups?.group;
+	const key =
+		`${reformatTitleForSearching(title)}.${season}.${resolution ? resolution : ""}.${source ? source : ""}-${group ? group : ""}`.toLowerCase();
+	return [episode, key];
+}
+
+export async function getReleaseAndKeys(
+	name: string,
+): Promise<string[] | null> {
+	const stem = stripExtension(name);
+	const animeMatch = stem.match(ANIME_REGEX);
+	if (!animeMatch) return null;
+	const firstTitle = animeMatch!.groups!.title;
+	const altTitle = animeMatch!.groups!.altTitle;
+	const release = animeMatch!.groups!.release;
+	const resolution = stem.match(RES_STRICT_REGEX)?.groups?.resolution;
+	const source = stem.match(SOURCE_REGEX)?.groups?.source;
+	let group = stem.match(RELEASE_GROUP_REGEX)?.groups?.group;
+	group = group ? group : animeMatch!.groups!.group;
+	const keys: string[] = [];
+	for (const title of [firstTitle, altTitle]) {
+		if (!title) continue;
+		if (title.toLowerCase() === "season") continue;
+		if (title.toLowerCase() === "ep") continue;
+		const key =
+			`${reformatTitleForSearching(title)}.${resolution ? resolution : ""}.${source ? source : ""}-${group ? group : ""}`.toLowerCase();
+		keys.push(key);
+	}
+	if (keys.length === 0) return null;
+	return [release, ...keys];
+}
+
+export async function createEnsembleSearchees(
+	allSearchees: Searchee[],
+): Promise<Searchee[]> {
+	const { seasonFromEpisodes } = getRuntimeConfig();
+	if (!seasonFromEpisodes) return [];
+
+	logger.verbose(`Creating virtual searchees for seasons...`);
+	const seasonsMap = new Map<string, Searchee[]>();
+	for (const searchee of allSearchees) {
+		const key = await getSeasonKey(searchee.name);
+		if (key) {
+			if (seasonsMap.has(key)) {
+				seasonsMap.get(key)!.push(searchee);
+			} else {
+				seasonsMap.set(key, [searchee]);
+			}
+		}
+	}
+	const episodesMap = new Map<string, Map<string, Searchee[]>>();
+	for (const searchee of allSearchees) {
+		const episodeAndKeys = await getEpisodeAndKeys(searchee.name);
+		if (episodeAndKeys) {
+			const [episode, ...keys] = episodeAndKeys;
+			for (const key of keys) {
+				if (seasonsMap.has(key)) continue;
+				if (episodesMap.has(key)) {
+					if (episodesMap.get(key)!.has(episode)) {
+						const currFile = getLargestFile(searchee);
+						const isUniqueFile = episodesMap
+							.get(key)!
+							.get(episode)!
+							.every((e) => {
+								return (
+									currFile.length !== getLargestFile(e).length
+								);
+							});
+						if (isUniqueFile) {
+							episodesMap.get(key)!.get(episode)!.push(searchee);
+						}
+					} else {
+						episodesMap.get(key)!.set(episode, [searchee]);
+					}
+				} else {
+					episodesMap.set(key, new Map([[episode, [searchee]]]));
+				}
+			}
+			continue;
+		}
+		if (SEASON_REGEX.test(searchee.name)) continue;
+		const releaseAndKeys = await getReleaseAndKeys(searchee.name);
+		if (releaseAndKeys) {
+			const [episode, ...keys] = releaseAndKeys;
+			for (const key of keys) {
+				if (episodesMap.has(key)) {
+					if (episodesMap.get(key)!.has(episode)) {
+						const currFile = getLargestFile(searchee);
+						const isUniqueFile = episodesMap
+							.get(key)!
+							.get(episode)!
+							.every((e) => {
+								return (
+									currFile.length !== getLargestFile(e).length
+								);
+							});
+						if (isUniqueFile) {
+							episodesMap.get(key)!.get(episode)!.push(searchee);
+						}
+					} else {
+						episodesMap.get(key)!.set(episode, [searchee]);
+					}
+				} else {
+					episodesMap.set(key, new Map([[episode, [searchee]]]));
+				}
+			}
+			continue;
+		}
+	}
+
+	const torrentSavePaths = await getClient().getAllDownloadDirs(
+		false,
+		allSearchees.filter(hasInfoHash),
+	);
+
+	const seasonSearchees: Searchee[] = [];
+	for (const [key, episodeSearchees] of episodesMap) {
+		if (episodeSearchees.size < 3) {
+			continue;
+		}
+		const episodes = Array.from(episodeSearchees.keys()).map((e) =>
+			parseInt(e.replace("E", "").replace("e", "")),
+		);
+		const highestEpisode = Math.max(...episodes);
+		const missingEpisodes = highestEpisode - episodes.length;
+		if (missingEpisodes / highestEpisode > 1 - seasonFromEpisodes) {
+			logger.verbose(
+				`Skipping virtual searchee for ${key} episodes as there are too many missing: ${missingEpisodes}/${highestEpisode}`,
+			);
+			continue;
+		}
+		const seasonSearchee: Searchee = { name: key, files: [], length: 0 };
+		let newestFileAge = 0;
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		for (const [_, searchees] of episodeSearchees) {
+			let totalEpisodeLength = 0;
+			let validSearchees = 0;
+			for (const searchee of searchees) {
+				let sourceRoot: string;
+				if (searchee.path) {
+					sourceRoot = searchee.path;
+				} else {
+					const savePath = torrentSavePaths.get(searchee.infoHash!);
+					if (!savePath) continue;
+					sourceRoot = join(
+						savePath,
+						searchee.files.length === 1
+							? searchee.files[0].path
+							: searchee.name,
+					);
+				}
+				if (!existsSync(sourceRoot)) continue;
+				const largestFile = getLargestFile(searchee);
+				const absoluteFile: File = {
+					length: largestFile.length,
+					name: largestFile.name,
+					path: statSync(sourceRoot).isFile()
+						? sourceRoot
+						: join(dirname(sourceRoot), largestFile.path),
+				};
+				if (!existsSync(absoluteFile.path)) continue;
+				seasonSearchee.files.push(absoluteFile);
+				totalEpisodeLength += absoluteFile.length;
+				validSearchees++;
+				newestFileAge = Math.max(
+					newestFileAge,
+					statSync(absoluteFile.path).mtimeMs,
+				);
+			}
+			if (validSearchees === 0) continue;
+			seasonSearchee.length += Math.round(
+				totalEpisodeLength / validSearchees,
+			);
+		}
+		if (seasonSearchee.files.length === 0) {
+			logger.verbose(
+				`Skipping virtual searchee for ${key} episodes as no files were found`,
+			);
+			continue;
+		}
+		if (Date.now() - newestFileAge < ms("8 days")) {
+			logger.verbose(
+				`Skipping virtual searchee for ${key} episodes as some are too new: ${new Date(newestFileAge).toISOString()}`,
+			);
+			continue;
+		}
+		logger.verbose(
+			`Created virtual searchee for ${key} ${episodeSearchees.size} episodes (${seasonSearchee.files.length} files) [${humanReadableSize(seasonSearchee.length)}]`,
+		);
+		seasonSearchees.push(seasonSearchee);
+	}
+	logger.verbose(
+		`Created ${seasonSearchees.length} virtual season searchees...`,
+	);
+
+	return seasonSearchees;
 }

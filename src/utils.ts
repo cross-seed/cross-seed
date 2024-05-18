@@ -11,9 +11,12 @@ import {
 	Decision,
 	SCENE_TITLE_REGEX,
 } from "./constants.js";
+import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { IdSearchParams, TorznabParams } from "./torznab.js";
-import { Searchee } from "./searchee.js";
+import { File, Searchee } from "./searchee.js";
+import { statSync } from "fs";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export enum MediaType {
 	EPISODE = "episode",
@@ -215,4 +218,29 @@ export function extractCredentialsFromUrl(
 
 export function capitalizeFirstLetter(string) {
 	return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+export function getLargestFile(data: Searchee | Metafile): File {
+	return data.files.reduce((a, b) => (a.length > b.length ? a : b));
+}
+
+export function getNewestFileAge(data: Searchee | Metafile): number {
+	return data.files.reduce(
+		(acc, file) => Math.max(acc, statSync(file.path).mtimeMs),
+		0,
+	);
+}
+
+export function getFuzzySizeFactor(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? 1 - seasonFromEpisodes
+		: fuzzySizeThreshold;
+}
+
+export function getMinSizeRatio(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? seasonFromEpisodes
+		: 1 - fuzzySizeThreshold;
 }

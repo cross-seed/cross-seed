@@ -9,7 +9,7 @@ import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee } from "../searchee.js";
+import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
@@ -409,38 +409,70 @@ export default class Deluge implements TorrentClient {
 
 	/**
 	 * returns directory of an infohash in deluge as a string
-	 * @param searchee Searchee or Metafile for torrent to lookup in client
+	 * @param meta SearcheeWithInfoHash or Metafile for torrent to lookup in client
+	 * @param onlyCompleted boolean to only return a completed torrent
 	 * @return Result containing either a string with path or reason it was not provided
 	 */
 	async getDownloadDir(
-		searchee: Searchee,
+		meta: SearcheeWithInfoHash | Metafile,
+		onlyCompleted: boolean,
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		let torrent: TorrentInfo, response: Result<TorrentStatus, ErrorType>;
-		const params = [["save_path", "progress"], { hash: searchee.infoHash }];
+		let response: Result<TorrentStatus, ErrorType>;
+		const params = [["save_path", "progress"], { hash: meta.infoHash }];
 		try {
 			response = await this.call<TorrentStatus>("web.update_ui", params);
 		} catch (e) {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		if (response.isOk()) {
-			const torrentResponse = response.unwrapOrThrow().torrents;
-			if (!torrentResponse) {
-				return resultOfErr("UNKNOWN_ERROR");
-			}
-			torrent = torrentResponse![searchee.infoHash!];
-			if (!torrent) {
-				return resultOfErr("NOT_FOUND");
-			}
-			if (torrent.progress !== 100) {
-				return resultOfErr("TORRENT_NOT_COMPLETE");
-			}
-		} else {
+		if (!response.isOk()) {
 			return resultOfErr("UNKNOWN_ERROR");
+		}
+		const torrentResponse = response.unwrapOrThrow().torrents;
+		if (!torrentResponse) {
+			return resultOfErr("UNKNOWN_ERROR");
+		}
+		const torrent = torrentResponse![meta.infoHash!];
+		if (!torrent) {
+			return resultOfErr("NOT_FOUND");
+		}
+		if (onlyCompleted && torrent.progress !== 100) {
+			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}
 		return resultOf(torrent.save_path);
 	}
+
+	/**
+	 * returns map of hashes and download directories for all torrents
+	 * @param onlyCompleted boolean to only return completed torrents
+	 * @return Result containing either a string with path or reason it was not provided
+	 */
+	async getAllDownloadDirs(
+		onlyCompleted: boolean,
+	): Promise<Map<string, string>> {
+		const dirs = new Map<string, string>();
+		let response: Result<TorrentStatus, ErrorType>;
+		const params = [["save_path"], {}];
+		try {
+			response = await this.call<TorrentStatus>("web.update_ui", params);
+		} catch (e) {
+			return dirs;
+		}
+		if (!response.isOk()) {
+			return dirs;
+		}
+		const torrentResponse = response.unwrapOrThrow().torrents;
+		if (!torrentResponse) {
+			return dirs;
+		}
+		for (const [hash, torrent] of Object.entries(torrentResponse)) {
+			if (onlyCompleted && torrent.progress !== 100) continue;
+			dirs.set(hash, torrent.save_path);
+		}
+		return dirs;
+	}
+
 	/**
 	 * returns information needed to complete/validate injection
 	 * @param searchee the Searchee for the torrent you are requesting TorrentInfo from

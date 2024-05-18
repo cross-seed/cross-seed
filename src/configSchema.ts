@@ -12,15 +12,18 @@ const ZodErrorMessages = {
 	emptyString:
 		"cannot have an empty string. If you want to unset it, use null or undefined.",
 	delay: "delay is in seconds, you can't travel back in time.",
-	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
+	numberMustBeRatio:
+		"fuzzySizeThreshold and seasonFromEpisodes must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
 		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in unintended behavior.",
 	needsLinkDir:
-		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
+		"You need to set a linkDir (and have your data accessible) for risky/partial matching and seasonFromEpisodes to work.",
 	linkDirInDataDir:
 		"You cannot have your linkDir inside of your dataDirs. Please adjust your paths to correct this.",
+	requiresPartial:
+		"seasonFromEpisodes requires matchMode partial if enabled and value is below 1.",
 };
 
 /**
@@ -121,8 +124,15 @@ export const VALIDATION_SCHEMA = z
 		includeEpisodes: z.boolean(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
+		seasonFromEpisodes: z
+			.number()
+			.positive()
+			.lte(1, {
+				message: ZodErrorMessages.numberMustBeRatio,
+			})
+			.nullish(),
 		fuzzySizeThreshold: z.number().positive().lte(1, {
-			message: ZodErrorMessages.fuzzySizeThreshold,
+			message: ZodErrorMessages.numberMustBeRatio,
 		}),
 		excludeOlder: z
 			.string()
@@ -203,7 +213,10 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.injectUrl,
 	)
 	.refine(
-		(config) => config.matchMode === MatchMode.SAFE || config.linkDir,
+		(config) =>
+			(config.matchMode === MatchMode.SAFE &&
+				!config.seasonFromEpisodes) ||
+			config.linkDir,
 		ZodErrorMessages.needsLinkDir,
 	)
 	.refine((config) => {
@@ -211,4 +224,10 @@ export const VALIDATION_SCHEMA = z
 			return !isChildPath(config.linkDir, config.dataDirs);
 		}
 		return true;
-	}, ZodErrorMessages.linkDirInDataDir);
+	}, ZodErrorMessages.linkDirInDataDir)
+	.refine((config) => {
+		if (config.seasonFromEpisodes && config.seasonFromEpisodes < 1) {
+			return config.matchMode === MatchMode.PARTIAL;
+		}
+		return true;
+	}, ZodErrorMessages.requiresPartial);

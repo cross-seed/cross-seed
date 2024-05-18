@@ -144,14 +144,15 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	private async checkOriginalTorrent(
-		searchee: SearcheeWithInfoHash,
+		data: SearcheeWithInfoHash | Metafile,
+		onlyCompleted: boolean,
 	): Promise<
 		Result<
 			{ directoryBase: string; isMultiFile: boolean },
 			"FAILURE" | "TORRENT_NOT_COMPLETE" | "NOT_FOUND"
 		>
 	> {
-		const infoHash = searchee.infoHash.toUpperCase();
+		const infoHash = data.infoHash.toUpperCase();
 		type ReturnType =
 			| [[string], ["0" | "1"], ["0" | "1"]]
 			| [Fault, Fault, Fault];
@@ -198,7 +199,7 @@ export default class RTorrent implements TorrentClient {
 			const [[directoryBase], [isCompleteStr], [isMultiFileStr]] =
 				response;
 			const isComplete = Boolean(Number(isCompleteStr));
-			if (!isComplete) {
+			if (onlyCompleted && !isComplete) {
 				return resultOfErr("TORRENT_NOT_COMPLETE");
 			}
 			return resultOf({
@@ -230,6 +231,7 @@ export default class RTorrent implements TorrentClient {
 		} else {
 			const result = await this.checkOriginalTorrent(
 				searchee as SearcheeWithInfoHash,
+				true,
 			);
 			return result.mapOk(({ directoryBase }) => ({
 				directoryBase,
@@ -259,18 +261,32 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	async getDownloadDir(
-		searchee: Searchee,
+		meta: SearcheeWithInfoHash | Metafile,
+		onlyCompleted: boolean,
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		const result = await this.checkOriginalTorrent(
-			searchee as SearcheeWithInfoHash,
-		);
+		const result = await this.checkOriginalTorrent(meta, onlyCompleted);
 		return result
 			.mapOk(({ directoryBase, isMultiFile }) => {
 				return isMultiFile ? dirname(directoryBase) : directoryBase;
 			})
 			.mapErr((error) => (error === "FAILURE" ? "UNKNOWN_ERROR" : error));
+	}
+
+	async getAllDownloadDirs(
+		onlyCompleted: boolean,
+		metas: SearcheeWithInfoHash[] | Metafile[],
+	): Promise<Map<string, string>> {
+		// TODO: Use a single api call for multiple directories
+		const dirs = new Map<string, string>();
+		for (const item of metas) {
+			const result = await this.getDownloadDir(item, onlyCompleted);
+			if (result.isOk()) {
+				dirs.set(item.infoHash, result.unwrapOrThrow());
+			}
+		}
+		return dirs;
 	}
 
 	async inject(

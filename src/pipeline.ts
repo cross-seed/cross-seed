@@ -13,7 +13,7 @@ import {
 	findPotentialNestedRoots,
 	findSearcheesFromAllDataDirs,
 } from "./dataFiles.js";
-import { db } from "./db.js";
+import { db, memDB } from "./db.js";
 import { assessCandidate, ResultAssessment } from "./decide.js";
 import {
 	IndexerStatus,
@@ -25,9 +25,11 @@ import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
+	createEnsembleSearchees,
 	createSearcheeFromMetafile,
 	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
+	getSeasonKey,
 	Searchee,
 } from "./searchee.js";
 import {
@@ -39,7 +41,12 @@ import {
 	TorrentLocator,
 } from "./torrent.js";
 import { queryRssFeeds, searchTorznab } from "./torznab.js";
-import { filterAsync, isTruthy, stripExtension } from "./utils.js";
+import {
+	filterAsync,
+	humanReadableSize,
+	isTruthy,
+	stripExtension,
+} from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -218,19 +225,64 @@ export async function searchForLocalTorrentByCriteria(
 
 export async function checkNewCandidateMatch(
 	candidate: Candidate,
+	seasonFromEpisodes: boolean,
 ): Promise<InjectionResult | SaveResult | null> {
-	const meta = await getTorrentByFuzzyName(candidate.name);
-	if (meta === null) {
+	let searchee: Searchee;
+	if (seasonFromEpisodes) {
+		const key = await getSeasonKey(candidate.name);
+		if (!key) return null;
+		const ensemble = await memDB("ensemble").where({ ensemble: key });
+		if (ensemble.length === 0) {
+			logger.verbose({
+				label: Label.REVERSE_LOOKUP,
+				message: `Did not find an ensemble for ${candidate.name} - ${key}`,
+			});
+			return null;
+		}
+		const files = ensemble
+			.map((e) => ({
+				path: e.absolute_path,
+				name: e.name,
+				length: e.length,
+			}))
+			.filter((f) => fs.existsSync(f.path));
+		if (files.length === 0) {
+			logger.verbose({
+				label: Label.REVERSE_LOOKUP,
+				message: `Did not find any files for ensemble ${key} from ${candidate.name} - sources may be incomplete or missing`,
+			});
+			return null;
+		}
+		const uniqueElements = new Set(ensemble.map((e) => e.element));
+		const totalLength = [...uniqueElements].reduce((acc, cur) => {
+			const elements = ensemble.filter(
+				(e) =>
+					e.element === cur &&
+					files.some((f) => f.path === e.absolute_path),
+			);
+			const avg =
+				elements.reduce((a, c) => a + c.length, 0) / elements.length;
+			return acc + avg;
+		}, 0);
+		searchee = { name: key, files: files, length: totalLength };
 		logger.verbose({
 			label: Label.REVERSE_LOOKUP,
-			message: `Did not find an existing entry for ${candidate.name}`,
+			message: `Found ensemble for ${candidate.name} (${key}) - ${humanReadableSize(totalLength)} - ${files.length} files`,
 		});
-		return null;
+	} else {
+		const meta = await getTorrentByFuzzyName(candidate.name);
+		if (meta === null) {
+			logger.verbose({
+				label: Label.REVERSE_LOOKUP,
+				message: `Did not find an existing entry for ${candidate.name}`,
+			});
+			return null;
+		}
+		if (!filterByContent(meta)) return null;
+		searchee = createSearcheeFromMetafile(meta);
 	}
 
 	const hashesToExclude = await getInfoHashesToExclude();
-	if (!filterByContent(meta)) return null;
-	const searchee = createSearcheeFromMetafile(meta);
 
 	// make sure searchee is in database
 	await db("searchee")
@@ -295,26 +347,31 @@ async function findSearchableTorrents() {
 	const hashesToExclude = allSearchees
 		.map((t) => t.infoHash)
 		.filter(isTruthy);
-	let filteredTorrents = await filterAsync(
+	const filteredTorrents = await filterAsync(
 		filterDupes(allSearchees).filter(filterByContent),
 		filterTimestamps,
 	);
 
+	// Best to search ensemble first as it relies on file dates and search time
+	let finalSearchees = [
+		...(await createEnsembleSearchees(allSearchees)),
+		...filteredTorrents,
+	];
+
 	logger.info({
 		label: Label.SEARCH,
-		message: `Found ${allSearchees.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
+		message: `Found ${allSearchees.length} torrents, ${finalSearchees.length} suitable to search for matches`,
 	});
 
-	if (searchLimit && filteredTorrents.length > searchLimit) {
+	if (searchLimit && finalSearchees.length > searchLimit) {
 		logger.info({
 			label: Label.SEARCH,
 			message: `Limited to ${searchLimit} searches`,
 		});
-
-		filteredTorrents = filteredTorrents.slice(0, searchLimit);
+		finalSearchees = finalSearchees.slice(0, searchLimit);
 	}
 
-	return { samples: filteredTorrents, hashesToExclude };
+	return { samples: finalSearchees, hashesToExclude };
 }
 
 export async function main(): Promise<void> {
@@ -343,7 +400,7 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const { torznab } = getRuntimeConfig();
+	const { seasonFromEpisodes, torznab } = getRuntimeConfig();
 	if (torznab.length > 0) {
 		const candidates = await queryRssFeeds();
 		const lastRun =
@@ -376,7 +433,10 @@ export async function scanRssFeeds() {
 					candidatesSinceLastTime.length
 				}`,
 			});
-			await checkNewCandidateMatch(candidate);
+			await checkNewCandidateMatch(candidate, false);
+			if (seasonFromEpisodes) {
+				await checkNewCandidateMatch(candidate, true);
+			}
 		}
 		logger.info({ label: Label.RSS, message: "Scan complete" });
 	}
