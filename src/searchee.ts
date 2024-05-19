@@ -9,6 +9,7 @@ import {
 	SEASON_REGEX,
 	RES_STRICT_REGEX,
 	SOURCE_REGEX,
+	IGNORED_FOLDERS_REGEX,
 } from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
@@ -104,12 +105,20 @@ export async function createSearcheeFromPath(
 		(runningTotal, file) => runningTotal + file.length,
 		0,
 	);
-	return resultOf({
+	const seasonMatch =
+		basename(filepath).length < 12
+			? basename(filepath).match(IGNORED_FOLDERS_REGEX)
+			: undefined;
+
+	const x = {
 		files: files,
 		path: filepath,
-		name: basename(filepath),
+		name: seasonMatch
+			? `${basename(dirname(filepath))} S${seasonMatch?.groups?.season}`
+			: basename(filepath),
 		length: totalLength,
-	});
+	};
+	return resultOf(x);
 }
 
 export async function getSeasonKey(name: string): Promise<string | null> {

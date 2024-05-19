@@ -7,12 +7,16 @@ import {
 } from "./constants.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
-function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
+function shouldIgnorePathHeuristically(
+	root: string,
+	isDir: boolean,
+	isWebHook?: boolean,
+) {
 	const folderBaseName = basename(root);
 	if (isDir) {
 		return (
 			IGNORED_FOLDERS_SUBSTRINGS.includes(folderBaseName.toLowerCase()) ||
-			IGNORED_FOLDERS_REGEX.test(folderBaseName)
+			(IGNORED_FOLDERS_REGEX.test(folderBaseName) && !isWebHook)
 		);
 	} else {
 		return !VIDEO_EXTENSIONS.includes(extname(folderBaseName));
@@ -21,11 +25,10 @@ function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
 export function findPotentialNestedRoots(
 	root: string,
 	depth: number,
-	isDirHint?: boolean,
+	isWebHook?: boolean,
 ): string[] {
-	const isDir =
-		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
-	if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir)) {
+	const isDir = statSync(root).isDirectory();
+	if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir, isWebHook)) {
 		return [];
 	}
 	// if depth is 0, don't look at children

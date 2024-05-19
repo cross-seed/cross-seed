@@ -11,7 +11,7 @@ export const TORRENT_CATEGORY_SUFFIX = `.cross-seed`;
 export const EP_REGEX =
 	/^(?<title>.+?)[_.\s-]+(?:(?<season>S\d+)?[_.\s-]{0,3}(?<episode>(?:E|(?<=S\d+[_\s-]{1,3}))\d+(?:[\s-]?E?\d+)?(?![pix]))(?!\d+[pix])|(?<date>(?<year>(?:19|20)\d{2})[_.\s-](?<month>\d{2})[_.\s-](?<day>\d{2})))/i;
 export const SEASON_REGEX =
-	/^(?<title>.+?)[_.\s-]+(?<season>S\d+)(?:[_.\s~-]*?(?<seasonmax>S?\d+))?(?=[_.\s](?!E\d+))/i;
+	/^(?<title>.+?)[_.\s-]+(?<season>S\d+)(?:[_.\s~-]*?(?<seasonmax>S?\d+))?(?=[_.\s]?(?!E\d+))/i;
 export const MOVIE_REGEX =
 	/^(?<title>.+?)-?[_.\s][[(]?(?<year>(?:18|19|20)\d{2})[)\]]?(?![pix])/i;
 export const ANIME_REGEX =
@@ -70,7 +70,7 @@ export const ALL_EXTENSIONS = [
 ];
 
 export const IGNORED_FOLDERS_REGEX =
-	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;
+	/^(?:S(?:eason )?(?<season>\d{1,4}))|(?:(?:CD|DVD|DISC)(?:\d{1,2}))$/i;
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 export const UNKNOWN_TRACKER = "UnknownTracker";

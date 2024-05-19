@@ -21,7 +21,7 @@ import {
 } from "./utils.js";
 import path from "path";
 
-export function filterByContent(searchee: Searchee): boolean {
+export function filterByContent(searchee: Searchee, isWebHook?): boolean {
 	const {
 		includeEpisodes,
 		includeNonVideos,
@@ -73,7 +73,8 @@ export function filterByContent(searchee: Searchee): boolean {
 	if (
 		searchee.path &&
 		statSync(searchee.path).isDirectory() &&
-		ARR_DIR_REGEX.test(path.basename(searchee.path))
+		ARR_DIR_REGEX.test(path.basename(searchee.path)) &&
+		!isWebHook
 	) {
 		logReason("it is a arr movie/series directory");
 		return false;

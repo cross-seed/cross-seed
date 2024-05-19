@@ -84,6 +84,7 @@ async function assessCandidates(
 	candidates: Candidate[],
 	searchee: Searchee,
 	hashesToExclude: string[],
+	isWebHook?: boolean,
 ): Promise<AssessmentWithTracker[]> {
 	const assessments: AssessmentWithTracker[] = [];
 	for (const result of candidates) {
@@ -91,6 +92,7 @@ async function assessCandidates(
 			result,
 			searchee,
 			hashesToExclude,
+			isWebHook,
 		);
 		assessments.push({ assessment, tracker: result.tracker });
 	}
@@ -102,6 +104,7 @@ async function findOnOtherSites(
 	searcheeLog: string,
 	hashesToExclude: string[],
 	prevCandidates: Map<string, IndexerCandidates[]>,
+	isWebHook?: boolean,
 ): Promise<FoundOnOtherSites> {
 	// make sure searchee is in database
 	await db("searchee")
@@ -141,6 +144,7 @@ async function findOnOtherSites(
 		results,
 		searchee,
 		hashesToExclude,
+		isWebHook,
 	);
 
 	const { rateLimited, notRateLimited } = assessments.reduce(
@@ -237,7 +241,7 @@ export async function searchForLocalTorrentByCriteria(
 	let searchees: Searchee[];
 	if (criteria.path) {
 		const searcheeResults = await Promise.all(
-			findPotentialNestedRoots(criteria.path, maxDataDepth).map(
+			findPotentialNestedRoots(criteria.path, maxDataDepth, true).map(
 				createSearcheeFromPath,
 			),
 		);
@@ -249,7 +253,7 @@ export async function searchForLocalTorrentByCriteria(
 	let matches = 0;
 	const prevCandidates = new Map<string, IndexerCandidates[]>();
 	for (const searchee of searchees) {
-		if (!filterByContent(searchee)) return null;
+		if (!filterByContent(searchee, true)) return null;
 		const searcheeLog = searchee.infoHash
 			? `${chalk.bold.white(searchee.name)} ${chalk.dim(`[${searchee.infoHash.slice(0, 8)}...]`)}`
 			: searchee.path
@@ -260,6 +264,7 @@ export async function searchForLocalTorrentByCriteria(
 			searcheeLog,
 			hashesToExclude,
 			prevCandidates,
+			true,
 		);
 		matches += foundOnOtherSites.matches;
 	}

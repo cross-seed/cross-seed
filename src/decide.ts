@@ -282,6 +282,7 @@ export async function assessCandidateHelper(
 	metaOrCandidate: Candidate | Metafile,
 	searchee: Searchee,
 	hashesToExclude: string[],
+	isWebHook?: boolean,
 ): Promise<ResultAssessment> {
 	const { matchMode, blockList } = getRuntimeConfig();
 
@@ -292,18 +293,20 @@ export async function assessCandidateHelper(
 	const size = isCandidate ? metaOrCandidate.size : metaOrCandidate.length;
 
 	if (isCandidate) {
-		if (!releaseGroupDoesMatch(searchee.name, name, matchMode)) {
-			return { decision: Decision.RELEASE_GROUP_MISMATCH };
-		}
-		if (!releaseVersionDoesMatch(searchee.name, name, matchMode)) {
-			return { decision: Decision.PROPER_REPACK_MISMATCH };
+		if (!isWebHook) {
+			if (!releaseGroupDoesMatch(searchee.name, name, matchMode)) {
+				return { decision: Decision.RELEASE_GROUP_MISMATCH };
+			}
+			if (!releaseVersionDoesMatch(searchee.name, name, matchMode)) {
+				return { decision: Decision.PROPER_REPACK_MISMATCH };
+			}
 		}
 		if (size) {
 			if (!fuzzySizeDoesMatch(size, searchee)) {
 				return { decision: Decision.FUZZY_SIZE_MISMATCH };
 			}
 		} else {
-			if (!resDoesMatch(searchee.name, name, matchMode)) {
+			if (!resDoesMatch(searchee.name, name, matchMode) && isWebHook) {
 				return { decision: Decision.RESOLUTION_MISMATCH };
 			}
 		}
@@ -396,11 +399,13 @@ async function assessAndSaveResults(
 	guid: string,
 	infoHashesToExclude: string[],
 	firstSeen: number,
+	isWebHook?: boolean,
 ) {
 	const assessment = await assessCandidateHelper(
 		metaOrCandidate,
 		searchee,
 		infoHashesToExclude,
+		isWebHook,
 	);
 
 	await db.transaction(async (trx) => {
@@ -428,6 +433,7 @@ async function assessCandidateCaching(
 	candidate: Candidate,
 	searchee: Searchee,
 	infoHashesToExclude: string[],
+	isWebHook?: boolean,
 ): Promise<ResultAssessment> {
 	const { guid, name, tracker } = candidate;
 	const logReason = createReasonLogger(name, tracker, searchee.name);
@@ -470,6 +476,7 @@ async function assessCandidateCaching(
 			guid,
 			infoHashesToExclude,
 			Date.now(),
+			isWebHook,
 		);
 	} else if (
 		DECISION_ALL_MATCH.includes(cacheEntry.decision) &&
