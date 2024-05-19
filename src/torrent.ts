@@ -2,7 +2,7 @@ import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import { basename, dirname, extname, join, resolve } from "path";
 import { inspect } from "util";
-import { USER_AGENT } from "./constants.js";
+import { SearchSource, USER_AGENT } from "./constants.js";
 import { db, memDB } from "./db.js";
 import { logger, logOnce } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
@@ -336,7 +336,9 @@ export async function loadTorrentDirLight(
 		const searcheeResult =
 			await createSearcheeFromTorrentFile(torrentFilePath);
 		if (searcheeResult.isOk()) {
-			searchees.push(searcheeResult.unwrapOrThrow());
+			const unwrappedSearchee = searcheeResult.unwrapOrThrow();
+			unwrappedSearchee.source = SearchSource.INDEX;
+			searchees.push(unwrappedSearchee);
 		}
 	}
 	return searchees;

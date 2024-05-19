@@ -10,6 +10,7 @@ import {
 	DecisionAllMatch,
 	InjectionResult,
 	SaveResult,
+	SearchSource,
 	UNKNOWN_TRACKER,
 } from "./constants.js";
 import {
@@ -241,9 +242,12 @@ export async function searchForLocalTorrentByCriteria(
 	let searchees: Searchee[];
 	if (criteria.path) {
 		const searcheeResults = await Promise.all(
-			findPotentialNestedRoots(criteria.path, maxDataDepth, true).map(
-				createSearcheeFromPath,
-			),
+			findPotentialNestedRoots(
+				criteria.path,
+				maxDataDepth,
+				undefined,
+				!!SearchSource.WEBHOOK,
+			).map((path) => createSearcheeFromPath(path, SearchSource.WEBHOOK)),
 		);
 		searchees = searcheeResults.map((t) => t.unwrapOrThrow());
 	} else {
@@ -274,6 +278,7 @@ export async function searchForLocalTorrentByCriteria(
 export async function checkNewCandidateMatch(
 	candidate: Candidate,
 	seasonFromEpisodes: boolean,
+	source: SearchSource,
 ): Promise<InjectionResult | SaveResult | null> {
 	const candidateLog = `${candidate.tracker}: ${candidate.name}`;
 	let searchee: Searchee;
@@ -293,6 +298,7 @@ export async function checkNewCandidateMatch(
 				path: e.absolute_path,
 				name: e.name,
 				length: e.length,
+				source: source,
 			}))
 			.filter((f) => fs.existsSync(f.path));
 		if (files.length === 0) {
@@ -328,7 +334,7 @@ export async function checkNewCandidateMatch(
 			return null;
 		}
 		if (!filterByContent(meta)) return null;
-		searchee = createSearcheeFromMetafile(meta);
+		searchee = createSearcheeFromMetafile(meta, source);
 	}
 
 	const hashesToExclude = await getInfoHashesToExclude();
@@ -368,7 +374,9 @@ async function findSearchableTorrents(useFilters: boolean) {
 	let allSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
-			torrents.map(createSearcheeFromTorrentFile), //also create searchee from path
+			torrents.map((path) =>
+				createSearcheeFromTorrentFile(path, SearchSource.INDEX),
+			), //also create searchee from path
 		);
 		allSearchees = searcheeResults
 			.filter((t) => t.isOk())
@@ -379,7 +387,9 @@ async function findSearchableTorrents(useFilters: boolean) {
 		}
 		if (Array.isArray(dataDirs)) {
 			const searcheeResults = await Promise.all(
-				findSearcheesFromAllDataDirs().map(createSearcheeFromPath),
+				findSearcheesFromAllDataDirs().map((path) =>
+					createSearcheeFromPath(path, SearchSource.INDEX),
+				),
 			);
 			allSearchees.push(
 				...searcheeResults
@@ -513,9 +523,9 @@ export async function scanRssFeeds() {
 					candidatesSinceLastTime.length
 				}`,
 			});
-			await checkNewCandidateMatch(candidate, false);
+			await checkNewCandidateMatch(candidate, false, SearchSource.RSS);
 			if (seasonFromEpisodes) {
-				await checkNewCandidateMatch(candidate, true);
+				await checkNewCandidateMatch(candidate, true, SearchSource.RSS);
 			}
 		}
 		logger.info({ label: Label.RSS, message: "Scan complete" });

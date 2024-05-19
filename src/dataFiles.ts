@@ -25,9 +25,11 @@ function shouldIgnorePathHeuristically(
 export function findPotentialNestedRoots(
 	root: string,
 	depth: number,
+	isDirHint?: boolean,
 	isWebHook?: boolean,
 ): string[] {
-	const isDir = statSync(root).isDirectory();
+	const isDir =
+		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
 	if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir, isWebHook)) {
 		return [];
 	}

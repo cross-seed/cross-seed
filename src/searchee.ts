@@ -10,6 +10,7 @@ import {
 	RES_STRICT_REGEX,
 	SOURCE_REGEX,
 	IGNORED_FOLDERS_REGEX,
+	SearchSource,
 } from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
@@ -38,6 +39,7 @@ export interface Searchee {
 	files: File[];
 	name: string;
 	length: number;
+	source?: SearchSource;
 }
 
 export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
@@ -72,21 +74,26 @@ function getFilesFromDataRoot(rootPath: string): File[] {
 	}));
 }
 
-export function createSearcheeFromMetafile(meta: Metafile): Searchee {
+export function createSearcheeFromMetafile(
+	meta: Metafile,
+	source?: SearchSource,
+): Searchee {
 	return {
 		files: meta.files,
 		infoHash: meta.infoHash,
 		name: meta.name,
 		length: meta.length,
+		source: source,
 	};
 }
 
 export async function createSearcheeFromTorrentFile(
 	filepath: string,
+	source?: SearchSource,
 ): Promise<Result<Searchee, Error>> {
 	try {
 		const meta = await parseTorrentFromFilename(filepath);
-		return resultOf(createSearcheeFromMetafile(meta));
+		return resultOf(createSearcheeFromMetafile(meta, source));
 	} catch (e) {
 		logger.error(`Failed to parse ${basename(filepath)}`);
 		logger.debug(e);
@@ -96,6 +103,7 @@ export async function createSearcheeFromTorrentFile(
 
 export async function createSearcheeFromPath(
 	filepath: string,
+	source?: SearchSource,
 ): Promise<Result<Searchee, Error>> {
 	const files = getFilesFromDataRoot(filepath);
 	if (files.length === 0) {
@@ -110,15 +118,15 @@ export async function createSearcheeFromPath(
 			? basename(filepath).match(IGNORED_FOLDERS_REGEX)
 			: undefined;
 
-	const x = {
+	return resultOf({
 		files: files,
 		path: filepath,
 		name: seasonMatch
 			? `${basename(dirname(filepath))} S${seasonMatch?.groups?.season}`
 			: basename(filepath),
 		length: totalLength,
-	};
-	return resultOf(x);
+		source: source,
+	});
 }
 
 export async function getSeasonKey(name: string): Promise<string | null> {
@@ -345,6 +353,7 @@ export async function createEnsembleSearchees(
 		logReason(
 			`Created virtual searchee for ${key} ${episodeSearchees.size} episodes (${seasonSearchee.files.length} files) [${humanReadableSize(seasonSearchee.length)}]`,
 		);
+		seasonSearchee.source = SearchSource.INDEX;
 		seasonSearchees.push(seasonSearchee);
 	}
 	logReason(`Created ${seasonSearchees.length} virtual season searchees...`);

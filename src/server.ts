@@ -9,7 +9,7 @@ import {
 	checkNewCandidateMatch,
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
-import { InjectionResult, SaveResult } from "./constants.js";
+import { InjectionResult, SaveResult, SearchSource } from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
@@ -179,9 +179,17 @@ async function announce(
 	const candidate = data as Candidate;
 	try {
 		await indexNewTorrents();
-		let result = await checkNewCandidateMatch(candidate, false);
+		let result = await checkNewCandidateMatch(
+			candidate,
+			false,
+			SearchSource.ANNOUNCE,
+		);
 		if (seasonFromEpisodes) {
-			const res = await checkNewCandidateMatch(candidate, true);
+			const res = await checkNewCandidateMatch(
+				candidate,
+				true,
+				SearchSource.ANNOUNCE,
+			);
 			if (
 				result !== InjectionResult.SUCCESS &&
 				(res === InjectionResult.SUCCESS || res === SaveResult.SAVED)

@@ -79,7 +79,13 @@ export enum Action {
 	SAVE = "save",
 	INJECT = "inject",
 }
-
+export enum SearchSource {
+	RSS = "rss",
+	ANNOUNCE = "announce",
+	WEBHOOK = "webhook",
+	SEARCH = "search",
+	INDEX = "index",
+}
 export enum InjectionResult {
 	SUCCESS = "INJECTED",
 	FAILURE = "FAILURE",
