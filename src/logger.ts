@@ -45,7 +45,7 @@ function redactUrlPassword(message, urlStr) {
 	return message;
 }
 
-function redactMessage(message: string | unknown, options?) {
+function redactMessage(message: string | unknown, options?: RuntimeConfig) {
 	if (typeof message !== "string") {
 		return message;
 	}

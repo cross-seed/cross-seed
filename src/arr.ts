@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import ms from "ms";
-import { join } from "path";
+import { join as posixJoin } from "node:path/posix";
+import { URLSearchParams } from "node:url";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -29,7 +30,6 @@ export type ParseResponse =
 
 export async function validateUArrLs() {
 	const { sonarr, radarr } = getRuntimeConfig();
-	if (!sonarr && !radarr) return;
 
 	if (sonarr) {
 		const urls: URL[] = sonarr.map((str) => new URL(str));
@@ -39,7 +39,7 @@ export async function validateUArrLs() {
 					`Sonarr url ${url} does not specify an apikey`,
 				);
 			}
-			await checkArrIsActive(url, "Sonarr");
+			await checkArrIsActive(url.href, "Sonarr");
 		}
 	}
 	if (radarr) {
@@ -50,33 +50,59 @@ export async function validateUArrLs() {
 					`Radarr url ${url} does not specify an apikey`,
 				);
 			}
-			await checkArrIsActive(url, "Radarr");
+			await checkArrIsActive(url.href, "Radarr");
 		}
 	}
 }
 
-async function checkArrIsActive(url: URL, arrInstance: string) {
-	const apikey = getApikey(url.toString())!;
-	url.pathname = join(url.pathname, "/ping");
-	const arrPingCheck = await makeArrApiCall(url, apikey);
+async function checkArrIsActive(uArrL: string, arrInstance: string) {
+	const arrPingCheck = await makeArrApiCall<{
+		current: string;
+	}>(uArrL, "/api");
+
 	if (arrPingCheck.isOk()) {
 		const arrPingResponse = arrPingCheck.unwrapOrThrow();
-		if (arrPingResponse["status"] !== "OK") {
+		if (!arrPingResponse?.current) {
 			throw new CrossSeedError(
-				`Failed to establish an "OK" from ${arrInstance} URL: ${url}`,
+				`Failed to establish a connection to ${arrInstance} URL: ${uArrL}`,
 			);
 		}
 	} else {
+		const error = arrPingCheck.unwrapErrOrThrow();
 		throw new CrossSeedError(
-			`Could not contact ${arrInstance} URL: ${url} - ${arrPingCheck.unwrapErrOrThrow().message}`,
+			`Could not contact ${arrInstance} at ${uArrL}`,
+			{
+				cause:
+					error.message.includes("fetch failed") && error.cause
+						? error.cause
+						: error,
+			},
 		);
 	}
 }
 
-async function makeArrApiCall(
-	url: URL,
-	apikey: string,
-): Promise<Result<ParseResponse, Error>> {
+function getBodySampleMessage(text: string): string {
+	const first1000Chars = text.substring(0, 1000);
+	if (first1000Chars) {
+		return `first 1000 characters: ${first1000Chars}`;
+	} else {
+		return "";
+	}
+}
+
+async function makeArrApiCall<ResponseType>(
+	uArrL: string,
+	resourcePath: string,
+	params = new URLSearchParams(),
+): Promise<Result<ResponseType, Error>> {
+	const apikey = getApikey(uArrL)!;
+	const url = new URL(sanitizeUrl(uArrL));
+
+	url.pathname = posixJoin(url.pathname, resourcePath);
+	for (const [name, value] of params) {
+		url.searchParams.set(name, value);
+	}
+
 	let response: Response;
 	try {
 		response = await fetch(url, {
@@ -85,32 +111,41 @@ async function makeArrApiCall(
 		});
 	} catch (networkError) {
 		if (networkError.name === "AbortError") {
-			return resultOfErr(new Error(`connection timeout`));
+			return resultOfErr(new Error("connection timeout"));
 		}
-		return resultOfErr(new Error(networkError));
+		return resultOfErr(networkError);
 	}
 	if (!response.ok) {
-		return resultOfErr(new Error(`${response.status}`));
+		const responseText = await response.text();
+		const bodySampleMessage = getBodySampleMessage(responseText);
+		return resultOfErr(
+			new Error(
+				`${response.status} ${response.statusText} ${bodySampleMessage}`,
+			),
+		);
 	}
-
-	const responseBody = (await response.json()) as ParseResponse;
-	if (!responseBody) {
-		return resultOfErr(new Error("Response was empty"));
+	try {
+		const responseBody = await response.clone().json();
+		return resultOf(responseBody as ResponseType);
+	} catch (e) {
+		const responseText = await response.text();
+		return resultOfErr(
+			new Error(
+				`Arr response was non-JSON. ${getBodySampleMessage(responseText)}`,
+			),
+		);
 	}
-	return resultOf(responseBody);
 }
 
 async function getExternalIdsFromArr(
 	searchee: Searchee,
 	uArrL: string,
 ): Promise<ExternalIds> {
-	const apikey = getApikey(uArrL)!;
-	const url = new URL(sanitizeUrl(uArrL));
-
-	url.pathname = join(url.pathname, "/api/v3/parse");
-	url.searchParams.append("title", searchee.name);
-
-	const response = await makeArrApiCall(url, apikey);
+	const response = await makeArrApiCall<ParseResponse>(
+		uArrL,
+		"/api/v3/parse",
+		new URLSearchParams({ title: searchee.name }),
+	);
 
 	if (response.isOk()) {
 		const responseBody = response.unwrapOrThrow() as ParseResponse;
