@@ -23,10 +23,7 @@ export interface ExternalIds {
 	tvdbId?: string;
 }
 
-export type ParseResponse =
-	| { movie: ExternalIds }
-	| { series: ExternalIds }
-	| { status: string };
+export type ParseResponse = { movie: ExternalIds } | { series: ExternalIds };
 
 export async function validateUArrLs() {
 	const { sonarr, radarr } = getRuntimeConfig();
