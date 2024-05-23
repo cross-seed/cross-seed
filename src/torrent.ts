@@ -45,8 +45,9 @@ function isMagnetRedirectError(error: Error): boolean {
 	);
 }
 
-export async function parseTorrentFromURL(
+export async function snatch(
 	url: string,
+	tracker: string,
 ): Promise<Result<Metafile, SnatchError>> {
 	const abortController = new AbortController();
 	const { snatchTimeout } = getRuntimeConfig();
@@ -63,13 +64,15 @@ export async function parseTorrentFromURL(
 		});
 	} catch (e) {
 		if (e.name === "AbortError") {
-			logger.error(`snatching ${url} timed out`);
+			logger.error(`snatch timed out from ${tracker}: ${url}`);
 			return resultOfErr(SnatchError.ABORTED);
 		} else if (isMagnetRedirectError(e)) {
-			logger.error(`Unsupported: magnet link detected at ${url}`);
+			logger.error(
+				`Unsupported: magnet link detected at ${tracker}: ${url}`,
+			);
 			return resultOfErr(SnatchError.MAGNET_LINK);
 		}
-		logger.error(`failed to access ${url}`);
+		logger.error(`failed to access ${tracker}: ${url}`);
 		logger.debug(e);
 		return resultOfErr(SnatchError.UNKNOWN_ERROR);
 	}
@@ -78,7 +81,7 @@ export async function parseTorrentFromURL(
 		return resultOfErr(SnatchError.RATE_LIMITED);
 	} else if (!response.ok) {
 		logger.error(
-			`error downloading torrent at ${url}: ${response.status} ${response.statusText}`,
+			`error downloading torrent from ${tracker} at ${url}: ${response.status} ${response.statusText}`,
 		);
 		logger.debug("response: %s", await response.text());
 		return resultOfErr(SnatchError.UNKNOWN_ERROR);
@@ -87,7 +90,7 @@ export async function parseTorrentFromURL(
 		if (responseText.includes("429")) {
 			return resultOfErr(SnatchError.RATE_LIMITED);
 		}
-		logger.error(`invalid torrent contents at ${url}`);
+		logger.error(`invalid torrent contents from ${tracker}: ${url}`);
 		logger.debug(
 			`contents: "${responseText.slice(0, 100)}${
 				responseText.length > 100 ? "..." : ""
@@ -102,7 +105,7 @@ export async function parseTorrentFromURL(
 			),
 		);
 	} catch (e) {
-		logger.error(`invalid torrent contents at ${url}`);
+		logger.error(`invalid torrent contents from ${tracker}: ${url}`);
 		const contentType = response.headers.get("Content-Type");
 		const contentLength = response.headers.get("Content-Length");
 		logger.debug(`Content-Type: ${contentType}`);

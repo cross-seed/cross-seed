@@ -6,6 +6,7 @@ import {
 	MatchMode,
 	RELEASE_GROUP_REGEX,
 	REPACK_PROPER_REGEX,
+	RESOLUTION_REGEX,
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -15,11 +16,7 @@ import { Candidate } from "./pipeline.js";
 import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
-import {
-	parseTorrentFromFilename,
-	parseTorrentFromURL,
-	SnatchError,
-} from "./torrent.js";
+import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
 import { humanReadableSize } from "./utils.js";
 
 export interface ResultAssessment {
@@ -57,6 +54,11 @@ const createReasonLogger =
 						? `${humanReadableSize(searchee.length)} -> ${humanReadableSize(candidate.size)}`
 						: `${sizeDiff > 0 ? "+" : ""}${sizeDiff} bytes`
 				})`;
+				break;
+			case Decision.RESOLUTION_MISMATCH:
+				reason = `its resolution does not match - (${searchee.name
+					.match(RESOLUTION_REGEX)?.[0]
+					?.trim()} -> ${candidate.name.match(RESOLUTION_REGEX)?.[0]?.trim()})`;
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
@@ -225,7 +227,7 @@ function releaseGroupDoesMatch(
 }
 
 async function assessCandidateHelper(
-	{ link, size, name }: Candidate,
+	{ link, size, name, tracker }: Candidate,
 	searchee: Searchee,
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
@@ -246,7 +248,7 @@ async function assessCandidateHelper(
 	if (!releaseVersionDoesMatch(searchee.name, name, matchMode)) {
 		return { decision: Decision.PROPER_REPACK_MISMATCH };
 	}
-	const result = await parseTorrentFromURL(link);
+	const result = await snatch(link, tracker);
 
 	if (result.isErr()) {
 		return result.unwrapErrOrThrow() === SnatchError.RATE_LIMITED

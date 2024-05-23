@@ -20,6 +20,8 @@ export enum Label {
 	RSS = "rss",
 	PERF = "perf",
 	REVERSE_LOOKUP = "reverselookup",
+	RADARR = "radarr",
+	SONARR = "sonarr",
 }
 
 export let logger: winston.Logger;
@@ -43,7 +45,7 @@ function redactUrlPassword(message, urlStr) {
 	return message;
 }
 
-function redactMessage(message: string | unknown, options?) {
+function redactMessage(message: string | unknown, options?: RuntimeConfig) {
 	if (typeof message !== "string") {
 		return message;
 	}

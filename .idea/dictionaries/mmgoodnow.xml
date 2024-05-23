@@ -5,6 +5,7 @@
       <w>bencode</w>
       <w>caronc</w>
       <w>dlspeed</w>
+      <w>imdbid</w>
       <w>infohash</w>
       <w>jackett</w>
       <w>jsified</w>
@@ -18,7 +19,11 @@
       <w>searchees</w>
       <w>seedable</w>
       <w>sonarr's</w>
+      <w>tmdb</w>
+      <w>tmdbid</w>
       <w>torznab</w>
+      <w>tvdb</w>
+      <w>tvdbid</w>
       <w>tvsearch</w>
       <w>upspeed</w>
       <w>xmlrpc</w>

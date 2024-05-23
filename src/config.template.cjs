@@ -30,6 +30,38 @@ module.exports = {
 	torznab: [],
 
 	/**
+	 * URL(s) to your Sonarr instance(s), included in the same way as torznab
+	 * URLs but for your Sonarr: note that api is not at the end. see below.
+	 *
+	 * You should order these in most likely to match -> least likely order.
+	 * They are searched sequentially as they are listed.
+	 *
+	 * This apikey parameter comes from Sonarr
+	 *
+	 * Example: sonarr: ["http://sonarr:8989/?apikey=12345"],
+	 *
+	 *			sonarr: ["http://sonarr:8989/?apikey=12345",
+	 *					"http://sonarr4k:8989/?apikey=12345"],
+	 */
+	sonarr: undefined,
+
+	/**
+	 * URL(s) to your Radarr instance(s), included in the same way as torznab
+	 * URLs but for your Sonarr: note that api is not at the end. see below.
+	 *
+	 * You should order these in most likely to match -> least likely order.
+	 * They are searched sequentially as they are listed.
+	 *
+	 * This apikey parameter comes from Sonarr
+	 *
+	 * Example: radarr: ["http://radarr:7878/?apikey=12345"],
+	 *
+	 * 			radarr: ["http://radarr:7878/?apikey=12345",
+	 * 					"http://radarr4k:7878/?apikey=12345"],
+	 */
+	radarr: undefined,
+
+	/**
 	 * Bind to a specific host address.
 	 * Example: "127.0.0.1"
 	 * Default is "0.0.0.0"

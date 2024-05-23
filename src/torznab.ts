@@ -1,9 +1,11 @@
 import ms from "ms";
 import xml2js from "xml2js";
+import { ExternalIds, getAvailableArrIds, getRelevantArrIds } from "./arr.js";
 import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
+	getAllIndexers,
 	getEnabledIndexers,
 	Indexer,
 	IndexerStatus,
@@ -12,18 +14,34 @@ import {
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee, hasVideo } from "./searchee.js";
+import { Searchee } from "./searchee.js";
 import {
-	getAnimeQueries,
 	cleanseSeparators,
-	getTag,
+	getAnimeQueries,
+	getApikey,
+	getMediaType,
 	MediaType,
 	nMsAgo,
 	reformatTitleForSearching,
+	sanitizeUrl,
 	stripExtension,
 } from "./utils.js";
 
-interface TorznabParams {
+export interface TorznabCats {
+	tv: boolean;
+	movie: boolean;
+	anime: boolean;
+	audio: boolean;
+	book: boolean;
+}
+
+export interface IdSearchParams {
+	tvdbid?: string;
+	tmdbid?: string;
+	imdbid?: string;
+}
+
+export interface TorznabParams extends IdSearchParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
@@ -32,17 +50,30 @@ interface TorznabParams {
 	ep?: number | string;
 }
 
-interface Caps {
-	search: boolean;
-	tvSearch: boolean;
-	movieSearch: boolean;
+export interface IdSearchCaps {
+	tvdbId?: boolean;
+	tmdbId?: boolean;
+	imdbId?: boolean;
 }
 
-type TorznabSearchTechnique = [] | [{ $?: { available: "yes" | "no" } }];
+export interface Caps {
+	search: boolean;
+	categories: TorznabCats;
+	tvSearch: boolean;
+	movieSearch: boolean;
+	movieIdSearch: IdSearchCaps;
+	tvIdSearch: IdSearchCaps;
+}
 
+type TorznabSearchTechnique =
+	| []
+	| [{ $: { available: "yes" | "no"; supportedParams: string } }];
+
+type CategoryXmlElement = { $: { id: string; name: string } };
 type TorznabCaps = {
 	caps?: {
-		searching?: [
+		categories: { category: CategoryXmlElement[] }[];
+		searching: [
 			{
 				search?: TorznabSearchTechnique;
 				"tv-search"?: TorznabSearchTechnique;
@@ -65,17 +96,6 @@ interface TorznabResult {
 
 type TorznabResults = { rss?: { channel?: [] | [{ item?: TorznabResult[] }] } };
 
-function sanitizeUrl(url: string | URL): string {
-	if (typeof url === "string") {
-		url = new URL(url);
-	}
-	return url.origin + url.pathname;
-}
-
-function getApikey(url: string) {
-	return new URL(url).searchParams.get("apikey");
-}
-
 function parseTorznabResults(xml: TorznabResults): Candidate[] {
 	const items = xml?.rss?.channel?.[0]?.item;
 	if (!items || !Array.isArray(items)) {
@@ -97,46 +117,107 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 }
 
 function parseTorznabCaps(xml: TorznabCaps): Caps {
-	const capsSection = xml?.caps?.searching?.[0];
-	const isAvailable = (searchTechnique) =>
+	const searchingSection = xml?.caps?.searching?.[0];
+	const isAvailable = (searchTechnique: TorznabSearchTechnique | undefined) =>
 		searchTechnique?.[0]?.$?.available === "yes";
+
+	function getSupportedIds(
+		searchTechnique: TorznabSearchTechnique | undefined,
+	): IdSearchCaps {
+		const supportedParamsStr = searchTechnique?.[0]?.$?.supportedParams;
+		const supportedIds =
+			supportedParamsStr
+				?.split(",")
+				?.filter((token) => token.includes("id")) ?? [];
+
+		return {
+			tvdbId: supportedIds.includes("tvdbid"),
+			tmdbId: supportedIds.includes("tmdbid"),
+			imdbId: supportedIds.includes("imdbid"),
+		};
+	}
+
+	const categoryCaps = xml?.caps?.categories?.[0]?.category;
+
+	function getCatCaps(item: CategoryXmlElement[] | undefined) {
+		const categoryNames: string[] = (item ?? []).map(
+			(category) => category.$.name,
+		);
+
+		function indexerDoesSupportCat(category: string): boolean {
+			return categoryNames.some((cat) =>
+				cat.toLowerCase().includes(category),
+			);
+		}
+		return {
+			movie: indexerDoesSupportCat("movie"),
+			tv: indexerDoesSupportCat("tv"),
+			anime: indexerDoesSupportCat("anime"),
+			audio: indexerDoesSupportCat("audio"),
+			book: indexerDoesSupportCat("book"),
+		};
+	}
+
 	return {
-		search: Boolean(isAvailable(capsSection?.search)),
-		tvSearch: Boolean(isAvailable(capsSection?.["tv-search"])),
-		movieSearch: Boolean(isAvailable(capsSection?.["movie-search"])),
+		search: Boolean(isAvailable(searchingSection?.search)),
+		tvSearch: Boolean(isAvailable(searchingSection?.["tv-search"])),
+		movieSearch: Boolean(isAvailable(searchingSection?.["movie-search"])),
+		movieIdSearch: getSupportedIds(searchingSection?.["movie-search"]),
+		tvIdSearch: getSupportedIds(searchingSection?.["tv-search"]),
+		categories: getCatCaps(categoryCaps),
 	};
 }
 
-function createTorznabSearchQueries(
+async function createTorznabSearchQueries(
 	searchee: Searchee,
+	ids: ExternalIds,
 	caps: Caps,
-): TorznabParams[] {
+): Promise<TorznabParams[]> {
 	const nameWithoutExtension = stripExtension(searchee.name);
-	const isVideo = hasVideo(searchee);
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
-	const mediaType = getTag(nameWithoutExtension, isVideo);
+	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
+	const shouldUseIdSearch = Object.values(relevantIds).some((id) => id);
+	const mediaType = getMediaType(searchee);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = nameWithoutExtension.match(EP_REGEX);
+		const groups = match!.groups!;
 		return [
 			{
 				t: "tvsearch",
-				q: cleanseSeparators(match!.groups!.title),
-				season: match!.groups!.season
-					? extractNumber(match!.groups!.season)
-					: match!.groups!.year,
-				ep: match!.groups!.episode
-					? extractNumber(match!.groups!.episode)
-					: `${match!.groups!.month}/${match!.groups!.day}`,
+				q: shouldUseIdSearch
+					? undefined
+					: cleanseSeparators(groups.title),
+				season: groups.season
+					? extractNumber(groups.season)
+					: groups.year,
+				ep: groups.episode
+					? extractNumber(groups.episode)
+					: `${groups.month}/${groups.day}`,
+				...relevantIds,
 			},
 		] as const;
 	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
 		const match = nameWithoutExtension.match(SEASON_REGEX);
+		const groups = match!.groups!;
 		return [
 			{
 				t: "tvsearch",
-				q: cleanseSeparators(match!.groups!.title),
-				season: extractNumber(match!.groups!.season),
+				q: shouldUseIdSearch
+					? undefined
+					: cleanseSeparators(groups.title),
+				season: extractNumber(groups.season),
+				...relevantIds,
+			},
+		] as const;
+	} else if (mediaType === MediaType.MOVIE && caps.movieSearch) {
+		return [
+			{
+				t: "movie",
+				q: shouldUseIdSearch
+					? undefined
+					: reformatTitleForSearching(nameWithoutExtension),
+				...relevantIds,
 			},
 		] as const;
 	} else if (mediaType === MediaType.ANIME) {
@@ -155,10 +236,31 @@ function createTorznabSearchQueries(
 	}
 }
 
+export function indexerDoesSupportMediaType(
+	mediaType: MediaType,
+	caps: TorznabCats,
+) {
+	switch (mediaType) {
+		case MediaType.EPISODE:
+		case MediaType.SEASON:
+			return caps.tv;
+		case MediaType.MOVIE:
+			return caps.movie;
+		case MediaType.ANIME:
+			return caps.anime;
+		case MediaType.AUDIO:
+			return caps.audio;
+		case MediaType.BOOK:
+			return caps.book;
+		case MediaType.OTHER:
+			return true;
+	}
+}
+
 export async function queryRssFeeds(): Promise<Candidate[]> {
 	const candidatesByUrl = await makeRequests(
 		await getEnabledIndexers(),
-		() => [{ t: "search", q: "" }],
+		async () => [{ t: "search", q: "" }],
 	);
 	return candidatesByUrl.flatMap((e) => e.candidates);
 }
@@ -193,30 +295,40 @@ export async function searchTorznab(
 			(entry) => entry.indexerId === indexer.id,
 		);
 		return (
-			!entry ||
-			((!excludeOlder || entry.firstSearched > nMsAgo(excludeOlder)) &&
-				(!excludeRecentSearch ||
-					entry.lastSearched < nMsAgo(excludeRecentSearch)))
+			indexerDoesSupportMediaType(
+				getMediaType(searchee),
+				JSON.parse(indexer.categories),
+			) &&
+			(!entry ||
+				((!excludeOlder ||
+					entry.firstSearched > nMsAgo(excludeOlder)) &&
+					(!excludeRecentSearch ||
+						entry.lastSearched < nMsAgo(excludeRecentSearch))))
 		);
 	});
 
-	const timestampCallout = " (filtered by timestamps)";
+	const timeOrCatCallout = " (filtered by category/timestamps)";
 	logger.info({
 		label: Label.TORZNAB,
 		message: `Searching ${indexersToUse.length} indexers for ${name}${
 			indexersToUse.length < enabledIndexers.length
-				? timestampCallout
+				? timeOrCatCallout
 				: ""
 		}`,
 	});
-
-	return makeRequests(indexersToUse, (indexer) =>
-		createTorznabSearchQueries(searchee, {
+	const searcheeIds =
+		indexersToUse.length > 0 ? await getAvailableArrIds(searchee) : {};
+	return await makeRequests(indexersToUse, async (indexer) => {
+		const caps = {
 			search: indexer.searchCap,
 			tvSearch: indexer.tvSearchCap,
 			movieSearch: indexer.movieSearchCap,
-		}),
-	);
+			tvIdSearch: JSON.parse(indexer.tvIdCaps),
+			movieIdSearch: JSON.parse(indexer.movieIdCaps),
+			categories: JSON.parse(indexer.categories),
+		};
+		return await createTorznabSearchQueries(searchee, searcheeIds, caps);
+	});
 }
 
 export async function syncWithDb() {
@@ -233,7 +345,10 @@ export async function syncWithDb() {
 			retryAfter: "retry_after",
 			searchCap: "search_cap",
 			tvSearchCap: "tv_search_cap",
+			tvIdCaps: "tv_id_caps",
 			movieSearchCap: "movie_search_cap",
+			movieIdCaps: "movie_id_caps",
+			categories: "cat_caps",
 		});
 
 	const inConfigButNotInDb = torznab.filter(
@@ -304,10 +419,10 @@ export async function syncWithDb() {
 	});
 }
 
-function assembleUrl(
+export function assembleUrl(
 	urlStr: string,
 	apikey: string,
-	params: TorznabParams,
+	params: TorznabParams | IdSearchParams,
 ): string {
 	const url = new URL(urlStr);
 	const searchParams = new URLSearchParams();
@@ -336,7 +451,7 @@ async function fetchCaps(indexer: {
 		const error = new Error(
 			`Indexer ${indexer.url} failed to respond, check verbose logs`,
 		);
-		logger.error(error);
+		logger.error(error.message);
 		logger.debug(e);
 		throw error;
 	}
@@ -346,7 +461,7 @@ async function fetchCaps(indexer: {
 		const error = new Error(
 			`Indexer ${indexer.url} responded with code ${response.status} when fetching caps, check verbose logs`,
 		);
-		logger.error(error);
+		logger.error(error.message);
 		logger.debug(
 			`Response body first 1000 characters: ${responseText.substring(
 				0,
@@ -362,7 +477,7 @@ async function fetchCaps(indexer: {
 		const error = new Error(
 			`Indexer ${indexer.url} responded with invalid XML when fetching caps, check verbose logs`,
 		);
-		logger.error(error);
+		logger.error(error.message);
 		logger.debug(
 			`Response body first 1000 characters: ${responseText.substring(
 				0,
@@ -406,13 +521,17 @@ async function updateCaps(
 		indexers.map((i) => i.id),
 		outcomes,
 	);
-
 	for (const [indexerId, caps] of fulfilled) {
-		await db("indexer").where({ id: indexerId }).update({
-			search_cap: caps.search,
-			tv_search_cap: caps.tvSearch,
-			movie_search_cap: caps.movieSearch,
-		});
+		await db("indexer")
+			.where({ id: indexerId })
+			.update({
+				search_cap: caps.search,
+				tv_search_cap: caps.tvSearch,
+				movie_search_cap: caps.movieSearch,
+				movie_id_caps: JSON.stringify(caps.movieIdSearch),
+				tv_id_caps: JSON.stringify(caps.tvIdSearch),
+				cat_caps: JSON.stringify(caps.categories),
+			});
 	}
 }
 
@@ -434,16 +553,8 @@ export async function validateTorznabUrls() {
 		}
 	}
 	await syncWithDb();
-	const enabledIndexersWithoutCaps = await db("indexer")
-		.where({
-			active: true,
-			search_cap: null,
-			tv_search_cap: null,
-			movie_search_cap: null,
-		})
-		.orWhere({ search_cap: false, active: true })
-		.select({ id: "id", url: "url", apikey: "apikey" });
-	await updateCaps(enabledIndexersWithoutCaps);
+	const allIndexers = await getAllIndexers();
+	await updateCaps(allIndexers);
 
 	const indexersWithoutSearch = await db("indexer")
 		.where({ search_cap: false, active: true })
@@ -464,14 +575,16 @@ export async function validateTorznabUrls() {
 
 async function makeRequests(
 	indexers: Indexer[],
-	getQueries: (indexer: Indexer) => TorznabParams[],
+	getQueries: (indexer: Indexer) => Promise<TorznabParams[]>,
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
 	const { searchTimeout } = getRuntimeConfig();
-	const searchUrls = indexers.flatMap((indexer: Indexer) =>
-		getQueries(indexer).map((query) =>
-			assembleUrl(indexer.url, indexer.apikey, query),
+	const searchUrls = await Promise.all(
+		indexers.flatMap(async (indexer: Indexer) =>
+			(await getQueries(indexer)).map((query) =>
+				assembleUrl(indexer.url, indexer.apikey, query),
+			),
 		),
-	);
+	).then((urls) => urls.flat());
 	searchUrls.forEach(
 		(message) => void logger.verbose({ label: Label.TORZNAB, message }),
 	);

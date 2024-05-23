@@ -18,11 +18,53 @@ export const ANIME_REGEX =
 	/^(?:\[(?<group>.*?)\][_.\s-]?)?(?:\[?(?<title>.+?)[_.\s-]?(?:\(?(?:\d{1,2}(?:st|nd|rd|th))?\s?Season)?[_.\s-]?\]?)(?:[([~/|-]\s?(?!\d{1,4})(?<altTitle>.+?)[)\]~-]?\s?)?[_.\s-]?(?:[[(]?(?<year>(?:19|20)\d{2})[)\]]?)?[[_.\s-](?:S\d{1,2})?[_.\s-]{0,3}(?:#|EP?|(?:SP))?[_.\s-]{0,3}(?<release>\d{1,4})/i;
 export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w ]+?)(?:\[.+\])?(?:\))?(?=(?:\.\w{1,5})?$)/i;
+export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[ipx])\b/i;
 
 export const REPACK_PROPER_REGEX =
-	/(\b(?<type>(REPACK|PROPER|\d\v\d)\d?))|(?<arrtype>(Proper|v\d))\b/;
+	/(?:\b(?<type>(?:REPACK|PROPER|\d\v\d)\d?))|(?<arrtype>(?:Proper|v\d))\b/;
+export const SCENE_TITLE_REGEX = /^(?:\w{0,5}-)?(?<title>.*)/i;
+
+export const ARR_DIR_REGEX =
+	/^(?!.*(?:(\d{3,4}[ipx])|([xh]26[4-6])|(?:(he)|a)vc))[\p{L}\s:\w'’!().,&–+-]+(?:\(\d{4}\))?\s?(?:\{(?:tm|tv|im)db(?:id)?-\w+\})?$/iu;
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
+export const AUDIO_EXTENSIONS = [
+	".wav",
+	".aiff",
+	".alac",
+	".flac",
+	".ape",
+	".mp3",
+	".aac",
+	".m4a",
+	".m4b",
+	".m4p",
+	".ogg",
+	".wma",
+	".aa",
+	".aax",
+];
+export const BOOK_EXTENSIONS = [
+	".epub",
+	".mobi",
+	".azw",
+	".azw3",
+	".azw4",
+	".pdf",
+	".djvu",
+	".html",
+	".chm",
+	".cbr",
+	".cbz",
+	".cb7",
+	".cbt",
+	".cba",
+];
+export const ALL_EXTENSIONS = [
+	...VIDEO_EXTENSIONS,
+	...AUDIO_EXTENSIONS,
+	...BOOK_EXTENSIONS,
+];
 
 export const IGNORED_FOLDERS_REGEX =
 	/^(S(eason )?\d{1,4}|((CD|DVD|DISC)\d{1,2}))$/i;
@@ -60,6 +102,7 @@ export enum Decision {
 	RELEASE_GROUP_MISMATCH = "RELEASE_GROUP_MISMATCH",
 	BLOCKED_RELEASE = "BLOCKED_RELEASE",
 	PROPER_REPACK_MISMATCH = "PROPER_REPACK_MISMATCH",
+	RESOLUTION_MISMATCH = "RESOLUTION_MISMATCH",
 }
 
 export enum MatchMode {
