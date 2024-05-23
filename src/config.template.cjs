@@ -134,12 +134,15 @@ module.exports = {
 	 * IF YOU ARE USING HARDLINKS, THIS MUST BE UNDER THE SAME VOLUME AS YOUR
 	 * DATADIRS. THIS PATH MUST ALSO BE ACCESSIBLE VIA YOUR TORRENT CLIENT
 	 * USING THE SAME PATH.
+	 *
+	 * We recommend reading the following FAQ entry:
+	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#what-linktype-should-i-use
 	 */
 	linkDir: undefined,
 
 	/**
 	 * cross-seed will use links of this type to inject data-based matches into
-	 * your client.
+	 * your client. We recommend reading the following FAQ entry:
 	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#what-linktype-should-i-use
 	 * Options: "symlink", "hardlink".
 	 */
@@ -166,6 +169,9 @@ module.exports = {
 	 * "partial" is like risky but allows matches if they are missing small
 	 * files like .nfo/.srt.
 	 * Options: "safe", "risky", "partial".
+	 *
+	 * We recommend reading the following FAQ entry:
+	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#what-linktype-should-i-use
 	 */
 	matchMode: "safe",
 

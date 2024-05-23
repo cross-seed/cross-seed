@@ -390,6 +390,7 @@ export default class QBittorrent implements TorrentClient {
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
 			if (path) {
+				formData.append("downloadPath", savePath);
 				formData.append("savepath", savePath);
 			}
 			formData.append(
