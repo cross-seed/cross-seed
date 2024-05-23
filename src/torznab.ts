@@ -1,6 +1,6 @@
 import ms from "ms";
 import xml2js from "xml2js";
-import { getAvailableArrIds, getRelevantArrIds, ExternalIds } from "./arr.js";
+import { ExternalIds, getAvailableArrIds, getRelevantArrIds } from "./arr.js";
 import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
@@ -16,7 +16,6 @@ import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import {
-	assembleUrl,
 	cleanseSeparators,
 	getAnimeQueries,
 	getApikey,
@@ -418,6 +417,24 @@ export async function syncWithDb() {
 			.where({ status: IndexerStatus.UNKNOWN_ERROR })
 			.update({ status: IndexerStatus.OK });
 	});
+}
+
+export function assembleUrl(
+	urlStr: string,
+	apikey: string,
+	params: TorznabParams | IdSearchParams,
+): string {
+	const url = new URL(urlStr);
+	const searchParams = new URLSearchParams();
+
+	searchParams.set("apikey", apikey);
+
+	for (const [key, value] of Object.entries(params)) {
+		if (value != null) searchParams.set(key, value);
+	}
+
+	url.search = searchParams.toString();
+	return url.toString();
 }
 
 async function fetchCaps(indexer: {

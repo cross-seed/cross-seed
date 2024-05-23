@@ -1,18 +1,17 @@
 import path, { basename } from "path";
 import {
-	EP_REGEX,
-	MOVIE_REGEX,
-	SEASON_REGEX,
+	ALL_EXTENSIONS,
 	ANIME_REGEX,
-	VIDEO_EXTENSIONS,
 	AUDIO_EXTENSIONS,
 	BOOK_EXTENSIONS,
-	ALL_EXTENSIONS,
 	Decision,
+	EP_REGEX,
+	MOVIE_REGEX,
 	SCENE_TITLE_REGEX,
+	SEASON_REGEX,
+	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
-import { IdSearchParams, TorznabParams } from "./torznab.js";
 import { Searchee } from "./searchee.js";
 
 export enum MediaType {
@@ -109,24 +108,6 @@ export function sanitizeUrl(url: string | URL): string {
 		url = new URL(url);
 	}
 	return url.origin + url.pathname;
-}
-
-export function assembleUrl(
-	urlStr: string,
-	apikey: string,
-	params: TorznabParams | IdSearchParams,
-): string {
-	const url = new URL(urlStr);
-	const searchParams = new URLSearchParams();
-
-	searchParams.set("apikey", apikey);
-
-	for (const [key, value] of Object.entries(params)) {
-		if (value != null) searchParams.set(key, value);
-	}
-
-	url.search = searchParams.toString();
-	return url.toString();
 }
 
 export function getApikey(url: string) {
