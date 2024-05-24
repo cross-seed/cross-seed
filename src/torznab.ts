@@ -275,6 +275,7 @@ export async function searchTorznab(
 	const enabledIndexers = await getEnabledIndexers();
 
 	const name = searchee.name;
+	const mediaType = getMediaType(searchee);
 
 	// search history for name across all indexers
 	const timestampDataSql = await db("searchee")
@@ -296,7 +297,7 @@ export async function searchTorznab(
 		);
 		return (
 			indexerDoesSupportMediaType(
-				getMediaType(searchee),
+				mediaType,
 				JSON.parse(indexer.categories),
 			) &&
 			(!entry ||
@@ -310,7 +311,7 @@ export async function searchTorznab(
 	const timeOrCatCallout = " (filtered by category/timestamps)";
 	logger.info({
 		label: Label.TORZNAB,
-		message: `Searching ${indexersToUse.length} indexers for ${name}${
+		message: `(${mediaType.toUpperCase()}) Searching ${indexersToUse.length} indexers for ${name}${
 			indexersToUse.length < enabledIndexers.length
 				? timeOrCatCallout
 				: ""

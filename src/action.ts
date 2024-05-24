@@ -224,14 +224,20 @@ export async function performAction(
 				destinationDir = dirname(searchee.path);
 			}
 		} else {
+			const result = linkedFilesRootResult.unwrapErrOrThrow();
+			logger.error(`Failed to link files for ${newMeta.name}: ${result}`);
+			const injectionResult =
+				result === "TORRENT_NOT_COMPLETE"
+					? InjectionResult.TORRENT_NOT_COMPLETE
+					: InjectionResult.FAILURE;
 			logInjectionResult(
-				InjectionResult.FAILURE,
+				injectionResult,
 				tracker,
 				newMeta.name,
 				decision,
 			);
 			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
-			return InjectionResult.FAILURE;
+			return injectionResult;
 		}
 	} else if (searchee.path) {
 		// should be a MATCH, as risky requires a linkDir to be set
