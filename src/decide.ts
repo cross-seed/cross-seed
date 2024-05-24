@@ -251,12 +251,12 @@ async function assessCandidateHelper(
 	const result = await snatch(link, tracker);
 
 	if (result.isErr()) {
-		return result.unwrapErrOrThrow() === SnatchError.RATE_LIMITED
+		return result.unwrapErr() === SnatchError.RATE_LIMITED
 			? { decision: Decision.RATE_LIMITED }
 			: { decision: Decision.DOWNLOAD_FAILED };
 	}
 
-	const candidateMeta = result.unwrapOrThrow();
+	const candidateMeta = result.unwrap();
 
 	if (hashesToExclude.includes(candidateMeta.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };

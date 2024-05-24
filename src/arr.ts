@@ -58,14 +58,14 @@ async function checkArrIsActive(uArrL: string, arrInstance: string) {
 	}>(uArrL, "/api");
 
 	if (arrPingCheck.isOk()) {
-		const arrPingResponse = arrPingCheck.unwrapOrThrow();
+		const arrPingResponse = arrPingCheck.unwrap();
 		if (!arrPingResponse?.current) {
 			throw new CrossSeedError(
 				`Failed to establish a connection to ${arrInstance} URL: ${uArrL}`,
 			);
 		}
 	} else {
-		const error = arrPingCheck.unwrapErrOrThrow();
+		const error = arrPingCheck.unwrapErr();
 		throw new CrossSeedError(
 			`Could not contact ${arrInstance} at ${uArrL}`,
 			{
@@ -145,7 +145,7 @@ async function getExternalIdsFromArr(
 	);
 
 	if (response.isOk()) {
-		const responseBody = response.unwrapOrThrow() as ParseResponse;
+		const responseBody = response.unwrap() as ParseResponse;
 		if ("movie" in responseBody) {
 			const { tvdbId, tmdbId, imdbId } = responseBody.movie;
 			return { tvdbId, imdbId, tmdbId };
@@ -258,10 +258,6 @@ export async function getAvailableArrIds(
 	searchee: Searchee,
 ): Promise<ExternalIds> {
 	const mediaType = getMediaType(searchee);
-	try {
-		const result = await scanAllArrsForExternalIds(searchee, mediaType);
-		return result.unwrapOrThrow();
-	} catch (e) {
-		return {};
-	}
+	const result = await scanAllArrsForExternalIds(searchee, mediaType);
+	return result.orElse({});
 }

@@ -290,7 +290,7 @@ export default class RTorrent implements TorrentClient {
 
 		const result = await this.getDownloadLocation(meta, searchee, path);
 		if (result.isErr()) {
-			switch (result.unwrapErrOrThrow()) {
+			switch (result.unwrapErr()) {
 				case "NOT_FOUND":
 					return InjectionResult.FAILURE;
 				case "TORRENT_NOT_COMPLETE":
@@ -299,7 +299,7 @@ export default class RTorrent implements TorrentClient {
 					return InjectionResult.FAILURE;
 			}
 		}
-		const { directoryBase, basePath } = result.unwrapOrThrow();
+		const { directoryBase, basePath } = result.unwrap();
 
 		const torrentFilePath = resolve(
 			outputDir,

@@ -94,10 +94,7 @@ export default class Deluge implements TorrentClient {
 			[],
 			0,
 		);
-		if (
-			isConnectedResponse.isOk() &&
-			!isConnectedResponse.unwrapOrThrow()
-		) {
+		if (isConnectedResponse.isOk() && !isConnectedResponse.unwrap()) {
 			logger.warn(
 				"Deluge WebUI disconnected from daemon...attempting to reconnect.",
 			);
@@ -109,7 +106,7 @@ export default class Deluge implements TorrentClient {
 				[webuiHostList[0][0]],
 				0,
 			);
-			if (connectResponse.isOk() && connectResponse.unwrapOrThrow()) {
+			if (connectResponse.isOk() && connectResponse.unwrap()) {
 				logger.info("Deluge WebUI connected to the daemon.");
 			} else {
 				throw new CrossSeedError(
@@ -132,8 +129,9 @@ export default class Deluge implements TorrentClient {
 		retries = 1,
 	): Promise<Result<ResultType, ErrorType>> {
 		const { delugeRpcUrl } = getRuntimeConfig();
-		const { href } =
-			extractCredentialsFromUrl(delugeRpcUrl).unwrapOrThrow();
+		const { href } = extractCredentialsFromUrl(delugeRpcUrl).unwrapOrThrow(
+			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
+		);
 		const headers = new Headers({ "Content-Type": "application/json" });
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
@@ -212,7 +210,7 @@ export default class Deluge implements TorrentClient {
 			[],
 		);
 		if (enabledPlugins.isOk()) {
-			return enabledPlugins.unwrapOrThrow().includes("Label");
+			return enabledPlugins.unwrap().includes("Label");
 		} else {
 			return false;
 		}
@@ -263,7 +261,7 @@ export default class Deluge implements TorrentClient {
 				this.isLabelEnabled = false;
 				throw new Error("Labels have been disabled.");
 			}
-			if (getCurrentLabels.unwrapOrThrow().includes(label)) {
+			if (getCurrentLabels.unwrap().includes(label)) {
 				setResult = await this.call<void>("label.set_torrent", [
 					newTorrent.infoHash,
 					label,
@@ -277,7 +275,7 @@ export default class Deluge implements TorrentClient {
 				]);
 			}
 			if (setResult.isErr()) {
-				throw new Error(setResult.unwrapErrOrThrow().message);
+				throw new Error(setResult.unwrapErr().message);
 			}
 		} catch (e) {
 			logger.debug(e);
@@ -336,7 +334,7 @@ export default class Deluge implements TorrentClient {
 				params,
 			);
 			if (addResponse.isErr()) {
-				const addResponseError = addResponse.unwrapErrOrThrow();
+				const addResponseError = addResponse.unwrapErr();
 				if (addResponseError.message.includes("already")) {
 					return InjectionResult.ALREADY_EXISTS;
 				} else if (addResponseError) {
@@ -425,7 +423,7 @@ export default class Deluge implements TorrentClient {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
 		if (response.isOk()) {
-			const torrentResponse = response.unwrapOrThrow().torrents;
+			const torrentResponse = response.unwrap().torrents;
 			if (!torrentResponse) {
 				return resultOfErr("UNKNOWN_ERROR");
 			}

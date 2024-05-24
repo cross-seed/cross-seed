@@ -1,78 +1,76 @@
-export interface Result<T, U> {
-	isOk(): boolean;
-	isErr(): boolean;
-	mapOk<R>(mapper: (t: T) => R): Result<R, U>;
-	mapErr<R>(mapper: (u: U) => R): Result<T, R>;
-	unwrapOrThrow(errToThrow?: Error): T;
-	unwrapErrOrThrow(): U;
-}
-
-class OkResult<T, U> implements Result<T, U> {
+class OkResult<T> {
 	private readonly contents: T;
 
 	constructor(contents: T) {
 		this.contents = contents;
 	}
 
-	isOk() {
+	isOk(): this is OkResult<T> {
 		return true;
 	}
 
-	isErr() {
+	isErr(): false {
 		return false;
 	}
 
-	mapOk<R>(mapper: (t: T) => R): Result<R, U> {
+	mapOk<R>(mapper: (t: T) => R): OkResult<R> {
 		return new OkResult(mapper(this.contents));
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	mapErr<R>(mapper: (u: U) => R): Result<T, R> {
-		return this as unknown as Result<T, R>;
+	mapErr(): OkResult<T> {
+		return this;
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	unwrapOrThrow(errToThrow?: Error): T {
+	unwrap(): T {
 		return this.contents;
 	}
 
-	unwrapErrOrThrow(): U {
-		throw new Error("Tried to unwrap an OkResult's error");
+	unwrapOrThrow(): T {
+		return this.contents;
+	}
+
+	orElse(): T {
+		return this.contents;
 	}
 }
 
-class ErrResult<T, U> implements Result<T, U> {
+class ErrResult<U> {
 	private readonly contents: U;
 
 	constructor(contents: U) {
 		this.contents = contents;
 	}
 
-	isOk(): boolean {
+	isOk(): this is OkResult<never> {
 		return false;
 	}
 
-	isErr(): boolean {
+	isErr(): this is ErrResult<U> {
 		return true;
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	mapOk<R>(mapper: (t: T) => R): Result<R, U> {
-		return this as unknown as Result<R, U>;
+	mapOk(): ErrResult<U> {
+		return this;
 	}
 
-	mapErr<R>(mapper: (u: U) => R): Result<T, R> {
+	mapErr<R>(mapper: (u: U) => R): ErrResult<R> {
 		return new ErrResult(mapper(this.contents));
 	}
 
-	unwrapOrThrow(errToThrow?: Error): T {
-		throw errToThrow ?? new Error("Tried to unwrap an ErrResult's error");
-	}
-
-	unwrapErrOrThrow(): U {
+	unwrapErr(): U {
 		return this.contents;
 	}
+
+	unwrapOrThrow(errToThrow: Error): never {
+		throw errToThrow;
+	}
+
+	orElse<T>(t: T): T {
+		return t;
+	}
 }
+
+export type Result<T, U> = OkResult<T> | ErrResult<U>;
 
 export function resultOf<T, U>(value: T): Result<T, U> {
 	return new OkResult(value);
@@ -80,4 +78,8 @@ export function resultOf<T, U>(value: T): Result<T, U> {
 
 export function resultOfErr<T, U>(value: U): Result<T, U> {
 	return new ErrResult(value);
+}
+
+export function isOk<T, U>(result: Result<T, U>): result is OkResult<T> {
+	return result.isOk();
 }

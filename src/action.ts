@@ -154,7 +154,7 @@ async function linkAllFilesInMetafile(
 			);
 		}
 		sourceRoot = join(
-			downloadDirResult.unwrapOrThrow(),
+			downloadDirResult.unwrap(),
 			searchee.files.length === 1
 				? searchee.files[0].path
 				: searchee.name,
@@ -214,17 +214,17 @@ export async function performAction(
 			decision,
 		);
 		if (linkedFilesRootResult.isOk()) {
-			destinationDir = dirname(linkedFilesRootResult.unwrapOrThrow());
+			destinationDir = dirname(linkedFilesRootResult.unwrap());
 		} else if (
 			decision === Decision.MATCH &&
-			linkedFilesRootResult.unwrapErrOrThrow() === "MISSING_DATA"
+			linkedFilesRootResult.unwrapErr() === "MISSING_DATA"
 		) {
 			logger.warn("Falling back to non-linking.");
 			if (searchee.path) {
 				destinationDir = dirname(searchee.path);
 			}
 		} else {
-			const result = linkedFilesRootResult.unwrapErrOrThrow();
+			const result = linkedFilesRootResult.unwrapErr();
 			logger.error(`Failed to link files for ${newMeta.name}: ${result}`);
 			const injectionResult =
 				result === "TORRENT_NOT_COMPLETE"

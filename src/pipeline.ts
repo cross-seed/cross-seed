@@ -23,6 +23,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
+import { isOk } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromMetafile,
@@ -199,7 +200,7 @@ export async function searchForLocalTorrentByCriteria(
 				createSearcheeFromPath,
 			),
 		);
-		searchees = searcheeResults.map((t) => t.unwrapOrThrow());
+		searchees = searcheeResults.filter(isOk).map((t) => t.unwrap());
 	} else {
 		searchees = [await getTorrentByCriteria(criteria)];
 	}
@@ -273,9 +274,7 @@ async function findSearchableTorrents() {
 		const searcheeResults = await Promise.all(
 			torrents.map(createSearcheeFromTorrentFile), //also create searchee from path
 		);
-		allSearchees = searcheeResults
-			.filter((t) => t.isOk())
-			.map((t) => t.unwrapOrThrow());
+		allSearchees = searcheeResults.filter(isOk).map((r) => r.unwrap());
 	} else {
 		if (typeof torrentDir === "string") {
 			allSearchees.push(...(await loadTorrentDirLight(torrentDir)));
@@ -285,9 +284,7 @@ async function findSearchableTorrents() {
 				findSearcheesFromAllDataDirs().map(createSearcheeFromPath),
 			);
 			allSearchees.push(
-				...searcheeResults
-					.filter((t) => t.isOk())
-					.map((t) => t.unwrapOrThrow()),
+				...searcheeResults.filter(isOk).map((r) => r.unwrap()),
 			);
 		}
 	}
