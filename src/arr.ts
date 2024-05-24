@@ -65,7 +65,7 @@ async function checkArrIsActive(uArrL: string, arrInstance: string) {
 			);
 		}
 	} else {
-		const error = arrPingCheck.unwrapErrOrThrow();
+		const error = arrPingCheck.unwrapErr();
 		throw new CrossSeedError(
 			`Could not contact ${arrInstance} at ${uArrL}`,
 			{

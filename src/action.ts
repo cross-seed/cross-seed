@@ -224,7 +224,7 @@ export async function performAction(
 				destinationDir = dirname(searchee.path);
 			}
 		} else {
-			const result = linkedFilesRootResult.unwrapErrOrThrow();
+			const result = linkedFilesRootResult.unwrapErr();
 			logger.error(`Failed to link files for ${newMeta.name}: ${result}`);
 			const injectionResult =
 				result === "TORRENT_NOT_COMPLETE"
