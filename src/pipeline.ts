@@ -200,9 +200,7 @@ export async function searchForLocalTorrentByCriteria(
 				createSearcheeFromPath,
 			),
 		);
-		searchees = searcheeResults.map((t) =>
-			t.unwrapOrThrow(new Error("Failed to unwrap error searchee")),
-		);
+		searchees = searcheeResults.filter(isOk).map((t) => t.unwrap());
 	} else {
 		searchees = [await getTorrentByCriteria(criteria)];
 	}
