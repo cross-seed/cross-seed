@@ -249,7 +249,7 @@ export async function getRelevantArrIds(
 
 	return {
 		tvdbid: idSearchCaps.tvdbId ? ids.tvdbId : undefined,
-		tmdbid: idSearchCaps.tvdbId ? ids.tmdbId : undefined,
+		tmdbid: idSearchCaps.tmdbId ? ids.tmdbId : undefined,
 		imdbid: idSearchCaps.imdbId ? ids.imdbId : undefined,
 	};
 }
