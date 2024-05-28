@@ -16,7 +16,7 @@ const ZodErrorMessages = {
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
-		"Using Automatic Torrent Management in qBittorrent without flatLinking enabled can result in unintended behavior.",
+		"If using Automatic Torrent Management in qBittorrent, please read: https://www.cross-seed.org/docs/v6-migration#qbittorrent",
 	needsLinkDir:
 		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
 	linkDirInDataDir:

@@ -89,6 +89,10 @@ module.exports = {
 	/**
 	 * The url of your qBittorrent webui.
 	 * Only relevant with action: "inject".
+	 *
+	 * If using Automatic Torrent Management, please read:
+	 * https://www.cross-seed.org/docs/v6-migration#qbittorrent
+	 *
 	 * Supply your username and password inside the url like so:
 	 * "http://username:password@localhost:8080"
 	 */
@@ -186,8 +190,8 @@ module.exports = {
 	 * Each individual Torznab tracker's cross-seeds, otherwise, will have it's
 	 * own folder with the tracker's name and it's links within it.
 	 *
-	 * qBittorent: If you are using qBittorrent with Auto Torrent Management in any capacity
-	 * it is recommended to enable this to avoid issues.
+	 * If using Automatic Torrent Management in qBittorrent, please read:
+	 * https://www.cross-seed.org/docs/v6-migration#qbittorrent
 	 *
 	 * Default: false.
 	 */
