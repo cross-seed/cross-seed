@@ -221,6 +221,9 @@ export async function scanAllArrsForExternalIds(
 	mediaType: MediaType,
 ): Promise<Result<ExternalIds, boolean>> {
 	const uArrLs = getRelevantArrInstances(mediaType);
+	if (uArrLs.length === 0) {
+		return resultOfErr(false);
+	}
 	try {
 		for (const uArrL of uArrLs) {
 			const externalIds = await getExternalIdsFromArr(searchee, uArrL);
