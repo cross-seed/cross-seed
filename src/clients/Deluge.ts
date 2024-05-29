@@ -1,6 +1,6 @@
 import ms from "ms";
 import {
-	Decision,
+	DecisionAnyMatch,
 	InjectionResult,
 	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
@@ -297,10 +297,7 @@ export default class Deluge implements TorrentClient {
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
-		decision:
-			| Decision.MATCH
-			| Decision.MATCH_SIZE_ONLY
-			| Decision.MATCH_PARTIAL,
+		decision: DecisionAnyMatch,
 		path?: string,
 	): Promise<InjectionResult> {
 		try {
@@ -388,10 +385,7 @@ export default class Deluge implements TorrentClient {
 		filename: string,
 		filedump: string,
 		path: string,
-		decision:
-			| Decision.MATCH
-			| Decision.MATCH_SIZE_ONLY
-			| Decision.MATCH_PARTIAL,
+		decision: DecisionAnyMatch,
 	): InjectData {
 		const toRecheck = shouldRecheck(decision);
 		return [

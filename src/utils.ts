@@ -50,7 +50,7 @@ export function humanReadableSize(bytes: number) {
 	const k = 1000;
 	const sizes = ["B", "kB", "MB", "GB", "TB"];
 	// engineering notation: (coefficient) * 1000 ^ (exponent)
-	const exponent = Math.floor(Math.log(bytes) / Math.log(k));
+	const exponent = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }

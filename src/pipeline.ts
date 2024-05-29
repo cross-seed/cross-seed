@@ -7,6 +7,7 @@ import {
 	ActionResult,
 	Decision,
 	InjectionResult,
+	isDecisionAnyMatch,
 	SaveResult,
 } from "./constants.js";
 import {
@@ -126,11 +127,8 @@ async function findOnOtherSites(
 		},
 	);
 
-	const matches = assessments.filter(
-		(e) =>
-			e.assessment.decision === Decision.MATCH ||
-			e.assessment.decision === Decision.MATCH_SIZE_ONLY ||
-			e.assessment.decision === Decision.MATCH_PARTIAL,
+	const matches = assessments.filter((e) =>
+		isDecisionAnyMatch(e.assessment.decision),
 	);
 	const actionResults = await performActions(searchee, matches);
 	if (actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
@@ -245,11 +243,7 @@ export async function checkNewCandidateMatch(
 		hashesToExclude,
 	);
 
-	if (
-		assessment.decision !== Decision.MATCH &&
-		assessment.decision !== Decision.MATCH_SIZE_ONLY &&
-		assessment.decision !== Decision.MATCH_PARTIAL
-	) {
+	if (!isDecisionAnyMatch(assessment.decision)) {
 		return null;
 	}
 

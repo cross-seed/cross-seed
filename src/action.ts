@@ -6,6 +6,7 @@ import {
 	Action,
 	ActionResult,
 	Decision,
+	DecisionAnyMatch,
 	InjectionResult,
 	LinkType,
 	SaveResult,
@@ -126,10 +127,7 @@ async function linkAllFilesInMetafile(
 	searchee: Searchee,
 	newMeta: Metafile,
 	tracker: string,
-	decision:
-		| Decision.MATCH
-		| Decision.MATCH_SIZE_ONLY
-		| Decision.MATCH_PARTIAL,
+	decision: DecisionAnyMatch,
 ): Promise<
 	Result<
 		string,
@@ -185,10 +183,7 @@ async function linkAllFilesInMetafile(
 
 export async function performAction(
 	newMeta: Metafile,
-	decision:
-		| Decision.MATCH
-		| Decision.MATCH_SIZE_ONLY
-		| Decision.MATCH_PARTIAL,
+	decision: DecisionAnyMatch,
 	searchee: Searchee,
 	tracker: string,
 ): Promise<ActionResult> {
