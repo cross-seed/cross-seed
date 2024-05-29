@@ -10,6 +10,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
 import { reformatTitleForSearching, stripExtension } from "./utils.js";
+import { Candidate } from "./pipeline.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -46,11 +47,12 @@ function isMagnetRedirectError(error: Error): boolean {
 }
 
 export async function snatch(
-	url: string,
-	tracker: string,
+	candidate: Candidate,
 ): Promise<Result<Metafile, SnatchError>> {
 	const abortController = new AbortController();
 	const { snatchTimeout } = getRuntimeConfig();
+	const url = candidate.link;
+	const tracker = candidate.tracker;
 
 	if (typeof snatchTimeout === "number") {
 		setTimeout(() => void abortController.abort(), snatchTimeout).unref();
@@ -64,15 +66,20 @@ export async function snatch(
 		});
 	} catch (e) {
 		if (e.name === "AbortError") {
-			logger.error(`snatch timed out from ${tracker}: ${url}`);
+			logger.error(
+				`Snatch timed out from ${tracker} for ${candidate.name}`,
+			);
+			logger.debug(`${candidate.name}: ${url}`);
 			return resultOfErr(SnatchError.ABORTED);
 		} else if (isMagnetRedirectError(e)) {
 			logger.error(
-				`Unsupported: magnet link detected at ${tracker}: ${url}`,
+				`Unsupported: magnet link detected from ${tracker} for ${candidate.name}`,
 			);
+			logger.debug(`${candidate.name}: ${url}`);
 			return resultOfErr(SnatchError.MAGNET_LINK);
 		}
-		logger.error(`failed to access ${tracker}: ${url}`);
+		logger.error(`Failed to access ${tracker} for ${candidate.name}`);
+		logger.debug(`${candidate.name}: ${url}`);
 		logger.debug(e);
 		return resultOfErr(SnatchError.UNKNOWN_ERROR);
 	}
@@ -81,18 +88,22 @@ export async function snatch(
 		return resultOfErr(SnatchError.RATE_LIMITED);
 	} else if (!response.ok) {
 		logger.error(
-			`error downloading torrent from ${tracker} at ${url}: ${response.status} ${response.statusText}`,
+			`Error downloading torrent from ${tracker} for ${candidate.name}: ${response.status} ${response.statusText}`,
 		);
-		logger.debug("response: %s", await response.text());
+		const responseText = await response.clone().text();
+		logger.debug(
+			`${candidate.name}: ${url} - Response: "${responseText.slice(0, 100)}${
+				responseText.length > 100 ? "..." : ""
+			}"`,
+		);
 		return resultOfErr(SnatchError.UNKNOWN_ERROR);
 	} else if (response.headers.get("Content-Type") === "application/rss+xml") {
 		const responseText = await response.clone().text();
-		if (responseText.includes("429")) {
-			return resultOfErr(SnatchError.RATE_LIMITED);
-		}
-		logger.error(`invalid torrent contents from ${tracker}: ${url}`);
+		logger.error(
+			`Invalid torrent contents from ${tracker} for ${candidate.name}`,
+		);
 		logger.debug(
-			`contents: "${responseText.slice(0, 100)}${
+			`${candidate.name}: ${url} - Contents: "${responseText.slice(0, 100)}${
 				responseText.length > 100 ? "..." : ""
 			}"`,
 		);
@@ -105,11 +116,15 @@ export async function snatch(
 			),
 		);
 	} catch (e) {
-		logger.error(`invalid torrent contents from ${tracker}: ${url}`);
+		logger.error(
+			`Invalid torrent contents from ${tracker} for ${candidate.name}`,
+		);
 		const contentType = response.headers.get("Content-Type");
 		const contentLength = response.headers.get("Content-Length");
-		logger.debug(`Content-Type: ${contentType}`);
-		logger.debug(`Content-Length: ${contentLength}`);
+		logger.debug(
+			`${candidate.name}: ${url} - Content-Type: ${contentType} - Content-Length: ${contentLength}`,
+		);
+		logger.debug(e);
 		return resultOfErr(SnatchError.INVALID_CONTENTS);
 	}
 }

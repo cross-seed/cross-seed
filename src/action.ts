@@ -6,6 +6,7 @@ import {
 	Action,
 	ActionResult,
 	Decision,
+	DecisionAnyMatch,
 	InjectionResult,
 	LinkType,
 	SaveResult,
@@ -95,7 +96,7 @@ function fuzzyLinkOneFile(
 /**
  * @return the root of linked files.
  */
-function fuzzyLinkPartial(
+function linkFuzzyTree(
 	searchee: Searchee,
 	newMeta: Metafile,
 	destinationDir: string,
@@ -126,10 +127,7 @@ async function linkAllFilesInMetafile(
 	searchee: Searchee,
 	newMeta: Metafile,
 	tracker: string,
-	decision:
-		| Decision.MATCH
-		| Decision.MATCH_SIZE_ONLY
-		| Decision.MATCH_PARTIAL,
+	decision: DecisionAnyMatch,
 ): Promise<
 	Result<
 		string,
@@ -172,23 +170,16 @@ async function linkAllFilesInMetafile(
 		return resultOf(
 			linkExactTree(searchee, newMeta, fullLinkDir, sourceRoot),
 		);
-	} else if (decision === Decision.MATCH_SIZE_ONLY) {
-		return resultOf(
-			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot),
-		);
 	} else {
 		return resultOf(
-			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot),
+			linkFuzzyTree(searchee, newMeta, fullLinkDir, sourceRoot),
 		);
 	}
 }
 
 export async function performAction(
 	newMeta: Metafile,
-	decision:
-		| Decision.MATCH
-		| Decision.MATCH_SIZE_ONLY
-		| Decision.MATCH_PARTIAL,
+	decision: DecisionAnyMatch,
 	searchee: Searchee,
 	tracker: string,
 ): Promise<ActionResult> {

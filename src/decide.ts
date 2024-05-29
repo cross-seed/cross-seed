@@ -1,12 +1,13 @@
-import { existsSync, writeFileSync } from "fs";
+import { existsSync, statSync, utimesSync, writeFileSync } from "fs";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
 	Decision,
+	isDecisionAnyMatch,
 	MatchMode,
 	RELEASE_GROUP_REGEX,
 	REPACK_PROPER_REGEX,
-	RESOLUTION_REGEX,
+	RES_STRICT_REGEX,
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -32,13 +33,13 @@ const createReasonLogger =
 		searchee: Searchee,
 		candidate: Candidate,
 	): void => {
+		if (cached) return;
 		function logReason(reason): void {
 			logger.verbose({
 				label: Label.DECIDE,
 				message: `${name} - no match for ${tracker} torrent ${Title} - ${reason}`,
 			});
 		}
-		const sizeDiff = candidate.size - searchee.length;
 
 		let reason;
 		switch (decision) {
@@ -48,17 +49,19 @@ const createReasonLogger =
 				return;
 			case Decision.MATCH:
 				return;
+			case Decision.FUZZY_SIZE_MISMATCH:
 			case Decision.SIZE_MISMATCH:
-				reason = `its size does not match - (${
-					Math.abs(sizeDiff) > 10000000 // 10MB is the rounding error
-						? `${humanReadableSize(searchee.length)} -> ${humanReadableSize(candidate.size)}`
-						: `${sizeDiff > 0 ? "+" : ""}${sizeDiff} bytes`
-				})`;
+			case Decision.PARTIAL_SIZE_MISMATCH:
+				reason = `its size does not match by ${decision}${
+					candidate.size
+						? `: ${candidate.size >= searchee.length ? "+" : ""}${humanReadableSize(candidate.size - searchee.length)}`
+						: ""
+				}`;
 				break;
 			case Decision.RESOLUTION_MISMATCH:
-				reason = `its resolution does not match - (${searchee.name
-					.match(RESOLUTION_REGEX)?.[0]
-					?.trim()} -> ${candidate.name.match(RESOLUTION_REGEX)?.[0]?.trim()})`;
+				reason = `its resolution does not match: ${
+					searchee.name.match(RES_STRICT_REGEX)?.groups?.res
+				} -> ${candidate.name.match(RES_STRICT_REGEX)?.groups?.res}`;
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
 				reason = "it doesn't have a download link";
@@ -69,6 +72,9 @@ const createReasonLogger =
 			case Decision.DOWNLOAD_FAILED:
 				reason = "the torrent file failed to download";
 				break;
+			case Decision.MAGNET_LINK:
+				reason = "the torrent is a magnet link";
+				break;
 			case Decision.INFO_HASH_ALREADY_EXISTS:
 				reason = "the info hash matches a torrent you already have";
 				break;
@@ -76,31 +82,29 @@ const createReasonLogger =
 				reason = "it has a different file tree";
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
-				reason = `it has a different release group - (${searchee.name
-					.match(RELEASE_GROUP_REGEX)?.[0]
-					?.trim()} -> ${candidate.name
-					.match(RELEASE_GROUP_REGEX)?.[0]
-					?.trim()})`;
+				reason = `it has a different release group: ${searchee.name
+					.match(RELEASE_GROUP_REGEX)
+					?.groups?.group?.trim()} -> ${candidate.name
+					.match(RELEASE_GROUP_REGEX)
+					?.groups?.group?.trim()}`;
 				break;
 			case Decision.PROPER_REPACK_MISMATCH:
-				reason = `one is a different subsequent release - (${
+				reason = `one is a different subsequent release: ${
 					searchee.name.match(REPACK_PROPER_REGEX)?.groups?.type ??
 					"INITIAL"
-				} -> ${candidate.name.match(REPACK_PROPER_REGEX)?.groups?.type ?? "INITIAL"})`;
+				} -> ${candidate.name.match(REPACK_PROPER_REGEX)?.groups?.type ?? "INITIAL"}`;
 				break;
 			case Decision.BLOCKED_RELEASE:
-				reason = `it matches the blocklist - ("${findBlockedStringInReleaseMaybe(
+				reason = `it matches the blocklist: "${findBlockedStringInReleaseMaybe(
 					searchee,
 					getRuntimeConfig().blockList,
-				)}")`;
+				)}"`;
 				break;
 			default:
 				reason = decision;
 				break;
 		}
-		if (!cached) {
-			logReason(reason);
-		}
+		logReason(reason);
 	};
 
 export function compareFileTrees(
@@ -123,16 +127,23 @@ export function compareFileTreesIgnoringNames(
 	candidate: Metafile,
 	searchee: Searchee,
 ): boolean {
-	const cmp = (candidate, searchee) => {
-		return searchee.length === candidate.length;
-	};
-
-	return candidate.files.every((elOfA) =>
-		searchee.files.some((elOfB) => cmp(elOfA, elOfB)),
-	);
+	for (const candidateFile of candidate.files) {
+		let matchedSearcheeFiles = searchee.files.filter(
+			(searcheeFile) => searcheeFile.length === candidateFile.length,
+		);
+		if (matchedSearcheeFiles.length > 1) {
+			matchedSearcheeFiles = matchedSearcheeFiles.filter(
+				(searcheeFile) => searcheeFile.name === candidateFile.name,
+			);
+		}
+		if (matchedSearcheeFiles.length === 0) {
+			return false;
+		}
+	}
+	return true;
 }
 
-export function compareFileTreesPartialIgnoringNames(
+export function comparePartialSizeOnly(
 	candidate: Metafile,
 	searchee: Searchee,
 ): boolean {
@@ -173,13 +184,35 @@ export function compareFileTreesPartial(
 	return availablePieces / totalPieces >= 1 - fuzzySizeThreshold;
 }
 
-function sizeDoesMatch(resultSize: number, searchee: Searchee) {
+function fuzzySizeDoesMatch(resultSize: number, searchee: Searchee) {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 
 	const { length } = searchee;
 	const lowerBound = length - fuzzySizeThreshold * length;
 	const upperBound = length + fuzzySizeThreshold * length;
 	return resultSize >= lowerBound && resultSize <= upperBound;
+}
+function resolutionDoesMatch(
+	searcheeName: string,
+	candidateName: string,
+	matchMode: MatchMode,
+) {
+	const searcheeRes = searcheeName
+		.match(RES_STRICT_REGEX)
+		?.groups?.res?.trim()
+		?.toLowerCase();
+	const candidateRes = candidateName
+		.match(RES_STRICT_REGEX)
+		?.groups?.res?.trim()
+		?.toLowerCase();
+	if (searcheeRes === candidateRes) {
+		return true;
+	}
+	// if we are unsure, pass in risky or partial mode but fail in safe mode
+	if (!searcheeRes || !candidateRes) {
+		return matchMode !== MatchMode.SAFE;
+	}
+	return searcheeRes.startsWith(candidateRes);
 }
 function releaseVersionDoesMatch(
 	searcheeName: string,
@@ -209,12 +242,12 @@ function releaseGroupDoesMatch(
 	matchMode: MatchMode,
 ) {
 	const searcheeReleaseGroup = searcheeName
-		.match(RELEASE_GROUP_REGEX)?.[0]
-		?.trim()
+		.match(RELEASE_GROUP_REGEX)
+		?.groups?.group?.trim()
 		?.toLowerCase();
 	const candidateReleaseGroup = candidateName
-		.match(RELEASE_GROUP_REGEX)?.[0]
-		?.trim()
+		.match(RELEASE_GROUP_REGEX)
+		?.groups?.group?.trim()
 		?.toLowerCase();
 	if (searcheeReleaseGroup === candidateReleaseGroup) {
 		return true;
@@ -227,20 +260,12 @@ function releaseGroupDoesMatch(
 }
 
 async function assessCandidateHelper(
-	{ link, size, name, tracker }: Candidate,
+	candidate: Candidate,
 	searchee: Searchee,
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { matchMode, blockList } = getRuntimeConfig();
-	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
-		return { decision: Decision.BLOCKED_RELEASE };
-	}
-
-	if (size && !sizeDoesMatch(size, searchee)) {
-		return { decision: Decision.SIZE_MISMATCH };
-	}
-
-	if (!link) return { decision: Decision.NO_DOWNLOAD_LINK };
+	const { name, size, link } = candidate;
 
 	if (!releaseGroupDoesMatch(searchee.name, name, matchMode)) {
 		return { decision: Decision.RELEASE_GROUP_MISMATCH };
@@ -248,63 +273,75 @@ async function assessCandidateHelper(
 	if (!releaseVersionDoesMatch(searchee.name, name, matchMode)) {
 		return { decision: Decision.PROPER_REPACK_MISMATCH };
 	}
-	const result = await snatch(link, tracker);
+	if (size) {
+		if (!fuzzySizeDoesMatch(size, searchee)) {
+			return { decision: Decision.FUZZY_SIZE_MISMATCH };
+		}
+	} else {
+		if (!resolutionDoesMatch(searchee.name, name, matchMode)) {
+			return { decision: Decision.RESOLUTION_MISMATCH };
+		}
+	}
+	if (!link) {
+		return { decision: Decision.NO_DOWNLOAD_LINK };
+	}
 
+	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
+		return { decision: Decision.BLOCKED_RELEASE };
+	}
+
+	const result = await snatch(candidate);
 	if (result.isErr()) {
-		return result.unwrapErr() === SnatchError.RATE_LIMITED
+		const err = result.unwrapErr();
+		return err === SnatchError.RATE_LIMITED
 			? { decision: Decision.RATE_LIMITED }
-			: { decision: Decision.DOWNLOAD_FAILED };
+			: err === SnatchError.MAGNET_LINK
+				? { decision: Decision.MAGNET_LINK }
+				: { decision: Decision.DOWNLOAD_FAILED };
+	}
+	const metafile = result.unwrap();
+	cacheTorrentFile(metafile);
+	candidate.size = metafile.length; // Trackers can be wrong
+
+	if (hashesToExclude.includes(metafile.infoHash)) {
+		return { decision: Decision.INFO_HASH_ALREADY_EXISTS, metafile };
 	}
 
-	const candidateMeta = result.unwrap();
-
-	if (hashesToExclude.includes(candidateMeta.infoHash)) {
-		return { decision: Decision.INFO_HASH_ALREADY_EXISTS };
-	}
-	const sizeMatch = compareFileTreesIgnoringNames(candidateMeta, searchee);
-	const perfectMatch = compareFileTrees(candidateMeta, searchee);
-
+	const perfectMatch = compareFileTrees(metafile, searchee);
 	if (perfectMatch) {
-		return { decision: Decision.MATCH, metafile: candidateMeta };
+		return { decision: Decision.MATCH, metafile };
 	}
-	if (
-		sizeMatch &&
-		matchMode !== MatchMode.SAFE &&
-		searchee.files.length === 1
-	) {
-		return {
-			decision: Decision.MATCH_SIZE_ONLY,
-			metafile: candidateMeta,
-		};
+
+	const sizeMatch = compareFileTreesIgnoringNames(metafile, searchee);
+	if (sizeMatch && matchMode !== MatchMode.SAFE) {
+		return { decision: Decision.MATCH_SIZE_ONLY, metafile };
 	}
 
 	if (matchMode === MatchMode.PARTIAL) {
-		const partialSizeMatch = compareFileTreesPartialIgnoringNames(
-			candidateMeta,
-			searchee,
-		);
+		const partialSizeMatch = comparePartialSizeOnly(metafile, searchee);
 		if (!partialSizeMatch) {
-			return { decision: Decision.SIZE_MISMATCH };
+			return { decision: Decision.PARTIAL_SIZE_MISMATCH, metafile };
 		}
-
-		const partialMatch = compareFileTreesPartial(candidateMeta, searchee);
+		const partialMatch = compareFileTreesPartial(metafile, searchee);
 		if (partialMatch) {
-			return {
-				decision: Decision.MATCH_PARTIAL,
-				metafile: candidateMeta,
-			};
+			return { decision: Decision.MATCH_PARTIAL, metafile };
 		}
 	} else if (!sizeMatch) {
-		return { decision: Decision.SIZE_MISMATCH };
+		return { decision: Decision.SIZE_MISMATCH, metafile };
 	}
 
-	return { decision: Decision.FILE_TREE_MISMATCH };
+	return { decision: Decision.FILE_TREE_MISMATCH, metafile };
 }
 
 function existsInTorrentCache(infoHash: string): boolean {
-	return existsSync(
-		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`),
+	const torrentPath = path.join(
+		appDir(),
+		TORRENT_CACHE_FOLDER,
+		`${infoHash}.cached.torrent`,
 	);
+	if (!existsSync(torrentPath)) return false;
+	utimesSync(torrentPath, new Date(), statSync(torrentPath).mtime);
+	return true;
 }
 
 async function getCachedTorrentFile(infoHash: string): Promise<Metafile> {
@@ -314,14 +351,13 @@ async function getCachedTorrentFile(infoHash: string): Promise<Metafile> {
 }
 
 function cacheTorrentFile(meta: Metafile): void {
-	writeFileSync(
-		path.join(
-			appDir(),
-			TORRENT_CACHE_FOLDER,
-			`${meta.infoHash}.cached.torrent`,
-		),
-		meta.encode(),
+	const torrentPath = path.join(
+		appDir(),
+		TORRENT_CACHE_FOLDER,
+		`${meta.infoHash}.cached.torrent`,
 	);
+	if (existsInTorrentCache(meta.infoHash)) return;
+	writeFileSync(torrentPath, meta.encode());
 }
 
 async function assessAndSaveResults(
@@ -336,14 +372,6 @@ async function assessAndSaveResults(
 		infoHashesToExclude,
 	);
 
-	if (
-		assessment.decision === Decision.MATCH ||
-		assessment.decision === Decision.MATCH_SIZE_ONLY ||
-		assessment.decision === Decision.MATCH_PARTIAL
-	) {
-		cacheTorrentFile(assessment.metafile!);
-	}
-
 	await db.transaction(async (trx) => {
 		const now = Date.now();
 		const { id } = await trx("searchee")
@@ -354,12 +382,7 @@ async function assessAndSaveResults(
 			searchee_id: id,
 			guid: guid,
 			decision: assessment.decision,
-			info_hash:
-				assessment.decision === Decision.MATCH ||
-				assessment.decision === Decision.MATCH_SIZE_ONLY ||
-				assessment.decision === Decision.MATCH_PARTIAL
-					? assessment.metafile!.infoHash
-					: null,
+			info_hash: assessment.metafile?.infoHash ?? null,
 			last_seen: now,
 			first_seen: now,
 		});
@@ -399,9 +422,7 @@ async function assessCandidateCaching(
 		);
 		logReason(assessment.decision, false, searchee, candidate);
 	} else if (
-		(cacheEntry.decision === Decision.MATCH ||
-			cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
-			cacheEntry.decision === Decision.MATCH_PARTIAL) &&
+		isDecisionAnyMatch(cacheEntry.decision) &&
 		infoHashesToExclude.includes(cacheEntry.infoHash)
 	) {
 		// has been added since the last run
@@ -410,9 +431,8 @@ async function assessCandidateCaching(
 			.where({ id: cacheEntry.id })
 			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
 	} else if (
-		(cacheEntry.decision === Decision.MATCH ||
-			cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
-			cacheEntry.decision === Decision.MATCH_PARTIAL) &&
+		isDecisionAnyMatch(cacheEntry.decision) &&
+		cacheEntry.infoHash &&
 		existsInTorrentCache(cacheEntry.infoHash)
 	) {
 		// cached match
@@ -420,11 +440,7 @@ async function assessCandidateCaching(
 			decision: cacheEntry.decision,
 			metafile: await getCachedTorrentFile(cacheEntry.infoHash),
 		};
-	} else if (
-		cacheEntry.decision === Decision.MATCH ||
-		cacheEntry.decision === Decision.MATCH_SIZE_ONLY ||
-		cacheEntry.decision === Decision.MATCH_PARTIAL
-	) {
+	} else if (isDecisionAnyMatch(cacheEntry.decision)) {
 		assessment = await assessAndSaveResults(
 			candidate,
 			searchee,

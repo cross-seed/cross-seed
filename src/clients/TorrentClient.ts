@@ -1,5 +1,5 @@
 import { Metafile } from "../parseTorrent.js";
-import { Decision, InjectionResult } from "../constants.js";
+import { DecisionAnyMatch, InjectionResult } from "../constants.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee } from "../searchee.js";
 import QBittorrent from "./QBittorrent.js";
@@ -19,10 +19,7 @@ export interface TorrentClient {
 	inject: (
 		newTorrent: Metafile,
 		searchee: Searchee,
-		decision:
-			| Decision.MATCH
-			| Decision.MATCH_SIZE_ONLY
-			| Decision.MATCH_PARTIAL,
+		decision: DecisionAnyMatch,
 		path?: string,
 	) => Promise<InjectionResult>;
 	validateConfig: () => Promise<void>;

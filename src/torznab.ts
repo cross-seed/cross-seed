@@ -311,11 +311,11 @@ export async function searchTorznab(
 	const timeOrCatCallout = " (filtered by category/timestamps)";
 	logger.info({
 		label: Label.TORZNAB,
-		message: `(${mediaType.toUpperCase()}) Searching ${indexersToUse.length} indexers for ${name}${
+		message: `Searching ${indexersToUse.length} indexers for ${name}${
 			indexersToUse.length < enabledIndexers.length
 				? timeOrCatCallout
 				: ""
-		}`,
+		} [${mediaType.toUpperCase()}]`,
 	});
 	const searcheeIds =
 		indexersToUse.length > 0 ? await getAvailableArrIds(searchee) : {};
