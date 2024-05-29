@@ -127,13 +127,20 @@ export function compareFileTreesIgnoringNames(
 	candidate: Metafile,
 	searchee: Searchee,
 ): boolean {
-	const cmp = (candidate, searchee) => {
-		return searchee.length === candidate.length;
-	};
-
-	return candidate.files.every((elOfA) =>
-		searchee.files.some((elOfB) => cmp(elOfA, elOfB)),
-	);
+	for (const candidateFile of candidate.files) {
+		let matchedSearcheeFiles = searchee.files.filter(
+			(searcheeFile) => searcheeFile.length === candidateFile.length,
+		);
+		if (matchedSearcheeFiles.length > 1) {
+			matchedSearcheeFiles = matchedSearcheeFiles.filter(
+				(searcheeFile) => searcheeFile.name === candidateFile.name,
+			);
+		}
+		if (matchedSearcheeFiles.length === 0) {
+			return false;
+		}
+	}
+	return true;
 }
 
 export function comparePartialSizeOnly(
@@ -306,11 +313,7 @@ async function assessCandidateHelper(
 	}
 
 	const sizeMatch = compareFileTreesIgnoringNames(metafile, searchee);
-	if (
-		sizeMatch &&
-		matchMode !== MatchMode.SAFE &&
-		searchee.files.length === 1
-	) {
+	if (sizeMatch && matchMode !== MatchMode.SAFE) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile };
 	}
 

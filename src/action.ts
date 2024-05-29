@@ -96,7 +96,7 @@ function fuzzyLinkOneFile(
 /**
  * @return the root of linked files.
  */
-function fuzzyLinkPartial(
+function linkFuzzyTree(
 	searchee: Searchee,
 	newMeta: Metafile,
 	destinationDir: string,
@@ -170,13 +170,9 @@ async function linkAllFilesInMetafile(
 		return resultOf(
 			linkExactTree(searchee, newMeta, fullLinkDir, sourceRoot),
 		);
-	} else if (decision === Decision.MATCH_SIZE_ONLY) {
-		return resultOf(
-			fuzzyLinkOneFile(searchee, newMeta, fullLinkDir, sourceRoot),
-		);
 	} else {
 		return resultOf(
-			fuzzyLinkPartial(searchee, newMeta, fullLinkDir, sourceRoot),
+			linkFuzzyTree(searchee, newMeta, fullLinkDir, sourceRoot),
 		);
 	}
 }
