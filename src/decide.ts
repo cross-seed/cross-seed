@@ -19,7 +19,7 @@ import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
-import { humanReadableSize } from "./utils.js";
+import { humanReadableSize, stripExtension } from "./utils.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -83,9 +83,11 @@ const createReasonLogger =
 				reason = "it has a different file tree";
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
-				reason = `it has a different release group: ${searchee.name
+				reason = `it has a different release group: ${stripExtension(
+					searchee.name,
+				)
 					.match(RELEASE_GROUP_REGEX)
-					?.groups?.group?.trim()} -> ${candidate.name
+					?.groups?.group?.trim()} -> ${stripExtension(candidate.name)
 					.match(RELEASE_GROUP_REGEX)
 					?.groups?.group?.trim()}`;
 				break;
@@ -246,11 +248,11 @@ function releaseGroupDoesMatch(
 	candidateName: string,
 	matchMode: MatchMode,
 ) {
-	const searcheeReleaseGroup = searcheeName
+	const searcheeReleaseGroup = stripExtension(searcheeName)
 		.match(RELEASE_GROUP_REGEX)
 		?.groups?.group?.trim()
 		?.toLowerCase();
-	const candidateReleaseGroup = candidateName
+	const candidateReleaseGroup = stripExtension(candidateName)
 		.match(RELEASE_GROUP_REGEX)
 		?.groups?.group?.trim()
 		?.toLowerCase();
