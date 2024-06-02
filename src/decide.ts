@@ -2,6 +2,7 @@ import { existsSync, statSync, utimesSync, writeFileSync } from "fs";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
+	ARR_PROPER_REGEX,
 	Decision,
 	isDecisionAnyMatch,
 	MatchMode,
@@ -219,18 +220,22 @@ function releaseVersionDoesMatch(
 	candidateName: string,
 	matchMode: MatchMode,
 ) {
-	const searcheeVersionType = searcheeName.match(REPACK_PROPER_REGEX);
-	const candidateVersionType = candidateName.match(REPACK_PROPER_REGEX);
+	const searcheeVersionType =
+		stripExtension(searcheeName).match(REPACK_PROPER_REGEX);
+	const candidateVersionType =
+		stripExtension(candidateName).match(REPACK_PROPER_REGEX);
 	const searcheeTypeStr = searcheeVersionType?.groups?.type
 		?.trim()
 		?.toLowerCase();
 	const candidateTypeStr = candidateVersionType?.groups?.type
 		?.trim()
 		?.toLowerCase();
+	const arrProperType =
+		stripExtension(searcheeName).match(ARR_PROPER_REGEX)?.groups?.arrtype;
 
 	if (
 		searcheeTypeStr !== candidateTypeStr ||
-		searcheeVersionType?.groups?.arrtype
+		(arrProperType && candidateVersionType)
 	) {
 		return matchMode !== MatchMode.SAFE;
 	}

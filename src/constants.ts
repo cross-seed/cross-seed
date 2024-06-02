@@ -22,7 +22,10 @@ export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[ipx])\b/i;
 export const RES_STRICT_REGEX = /(?<res>(?:2160|1080|720)[pi])/;
 
 export const REPACK_PROPER_REGEX =
-	/(?:\b(?<type>(?:REPACK|PROPER|\d\v\d)\d?))|(?<arrtype>(?:Proper|v\d))\b/;
+	/(?:\b(?<type>(?:REPACK|PROPER|\d\v\d)\d?))\b/i;
+
+export const ARR_PROPER_REGEX = /(?:\b(?<arrtype>(?:Proper|v\d)))\b/;
+
 export const SCENE_TITLE_REGEX = /^(?:\w{0,5}-)?(?<title>.*)/i;
 
 export const ARR_DIR_REGEX =
