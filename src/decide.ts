@@ -30,7 +30,7 @@ const createReasonLogger =
 	(Title: string, tracker: string, name: string) =>
 	(
 		decision: Decision,
-		cached,
+		cached: boolean,
 		searchee: Searchee,
 		candidate: Candidate,
 	): void => {

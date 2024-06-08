@@ -41,7 +41,7 @@ import {
 	TorrentLocator,
 } from "./torrent.js";
 import { queryRssFeeds, searchTorznab } from "./torznab.js";
-import { filterAsync, isTruthy, stripExtension } from "./utils.js";
+import { filterAsync, getLogString, isTruthy } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -83,6 +83,7 @@ async function assessCandidates(
 async function findOnOtherSites(
 	searchee: Searchee,
 	hashesToExclude: string[],
+	progress: string,
 ): Promise<FoundOnOtherSites> {
 	// make sure searchee is in database
 	await db("searchee")
@@ -90,14 +91,7 @@ async function findOnOtherSites(
 		.onConflict("name")
 		.ignore();
 
-	let response: { indexerId: number; candidates: Candidate[] }[];
-	try {
-		response = await searchTorznab(searchee);
-	} catch (e) {
-		logger.error(`error searching for ${searchee.name}`);
-		logger.debug(e);
-		return { searchedIndexers: 0, matches: 0 };
-	}
+	const response = await searchTorznab(searchee, progress);
 
 	const results: Candidate[] = response.flatMap((e) =>
 		e.candidates.map((candidate) => ({
@@ -161,17 +155,15 @@ async function findMatchesBatch(
 	const { delay } = getRuntimeConfig();
 
 	let totalFound = 0;
-	for (const [i, sample] of samples.entries()) {
+	for (const [i, searchee] of samples.entries()) {
 		try {
 			const sleep = new Promise((r) => setTimeout(r, delay * 1000));
 
-			const progress = chalk.blue(`[${i + 1}/${samples.length}]`);
-			const name = stripExtension(sample.name);
-			logger.info("%s %s %s", progress, chalk.dim("Searching for"), name);
-
+			const progress = chalk.blue(`[${i + 1}/${samples.length}] `);
 			const { matches, searchedIndexers } = await findOnOtherSites(
-				sample,
+				searchee,
 				hashesToExclude,
+				progress,
 			);
 			totalFound += matches;
 
@@ -179,7 +171,8 @@ async function findMatchesBatch(
 			if (searchedIndexers === 0) continue;
 			await sleep;
 		} catch (e) {
-			logger.error(`error searching for ${sample.name}`);
+			const searcheeLog = getLogString(searchee, chalk.bold.white);
+			logger.error(`Error searching for ${searcheeLog}`);
 			logger.debug(e);
 		}
 	}
@@ -204,11 +197,12 @@ export async function searchForLocalTorrentByCriteria(
 	}
 	const hashesToExclude = await getInfoHashesToExclude();
 	let matches = 0;
-	for (let i = 0; i < searchees.length; i++) {
-		if (!filterByContent(searchees[i])) return null;
+	for (const searchee of searchees) {
+		if (!filterByContent(searchee)) return null;
 		const foundOnOtherSites = await findOnOtherSites(
-			searchees[i],
+			searchee,
 			hashesToExclude,
+			"",
 		);
 		matches += foundOnOtherSites.matches;
 	}

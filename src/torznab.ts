@@ -6,7 +6,12 @@ import {
 	ParsedMedia,
 	formatFoundIds,
 } from "./arr.js";
-import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
+import {
+	EP_REGEX,
+	SEASON_REGEX,
+	UNKNOWN_TRACKER,
+	USER_AGENT,
+} from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
@@ -22,8 +27,10 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import {
 	cleanseSeparators,
+	formatAsList,
 	getAnimeQueries,
 	getApikey,
+	getLogString,
 	getMediaType,
 	isTruthy,
 	MediaType,
@@ -32,7 +39,7 @@ import {
 	sanitizeUrl,
 	stripExtension,
 } from "./utils.js";
-import { Result, resultOfErr } from "./Result.js";
+import chalk from "chalk";
 
 export interface TorznabCats {
 	tv: boolean;
@@ -116,7 +123,7 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 			item?.prowlarrindexer?.[0]?._ ??
 			item?.jackettindexer?.[0]?._ ??
 			item?.indexer?.[0]?._ ??
-			"Unknown tracker",
+			UNKNOWN_TRACKER,
 		link: item.link[0],
 		size: Number(item.size[0]),
 		pubDate: new Date(item.pubDate[0]).getTime(),
@@ -280,64 +287,19 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 
 export async function searchTorznab(
 	searchee: Searchee,
+	progress: string,
 ): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
-	const { excludeRecentSearch, excludeOlder, torznab } = getRuntimeConfig();
+	const { torznab } = getRuntimeConfig();
 	if (torznab.length === 0) {
 		throw new Error("no indexers are available");
 	}
-	const enabledIndexers = await getEnabledIndexers();
 
-	const name = searchee.name;
 	const mediaType = getMediaType(searchee);
-
-	// search history for name across all indexers
-	const timestampDataSql = await db("searchee")
-		.join("timestamp", "searchee.id", "timestamp.searchee_id")
-		.join("indexer", "timestamp.indexer_id", "indexer.id")
-		.whereIn(
-			"indexer.id",
-			enabledIndexers.map((i) => i.id),
-		)
-		.andWhere({ name })
-		.select({
-			indexerId: "indexer.id",
-			firstSearched: "timestamp.first_searched",
-			lastSearched: "timestamp.last_searched",
-		});
-	const indexersToUse = enabledIndexers.filter((indexer) => {
-		const entry = timestampDataSql.find(
-			(entry) => entry.indexerId === indexer.id,
-		);
-		return (
-			indexerDoesSupportMediaType(
-				mediaType,
-				JSON.parse(indexer.categories),
-			) &&
-			(!entry ||
-				((!excludeOlder ||
-					entry.firstSearched > nMsAgo(excludeOlder)) &&
-					(!excludeRecentSearch ||
-						entry.lastSearched < nMsAgo(excludeRecentSearch))))
-		);
-	});
-
-	const res: Result<ParsedMedia, boolean> =
-		indexersToUse.length > 0
-			? await scanAllArrsForMedia(searchee, mediaType)
-			: resultOfErr(false);
-	const parsedMedia = res.isOk() ? res.unwrap() : undefined;
-	const ids = parsedMedia?.movie ?? parsedMedia?.series;
-	const idsStr = ids ? `: ${formatFoundIds(ids)}` : "";
-
-	const timeOrCatCallout = " (filtered by category/timestamps)";
-	logger.info({
-		label: Label.TORZNAB,
-		message: `Searching ${indexersToUse.length} indexers for ${name}${
-			indexersToUse.length < enabledIndexers.length
-				? timeOrCatCallout
-				: ""
-		} [${mediaType.toUpperCase()}${idsStr}]`,
-	});
+	const { indexersToUse, parsedMedia } = await getAndLogIndexers(
+		searchee,
+		mediaType,
+		progress,
+	);
 	return await makeRequests(indexersToUse, async (indexer) => {
 		const caps = {
 			search: indexer.searchCap,
@@ -680,4 +642,84 @@ async function makeRequests(
 		indexerId,
 		candidates: results,
 	}));
+}
+async function getAndLogIndexers(
+	searchee: Searchee,
+	mediaType: MediaType,
+	progress: string,
+): Promise<{ indexersToUse: Indexer[]; parsedMedia?: ParsedMedia }> {
+	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
+	const searcheeLog = getLogString(searchee, chalk.bold.white);
+	const mediaTypeLog = chalk.white(mediaType.toUpperCase());
+
+	const enabledIndexers = await getEnabledIndexers();
+
+	// search history for name across all indexers
+	const name = searchee.name;
+	const timestampDataSql = await db("searchee")
+		.join("timestamp", "searchee.id", "timestamp.searchee_id")
+		.join("indexer", "timestamp.indexer_id", "indexer.id")
+		.whereIn(
+			"indexer.id",
+			enabledIndexers.map((i) => i.id),
+		)
+		.andWhere({ name })
+		.select({
+			indexerId: "indexer.id",
+			firstSearched: "timestamp.first_searched",
+			lastSearched: "timestamp.last_searched",
+		});
+
+	const skipBefore = excludeOlder
+		? nMsAgo(excludeOlder)
+		: Number.NEGATIVE_INFINITY;
+	const skipAfter = excludeRecentSearch
+		? nMsAgo(excludeRecentSearch)
+		: Number.POSITIVE_INFINITY;
+	const timeFilteredIndexers = enabledIndexers.filter((indexer) => {
+		const entry = timestampDataSql.find(
+			(entry) => entry.indexerId === indexer.id,
+		);
+		if (!entry) return true;
+		if (entry.firstSearched < skipBefore) return false;
+		if (entry.lastSearched > skipAfter) return false;
+		return true;
+	});
+
+	const indexersToUse = timeFilteredIndexers.filter((indexer) => {
+		return indexerDoesSupportMediaType(
+			mediaType,
+			JSON.parse(indexer.categories),
+		);
+	});
+
+	const filteringCauses = [
+		enabledIndexers.length > timeFilteredIndexers.length && "timestamps",
+		timeFilteredIndexers.length > indexersToUse.length && "category",
+	].filter(isTruthy);
+	const reasonStr = filteringCauses.length
+		? ` (filtered by ${formatAsList(filteringCauses)})`
+		: "";
+	if (indexersToUse.length === 0) {
+		logger.info(
+			`${progress}Skipped searching on indexers for ${searcheeLog}${reasonStr} | MediaType: ${mediaTypeLog} | IDs: N/A`,
+		);
+		return { indexersToUse };
+	}
+
+	// Parse media from arrs
+	const res = await scanAllArrsForMedia(searchee, mediaType);
+	const parsedMedia = res.isOk() ? res.unwrap() : undefined;
+	const ids = parsedMedia?.movie ?? parsedMedia?.series;
+	const idsStr = ids ? formatFoundIds(ids) : "NONE";
+
+	logger.info(
+		`${progress}Searching for ${searcheeLog} | MediaType: ${mediaTypeLog} | IDs: ${idsStr}`,
+	);
+	logger.verbose({
+		label: Label.TORZNAB,
+		message: `Using ${indexersToUse.length} indexers for ${searcheeLog}${reasonStr}`,
+	});
+
+	return { indexersToUse, parsedMedia };
 }

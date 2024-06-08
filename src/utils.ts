@@ -13,6 +13,8 @@ import {
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { Searchee } from "./searchee.js";
+import { Metafile } from "./parseTorrent.js";
+import chalk, { ChalkInstance } from "chalk";
 
 export enum MediaType {
 	EPISODE = "episode",
@@ -129,6 +131,10 @@ export function getAnimeQueries(name: string): string[] {
 		animeQueries.push(cleanseSeparators(`${title} ${release}`));
 	}
 	if (altTitle) {
+		// Edge cases from regex
+		if (altTitle.toLowerCase() === "season") return animeQueries;
+		if (altTitle.toLowerCase() === "ep") return animeQueries;
+
 		animeQueries.push(cleanseSeparators(`${altTitle} ${release}`));
 	}
 	return animeQueries;
@@ -158,6 +164,17 @@ export async function filterAsync(arr, predicate) {
 export function humanReadableDate(timestamp: number): string {
 	// swedish conventions roughly follow the iso format!
 	return new Date(timestamp).toLocaleString("sv");
+}
+
+export function getLogString(data: Metafile | Searchee, color: ChalkInstance) {
+	if (data instanceof Metafile) {
+		return `${color(data.name)} ${chalk.dim(`[${data.infoHash.slice(0, 8)}...]`)}`;
+	}
+	return data.infoHash
+		? `${color(data.name)} ${chalk.dim(`[${data.infoHash.slice(0, 8)}...]`)}`
+		: data.path
+			? color(data.path)
+			: color(data.name);
 }
 
 export function formatAsList(strings: string[]) {
