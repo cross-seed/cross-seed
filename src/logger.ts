@@ -20,6 +20,7 @@ export enum Label {
 	RSS = "rss",
 	PERF = "perf",
 	REVERSE_LOOKUP = "reverselookup",
+	ARRS = "arrs",
 	RADARR = "radarr",
 	SONARR = "sonarr",
 }

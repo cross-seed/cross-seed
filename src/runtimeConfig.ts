@@ -35,8 +35,8 @@ export interface RuntimeConfig {
 	searchLimit: number;
 	blockList: string[];
 	apiKey?: string;
-	sonarr?: string[];
-	radarr?: string[];
+	sonarr: string[];
+	radarr: string[];
 }
 
 let runtimeConfig: RuntimeConfig;

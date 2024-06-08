@@ -1,6 +1,11 @@
 import ms from "ms";
 import xml2js from "xml2js";
-import { ExternalIds, getAvailableArrIds, getRelevantArrIds } from "./arr.js";
+import {
+	scanAllArrsForMedia,
+	getRelevantArrIds,
+	ParsedMedia,
+	formatFoundIds,
+} from "./arr.js";
 import { EP_REGEX, SEASON_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
@@ -20,12 +25,14 @@ import {
 	getAnimeQueries,
 	getApikey,
 	getMediaType,
+	isTruthy,
 	MediaType,
 	nMsAgo,
 	reformatTitleForSearching,
 	sanitizeUrl,
 	stripExtension,
 } from "./utils.js";
+import { Result, resultOfErr } from "./Result.js";
 
 export interface TorznabCats {
 	tv: boolean;
@@ -170,24 +177,25 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 
 async function createTorznabSearchQueries(
 	searchee: Searchee,
-	ids: ExternalIds,
+	mediaType: MediaType,
 	caps: Caps,
+	parsedMedia?: ParsedMedia,
 ): Promise<TorznabParams[]> {
-	const nameWithoutExtension = stripExtension(searchee.name);
+	const stem = stripExtension(searchee.name);
 	const extractNumber = (str: string): number =>
 		parseInt(str.match(/\d+/)![0]);
-	const relevantIds = await getRelevantArrIds(searchee, ids, caps);
-	const shouldUseIdSearch = Object.values(relevantIds).some((id) => id);
-	const mediaType = getMediaType(searchee);
+	let relevantIds: IdSearchParams = {};
+	if (parsedMedia) {
+		relevantIds = await getRelevantArrIds(caps, parsedMedia);
+	}
+	const useIds = Object.values(relevantIds).some(isTruthy);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
-		const match = nameWithoutExtension.match(EP_REGEX);
+		const match = stem.match(EP_REGEX);
 		const groups = match!.groups!;
 		return [
 			{
 				t: "tvsearch",
-				q: shouldUseIdSearch
-					? undefined
-					: cleanseSeparators(groups.title),
+				q: useIds ? undefined : cleanseSeparators(groups.title),
 				season: groups.season
 					? extractNumber(groups.season)
 					: groups.year,
@@ -198,14 +206,12 @@ async function createTorznabSearchQueries(
 			},
 		] as const;
 	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
-		const match = nameWithoutExtension.match(SEASON_REGEX);
+		const match = stem.match(SEASON_REGEX);
 		const groups = match!.groups!;
 		return [
 			{
 				t: "tvsearch",
-				q: shouldUseIdSearch
-					? undefined
-					: cleanseSeparators(groups.title),
+				q: useIds ? undefined : cleanseSeparators(groups.title),
 				season: extractNumber(groups.season),
 				...relevantIds,
 			},
@@ -214,15 +220,22 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "movie",
-				q: shouldUseIdSearch
-					? undefined
-					: reformatTitleForSearching(nameWithoutExtension),
+				q: useIds ? undefined : reformatTitleForSearching(stem),
 				...relevantIds,
 			},
 		] as const;
+	}
+	if (useIds && caps.tvSearch && parsedMedia?.series) {
+		const eps = parsedMedia.episodes;
+		const season = eps.length > 0 ? eps[0].seasonNumber : undefined;
+		const ep = eps.length === 1 ? eps[0].episodeNumber : undefined;
+		return [
+			{ t: "tvsearch", q: undefined, season, ep, ...relevantIds },
+		] as const;
+	} else if (useIds && caps.movieSearch && parsedMedia?.movie) {
+		return [{ t: "movie", q: undefined, ...relevantIds }] as const;
 	} else if (mediaType === MediaType.ANIME) {
-		const animeQueries = getAnimeQueries(nameWithoutExtension);
-		return animeQueries.map((animeQuery) => ({
+		return getAnimeQueries(stem).map((animeQuery) => ({
 			t: "search",
 			q: animeQuery,
 		}));
@@ -230,7 +243,7 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "search",
-				q: reformatTitleForSearching(nameWithoutExtension),
+				q: reformatTitleForSearching(stem),
 			},
 		] as const;
 	}
@@ -244,10 +257,10 @@ export function indexerDoesSupportMediaType(
 		case MediaType.EPISODE:
 		case MediaType.SEASON:
 			return caps.tv;
-		case MediaType.MOVIE:
+		case MediaType.MOVIE: // Should get most anime movies
 			return caps.movie;
-		case MediaType.ANIME:
-			return caps.anime;
+		case MediaType.ANIME: // All? indexers support anime (sometimes no cat)
+			return caps.anime || caps.tv || caps.movie;
 		case MediaType.AUDIO:
 			return caps.audio;
 		case MediaType.BOOK:
@@ -308,6 +321,14 @@ export async function searchTorznab(
 		);
 	});
 
+	const res: Result<ParsedMedia, boolean> =
+		indexersToUse.length > 0
+			? await scanAllArrsForMedia(searchee, mediaType)
+			: resultOfErr(false);
+	const parsedMedia = res.isOk() ? res.unwrap() : undefined;
+	const ids = parsedMedia?.movie ?? parsedMedia?.series;
+	const idsStr = ids ? `: ${formatFoundIds(ids)}` : "";
+
 	const timeOrCatCallout = " (filtered by category/timestamps)";
 	logger.info({
 		label: Label.TORZNAB,
@@ -315,10 +336,8 @@ export async function searchTorznab(
 			indexersToUse.length < enabledIndexers.length
 				? timeOrCatCallout
 				: ""
-		} [${mediaType.toUpperCase()}]`,
+		} [${mediaType.toUpperCase()}${idsStr}]`,
 	});
-	const searcheeIds =
-		indexersToUse.length > 0 ? await getAvailableArrIds(searchee) : {};
 	return await makeRequests(indexersToUse, async (indexer) => {
 		const caps = {
 			search: indexer.searchCap,
@@ -328,7 +347,12 @@ export async function searchTorznab(
 			movieIdSearch: JSON.parse(indexer.movieIdCaps),
 			categories: JSON.parse(indexer.categories),
 		};
-		return await createTorznabSearchQueries(searchee, searcheeIds, caps);
+		return await createTorznabSearchQueries(
+			searchee,
+			mediaType,
+			caps,
+			parsedMedia,
+		);
 	});
 }
 
