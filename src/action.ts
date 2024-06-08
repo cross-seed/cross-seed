@@ -10,37 +10,53 @@ import {
 	InjectionResult,
 	LinkType,
 	SaveResult,
+	SearcheeSource,
 } from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
+import { createSearcheeFromPath, Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
-import { getMediaType } from "./utils.js";
+import { getLogString, getMediaType } from "./utils.js";
 
-function logInjectionResult(
-	result: InjectionResult,
+function logActionResult(
+	result: ActionResult,
+	newMeta: Metafile,
+	searchee: Searchee,
 	tracker: string,
-	name: string,
 	decision: Decision,
 ) {
-	const styledName = chalk.green.bold(name);
-	const styledTracker = chalk.bold(tracker);
-	const foundBy = `Found ${styledName} on ${styledTracker} by`;
+	const metaLog = getLogString(newMeta, chalk.green.bold);
+	const searcheeLog = getLogString(searchee, chalk.magenta.bold);
+	const source = searchee.infoHash
+		? `${SearcheeSource.TORRENT} (${searcheeLog})`
+		: searchee.path
+			? `${SearcheeSource.DATA} (${searcheeLog})`
+			: `${SearcheeSource.VIRTUAL} (${searcheeLog})`;
+	const foundBy = `Found ${metaLog} on ${chalk.bold(tracker)} by`;
 
 	switch (result) {
+		case SaveResult.SAVED:
+			logger.info(
+				`${foundBy} ${chalk.green.bold(decision)} from ${source} - saved`,
+			);
+			break;
 		case InjectionResult.SUCCESS:
-			logger.info(`${foundBy} ${chalk.green.bold(decision)} - injected`);
+			logger.info(
+				`${foundBy} ${chalk.green.bold(decision)} from ${source} - injected`,
+			);
 			break;
 		case InjectionResult.ALREADY_EXISTS:
-			logger.info(`${foundBy} ${chalk.yellow(decision)} - exists`);
+			logger.info(
+				`${foundBy} ${chalk.yellow(decision)} from ${source} - exists`,
+			);
 			break;
 		case InjectionResult.TORRENT_NOT_COMPLETE:
 			logger.warn(
-				`${foundBy} by ${chalk.yellow(
+				`${foundBy} ${chalk.yellow(
 					decision,
-				)} - skipping incomplete torrent`,
+				)} from ${source} - skipping incomplete torrent`,
 			);
 			break;
 		case InjectionResult.FAILURE:
@@ -48,7 +64,7 @@ function logInjectionResult(
 			logger.error(
 				`${foundBy} ${chalk.red(
 					decision,
-				)} - failed to inject, saving...`,
+				)} from ${source} - failed to inject, saving...`,
 			);
 			break;
 	}
@@ -141,6 +157,20 @@ async function linkAllFilesInMetafile(
 	const fullLinkDir = flatLinking ? linkDir : join(linkDir, tracker);
 	let sourceRoot: string;
 	if (searchee.path) {
+		if (!existsSync(searchee.path)) {
+			logger.error(
+				`Linking failed, ${searchee.path} not found. Make sure Docker volume mounts are set up properly.`,
+			);
+			return resultOfErr("MISSING_DATA");
+		}
+		const result = await createSearcheeFromPath(searchee.path);
+		if (result.isErr()) {
+			return resultOfErr("TORRENT_NOT_FOUND");
+		}
+		const refreshedSearchee = result.unwrap();
+		if (searchee.length !== refreshedSearchee.length) {
+			return resultOfErr("TORRENT_NOT_COMPLETE");
+		}
 		sourceRoot = searchee.path;
 	} else {
 		const downloadDirResult = await getClient().getDownloadDir(searchee);
@@ -157,13 +187,12 @@ async function linkAllFilesInMetafile(
 				? searchee.files[0].path
 				: searchee.name,
 		);
-	}
-
-	if (!existsSync(sourceRoot)) {
-		logger.error(
-			`Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
-		);
-		return resultOfErr("MISSING_DATA");
+		if (!existsSync(sourceRoot)) {
+			logger.error(
+				`Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
+			);
+			return resultOfErr("MISSING_DATA");
+		}
 	}
 
 	if (decision === Decision.MATCH) {
@@ -187,11 +216,7 @@ export async function performAction(
 
 	if (action === Action.SAVE) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
-		const styledName = chalk.green.bold(newMeta.name);
-		const styledTracker = chalk.bold(tracker);
-		logger.info(
-			`Found ${styledName} on ${styledTracker} by ${decision} - saved`,
-		);
+		logActionResult(SaveResult.SAVED, newMeta, searchee, tracker, decision);
 		return SaveResult.SAVED;
 	}
 
@@ -221,10 +246,11 @@ export async function performAction(
 				result === "TORRENT_NOT_COMPLETE"
 					? InjectionResult.TORRENT_NOT_COMPLETE
 					: InjectionResult.FAILURE;
-			logInjectionResult(
+			logActionResult(
 				injectionResult,
+				newMeta,
+				searchee,
 				tracker,
-				newMeta.name,
 				decision,
 			);
 			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
@@ -241,7 +267,7 @@ export async function performAction(
 		destinationDir,
 	);
 
-	logInjectionResult(result, tracker, newMeta.name, decision);
+	logActionResult(result, newMeta, searchee, tracker, decision);
 	if (result === InjectionResult.FAILURE) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 	}
