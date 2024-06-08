@@ -18,12 +18,15 @@ export const MOVIE_REGEX =
 export const ANIME_REGEX =
 	/^(?:\[(?<group>.*?)\][_.\s-]?)?(?:\[?(?<title>.+?)[_.\s-]?(?:\(?(?:\d{1,2}(?:st|nd|rd|th))?\s?Season)?[_.\s-]?\]?)(?:[([~/|-]\s?(?!\d{1,4})(?<altTitle>.+?)[)\]~-]?\s?)?[_.\s-]?(?:[[(]?(?<year>(?:19|20)\d{2})[)\]]?)?[[_.\s-](?:S\d{1,2})?[_.\s-]{0,3}(?:#|EP?|(?:SP))?[_.\s-]{0,3}(?<release>\d{1,4})/i;
 export const RELEASE_GROUP_REGEX =
-	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w ]+?)(?:\[.+\])?(?:\))?(?=(?:\.\w{1,5})?$)/i;
+	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w .]+?)(?:\[.+\])?(?:\))?$/i;
 export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[ipx])\b/i;
 export const RES_STRICT_REGEX = /(?<res>(?:2160|1080|720)[pi])/;
 
 export const REPACK_PROPER_REGEX =
-	/(?:\b(?<type>(?:REPACK|PROPER|\d\v\d)\d?))|(?<arrtype>(?:Proper|v\d))\b/;
+	/(?:\b(?<type>(?:REPACK|PROPER|\d\v\d)\d?))\b/i;
+
+export const ARR_PROPER_REGEX = /(?:\b(?<arrtype>(?:Proper|v\d)))\b/;
+
 export const SCENE_TITLE_REGEX = /^(?:\w{0,5}-)?(?<title>.*)/i;
 
 export const ARR_DIR_REGEX =
