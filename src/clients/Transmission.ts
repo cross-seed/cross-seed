@@ -92,7 +92,7 @@ export default class Transmission implements TorrentClient {
 				);
 			}
 		} catch (e) {
-			if (e instanceof TypeError) {
+			if (e instanceof SyntaxError) {
 				logger.error({
 					label: Label.TRANSMISSION,
 					message: `Transmission returned non-JSON response`,
