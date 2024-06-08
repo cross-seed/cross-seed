@@ -8,6 +8,7 @@ import {
 	Action,
 	LinkType,
 	MatchMode,
+	NEWLINE_INDENT,
 	PROGRAM_NAME,
 	PROGRAM_VERSION,
 } from "./constants.js";
@@ -73,7 +74,7 @@ export async function validateAndSetRuntimeConfig(options: RuntimeConfig) {
 			logger.error(
 				`${
 					path.length > 0 ? `Option: ${optionLine}` : "Configuration:"
-				}\n\t\t\t\t${message}\n\t\t\t\t(https://www.cross-seed.org/docs/basics/options${
+				}${NEWLINE_INDENT}${message}${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options${
 					urlPath ? `#${urlPath.toLowerCase()}` : ""
 				})\n`,
 			);

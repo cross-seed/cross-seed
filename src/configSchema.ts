@@ -1,6 +1,6 @@
 import ms from "ms";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
-import { Action, LinkType, MatchMode } from "./constants.js";
+import { Action, LinkType, MatchMode, NEWLINE_INDENT } from "./constants.js";
 import { logger } from "./logger.js";
 import { resolve, relative, isAbsolute } from "path";
 
@@ -11,7 +11,8 @@ const ZodErrorMessages = {
 	vercel: "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
 	emptyString:
 		"cannot have an empty string. If you want to unset it, use null or undefined.",
-	delay: "delay is in seconds, you can't travel back in time.",
+	delayNegative: "delay is in seconds, you can't travel back in time.",
+	delayTooHigh: `delay over 1hr is not supported.${NEWLINE_INDENT}To even out search loads please see the following documentation:${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/daemon#set-up-periodic-searches)`,
 	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
@@ -102,9 +103,12 @@ function isChildPath(linkDir: string, dataDirs: string[]): boolean {
 
 export const VALIDATION_SCHEMA = z
 	.object({
-		delay: z.number().nonnegative({
-			message: ZodErrorMessages.delay,
-		}),
+		delay: z
+			.number()
+			.nonnegative({
+				message: ZodErrorMessages.delayNegative,
+			})
+			.lte(3600, ZodErrorMessages.delayTooHigh),
 		torznab: z.array(z.string().url()),
 		dataDirs: z.array(z.string()).nullish(),
 		matchMode: z.nativeEnum(MatchMode),
