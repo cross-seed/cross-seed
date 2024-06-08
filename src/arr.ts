@@ -9,21 +9,41 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { Caps, IdSearchParams } from "./torznab.js";
 import {
-	capitalizeFirstLetter,
+	cleanseSeparators,
 	getApikey,
-	getMediaType,
 	isTruthy,
 	MediaType,
 	sanitizeUrl,
+	stripExtension,
 } from "./utils.js";
+import {
+	RELEASE_GROUP_REGEX,
+	REPACK_PROPER_REGEX,
+	RESOLUTION_REGEX,
+} from "./constants.js";
 
-export interface ExternalIds {
+interface ExternalIds {
 	imdbId?: string;
 	tmdbId?: string;
 	tvdbId?: string;
 }
 
-export type ParseResponse = { movie: ExternalIds } | { series: ExternalIds };
+interface ParsedMovie {
+	movie: ExternalIds;
+	series: undefined;
+	episodes: undefined;
+}
+
+interface ParsedSeries {
+	movie: undefined;
+	series: ExternalIds;
+	episodes: {
+		seasonNumber: number;
+		episodeNumber: number;
+	}[];
+}
+
+export type ParsedMedia = ParsedMovie | ParsedSeries;
 
 export async function validateUArrLs() {
 	const { sonarr, radarr } = getRuntimeConfig();
@@ -103,7 +123,7 @@ async function makeArrApiCall<ResponseType>(
 	let response: Response;
 	try {
 		response = await fetch(url, {
-			signal: AbortSignal.timeout(ms("5 seconds")),
+			signal: AbortSignal.timeout(ms("30 seconds")),
 			headers: { "X-Api-Key": apikey },
 		});
 	} catch (networkError) {
@@ -134,35 +154,26 @@ async function makeArrApiCall<ResponseType>(
 	}
 }
 
-async function getExternalIdsFromArr(
-	searchee: Searchee,
+async function getMediaFromArr(
 	uArrL: string,
-): Promise<ExternalIds> {
-	const response = await makeArrApiCall<ParseResponse>(
+	title: string,
+): Promise<Result<ParsedMedia, Error>> {
+	return await makeArrApiCall<ParsedMedia>(
 		uArrL,
 		"/api/v3/parse",
-		new URLSearchParams({ title: searchee.name }),
+		new URLSearchParams({ title }),
 	);
-
-	if (response.isOk()) {
-		const responseBody = response.unwrap() as ParseResponse;
-		if ("movie" in responseBody) {
-			const { tvdbId, tmdbId, imdbId } = responseBody.movie;
-			return { tvdbId, imdbId, tmdbId };
-		} else if ("series" in responseBody) {
-			const { tvdbId, tmdbId, imdbId } = responseBody.series;
-			return { tvdbId, imdbId, tmdbId };
-		}
-	}
-	return {};
 }
 
-function formatFoundIds(foundIds: ExternalIds): string {
+export function formatFoundIds(foundIds: ExternalIds): string {
 	return Object.entries(foundIds)
-		.filter(([, idValue]) => idValue)
+		.filter(([idName]) =>
+			["imdbid", "tmdbid", "tvdbid"].includes(idName.toLowerCase()),
+		)
 		.map(([idName, idValue]) => {
-			const externalProvider = idName.toUpperCase().replace("ID", "");
-			return `${chalk.yellow(externalProvider)}: ${chalk.white(idValue)}`;
+			const name = idName.toUpperCase().replace("ID", "");
+			const val = idValue ?? "N/A";
+			return `${chalk.yellow(name)}=${chalk.white(val)}`;
 		})
 		.join(" ");
 }
@@ -170,20 +181,18 @@ function formatFoundIds(foundIds: ExternalIds): string {
 function logArrQueryResult(
 	externalIds: ExternalIds,
 	searchTerm: string,
-	mediaType: MediaType,
+	label: Label.RADARR | Label.SONARR | Label.ARRS,
 	error?: Error,
 ) {
-	const mediaTypeStr = mediaType === MediaType.MOVIE ? "movie" : "series";
-	const label = mediaType === MediaType.MOVIE ? Label.RADARR : Label.SONARR;
 	if (error) {
 		if (!Object.values(externalIds).some(isTruthy)) {
 			logger.verbose({
 				label: label,
-				message: `Lookup failed for ${chalk.yellow(searchTerm)}`,
+				message: `Lookup failed for ${chalk.yellow(searchTerm)} - ${chalk.red(error.message)}`,
 			});
 			logger.verbose({
 				label: label,
-				message: `Make sure the ${mediaTypeStr} is added to ${capitalizeFirstLetter(label)}.`,
+				message: `Make sure the item is added to an Arr instance.`,
 			});
 			return;
 		}
@@ -198,7 +207,7 @@ function logArrQueryResult(
 		const foundIdsStr = formatFoundIds(externalIds);
 		logger.verbose({
 			label: label,
-			message: `Found ${mediaTypeStr} for ${chalk.green.bold(searchTerm)} -> ${foundIdsStr}`,
+			message: `Found media for ${chalk.green.bold(searchTerm)} -> ${foundIdsStr}`,
 		});
 	}
 }
@@ -208,56 +217,70 @@ function getRelevantArrInstances(mediaType: MediaType): string[] {
 	switch (mediaType) {
 		case MediaType.SEASON:
 		case MediaType.EPISODE:
-			return sonarr ?? [];
+			return sonarr;
 		case MediaType.MOVIE:
-			return radarr ?? [];
+			return radarr;
+		case MediaType.ANIME:
+		case MediaType.OTHER:
+			return [...sonarr, ...radarr];
 		default:
 			return [];
 	}
 }
 
-export async function scanAllArrsForExternalIds(
+export async function scanAllArrsForMedia(
 	searchee: Searchee,
 	mediaType: MediaType,
-): Promise<Result<ExternalIds, boolean>> {
+): Promise<Result<ParsedMedia, boolean>> {
 	const uArrLs = getRelevantArrInstances(mediaType);
-	try {
-		for (const uArrL of uArrLs) {
-			const externalIds = await getExternalIdsFromArr(searchee, uArrL);
-			if (Object.values(externalIds).some(isTruthy)) {
-				logArrQueryResult(externalIds, searchee.name, mediaType);
-				return resultOf(externalIds);
-			}
-		}
-		throw new Error("fall through to catch");
-	} catch (error) {
-		logArrQueryResult({}, searchee.name, mediaType, error);
+	if (uArrLs.length === 0) {
 		return resultOfErr(false);
 	}
+	const title =
+		mediaType === MediaType.OTHER
+			? cleanseSeparators(
+					stripExtension(searchee.name)
+						.replace(RELEASE_GROUP_REGEX, "")
+						.replace(RESOLUTION_REGEX, "")
+						.replace(REPACK_PROPER_REGEX, ""),
+				)
+			: searchee.name;
+	let error = new Error(`No ids found for ${title} [${mediaType}]`);
+	for (const uArrL of uArrLs) {
+		const name =
+			mediaType === MediaType.OTHER &&
+			getRuntimeConfig().sonarr?.includes(uArrL)
+				? `${title} S00E00` // Sonarr needs season or episode
+				: title;
+		const result = await getMediaFromArr(uArrL, name);
+		if (result.isErr()) {
+			error = result.unwrapErr();
+			continue;
+		}
+		const response = result.unwrap();
+		const ids = response.movie ?? response.series ?? {};
+		if (Object.values(ids).some(isTruthy)) {
+			const label = response.movie ? Label.RADARR : Label.SONARR;
+			logArrQueryResult(ids, name, label);
+			return resultOf(response);
+		}
+	}
+	logArrQueryResult({}, searchee.name, Label.ARRS, error);
+	return resultOfErr(false);
 }
 
 export async function getRelevantArrIds(
-	searchee: Searchee,
-	ids: ExternalIds,
 	caps: Caps,
+	parsedMedia: ParsedMedia,
 ): Promise<IdSearchParams> {
-	const mediaType = getMediaType(searchee);
-	const idSearchCaps =
-		mediaType === MediaType.EPISODE || mediaType === MediaType.SEASON
-			? caps.tvIdSearch
-			: caps.movieIdSearch;
+	const idSearchCaps = parsedMedia.movie
+		? caps.movieIdSearch
+		: caps.tvIdSearch;
+	const ids = parsedMedia.movie ?? parsedMedia.series;
 
 	return {
 		tvdbid: idSearchCaps.tvdbId ? ids.tvdbId : undefined,
 		tmdbid: idSearchCaps.tmdbId ? ids.tmdbId : undefined,
 		imdbid: idSearchCaps.imdbId ? ids.imdbId : undefined,
 	};
-}
-
-export async function getAvailableArrIds(
-	searchee: Searchee,
-): Promise<ExternalIds> {
-	const mediaType = getMediaType(searchee);
-	const result = await scanAllArrsForExternalIds(searchee, mediaType);
-	return result.orElse({});
 }
