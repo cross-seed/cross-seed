@@ -48,12 +48,20 @@ export async function getAllIndexers(): Promise<Indexer[]> {
 
 export async function getEnabledIndexers(): Promise<Indexer[]> {
 	return db("indexer")
-		.where({ active: true, search_cap: true, status: null })
-		.orWhere({ active: true, search_cap: true, status: IndexerStatus.OK })
-		.orWhere((b) =>
-			b
-				.where({ active: true, search_cap: true })
-				.where("retry_after", "<", Date.now()),
+		.whereNot({
+			search_cap: null,
+			tv_search_cap: null,
+			movie_search_cap: null,
+			tv_id_caps: null,
+			movie_id_caps: null,
+			cat_caps: null,
+		})
+		.where({ active: true, search_cap: true })
+		.where((i) =>
+			i
+				.where({ status: null })
+				.orWhere({ status: IndexerStatus.OK })
+				.orWhere("retry_after", "<", Date.now()),
 		)
 		.select({
 			id: "id",

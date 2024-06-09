@@ -4,6 +4,7 @@ import { main, scanRssFeeds } from "./pipeline.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
+import { updateCaps } from "./torznab.js";
 
 class Job {
 	name: string;
@@ -41,6 +42,7 @@ function getJobs(): Job[] {
 	if (torznab.length > 0) {
 		if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
 		if (searchCadence) jobs.push(new Job("search", searchCadence, main));
+		jobs.push(new Job("updateIndexerCaps", ms("1 day"), updateCaps));
 	}
 	return jobs;
 }
