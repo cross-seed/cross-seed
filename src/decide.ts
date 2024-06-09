@@ -19,7 +19,7 @@ import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
-import { humanReadableSize, stripExtension } from "./utils.js";
+import { extractInt, humanReadableSize, stripExtension } from "./utils.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -215,7 +215,7 @@ function resolutionDoesMatch(
 	if (!searcheeRes || !candidateRes) {
 		return matchMode !== MatchMode.SAFE;
 	}
-	return searcheeRes.startsWith(candidateRes);
+	return extractInt(searcheeRes) === extractInt(candidateRes);
 }
 function releaseVersionDoesMatch(
 	searcheeName: string,

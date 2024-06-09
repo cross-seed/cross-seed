@@ -27,6 +27,7 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import {
 	cleanseSeparators,
+	extractInt,
 	formatAsList,
 	getAnimeQueries,
 	getApikey,
@@ -189,8 +190,6 @@ async function createTorznabSearchQueries(
 	parsedMedia?: ParsedMedia,
 ): Promise<TorznabParams[]> {
 	const stem = stripExtension(searchee.name);
-	const extractNumber = (str: string): number =>
-		parseInt(str.match(/\d+/)![0]);
 	let relevantIds: IdSearchParams = {};
 	if (parsedMedia) {
 		relevantIds = await getRelevantArrIds(caps, parsedMedia);
@@ -203,11 +202,9 @@ async function createTorznabSearchQueries(
 			{
 				t: "tvsearch",
 				q: useIds ? undefined : cleanseSeparators(groups.title),
-				season: groups.season
-					? extractNumber(groups.season)
-					: groups.year,
+				season: groups.season ? extractInt(groups.season) : groups.year,
 				ep: groups.episode
-					? extractNumber(groups.episode)
+					? extractInt(groups.episode)
 					: `${groups.month}/${groups.day}`,
 				...relevantIds,
 			},
@@ -219,7 +216,7 @@ async function createTorznabSearchQueries(
 			{
 				t: "tvsearch",
 				q: useIds ? undefined : cleanseSeparators(groups.title),
-				season: extractNumber(groups.season),
+				season: extractInt(groups.season),
 				...relevantIds,
 			},
 		] as const;
