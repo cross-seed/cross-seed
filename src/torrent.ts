@@ -1,5 +1,6 @@
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
+import fs from "fs";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
 import { USER_AGENT } from "./constants.js";
@@ -136,10 +137,17 @@ export async function saveTorrentFile(
 ): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
 	const buf = meta.encode();
-	const filename = `[${tag}][${tracker}]${stripExtension(
-		meta.getFileSystemSafeName(),
-	)}.torrent`;
-	await writeFile(join(outputDir, filename), buf, { mode: 0o644 });
+	const filePath = join(
+		outputDir,
+		`[${tag}][${tracker}]${stripExtension(
+			meta.getFileSystemSafeName(),
+		)}[${meta.infoHash}].torrent`,
+	);
+	if (fs.existsSync(filePath)) {
+		fs.utimesSync(filePath, new Date(), fs.statSync(filePath).mtime);
+		return;
+	}
+	await writeFile(filePath, buf, { mode: 0o644 });
 }
 
 export async function findAllTorrentFilesInDir(
