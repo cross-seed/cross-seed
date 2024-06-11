@@ -15,11 +15,13 @@ import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 
 interface TorrentInfo {
+	name?: string;
 	complete?: boolean;
 	save_path: string;
 	state?: string;
 	progress?: number;
 	label?: string;
+	total_remaining?: number;
 }
 enum DelugeErrorCode {
 	NO_AUTH = 1,
@@ -446,7 +448,14 @@ export default class Deluge implements TorrentClient {
 		let torrent: TorrentInfo;
 		try {
 			const params = [
-				["state", "progress", "save_path", "label"],
+				[
+					"name",
+					"state",
+					"progress",
+					"save_path",
+					"label",
+					"total_remaining",
+				],
 				{ hash: searchee.infoHash },
 			];
 
@@ -468,7 +477,12 @@ export default class Deluge implements TorrentClient {
 			}
 
 			const completedTorrent =
-				torrent.state === "Seeding" || torrent.progress === 100;
+				(torrent.state === "Paused" &&
+					(torrent.progress === 100 || !torrent.total_remaining)) ||
+				torrent.state === "Seeding" ||
+				torrent.progress === 100 ||
+				!torrent.total_remaining;
+
 			const torrentLabel =
 				this.isLabelEnabled && torrent.label!.length != 0
 					? torrent.label
