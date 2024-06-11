@@ -96,11 +96,13 @@ export function initializeLogger(options: RuntimeConfig): void {
 			}),
 			winston.format.errors({ stack: true }),
 			winston.format.splat(),
-			winston.format.printf(({ level, message, label, timestamp }) => {
-				return `${timestamp} ${level}: ${
-					label ? `[${label}] ` : ""
-				}${stripAnsiChars(redactMessage(message, options))}`;
-			}),
+			winston.format.printf(
+				({ level, message, label, timestamp, stack }) => {
+					return `${timestamp} ${level}: ${
+						label ? `[${label}] ` : ""
+					}${stripAnsiChars(redactMessage(stack ? stack : message, options))}`;
+				},
+			),
 		),
 		transports: [
 			new DailyRotateFile({
