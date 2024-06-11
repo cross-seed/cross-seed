@@ -59,6 +59,8 @@ function redactMessage(message: string | unknown, options?: RuntimeConfig) {
 	ret = ret.replace(/(?:auto\.\d+\.)([a-zA-Z0-9]+)/g, (match, key) =>
 		match.replace(key, redactionMsg),
 	);
+	ret = ret.replace(/apiKey: '.+'/g, `apiKey: ${redactionMsg}`);
+
 	ret = ret.replace(
 		/\/notification\/crossSeed\/[a-zA-Z-0-9_-]+/g,
 		`/notification/crossSeed/${redactionMsg}`,
