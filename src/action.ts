@@ -115,10 +115,11 @@ function fuzzyLinkOneFile(
 		? sourceRoot
 		: join(dirname(sourceRoot), searchee.files[0].path);
 	const destFilePath = join(destinationDir, newMeta.files[0].path);
+	const alreadyExisted = existsSync(destFilePath);
 	mkdirSync(dirname(destFilePath), { recursive: true });
 	linkFile(srcFilePath, destFilePath);
 	const contentPath = join(destinationDir, newMeta.name);
-	return { contentPath, alreadyExisted: existsSync(destFilePath) };
+	return { contentPath, alreadyExisted };
 }
 
 /**
