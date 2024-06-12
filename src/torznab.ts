@@ -495,9 +495,8 @@ function collateOutcomes<Correlator, SuccessReturnType>(
 	);
 }
 
-async function updateCaps(
-	indexers: { id: number; url: string; apikey: string }[],
-): Promise<void> {
+export async function updateCaps(): Promise<void> {
+	const indexers = await getAllIndexers();
 	const outcomes = await Promise.allSettled<Caps>(
 		indexers.map((indexer) => fetchCaps(indexer)),
 	);
@@ -537,8 +536,7 @@ export async function validateTorznabUrls() {
 		}
 	}
 	await syncWithDb();
-	const allIndexers = await getAllIndexers();
-	await updateCaps(allIndexers);
+	await updateCaps(); // Refresh every indexer's caps
 
 	const indexersWithoutSearch = await db("indexer")
 		.where({ search_cap: false, active: true })
