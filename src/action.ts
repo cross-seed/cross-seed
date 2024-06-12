@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { existsSync, linkSync, mkdirSync, statSync, symlinkSync } from "fs";
+import { existsSync, linkSync, mkdirSync, rm, statSync, symlinkSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
@@ -19,6 +19,11 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromPath, Searchee } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getLogString, getMediaType } from "./utils.js";
+
+interface LinkResult {
+	contentPath: string;
+	alreadyExisted: boolean;
+}
 
 function logActionResult(
 	result: ActionResult,
@@ -56,7 +61,7 @@ function logActionResult(
 			logger.warn(
 				`${foundBy} ${chalk.yellow(
 					decision,
-				)} from ${source} - skipping incomplete torrent`,
+				)} from ${source} - incomplete torrent, saving...`,
 			);
 			break;
 		case InjectionResult.FAILURE:
@@ -78,17 +83,23 @@ function linkExactTree(
 	newMeta: Metafile,
 	destinationDir: string,
 	sourceRoot: string,
-): string {
+): LinkResult {
 	if (searchee.files.length === 1) {
 		return fuzzyLinkOneFile(searchee, newMeta, destinationDir, sourceRoot);
 	}
+	let alreadyExisted = false;
 	for (const newFile of newMeta.files) {
 		const srcFilePath = join(dirname(sourceRoot), newFile.path);
 		const destFilePath = join(destinationDir, newFile.path);
+		if (existsSync(destFilePath)) {
+			alreadyExisted = true;
+			continue;
+		}
 		mkdirSync(dirname(destFilePath), { recursive: true });
 		linkFile(srcFilePath, destFilePath);
 	}
-	return join(destinationDir, newMeta.name);
+	const contentPath = join(destinationDir, newMeta.name);
+	return { contentPath, alreadyExisted };
 }
 
 /**
@@ -99,14 +110,15 @@ function fuzzyLinkOneFile(
 	newMeta: Metafile,
 	destinationDir: string,
 	sourceRoot: string,
-): string {
+): LinkResult {
 	const srcFilePath = statSync(sourceRoot).isFile()
 		? sourceRoot
 		: join(dirname(sourceRoot), searchee.files[0].path);
 	const destFilePath = join(destinationDir, newMeta.files[0].path);
 	mkdirSync(dirname(destFilePath), { recursive: true });
 	linkFile(srcFilePath, destFilePath);
-	return join(destinationDir, newMeta.name);
+	const contentPath = join(destinationDir, newMeta.name);
+	return { contentPath, alreadyExisted: existsSync(destFilePath) };
 }
 
 /**
@@ -117,7 +129,8 @@ function linkFuzzyTree(
 	newMeta: Metafile,
 	destinationDir: string,
 	sourceRoot: string,
-): string {
+): LinkResult {
+	let alreadyExisted = false;
 	for (const newFile of newMeta.files) {
 		let matchedSearcheeFiles = searchee.files.filter(
 			(searcheeFile) => searcheeFile.length === newFile.length,
@@ -132,11 +145,31 @@ function linkFuzzyTree(
 				? sourceRoot
 				: join(dirname(sourceRoot), matchedSearcheeFiles[0].path);
 			const destFilePath = join(destinationDir, newFile.path);
+			if (existsSync(destFilePath)) {
+				alreadyExisted = true;
+				continue;
+			}
 			mkdirSync(dirname(destFilePath), { recursive: true });
 			linkFile(srcFilePath, destFilePath);
 		}
 	}
-	return join(destinationDir, newMeta.name);
+	const contentPath = join(destinationDir, newMeta.name);
+	return { contentPath, alreadyExisted };
+}
+
+function unlinkMetafile(meta: Metafile, destinationDir: string) {
+	const file = meta.files[0];
+	let rootFolder = file.path;
+	let parent = dirname(rootFolder);
+	while (parent !== ".") {
+		rootFolder = parent;
+		parent = dirname(rootFolder);
+	}
+	const fullPath = join(destinationDir, rootFolder);
+	if (!existsSync(fullPath)) return;
+	if (resolve(fullPath) === resolve(destinationDir)) return;
+	logger.verbose(`Unlinking ${fullPath}`);
+	rm(fullPath, { recursive: true }, () => {});
 }
 
 async function linkAllFilesInMetafile(
@@ -146,7 +179,7 @@ async function linkAllFilesInMetafile(
 	decision: DecisionAnyMatch,
 ): Promise<
 	Result<
-		string,
+		LinkResult,
 		| "MISSING_DATA"
 		| "TORRENT_NOT_FOUND"
 		| "TORRENT_NOT_COMPLETE"
@@ -221,6 +254,7 @@ export async function performAction(
 	}
 
 	let destinationDir: string | undefined;
+	let unlinkOk = false;
 
 	if (linkDir) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
@@ -230,7 +264,9 @@ export async function performAction(
 			decision,
 		);
 		if (linkedFilesRootResult.isOk()) {
-			destinationDir = dirname(linkedFilesRootResult.unwrap());
+			const linkResult = linkedFilesRootResult.unwrap();
+			destinationDir = dirname(linkResult.contentPath);
+			unlinkOk = !linkResult.alreadyExisted;
 		} else if (
 			decision === Decision.MATCH &&
 			linkedFilesRootResult.unwrapErr() === "MISSING_DATA"
@@ -268,8 +304,18 @@ export async function performAction(
 	);
 
 	logActionResult(result, newMeta, searchee, tracker, decision);
-	if (result === InjectionResult.FAILURE) {
+	if (result === InjectionResult.ALREADY_EXISTS) {
+		if (unlinkOk && destinationDir) {
+			unlinkMetafile(newMeta, destinationDir);
+		}
+	} else if (
+		result === InjectionResult.FAILURE ||
+		result === InjectionResult.TORRENT_NOT_COMPLETE
+	) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
+		if (unlinkOk && destinationDir) {
+			unlinkMetafile(newMeta, destinationDir);
+		}
 	}
 	return result;
 }

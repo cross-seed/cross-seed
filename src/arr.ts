@@ -188,11 +188,7 @@ function logArrQueryResult(
 		if (!Object.values(externalIds).some(isTruthy)) {
 			logger.verbose({
 				label: label,
-				message: `Lookup failed for ${chalk.yellow(searchTerm)} - ${chalk.red(error.message)}`,
-			});
-			logger.verbose({
-				label: label,
-				message: `Make sure the item is added to an Arr instance.`,
+				message: `Lookup failed for ${chalk.yellow(searchTerm)} - ${chalk.red(error.message)} - make sure the item is added to an Arr instance.`,
 			});
 			return;
 		}
@@ -245,7 +241,9 @@ export async function scanAllArrsForMedia(
 						.replace(REPACK_PROPER_REGEX, ""),
 				)
 			: searchee.name;
-	let error = new Error(`No ids found for ${title} [${mediaType}]`);
+	let error = new Error(
+		`No ids found for ${title} | MediaType: ${mediaType.toUpperCase()}`,
+	);
 	for (const uArrL of uArrLs) {
 		const name =
 			mediaType === MediaType.OTHER &&
