@@ -124,9 +124,13 @@ export default class QBittorrent implements TorrentClient {
 		headers: Record<string, string> = {},
 		retries = 3,
 	): Promise<string | undefined> {
+		const bodyStr =
+			body instanceof FormData
+				? JSON.stringify(Object.fromEntries(body))
+				: JSON.stringify(body);
 		logger.verbose({
 			label: Label.QBITTORRENT,
-			message: `Making request (${retries}) to ${path} with body ${JSON.stringify(body)}`,
+			message: `Making request (${retries}) to ${path} with body ${bodyStr}`,
 		});
 
 		let response: Response | undefined;
