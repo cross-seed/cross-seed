@@ -627,9 +627,16 @@ async function makeRequests(
 	);
 
 	for (const [indexerId, reason] of rejected) {
-		logger.warn(
-			`Failed to reach ${indexers.find((i) => i.id === indexerId)!.url}`,
-		);
+		const indexer = indexers.find((i) => i.id === indexerId)!;
+		if (!indexer) {
+			logger.error(
+				`Indexer with id ${indexerId} not found - ${typeof indexerId}`,
+			);
+			for (const i of indexers) {
+				logger.error(`Indexer: ${i.id} - ${typeof i.id}`);
+			}
+		}
+		logger.warn(`Failed to reach ${indexer.url}`);
 		logger.debug(reason);
 	}
 
