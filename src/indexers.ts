@@ -47,7 +47,7 @@ export async function getAllIndexers(): Promise<Indexer[]> {
 }
 
 export async function getEnabledIndexers(): Promise<Indexer[]> {
-	return db("indexer")
+	const enabledIndexers = await db("indexer")
 		.whereNot({
 			search_cap: null,
 			tv_search_cap: null,
@@ -77,6 +77,10 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 			movieIdCaps: "movie_id_caps",
 			categories: "cat_caps",
 		});
+	for (const indexer of enabledIndexers) {
+		logger.info(`(${typeof indexer.id}) ${indexer.id}: ${indexer.url}`);
+	}
+	return enabledIndexers;
 }
 
 export async function updateIndexerStatus(
