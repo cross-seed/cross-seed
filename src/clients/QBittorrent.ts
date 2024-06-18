@@ -7,6 +7,7 @@ import {
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
+import ms from "ms";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
@@ -294,30 +295,34 @@ export default class QBittorrent implements TorrentClient {
 	 */
 	async getTorrentInfo(
 		hash: string | undefined,
+		retries = 0,
 	): Promise<TorrentInfo | undefined> {
 		if (!hash) return undefined;
-		const responseText = await this.request(
-			"/torrents/info",
-			`hashes=${hash}`,
-			X_WWW_FORM_URLENCODED,
-		);
-		if (responseText) {
-			const torrents = JSON.parse(responseText) as TorrentInfo[];
-			if (torrents.length > 0) {
-				return torrents[0];
+		for (let i = 0; i <= retries; i++) {
+			const responseText = await this.request(
+				"/torrents/info",
+				`hashes=${hash}`,
+				X_WWW_FORM_URLENCODED,
+			);
+			if (responseText) {
+				const torrents = JSON.parse(responseText) as TorrentInfo[];
+				if (torrents.length > 0) {
+					return torrents[0];
+				}
 			}
+			const torrents = await this.getAllTorrentInfo();
+			const torrentInfo = torrents.find(
+				(torrent) =>
+					hash === torrent.hash ||
+					hash === torrent.infohash_v1 ||
+					hash === torrent.infohash_v2,
+			);
+			if (torrentInfo) {
+				return torrentInfo;
+			}
+			await wait(ms("1 second") * 2 ** i);
 		}
-		logger.verbose({
-			label: Label.QBITTORRENT,
-			message: `Failed to retrieve torrent info using infohash_v1 ${hash}, checking all hashes`,
-		});
-		const torrents = await this.getAllTorrentInfo();
-		return torrents.find(
-			(torrent) =>
-				hash === torrent.hash ||
-				hash === torrent.infohash_v1 ||
-				hash === torrent.infohash_v2,
-		);
+		return undefined;
 	}
 
 	isTorrentComplete(torrentInfo: TorrentInfo): boolean {
@@ -414,8 +419,7 @@ export default class QBittorrent implements TorrentClient {
 			formData.append("foo", "bar");
 			await this.addTorrent(formData);
 
-			await wait(1000);
-			const newInfo = await this.getTorrentInfo(newTorrent.infoHash);
+			const newInfo = await this.getTorrentInfo(newTorrent.infoHash, 5);
 			if (!newInfo) {
 				throw new Error(`Failed to retrieve torrent after adding`);
 			}
