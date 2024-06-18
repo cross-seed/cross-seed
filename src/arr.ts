@@ -257,6 +257,11 @@ export async function scanAllArrsForMedia(
 		}
 		const response = result.unwrap();
 		const ids = response.movie ?? response.series ?? {};
+		for (const [key, value] of Object.entries(ids)) {
+			if (value === 0 || value === "0") {
+				ids[key] = undefined;
+			}
+		}
 		if (Object.values(ids).some(isTruthy)) {
 			const label = response.movie ? Label.RADARR : Label.SONARR;
 			logArrQueryResult(ids, name, label);
