@@ -255,7 +255,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 		.option(
 			"--search-limit <number>",
 			"The number of searches before stops",
-			parseInt,
+			(n) => parseInt(n),
 			fallback(fileConfig.searchLimit, 0),
 		)
 		.option(
