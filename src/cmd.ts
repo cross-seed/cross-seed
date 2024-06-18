@@ -259,7 +259,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			fallback(fileConfig.searchLimit, 0),
 		)
 		.option(
-			"--block-list <strings>",
+			"--block-list <strings...>",
 			"The infohashes and/or strings in torrent name to block from cross-seed",
 			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.blockList, []),
