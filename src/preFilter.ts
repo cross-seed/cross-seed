@@ -36,8 +36,6 @@ export function filterByContent(searchee: Searchee): boolean {
 		return false;
 	}
 
-	const isSingleEpisodeTorrent =
-		searchee.files.length === 1 && EP_REGEX.test(searchee.name);
 	const isSeasonPackEpisode =
 		searchee.path &&
 		searchee.files.length === 1 &&
@@ -46,8 +44,8 @@ export function filterByContent(searchee: Searchee): boolean {
 	if (
 		!includeEpisodes &&
 		!includeSingleEpisodes &&
-		isSingleEpisodeTorrent &&
-		!isSeasonPackEpisode
+		!isSeasonPackEpisode &&
+		EP_REGEX.test(searchee.name)
 	) {
 		logReason("it is a single episode");
 		return false;
