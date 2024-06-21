@@ -52,8 +52,17 @@ export async function snatch(
 ): Promise<Result<Metafile, SnatchError>> {
 	const abortController = new AbortController();
 	const { snatchTimeout } = getRuntimeConfig();
-	const url = candidate.link;
 	const tracker = candidate.tracker;
+	const url = candidate.link;
+	const trackerId = candidate.indexerId;
+
+	// Fetch basicauth header from the database
+	const result = await db("indexer")
+		.select("basicauth")
+		.where({ id: trackerId })
+		.first();
+
+	const basicauth = result ? result.basicauth : null;
 
 	if (typeof snatchTimeout === "number") {
 		setTimeout(() => void abortController.abort(), snatchTimeout).unref();
@@ -61,8 +70,15 @@ export async function snatch(
 
 	let response: Response;
 	try {
+		const headers = {
+			"User-Agent": USER_AGENT,
+		};
+		// Include basicauth if available
+		if (basicauth) {
+			headers["Authorization"] = `Basic ${basicauth}`;
+		}
 		response = await fetch(url, {
-			headers: { "User-Agent": USER_AGENT },
+			headers,
 			signal: abortController.signal,
 		});
 	} catch (e) {

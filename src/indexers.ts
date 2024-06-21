@@ -15,6 +15,7 @@ export interface Indexer {
 	id: number;
 	url: string;
 	apikey: string;
+	basicauth: string;
 	/**
 	 * Whether the indexer is currently specified in config
 	 */
@@ -34,6 +35,7 @@ export async function getAllIndexers(): Promise<Indexer[]> {
 		id: "id",
 		url: "url",
 		apikey: "apikey",
+		basicauth: "basicauth",
 		active: "active",
 		status: "status",
 		retryAfter: "retry_after",
@@ -67,6 +69,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 			id: "id",
 			url: "url",
 			apikey: "apikey",
+			basicauth: "basicauth",
 			active: "active",
 			status: "status",
 			retryAfter: "retry_after",

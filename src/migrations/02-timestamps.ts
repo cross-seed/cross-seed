@@ -1,18 +1,8 @@
-import Knex from "knex";
+import { Knex } from "knex";
 import { getRuntimeConfig } from "../runtimeConfig.js";
+import { sanitizeUrl, getApikey, getBasicAuth } from "../utils.js";
 
-function sanitizeUrl(url: string | URL): string {
-	if (typeof url === "string") {
-		url = new URL(url);
-	}
-	return url.origin + url.pathname;
-}
-
-function getApikey(url: string) {
-	return new URL(url).searchParams.get("apikey");
-}
-
-async function backfill(knex: Knex.Knex) {
+async function backfill(knex: Knex) {
 	const torznab = getRuntimeConfig()?.torznab ?? [];
 
 	if (torznab.length > 0) {
@@ -21,11 +11,12 @@ async function backfill(knex: Knex.Knex) {
 				torznab.map((url) => ({
 					url: sanitizeUrl(url),
 					apikey: getApikey(url),
+					basicauth: getBasicAuth(url), // Include basicauth here
 					active: true,
 				})),
 			)
 			.onConflict("url")
-			.merge(["active", "apikey"]);
+			.merge(["active", "apikey", "basicauth"]); // Include basicauth here
 
 		const timestampRows = await knex
 			.select(
@@ -41,11 +32,12 @@ async function backfill(knex: Knex.Knex) {
 	}
 }
 
-async function up(knex: Knex.Knex): Promise<void> {
+export async function up(knex: Knex): Promise<void> {
 	await knex.schema.createTable("indexer", (table) => {
 		table.increments("id").primary();
 		table.string("url").unique();
 		table.string("apikey");
+		table.string("basicauth"); // Include basicauth here
 		table.boolean("active");
 	});
 
@@ -60,9 +52,10 @@ async function up(knex: Knex.Knex): Promise<void> {
 	await backfill(knex);
 }
 
-async function down(knex: Knex.Knex): Promise<void> {
+export async function down(knex: Knex): Promise<void> {
 	await knex.schema.dropTable("timestamp");
 	await knex.schema.dropTable("indexer");
 }
+
 
 export default { name: "02-timestamps", up, down };

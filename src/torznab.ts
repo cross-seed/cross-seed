@@ -31,6 +31,7 @@ import {
 	formatAsList,
 	getAnimeQueries,
 	getApikey,
+	getBasicAuth,
 	getLogString,
 	getMediaType,
 	isTruthy,
@@ -324,6 +325,7 @@ export async function syncWithDb() {
 			id: "id",
 			url: "url",
 			apikey: "apikey",
+			basicauth: "basicauth",
 			active: "active",
 			status: "status",
 			retryAfter: "retry_after",
@@ -383,6 +385,7 @@ export async function syncWithDb() {
 				inConfigButNotInDb.map((url) => ({
 					url: sanitizeUrl(url),
 					apikey: getApikey(url),
+					basicauth: getBasicAuth(url),
 					active: true,
 				})),
 			)
@@ -403,13 +406,24 @@ export async function syncWithDb() {
 	});
 }
 
+interface AssembledUrl {
+	url: string;
+	headers: Record<string, string>;
+}
+
 export function assembleUrl(
 	urlStr: string,
 	apikey: string,
-	params: TorznabParams | IdSearchParams,
-): string {
+	basicauth: string,
+	params: TorznabParams | IdSearchParams
+): AssembledUrl {
 	const url = new URL(urlStr);
 	const searchParams = new URLSearchParams();
+	const headers: Record<string, string> = {};
+
+	if (basicauth) {
+		headers['Authorization'] = `Basic ${basicauth}`;
+	}
 
 	searchParams.set("apikey", apikey);
 
@@ -418,19 +432,29 @@ export function assembleUrl(
 	}
 
 	url.search = searchParams.toString();
-	return url.toString();
+
+	return {
+		url: url.toString(),
+		headers: headers
+	};
 }
 
 async function fetchCaps(indexer: {
 	id: number;
 	url: string;
 	apikey: string;
+	basicauth: string;
 }): Promise<Caps> {
 	let response;
 	try {
-		response = await fetch(
-			assembleUrl(indexer.url, indexer.apikey, { t: "caps" }),
-		);
+		const { url, headers } = assembleUrl(indexer.url, indexer.apikey, indexer.basicauth, { t: "caps" });
+
+		response = await fetch(url, {
+			headers: {
+				...headers,
+				"User-Agent": USER_AGENT
+			}
+		});
 	} catch (e) {
 		const error = new Error(
 			`Indexer ${indexer.url} failed to respond, check verbose logs`,
@@ -563,7 +587,7 @@ async function makeRequests(
 	const searchUrls = await Promise.all(
 		indexers.flatMap(async (indexer: Indexer) =>
 			(await getQueries(indexer)).map((query) =>
-				assembleUrl(indexer.url, indexer.apikey, query),
+				assembleUrl(indexer.url, indexer.apikey, indexer.basicauth, query),
 			),
 		),
 	).then((urls) => urls.flat());
@@ -580,11 +604,14 @@ async function makeRequests(
 	}
 
 	const outcomes = await Promise.allSettled<Candidate[]>(
-		searchUrls.map((url, i) =>
-			fetch(url, {
-				headers: { "User-Agent": USER_AGENT },
-				signal: abortControllers[i].signal,
-			})
+			searchUrls.map(({ url, headers }, i) =>
+				fetch(url, {
+					headers: {
+						"User-Agent": USER_AGENT,
+						...headers,
+					},
+					signal: abortControllers[i].signal,
+				})
 				.then((response) => {
 					if (!response.ok) {
 						const retryAfterSeconds = Number(

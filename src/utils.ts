@@ -111,7 +111,18 @@ export function sanitizeUrl(url: string | URL): string {
 	}
 	return url.origin + url.pathname;
 }
-
+export function getBasicAuth(url: string | URL): string {
+	if (typeof url === "string") {
+		url = new URL(url);
+	}
+	const username = url.username
+	const password = url.password
+	if (!username || !password) {
+		return '';
+	}
+	const btoa = `${Buffer.from(username + ':' + password).toString('base64')}`
+	return btoa
+}
 export function getApikey(url: string) {
 	return new URL(url).searchParams.get("apikey");
 }
