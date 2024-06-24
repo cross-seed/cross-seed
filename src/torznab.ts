@@ -54,6 +54,7 @@ export interface IdSearchParams {
 	tvdbid?: string;
 	tmdbid?: string;
 	imdbid?: string;
+	tvmazeid?: string;
 }
 
 export interface TorznabParams extends IdSearchParams {
@@ -69,6 +70,7 @@ export interface IdSearchCaps {
 	tvdbId?: boolean;
 	tmdbId?: boolean;
 	imdbId?: boolean;
+	tvMazeId?: boolean;
 }
 
 export interface Caps {
@@ -149,6 +151,7 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 			tvdbId: supportedIds.includes("tvdbid"),
 			tmdbId: supportedIds.includes("tmdbid"),
 			imdbId: supportedIds.includes("imdbid"),
+			tvMazeId: supportedIds.includes("tvmazeid"),
 		};
 	}
 
