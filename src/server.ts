@@ -81,7 +81,7 @@ async function search(
 		data = parseData(dataStr);
 	} catch (e) {
 		logger.error({
-			label: Label.SERVER,
+			label: Label.WEBHOOK,
 			message: e.message,
 		});
 		res.writeHead(400);
@@ -92,7 +92,7 @@ async function search(
 
 	if (!("infoHash" in criteria || "name" in criteria || "path" in criteria)) {
 		const message = "A name, info hash, or path must be provided";
-		logger.error({ label: Label.SERVER, message });
+		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);
 		return;
@@ -104,7 +104,7 @@ async function search(
 	res.end();
 
 	logger.info({
-		label: Label.SERVER,
+		label: Label.WEBHOOK,
 		message: `Received search request: ${criteriaStr}`,
 	});
 
@@ -118,12 +118,12 @@ async function search(
 
 		if (numFound === null) {
 			logger.info({
-				label: Label.SERVER,
+				label: Label.WEBHOOK,
 				message: `Did not search for ${criteriaStr}`,
 			});
 		} else {
 			logger.info({
-				label: Label.SERVER,
+				label: Label.WEBHOOK,
 				message: `Found ${numFound} torrents for ${criteriaStr}`,
 			});
 		}
@@ -143,7 +143,7 @@ async function announce(
 		data = parseData(dataStr);
 	} catch (e) {
 		logger.error({
-			label: Label.SERVER,
+			label: Label.ANNOUNCE,
 			message: e.message,
 		});
 		res.writeHead(400);
@@ -161,7 +161,7 @@ async function announce(
 	) {
 		const message = "Missing params: {guid, name, link, tracker} required";
 		logger.error({
-			label: Label.SERVER,
+			label: Label.ANNOUNCE,
 			message,
 		});
 		res.writeHead(400);
@@ -170,14 +170,14 @@ async function announce(
 	}
 
 	logger.verbose({
-		label: Label.SERVER,
+		label: Label.ANNOUNCE,
 		message: `Received announce from ${data.tracker}: ${data.name}`,
 	});
 
 	const candidate = data as Candidate;
 	try {
 		await indexNewTorrents();
-		const result = await checkNewCandidateMatch(candidate);
+		const result = await checkNewCandidateMatch(candidate, Label.ANNOUNCE);
 		const isOk =
 			result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
 		if (!isOk) {
@@ -188,7 +188,7 @@ async function announce(
 			}
 		} else {
 			logger.info({
-				label: Label.SERVER,
+				label: Label.ANNOUNCE,
 				message: `Added announce from ${candidate.tracker}: ${candidate.name}`,
 			});
 			res.writeHead(200);

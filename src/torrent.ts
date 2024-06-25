@@ -73,7 +73,7 @@ export async function snatch(
 			logger.debug(`${candidate.name}: ${url}`);
 			return resultOfErr(SnatchError.ABORTED);
 		} else if (isMagnetRedirectError(e)) {
-			logger.error(
+			logger.verbose(
 				`Unsupported: magnet link detected from ${tracker} for ${candidate.name}`,
 			);
 			logger.debug(`${candidate.name}: ${url}`);

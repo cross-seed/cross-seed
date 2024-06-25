@@ -10,13 +10,16 @@ import {
 	InjectionResult,
 	LinkType,
 	SaveResult,
-	SearcheeSource,
 } from "./constants.js";
 import { logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { createSearcheeFromPath, Searchee } from "./searchee.js";
+import {
+	createSearcheeFromPath,
+	getSearcheeSource,
+	Searchee,
+} from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getLogString, getMediaType } from "./utils.js";
 
@@ -34,43 +37,44 @@ function logActionResult(
 ) {
 	const metaLog = getLogString(newMeta, chalk.green.bold);
 	const searcheeLog = getLogString(searchee, chalk.magenta.bold);
-	const source = searchee.infoHash
-		? `${SearcheeSource.TORRENT} (${searcheeLog})`
-		: searchee.path
-			? `${SearcheeSource.DATA} (${searcheeLog})`
-			: `${SearcheeSource.VIRTUAL} (${searcheeLog})`;
+	const source = `${getSearcheeSource(searchee)} (${searcheeLog})`;
 	const foundBy = `Found ${metaLog} on ${chalk.bold(tracker)} by`;
 
 	switch (result) {
 		case SaveResult.SAVED:
-			logger.info(
-				`${foundBy} ${chalk.green.bold(decision)} from ${source} - saved`,
-			);
+			logger.info({
+				label: searchee.label,
+				message: `${foundBy} ${chalk.green.bold(decision)} from ${source} - saved`,
+			});
 			break;
 		case InjectionResult.SUCCESS:
-			logger.info(
-				`${foundBy} ${chalk.green.bold(decision)} from ${source} - injected`,
-			);
+			logger.info({
+				label: searchee.label,
+				message: `${foundBy} ${chalk.green.bold(decision)} from ${source} - injected`,
+			});
 			break;
 		case InjectionResult.ALREADY_EXISTS:
-			logger.info(
-				`${foundBy} ${chalk.yellow(decision)} from ${source} - exists`,
-			);
+			logger.info({
+				label: searchee.label,
+				message: `${foundBy} ${chalk.yellow(decision)} from ${source} - exists`,
+			});
 			break;
 		case InjectionResult.TORRENT_NOT_COMPLETE:
-			logger.warn(
-				`${foundBy} ${chalk.yellow(
+			logger.warn({
+				label: searchee.label,
+				message: `${foundBy} ${chalk.yellow(
 					decision,
 				)} from ${source} - incomplete torrent, saving...`,
-			);
+			});
 			break;
 		case InjectionResult.FAILURE:
 		default:
-			logger.error(
-				`${foundBy} ${chalk.red(
+			logger.error({
+				label: searchee.label,
+				message: `${foundBy} ${chalk.red(
 					decision,
 				)} from ${source} - failed to inject, saving...`,
-			);
+			});
 			break;
 	}
 }
@@ -192,9 +196,10 @@ async function linkAllFilesInMetafile(
 	let sourceRoot: string;
 	if (searchee.path) {
 		if (!existsSync(searchee.path)) {
-			logger.error(
-				`Linking failed, ${searchee.path} not found. Make sure Docker volume mounts are set up properly.`,
-			);
+			logger.error({
+				label: searchee.label,
+				message: `Linking failed, ${searchee.path} not found. Make sure Docker volume mounts are set up properly.`,
+			});
 			return resultOfErr("MISSING_DATA");
 		}
 		const result = await createSearcheeFromPath(searchee.path);
@@ -222,9 +227,10 @@ async function linkAllFilesInMetafile(
 				: searchee.name,
 		);
 		if (!existsSync(sourceRoot)) {
-			logger.error(
-				`Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
-			);
+			logger.error({
+				label: searchee.label,
+				message: `Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
+			});
 			return resultOfErr("MISSING_DATA");
 		}
 	}
@@ -272,13 +278,19 @@ export async function performAction(
 			decision === Decision.MATCH &&
 			linkedFilesRootResult.unwrapErr() === "MISSING_DATA"
 		) {
-			logger.warn("Falling back to non-linking.");
+			logger.warn({
+				label: searchee.label,
+				message: `Falling back to non-linking for ${newMeta.name}`,
+			});
 			if (searchee.path) {
 				destinationDir = dirname(searchee.path);
 			}
 		} else {
 			const result = linkedFilesRootResult.unwrapErr();
-			logger.error(`Failed to link files for ${newMeta.name}: ${result}`);
+			logger.error({
+				label: searchee.label,
+				message: `Failed to link files for ${newMeta.name}: ${result}`,
+			});
 			const injectionResult =
 				result === "TORRENT_NOT_COMPLETE"
 					? InjectionResult.TORRENT_NOT_COMPLETE
