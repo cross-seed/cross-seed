@@ -26,6 +26,7 @@ interface ExternalIds {
 	imdbId?: string;
 	tmdbId?: string;
 	tvdbId?: string;
+	tvMazeId?: string;
 }
 
 interface ParsedMovie {
@@ -168,7 +169,9 @@ async function getMediaFromArr(
 export function formatFoundIds(foundIds: ExternalIds): string {
 	return Object.entries(foundIds)
 		.filter(([idName]) =>
-			["imdbid", "tmdbid", "tvdbid"].includes(idName.toLowerCase()),
+			["imdbid", "tmdbid", "tvdbid", "tvmazeid"].includes(
+				idName.toLowerCase(),
+			),
 		)
 		.map(([idName, idValue]) => {
 			const name = idName.toUpperCase().replace("ID", "");
@@ -280,10 +283,11 @@ export async function getRelevantArrIds(
 		? caps.movieIdSearch
 		: caps.tvIdSearch;
 	const ids = parsedMedia.movie ?? parsedMedia.series;
-
-	return {
+	const x = {
 		tvdbid: idSearchCaps.tvdbId ? ids.tvdbId : undefined,
 		tmdbid: idSearchCaps.tmdbId ? ids.tmdbId : undefined,
 		imdbid: idSearchCaps.imdbId ? ids.imdbId : undefined,
+		tvmazeid: idSearchCaps.tvMazeId ? ids.tvMazeId : undefined,
 	};
+	return x;
 }
