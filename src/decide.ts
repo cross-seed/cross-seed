@@ -4,7 +4,7 @@ import { appDir } from "./configuration.js";
 import {
 	ARR_PROPER_REGEX,
 	Decision,
-	isDecisionAnyMatch,
+	isAnyMatchedDecision,
 	MatchMode,
 	RELEASE_GROUP_REGEX,
 	REPACK_PROPER_REGEX,
@@ -429,7 +429,7 @@ async function assessCandidateCaching(
 		);
 		logReason(assessment.decision, false, searchee, candidate);
 	} else if (
-		isDecisionAnyMatch(cacheEntry.decision) &&
+		isAnyMatchedDecision(cacheEntry.decision) &&
 		infoHashesToExclude.includes(cacheEntry.infoHash)
 	) {
 		// has been added since the last run
@@ -438,7 +438,7 @@ async function assessCandidateCaching(
 			.where({ id: cacheEntry.id })
 			.update({ decision: Decision.INFO_HASH_ALREADY_EXISTS });
 	} else if (
-		isDecisionAnyMatch(cacheEntry.decision) &&
+		isAnyMatchedDecision(cacheEntry.decision) &&
 		cacheEntry.infoHash &&
 		existsInTorrentCache(cacheEntry.infoHash)
 	) {
@@ -447,7 +447,7 @@ async function assessCandidateCaching(
 			decision: cacheEntry.decision,
 			metafile: await getCachedTorrentFile(cacheEntry.infoHash),
 		};
-	} else if (isDecisionAnyMatch(cacheEntry.decision)) {
+	} else if (isAnyMatchedDecision(cacheEntry.decision)) {
 		assessment = await assessAndSaveResults(
 			candidate,
 			searchee,

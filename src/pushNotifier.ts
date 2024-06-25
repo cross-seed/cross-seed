@@ -6,7 +6,7 @@ import {
 	USER_AGENT,
 } from "./constants.js";
 import { ResultAssessment } from "./decide.js";
-import { Label, logger } from "./logger.js";
+import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { formatAsList } from "./utils.js";
@@ -68,9 +68,9 @@ export class PushNotifier {
 export function sendResultsNotification(
 	searchee: Searchee,
 	results: [ResultAssessment, TrackerName, ActionResult][],
-	source: Label.REVERSE_LOOKUP | Label.SEARCH,
 ) {
 	const name = searchee.name;
+	const source = searchee.label;
 	const notableSuccesses = results.filter(
 		([, , actionResult]) =>
 			actionResult === InjectionResult.SUCCESS ||

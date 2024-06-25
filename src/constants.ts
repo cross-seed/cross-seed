@@ -118,7 +118,7 @@ export type DecisionAnyMatch =
 	| Decision.MATCH
 	| Decision.MATCH_SIZE_ONLY
 	| Decision.MATCH_PARTIAL;
-export function isDecisionAnyMatch(
+export function isAnyMatchedDecision(
 	decision: Decision,
 ): decision is DecisionAnyMatch {
 	return (
@@ -137,12 +137,6 @@ export enum MatchMode {
 export enum LinkType {
 	SYMLINK = "symlink",
 	HARDLINK = "hardlink",
-}
-
-export enum SearcheeSource {
-	TORRENT = "torrentDir",
-	DATA = "dataDir",
-	VIRTUAL = "virtual",
 }
 
 export const IGNORED_FOLDERS_SUBSTRINGS = [

@@ -699,9 +699,10 @@ async function getAndLogIndexers(
 		? ` (filtered by ${formatAsList(filteringCauses)})`
 		: "";
 	if (indexersToUse.length === 0) {
-		logger.info(
-			`${progress}Skipped searching on indexers for ${searcheeLog}${reasonStr} | MediaType: ${mediaTypeLog} | IDs: N/A`,
-		);
+		logger.info({
+			label: searchee.label,
+			message: `${progress}Skipped searching on indexers for ${searcheeLog}${reasonStr} | MediaType: ${mediaTypeLog} | IDs: N/A`,
+		});
 		return { indexersToUse };
 	}
 
@@ -711,9 +712,10 @@ async function getAndLogIndexers(
 	const ids = parsedMedia?.movie ?? parsedMedia?.series;
 	const idsStr = ids ? formatFoundIds(ids) : "NONE";
 
-	logger.info(
-		`${progress}Searching for ${searcheeLog} | MediaType: ${mediaTypeLog} | IDs: ${idsStr}`,
-	);
+	logger.info({
+		label: searchee.label,
+		message: `${progress}Searching for ${searcheeLog} | MediaType: ${mediaTypeLog} | IDs: ${idsStr}`,
+	});
 	logger.verbose({
 		label: Label.TORZNAB,
 		message: `Using ${indexersToUse.length} indexers for ${searcheeLog}${reasonStr}`,
