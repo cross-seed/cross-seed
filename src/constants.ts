@@ -10,7 +10,7 @@ export const TORRENT_CATEGORY_SUFFIX = `.cross-seed`;
 export const NEWLINE_INDENT = "\n\t\t\t\t";
 
 export const EP_REGEX =
-	/^(?<title>.+?)[_.\s-]+(?:(?<season>S\d+)?[_.\s-]{0,3}(?<episode>(?:E|(?<=S\d+[_\s-]{1,3}))\d+(?:[\s-]?E?\d+)?(?![pix]))(?!\d+[pix])|(?<date>(?<year>(?:19|20)\d{2})[_.\s-](?<month>\d{2})[_.\s-](?<day>\d{2})))/i;
+	/^(?<title>.+?)[_.\s-]+(?:(?<season>S\d+)?[_.\s-]{0,3}(?!(?:19|20)\d{2})(?<episode>(?:E|(?<=S\d+[_\s-]{1,3}))\d+(?:[\s-]?(?!(?:19|20)\d{2})E?\d+)?(?![pix]))(?!\d+[pix])|(?<date>(?<year>(?:19|20)\d{2})[_.\s-](?<month>\d{2})[_.\s-](?<day>\d{2})))/i;
 export const IS_MULTI_EP_REGEX = /E\d+(?:[-.]?S\d+E\d|[-.]?E\d|[-.]\d)/i;
 export const SEASON_REGEX =
 	/^(?<title>.+?)[[_.\s-]+(?<season>S\d+)(?:[_.\s~-]*?(?<seasonmax>S?\d+))?(?=[\]_.\s](?!E\d+))/i;
