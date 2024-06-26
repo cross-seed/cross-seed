@@ -178,41 +178,40 @@ export default class QBittorrent implements TorrentClient {
 				: "Original";
 	}
 
+	private getCategoryForNewTorrent(category: string): string {
+		const { duplicateCategories, linkCategory } = getRuntimeConfig();
+
+		if (!duplicateCategories) {
+			return category;
+		}
+		if (!category.length || category === linkCategory) {
+			return category; // Use tags for category duplication if linking
+		}
+		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
+			return category;
+		}
+
+		return `${category}${TORRENT_CATEGORY_SUFFIX}`;
+	}
+
 	private getTagsForNewTorrent(
-		searchee: Searchee,
 		searcheeInfo: TorrentInfo | undefined,
-		category: string,
+		path: string | undefined,
 	): string {
 		const { duplicateCategories, linkCategory } = getRuntimeConfig();
 
-		/* get the original category if torrent based - cuz otherwise we
-		 * use 'category'. this addresses path being truthy but still being
-		 * torrent searchee
-		 */
-		const categoryForTagging = searcheeInfo
-			? searcheeInfo.category
-			: category;
-		if (
-			!categoryForTagging?.length ||
-			categoryForTagging === linkCategory
-		) {
+		if (!duplicateCategories || !searcheeInfo || !path) {
+			return TORRENT_TAG; // Require path to duplicate category using tags
+		}
+		const searcheeCategory = searcheeInfo.category;
+		if (!searcheeCategory.length || searcheeCategory === linkCategory) {
 			return TORRENT_TAG;
 		}
 
-		if (categoryForTagging.endsWith(TORRENT_CATEGORY_SUFFIX)) {
-			if (duplicateCategories) {
-				return `${TORRENT_TAG},${categoryForTagging}`;
-			} else {
-				return TORRENT_TAG;
-			}
+		if (searcheeCategory.endsWith(TORRENT_CATEGORY_SUFFIX)) {
+			return `${TORRENT_TAG},${searcheeCategory}`;
 		}
-		if (!searchee.infoHash) {
-			return TORRENT_TAG;
-		} else if (duplicateCategories) {
-			return `${TORRENT_TAG},${categoryForTagging}${TORRENT_CATEGORY_SUFFIX}`;
-		} else {
-			return TORRENT_TAG;
-		}
+		return `${TORRENT_TAG},${searcheeCategory}${TORRENT_CATEGORY_SUFFIX}`;
 	}
 
 	async createTag(): Promise<void> {
@@ -352,7 +351,7 @@ export default class QBittorrent implements TorrentClient {
 		decision: DecisionAnyMatch,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { flatLinking, linkCategory } = getRuntimeConfig();
+		const { linkCategory } = getRuntimeConfig();
 		try {
 			if (await this.getTorrentInfo(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
@@ -395,18 +394,18 @@ export default class QBittorrent implements TorrentClient {
 			// ---------------------- Building form data ----------------------
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
-			if (path) {
+			if (!autoTMM) {
 				formData.append("downloadPath", savePath);
 				formData.append("savepath", savePath);
 			}
+			formData.append("autoTMM", autoTMM.toString());
 			formData.append(
-				"autoTMM",
-				flatLinking && searchee.infoHash ? autoTMM.toString() : "false",
+				"category",
+				this.getCategoryForNewTorrent(category),
 			);
-			formData.append("category", category);
 			formData.append(
 				"tags",
-				this.getTagsForNewTorrent(searchee, searcheeInfo, category),
+				this.getTagsForNewTorrent(searcheeInfo, path),
 			);
 			formData.append(
 				"contentLayout",
