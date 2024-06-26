@@ -177,11 +177,32 @@ export default class QBittorrent implements TorrentClient {
 				? "Subfolder"
 				: "Original";
 	}
+	private getCategoryForNewTorrent(
+		searchee: Searchee,
+		category: string,
+	): string {
+		//known = not linked
+
+		const { duplicateCategories, linkCategory } = getRuntimeConfig();
+		if (searchee.path) {
+			//direct data match or linked
+			return linkCategory;
+		}
+		if (
+			!category.endsWith(TORRENT_CATEGORY_SUFFIX) &&
+			duplicateCategories
+		) {
+			// doesnt have suffix and needs dupcat
+			return `${category}.cross-seed`;
+		}
+		// returns the searcheeInfo set in the deconstruction
+		return category;
+	}
 
 	private getTagsForNewTorrent(
-		searchee: Searchee,
 		searcheeInfo: TorrentInfo | undefined,
 		category: string,
+		isTorrentLinked: boolean,
 	): string {
 		const { duplicateCategories, linkCategory } = getRuntimeConfig();
 
@@ -192,27 +213,23 @@ export default class QBittorrent implements TorrentClient {
 		const categoryForTagging = searcheeInfo
 			? searcheeInfo.category
 			: category;
+
 		if (
 			!categoryForTagging?.length ||
 			categoryForTagging === linkCategory
 		) {
+			// data match
 			return TORRENT_TAG;
 		}
-
-		if (categoryForTagging.endsWith(TORRENT_CATEGORY_SUFFIX)) {
-			if (duplicateCategories) {
+		if (isTorrentLinked) {
+			if (categoryForTagging.endsWith(TORRENT_CATEGORY_SUFFIX)) {
+				// linked infohash with suffix
 				return `${TORRENT_TAG},${categoryForTagging}`;
-			} else {
-				return TORRENT_TAG;
+			} else if (duplicateCategories) {
+				return `${TORRENT_TAG},${categoryForTagging}${TORRENT_CATEGORY_SUFFIX}`;
 			}
 		}
-		if (!searchee.infoHash) {
-			return TORRENT_TAG;
-		} else if (duplicateCategories) {
-			return `${TORRENT_TAG},${categoryForTagging}${TORRENT_CATEGORY_SUFFIX}`;
-		} else {
-			return TORRENT_TAG;
-		}
+		return TORRENT_TAG;
 	}
 
 	async createTag(): Promise<void> {
@@ -395,18 +412,22 @@ export default class QBittorrent implements TorrentClient {
 			// ---------------------- Building form data ----------------------
 			const formData = new FormData();
 			formData.append("torrents", buffer, filename);
-			if (path) {
+			if (path || autoTMM.toString() === "false") {
 				formData.append("downloadPath", savePath);
-				formData.append("savepath", savePath);
 			}
 			formData.append(
 				"autoTMM",
 				flatLinking && searchee.infoHash ? autoTMM.toString() : "false",
 			);
-			formData.append("category", category);
+			formData.append(
+				"category",
+				path
+					? category
+					: this.getCategoryForNewTorrent(searchee, category),
+			);
 			formData.append(
 				"tags",
-				this.getTagsForNewTorrent(searchee, searcheeInfo, category),
+				this.getTagsForNewTorrent(searcheeInfo, category, !!path),
 			);
 			formData.append(
 				"contentLayout",
