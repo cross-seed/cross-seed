@@ -9,7 +9,7 @@ import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee } from "../searchee.js";
+import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
@@ -407,31 +407,31 @@ export default class Deluge implements TorrentClient {
 	 * @return Result containing either a string with path or reason it was not provided
 	 */
 	async getDownloadDir(
-		searchee: Searchee,
+		meta: SearcheeWithInfoHash | Metafile,
+		options: { onlyCompleted: boolean },
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		let torrent: TorrentInfo, response: Result<TorrentStatus, ErrorType>;
-		const params = [["save_path", "progress"], { hash: searchee.infoHash }];
+		let response: Result<TorrentStatus, ErrorType>;
+		const params = [["save_path", "progress"], { hash: meta.infoHash }];
 		try {
 			response = await this.call<TorrentStatus>("web.update_ui", params);
 		} catch (e) {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		if (response.isOk()) {
-			const torrentResponse = response.unwrap().torrents;
-			if (!torrentResponse) {
-				return resultOfErr("UNKNOWN_ERROR");
-			}
-			torrent = torrentResponse![searchee.infoHash!];
-			if (!torrent) {
-				return resultOfErr("NOT_FOUND");
-			}
-			if (torrent.progress !== 100) {
-				return resultOfErr("TORRENT_NOT_COMPLETE");
-			}
-		} else {
+		if (!response.isOk()) {
 			return resultOfErr("UNKNOWN_ERROR");
+		}
+		const torrentResponse = response.unwrap().torrents;
+		if (!torrentResponse) {
+			return resultOfErr("UNKNOWN_ERROR");
+		}
+		const torrent = torrentResponse![meta.infoHash!];
+		if (!torrent) {
+			return resultOfErr("NOT_FOUND");
+		}
+		if (options.onlyCompleted && torrent.progress !== 100) {
+			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}
 		return resultOf(torrent.save_path);
 	}

@@ -124,7 +124,8 @@ export default class Transmission implements TorrentClient {
 	}
 
 	async checkOriginalTorrent(
-		searchee: SearcheeWithInfoHash,
+		data: SearcheeWithInfoHash | Metafile,
+		onlyCompleted: boolean,
 	): Promise<
 		Result<
 			{ downloadDir: string },
@@ -137,7 +138,7 @@ export default class Transmission implements TorrentClient {
 				"torrent-get",
 				{
 					fields: ["downloadDir", "percentDone"],
-					ids: [searchee.infoHash],
+					ids: [data.infoHash],
 				},
 			);
 		} catch (e) {
@@ -149,7 +150,7 @@ export default class Transmission implements TorrentClient {
 
 		const [{ downloadDir, percentDone }] = queryResponse.torrents;
 
-		if (percentDone < 1) {
+		if (onlyCompleted && percentDone < 1) {
 			return resultOfErr(InjectionResult.TORRENT_NOT_COMPLETE);
 		}
 
@@ -157,12 +158,14 @@ export default class Transmission implements TorrentClient {
 	}
 
 	async getDownloadDir(
-		searchee: Searchee,
+		meta: SearcheeWithInfoHash | Metafile,
+		options: { onlyCompleted: boolean },
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
 		const result = await this.checkOriginalTorrent(
-			searchee as SearcheeWithInfoHash,
+			meta,
+			options.onlyCompleted,
 		);
 		return result
 			.mapOk((r) => r.downloadDir)
@@ -181,6 +184,7 @@ export default class Transmission implements TorrentClient {
 		} else {
 			const result = await this.getDownloadDir(
 				searchee as SearcheeWithInfoHash,
+				{ onlyCompleted: true },
 			);
 			if (result.isErr()) {
 				return InjectionResult.FAILURE;

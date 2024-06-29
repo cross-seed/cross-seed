@@ -239,19 +239,23 @@ export default class QBittorrent implements TorrentClient {
 	@return either a string containing the path or a error mesage
 	*/
 	async getDownloadDir(
-		searchee: SearcheeWithInfoHash,
+		meta: SearcheeWithInfoHash | Metafile,
+		options: { onlyCompleted: boolean },
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
 		try {
-			const torrentInfo = await this.getTorrentInfo(searchee.infoHash);
+			const torrentInfo = await this.getTorrentInfo(meta.infoHash);
 			if (!torrentInfo) {
 				return resultOfErr("NOT_FOUND");
 			}
-			if (!this.isTorrentComplete(torrentInfo)) {
+			if (
+				options.onlyCompleted &&
+				!this.isTorrentInfoComplete(torrentInfo)
+			) {
 				return resultOfErr("TORRENT_NOT_COMPLETE");
 			}
-			const savePath = this.getCorrectSavePath(searchee, torrentInfo);
+			const savePath = this.getCorrectSavePath(meta, torrentInfo);
 			return resultOf(savePath);
 		} catch (e) {
 			if (e.message.includes("retrieve")) {
@@ -324,7 +328,7 @@ export default class QBittorrent implements TorrentClient {
 		return undefined;
 	}
 
-	isTorrentComplete(torrentInfo: TorrentInfo): boolean {
+	isTorrentInfoComplete(torrentInfo: TorrentInfo): boolean {
 		return [
 			"uploading",
 			"pausedUP",
@@ -380,7 +384,7 @@ export default class QBittorrent implements TorrentClient {
 					}
 				: {
 						savePath: searcheeInfo!.save_path,
-						isComplete: this.isTorrentComplete(searcheeInfo!),
+						isComplete: this.isTorrentInfoComplete(searcheeInfo!),
 						autoTMM: searcheeInfo!.auto_tmm,
 						category: searcheeInfo!.category,
 					};

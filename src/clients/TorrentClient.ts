@@ -1,7 +1,7 @@
 import { Metafile } from "../parseTorrent.js";
 import { DecisionAnyMatch, InjectionResult } from "../constants.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee } from "../searchee.js";
+import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
 import Transmission from "./Transmission.js";
@@ -12,7 +12,8 @@ let activeClient: TorrentClient;
 
 export interface TorrentClient {
 	getDownloadDir: (
-		searchee: Searchee,
+		meta: SearcheeWithInfoHash | Metafile,
+		options: { onlyCompleted: boolean },
 	) => Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	>;
