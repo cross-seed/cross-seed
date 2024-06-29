@@ -22,7 +22,12 @@ import {
 	updateSearchTimestamps,
 } from "./indexers.js";
 import { Label, logger } from "./logger.js";
-import { filterByContent, filterDupes, filterTimestamps } from "./preFilter.js";
+import {
+	filterByContent,
+	filterDupes,
+	filterDupesFromSimilar,
+	filterTimestamps,
+} from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
 import { isOk } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -37,7 +42,7 @@ import {
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
-	getTorrentByFuzzyName,
+	getTorrentByName,
 	indexNewTorrents,
 	loadTorrentDirLight,
 	TorrentLocator,
@@ -240,46 +245,70 @@ export async function checkNewCandidateMatch(
 	candidate: Candidate,
 	searcheeLabel: SearcheeLabel,
 ): Promise<InjectionResult | SaveResult | null> {
-	const candidateLog = `${candidate.tracker}: ${candidate.name}`;
-	const meta = await getTorrentByFuzzyName(candidate.name);
-	if (meta === null) {
+	const candidateLog = `${candidate.name} from ${candidate.tracker}`;
+	const { keys, metas } = await getTorrentByName(candidate.name);
+	const method = keys.length ? `[${keys}]` : "Fuse fallback";
+	if (!metas.length) {
 		logger.verbose({
 			label: searcheeLabel,
-			message: `Did not find an existing entry for ${candidateLog}`,
+			message: `Did not find an existing entry using ${method} for ${candidateLog}`,
 		});
 		return null;
 	}
-
-	const hashesToExclude = await getInfoHashesToExclude();
-	const searchee = createSearcheeFromMetafile(meta);
-	searchee.label = searcheeLabel;
-	if (!filterByContent(searchee as SearcheeWithLabel)) return null;
-
-	// make sure searchee is in database
-	await db("searchee")
-		.insert({ name: searchee.name })
-		.onConflict("name")
-		.ignore();
-
-	const assessment: ResultAssessment = await assessCandidate(
-		candidate,
-		searchee,
-		hashesToExclude,
+	const rawSearchees = metas.map(createSearcheeFromMetafile);
+	rawSearchees.map((s) => (s.label = searcheeLabel));
+	const searchees = filterDupesFromSimilar(
+		rawSearchees.filter(filterByContent),
 	);
-
-	if (!isAnyMatchedDecision(assessment.decision)) {
+	if (!searchees.length) {
+		logger.verbose({
+			label: searcheeLabel,
+			message: `No valid entries found using ${method} for ${candidateLog}`,
+		});
 		return null;
 	}
+	logger.verbose({
+		label: searcheeLabel,
+		message: `Unique entries [${searchees.map((m) => m.name)}] using ${method} for ${candidateLog}`,
+	});
 
-	const result = await performAction(
-		assessment.metafile!,
-		assessment.decision,
-		searchee,
-		candidate.tracker,
-	);
-	sendResultsNotification(searchee as SearcheeWithLabel, [
-		[assessment, candidate.tracker, result],
-	]);
+	const hashesToExclude = await getInfoHashesToExclude();
+
+	let result: InjectionResult | SaveResult | null = null;
+	searchees.sort((a, b) => b.files.length - a.files.length);
+	for (const searchee of searchees) {
+		await db("searchee")
+			.insert({ name: searchee.name })
+			.onConflict("name")
+			.ignore();
+
+		const assessment: ResultAssessment = await assessCandidate(
+			candidate,
+			searchee,
+			hashesToExclude,
+		);
+
+		if (!isAnyMatchedDecision(assessment.decision)) {
+			continue;
+		}
+
+		result = await performAction(
+			assessment.metafile!,
+			assessment.decision,
+			searchee,
+			candidate.tracker,
+		);
+		sendResultsNotification(searchee as SearcheeWithLabel, [
+			[assessment, candidate.tracker, result],
+		]);
+		if (
+			result === SaveResult.SAVED ||
+			result === InjectionResult.SUCCESS ||
+			result === InjectionResult.ALREADY_EXISTS
+		) {
+			break;
+		}
+	}
 	return result;
 }
 
