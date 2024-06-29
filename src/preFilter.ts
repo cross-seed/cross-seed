@@ -14,20 +14,19 @@ import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
-import { getMediaType, humanReadableDate, nMsAgo } from "./utils.js";
+import {
+	getLogString,
+	getMediaType,
+	humanReadableDate,
+	nMsAgo,
+} from "./utils.js";
+import chalk from "chalk";
 
 function logReason(reason: string, searchee: Searchee): void {
 	logger.verbose({
 		label: Label.PREFILTER,
-		message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
+		message: `${getLogString(searchee, chalk.reset)} was not selected for searching because ${reason}`,
 	});
-}
-
-function isSonarrSeasonFolder(searchee: Searchee): boolean {
-	return (
-		searchee.files.length > 1 &&
-		SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path!))
-	);
 }
 
 function isSeasonPackEpisode(searchee: Searchee): boolean {
@@ -41,6 +40,7 @@ function isSeasonPackEpisode(searchee: Searchee): boolean {
 
 export function filterByContent(searchee: Searchee): boolean {
 	const {
+		fuzzySizeThreshold,
 		includeEpisodes,
 		includeNonVideos,
 		includeSingleEpisodes,
@@ -69,12 +69,20 @@ export function filterByContent(searchee: Searchee): boolean {
 		logReason("it is a season pack episode", searchee);
 		return false;
 	}
-	const allFilesAreVideos = searchee.files.every((file) =>
-		VIDEO_EXTENSIONS.includes(extname(file.name)),
-	);
 
-	if (!includeNonVideos && !allFilesAreVideos) {
-		logReason("not all files are videos", searchee);
+	const nonVideoSizeRatio =
+		searchee.files.reduce((acc, cur) => {
+			if (!VIDEO_EXTENSIONS.includes(extname(cur.name))) {
+				return acc + cur.length;
+			}
+			return acc;
+		}, 0) / searchee.length;
+
+	if (!includeNonVideos && nonVideoSizeRatio > fuzzySizeThreshold) {
+		logReason(
+			`nonVideoSizeRatio > fuzzySizeThreshold: ${nonVideoSizeRatio} > ${fuzzySizeThreshold}`,
+			searchee,
+		);
 		return false;
 	}
 
@@ -82,7 +90,10 @@ export function filterByContent(searchee: Searchee): boolean {
 		searchee.path &&
 		statSync(searchee.path).isDirectory() &&
 		ARR_DIR_REGEX.test(basename(searchee.path)) &&
-		!isSonarrSeasonFolder(searchee)
+		!(
+			searchee.files.length > 1 &&
+			SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path))
+		)
 	) {
 		logReason("it is could be an arr movie/series directory", searchee);
 		return false;
@@ -163,12 +174,6 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		.first()) as TimestampDataSql;
 
 	const { first_searched_any, last_searched_all } = timestampDataSql;
-	function logReason(reason) {
-		logger.verbose({
-			label: Label.PREFILTER,
-			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
-		});
-	}
 
 	if (
 		typeof excludeOlder === "number" &&
@@ -179,6 +184,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			`its first search timestamp ${humanReadableDate(
 				first_searched_any,
 			)} is older than ${ms(excludeOlder, { long: true })} ago`,
+			searchee,
 		);
 		return false;
 	}
@@ -192,6 +198,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			`its last search timestamp ${humanReadableDate(
 				last_searched_all,
 			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`,
+			searchee,
 		);
 		return false;
 	}
