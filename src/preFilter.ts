@@ -115,7 +115,16 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 		const entry = acc.get(cur.name);
 		if (entry === undefined) {
 			acc.set(cur.name, cur);
-		} else if (cur.infoHash && !entry.infoHash) {
+			return acc;
+		}
+		if (cur.files.length > entry.files.length) {
+			acc.set(cur.name, cur);
+			return acc;
+		}
+		if (cur.files.length < entry.files.length) {
+			return acc;
+		}
+		if (cur.infoHash && !entry.infoHash) {
 			acc.set(cur.name, cur);
 		}
 		return acc;
