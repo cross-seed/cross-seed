@@ -172,9 +172,11 @@ export function getLogString(data: Metafile | Searchee, color: ChalkInstance) {
 	}
 	return data.infoHash
 		? `${color(data.name)} ${chalk.dim(`[${data.infoHash.slice(0, 8)}...]`)}`
-		: data.path
-			? color(data.path)
-			: color(data.name);
+		: !data.path
+			? color(data.name)
+			: data.name === basename(data.path)
+				? color(data.path)
+				: `${color(data.name)} ${chalk.dim(`[${data.path}]`)}`;
 }
 
 export function formatAsList(strings: string[]) {

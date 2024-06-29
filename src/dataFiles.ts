@@ -1,21 +1,16 @@
 import { readdirSync, statSync } from "fs";
 import { basename, extname, join } from "path";
-import {
-	IGNORED_FOLDERS_SUBSTRINGS,
-	IGNORED_FOLDERS_REGEX,
-	VIDEO_EXTENSIONS,
-} from "./constants.js";
+import { IGNORED_FOLDERS_SUBSTRINGS, VIDEO_EXTENSIONS } from "./constants.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
 function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
-	const folderBaseName = basename(root);
+	const searchBasename = basename(root);
 	if (isDir) {
-		return (
-			IGNORED_FOLDERS_SUBSTRINGS.includes(folderBaseName.toLowerCase()) ||
-			IGNORED_FOLDERS_REGEX.test(folderBaseName)
+		return IGNORED_FOLDERS_SUBSTRINGS.includes(
+			searchBasename.toLowerCase(),
 		);
 	} else {
-		return !VIDEO_EXTENSIONS.includes(extname(folderBaseName));
+		return !VIDEO_EXTENSIONS.includes(extname(searchBasename));
 	}
 }
 export function findPotentialNestedRoots(

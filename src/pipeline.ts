@@ -202,11 +202,13 @@ export async function searchForLocalTorrentByCriteria(
 	searchees.map((s) => (s.label = Label.WEBHOOK));
 	const hashesToExclude = await getInfoHashesToExclude();
 	let totalFound = 0;
+	let filtered = 0;
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
 		try {
 			if (!filterByContent(searchee)) {
-				return null;
+				filtered++;
+				continue;
 			}
 			const sleep = wait(delay * 1000);
 
@@ -229,6 +231,7 @@ export async function searchForLocalTorrentByCriteria(
 			logger.debug(e);
 		}
 	}
+	if (filtered === searchees.length) return null;
 	return totalFound;
 }
 

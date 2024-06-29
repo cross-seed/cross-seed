@@ -1,9 +1,10 @@
 import ms from "ms";
-import { extname } from "path";
+import { extname, basename, dirname } from "path";
 import { statSync } from "fs";
 import {
 	ARR_DIR_REGEX,
 	EP_REGEX,
+	SONARR_SUBFOLDERS_REGEX,
 	SEASON_REGEX,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
@@ -14,7 +15,29 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee } from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
 import { getMediaType, humanReadableDate, nMsAgo } from "./utils.js";
-import path from "path";
+
+function logReason(reason: string, searchee: Searchee): void {
+	logger.verbose({
+		label: Label.PREFILTER,
+		message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
+	});
+}
+
+function isSonarrSeasonFolder(searchee: Searchee): boolean {
+	return (
+		searchee.files.length > 1 &&
+		SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path!))
+	);
+}
+
+function isSeasonPackEpisode(searchee: Searchee): boolean {
+	return (
+		!!searchee.path &&
+		searchee.files.length === 1 &&
+		(SEASON_REGEX.test(basename(dirname(searchee.path))) ||
+			SONARR_SUBFOLDERS_REGEX.test(basename(dirname(searchee.path))))
+	);
+}
 
 export function filterByContent(searchee: Searchee): boolean {
 	const {
@@ -24,35 +47,26 @@ export function filterByContent(searchee: Searchee): boolean {
 		blockList,
 	} = getRuntimeConfig();
 
-	function logReason(reason): void {
-		logger.verbose({
-			label: Label.PREFILTER,
-			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
-		});
-	}
 	const blockedNote = findBlockedStringInReleaseMaybe(searchee, blockList);
 	if (blockedNote) {
-		logReason(`it matched the blocklist - ("${blockedNote}")`);
+		logReason(`it matched the blocklist - ("${blockedNote}")`, searchee);
 		return false;
 	}
 
-	const isSeasonPackEpisode =
-		searchee.path &&
-		searchee.files.length === 1 &&
-		SEASON_REGEX.test(path.basename(path.dirname(searchee.path)));
+	const isSeasonPackEp = isSeasonPackEpisode(searchee);
 
 	if (
 		!includeEpisodes &&
 		!includeSingleEpisodes &&
-		!isSeasonPackEpisode &&
+		!isSeasonPackEp &&
 		EP_REGEX.test(searchee.name)
 	) {
-		logReason("it is a single episode");
+		logReason("it is a single episode", searchee);
 		return false;
 	}
 
-	if (!includeEpisodes && isSeasonPackEpisode) {
-		logReason("it is a season pack episode");
+	if (!includeEpisodes && isSeasonPackEp) {
+		logReason("it is a season pack episode", searchee);
 		return false;
 	}
 	const allFilesAreVideos = searchee.files.every((file) =>
@@ -60,15 +74,17 @@ export function filterByContent(searchee: Searchee): boolean {
 	);
 
 	if (!includeNonVideos && !allFilesAreVideos) {
-		logReason("not all files are videos");
+		logReason("not all files are videos", searchee);
 		return false;
 	}
+
 	if (
 		searchee.path &&
 		statSync(searchee.path).isDirectory() &&
-		ARR_DIR_REGEX.test(path.basename(searchee.path))
+		ARR_DIR_REGEX.test(basename(searchee.path)) &&
+		!isSonarrSeasonFolder(searchee)
 	) {
-		logReason("it is a arr movie/series directory");
+		logReason("it is could be an arr movie/series directory", searchee);
 		return false;
 	}
 	return true;
