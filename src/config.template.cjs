@@ -216,7 +216,7 @@ module.exports = {
 	 * searchees. Setting this to higher values will result in more searchees
 	 * and more API hits to your indexers.
 	 */
-	maxDataDepth: 1,
+	maxDataDepth: 2,
 
 	/**
 	 * Directory containing .torrent files.
@@ -351,7 +351,7 @@ module.exports = {
 	 * "30 seconds"
 	 * null
 	 */
-	snatchTimeout: undefined,
+	snatchTimeout: "30 seconds",
 
 	/**
 	 * Fail search requests that haven't responded after this long.
@@ -360,7 +360,7 @@ module.exports = {
 	 * "30 seconds"
 	 * null
 	 */
-	searchTimeout: undefined,
+	searchTimeout: "2 minutes",
 
 	/**
 	 * The number of searches to make in one run/batch.
