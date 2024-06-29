@@ -246,8 +246,8 @@ module.exports = {
 
 	/**
 	 * Whether to include single episode torrents in the search (not those from
-	 * season packs).
-	 * Like `includeEpisodes` but slightly more restrictive.
+	 * season packs). Like `includeEpisodes` but slightly more restrictive.
+	 * true/false always match single episodes from rss and announce.
 	 */
 	includeSingleEpisodes: false,
 

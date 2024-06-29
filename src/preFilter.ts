@@ -12,7 +12,7 @@ import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
+import { Searchee, SearcheeWithLabel } from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
 import {
 	getLogString,
@@ -38,7 +38,7 @@ function isSeasonPackEpisode(searchee: Searchee): boolean {
 	);
 }
 
-export function filterByContent(searchee: Searchee): boolean {
+export function filterByContent(searchee: SearcheeWithLabel): boolean {
 	const {
 		fuzzySizeThreshold,
 		includeEpisodes,
@@ -59,6 +59,7 @@ export function filterByContent(searchee: Searchee): boolean {
 		!includeEpisodes &&
 		!includeSingleEpisodes &&
 		!isSeasonPackEp &&
+		![Label.ANNOUNCE, Label.RSS].includes(searchee.label) &&
 		EP_REGEX.test(searchee.name)
 	) {
 		logReason("it is a single episode", searchee);

@@ -37,6 +37,7 @@ export interface Searchee {
 }
 
 export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
+export type SearcheeWithLabel = WithRequired<Searchee, "label">;
 
 export function hasInfoHash(
 	searchee: Searchee,
