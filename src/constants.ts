@@ -136,6 +136,7 @@ export enum Decision {
 	BLOCKED_RELEASE = "BLOCKED_RELEASE",
 	PROPER_REPACK_MISMATCH = "PROPER_REPACK_MISMATCH",
 	RESOLUTION_MISMATCH = "RESOLUTION_MISMATCH",
+	SOURCE_MISMATCH = "SOURCE_MISMATCH",
 }
 export type DecisionAnyMatch =
 	| Decision.MATCH
@@ -148,6 +149,15 @@ export function isAnyMatchedDecision(
 		decision === Decision.MATCH ||
 		decision === Decision.MATCH_SIZE_ONLY ||
 		decision === Decision.MATCH_PARTIAL
+	);
+}
+export function isStaticDecision(decision: Decision): boolean {
+	return (
+		decision === Decision.RELEASE_GROUP_MISMATCH ||
+		decision === Decision.RESOLUTION_MISMATCH ||
+		decision === Decision.SOURCE_MISMATCH ||
+		decision === Decision.PROPER_REPACK_MISMATCH ||
+		decision === Decision.MAGNET_LINK
 	);
 }
 

@@ -289,14 +289,7 @@ program
 	.command("clear-cache")
 	.description("Clear the cache of downloaded-and-rejected torrents")
 	.action(async () => {
-		await db("decision").del();
-		await db("indexer").update({
-			status: null,
-			retry_after: null,
-			search_cap: null,
-			tv_search_cap: null,
-			movie_search_cap: null,
-		});
+		await db("decision").whereNull("info_hash").del();
 		await db.destroy();
 	});
 program
