@@ -13,7 +13,6 @@ export interface FileConfig {
 	action?: Action;
 	pconfigVersion?: number;
 	delay?: number;
-	includeEpisodes?: boolean;
 	includeSingleEpisodes?: boolean;
 	outputDir?: string;
 	rtorrentRpcUrl?: string;

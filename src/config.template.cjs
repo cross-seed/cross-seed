@@ -238,22 +238,16 @@ module.exports = {
 	outputDir: ".",
 
 	/**
-	 * Whether to search for all episode torrents, including those from season
-	 * packs.
-	 * This option overrides includeSingleEpisodes when set to true.
-	 */
-	includeEpisodes: false,
-
-	/**
-	 * Whether to include single episode torrents in the search (not those from
-	 * season packs). Like `includeEpisodes` but slightly more restrictive.
-	 * true/false always match single episodes from rss and announce.
+	 * Whether to include single episode torrents in a search (not those from
+	 * season packs).
+	 *
+	 * This setting does not affect matching episodes from rss and
+	 * announce.
 	 */
 	includeSingleEpisodes: false,
 
 	/**
 	 * Include torrents which are comprised of non-video files.
-	 * This option does not override includeEpisodes or includeSingleEpisodes.
 	 *
 	 * If this option is set to false, any folders or torrents whose
 	 * totalNonVideoFilesSize / totalSize > fuzzySizeThreshold
@@ -266,18 +260,11 @@ module.exports = {
 	 *
 	 * To search for all video media except individual episodes, use:
 	 *
-	 *		includeEpisodes: false
 	 *		includeSingleEpisodes: false
 	 *		includeNonVideos: false
 	 *
-	 * To search for  all video media including episodes, use:
+	 * To search for all video media including individual episodes, use:
 	 *
-	 *		includeEpisodes: true
-	 *		includeNonVideos: false
-	 *
-	 * To search for  all video media except season pack episodes (data-based) use:
-	 *
-	 *		includeEpisodes: false
 	 *		includeSingleEpisodes: true
 	 *		includeNonVideos: false
 	 *

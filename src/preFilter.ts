@@ -29,19 +29,9 @@ function logReason(reason: string, searchee: Searchee): void {
 	});
 }
 
-function isSeasonPackEpisode(searchee: Searchee): boolean {
-	return (
-		!!searchee.path &&
-		searchee.files.length === 1 &&
-		(SEASON_REGEX.test(basename(dirname(searchee.path))) ||
-			SONARR_SUBFOLDERS_REGEX.test(basename(dirname(searchee.path))))
-	);
-}
-
 export function filterByContent(searchee: SearcheeWithLabel): boolean {
 	const {
 		fuzzySizeThreshold,
-		includeEpisodes,
 		includeNonVideos,
 		includeSingleEpisodes,
 		blockList,
@@ -53,21 +43,22 @@ export function filterByContent(searchee: SearcheeWithLabel): boolean {
 		return false;
 	}
 
-	const isSeasonPackEp = isSeasonPackEpisode(searchee);
+	if (
+		searchee.path &&
+		searchee.files.length === 1 &&
+		(SEASON_REGEX.test(basename(dirname(searchee.path))) ||
+			SONARR_SUBFOLDERS_REGEX.test(basename(dirname(searchee.path))))
+	) {
+		logReason("it is a season pack episode", searchee);
+		return false;
+	}
 
 	if (
-		!includeEpisodes &&
 		!includeSingleEpisodes &&
-		!isSeasonPackEp &&
 		![Label.ANNOUNCE, Label.RSS].includes(searchee.label) &&
 		EP_REGEX.test(searchee.name)
 	) {
 		logReason("it is a single episode", searchee);
-		return false;
-	}
-
-	if (!includeEpisodes && isSeasonPackEp) {
-		logReason("it is a season pack episode", searchee);
 		return false;
 	}
 
