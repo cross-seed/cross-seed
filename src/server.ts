@@ -9,8 +9,9 @@ import {
 	checkNewCandidateMatch,
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
-import { InjectionResult, SaveResult } from "./constants.js";
+import { Decision, InjectionResult, SaveResult } from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
+import chalk from "chalk";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -128,7 +129,10 @@ async function search(
 			});
 		}
 	} catch (e) {
-		logger.error(e);
+		logger.error({
+			label: Label.WEBHOOK,
+			message: e.message,
+		});
 		logger.debug(e);
 	}
 }
@@ -175,27 +179,59 @@ async function announce(
 	});
 
 	const candidate = data as Candidate;
+	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	try {
 		await indexNewTorrents();
-		const result = await checkNewCandidateMatch(candidate, Label.ANNOUNCE);
-		const isOk =
-			result === InjectionResult.SUCCESS || result === SaveResult.SAVED;
-		if (!isOk) {
-			if (result === InjectionResult.TORRENT_NOT_COMPLETE) {
-				res.writeHead(202);
-			} else {
-				res.writeHead(204);
-			}
-		} else {
-			logger.info({
-				label: Label.ANNOUNCE,
-				message: `Added announce from ${candidate.tracker}: ${candidate.name}`,
-			});
-			res.writeHead(200);
+		const result = await checkNewCandidateMatch(
+			candidate,
+			candidateLog,
+			Label.ANNOUNCE,
+		);
+		if (!result.decision) {
+			res.writeHead(204);
+			res.end();
+			return;
 		}
+
+		const injected = result.actionResult === InjectionResult.SUCCESS;
+		const added =
+			injected ||
+			result.actionResult === InjectionResult.FAILURE ||
+			result.actionResult === SaveResult.SAVED;
+		const exists =
+			result.decision === Decision.INFO_HASH_ALREADY_EXISTS ||
+			result.actionResult === InjectionResult.ALREADY_EXISTS;
+		const incomplete =
+			result.actionResult === InjectionResult.TORRENT_NOT_COMPLETE;
+
+		let status: number;
+		let state: string;
+		if (added) {
+			status = 200;
+			state = injected ? "Injected" : "Saved";
+		} else if (exists) {
+			status = 200;
+			state = "Already exists";
+		} else if (incomplete) {
+			status = 202;
+			state = "Saved";
+		} else {
+			throw new Error(
+				`Unexpected result: ${result.decision} | ${result.actionResult}`,
+			);
+		}
+		logger.info({
+			label: Label.ANNOUNCE,
+			message: `${state} ${candidateLog} (status: ${status})`,
+		});
+		res.writeHead(status);
 		res.end();
 	} catch (e) {
-		logger.error(e);
+		logger.error({
+			label: Label.ANNOUNCE,
+			message: e.message,
+		});
+		logger.debug(e);
 		res.writeHead(500);
 		res.end(e.message);
 	}

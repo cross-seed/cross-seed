@@ -281,6 +281,28 @@ export default class RTorrent implements TorrentClient {
 			.mapErr((error) => (error === "FAILURE" ? "UNKNOWN_ERROR" : error));
 	}
 
+	async isTorrentComplete(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		try {
+			const response = await this.methodCallP<string[]>("d.complete", [
+				infoHash,
+			]);
+			if (response.length === 0) {
+				return resultOfErr("NOT_FOUND");
+			}
+			return resultOf(response[0] === "1");
+		} catch (e) {
+			return resultOfErr("NOT_FOUND");
+		}
+	}
+
+	async recheckTorrent(infoHash: string): Promise<void> {
+		// Pause first as it may resume after recheck automatically
+		await this.methodCallP<void>("d.pause", [infoHash]);
+		await this.methodCallP<void>("d.check_hash", [infoHash]);
+	}
+
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,
