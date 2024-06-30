@@ -26,7 +26,11 @@ interface Response<T> {
 }
 
 interface TorrentGetResponseArgs {
-	torrents: { downloadDir: string; percentDone: number }[];
+	torrents: {
+		hashString: string;
+		downloadDir: string;
+		percentDone: number;
+	}[];
 }
 
 interface TorrentMetadata {
@@ -175,6 +179,20 @@ export default class Transmission implements TorrentClient {
 		return result
 			.mapOk((r) => r.downloadDir)
 			.mapErr((err) => (err === "FAILURE" ? "UNKNOWN_ERROR" : err));
+	}
+
+	async getAllDownloadDirs(
+		onlyCompleted: boolean,
+	): Promise<Map<string, string>> {
+		const res = await this.request<TorrentGetResponseArgs>("torrent-get", {
+			fields: ["hashString", "downloadDir", "percentDone"],
+		});
+		const downloadDirs = new Map<string, string>();
+		for (const { hashString, downloadDir, percentDone } of res.torrents) {
+			if (onlyCompleted && percentDone < 1) continue;
+			downloadDirs.set(hashString, downloadDir);
+		}
+		return downloadDirs;
 	}
 
 	async isTorrentComplete(

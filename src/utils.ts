@@ -1,4 +1,5 @@
 import path, { basename } from "path";
+import chalk, { ChalkInstance } from "chalk";
 import {
 	ALL_EXTENSIONS,
 	ANIME_REGEX,
@@ -11,10 +12,10 @@ import {
 	SEASON_REGEX,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
-import { Result, resultOf, resultOfErr } from "./Result.js";
-import { Searchee } from "./searchee.js";
 import { Metafile } from "./parseTorrent.js";
-import chalk, { ChalkInstance } from "chalk";
+import { Result, resultOf, resultOfErr } from "./Result.js";
+import { File, Searchee } from "./searchee.js";
+import { statSync } from "fs";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export enum MediaType {
@@ -227,12 +228,27 @@ export function extractInt(str: string): number {
 	return parseInt(str.match(/\d+/)![0]);
 }
 
-export function getFuzzySizeFactor(): number {
-	const { fuzzySizeThreshold } = getRuntimeConfig();
-	return fuzzySizeThreshold;
+export function getLargestFile(data: Searchee | Metafile): File {
+	return data.files.reduce((a, b) => (a.length > b.length ? a : b));
 }
 
-export function getMinSizeRatio(): number {
-	const { fuzzySizeThreshold } = getRuntimeConfig();
-	return 1 - fuzzySizeThreshold;
+export function getNewestFileAge(data: Searchee | Metafile): number {
+	return data.files.reduce(
+		(acc, file) => Math.max(acc, statSync(file.path).mtimeMs),
+		0,
+	);
+}
+
+export function getFuzzySizeFactor(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? 1 - seasonFromEpisodes
+		: fuzzySizeThreshold;
+}
+
+export function getMinSizeRatio(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? seasonFromEpisodes
+		: 1 - fuzzySizeThreshold;
 }

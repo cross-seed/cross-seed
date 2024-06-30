@@ -12,6 +12,7 @@ import {
 import { Decision, InjectionResult, SaveResult } from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 import chalk from "chalk";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -141,6 +142,7 @@ async function announce(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	const { seasonFromEpisodes } = getRuntimeConfig();
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -182,27 +184,48 @@ async function announce(
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	try {
 		await indexNewTorrents();
-		const result = await checkNewCandidateMatch(
-			candidate,
-			candidateLog,
-			Label.ANNOUNCE,
-		);
-		if (!result.decision) {
+		const results = [
+			await checkNewCandidateMatch(
+				candidate,
+				candidateLog,
+				false,
+				Label.ANNOUNCE,
+			),
+		];
+		if (seasonFromEpisodes) {
+			results.push(
+				await checkNewCandidateMatch(
+					candidate,
+					candidateLog,
+					true,
+					Label.ANNOUNCE,
+				),
+			);
+		}
+		if (results.every((r) => !r.decision)) {
 			res.writeHead(204);
 			res.end();
 			return;
 		}
 
-		const injected = result.actionResult === InjectionResult.SUCCESS;
+		const injected = results.some(
+			(r) => r.actionResult === InjectionResult.SUCCESS,
+		);
 		const added =
 			injected ||
-			result.actionResult === InjectionResult.FAILURE ||
-			result.actionResult === SaveResult.SAVED;
-		const exists =
-			result.decision === Decision.INFO_HASH_ALREADY_EXISTS ||
-			result.actionResult === InjectionResult.ALREADY_EXISTS;
-		const incomplete =
-			result.actionResult === InjectionResult.TORRENT_NOT_COMPLETE;
+			results.some(
+				(r) =>
+					r.actionResult === InjectionResult.FAILURE ||
+					r.actionResult === SaveResult.SAVED,
+			);
+		const exists = results.some(
+			(r) =>
+				r.decision === Decision.INFO_HASH_ALREADY_EXISTS ||
+				r.actionResult === InjectionResult.ALREADY_EXISTS,
+		);
+		const incomplete = results.some(
+			(r) => r.actionResult === InjectionResult.TORRENT_NOT_COMPLETE,
+		);
 
 		let status: number;
 		let state: string;
@@ -217,7 +240,7 @@ async function announce(
 			state = "Saved";
 		} else {
 			throw new Error(
-				`Unexpected result: ${result.decision} | ${result.actionResult}`,
+				`Unexpected results: ${results.map((r) => `${r.decision} | ${r.actionResult}`).join(", ")}`,
 			);
 		}
 		logger.info({

@@ -20,7 +20,7 @@ import {
 	findPotentialNestedRoots,
 	findSearcheesFromAllDataDirs,
 } from "./dataFiles.js";
-import { db } from "./db.js";
+import { db, memDB } from "./db.js";
 import {
 	assessCandidate,
 	assessCandidateHelper,
@@ -41,9 +41,11 @@ import { sendResultsNotification } from "./pushNotifier.js";
 import { isOk } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
+	createEnsembleSearchees,
 	createSearcheeFromMetafile,
 	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
+	getSeasonKey,
 	Searchee,
 	SearcheeLabel,
 	SearcheeWithLabel,
@@ -65,7 +67,14 @@ import {
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
-import { formatAsList, getLogString, isTruthy, wait } from "./utils.js";
+import {
+	formatAsList,
+	getLogString,
+	humanReadableSize,
+	isTruthy,
+	stripExtension,
+	wait,
+} from "./utils.js";
 import { Metafile } from "./parseTorrent.js";
 import { getClient } from "./clients/TorrentClient.js";
 import { dirname } from "path";
@@ -285,31 +294,85 @@ export async function searchForLocalTorrentByCriteria(
 export async function checkNewCandidateMatch(
 	candidate: Candidate,
 	candidateLog: string,
+	seasonFromEpisodes: boolean,
 	searcheeLabel: SearcheeLabel,
 ): Promise<{
 	decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null;
 	actionResult: ActionResult | null;
 }> {
-	const { keys, metas } = await getTorrentByName(candidate.name);
-	const method = keys.length ? `[${keys}]` : "Fuse fallback";
-	if (!metas.length) {
+	const searchees: Searchee[] = [];
+	let method: string;
+	if (seasonFromEpisodes) {
+		const seasonKey = getSeasonKey(stripExtension(candidate.name));
+		if (!seasonKey) return { decision: null, actionResult: null };
+		const { ensembleTitle, keyTitle, season } = seasonKey;
+		const key = `${keyTitle}.${season}`;
+		const ensemble = await memDB("ensemble").where({ ensemble: key });
+		if (ensemble.length === 0) {
+			logger.verbose({
+				label: searcheeLabel,
+				message: `Did not find an ensemble ${ensembleTitle} for ${candidateLog}`,
+			});
+			return { decision: null, actionResult: null };
+		}
+		const files = ensemble
+			.map((e) => ({
+				path: e.absolute_path,
+				name: e.name,
+				length: e.length,
+			}))
+			.filter((f) => fs.existsSync(f.path));
+		if (files.length === 0) {
+			logger.verbose({
+				label: searcheeLabel,
+				message: `Did not find any files for ensemble ${ensembleTitle} for ${candidateLog}: sources may be incomplete or missing`,
+			});
+			return { decision: null, actionResult: null };
+		}
+		const uniqueElements = new Set(ensemble.map((e) => e.element));
+		const totalLength = [...uniqueElements].reduce((acc, cur) => {
+			const elements = ensemble.filter(
+				(e) =>
+					e.element === cur &&
+					files.some((f) => f.path === e.absolute_path),
+			);
+			const avg =
+				elements.reduce((a, c) => a + c.length, 0) / elements.length;
+			return acc + avg;
+		}, 0);
+		searchees.push({
+			name: ensembleTitle,
+			files: files,
+			length: totalLength,
+			label: searcheeLabel,
+		});
 		logger.verbose({
 			label: searcheeLabel,
-			message: `Did not find an existing entry using ${method} for ${candidateLog}`,
+			message: `Using ensemble ${ensembleTitle} for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
 		});
-		return { decision: null, actionResult: null };
-	}
-	const rawSearchees = metas.map(createSearcheeFromMetafile);
-	rawSearchees.map((s) => (s.label = searcheeLabel));
-	const searchees = filterDupesFromSimilar(
-		rawSearchees.filter(filterByContent),
-	);
-	if (!searchees.length) {
-		logger.verbose({
-			label: searcheeLabel,
-			message: `No valid entries found using ${method} for ${candidateLog}`,
-		});
-		return { decision: null, actionResult: null };
+		method = "ensemble";
+	} else {
+		const { keys, metas } = await getTorrentByName(candidate.name);
+		method = keys.length ? `[${keys}]` : "Fuse fallback";
+		if (!metas.length) {
+			logger.verbose({
+				label: searcheeLabel,
+				message: `Did not find an existing entry using ${method} for ${candidateLog}`,
+			});
+			return { decision: null, actionResult: null };
+		}
+		const rawSearchees = metas.map(createSearcheeFromMetafile);
+		rawSearchees.map((s) => (s.label = searcheeLabel));
+		searchees.push(
+			...filterDupesFromSimilar(rawSearchees.filter(filterByContent)),
+		);
+		if (!searchees.length) {
+			logger.verbose({
+				label: searcheeLabel,
+				message: `No valid entries found using ${method} for ${candidateLog}`,
+			});
+			return { decision: null, actionResult: null };
+		}
 	}
 	logger.verbose({
 		label: searcheeLabel,
@@ -398,14 +461,24 @@ async function findSearchableTorrents(
 	const hashesToExclude = allSearchees
 		.map((t) => t.infoHash)
 		.filter(isTruthy);
+	const ensembleSearchees = await createEnsembleSearchees(
+		allSearchees,
+		useFilters,
+	);
 
 	if (!useFilters) {
 		return {
-			searchees: allSearchees as SearcheeWithLabel[],
+			searchees: [
+				...allSearchees,
+				...ensembleSearchees,
+			] as SearcheeWithLabel[],
 			hashesToExclude,
 		};
 	}
-	const filteredSearchees = allSearchees.filter(filterByContent);
+	const filteredSearchees = [
+		...ensembleSearchees, // Search first as it uses timestamp for logic
+		...allSearchees.filter(filterByContent),
+	];
 
 	// Group the exact same search queries together for easy cache use later
 	const grouping = new Map<string, Searchee[]>();
@@ -452,7 +525,6 @@ async function findSearchableTorrents(
 			label: Label.SEARCH,
 			message: `Limited to ${searchLimit} searches`,
 		});
-
 		finalSearchees = finalSearchees.slice(0, searchLimit);
 	}
 
@@ -491,7 +563,7 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const { torznab } = getRuntimeConfig();
+	const { seasonFromEpisodes, torznab } = getRuntimeConfig();
 	if (torznab.length > 0) {
 		const candidates = await queryRssFeeds();
 		const lastRun =
@@ -523,7 +595,20 @@ export async function scanRssFeeds() {
 				label: Label.RSS,
 				message: `(${i + 1}/${candidatesSinceLastTime.length}) ${candidateLog}`,
 			});
-			await checkNewCandidateMatch(candidate, candidateLog, Label.RSS);
+			await checkNewCandidateMatch(
+				candidate,
+				candidateLog,
+				false,
+				Label.RSS,
+			);
+			if (seasonFromEpisodes) {
+				await checkNewCandidateMatch(
+					candidate,
+					candidateLog,
+					true,
+					Label.RSS,
+				);
+			}
 		}
 		logger.info({ label: Label.RSS, message: "Scan complete" });
 	}

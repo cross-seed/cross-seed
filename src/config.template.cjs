@@ -276,6 +276,17 @@ module.exports = {
 	includeNonVideos: false,
 
 	/**
+	 * Match season packs from the episodes you already have.
+	 * Requires linkDir, works best with matchMode "partial" and sonarr.
+	 * Works with rss/announce but best results with search (esp anime).
+	 *
+	 * undefined or null - disabled
+	 * 0.8 - must have at least 80% of the episodes (<1 requires partial)
+	 * 1 - must have all episodes
+	 */
+	seasonFromEpisodes: 1,
+
+	/**
 	 * You should NOT modify this unless you have good reason.
 	 * The following option is the preliminary value to compare sizes of
 	 * releases for further comparison.

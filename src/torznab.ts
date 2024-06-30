@@ -32,6 +32,7 @@ import {
 	getAnimeQueries,
 	getApikey,
 	getLogString,
+	getNewestFileAge,
 	getMediaType,
 	isTruthy,
 	MediaType,
@@ -666,7 +667,8 @@ async function getAndLogIndexers(
 	mediaType: MediaType,
 	progress: string,
 ): Promise<{ indexersToSearch: Indexer[]; parsedMedia?: ParsedMedia }> {
-	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
+	const { excludeRecentSearch, excludeOlder, seasonFromEpisodes } =
+		getRuntimeConfig();
 	const searcheeLog = getLogString(searchee, chalk.bold.white);
 	const mediaTypeLog = chalk.white(mediaType.toUpperCase());
 
@@ -694,11 +696,16 @@ async function getAndLogIndexers(
 	const skipAfter = excludeRecentSearch
 		? nMsAgo(excludeRecentSearch)
 		: Number.POSITIVE_INFINITY;
+	const isEnsemble =
+		seasonFromEpisodes && !searchee.infoHash && !searchee.path;
 	const timeFilteredIndexers = enabledIndexers.filter((indexer) => {
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id,
 		);
 		if (!entry) return true;
+		if (isEnsemble && entry.lastSearched < getNewestFileAge(searchee)) {
+			return true;
+		}
 		if (entry.firstSearched < skipBefore) return false;
 		if (entry.lastSearched > skipAfter) return false;
 		return true;
