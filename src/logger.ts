@@ -11,6 +11,7 @@ export enum Label {
 	TRANSMISSION = "transmission",
 	DELUGE = "deluge",
 	DECIDE = "decide",
+	INJECT = "inject",
 	PREFILTER = "prefilter",
 	CONFIGDUMP = "configdump",
 	TORZNAB = "torznab",

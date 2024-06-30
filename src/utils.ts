@@ -184,11 +184,12 @@ export function getLogString(data: Metafile | Searchee, color: ChalkInstance) {
 				: `${color(data.name)} ${chalk.dim(`[${data.path}]`)}`;
 }
 
-export function formatAsList(strings: string[]) {
+export function formatAsList(strings: string[], toSort = true, unit = false) {
+	if (toSort) strings.sort((a, b) => a.localeCompare(b));
 	return new Intl.ListFormat("en", {
 		style: "long",
-		type: "conjunction",
-	}).format(strings.sort((a, b) => a.localeCompare(b)));
+		type: unit ? "unit" : "conjunction",
+	}).format(strings);
 }
 
 export function fallback<T>(...args: T[]): T | undefined {
