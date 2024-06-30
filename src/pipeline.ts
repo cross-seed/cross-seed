@@ -650,6 +650,7 @@ export async function injectSavedTorrents() {
 
 	const toDelete = new Set<string>();
 	const toRecheck = new Set<string>();
+	const toResume = new Set<string>();
 
 	// Usually source got deleted or partial injection never completes
 	function shouldCleanUpTorrent(torrentFilePath: string) {
@@ -888,6 +889,9 @@ export async function injectSavedTorrents() {
 					label: Label.INJECT,
 					message: `${progress} Unable to inject ${filePathLog} - ${chalk.yellow(injectionResult)}${isComplete ? "" : " (incomplete)"}`,
 				});
+				if (!isComplete) {
+					toResume.add(meta.infoHash);
+				}
 			}
 			totalAlreadyExists++;
 			totalCandidateIncomplete += isComplete ? 0 : 1;
@@ -914,6 +918,11 @@ export async function injectSavedTorrents() {
 
 	for (const infoHash of toRecheck) {
 		await getClient().recheckTorrent(infoHash);
+		getClient().resumeInjection(infoHash, false);
+		toResume.delete(infoHash);
+	}
+	for (const infoHash of toResume) {
+		getClient().resumeInjection(infoHash, true);
 	}
 
 	const incompleteMsg = `${chalk.bold.yellow(totalAlreadyExists)} existed in client${
@@ -977,5 +986,12 @@ export async function injectSavedTorrents() {
 			});
 			logger.debug(e);
 		}
+	}
+
+	if (totalPartialMatches || toRecheck.size || toResume.size) {
+		logger.warn({
+			label: Label.INJECT,
+			message: `Waiting for matches to finish rechecking...`,
+		});
 	}
 }

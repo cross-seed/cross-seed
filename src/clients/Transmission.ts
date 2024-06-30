@@ -1,4 +1,5 @@
 import {
+	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
 	TORRENT_TAG,
@@ -9,8 +10,19 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { shouldRecheck, extractCredentialsFromUrl } from "../utils.js";
-import { TorrentClient } from "./TorrentClient.js";
+import {
+	shouldRecheck,
+	extractCredentialsFromUrl,
+	wait,
+	humanReadableSize,
+} from "../utils.js";
+import {
+	getResumeStopTime,
+	maxRemainingBytes,
+	resumeErrSleepTime,
+	resumeSleepTime,
+	TorrentClient,
+} from "./TorrentClient.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
 type Method =
@@ -18,7 +30,8 @@ type Method =
 	| "torrent-add"
 	| "torrent-get"
 	| "torrent-stop"
-	| "torrent-verify";
+	| "torrent-verify"
+	| "torrent-start";
 
 interface Response<T> {
 	result: "success" | string;
@@ -27,9 +40,12 @@ interface Response<T> {
 
 interface TorrentGetResponseArgs {
 	torrents: {
-		hashString: string;
 		downloadDir: string;
+		hashString: string;
+		leftUntilDone: number;
+		name: string;
 		percentDone: number;
+		status: number;
 	}[];
 }
 
@@ -222,6 +238,61 @@ export default class Transmission implements TorrentClient {
 		});
 	}
 
+	async resumeInjection(infoHash: string, checkOnce: boolean): Promise<void> {
+		let sleepTime = resumeSleepTime;
+		const stopTime = getResumeStopTime();
+		let stop = false;
+		while (Date.now() < stopTime) {
+			if (checkOnce) {
+				if (stop) return;
+				stop = true;
+			}
+			await wait(sleepTime);
+			const queryResponse = await this.request<TorrentGetResponseArgs>(
+				"torrent-get",
+				{
+					fields: ["leftUntilDone", "name", "status"],
+					ids: [infoHash],
+				},
+			);
+			if (queryResponse.torrents.length === 0) {
+				sleepTime = resumeErrSleepTime; // Dropping connections or restart
+				continue;
+			}
+			const [{ leftUntilDone, name, status }] = queryResponse.torrents;
+			const torrentLog = `${name} [${infoHash.slice(0, 8)}...]`;
+			if ([1, 2].includes(status)) {
+				continue;
+			}
+			if (status !== 0) {
+				logger.warn({
+					label: Label.TRANSMISSION,
+					message: `Will not resume ${torrentLog}: status is ${status}`,
+				});
+				return;
+			}
+			if (leftUntilDone > maxRemainingBytes) {
+				logger.warn({
+					label: Label.TRANSMISSION,
+					message: `Will not resume ${torrentLog}: ${humanReadableSize(leftUntilDone, true)} remaining > ${humanReadableSize(maxRemainingBytes, true)}`,
+				});
+				return;
+			}
+			logger.info({
+				label: Label.TRANSMISSION,
+				message: `Resuming partial match ${torrentLog}: ${humanReadableSize(leftUntilDone, true)} remaining`,
+			});
+			await this.request<void>("torrent-start", {
+				ids: [infoHash],
+			});
+			return;
+		}
+		logger.warn({
+			label: Label.TRANSMISSION,
+			message: `Will not resume torrent ${infoHash}: timeout`,
+		});
+	}
+
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
@@ -255,6 +326,9 @@ export default class Transmission implements TorrentClient {
 					labels: [TORRENT_TAG],
 				},
 			);
+			if (decision === Decision.MATCH_PARTIAL) {
+				this.resumeInjection(newTorrent.infoHash, false);
+			}
 		} catch (e) {
 			return InjectionResult.FAILURE;
 		}

@@ -4,6 +4,7 @@ import {
 	InjectionResult,
 	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
+	Decision,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
@@ -11,8 +12,19 @@ import ms from "ms";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
-import { TorrentClient } from "./TorrentClient.js";
+import {
+	shouldRecheck,
+	extractCredentialsFromUrl,
+	wait,
+	humanReadableSize,
+} from "../utils.js";
+import {
+	getResumeStopTime,
+	maxRemainingBytes,
+	resumeErrSleepTime,
+	resumeSleepTime,
+	TorrentClient,
+} from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
 
@@ -404,6 +416,60 @@ export default class QBittorrent implements TorrentClient {
 		return dirname(dataInfo.content_path) !== dataInfo.save_path;
 	}
 
+	async resumeInjection(infoHash: string, checkOnce: boolean): Promise<void> {
+		let sleepTime = resumeSleepTime;
+		const stopTime = getResumeStopTime();
+		let stop = false;
+		while (Date.now() < stopTime) {
+			if (checkOnce) {
+				if (stop) return;
+				stop = true;
+			}
+			await wait(sleepTime);
+			const torrentInfo = await this.getTorrentInfo(infoHash);
+			if (!torrentInfo) {
+				sleepTime = resumeErrSleepTime; // Dropping connections or restart
+				continue;
+			}
+			const torrentLog = `${torrentInfo.name} [${infoHash.slice(0, 8)}...]`;
+			if (["checkingDL", "checkingUP"].includes(torrentInfo.state)) {
+				continue;
+			}
+			if (
+				!["pausedDL", "stoppedDL", "pausedUP", "stoppedUP"].includes(
+					torrentInfo.state,
+				)
+			) {
+				logger.warn({
+					label: Label.QBITTORRENT,
+					message: `Will not resume ${torrentLog}: state is ${torrentInfo.state}`,
+				});
+				return;
+			}
+			if (torrentInfo.amount_left > maxRemainingBytes) {
+				logger.warn({
+					label: Label.QBITTORRENT,
+					message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, true)} remaining > ${humanReadableSize(maxRemainingBytes, true)}`,
+				});
+				return;
+			}
+			logger.info({
+				label: Label.QBITTORRENT,
+				message: `Resuming partial match ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, true)} remaining`,
+			});
+			await this.request(
+				"/torrents/resume",
+				`hashes=${infoHash}`,
+				X_WWW_FORM_URLENCODED,
+			);
+			return;
+		}
+		logger.warn({
+			label: Label.QBITTORRENT,
+			message: `Will not resume torrent ${infoHash}: timeout`,
+		});
+	}
+
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
@@ -483,6 +549,9 @@ export default class QBittorrent implements TorrentClient {
 			}
 			if (toRecheck) {
 				await this.recheckTorrent(newInfo.hash);
+				if (decision === Decision.MATCH_PARTIAL) {
+					this.resumeInjection(newInfo.hash, false);
+				}
 			}
 
 			return InjectionResult.SUCCESS;

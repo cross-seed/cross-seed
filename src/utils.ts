@@ -50,9 +50,12 @@ export function nMsAgo(n: number): number {
 export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
-export function humanReadableSize(bytes: number) {
-	const k = 1000;
-	const sizes = ["B", "kB", "MB", "GB", "TB"];
+export function humanReadableSize(bytes: number, binary = false) {
+	if (bytes === 0) return "0 B";
+	const k = binary ? 1024 : 1000;
+	const sizes = binary
+		? ["B", "KiB", "MiB", "GiB", "TiB"]
+		: ["B", "kB", "MB", "GB", "TB"];
 	// engineering notation: (coefficient) * 1000 ^ (exponent)
 	const exponent = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
 	const coefficient = bytes / Math.pow(k, exponent);

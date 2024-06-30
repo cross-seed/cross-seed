@@ -4,6 +4,7 @@ import { dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
 import {
+	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
 	TORRENT_TAG,
@@ -318,6 +319,12 @@ export default class RTorrent implements TorrentClient {
 		await this.methodCallP<void>("d.check_hash", [infoHash]);
 	}
 
+	async resumeInjection(infoHash: string, checkOnce: boolean): Promise<void> {
+		if (checkOnce) {
+			infoHash;
+		} // Remove for implementation
+	}
+
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,
@@ -361,6 +368,9 @@ export default class RTorrent implements TorrentClient {
 					`d.custom1.set="${TORRENT_TAG}"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
 				]);
+				if (decision === Decision.MATCH_PARTIAL) {
+					this.resumeInjection(meta.infoHash, false);
+				}
 				break;
 			} catch (e) {
 				await wait(1000 * Math.pow(2, i));

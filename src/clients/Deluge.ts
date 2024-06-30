@@ -4,14 +4,26 @@ import {
 	InjectionResult,
 	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
+	Decision,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { TorrentClient } from "./TorrentClient.js";
-import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
+import {
+	getResumeStopTime,
+	maxRemainingBytes,
+	resumeErrSleepTime,
+	resumeSleepTime,
+	TorrentClient,
+} from "./TorrentClient.js";
+import {
+	shouldRecheck,
+	extractCredentialsFromUrl,
+	wait,
+	humanReadableSize,
+} from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 
 interface TorrentInfo {
@@ -217,6 +229,61 @@ export default class Deluge implements TorrentClient {
 			return false;
 		}
 	}
+
+	/**
+	 * checks the status of an infohash in the client and resumes if/when criteria is met
+	 * @param infoHash string containing the infohash to resume
+	 */
+	async resumeInjection(infoHash: string, checkOnce: boolean): Promise<void> {
+		let sleepTime = resumeSleepTime;
+		const stopTime = getResumeStopTime();
+		let stop = false;
+		while (Date.now() < stopTime) {
+			if (checkOnce) {
+				if (stop) return;
+				stop = true;
+			}
+			await wait(sleepTime);
+			let torrentInfo: TorrentInfo;
+			let torrentLog: string;
+			try {
+				torrentInfo = await this.getTorrentInfo(infoHash);
+
+				if (torrentInfo.state === "Checking") {
+					continue;
+				}
+				torrentLog = `${torrentInfo.name} [${infoHash.slice(0, 8)}...]`;
+				if (torrentInfo.state !== "Paused") {
+					logger.warn({
+						label: Label.DELUGE,
+						message: `Will not resume ${torrentLog}: state is ${torrentInfo.state}`,
+					});
+					return;
+				}
+				if (torrentInfo.total_remaining! > maxRemainingBytes) {
+					logger.warn({
+						label: Label.DELUGE,
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, true)} remaining > ${humanReadableSize(maxRemainingBytes, true)}`,
+					});
+					return;
+				}
+			} catch (e) {
+				sleepTime = resumeErrSleepTime; // Dropping connections or restart
+				continue;
+			}
+			logger.info({
+				label: Label.DELUGE,
+				message: `Resuming partial match ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, true)} remaining`,
+			});
+			await this.call<string>("core.resume_torrent", [[infoHash]]);
+			return;
+		}
+		logger.warn({
+			label: Label.DELUGE,
+			message: `Will not resume torrent ${infoHash}: timeout`,
+		});
+	}
+
 	/**
 	 * generates the label for injection based on searchee and torrentInfo
 	 * @param searchee Searchee that contains the originating torrent
@@ -361,6 +428,9 @@ export default class Deluge implements TorrentClient {
 					// leaves torrent ready to download - ~99%
 					await wait(1000);
 					await this.recheckTorrent(newTorrent.infoHash);
+					if (decision === Decision.MATCH_PARTIAL) {
+						this.resumeInjection(newTorrent.infoHash, false);
+					}
 				}
 			}
 		} catch (error) {
@@ -535,9 +605,12 @@ export default class Deluge implements TorrentClient {
 					: undefined;
 
 			return {
+				name: torrent.name,
 				complete: completedTorrent,
+				state: torrent.state,
 				save_path: torrent.save_path,
 				label: torrentLabel,
+				total_remaining: torrent.total_remaining,
 			};
 		} catch (e) {
 			logger.error({
