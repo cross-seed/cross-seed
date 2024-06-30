@@ -407,7 +407,8 @@ export default class Deluge implements TorrentClient {
 
 	/**
 	 * returns directory of an infohash in deluge as a string
-	 * @param searchee Searchee or Metafile for torrent to lookup in client
+	 * @param meta SearcheeWithInfoHash or Metafile for torrent to lookup in client
+	 * @param onlyCompleted boolean to only return a completed torrent
 	 * @return Result containing either a string with path or reason it was not provided
 	 */
 	async getDownloadDir(
@@ -439,6 +440,37 @@ export default class Deluge implements TorrentClient {
 		}
 		return resultOf(torrent.save_path);
 	}
+
+	/**
+	 * returns map of hashes and download directories for all torrents
+	 * @param onlyCompleted boolean to only return completed torrents
+	 * @return Promise of a Map with hashes and download directories
+	 */
+	async getAllDownloadDirs(
+		onlyCompleted: boolean,
+	): Promise<Map<string, string>> {
+		const dirs = new Map<string, string>();
+		let response: Result<TorrentStatus, ErrorType>;
+		const params = [["save_path", "progress"], {}];
+		try {
+			response = await this.call<TorrentStatus>("web.update_ui", params);
+		} catch (e) {
+			return dirs;
+		}
+		if (!response.isOk()) {
+			return dirs;
+		}
+		const torrentResponse = response.unwrap().torrents;
+		if (!torrentResponse) {
+			return dirs;
+		}
+		for (const [hash, torrent] of Object.entries(torrentResponse)) {
+			if (onlyCompleted && torrent.progress !== 100) continue;
+			dirs.set(hash, torrent.save_path);
+		}
+		return dirs;
+	}
+
 	/**
 	 * checks if a torrent is complete in deluge
 	 * @param infoHash the infoHash of the torrent to check

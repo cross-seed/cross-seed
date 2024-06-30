@@ -128,12 +128,21 @@ export function compareFileTrees(
 	candidate: Metafile,
 	searchee: Searchee,
 ): boolean {
-	const cmp = (elOfA: File, elOfB: File) => {
-		const lengthsAreEqual = elOfB.length === elOfA.length;
-		const pathsAreEqual = elOfB.path === elOfA.path;
-
-		return lengthsAreEqual && pathsAreEqual;
-	};
+	let cmp: (elOfA: File, elOfB: File) => boolean;
+	if (!searchee.infoHash && !searchee.path) {
+		// Absolute path so need name
+		cmp = (elOfA: File, elOfB: File) => {
+			const lengthsAreEqual = elOfB.length === elOfA.length;
+			const namesAreEqual = elOfB.name === elOfA.name;
+			return lengthsAreEqual && namesAreEqual;
+		};
+	} else {
+		cmp = (elOfA: File, elOfB: File) => {
+			const lengthsAreEqual = elOfB.length === elOfA.length;
+			const pathsAreEqual = elOfB.path === elOfA.path;
+			return lengthsAreEqual && pathsAreEqual;
+		};
+	}
 
 	return candidate.files.every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB)),
@@ -176,7 +185,7 @@ export function comparePartialSizeOnly(
 			matchedSizes += candidateFile.length;
 		}
 	}
-	return matchedSizes / candidate.length >= getMinSizeRatio();
+	return matchedSizes / candidate.length >= getMinSizeRatio(searchee);
 }
 
 export function compareFileTreesPartial(
@@ -202,11 +211,11 @@ export function compareFileTreesPartial(
 	}
 	const totalPieces = Math.ceil(candidate.length / candidate.pieceLength);
 	const availablePieces = Math.floor(matchedSizes / candidate.pieceLength);
-	return availablePieces / totalPieces >= getMinSizeRatio();
+	return availablePieces / totalPieces >= getMinSizeRatio(searchee);
 }
 
 function fuzzySizeDoesMatch(resultSize: number, searchee: Searchee) {
-	const fuzzySizeFactor = getFuzzySizeFactor();
+	const fuzzySizeFactor = getFuzzySizeFactor(searchee);
 
 	const { length } = searchee;
 	const lowerBound = length - fuzzySizeFactor * length;
@@ -440,7 +449,7 @@ async function assessAndSaveResults(
 				decision: assessment.decision,
 				first_seen: firstSeen,
 				last_seen: Date.now(),
-				fuzzy_size_factor: getFuzzySizeFactor(),
+				fuzzy_size_factor: getFuzzySizeFactor(searchee),
 			})
 			.onConflict(["searchee_id", "guid"])
 			.merge();
@@ -516,7 +525,7 @@ async function assessCandidateCaching(
 		// Re-assess decisions using Metafile if cached
 		if (
 			cacheEntry.decision !== Decision.FUZZY_SIZE_MISMATCH ||
-			cacheEntry.fuzzySizeFactor < getFuzzySizeFactor()
+			cacheEntry.fuzzySizeFactor < getFuzzySizeFactor(searchee)
 		) {
 			assessment = await assessAndSaveResults(
 				metaOrCandidate,
