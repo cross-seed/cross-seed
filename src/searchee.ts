@@ -7,7 +7,7 @@ import {
 	RELEASE_GROUP_REGEX,
 	SEASON_REGEX,
 	RES_STRICT_REGEX,
-	sourceRegexParse,
+	parseSource,
 	SONARR_SUBFOLDERS_REGEX,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
@@ -176,7 +176,7 @@ export async function createSearcheeFromPath(
 export function getKeyMetaInfo(stem: string, isAnime: boolean): string {
 	const resM = stem.match(RES_STRICT_REGEX)?.groups?.res;
 	const res = resM ? `.${resM}` : "";
-	const sourceM = sourceRegexParse(stem);
+	const sourceM = parseSource(stem);
 	const source = sourceM ? `.${sourceM}` : "";
 	const groupM = stem.match(RELEASE_GROUP_REGEX)?.groups?.group;
 	if (groupM) {

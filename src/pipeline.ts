@@ -24,7 +24,7 @@ import {
 import { Label, logger } from "./logger.js";
 import {
 	filterByContent,
-	filterDupes,
+	filterDupesByName,
 	filterDupesFromSimilar,
 	filterTimestamps,
 } from "./preFilter.js";
@@ -42,7 +42,7 @@ import {
 import {
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
-	getTorrentByName,
+	getSimilarTorrentsByName,
 	indexNewTorrents,
 	loadTorrentDirLight,
 	TorrentLocator,
@@ -249,7 +249,7 @@ export async function checkNewCandidateMatch(
 	searcheeLabel: SearcheeLabel,
 ): Promise<InjectionResult | SaveResult | null> {
 	const candidateLog = `${candidate.name} from ${candidate.tracker}`;
-	const { keys, metas } = await getTorrentByName(candidate.name);
+	const { keys, metas } = await getSimilarTorrentsByName(candidate.name);
 	const method = keys.length ? `[${keys}]` : "Fuse fallback";
 	if (!metas.length) {
 		logger.verbose({
@@ -259,8 +259,11 @@ export async function checkNewCandidateMatch(
 		return null;
 	}
 	const searchees: SearcheeWithLabel[] = filterDupesFromSimilar(
-		metas.map(createSearcheeFromMetafile).filter(filterByContent),
-	).map((searchee) => ({ ...searchee, label: searcheeLabel }));
+		metas
+			.map(createSearcheeFromMetafile)
+			.map((searchee) => ({ ...searchee, label: searcheeLabel }))
+			.filter(filterByContent),
+	);
 	if (!searchees.length) {
 		logger.verbose({
 			label: searcheeLabel,
@@ -346,7 +349,7 @@ async function findSearchableTorrents(searcheeLabel: SearcheeLabel): Promise<{
 		.map((t) => t.infoHash)
 		.filter(isTruthy);
 	let filteredTorrents: SearcheeWithLabel[] = await filterAsync(
-		filterDupes(allSearchees).filter(filterByContent),
+		filterDupesByName(allSearchees).filter(filterByContent),
 		filterTimestamps,
 	);
 

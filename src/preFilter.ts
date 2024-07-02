@@ -106,11 +106,12 @@ export function findBlockedStringInReleaseMaybe(
 }
 
 /**
- * Filters duplicates from searchees that should be for different candidates.
+ * Filters duplicates from searchees that should be for different candidates,
+ * e.g. all searchees created by cross-seed.
  * @param searchees - An array of searchees to filter duplicates from.
- * @returns An array of searchees with duplicates removed.
+ * @returns An array of searchees with duplicates removed, preferring infoHash.
  */
-export function filterDupes(searchees: Searchee[]): Searchee[] {
+export function filterDupesByName<T extends Searchee>(searchees: T[]): T[] {
 	const duplicateMap = searchees.reduce((acc, cur) => {
 		const entry = acc.get(cur.name);
 		if (entry === undefined) {
@@ -133,12 +134,15 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 }
 
 /**
- * Filters duplicates from searchees that are for the same candidates.
- * @param searchees - An array of searchees to filter duplicates from.
- * @returns An array of searchees with duplicates removed.
+ * Filters duplicates from searchees that are for the same candidates,
+ * e.g. searchees for the same media but different resolutions.
+ * @param searchees - An array of searchees for a specific media.
+ * @returns An array of searchees that are unique from a matching perspective.
  */
-export function filterDupesFromSimilar(searchees: Searchee[]): Searchee[] {
-	const filteredSearchees: Searchee[] = [];
+export function filterDupesFromSimilar<T extends Searchee>(
+	searchees: T[],
+): T[] {
+	const filteredSearchees: T[] = [];
 	for (const searchee of searchees) {
 		const isDupe = filteredSearchees.some((s) => {
 			if (searchee.length !== s.length) return false;

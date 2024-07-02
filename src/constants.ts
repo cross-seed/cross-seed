@@ -40,11 +40,11 @@ const SOURCE_REGEXES = {
 	NF: /\b(nf|netflix(u?hd)?)\b/i,
 	HULU: /\b(hulu)\b/i,
 	ATVP: /\b(atvp|aptv)\b/i,
-	HBO: /\b(hbo)(?![ ._-]max)\b|\b(hmax|hbom|hbo[ ._-]max)\b|\b((?<!hbo[ ._-])max)\b/i,
-	PCOK: /\b(pcok|peacock)\b/i,
+	HBO: /\b(hbo)(?![ ._-]max)\b|\b(hmax|hbom|hbo[ ._-]max)\b/i,
+	PCOK: /\b(pcok)\b/i,
 	PMTP: /\b(pmtp|Paramount Plus)\b/i,
 };
-export function sourceRegexParse(title: string): string | null {
+export function parseSource(title: string): string | null {
 	for (const [source, regex] of Object.entries(SOURCE_REGEXES)) {
 		if (regex.test(title)) return source;
 	}
@@ -53,8 +53,8 @@ export function sourceRegexParse(title: string): string | null {
 export function sourceRegexRemove(title: string): string {
 	const originalLength = title.length;
 	for (const regex of Object.values(SOURCE_REGEXES)) {
-		title = title.replace(regex, "");
-		if (title.length !== originalLength) return title;
+		const newTitle = title.replace(regex, "");
+		if (newTitle.length !== originalLength) return newTitle;
 	}
 	return title;
 }

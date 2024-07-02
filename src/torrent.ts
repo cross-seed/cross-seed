@@ -259,7 +259,7 @@ function getKeysFromName(name: string): {
 	return { keyTitles: [], useFallback: true };
 }
 
-export async function getTorrentByName(
+export async function getSimilarTorrentsByName(
 	name: string,
 ): Promise<{ keys: string[]; metas: Metafile[] }> {
 	const { keyTitles, element, useFallback } = getKeysFromName(name);
@@ -268,9 +268,6 @@ export async function getTorrentByName(
 		return { keys: [], metas };
 	}
 	const maxDistance = Math.floor(keyTitles[0].length / 4);
-	const keys = element
-		? keyTitles.map((keyTitle) => `${keyTitle}.${element}`)
-		: keyTitles;
 
 	const allEntries: { name: string; file_path: string }[] = await db(
 		"torrent",
@@ -284,8 +281,10 @@ export async function getTorrentByName(
 			);
 		});
 	});
-	if (filteredEntries.length === 0) return { keys, metas };
 
+	const keys = element
+		? keyTitles.map((keyTitle) => `${keyTitle}.${element}`)
+		: keyTitles;
 	metas.push(
 		...(await Promise.all(
 			filteredEntries.map(async (dbName) => {
