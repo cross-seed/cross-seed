@@ -20,6 +20,7 @@ import {
 	RELEASE_GROUP_REGEX,
 	REPACK_PROPER_REGEX,
 	RESOLUTION_REGEX,
+	sourceRegexRemove,
 } from "./constants.js";
 
 interface ExternalIds {
@@ -238,10 +239,12 @@ export async function scanAllArrsForMedia(
 	const title =
 		mediaType === MediaType.OTHER
 			? cleanseSeparators(
-					stripExtension(searchee.name)
-						.replace(RELEASE_GROUP_REGEX, "")
-						.replace(RESOLUTION_REGEX, "")
-						.replace(REPACK_PROPER_REGEX, ""),
+					sourceRegexRemove(
+						stripExtension(searchee.name)
+							.replace(RELEASE_GROUP_REGEX, "")
+							.replace(RESOLUTION_REGEX, "")
+							.replace(REPACK_PROPER_REGEX, ""),
+					),
 				)
 			: searchee.name;
 	let error = new Error(

@@ -105,6 +105,11 @@ export function findBlockedStringInReleaseMaybe(
 	});
 }
 
+/**
+ * Filters duplicates from searchees that should be for different candidates.
+ * @param searchees - An array of searchees to filter duplicates from.
+ * @returns An array of searchees with duplicates removed.
+ */
 export function filterDupes(searchees: Searchee[]): Searchee[] {
 	const duplicateMap = searchees.reduce((acc, cur) => {
 		const entry = acc.get(cur.name);
@@ -125,6 +130,32 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 		});
 	}
 	return filtered;
+}
+
+/**
+ * Filters duplicates from searchees that are for the same candidates.
+ * @param searchees - An array of searchees to filter duplicates from.
+ * @returns An array of searchees with duplicates removed.
+ */
+export function filterDupesFromSimilar(searchees: Searchee[]): Searchee[] {
+	const filteredSearchees: Searchee[] = [];
+	for (const searchee of searchees) {
+		const isDupe = filteredSearchees.some((s) => {
+			if (searchee.length !== s.length) return false;
+			if (searchee.files.length !== s.files.length) return false;
+			const potentialFiles = s.files.map((f) => f.length);
+			return searchee.files.every((file) => {
+				const index = potentialFiles.indexOf(file.length);
+				if (index === -1) return false;
+				potentialFiles.splice(index, 1);
+				return true;
+			});
+		});
+		if (!isDupe) {
+			filteredSearchees.push(searchee);
+		}
+	}
+	return filteredSearchees;
 }
 
 type TimestampDataSql = {

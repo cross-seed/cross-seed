@@ -3,15 +3,23 @@ import Fuse from "fuse.js";
 import fs from "fs";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
-import { USER_AGENT } from "./constants.js";
+import { NON_UNICODE_ALPHANUM_REGEX, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
+import { distance } from "fastest-levenshtein";
 import { logger, logOnce } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { createSearcheeFromTorrentFile, Searchee } from "./searchee.js";
-import { reformatTitleForSearching, stripExtension } from "./utils.js";
 import { Candidate } from "./pipeline.js";
+import {
+	getEpisodeAndKey,
+	createSearcheeFromTorrentFile,
+	Searchee,
+	getSeasonKey,
+	getMovieKey,
+	getReleaseAndKeys,
+} from "./searchee.js";
+import { reformatTitleForSearching, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -219,14 +227,81 @@ export async function loadTorrentDirLight(
 	return searchees;
 }
 
-export async function getTorrentByFuzzyName(
+function getKeysFromName(name: string): {
+	keyTitles: string[];
+	element?: string | number;
+	useFallback: boolean;
+} {
+	const stem = stripExtension(name);
+	const episodeAndKey = getEpisodeAndKey(stem);
+	if (episodeAndKey) {
+		const keyTitles = [episodeAndKey.keyTitle];
+		const element = `${episodeAndKey.season}.${episodeAndKey.episode}`;
+		return { keyTitles, element, useFallback: false };
+	}
+	const seasonKey = getSeasonKey(stem);
+	if (seasonKey) {
+		const keyTitles = [seasonKey.keyTitle];
+		const element = seasonKey.season;
+		return { keyTitles, element, useFallback: false };
+	}
+	const movieKey = getMovieKey(stem);
+	if (movieKey) {
+		const keyTitles = [movieKey.keyTitle];
+		return { keyTitles, useFallback: false };
+	}
+	const releaseAndKeys = getReleaseAndKeys(stem);
+	if (releaseAndKeys) {
+		const keyTitles = releaseAndKeys.keyTitles;
+		const element = releaseAndKeys.release;
+		return { keyTitles, element, useFallback: true };
+	}
+	return { keyTitles: [], useFallback: true };
+}
+
+export async function getTorrentByName(
 	name: string,
-): Promise<null | Metafile> {
+): Promise<{ keys: string[]; metas: Metafile[] }> {
+	const { keyTitles, element, useFallback } = getKeysFromName(name);
+	const metas = useFallback ? await getTorrentByFuzzyName(name) : [];
+	if (!keyTitles.length) {
+		return { keys: [], metas };
+	}
+	const maxDistance = Math.floor(keyTitles[0].length / 4);
+	const keys = element
+		? keyTitles.map((keyTitle) => `${keyTitle}.${element}`)
+		: keyTitles;
+
+	const allEntries: { name: string; file_path: string }[] = await db(
+		"torrent",
+	).select("name", "file_path");
+	const filteredEntries = allEntries.filter((dbName) => {
+		const entry = getKeysFromName(dbName.name);
+		if (entry.element !== element) return false;
+		return entry.keyTitles.some((dbKeyTitle) => {
+			return keyTitles.some(
+				(keyTitle) => distance(keyTitle, dbKeyTitle) <= maxDistance,
+			);
+		});
+	});
+	if (filteredEntries.length === 0) return { keys, metas };
+
+	metas.push(
+		...(await Promise.all(
+			filteredEntries.map(async (dbName) => {
+				return parseTorrentFromFilename(dbName.file_path);
+			}),
+		)),
+	);
+	return { keys, metas };
+}
+
+export async function getTorrentByFuzzyName(name: string): Promise<Metafile[]> {
 	const allNames: { name: string; file_path: string }[] = await db(
 		"torrent",
 	).select("name", "file_path");
 	const fullMatch = reformatTitleForSearching(name)
-		.replace(/[^a-z0-9]/gi, "")
+		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
 		.toLowerCase();
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
@@ -234,7 +309,7 @@ export async function getTorrentByFuzzyName(
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
 			const dbMatch = reformatTitleForSearching(dbName.name)
-				.replace(/[^a-z0-9]/gi, "")
+				.replace(NON_UNICODE_ALPHANUM_REGEX, "")
 				.toLowerCase();
 			if (!dbMatch) return false;
 			return fullMatch === dbMatch;
@@ -250,12 +325,8 @@ export async function getTorrentByFuzzyName(
 		distance: 6,
 		threshold: 0.25,
 	}).search(name);
-
-	// Valid matches exist
-	if (potentialMatches.length === 0) return null;
-
-	const firstMatch = potentialMatches[0];
-	return parseTorrentFromFilename(firstMatch.item.file_path);
+	if (potentialMatches.length === 0) return [];
+	return [await parseTorrentFromFilename(potentialMatches[0].item.file_path)];
 }
 
 export async function getTorrentByCriteria(

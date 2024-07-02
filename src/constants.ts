@@ -22,18 +22,42 @@ export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w .]+?)(?:\[.+\])?(?:\))?(?:\s\[.+\])?$/i;
 export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[pix](?:\d{3,4}[pi]?)?)\b/i;
 export const RES_STRICT_REGEX = /(?<res>(?:2160|1080|720)[pi])/;
-
+export const YEAR_REGEX = /(?<year>(?:19|20)\d{2})(?![pix])/i;
 export const REPACK_PROPER_REGEX =
 	/(?:\b(?<type>(?:REPACK|PROPER|\d\v\d)\d?))\b/i;
-
 export const ARR_PROPER_REGEX = /(?:\b(?<arrtype>(?:Proper|v\d)))\b/;
-
 export const SCENE_TITLE_REGEX = /^(?:[a-z0-9]{0,5}-)?(?<title>.*)/;
-
 export const ARR_DIR_REGEX =
 	/^(?<title>(?!.*(?:(\d{3,4}[ipx])|([xh.]+26[4-6])|(mpeg)|(xvid)|(?:(he)|a)vc))[\p{L}\s:\w'’!();.,&–+-]+(?:\(\d{4}\))?)(?<id>\s[{[](?:tm|tv|im)db(?:id)?-\w+?[}\]])?$/iu;
 export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
+export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
+
+// Needs to be hanlded through helper functions since there is varitions
+const SOURCE_REGEXES = {
+	AMZN: /\b(amzn|amazon(hd)?)\b[ ._-]web[ ._-]?(dl|rip)?\b/i,
+	DSNP: /\b(dsnp|dsny|disney)\b/i,
+	NF: /\b(nf|netflix(u?hd)?)\b/i,
+	HULU: /\b(hulu)\b/i,
+	ATVP: /\b(atvp|aptv)\b/i,
+	HBO: /\b(hbo)(?![ ._-]max)\b|\b(hmax|hbom|hbo[ ._-]max)\b|\b((?<!hbo[ ._-])max)\b/i,
+	PCOK: /\b(pcok|peacock)\b/i,
+	PMTP: /\b(pmtp|Paramount Plus)\b/i,
+};
+export function sourceRegexParse(title: string): string | null {
+	for (const [source, regex] of Object.entries(SOURCE_REGEXES)) {
+		if (regex.test(title)) return source;
+	}
+	return null;
+}
+export function sourceRegexRemove(title: string): string {
+	const originalLength = title.length;
+	for (const regex of Object.values(SOURCE_REGEXES)) {
+		title = title.replace(regex, "");
+		if (title.length !== originalLength) return title;
+	}
+	return title;
+}
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
 export const AUDIO_EXTENSIONS = [
