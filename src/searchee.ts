@@ -1,10 +1,17 @@
 import { readdirSync, statSync } from "fs";
-import { basename, join, relative } from "path";
+import { basename, dirname, extname, join, relative } from "path";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { WithRequired } from "./utils.js";
+import {
+	ANIME_REGEX,
+	ARR_DIR_REGEX,
+	EP_REGEX,
+	SONARR_SUBFOLDERS_REGEX,
+	VIDEO_EXTENSIONS,
+} from "./constants.js";
 
 export interface File {
 	length: number;
@@ -30,6 +37,7 @@ export interface Searchee {
 }
 
 export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
+export type SearcheeWithLabel = WithRequired<Searchee, "label">;
 
 export function hasInfoHash(
 	searchee: Searchee,
@@ -100,20 +108,55 @@ export async function createSearcheeFromTorrentFile(
 }
 
 export async function createSearcheeFromPath(
-	filepath: string,
+	root: string,
 ): Promise<Result<Searchee, Error>> {
-	const files = getFilesFromDataRoot(filepath);
+	const files = getFilesFromDataRoot(root);
 	if (files.length === 0) {
-		return resultOfErr(new Error("No files found"));
+		const msg = `No files found in ${root}`;
+		logger.verbose({
+			label: Label.PREFILTER,
+			message: msg,
+		});
+		return resultOfErr(new Error(msg));
 	}
 	const totalLength = files.reduce<number>(
 		(runningTotal, file) => runningTotal + file.length,
 		0,
 	);
+
+	const baseName = basename(root);
+	const seasonMatch =
+		baseName.length < 12 ? baseName.match(SONARR_SUBFOLDERS_REGEX) : null;
+	if (!seasonMatch) {
+		return resultOf({
+			files: files,
+			path: root,
+			name: baseName,
+			length: totalLength,
+		});
+	}
+	// Name is just SXX or Season XX, need to find title above or below
+	const videoFile = files.find((file) =>
+		VIDEO_EXTENSIONS.includes(extname(file.name)),
+	);
+
+	const title =
+		videoFile?.name.match(EP_REGEX)?.groups?.title ??
+		basename(dirname(root)).match(ARR_DIR_REGEX)?.groups?.title ??
+		videoFile?.name.match(ANIME_REGEX)?.groups?.title;
+	if (!title) {
+		const msg = `Could not find title for ${root} in parent directory or child files`;
+		logger.verbose({
+			label: Label.PREFILTER,
+			message: msg,
+		});
+		return resultOfErr(new Error(msg));
+	}
+
 	return resultOf({
 		files: files,
-		path: filepath,
-		name: basename(filepath),
+		path: root,
+		name: `${title} S${seasonMatch.groups!.seasonNum}`,
 		length: totalLength,
 	});
 }

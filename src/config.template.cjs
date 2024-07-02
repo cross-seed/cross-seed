@@ -47,12 +47,12 @@ module.exports = {
 
 	/**
 	 * URL(s) to your Radarr instance(s), included in the same way as torznab
-	 * URLs but for your Sonarr: note that api is not at the end. see below.
+	 * URLs but for your Radarr: note that api is not at the end. see below.
 	 *
 	 * You should order these in most likely to match -> least likely order.
 	 * They are searched sequentially as they are listed.
 	 *
-	 * This apikey parameter comes from Sonarr
+	 * This apikey parameter comes from Radarr
 	 *
 	 * Example: radarr: ["http://radarr:7878/?apikey=12345"],
 	 *
@@ -133,8 +133,9 @@ module.exports = {
 	 * to your downloaded torrent data to find matches, rather than relying
 	 * entirely on the .torrent files themselves for matching.
 	 *
-	 * If directories are entered, they must all be on the one line and they
+	 * If directories are entered, they must all be in a single option and they
 	 * need to be surrounded by brackets.
+	 *
 	 * Windows users will need to use double backslash in all paths in this
 	 * config.
 	 *
@@ -148,12 +149,11 @@ module.exports = {
 
 	/**
 	 * Defines what qBittorrent or Deluge category to set on linked torrents
-	 * Default is "cross-seed-link".
 	 *
 	 * qBittorrent: If you have linking enabled, all torrents will be injected
 	 * to this category.
 	 *
-	 * Default is "cross-seed-data".
+	 * Default is "cross-seed-link".
 	 */
 	linkCategory: "cross-seed-link",
 
@@ -238,49 +238,40 @@ module.exports = {
 	outputDir: ".",
 
 	/**
-	 * Whether to search for all episode torrents, including those from season
-	 * packs.
-	 * This option overrides includeSingleEpisodes when set to true.
-	 */
-	includeEpisodes: false,
-
-	/**
-	 * Whether to include single episode torrents in the search (not those from
+	 * Whether to include single episode torrents in a search (not those from
 	 * season packs).
-	 * Like `includeEpisodes` but slightly more restrictive.
+	 *
+	 * This setting does not affect matching episodes from rss and
+	 * announce.
 	 */
 	includeSingleEpisodes: false,
 
 	/**
-	 * Include torrents which contain non-video files.
-	 * This option does not override includeEpisodes or includeSingleEpisodes.
+	 * Include torrents which are comprised of non-video files.
 	 *
-	 * If this option is set to false, any folders or torrents containing ANY
-	 * non-video files will automatically be excluded from cross-seed searches.
+	 * If this option is set to false, any folders or torrents whose
+	 * totalNonVideoFilesSize / totalSize > fuzzySizeThreshold
+	 * will be excluded.
 	 *
-	 * For example, if you have .srt or .nfo files inside your folders/torrents
-	 * you would set this as true.
+	 * For example, if you have .srt or .nfo files inside a torrent, using
+	 * false will still allow the torrent to be considered for cross-seeding
+	 * while disallowing torrents that are music, games, books, etc.
 	 * For full disc based folders (not .ISO) you may wish to set this as true.
-	 * You may also want to set this as false to exclude things like music,
-	 * games, or books.
 	 *
-	 * To search for everything except episodes, use:
+	 * To search for all video media except individual episodes, use:
 	 *
-	 *		includeEpisodes: false
 	 *		includeSingleEpisodes: false
-	 *		includeNonVideos: true
+	 *		includeNonVideos: false
 	 *
-	 * To search for everything including episodes, use:
+	 * To search for all video media including individual episodes, use:
 	 *
-	 *		includeEpisodes: true
-	 *		includeNonVideos: true
-	 *
-	 * To search for everything except season pack episodes (data-based) use:
-	 *
-	 *		includeEpisodes: false
 	 *		includeSingleEpisodes: true
-	 *		includeNonVideos: true
+	 *		includeNonVideos: false
 	 *
+	 * To search for absolutely ALL types of content, including non-video, configure
+	 * your episode settings based on the above examples and use:
+	 *
+	 * 		includeNonVideos: true
 	 */
 	includeNonVideos: false,
 

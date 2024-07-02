@@ -8,7 +8,7 @@ import {
 import { ResultAssessment } from "./decide.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
+import { SearcheeWithLabel } from "./searchee.js";
 import { formatAsList } from "./utils.js";
 
 export let pushNotifier: PushNotifier;
@@ -66,7 +66,7 @@ export class PushNotifier {
 }
 
 export function sendResultsNotification(
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	results: [ResultAssessment, TrackerName, ActionResult][],
 ) {
 	const name = searchee.name;

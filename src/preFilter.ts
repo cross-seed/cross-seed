@@ -1,9 +1,10 @@
 import ms from "ms";
-import { extname } from "path";
+import { extname, basename, dirname } from "path";
 import { statSync } from "fs";
 import {
 	ARR_DIR_REGEX,
 	EP_REGEX,
+	SONARR_SUBFOLDERS_REGEX,
 	SEASON_REGEX,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
@@ -11,64 +12,82 @@ import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
+import { Searchee, SearcheeWithLabel } from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
-import { getMediaType, humanReadableDate, nMsAgo } from "./utils.js";
-import path from "path";
+import {
+	getLogString,
+	getMediaType,
+	humanReadableDate,
+	nMsAgo,
+} from "./utils.js";
+import chalk from "chalk";
 
-export function filterByContent(searchee: Searchee): boolean {
+function logReason(reason: string, searchee: Searchee): void {
+	logger.verbose({
+		label: Label.PREFILTER,
+		message: `${getLogString(searchee, chalk.reset)} was not selected for searching because ${reason}`,
+	});
+}
+
+export function filterByContent(searchee: SearcheeWithLabel): boolean {
 	const {
-		includeEpisodes,
+		fuzzySizeThreshold,
 		includeNonVideos,
 		includeSingleEpisodes,
 		blockList,
 	} = getRuntimeConfig();
 
-	function logReason(reason): void {
-		logger.verbose({
-			label: Label.PREFILTER,
-			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
-		});
-	}
 	const blockedNote = findBlockedStringInReleaseMaybe(searchee, blockList);
 	if (blockedNote) {
-		logReason(`it matched the blocklist - ("${blockedNote}")`);
+		logReason(`it matched the blocklist - ("${blockedNote}")`, searchee);
 		return false;
 	}
-
-	const isSeasonPackEpisode =
-		searchee.path &&
-		searchee.files.length === 1 &&
-		SEASON_REGEX.test(path.basename(path.dirname(searchee.path)));
 
 	if (
-		!includeEpisodes &&
+		searchee.path &&
+		searchee.files.length === 1 &&
+		(SEASON_REGEX.test(basename(dirname(searchee.path))) ||
+			SONARR_SUBFOLDERS_REGEX.test(basename(dirname(searchee.path))))
+	) {
+		logReason("it is a season pack episode", searchee);
+		return false;
+	}
+
+	if (
 		!includeSingleEpisodes &&
-		!isSeasonPackEpisode &&
+		![Label.ANNOUNCE, Label.RSS].includes(searchee.label) &&
 		EP_REGEX.test(searchee.name)
 	) {
-		logReason("it is a single episode");
+		logReason("it is a single episode", searchee);
 		return false;
 	}
 
-	if (!includeEpisodes && isSeasonPackEpisode) {
-		logReason("it is a season pack episode");
-		return false;
-	}
-	const allFilesAreVideos = searchee.files.every((file) =>
-		VIDEO_EXTENSIONS.includes(extname(file.name)),
-	);
+	const nonVideoSizeRatio =
+		searchee.files.reduce((acc, cur) => {
+			if (!VIDEO_EXTENSIONS.includes(extname(cur.name))) {
+				return acc + cur.length;
+			}
+			return acc;
+		}, 0) / searchee.length;
 
-	if (!includeNonVideos && !allFilesAreVideos) {
-		logReason("not all files are videos");
+	if (!includeNonVideos && nonVideoSizeRatio > fuzzySizeThreshold) {
+		logReason(
+			`nonVideoSizeRatio ${nonVideoSizeRatio} > ${fuzzySizeThreshold} fuzzySizeThreshold`,
+			searchee,
+		);
 		return false;
 	}
+
 	if (
 		searchee.path &&
 		statSync(searchee.path).isDirectory() &&
-		ARR_DIR_REGEX.test(path.basename(searchee.path))
+		ARR_DIR_REGEX.test(basename(searchee.path)) &&
+		!(
+			searchee.files.length > 1 &&
+			SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path))
+		)
 	) {
-		logReason("it is a arr movie/series directory");
+		logReason("it looks like an arr movie/series directory", searchee);
 		return false;
 	}
 	return true;
@@ -147,12 +166,6 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		.first()) as TimestampDataSql;
 
 	const { first_searched_any, last_searched_all } = timestampDataSql;
-	function logReason(reason) {
-		logger.verbose({
-			label: Label.PREFILTER,
-			message: `Torrent ${searchee.name} was not selected for searching because ${reason}`,
-		});
-	}
 
 	if (
 		typeof excludeOlder === "number" &&
@@ -163,6 +176,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			`its first search timestamp ${humanReadableDate(
 				first_searched_any,
 			)} is older than ${ms(excludeOlder, { long: true })} ago`,
+			searchee,
 		);
 		return false;
 	}
@@ -176,6 +190,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			`its last search timestamp ${humanReadableDate(
 				last_searched_all,
 			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`,
+			searchee,
 		);
 		return false;
 	}
