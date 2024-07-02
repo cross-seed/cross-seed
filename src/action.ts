@@ -1,5 +1,12 @@
 import chalk from "chalk";
-import { existsSync, linkSync, mkdirSync, rm, statSync, symlinkSync } from "fs";
+import {
+	existsSync,
+	linkSync,
+	mkdirSync,
+	rmSync,
+	statSync,
+	symlinkSync,
+} from "fs";
 import { dirname, join, resolve } from "path";
 import { getClient } from "./clients/TorrentClient.js";
 import {
@@ -19,6 +26,7 @@ import {
 	createSearcheeFromPath,
 	getSearcheeSource,
 	Searchee,
+	SearcheeWithInfoHash,
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getLogString, getMediaType } from "./utils.js";
@@ -174,7 +182,7 @@ function unlinkMetafile(meta: Metafile, destinationDir: string) {
 	if (!existsSync(fullPath)) return;
 	if (resolve(fullPath) === resolve(destinationDir)) return;
 	logger.verbose(`Unlinking ${fullPath}`);
-	rm(fullPath, { recursive: true }, () => {});
+	rmSync(fullPath, { recursive: true });
 }
 
 async function linkAllFilesInMetafile(
@@ -212,7 +220,10 @@ async function linkAllFilesInMetafile(
 		}
 		sourceRoot = searchee.path;
 	} else {
-		const downloadDirResult = await getClient().getDownloadDir(searchee);
+		const downloadDirResult = await getClient().getDownloadDir(
+			searchee as SearcheeWithInfoHash,
+			{ onlyCompleted: true },
+		);
 		if (downloadDirResult.isErr()) {
 			return downloadDirResult.mapErr((e) =>
 				e === "NOT_FOUND" || e === "UNKNOWN_ERROR"
@@ -318,8 +329,17 @@ export async function performAction(
 
 	logActionResult(result, newMeta, searchee, tracker, decision);
 	if (result === InjectionResult.ALREADY_EXISTS) {
+		// Unlink if new savePath is different from the one in client (public tracker)
 		if (unlinkOk && destinationDir) {
-			unlinkMetafile(newMeta, destinationDir);
+			const res = await getClient().getDownloadDir(newMeta, {
+				onlyCompleted: false,
+			});
+			if (
+				res.isOk() &&
+				resolve(res.unwrap()) !== resolve(destinationDir)
+			) {
+				unlinkMetafile(newMeta, destinationDir);
+			}
 		}
 	} else if (
 		result === InjectionResult.FAILURE ||
