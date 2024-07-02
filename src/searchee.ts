@@ -199,7 +199,7 @@ export function getMovieKey(stem: string): {
 } | null {
 	const match = stem.match(MOVIE_REGEX);
 	if (!match) return null;
-	const keyTitle = reformatTitleForSearching(match.groups!.title, false)
+	const keyTitle = reformatTitleForSearching(match.groups!.title)
 		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
 		.toLowerCase();
 	if (!keyTitle.length) return null;
@@ -215,7 +215,7 @@ export function getSeasonKey(stem: string): {
 } | null {
 	const match = stem.match(SEASON_REGEX);
 	if (!match) return null;
-	const keyTitle = reformatTitleForSearching(match.groups!.title, false)
+	const keyTitle = reformatTitleForSearching(match.groups!.title)
 		.replace(YEAR_REGEX, "")
 		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
 		.toLowerCase();
@@ -225,7 +225,7 @@ export function getSeasonKey(stem: string): {
 	return { ensembleTitle, keyTitle, season };
 }
 
-export function getEpisodeAndKey(stem: string): {
+export function getEpisodeKey(stem: string): {
 	ensembleTitle: string;
 	keyTitle: string;
 	season: string;
@@ -233,7 +233,7 @@ export function getEpisodeAndKey(stem: string): {
 } | null {
 	const match = stem.match(EP_REGEX);
 	if (!match) return null;
-	const keyTitle = reformatTitleForSearching(match!.groups!.title, false)
+	const keyTitle = reformatTitleForSearching(match!.groups!.title)
 		.replace(YEAR_REGEX, "")
 		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
 		.toLowerCase();
@@ -249,7 +249,7 @@ export function getEpisodeAndKey(stem: string): {
 	return { ensembleTitle, keyTitle, season, episode };
 }
 
-export function getReleaseAndKeys(stem: string): {
+export function getAnimeKeys(stem: string): {
 	ensembleTitles: string[];
 	keyTitles: string[];
 	release: number;
@@ -263,7 +263,7 @@ export function getReleaseAndKeys(stem: string): {
 	for (const title of [firstTitle, altTitle]) {
 		if (!title) continue;
 		if (isBadTitle(title)) continue;
-		const keyTitle = reformatTitleForSearching(title, false)
+		const keyTitle = reformatTitleForSearching(title)
 			.replace(YEAR_REGEX, "")
 			.replace(NON_UNICODE_ALPHANUM_REGEX, "")
 			.toLowerCase();

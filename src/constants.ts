@@ -33,7 +33,7 @@ export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
 export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
 
-// Needs to be hanlded through helper functions since there is varitions
+// Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {
 	AMZN: /\b(amzn|amazon(hd)?)\b[ ._-]web[ ._-]?(dl|rip)?\b/i,
 	DSNP: /\b(dsnp|dsny|disney)\b/i,

@@ -12,14 +12,14 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Candidate } from "./pipeline.js";
 import {
-	getEpisodeAndKey,
+	getEpisodeKey,
 	createSearcheeFromTorrentFile,
 	Searchee,
 	getSeasonKey,
 	getMovieKey,
-	getReleaseAndKeys,
+	getAnimeKeys,
 } from "./searchee.js";
-import { reformatTitleForSearching, stripExtension } from "./utils.js";
+import { reformatNameForSearching, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -233,10 +233,10 @@ function getKeysFromName(name: string): {
 	useFallback: boolean;
 } {
 	const stem = stripExtension(name);
-	const episodeAndKey = getEpisodeAndKey(stem);
-	if (episodeAndKey) {
-		const keyTitles = [episodeAndKey.keyTitle];
-		const element = `${episodeAndKey.season}.${episodeAndKey.episode}`;
+	const episodeKey = getEpisodeKey(stem);
+	if (episodeKey) {
+		const keyTitles = [episodeKey.keyTitle];
+		const element = `${episodeKey.season}.${episodeKey.episode}`;
 		return { keyTitles, element, useFallback: false };
 	}
 	const seasonKey = getSeasonKey(stem);
@@ -250,10 +250,10 @@ function getKeysFromName(name: string): {
 		const keyTitles = [movieKey.keyTitle];
 		return { keyTitles, useFallback: false };
 	}
-	const releaseAndKeys = getReleaseAndKeys(stem);
-	if (releaseAndKeys) {
-		const keyTitles = releaseAndKeys.keyTitles;
-		const element = releaseAndKeys.release;
+	const animeKeys = getAnimeKeys(stem);
+	if (animeKeys) {
+		const keyTitles = animeKeys.keyTitles;
+		const element = animeKeys.release;
 		return { keyTitles, element, useFallback: true };
 	}
 	return { keyTitles: [], useFallback: true };
@@ -299,7 +299,7 @@ export async function getTorrentByFuzzyName(name: string): Promise<Metafile[]> {
 	const allNames: { name: string; file_path: string }[] = await db(
 		"torrent",
 	).select("name", "file_path");
-	const fullMatch = reformatTitleForSearching(name)
+	const fullMatch = reformatNameForSearching(name)
 		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
 		.toLowerCase();
 
@@ -307,7 +307,7 @@ export async function getTorrentByFuzzyName(name: string): Promise<Metafile[]> {
 	let filteredNames: typeof allNames = [];
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
-			const dbMatch = reformatTitleForSearching(dbName.name)
+			const dbMatch = reformatNameForSearching(dbName.name)
 				.replace(NON_UNICODE_ALPHANUM_REGEX, "")
 				.toLowerCase();
 			if (!dbMatch) return false;

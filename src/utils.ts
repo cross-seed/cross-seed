@@ -141,17 +141,17 @@ export function getAnimeQueries(name: string): string[] {
 	return animeQueries;
 }
 
-export function reformatTitleForSearching(
-	name: string,
-	useRegex = true,
-): string {
-	const fullMatch = useRegex
-		? name.match(EP_REGEX)?.groups?.title ??
+export function reformatTitleForSearching(title: string): string {
+	return cleanseSeparators(title).match(SCENE_TITLE_REGEX)!.groups!.title;
+}
+
+export function reformatNameForSearching(name: string): string {
+	return reformatTitleForSearching(
+		name.match(EP_REGEX)?.groups?.title ??
 			name.match(SEASON_REGEX)?.groups?.title ??
 			name.match(MOVIE_REGEX)?.groups?.title ??
-			name
-		: name;
-	return cleanseSeparators(fullMatch).match(SCENE_TITLE_REGEX)!.groups!.title;
+			name,
+	);
 }
 
 export const tap = (fn) => (value) => {
