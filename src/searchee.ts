@@ -1,17 +1,29 @@
 import { readdirSync, statSync } from "fs";
 import { basename, dirname, extname, join, relative } from "path";
-import { Label, logger } from "./logger.js";
-import { Metafile } from "./parseTorrent.js";
-import { Result, resultOf, resultOfErr } from "./Result.js";
-import { parseTorrentFromFilename } from "./torrent.js";
-import { WithRequired } from "./utils.js";
 import {
 	ANIME_REGEX,
 	ARR_DIR_REGEX,
 	EP_REGEX,
+	RELEASE_GROUP_REGEX,
+	SEASON_REGEX,
+	RES_STRICT_REGEX,
+	sourceRegexParse,
 	SONARR_SUBFOLDERS_REGEX,
+	MOVIE_REGEX,
+	NON_UNICODE_ALPHANUM_REGEX,
 	VIDEO_EXTENSIONS,
+	YEAR_REGEX,
 } from "./constants.js";
+import { Label, logger } from "./logger.js";
+import { Metafile } from "./parseTorrent.js";
+import { Result, resultOf, resultOfErr } from "./Result.js";
+import { parseTorrentFromFilename } from "./torrent.js";
+import {
+	extractInt,
+	isBadTitle,
+	reformatTitleForSearching,
+	WithRequired,
+} from "./utils.js";
 
 export interface File {
 	length: number;
@@ -159,4 +171,107 @@ export async function createSearcheeFromPath(
 		name: `${title} S${seasonMatch.groups!.seasonNum}`,
 		length: totalLength,
 	});
+}
+
+export function getKeyMetaInfo(stem: string, isAnime: boolean): string {
+	const resM = stem.match(RES_STRICT_REGEX)?.groups?.res;
+	const res = resM ? `.${resM}` : "";
+	const sourceM = sourceRegexParse(stem);
+	const source = sourceM ? `.${sourceM}` : "";
+	const groupM = stem.match(RELEASE_GROUP_REGEX)?.groups?.group;
+	if (groupM) {
+		return `${res}${source}-${groupM}`.toLowerCase();
+	}
+	if (!isAnime) {
+		return `${res}${source}`.toLowerCase();
+	}
+	const groupAnimeM = stem.match(ANIME_REGEX)?.groups?.group;
+	if (groupAnimeM) {
+		return `${res}${source}-${groupAnimeM}`.toLowerCase();
+	}
+	return `${res}${source}`.toLowerCase();
+}
+
+export function getMovieKey(stem: string): {
+	ensembleTitle: string;
+	keyTitle: string;
+	year: number;
+} | null {
+	const match = stem.match(MOVIE_REGEX);
+	if (!match) return null;
+	const keyTitle = reformatTitleForSearching(match.groups!.title, false)
+		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
+		.toLowerCase();
+	if (!keyTitle.length) return null;
+	const year = extractInt(match.groups!.year);
+	const ensembleTitle = `${match.groups!.title}.${year}`;
+	return { ensembleTitle, keyTitle, year };
+}
+
+export function getSeasonKey(stem: string): {
+	ensembleTitle: string;
+	keyTitle: string;
+	season: string;
+} | null {
+	const match = stem.match(SEASON_REGEX);
+	if (!match) return null;
+	const keyTitle = reformatTitleForSearching(match.groups!.title, false)
+		.replace(YEAR_REGEX, "")
+		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
+		.toLowerCase();
+	if (!keyTitle.length) return null;
+	const season = `S${extractInt(match.groups!.season)}`;
+	const ensembleTitle = `${match.groups!.title}.${season}`;
+	return { ensembleTitle, keyTitle, season };
+}
+
+export function getEpisodeAndKey(stem: string): {
+	ensembleTitle: string;
+	keyTitle: string;
+	season: string;
+	episode: number | string;
+} | null {
+	const match = stem.match(EP_REGEX);
+	if (!match) return null;
+	const keyTitle = reformatTitleForSearching(match!.groups!.title, false)
+		.replace(YEAR_REGEX, "")
+		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
+		.toLowerCase();
+	if (!keyTitle.length) return null;
+	const seasonM = match!.groups!.season;
+	const season = seasonM
+		? `S${extractInt(seasonM)}`
+		: `S${match!.groups!.year}`;
+	const ensembleTitle = `${match!.groups!.title}.${season}`;
+	const episode = seasonM
+		? extractInt(match!.groups!.episode)
+		: `${match!.groups!.month}/${match!.groups!.day}`;
+	return { ensembleTitle, keyTitle, season, episode };
+}
+
+export function getReleaseAndKeys(stem: string): {
+	ensembleTitles: string[];
+	keyTitles: string[];
+	release: number;
+} | null {
+	const match = stem.match(ANIME_REGEX);
+	if (!match) return null;
+	const firstTitle = match!.groups!.title;
+	const altTitle = match!.groups!.altTitle;
+	const keyTitles: string[] = [];
+	const ensembleTitles: string[] = [];
+	for (const title of [firstTitle, altTitle]) {
+		if (!title) continue;
+		if (isBadTitle(title)) continue;
+		const keyTitle = reformatTitleForSearching(title, false)
+			.replace(YEAR_REGEX, "")
+			.replace(NON_UNICODE_ALPHANUM_REGEX, "")
+			.toLowerCase();
+		if (!keyTitle.length) continue;
+		keyTitles.push(keyTitle);
+		ensembleTitles.push(title);
+	}
+	if (keyTitles.length === 0) return null;
+	const release = extractInt(match!.groups!.release);
+	return { ensembleTitles, keyTitles, release };
 }
