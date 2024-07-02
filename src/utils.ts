@@ -123,6 +123,10 @@ export function cleanseSeparators(str: string): string {
 		.trim();
 }
 
+export function isBadTitle(title: string): boolean {
+	return ["season", "ep"].includes(title.toLowerCase());
+}
+
 export function getAnimeQueries(name: string): string[] {
 	// Only use if getMediaType returns anime as it's conditional on a few factors
 	const animeQueries: string[] = [];
@@ -131,23 +135,23 @@ export function getAnimeQueries(name: string): string[] {
 		animeQueries.push(cleanseSeparators(`${title} ${release}`));
 	}
 	if (altTitle) {
-		// Edge cases from regex
-		if (altTitle.toLowerCase() === "season") return animeQueries;
-		if (altTitle.toLowerCase() === "ep") return animeQueries;
-
+		if (isBadTitle(altTitle)) return animeQueries;
 		animeQueries.push(cleanseSeparators(`${altTitle} ${release}`));
 	}
 	return animeQueries;
 }
 
-export function reformatTitleForSearching(name: string): string {
-	// use lazy regex evaluation
-	const fullMatch =
-		name.match(EP_REGEX)?.[0] ??
-		name.match(SEASON_REGEX)?.[0] ??
-		name.match(MOVIE_REGEX)?.[0] ??
-		name;
-	return cleanseSeparators(fullMatch).match(SCENE_TITLE_REGEX)!.groups!.title;
+export function reformatTitleForSearching(title: string): string {
+	return cleanseSeparators(title).match(SCENE_TITLE_REGEX)!.groups!.title;
+}
+
+export function reformatNameForSearching(name: string): string {
+	return reformatTitleForSearching(
+		name.match(EP_REGEX)?.groups?.title ??
+			name.match(SEASON_REGEX)?.groups?.title ??
+			name.match(MOVIE_REGEX)?.groups?.title ??
+			name,
+	);
 }
 
 export const tap = (fn) => (value) => {

@@ -36,7 +36,7 @@ import {
 	isTruthy,
 	MediaType,
 	nMsAgo,
-	reformatTitleForSearching,
+	reformatNameForSearching,
 	sanitizeUrl,
 	stripExtension,
 } from "./utils.js";
@@ -227,7 +227,7 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "movie",
-				q: useIds ? undefined : reformatTitleForSearching(stem),
+				q: useIds ? undefined : reformatNameForSearching(stem),
 				...relevantIds,
 			},
 		] as const;
@@ -250,7 +250,7 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "search",
-				q: reformatTitleForSearching(stem),
+				q: reformatNameForSearching(stem),
 			},
 		] as const;
 	}

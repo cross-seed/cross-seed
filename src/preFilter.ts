@@ -105,7 +105,13 @@ export function findBlockedStringInReleaseMaybe(
 	});
 }
 
-export function filterDupes(searchees: Searchee[]): Searchee[] {
+/**
+ * Filters duplicates from searchees that should be for different candidates,
+ * e.g. all searchees created by cross-seed.
+ * @param searchees - An array of searchees to filter duplicates from.
+ * @returns An array of searchees with duplicates removed, preferring infoHash.
+ */
+export function filterDupesByName<T extends Searchee>(searchees: T[]): T[] {
 	const duplicateMap = searchees.reduce((acc, cur) => {
 		const entry = acc.get(cur.name);
 		if (entry === undefined) {
@@ -125,6 +131,35 @@ export function filterDupes(searchees: Searchee[]): Searchee[] {
 		});
 	}
 	return filtered;
+}
+
+/**
+ * Filters duplicates from searchees that are for the same candidates,
+ * e.g. searchees for the same media but different resolutions.
+ * @param searchees - An array of searchees for a specific media.
+ * @returns An array of searchees that are unique from a matching perspective.
+ */
+export function filterDupesFromSimilar<T extends Searchee>(
+	searchees: T[],
+): T[] {
+	const filteredSearchees: T[] = [];
+	for (const searchee of searchees) {
+		const isDupe = filteredSearchees.some((s) => {
+			if (searchee.length !== s.length) return false;
+			if (searchee.files.length !== s.files.length) return false;
+			const potentialFiles = s.files.map((f) => f.length);
+			return searchee.files.every((file) => {
+				const index = potentialFiles.indexOf(file.length);
+				if (index === -1) return false;
+				potentialFiles.splice(index, 1);
+				return true;
+			});
+		});
+		if (!isDupe) {
+			filteredSearchees.push(searchee);
+		}
+	}
+	return filteredSearchees;
 }
 
 type TimestampDataSql = {
