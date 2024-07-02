@@ -189,32 +189,35 @@ export async function searchForLocalTorrentByCriteria(
 ): Promise<number | null> {
 	const { delay, maxDataDepth } = getRuntimeConfig();
 
-	let searchees: Searchee[];
+	let rawSearchees: Searchee[];
 	if (criteria.path) {
 		const searcheeResults = await Promise.all(
 			findPotentialNestedRoots(criteria.path, maxDataDepth).map(
 				createSearcheeFromPath,
 			),
 		);
-		searchees = searcheeResults.filter(isOk).map((t) => t.unwrap());
+		rawSearchees = searcheeResults.filter(isOk).map((t) => t.unwrap());
 	} else {
-		searchees = [await getTorrentByCriteria(criteria)];
+		rawSearchees = [await getTorrentByCriteria(criteria)];
 	}
-	searchees.map((s) => (s.label = Label.WEBHOOK));
+	const searchees: SearcheeWithLabel[] = rawSearchees.map((searchee) => ({
+		...searchee,
+		label: Label.WEBHOOK,
+	}));
 	const hashesToExclude = await getInfoHashesToExclude();
 	let totalFound = 0;
 	let filtered = 0;
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
 		try {
-			if (!filterByContent(searchee as SearcheeWithLabel)) {
+			if (!filterByContent(searchee)) {
 				filtered++;
 				continue;
 			}
 			const sleep = wait(delay * 1000);
 
 			const { matches, searchedIndexers } = await findOnOtherSites(
-				searchee as SearcheeWithLabel,
+				searchee,
 				hashesToExclude,
 				progress,
 			);
@@ -251,9 +254,11 @@ export async function checkNewCandidateMatch(
 	}
 
 	const hashesToExclude = await getInfoHashesToExclude();
-	const searchee = createSearcheeFromMetafile(meta);
-	searchee.label = searcheeLabel;
-	if (!filterByContent(searchee as SearcheeWithLabel)) return null;
+	const searchee: SearcheeWithLabel = {
+		...createSearcheeFromMetafile(meta),
+		label: searcheeLabel,
+	};
+	if (!filterByContent(searchee)) return null;
 
 	// make sure searchee is in database
 	await db("searchee")
@@ -277,7 +282,7 @@ export async function checkNewCandidateMatch(
 		searchee,
 		candidate.tracker,
 	);
-	sendResultsNotification(searchee as SearcheeWithLabel, [
+	sendResultsNotification(searchee, [
 		[assessment, candidate.tracker, result],
 	]);
 	return result;
@@ -288,26 +293,29 @@ async function findSearchableTorrents(searcheeLabel: SearcheeLabel): Promise<{
 	hashesToExclude: string[];
 }> {
 	const { torrents, dataDirs, torrentDir, searchLimit } = getRuntimeConfig();
-	let allSearchees: Searchee[] = [];
+	let rawSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
 			torrents.map(createSearcheeFromTorrentFile), //also create searchee from path
 		);
-		allSearchees = searcheeResults.filter(isOk).map((r) => r.unwrap());
+		rawSearchees = searcheeResults.filter(isOk).map((r) => r.unwrap());
 	} else {
 		if (typeof torrentDir === "string") {
-			allSearchees.push(...(await loadTorrentDirLight(torrentDir)));
+			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
 		}
 		if (Array.isArray(dataDirs)) {
 			const searcheeResults = await Promise.all(
 				findSearcheesFromAllDataDirs().map(createSearcheeFromPath),
 			);
-			allSearchees.push(
+			rawSearchees.push(
 				...searcheeResults.filter(isOk).map((r) => r.unwrap()),
 			);
 		}
 	}
-	allSearchees.map((s) => (s.label = searcheeLabel));
+	const allSearchees: SearcheeWithLabel[] = rawSearchees.map((searchee) => ({
+		...searchee,
+		label: searcheeLabel,
+	}));
 
 	const hashesToExclude = allSearchees
 		.map((t) => t.infoHash)

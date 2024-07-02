@@ -135,7 +135,7 @@ export async function createSearcheeFromPath(
 			length: totalLength,
 		});
 	}
-	// Title is just SXX or Season XX, need to find title above or below
+	// Name is just SXX or Season XX, need to find title above or below
 	const videoFile = files.find((file) =>
 		VIDEO_EXTENSIONS.includes(extname(file.name)),
 	);
@@ -156,7 +156,7 @@ export async function createSearcheeFromPath(
 	return resultOf({
 		files: files,
 		path: root,
-		name: `${title} S${seasonMatch?.groups?.seasonNum}`,
+		name: `${title} S${seasonMatch.groups!.seasonNum}`,
 		length: totalLength,
 	});
 }

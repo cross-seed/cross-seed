@@ -72,7 +72,7 @@ export function filterByContent(searchee: SearcheeWithLabel): boolean {
 
 	if (!includeNonVideos && nonVideoSizeRatio > fuzzySizeThreshold) {
 		logReason(
-			`nonVideoSizeRatio > fuzzySizeThreshold: ${nonVideoSizeRatio} > ${fuzzySizeThreshold}`,
+			`nonVideoSizeRatio ${nonVideoSizeRatio} > ${fuzzySizeThreshold} fuzzySizeThreshold`,
 			searchee,
 		);
 		return false;
@@ -87,7 +87,7 @@ export function filterByContent(searchee: SearcheeWithLabel): boolean {
 			SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path))
 		)
 	) {
-		logReason("it is could be an arr movie/series directory", searchee);
+		logReason("it looks like an arr movie/series directory", searchee);
 		return false;
 	}
 	return true;
