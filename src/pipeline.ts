@@ -24,7 +24,6 @@ import {
 import { Label, logger } from "./logger.js";
 import {
 	filterByContent,
-	filterDupesByName,
 	filterDupesFromSimilar,
 	filterTimestamps,
 } from "./preFilter.js";
@@ -47,8 +46,13 @@ import {
 	loadTorrentDirLight,
 	TorrentLocator,
 } from "./torrent.js";
-import { queryRssFeeds, searchTorznab } from "./torznab.js";
-import { filterAsync, getLogString, isTruthy, wait } from "./utils.js";
+import {
+	getSearchString,
+	IndexerCandidates,
+	queryRssFeeds,
+	searchTorznab,
+} from "./torznab.js";
+import { getLogString, isTruthy, wait } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -90,6 +94,7 @@ async function assessCandidates(
 async function findOnOtherSites(
 	searchee: SearcheeWithLabel,
 	hashesToExclude: string[],
+	prevCandidates: Map<string, IndexerCandidates[]>,
 	progress: string,
 ): Promise<FoundOnOtherSites> {
 	// make sure searchee is in database
@@ -98,7 +103,18 @@ async function findOnOtherSites(
 		.onConflict("name")
 		.ignore();
 
-	const response = await searchTorznab(searchee, progress);
+	const searchStr = await getSearchString(searchee);
+	const response = await searchTorznab(
+		searchee,
+		prevCandidates,
+		searchStr,
+		progress,
+	);
+	const searchedIndexers =
+		response.length === prevCandidates.get(searchStr)?.length
+			? 0
+			: response.length;
+	prevCandidates.set(searchStr, response);
 
 	const results: Candidate[] = response.flatMap((e) =>
 		e.candidates.map((candidate) => ({
@@ -134,7 +150,7 @@ async function findOnOtherSites(
 	const actionResults = await performActions(searchee, matches);
 	if (actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
 		// If the torrent is not complete, "cancel the search"
-		return { matches: 0, searchedIndexers: 0 };
+		return { searchedIndexers: 0, matches: 0 };
 	}
 
 	await updateSearchTimestamps(searchee.name, Array.from(notRateLimited));
@@ -152,7 +168,7 @@ async function findOnOtherSites(
 	);
 	sendResultsNotification(searchee, zipped);
 
-	return { matches: matches.length, searchedIndexers: response.length };
+	return { searchedIndexers, matches: matches.length };
 }
 
 async function findMatchesBatch(
@@ -162,21 +178,28 @@ async function findMatchesBatch(
 	const { delay } = getRuntimeConfig();
 
 	let totalFound = 0;
+	let prevSearchTime = 0;
+	const prevCandidates = new Map<string, IndexerCandidates[]>();
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
 		try {
-			const sleep = wait(delay * 1000);
+			const sleepTime = delay * 1000 - (Date.now() - prevSearchTime);
+			if (sleepTime > 0) {
+				await new Promise((r) => setTimeout(r, sleepTime));
+			}
+			const searchTime = Date.now();
 
-			const { matches, searchedIndexers } = await findOnOtherSites(
+			const { searchedIndexers, matches } = await findOnOtherSites(
 				searchee,
 				hashesToExclude,
+				prevCandidates,
 				progress,
 			);
 			totalFound += matches;
 
-			// if all indexers were rate limited, don't sleep
+			// if all indexers were rate limited or cached, don't sleep
 			if (searchedIndexers === 0) continue;
-			await sleep;
+			prevSearchTime = searchTime;
 		} catch (e) {
 			const searcheeLog = getLogString(searchee, chalk.bold.white);
 			logger.error({
@@ -212,6 +235,7 @@ export async function searchForLocalTorrentByCriteria(
 	const hashesToExclude = await getInfoHashesToExclude();
 	let totalFound = 0;
 	let filtered = 0;
+	const prevCandidates = new Map<string, IndexerCandidates[]>();
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
 		try {
@@ -224,6 +248,7 @@ export async function searchForLocalTorrentByCriteria(
 			const { matches, searchedIndexers } = await findOnOtherSites(
 				searchee,
 				hashesToExclude,
+				prevCandidates,
 				progress,
 			);
 			totalFound += matches;
@@ -321,12 +346,14 @@ async function findSearchableTorrents(searcheeLabel: SearcheeLabel): Promise<{
 	hashesToExclude: string[];
 }> {
 	const { torrents, dataDirs, torrentDir, searchLimit } = getRuntimeConfig();
-	let rawSearchees: Searchee[] = [];
+	const rawSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
 			torrents.map(createSearcheeFromTorrentFile), //also create searchee from path
 		);
-		rawSearchees = searcheeResults.filter(isOk).map((r) => r.unwrap());
+		rawSearchees.push(
+			...searcheeResults.filter(isOk).map((r) => r.unwrap()),
+		);
 	} else {
 		if (typeof torrentDir === "string") {
 			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
@@ -348,26 +375,57 @@ async function findSearchableTorrents(searcheeLabel: SearcheeLabel): Promise<{
 	const hashesToExclude = allSearchees
 		.map((t) => t.infoHash)
 		.filter(isTruthy);
-	let filteredTorrents: SearcheeWithLabel[] = await filterAsync(
-		filterDupesByName(allSearchees).filter(filterByContent),
-		filterTimestamps,
-	);
+
+	// Group the exact same search queries together for easy cache use later
+	const grouping = new Map<string, SearcheeWithLabel[]>();
+	for (const searchee of allSearchees.filter(filterByContent)) {
+		const key = await getSearchString(searchee);
+		if (!grouping.has(key)) {
+			grouping.set(key, []);
+		}
+		grouping.get(key)!.push(searchee);
+	}
+	const keysToDelete: string[] = [];
+	for (const [key, groupedSearchees] of grouping) {
+		// If one searchee needs to be searched, use the candidates for all
+		const searchees = filterDupesFromSimilar(groupedSearchees);
+		const results = await Promise.all(searchees.map(filterTimestamps));
+		if (!results.some(isTruthy)) {
+			keysToDelete.push(key);
+			continue;
+		}
+		// Prefer infoHash
+		searchees.sort((a, b) => {
+			if (a.infoHash && !b.infoHash) return -1;
+			if (!a.infoHash && b.infoHash) return 1;
+			return 0;
+		});
+		// Sort by most number files (less chance of partial)
+		searchees.sort((a, b) => {
+			return b.files.length - a.files.length;
+		});
+		grouping.set(key, searchees);
+	}
+	for (const key of keysToDelete) {
+		grouping.delete(key);
+	}
+	let finalSearchees = Array.from(grouping.values()).flat();
 
 	logger.info({
 		label: Label.SEARCH,
-		message: `Found ${allSearchees.length} torrents, ${filteredTorrents.length} suitable to search for matches`,
+		message: `Found ${allSearchees.length} torrents, ${finalSearchees.length} suitable to search for matches using ${grouping.size} unique queries`,
 	});
 
-	if (searchLimit && filteredTorrents.length > searchLimit) {
+	if (searchLimit && finalSearchees.length > searchLimit) {
 		logger.info({
 			label: Label.SEARCH,
 			message: `Limited to ${searchLimit} searches`,
 		});
 
-		filteredTorrents = filteredTorrents.slice(0, searchLimit);
+		finalSearchees = finalSearchees.slice(0, searchLimit);
 	}
 
-	return { searchees: filteredTorrents, hashesToExclude };
+	return { searchees: finalSearchees, hashesToExclude };
 }
 
 export async function main(): Promise<void> {

@@ -82,6 +82,31 @@ export interface Caps {
 	tvIdSearch: IdSearchCaps;
 }
 
+const ALL_CAPS: Caps = {
+	search: true,
+	categories: {
+		tv: true,
+		movie: true,
+		anime: true,
+		audio: true,
+		book: true,
+	},
+	tvSearch: true,
+	movieSearch: true,
+	movieIdSearch: {
+		tvdbId: true,
+		tmdbId: true,
+		imdbId: true,
+		tvMazeId: true,
+	},
+	tvIdSearch: {
+		tvdbId: true,
+		tmdbId: true,
+		imdbId: true,
+		tvMazeId: true,
+	},
+};
+
 type TorznabSearchTechnique =
 	| []
 	| [{ $: { available: "yes" | "no"; supportedParams: string } }];
@@ -112,6 +137,8 @@ interface TorznabResult {
 }
 
 type TorznabResults = { rss?: { channel?: [] | [{ item?: TorznabResult[] }] } };
+
+export type IndexerCandidates = { indexerId: number; candidates: Candidate[] };
 
 function parseTorznabResults(xml: TorznabResults): Candidate[] {
 	const items = xml?.rss?.channel?.[0]?.item;
@@ -193,10 +220,9 @@ async function createTorznabSearchQueries(
 	parsedMedia?: ParsedMedia,
 ): Promise<TorznabParams[]> {
 	const stem = stripExtension(searchee.name);
-	let relevantIds: IdSearchParams = {};
-	if (parsedMedia) {
-		relevantIds = await getRelevantArrIds(caps, parsedMedia);
-	}
+	const relevantIds: IdSearchParams = parsedMedia
+		? await getRelevantArrIds(caps, parsedMedia)
+		: {};
 	const useIds = Object.values(relevantIds).some(isTruthy);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = stem.match(EP_REGEX);
@@ -256,6 +282,16 @@ async function createTorznabSearchQueries(
 	}
 }
 
+export async function getSearchString(searchee: Searchee): Promise<string> {
+	const mediaType = getMediaType(searchee);
+	const params = (
+		await createTorznabSearchQueries(searchee, mediaType, ALL_CAPS)
+	)[0];
+	const season = params.season !== undefined ? `.S${params.season}` : "";
+	const ep = params.ep !== undefined ? `.E${params.ep}` : "";
+	return `${params.q}${season}${ep}`.toLowerCase();
+}
+
 export function indexerDoesSupportMediaType(
 	mediaType: MediaType,
 	caps: TorznabCats,
@@ -287,35 +323,43 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 
 export async function searchTorznab(
 	searchee: Searchee,
+	prevCandidates: Map<string, IndexerCandidates[]>,
+	searchStr: string,
 	progress: string,
-): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+): Promise<IndexerCandidates[]> {
 	const { torznab } = getRuntimeConfig();
 	if (torznab.length === 0) {
 		throw new Error("no indexers are available");
 	}
 
 	const mediaType = getMediaType(searchee);
-	const { indexersToUse, parsedMedia } = await getAndLogIndexers(
+	const { indexersToSearch, parsedMedia } = await getAndLogIndexers(
 		searchee,
+		prevCandidates,
+		searchStr,
 		mediaType,
 		progress,
 	);
-	return await makeRequests(indexersToUse, async (indexer) => {
-		const caps = {
-			search: indexer.searchCap,
-			tvSearch: indexer.tvSearchCap,
-			movieSearch: indexer.movieSearchCap,
-			tvIdSearch: JSON.parse(indexer.tvIdCaps),
-			movieIdSearch: JSON.parse(indexer.movieIdCaps),
-			categories: JSON.parse(indexer.categories),
-		};
-		return await createTorznabSearchQueries(
-			searchee,
-			mediaType,
-			caps,
-			parsedMedia,
-		);
-	});
+	const indexerCandidates = await makeRequests(
+		indexersToSearch,
+		async (indexer) => {
+			const caps = {
+				search: indexer.searchCap,
+				tvSearch: indexer.tvSearchCap,
+				movieSearch: indexer.movieSearchCap,
+				tvIdSearch: JSON.parse(indexer.tvIdCaps),
+				movieIdSearch: JSON.parse(indexer.movieIdCaps),
+				categories: JSON.parse(indexer.categories),
+			};
+			return await createTorznabSearchQueries(
+				searchee,
+				mediaType,
+				caps,
+				parsedMedia,
+			);
+		},
+	);
+	return [...(prevCandidates.get(searchStr) ?? []), ...indexerCandidates];
 }
 
 export async function syncWithDb() {
@@ -561,7 +605,7 @@ export async function validateTorznabUrls() {
 async function makeRequests(
 	indexers: Indexer[],
 	getQueries: (indexer: Indexer) => Promise<TorznabParams[]>,
-): Promise<{ indexerId: number; candidates: Candidate[] }[]> {
+): Promise<IndexerCandidates[]> {
 	const { searchTimeout } = getRuntimeConfig();
 	const searchUrls = await Promise.all(
 		indexers.flatMap(async (indexer: Indexer) =>
@@ -643,9 +687,11 @@ async function makeRequests(
 }
 async function getAndLogIndexers(
 	searchee: Searchee,
+	prevCandidates: Map<string, IndexerCandidates[]>,
+	searchStr: string,
 	mediaType: MediaType,
 	progress: string,
-): Promise<{ indexersToUse: Indexer[]; parsedMedia?: ParsedMedia }> {
+): Promise<{ indexersToSearch: Indexer[]; parsedMedia?: ParsedMedia }> {
 	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
 	const searcheeLog = getLogString(searchee, chalk.bold.white);
 	const mediaTypeLog = chalk.white(mediaType.toUpperCase());
@@ -691,6 +737,16 @@ async function getAndLogIndexers(
 		);
 	});
 
+	if (!prevCandidates.has(searchStr)) {
+		prevCandidates.clear(); // Invalidate cache if unrelated searchee
+	}
+	const cachedCandidates = prevCandidates.get(searchStr) ?? [];
+	const indexersToSearch = indexersToUse.filter((indexer) => {
+		return !cachedCandidates.some(
+			(candidates) => candidates.indexerId === indexer.id,
+		);
+	});
+
 	const filteringCauses = [
 		enabledIndexers.length > timeFilteredIndexers.length && "timestamps",
 		timeFilteredIndexers.length > indexersToUse.length && "category",
@@ -698,12 +754,12 @@ async function getAndLogIndexers(
 	const reasonStr = filteringCauses.length
 		? ` (filtered by ${formatAsList(filteringCauses)})`
 		: "";
-	if (indexersToUse.length === 0) {
+	if (indexersToSearch.length === 0 && cachedCandidates.length === 0) {
 		logger.info({
 			label: searchee.label,
 			message: `${progress}Skipped searching on indexers for ${searcheeLog}${reasonStr} | MediaType: ${mediaTypeLog} | IDs: N/A`,
 		});
-		return { indexersToUse };
+		return { indexersToSearch };
 	}
 
 	// Parse media from arrs
@@ -718,8 +774,8 @@ async function getAndLogIndexers(
 	});
 	logger.verbose({
 		label: Label.TORZNAB,
-		message: `Using ${indexersToUse.length} indexers for ${searcheeLog}${reasonStr}`,
+		message: `Using ${indexersToSearch.length}|${cachedCandidates.length} indexers by search|cache for ${searcheeLog}${reasonStr}`,
 	});
 
-	return { indexersToUse, parsedMedia };
+	return { indexersToSearch, parsedMedia };
 }
