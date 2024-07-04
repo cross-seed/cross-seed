@@ -23,11 +23,22 @@ import {
 	sourceRegexRemove,
 } from "./constants.js";
 
-interface ExternalIds {
+export interface ExternalIds {
 	imdbId?: string;
 	tmdbId?: string;
 	tvdbId?: string;
 	tvMazeId?: string;
+}
+export function arrIdsEqual(
+	a: ExternalIds | undefined,
+	b: ExternalIds | undefined,
+): boolean {
+	return (
+		a?.imdbId === b?.imdbId &&
+		a?.tmdbId === b?.tmdbId &&
+		a?.tvdbId === b?.tvdbId &&
+		a?.tvMazeId === b?.tvMazeId
+	);
 }
 
 interface ParsedMovie {
