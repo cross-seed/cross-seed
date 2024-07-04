@@ -47,8 +47,8 @@ import {
 	TorrentLocator,
 } from "./torrent.js";
 import {
+	CachedSearch,
 	getSearchString,
-	IndexerCandidates,
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
@@ -94,7 +94,7 @@ async function assessCandidates(
 async function findOnOtherSites(
 	searchee: SearcheeWithLabel,
 	hashesToExclude: string[],
-	prevCandidates: Map<string, IndexerCandidates[]>,
+	cachedSearch: CachedSearch,
 	progress: string,
 ): Promise<FoundOnOtherSites> {
 	// make sure searchee is in database
@@ -103,18 +103,10 @@ async function findOnOtherSites(
 		.onConflict("name")
 		.ignore();
 
-	const searchStr = await getSearchString(searchee);
-	const response = await searchTorznab(
-		searchee,
-		prevCandidates,
-		searchStr,
-		progress,
-	);
+	const response = await searchTorznab(searchee, cachedSearch, progress);
 	const searchedIndexers =
-		response.length === prevCandidates.get(searchStr)?.length
-			? 0
-			: response.length;
-	prevCandidates.set(searchStr, response);
+		response.length - cachedSearch.indexerCandidates.length;
+	cachedSearch.indexerCandidates = response;
 
 	const results: Candidate[] = response.flatMap((e) =>
 		e.candidates.map((candidate) => ({
@@ -179,7 +171,7 @@ async function findMatchesBatch(
 
 	let totalFound = 0;
 	let prevSearchTime = 0;
-	const prevCandidates = new Map<string, IndexerCandidates[]>();
+	const cachedSearch: CachedSearch = { q: null, indexerCandidates: [] };
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
 		try {
@@ -192,7 +184,7 @@ async function findMatchesBatch(
 			const { searchedIndexers, matches } = await findOnOtherSites(
 				searchee,
 				hashesToExclude,
-				prevCandidates,
+				cachedSearch,
 				progress,
 			);
 			totalFound += matches;
@@ -235,7 +227,7 @@ export async function searchForLocalTorrentByCriteria(
 	const hashesToExclude = await getInfoHashesToExclude();
 	let totalFound = 0;
 	let filtered = 0;
-	const prevCandidates = new Map<string, IndexerCandidates[]>();
+	const cachedSearch: CachedSearch = { q: null, indexerCandidates: [] };
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
 		try {
@@ -248,7 +240,7 @@ export async function searchForLocalTorrentByCriteria(
 			const { matches, searchedIndexers } = await findOnOtherSites(
 				searchee,
 				hashesToExclude,
-				prevCandidates,
+				cachedSearch,
 				progress,
 			);
 			totalFound += matches;

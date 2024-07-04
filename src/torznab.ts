@@ -1,6 +1,8 @@
 import ms from "ms";
 import xml2js from "xml2js";
 import {
+	arrIdsEqual,
+	ExternalIds,
 	scanAllArrsForMedia,
 	getRelevantArrIds,
 	ParsedMedia,
@@ -139,6 +141,11 @@ interface TorznabResult {
 type TorznabResults = { rss?: { channel?: [] | [{ item?: TorznabResult[] }] } };
 
 export type IndexerCandidates = { indexerId: number; candidates: Candidate[] };
+export type CachedSearch = {
+	q: string | null;
+	indexerCandidates: IndexerCandidates[];
+	ids?: ExternalIds;
+};
 
 function parseTorznabResults(xml: TorznabResults): Candidate[] {
 	const items = xml?.rss?.channel?.[0]?.item;
@@ -323,8 +330,7 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 
 export async function searchTorznab(
 	searchee: Searchee,
-	prevCandidates: Map<string, IndexerCandidates[]>,
-	searchStr: string,
+	cachedSearch: CachedSearch,
 	progress: string,
 ): Promise<IndexerCandidates[]> {
 	const { torznab } = getRuntimeConfig();
@@ -335,8 +341,7 @@ export async function searchTorznab(
 	const mediaType = getMediaType(searchee);
 	const { indexersToSearch, parsedMedia } = await getAndLogIndexers(
 		searchee,
-		prevCandidates,
-		searchStr,
+		cachedSearch,
 		mediaType,
 		progress,
 	);
@@ -359,7 +364,7 @@ export async function searchTorznab(
 			);
 		},
 	);
-	return [...(prevCandidates.get(searchStr) ?? []), ...indexerCandidates];
+	return [...cachedSearch.indexerCandidates, ...indexerCandidates];
 }
 
 export async function syncWithDb() {
@@ -687,8 +692,7 @@ async function makeRequests(
 }
 async function getAndLogIndexers(
 	searchee: Searchee,
-	prevCandidates: Map<string, IndexerCandidates[]>,
-	searchStr: string,
+	cachedSearch: CachedSearch,
 	mediaType: MediaType,
 	progress: string,
 ): Promise<{ indexersToSearch: Indexer[]; parsedMedia?: ParsedMedia }> {
@@ -737,12 +741,26 @@ async function getAndLogIndexers(
 		);
 	});
 
-	if (!prevCandidates.has(searchStr)) {
-		prevCandidates.clear(); // Invalidate cache if unrelated searchee
+	// Invalidate cache if searchStr or ids is different
+	let shouldScanArr = true;
+	let parsedMedia: ParsedMedia | undefined;
+	const searchStr = await getSearchString(searchee);
+	if (cachedSearch.q === searchStr) {
+		shouldScanArr = false;
+		const res = await scanAllArrsForMedia(searchee, mediaType);
+		parsedMedia = res.isOk() ? res.unwrap() : undefined;
+		const ids = parsedMedia?.movie ?? parsedMedia?.series;
+		if (!arrIdsEqual(ids, cachedSearch.ids)) {
+			cachedSearch.indexerCandidates.length = 0;
+			cachedSearch.ids = ids;
+		}
+	} else {
+		cachedSearch.q = searchStr;
+		cachedSearch.indexerCandidates.length = 0;
+		cachedSearch.ids = undefined; // Don't prematurely get ids if skipping
 	}
-	const cachedCandidates = prevCandidates.get(searchStr) ?? [];
 	const indexersToSearch = indexersToUse.filter((indexer) => {
-		return !cachedCandidates.some(
+		return !cachedSearch.indexerCandidates.some(
 			(candidates) => candidates.indexerId === indexer.id,
 		);
 	});
@@ -754,7 +772,8 @@ async function getAndLogIndexers(
 	const reasonStr = filteringCauses.length
 		? ` (filtered by ${formatAsList(filteringCauses)})`
 		: "";
-	if (indexersToSearch.length === 0 && cachedCandidates.length === 0) {
+	if (!indexersToSearch.length && !cachedSearch.indexerCandidates.length) {
+		cachedSearch.q = null; // Won't scan arrs for multiple skips in a row
 		logger.info({
 			label: searchee.label,
 			message: `${progress}Skipped searching on indexers for ${searcheeLog}${reasonStr} | MediaType: ${mediaTypeLog} | IDs: N/A`,
@@ -762,11 +781,12 @@ async function getAndLogIndexers(
 		return { indexersToSearch };
 	}
 
-	// Parse media from arrs
-	const res = await scanAllArrsForMedia(searchee, mediaType);
-	const parsedMedia = res.isOk() ? res.unwrap() : undefined;
-	const ids = parsedMedia?.movie ?? parsedMedia?.series;
-	const idsStr = ids ? formatFoundIds(ids) : "NONE";
+	if (shouldScanArr) {
+		const res = await scanAllArrsForMedia(searchee, mediaType);
+		parsedMedia = res.isOk() ? res.unwrap() : undefined;
+		cachedSearch.ids = parsedMedia?.movie ?? parsedMedia?.series;
+	}
+	const idsStr = cachedSearch.ids ? formatFoundIds(cachedSearch.ids) : "NONE";
 
 	logger.info({
 		label: searchee.label,
@@ -774,7 +794,7 @@ async function getAndLogIndexers(
 	});
 	logger.verbose({
 		label: Label.TORZNAB,
-		message: `Using ${indexersToSearch.length}|${cachedCandidates.length} indexers by search|cache for ${searcheeLog}${reasonStr}`,
+		message: `Using ${indexersToSearch.length}|${cachedSearch.indexerCandidates.length} indexers by search|cache for ${searcheeLog}${reasonStr}`,
 	});
 
 	return { indexersToSearch, parsedMedia };
