@@ -276,7 +276,7 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "search",
-				q: reformatNameForSearching(stem),
+				q: cleanseSeparators(stem),
 			},
 		] as const;
 	}
