@@ -17,9 +17,15 @@ import { Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
 import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { File, Searchee } from "./searchee.js";
+import { File, Searchee, SearcheeWithLabel } from "./searchee.js";
 import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
-import { extractInt, humanReadableSize, stripExtension } from "./utils.js";
+import {
+	extractInt,
+	humanReadableSize,
+	stripExtension,
+	wait,
+} from "./utils.js";
+import ms from "ms";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -268,7 +274,7 @@ function releaseGroupDoesMatch(
 
 async function assessCandidateHelper(
 	candidate: Candidate,
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { matchMode, blockList } = getRuntimeConfig();
@@ -297,16 +303,26 @@ async function assessCandidateHelper(
 		return { decision: Decision.BLOCKED_RELEASE };
 	}
 
-	const result = await snatch(candidate);
-	if (result.isErr()) {
-		const err = result.unwrapErr();
-		return err === SnatchError.RATE_LIMITED
-			? { decision: Decision.RATE_LIMITED }
-			: err === SnatchError.MAGNET_LINK
+	let res = await snatch(candidate);
+	if (res.isErr()) {
+		const e = res.unwrapErr();
+		if (
+			[Label.ANNOUNCE, Label.RSS].includes(searchee.label) &&
+			![SnatchError.RATE_LIMITED, SnatchError.MAGNET_LINK].includes(e)
+		) {
+			await wait(ms("30 seconds"));
+			res = await snatch(candidate);
+		}
+		if (res.isErr()) {
+			const err = res.unwrapErr();
+			return err === SnatchError.MAGNET_LINK
 				? { decision: Decision.MAGNET_LINK }
-				: { decision: Decision.DOWNLOAD_FAILED };
+				: err === SnatchError.RATE_LIMITED
+					? { decision: Decision.RATE_LIMITED }
+					: { decision: Decision.DOWNLOAD_FAILED };
+		}
 	}
-	const metafile = result.unwrap();
+	const metafile = res.unwrap();
 	cacheTorrentFile(metafile);
 	candidate.size = metafile.length; // Trackers can be wrong
 
@@ -369,7 +385,7 @@ function cacheTorrentFile(meta: Metafile): void {
 
 async function assessAndSaveResults(
 	result: Candidate,
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	guid: string,
 	infoHashesToExclude: string[],
 ) {
@@ -399,7 +415,7 @@ async function assessAndSaveResults(
 
 async function assessCandidateCaching(
 	candidate: Candidate,
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	infoHashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { guid, name, tracker } = candidate;
