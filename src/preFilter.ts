@@ -29,7 +29,10 @@ function logReason(reason: string, searchee: Searchee): void {
 	});
 }
 
-export function filterByContent(searchee: SearcheeWithLabel): boolean {
+export function filterByContent(
+	searchee: SearcheeWithLabel,
+	includeEpisodes?: boolean,
+): boolean {
 	const {
 		fuzzySizeThreshold,
 		includeNonVideos,
@@ -44,6 +47,7 @@ export function filterByContent(searchee: SearcheeWithLabel): boolean {
 	}
 
 	if (
+		(!includeEpisodes || !includeSingleEpisodes) &&
 		searchee.path &&
 		searchee.files.length === 1 &&
 		(SEASON_REGEX.test(basename(dirname(searchee.path))) ||

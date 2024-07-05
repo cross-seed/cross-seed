@@ -224,6 +224,7 @@ export async function searchForLocalTorrentByCriteria(
 		...searchee,
 		label: Label.WEBHOOK,
 	}));
+	const includeEpisodes = searchees.length === 1;
 	const hashesToExclude = await getInfoHashesToExclude();
 	let totalFound = 0;
 	let filtered = 0;
@@ -231,7 +232,7 @@ export async function searchForLocalTorrentByCriteria(
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
 		try {
-			if (!filterByContent(searchee)) {
+			if (!filterByContent(searchee, includeEpisodes)) {
 				filtered++;
 				continue;
 			}
@@ -279,7 +280,7 @@ export async function checkNewCandidateMatch(
 		metas
 			.map(createSearcheeFromMetafile)
 			.map((searchee) => ({ ...searchee, label: searcheeLabel }))
-			.filter(filterByContent),
+			.filter((searchee) => filterByContent(searchee)),
 	);
 	if (!searchees.length) {
 		logger.verbose({
@@ -370,7 +371,7 @@ async function findSearchableTorrents(searcheeLabel: SearcheeLabel): Promise<{
 
 	// Group the exact same search queries together for easy cache use later
 	const grouping = new Map<string, SearcheeWithLabel[]>();
-	for (const searchee of allSearchees.filter(filterByContent)) {
+	for (const searchee of allSearchees.filter((s) => filterByContent(s))) {
 		const key = await getSearchString(searchee);
 		if (!grouping.has(key)) {
 			grouping.set(key, []);
