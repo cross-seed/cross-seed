@@ -76,7 +76,7 @@ interface FoundOnOtherSites {
 
 async function assessCandidates(
 	candidates: Candidate[],
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	hashesToExclude: string[],
 ): Promise<AssessmentWithTracker[]> {
 	const assessments: AssessmentWithTracker[] = [];
@@ -177,7 +177,7 @@ async function findMatchesBatch(
 		try {
 			const sleepTime = delay * 1000 - (Date.now() - prevSearchTime);
 			if (sleepTime > 0) {
-				await new Promise((r) => setTimeout(r, sleepTime));
+				await wait(sleepTime);
 			}
 			const searchTime = Date.now();
 
