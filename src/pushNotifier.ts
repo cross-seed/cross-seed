@@ -69,7 +69,6 @@ export function sendResultsNotification(
 	searchee: SearcheeWithLabel,
 	results: [ResultAssessment, TrackerName, ActionResult][],
 ) {
-	const name = searchee.name;
 	const source = searchee.label;
 	const notableSuccesses = results.filter(
 		([, , actionResult]) =>
@@ -80,6 +79,7 @@ export function sendResultsNotification(
 		([, , actionResult]) => actionResult === InjectionResult.FAILURE,
 	);
 	if (notableSuccesses.length) {
+		const name = notableSuccesses[0][0].metafile!.name;
 		const numTrackers = notableSuccesses.length;
 		const infoHashes = notableSuccesses.map(
 			([assessment]) => assessment.metafile!.infoHash,
@@ -104,6 +104,7 @@ export function sendResultsNotification(
 	}
 
 	if (failures.length) {
+		const name = notableSuccesses[0][0].metafile!.name;
 		const numTrackers = failures.length;
 		const infoHashes = failures.map(
 			([assessment]) => assessment.metafile!.infoHash,
