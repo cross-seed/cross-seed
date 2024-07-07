@@ -104,7 +104,7 @@ export function sendResultsNotification(
 	}
 
 	if (failures.length) {
-		const name = notableSuccesses[0][0].metafile!.name;
+		const name = failures[0][0].metafile!.name;
 		const numTrackers = failures.length;
 		const infoHashes = failures.map(
 			([assessment]) => assessment.metafile!.infoHash,
