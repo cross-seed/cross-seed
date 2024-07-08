@@ -1,4 +1,4 @@
-import { dirname } from "path";
+import { dirname, resolve } from "path";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
@@ -346,7 +346,10 @@ export default class QBittorrent implements TorrentClient {
 	): boolean {
 		if (searchee.files.length > 1) return false;
 		if (dirname(searchee.files[0].path) !== ".") return false;
-		return dirname(searcheeInfo.content_path) !== searcheeInfo.save_path;
+		return (
+			resolve(dirname(searcheeInfo.content_path)) !==
+			resolve(searcheeInfo.save_path)
+		);
 	}
 
 	async inject(
