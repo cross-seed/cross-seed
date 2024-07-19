@@ -258,6 +258,7 @@ export default class QBittorrent implements TorrentClient {
 			const savePath = this.getCorrectSavePath(meta, torrentInfo);
 			return resultOf(savePath);
 		} catch (e) {
+			logger.debug(e);
 			if (e.message.includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
 			}
@@ -439,6 +440,7 @@ export default class QBittorrent implements TorrentClient {
 				label: Label.QBITTORRENT,
 				message: `Injection failed: ${e.message}`,
 			});
+			logger.debug(e);
 			return InjectionResult.FAILURE;
 		}
 	}

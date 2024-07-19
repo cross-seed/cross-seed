@@ -21,6 +21,7 @@ export enum MediaType {
 	SEASON = "pack",
 	MOVIE = "movie",
 	ANIME = "anime",
+	VIDEO = "video",
 	AUDIO = "audio",
 	BOOK = "book",
 	OTHER = "unknown",
@@ -56,15 +57,11 @@ export function humanReadableSize(bytes: number) {
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
+export function hasExt(searchee: Searchee, exts: string[]): boolean {
+	return searchee.files.some((f) => exts.includes(path.extname(f.name)));
+}
 export function getMediaType(searchee: Searchee): MediaType {
-	function hasExt(searchee: Searchee, exts: string[]) {
-		return searchee.files.some((f) => exts.includes(path.extname(f.name)));
-	}
-	const stem = stripExtension(searchee.name);
-	const hasVideoExtensions = hasExt(searchee, VIDEO_EXTENSIONS);
-
 	function unsupportedMediaType(searchee: Searchee): MediaType {
-		//any unsupported media that needs to be identified goes here
 		if (hasExt(searchee, AUDIO_EXTENSIONS)) {
 			return MediaType.AUDIO;
 		} else if (hasExt(searchee, BOOK_EXTENSIONS)) {
@@ -74,17 +71,20 @@ export function getMediaType(searchee: Searchee): MediaType {
 		}
 	}
 
-	// put new  supported media type cases in this switch
-	if (EP_REGEX.test(stem)) {
-		return MediaType.EPISODE;
-	} else if (SEASON_REGEX.test(stem)) {
-		return MediaType.SEASON;
-	} else if (hasVideoExtensions) {
-		if (MOVIE_REGEX.test(stem)) return MediaType.MOVIE;
-		if (ANIME_REGEX.test(stem)) return MediaType.ANIME;
-		return unsupportedMediaType(searchee);
-	} else {
-		return unsupportedMediaType(searchee);
+	/* eslint-disable no-fallthrough */
+	switch (true) {
+		case EP_REGEX.test(searchee.name):
+			return MediaType.EPISODE;
+		case SEASON_REGEX.test(searchee.name):
+			return MediaType.SEASON;
+		case hasExt(searchee, VIDEO_EXTENSIONS):
+			if (MOVIE_REGEX.test(searchee.name)) return MediaType.MOVIE;
+			if (ANIME_REGEX.test(searchee.name)) return MediaType.ANIME;
+			return MediaType.VIDEO;
+		case hasExt(searchee, [".rar"]):
+			if (MOVIE_REGEX.test(searchee.name)) return MediaType.MOVIE;
+		default:
+			return unsupportedMediaType(searchee);
 	}
 }
 export function shouldRecheck(decision: Decision): boolean {
