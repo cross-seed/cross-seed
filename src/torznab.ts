@@ -815,10 +815,6 @@ async function getAndLogIndexers(
 		label: searchee.label,
 		message: `${progress}Searching for ${searcheeLog} | MediaType: ${mediaTypeLog} | IDs: ${idsStr}`,
 	});
-	logger.verbose({
-		label: Label.TORZNAB,
-		message: `Using ${indexersToSearch.length}|${cachedSearch.indexerCandidates.length} indexers by search|cache for ${searcheeLog}${reasonStr}`,
-	});
 
 	return { indexersToSearch, parsedMedia };
 }

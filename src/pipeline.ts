@@ -104,8 +104,8 @@ async function findOnOtherSites(
 		.ignore();
 
 	const response = await searchTorznab(searchee, cachedSearch, progress);
-	const searchedIndexers =
-		response.length - cachedSearch.indexerCandidates.length;
+	const cachedIndexers = cachedSearch.indexerCandidates.length;
+	const searchedIndexers = response.length - cachedIndexers;
 	cachedSearch.indexerCandidates = response;
 
 	const results: Candidate[] = response.flatMap((e) =>
@@ -115,6 +115,12 @@ async function findOnOtherSites(
 		})),
 	);
 
+	if (response.length) {
+		logger.verbose({
+			label: Label.DECIDE,
+			message: `Assessing ${results.length} candidates for ${searchee.name} from ${searchedIndexers}|${cachedIndexers} indexers by search|cache`,
+		});
+	}
 	const assessments = await assessCandidates(
 		results,
 		searchee,

@@ -4,6 +4,7 @@ import timestamps from "./02-timestamps.js";
 import rateLimits from "./03-rateLimits.js";
 import auth from "./04-auth.js";
 import caps from "./05-caps.js";
+import uniqueDecisions from "./06-uniqueDecisions.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -14,6 +15,7 @@ export const migrations = {
 			rateLimits,
 			auth,
 			caps,
+			uniqueDecisions,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,
