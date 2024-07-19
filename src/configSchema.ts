@@ -12,16 +12,28 @@ const ZodErrorMessages = {
 	emptyString:
 		"cannot have an empty string. If you want to unset it, use null or undefined.",
 	delayNegative: "delay is in seconds, you can't travel back in time.",
-	delayTooHigh: `delay over 1hr is not supported.${NEWLINE_INDENT}To even out search loads please see the following documentation:${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/daemon#set-up-periodic-searches)`,
-	fuzzySizeThreshold: "fuzzySizeThreshold must be between 0 and 1.",
+	delayUnsupported: `delay must be 30 seconds to 1 hour.${NEWLINE_INDENT}To even out search loads please see the following documentation:${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/daemon#set-up-periodic-searches)`,
+	rssCadenceUnsupported: "rssCadence must be 10-120 minutes",
+	searchCadenceUnsupported: "searchCadence must be at least 1 day.",
+	searchCadenceExcludeRecent:
+		"excludeRecentSearch must be at least 3x searchCadence.",
+	excludeRecentOlder:
+		"excludeOlder and excludeRecentSearch must be defined for searching. excludeOlder must be 2-5x excludeRecentSearch.",
+	fuzzySizeThreshold:
+		"fuzzySizeThreshold must be between 0 and 1 with a maximum of 0.1 when using searchCadence or rssCadence",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
 		"If using Automatic Torrent Management in qBittorrent, please read: https://www.cross-seed.org/docs/v6-migration#qbittorrent",
+	includeSingleEpisodes:
+		"includeSingleEpisodes is not recommended when using rss or announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
+	needsInject: "You need to use the 'inject' action for partial matching.",
 	needsLinkDir:
 		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
 	linkDirInDataDir:
 		"You cannot have your linkDir inside of your dataDirs. Please adjust your paths to correct this.",
+	ouputDirInInputDir:
+		"You cannot have your outputDir inside of your torrentDir/dataDirs. Please adjust your paths to correct this.",
 };
 
 /**
@@ -82,14 +94,14 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
 
 /**
  * check a potential child path being inside a array of parent paths
- * @param linkDir path of the potential child (linkDir)
- * @param dataDirs array of dataDir paths
- * @returns true if `linkDir` is inside any dataDir at any nesting level, false otherwise.
+ * @param childDir path of the potential child (e.g linkDir)
+ * @param parentDirs array of parentDir paths (e.g dataDirs)
+ * @returns true if `childDir` is inside any `parentDirs` at any nesting level, false otherwise.
  */
-function isChildPath(linkDir: string, dataDirs: string[]): boolean {
-	return dataDirs.some((datadir) => {
-		const resolvedParent = resolve(datadir);
-		const resolvedChild = resolve(linkDir);
+function isChildPath(childDir: string, parentDirs: string[]): boolean {
+	return parentDirs.some((parentDir) => {
+		const resolvedParent = resolve(parentDir);
+		const resolvedChild = resolve(childDir);
 		const relativePath = relative(resolvedParent, resolvedChild);
 		// if the path does not start with '..' and is not absolute
 		return !(relativePath.startsWith("..") || isAbsolute(relativePath));
@@ -108,7 +120,8 @@ export const VALIDATION_SCHEMA = z
 			.nonnegative({
 				message: ZodErrorMessages.delayNegative,
 			})
-			.lte(3600, ZodErrorMessages.delayTooHigh),
+			.gte(30, ZodErrorMessages.delayUnsupported)
+			.lte(3600, ZodErrorMessages.delayUnsupported),
 		torznab: z.array(z.string().url()),
 		dataDirs: z.array(z.string()).nullish(),
 		matchMode: z.nativeEnum(MatchMode),
@@ -155,12 +168,22 @@ export const VALIDATION_SCHEMA = z
 			.string()
 			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
-			.nullish(),
+			.nullish()
+			.refine(
+				(cadence) =>
+					!cadence ||
+					(cadence >= ms("10 minutes") && cadence <= ms("2 hours")),
+				ZodErrorMessages.rssCadenceUnsupported,
+			),
 		searchCadence: z
 			.string()
 			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
-			.nullish(),
+			.nullish()
+			.refine(
+				(cadence) => !cadence || cadence >= ms("1 day"),
+				ZodErrorMessages.searchCadenceUnsupported,
+			),
 		snatchTimeout: z
 			.string()
 			.min(1, { message: ZodErrorMessages.emptyString })
@@ -189,6 +212,28 @@ export const VALIDATION_SCHEMA = z
 			.transform((value) => value ?? []),
 	})
 	.strict()
+	.refine(
+		(config) =>
+			!config.searchCadence ||
+			!config.excludeRecentSearch ||
+			3 * config.searchCadence <= config.excludeRecentSearch,
+		ZodErrorMessages.searchCadenceExcludeRecent,
+	)
+	.refine(
+		(config) =>
+			!config.searchCadence ||
+			(config.excludeOlder &&
+				config.excludeRecentSearch &&
+				config.excludeOlder >= 2 * config.excludeRecentSearch &&
+				config.excludeOlder <= 5 * config.excludeRecentSearch),
+		ZodErrorMessages.excludeRecentOlder,
+	)
+	.refine(
+		(config) =>
+			config.fuzzySizeThreshold <= 0.1 ||
+			(!config.searchCadence && !config.rssCadence),
+		ZodErrorMessages.fuzzySizeThreshold,
+	)
 	.refine((config) => {
 		if (
 			config.action === Action.INJECT &&
@@ -197,6 +242,12 @@ export const VALIDATION_SCHEMA = z
 			config.linkDir
 		) {
 			logger.warn(ZodErrorMessages.qBitAutoTMM);
+		}
+		return true;
+	})
+	.refine((config) => {
+		if (config.includeSingleEpisodes && config.rssCadence) {
+			logger.warn(ZodErrorMessages.includeSingleEpisodes);
 		}
 		return true;
 	})
@@ -212,7 +263,13 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.injectUrl,
 	)
 	.refine(
-		(config) => config.matchMode === MatchMode.SAFE || config.linkDir,
+		(config) =>
+			config.action === Action.INJECT ||
+			config.matchMode !== MatchMode.PARTIAL,
+		ZodErrorMessages.needsInject,
+	)
+	.refine(
+		(config) => config.linkDir || config.matchMode === MatchMode.SAFE,
 		ZodErrorMessages.needsLinkDir,
 	)
 	.refine((config) => {
@@ -220,4 +277,13 @@ export const VALIDATION_SCHEMA = z
 			return !isChildPath(config.linkDir, config.dataDirs);
 		}
 		return true;
-	}, ZodErrorMessages.linkDirInDataDir);
+	}, ZodErrorMessages.linkDirInDataDir)
+	.refine((config) => {
+		if (config.torrentDir) {
+			return !isChildPath(config.outputDir, [
+				config.torrentDir,
+				...(config.dataDirs ?? []),
+			]);
+		}
+		return true;
+	}, ZodErrorMessages.ouputDirInInputDir);

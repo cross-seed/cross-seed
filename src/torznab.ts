@@ -26,7 +26,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
+import { Searchee, SearcheeWithLabel } from "./searchee.js";
 import {
 	cleanseSeparators,
 	extractInt,
@@ -350,7 +350,7 @@ export async function queryRssFeeds(): Promise<Candidate[]> {
 }
 
 export async function searchTorznab(
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	cachedSearch: CachedSearch,
 	progress: string,
 ): Promise<IndexerCandidates[]> {
@@ -712,7 +712,7 @@ async function makeRequests(
 	}));
 }
 async function getAndLogIndexers(
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	cachedSearch: CachedSearch,
 	mediaType: MediaType,
 	progress: string,
@@ -739,12 +739,14 @@ async function getAndLogIndexers(
 			lastSearched: "timestamp.last_searched",
 		});
 
-	const skipBefore = excludeOlder
-		? nMsAgo(excludeOlder)
-		: Number.NEGATIVE_INFINITY;
-	const skipAfter = excludeRecentSearch
-		? nMsAgo(excludeRecentSearch)
-		: Number.POSITIVE_INFINITY;
+	const skipBefore =
+		searchee.label !== Label.WEBHOOK && excludeOlder
+			? nMsAgo(excludeOlder)
+			: Number.NEGATIVE_INFINITY;
+	const skipAfter =
+		searchee.label !== Label.WEBHOOK && excludeRecentSearch
+			? nMsAgo(excludeRecentSearch)
+			: Number.POSITIVE_INFINITY;
 	const timeFilteredIndexers = enabledIndexers.filter((indexer) => {
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id,
