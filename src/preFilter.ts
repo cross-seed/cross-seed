@@ -3,7 +3,6 @@ import { extname, basename, dirname } from "path";
 import { statSync } from "fs";
 import {
 	ARR_DIR_REGEX,
-	EP_REGEX,
 	SONARR_SUBFOLDERS_REGEX,
 	SEASON_REGEX,
 	VIDEO_EXTENSIONS,
@@ -15,18 +14,35 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee, SearcheeWithLabel } from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
 import {
+	filesWithExt,
 	getLogString,
 	getMediaType,
 	humanReadableDate,
+	MediaType,
 	nMsAgo,
 } from "./utils.js";
 import chalk from "chalk";
 
-function logReason(reason: string, searchee: Searchee): void {
+function logReason(
+	reason: string,
+	searchee: Searchee,
+	mediaType: MediaType,
+): void {
 	logger.verbose({
 		label: Label.PREFILTER,
-		message: `${getLogString(searchee, chalk.reset)} was not selected for searching because ${reason}`,
+		message: `${getLogString(searchee, chalk.reset)} | MediaType: ${mediaType.toUpperCase()} - was not selected for searching because ${reason}`,
 	});
+}
+
+function isSingleEpisode(searchee: Searchee, mediaType: MediaType): boolean {
+	if (mediaType === MediaType.EPISODE) return true;
+	if (mediaType !== MediaType.ANIME) return false;
+	return filesWithExt(searchee, VIDEO_EXTENSIONS).length === 1;
+	// if (m === MediaType.EPISODE) return true;
+	// if (!(m === MediaType.ANIME || m === MediaType.VIDEO)) return false;
+	// if (searchee.files.length === 1 && m === MediaType.ANIME) return true;
+	// if (searchee.files.length > 5) return false; // Probably a pack, allow extra files
+	// To check arrs use: return parsedMedia?.episodes?.length === 1, uncomment above
 }
 
 export function filterByContent(
@@ -40,9 +56,15 @@ export function filterByContent(
 		blockList,
 	} = getRuntimeConfig();
 
+	const mediaType = getMediaType(searchee);
+
 	const blockedNote = findBlockedStringInReleaseMaybe(searchee, blockList);
 	if (blockedNote) {
-		logReason(`it matched the blocklist - ("${blockedNote}")`, searchee);
+		logReason(
+			`it matched the blocklist - ("${blockedNote}")`,
+			searchee,
+			mediaType,
+		);
 		return false;
 	}
 
@@ -53,16 +75,16 @@ export function filterByContent(
 		(SEASON_REGEX.test(basename(dirname(searchee.path))) ||
 			SONARR_SUBFOLDERS_REGEX.test(basename(dirname(searchee.path))))
 	) {
-		logReason("it is a season pack episode", searchee);
+		logReason("it is a season pack episode", searchee, mediaType);
 		return false;
 	}
 
 	if (
 		!includeSingleEpisodes &&
 		![Label.ANNOUNCE, Label.RSS].includes(searchee.label) &&
-		EP_REGEX.test(searchee.name)
+		isSingleEpisode(searchee, mediaType)
 	) {
-		logReason("it is a single episode", searchee);
+		logReason("it is a single episode", searchee, mediaType);
 		return false;
 	}
 
@@ -78,6 +100,7 @@ export function filterByContent(
 		logReason(
 			`nonVideoSizeRatio ${nonVideoSizeRatio} > ${fuzzySizeThreshold} fuzzySizeThreshold`,
 			searchee,
+			mediaType,
 		);
 		return false;
 	}
@@ -91,7 +114,11 @@ export function filterByContent(
 			SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path))
 		)
 	) {
-		logReason("it looks like an arr movie/series directory", searchee);
+		logReason(
+			"it looks like an arr movie/series directory",
+			searchee,
+			mediaType,
+		);
 		return false;
 	}
 	return true;
@@ -225,6 +252,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 				first_searched_any,
 			)} is older than ${ms(excludeOlder, { long: true })} ago`,
 			searchee,
+			mediaType,
 		);
 		return false;
 	}
@@ -239,6 +267,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 				last_searched_all,
 			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`,
 			searchee,
+			mediaType,
 		);
 		return false;
 	}
