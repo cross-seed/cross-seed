@@ -123,7 +123,7 @@ module.exports = {
 	/**
 	 * Pause at least this many seconds in between each search. Higher is safer
 	 * for you and friendlier for trackers.
-	 * Minimum value of 10.
+	 * Minimum value of 30.
 	 */
 
 	delay: 30,
