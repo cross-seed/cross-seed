@@ -2,7 +2,9 @@ import chalk from "chalk";
 import {
 	existsSync,
 	linkSync,
+	lstatSync,
 	mkdirSync,
+	readlinkSync,
 	rmSync,
 	statSync,
 	symlinkSync,
@@ -371,15 +373,31 @@ export async function performActions(searchee, matches) {
 function linkFile(oldPath: string, newPath: string) {
 	const { linkType } = getRuntimeConfig();
 	try {
+		const ogFileResolvedPath = lstatSync(oldPath).isSymbolicLink()
+			? findSymlinksRealFile(oldPath)
+			: oldPath;
+
 		if (linkType === LinkType.HARDLINK) {
-			linkSync(oldPath, newPath);
+			linkSync(ogFileResolvedPath, newPath);
 		} else {
 			// we need to resolve because symlinks are resolved outside
 			// the context of cross-seed's working directory
-			symlinkSync(oldPath, resolve(newPath));
+			symlinkSync(ogFileResolvedPath, resolve(newPath));
 		}
 	} catch (e) {
 		if (e.code === "EEXIST") return;
 		throw e;
 	}
+}
+
+function findSymlinksRealFile(ogSymlinkPath: string): string {
+	let resolvedPath = readlinkSync(ogSymlinkPath);
+	while (lstatSync(resolvedPath).isSymbolicLink()) {
+		const nextResolvedPath = readlinkSync(resolvedPath);
+		if (resolvedPath === nextResolvedPath) {
+			throw new Error("recursive symlink failure");
+		}
+		resolvedPath = nextResolvedPath;
+	}
+	return resolvedPath;
 }
