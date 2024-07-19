@@ -1,4 +1,4 @@
-import path, { basename } from "path";
+import path from "path";
 import {
 	ALL_EXTENSIONS,
 	ANIME_REGEX,
@@ -12,7 +12,7 @@ import {
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
-import { Searchee } from "./searchee.js";
+import { File, Searchee } from "./searchee.js";
 import { Metafile } from "./parseTorrent.js";
 import chalk, { ChalkInstance } from "chalk";
 
@@ -37,7 +37,7 @@ export function isTruthy<T>(value: T): value is Truthy<T> {
 
 export function stripExtension(filename: string): string {
 	for (const ext of ALL_EXTENSIONS) {
-		if (filename.endsWith(ext)) return basename(filename, ext);
+		if (filename.endsWith(ext)) return path.basename(filename, ext);
 	}
 	return filename;
 }
@@ -56,6 +56,9 @@ export function humanReadableSize(bytes: number) {
 	const exponent = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
+}
+export function filesWithExt(searchee: Searchee, exts: string[]): File[] {
+	return searchee.files.filter((f) => exts.includes(path.extname(f.name)));
 }
 export function hasExt(searchee: Searchee, exts: string[]): boolean {
 	return searchee.files.some((f) => exts.includes(path.extname(f.name)));
@@ -178,7 +181,7 @@ export function getLogString(data: Metafile | Searchee, color: ChalkInstance) {
 		? `${color(data.name)} ${chalk.dim(`[${data.infoHash.slice(0, 8)}...]`)}`
 		: !data.path
 			? color(data.name)
-			: data.name === basename(data.path)
+			: data.name === path.basename(data.path)
 				? color(data.path)
 				: `${color(data.name)} ${chalk.dim(`[${data.path}]`)}`;
 }
