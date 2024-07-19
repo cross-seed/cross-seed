@@ -20,6 +20,7 @@ export const ANIME_REGEX =
 	/^(?:\[(?<group>.*?)\][_\s-]?)?(?:\[?(?<title>.+?)[_\s-]?(?:\(?(?:\d{1,2}(?:st|nd|rd|th))?\s?Season)?[_\s-]?\]?)(?:[([~/|-]\s?(?!\d{1,4})(?<altTitle>.+?)[)\]~-]?\s?)?[_\s-]?(?:[[(]?(?<year>(?:19|20)\d{2})[)\]]?)?[[_\s-](?:S\d{1,2})?[_\s-]{0,3}(?:#|EP?|(?:SP))?[_\s-]{0,3}(?!\d+[a-uw-z])(?<release>\d{1,4})(?!\.1)/i;
 export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w .]+?)(?:\[.+\])?(?:\))?(?:\s\[.+\])?$/i;
+export const ANIME_GROUP_REGEX = /^\s*\[(?<group>.+?)\]/i;
 export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[pix](?:\d{3,4}[pi]?)?)\b/i;
 export const RES_STRICT_REGEX = /(?<res>(?:2160|1080|720)[pi])/;
 export const YEAR_REGEX = /(?<year>(?:19|20)\d{2})(?![pix])/i;
@@ -136,6 +137,7 @@ export enum Decision {
 	BLOCKED_RELEASE = "BLOCKED_RELEASE",
 	PROPER_REPACK_MISMATCH = "PROPER_REPACK_MISMATCH",
 	RESOLUTION_MISMATCH = "RESOLUTION_MISMATCH",
+	SOURCE_MISMATCH = "SOURCE_MISMATCH",
 }
 export type DecisionAnyMatch =
 	| Decision.MATCH
@@ -148,6 +150,15 @@ export function isAnyMatchedDecision(
 		decision === Decision.MATCH ||
 		decision === Decision.MATCH_SIZE_ONLY ||
 		decision === Decision.MATCH_PARTIAL
+	);
+}
+export function isStaticDecision(decision: Decision): boolean {
+	return (
+		decision === Decision.RELEASE_GROUP_MISMATCH ||
+		decision === Decision.RESOLUTION_MISMATCH ||
+		decision === Decision.SOURCE_MISMATCH ||
+		decision === Decision.PROPER_REPACK_MISMATCH ||
+		decision === Decision.MAGNET_LINK
 	);
 }
 

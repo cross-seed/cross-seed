@@ -15,6 +15,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { File, Searchee } from "./searchee.js";
 import { Metafile } from "./parseTorrent.js";
 import chalk, { ChalkInstance } from "chalk";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 export enum MediaType {
 	EPISODE = "episode",
@@ -152,7 +153,7 @@ export function reformatNameForSearching(name: string): string {
 	return reformatTitleForSearching(
 		name.match(EP_REGEX)?.groups?.title ??
 			name.match(SEASON_REGEX)?.groups?.title ??
-			name.match(MOVIE_REGEX)?.groups?.title ??
+			name.match(MOVIE_REGEX)?.[0] ??
 			name,
 	);
 }
@@ -226,4 +227,14 @@ export function capitalizeFirstLetter(string) {
 
 export function extractInt(str: string): number {
 	return parseInt(str.match(/\d+/)![0]);
+}
+
+export function getFuzzySizeFactor(): number {
+	const { fuzzySizeThreshold } = getRuntimeConfig();
+	return fuzzySizeThreshold;
+}
+
+export function getMinSizeRatio(): number {
+	const { fuzzySizeThreshold } = getRuntimeConfig();
+	return 1 - fuzzySizeThreshold;
 }

@@ -23,6 +23,8 @@ import {
 } from "./utils.js";
 import chalk from "chalk";
 
+const MAX_INT = Number.MAX_SAFE_INTEGER;
+
 function logReason(
 	reason: string,
 	searchee: Searchee,
@@ -203,8 +205,9 @@ export function filterDupesFromSimilar<T extends Searchee>(
 }
 
 type TimestampDataSql = {
-	first_searched_any: number;
-	last_searched_all: number;
+	earliest_first_search: number;
+	latest_first_search: number;
+	earliest_last_search: number;
 };
 
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
@@ -231,41 +234,50 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 				.map((indexer) => indexer.id),
 		)
 		.min({
-			first_searched_any: db.raw(
-				"coalesce(timestamp.first_searched, 9223372036854775807)",
+			earliest_first_search: db.raw(
+				`coalesce(timestamp.first_searched, ${MAX_INT})`,
+			),
+		})
+		.max({
+			latest_first_search: db.raw(
+				`coalesce(timestamp.first_searched, ${MAX_INT})`,
 			),
 		})
 		.min({
-			last_searched_all: db.raw("coalesce(timestamp.last_searched, 0)"),
+			earliest_last_search: db.raw(
+				"coalesce(timestamp.last_searched, 0)",
+			),
 		})
 		.first()) as TimestampDataSql;
 
-	const { first_searched_any, last_searched_all } = timestampDataSql;
+	const { earliest_first_search, latest_first_search, earliest_last_search } =
+		timestampDataSql;
 
-	if (
-		typeof excludeOlder === "number" &&
-		first_searched_any &&
-		first_searched_any < nMsAgo(excludeOlder)
-	) {
-		logReason(
-			`its first search timestamp ${humanReadableDate(
-				first_searched_any,
-			)} is older than ${ms(excludeOlder, { long: true })} ago`,
-			searchee,
-			mediaType,
-		);
-		return false;
+	const skipBefore = excludeOlder
+		? nMsAgo(excludeOlder)
+		: Number.NEGATIVE_INFINITY;
+	// Don't exclude if new indexer was added
+	if (!latest_first_search || latest_first_search !== MAX_INT) {
+		if (earliest_first_search && earliest_first_search < skipBefore) {
+			logReason(
+				`its first search timestamp ${humanReadableDate(
+					earliest_first_search,
+				)} is older than ${ms(excludeOlder!, { long: true })} ago`,
+				searchee,
+				mediaType,
+			);
+			return false;
+		}
 	}
 
-	if (
-		typeof excludeRecentSearch === "number" &&
-		last_searched_all &&
-		last_searched_all > nMsAgo(excludeRecentSearch)
-	) {
+	const skipAfter = excludeRecentSearch
+		? nMsAgo(excludeRecentSearch)
+		: Number.POSITIVE_INFINITY;
+	if (earliest_last_search && earliest_last_search > skipAfter) {
 		logReason(
 			`its last search timestamp ${humanReadableDate(
-				last_searched_all,
-			)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`,
+				earliest_last_search,
+			)} is newer than ${ms(excludeRecentSearch!, { long: true })} ago`,
 			searchee,
 			mediaType,
 		);

@@ -2,6 +2,7 @@ import { readdirSync, statSync } from "fs";
 import { basename, dirname, extname, join, relative } from "path";
 import {
 	ANIME_REGEX,
+	ANIME_GROUP_REGEX,
 	ARR_DIR_REGEX,
 	EP_REGEX,
 	RELEASE_GROUP_REGEX,
@@ -173,7 +174,7 @@ export async function createSearcheeFromPath(
 	});
 }
 
-export function getKeyMetaInfo(stem: string, isAnime: boolean): string {
+export function getKeyMetaInfo(stem: string): string {
 	const resM = stem.match(RES_STRICT_REGEX)?.groups?.res;
 	const res = resM ? `.${resM}` : "";
 	const sourceM = parseSource(stem);
@@ -182,10 +183,7 @@ export function getKeyMetaInfo(stem: string, isAnime: boolean): string {
 	if (groupM) {
 		return `${res}${source}-${groupM}`.toLowerCase();
 	}
-	if (!isAnime) {
-		return `${res}${source}`.toLowerCase();
-	}
-	const groupAnimeM = stem.match(ANIME_REGEX)?.groups?.group;
+	const groupAnimeM = stem.match(ANIME_GROUP_REGEX)?.groups?.group;
 	if (groupAnimeM) {
 		return `${res}${source}-${groupAnimeM}`.toLowerCase();
 	}
