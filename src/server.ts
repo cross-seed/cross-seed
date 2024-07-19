@@ -88,10 +88,11 @@ async function search(
 		res.end(e.message);
 		return;
 	}
-	const criteria: TorrentLocator = pick(data, ["infoHash", "name", "path"]);
+	const criteria: TorrentLocator = pick(data, ["infoHash", "path"]);
 
-	if (!("infoHash" in criteria || "name" in criteria || "path" in criteria)) {
-		const message = "A name, info hash, or path must be provided";
+	if (!("infoHash" in criteria || "path" in criteria)) {
+		const message =
+			"An infoHash or path must be provided (infoHash is preferred).";
 		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);
@@ -119,7 +120,7 @@ async function search(
 		if (numFound === null) {
 			logger.info({
 				label: Label.WEBHOOK,
-				message: `Did not search for ${criteriaStr}`,
+				message: `Did not search for ${criteriaStr} (check verbose logs for preFilter reason)`,
 			});
 		} else {
 			logger.info({
