@@ -48,8 +48,13 @@ export interface TorznabCats {
 	tv: boolean;
 	movie: boolean;
 	anime: boolean;
+	xxx: boolean;
 	audio: boolean;
 	book: boolean;
+	/**
+	 * If the indexer has a category not covered by the above.
+	 */
+	additional: boolean;
 }
 
 export interface IdSearchParams {
@@ -90,8 +95,10 @@ const ALL_CAPS: Caps = {
 		tv: true,
 		movie: true,
 		anime: true,
+		xxx: true,
 		audio: true,
 		book: true,
+		additional: true,
 	},
 	tvSearch: true,
 	movieSearch: true,
@@ -192,22 +199,35 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	const categoryCaps = xml?.caps?.categories?.[0]?.category;
 
 	function getCatCaps(item: CategoryXmlElement[] | undefined) {
-		const categoryNames: string[] = (item ?? []).map(
-			(category) => category.$.name,
-		);
+		const categories = (item ?? []).map((cat) => ({
+			id: parseInt(cat.$.id),
+			name: cat.$.name.toLowerCase(),
+		}));
 
-		function indexerDoesSupportCat(category: string): boolean {
-			return categoryNames.some((cat) =>
-				cat.toLowerCase().includes(category),
-			);
-		}
-		return {
-			movie: indexerDoesSupportCat("movie"),
-			tv: indexerDoesSupportCat("tv"),
-			anime: indexerDoesSupportCat("anime"),
-			audio: indexerDoesSupportCat("audio"),
-			book: indexerDoesSupportCat("book"),
+		const caps = {
+			movie: false,
+			tv: false,
+			anime: false,
+			xxx: false,
+			audio: false,
+			book: false,
+			additional: false,
 		};
+		const keys = Object.keys(caps);
+		keys.splice(keys.indexOf("additional"), 1);
+		for (const { id, name } of categories) {
+			let isAdditional = true;
+			for (const cap of keys) {
+				if (name.includes(cap)) {
+					caps[cap] = true;
+					isAdditional = false;
+				}
+			}
+			if (isAdditional && id < 100000 && (id < 8000 || id > 8999)) {
+				caps.additional = true;
+			}
+		}
+		return caps;
 	}
 
 	return {
@@ -307,16 +327,17 @@ export function indexerDoesSupportMediaType(
 		case MediaType.EPISODE:
 		case MediaType.SEASON:
 			return caps.tv;
-		case MediaType.MOVIE: // Should get most anime movies
+		case MediaType.MOVIE:
 			return caps.movie;
-		case MediaType.ANIME: // All? indexers support anime (sometimes no cat)
-			return caps.anime || caps.tv || caps.movie;
+		case MediaType.ANIME:
+		case MediaType.VIDEO:
+			return caps.movie || caps.tv || caps.anime || caps.xxx;
 		case MediaType.AUDIO:
 			return caps.audio;
 		case MediaType.BOOK:
 			return caps.book;
 		case MediaType.OTHER:
-			return true;
+			return caps.additional;
 	}
 }
 
@@ -588,7 +609,7 @@ export async function validateTorznabUrls() {
 		}
 	}
 	await syncWithDb();
-	await updateCaps(); // Refresh every indexer's caps
+	await updateCaps();
 
 	const indexersWithoutSearch = await db("indexer")
 		.where({ search_cap: false, active: true })

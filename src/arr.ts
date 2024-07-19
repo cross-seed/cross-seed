@@ -232,7 +232,7 @@ function getRelevantArrInstances(mediaType: MediaType): string[] {
 		case MediaType.MOVIE:
 			return radarr;
 		case MediaType.ANIME:
-		case MediaType.OTHER:
+		case MediaType.VIDEO:
 			return [...sonarr, ...radarr];
 		default:
 			return [];
@@ -248,22 +248,22 @@ export async function scanAllArrsForMedia(
 		return resultOfErr(false);
 	}
 	const title =
-		mediaType === MediaType.OTHER
-			? cleanseSeparators(
+		mediaType !== MediaType.VIDEO
+			? searchee.name
+			: cleanseSeparators(
 					sourceRegexRemove(
 						stripExtension(searchee.name)
 							.replace(RELEASE_GROUP_REGEX, "")
 							.replace(RESOLUTION_REGEX, "")
 							.replace(REPACK_PROPER_REGEX, ""),
 					),
-				)
-			: searchee.name;
+				);
 	let error = new Error(
 		`No ids found for ${title} | MediaType: ${mediaType.toUpperCase()}`,
 	);
 	for (const uArrL of uArrLs) {
 		const name =
-			mediaType === MediaType.OTHER &&
+			mediaType === MediaType.VIDEO &&
 			getRuntimeConfig().sonarr?.includes(uArrL)
 				? `${title} S00E00` // Sonarr needs season or episode
 				: title;
