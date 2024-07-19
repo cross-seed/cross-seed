@@ -23,7 +23,6 @@ import { reformatNameForSearching, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
-	name?: string;
 	path?: string;
 }
 
@@ -332,16 +331,7 @@ export async function getTorrentByCriteria(
 	criteria: TorrentLocator,
 ): Promise<Metafile> {
 	const findResult = await db("torrent")
-		.where((b) => {
-			// there is always at least one criterion
-			if (criteria.infoHash) {
-				b = b.where({ info_hash: criteria.infoHash });
-			}
-			if (criteria.name) {
-				b = b.where({ name: criteria.name });
-			}
-			return b;
-		})
+		.where((b) => b.where({ info_hash: criteria.infoHash }))
 		.first();
 
 	if (findResult === undefined) {
