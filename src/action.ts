@@ -373,9 +373,7 @@ export async function performActions(searchee, matches) {
 function linkFile(oldPath: string, newPath: string) {
 	const { linkType } = getRuntimeConfig();
 	try {
-		const ogFileResolvedPath = lstatSync(oldPath).isSymbolicLink()
-			? findSymlinksRealFile(oldPath)
-			: oldPath;
+		const ogFileResolvedPath = unwrapSymlinks(oldPath);
 
 		if (linkType === LinkType.HARDLINK) {
 			linkSync(ogFileResolvedPath, newPath);
@@ -390,14 +388,17 @@ function linkFile(oldPath: string, newPath: string) {
 	}
 }
 
-function findSymlinksRealFile(ogSymlinkPath: string): string {
-	let resolvedPath = readlinkSync(ogSymlinkPath);
-	while (lstatSync(resolvedPath).isSymbolicLink()) {
-		const nextResolvedPath = readlinkSync(resolvedPath);
-		if (resolvedPath === nextResolvedPath) {
-			throw new Error("recursive symlink failure");
+/**
+ * Recursively resolves symlinks to the original file. Differs from realpath
+ * in that it will not resolve directory symlinks in the middle of the path.
+ * @param path
+ */
+function unwrapSymlinks(path: string): string {
+	for (let i = 0; i < 16; i++) {
+		if (!lstatSync(path).isSymbolicLink()) {
+			return path;
 		}
-		resolvedPath = nextResolvedPath;
+		path = resolve(dirname(path), readlinkSync(path));
 	}
-	return resolvedPath;
+	throw new Error(`too many levels of symbolic links at ${path}`);
 }
