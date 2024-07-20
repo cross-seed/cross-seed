@@ -123,7 +123,7 @@ module.exports = {
 	/**
 	 * Pause at least this many seconds in between each search. Higher is safer
 	 * for you and friendlier for trackers.
-	 * Minimum value of 10.
+	 * Minimum value of 30.
 	 */
 
 	delay: 30,
@@ -292,9 +292,10 @@ module.exports = {
 	/**
 	 * Exclude torrents first seen by cross-seed more than this long ago.
 	 * Examples:
-	 * "10 minutes"
-	 * "1 day"
-	 * "0" - this will search everything exactly once, never more.
+	 * "5 days"
+	 * "2 weeks"
+	 *
+	 * This value must be in the range of 2-5 times your excludeRecentSearch
 	 */
 	excludeOlder: "2 weeks",
 
@@ -304,7 +305,9 @@ module.exports = {
 	 * Doesn't exclude previously failed searches.
 	 * Examples:
 	 * "2 days"
-	 * "1 year"
+	 * "5 days"
+	 *
+	 * This value must be 2-5x less than excludeOlder.
 	 */
 	excludeRecentSearch: "3 days",
 
@@ -341,6 +344,8 @@ module.exports = {
 	 * Examples:
 	 * "2 weeks"
 	 * "3 days"
+	 *
+	 * This value must be at least 3x less than your excludeRecentSearch
 	 */
 	searchCadence: "1 day",
 

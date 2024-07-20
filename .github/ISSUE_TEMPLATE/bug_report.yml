@@ -26,7 +26,9 @@ body:
               If this behavior is a result of not being able to properly
               configure something, for example, please visit our Discord
               (https://discord.gg/jpbUFzS5Wb) prior to making any GitHub Issues.
-              these issues are strictly for bugs and feature requests.
+              GitHub issues are strictly for bugs and feature requests. If you
+              need support but cannot contact us via Discord, please use the
+              Discussions section.
           options:
               - label: I've tried to solve this already
                 required: true
