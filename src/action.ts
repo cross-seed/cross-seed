@@ -2,7 +2,9 @@ import chalk from "chalk";
 import {
 	existsSync,
 	linkSync,
+	lstatSync,
 	mkdirSync,
+	readlinkSync,
 	rmSync,
 	statSync,
 	symlinkSync,
@@ -371,15 +373,32 @@ export async function performActions(searchee, matches) {
 function linkFile(oldPath: string, newPath: string) {
 	const { linkType } = getRuntimeConfig();
 	try {
+		const ogFileResolvedPath = unwrapSymlinks(oldPath);
+
 		if (linkType === LinkType.HARDLINK) {
-			linkSync(oldPath, newPath);
+			linkSync(ogFileResolvedPath, newPath);
 		} else {
 			// we need to resolve because symlinks are resolved outside
 			// the context of cross-seed's working directory
-			symlinkSync(oldPath, resolve(newPath));
+			symlinkSync(ogFileResolvedPath, resolve(newPath));
 		}
 	} catch (e) {
 		if (e.code === "EEXIST") return;
 		throw e;
 	}
+}
+
+/**
+ * Recursively resolves symlinks to the original file. Differs from realpath
+ * in that it will not resolve directory symlinks in the middle of the path.
+ * @param path
+ */
+function unwrapSymlinks(path: string): string {
+	for (let i = 0; i < 16; i++) {
+		if (!lstatSync(path).isSymbolicLink()) {
+			return path;
+		}
+		path = resolve(dirname(path), readlinkSync(path));
+	}
+	throw new Error(`too many levels of symbolic links at ${path}`);
 }
