@@ -6,7 +6,6 @@ import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee } from "./searchee.js";
 import { Caps, IdSearchParams } from "./torznab.js";
 import {
 	cleanseSeparators,
@@ -240,7 +239,7 @@ function getRelevantArrInstances(mediaType: MediaType): string[] {
 }
 
 export async function scanAllArrsForMedia(
-	searchee: Searchee,
+	searcheeName: string,
 	mediaType: MediaType,
 ): Promise<Result<ParsedMedia, boolean>> {
 	const uArrLs = getRelevantArrInstances(mediaType);
@@ -249,10 +248,10 @@ export async function scanAllArrsForMedia(
 	}
 	const title =
 		mediaType !== MediaType.VIDEO
-			? searchee.name
+			? searcheeName
 			: cleanseSeparators(
 					sourceRegexRemove(
-						stripExtension(searchee.name)
+						stripExtension(searcheeName)
 							.replace(RELEASE_GROUP_REGEX, "")
 							.replace(RESOLUTION_REGEX, "")
 							.replace(REPACK_PROPER_REGEX, ""),
@@ -285,7 +284,7 @@ export async function scanAllArrsForMedia(
 			return resultOf(response);
 		}
 	}
-	logArrQueryResult({}, searchee.name, Label.ARRS, error);
+	logArrQueryResult({}, searcheeName, Label.ARRS, error);
 	return resultOfErr(false);
 }
 
