@@ -43,6 +43,7 @@ import {
 	stripExtension,
 } from "./utils.js";
 import chalk from "chalk";
+import { inspect } from "util";
 
 export interface TorznabCats {
 	tv: boolean;
@@ -241,12 +242,11 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 }
 
 async function createTorznabSearchQueries(
-	searchee: Searchee,
+	stem: string,
 	mediaType: MediaType,
 	caps: Caps,
 	parsedMedia?: ParsedMedia,
 ): Promise<TorznabParams[]> {
-	const stem = stripExtension(searchee.name);
 	const relevantIds: IdSearchParams = parsedMedia
 		? await getRelevantArrIds(caps, parsedMedia)
 		: {};
@@ -310,13 +310,35 @@ async function createTorznabSearchQueries(
 }
 
 export async function getSearchString(searchee: Searchee): Promise<string> {
+	const stem = stripExtension(searchee.name);
 	const mediaType = getMediaType(searchee);
 	const params = (
-		await createTorznabSearchQueries(searchee, mediaType, ALL_CAPS)
+		await createTorznabSearchQueries(stem, mediaType, ALL_CAPS)
 	)[0];
 	const season = params.season !== undefined ? `.S${params.season}` : "";
 	const ep = params.ep !== undefined ? `.E${params.ep}` : "";
 	return `${params.q}${season}${ep}`.toLowerCase();
+}
+
+/**
+ * Only for testing purposes.
+ * Logs the queries that would be sent to indexers for id and non-id searches.
+ * Ensure that item exists in your arr for the id search example.
+ * Ensure mediaType is what cross-seed would actually parse the item as.
+ */
+export async function logQueries(
+	searcheeName: string,
+	mediaType: MediaType,
+): Promise<void> {
+	const stem = stripExtension(searcheeName);
+	logger.info(
+		`RAW: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS))}`,
+	);
+	const res = await scanAllArrsForMedia(searcheeName, mediaType);
+	const parsedMedia = res.isOk() ? res.unwrap() : undefined;
+	logger.info(
+		`ID: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS, parsedMedia))}`,
+	);
 }
 
 export function indexerDoesSupportMediaType(
@@ -378,7 +400,7 @@ export async function searchTorznab(
 				categories: JSON.parse(indexer.categories),
 			};
 			return await createTorznabSearchQueries(
-				searchee,
+				stripExtension(searchee.name),
 				mediaType,
 				caps,
 				parsedMedia,
@@ -770,7 +792,7 @@ async function getAndLogIndexers(
 	const searchStr = await getSearchString(searchee);
 	if (cachedSearch.q === searchStr) {
 		shouldScanArr = false;
-		const res = await scanAllArrsForMedia(searchee, mediaType);
+		const res = await scanAllArrsForMedia(name, mediaType);
 		parsedMedia = res.isOk() ? res.unwrap() : undefined;
 		const ids = parsedMedia?.movie ?? parsedMedia?.series;
 		if (!arrIdsEqual(ids, cachedSearch.ids)) {
@@ -805,7 +827,7 @@ async function getAndLogIndexers(
 	}
 
 	if (shouldScanArr) {
-		const res = await scanAllArrsForMedia(searchee, mediaType);
+		const res = await scanAllArrsForMedia(name, mediaType);
 		parsedMedia = res.isOk() ? res.unwrap() : undefined;
 		cachedSearch.ids = parsedMedia?.movie ?? parsedMedia?.series;
 	}
