@@ -523,14 +523,9 @@ async function fetchCaps(indexer: {
 }): Promise<Caps> {
 	let response;
 	try {
-		const abortController = new AbortController();
-		setTimeout(
-			() => void abortController.abort(),
-			ms("10 seconds"),
-		).unref();
 		response = await fetch(
 			assembleUrl(indexer.url, indexer.apikey, { t: "caps" }),
-			{ signal: abortController.signal },
+			{ signal: AbortSignal.timeout(ms("10 seconds")) },
 		);
 	} catch (e) {
 		const error = new Error(

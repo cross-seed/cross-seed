@@ -138,12 +138,6 @@ export default class Deluge implements TorrentClient {
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
 		let response: Response, json: DelugeJSON<ResultType>;
-		const abortController = new AbortController();
-
-		setTimeout(
-			() => void abortController.abort(),
-			ms("10 seconds"),
-		).unref();
 
 		try {
 			response = await fetch(href, {
@@ -154,7 +148,7 @@ export default class Deluge implements TorrentClient {
 				}),
 				method: "POST",
 				headers,
-				signal: abortController.signal,
+				signal: AbortSignal.timeout(ms("10 seconds")),
 			});
 		} catch (networkError) {
 			if (networkError.name === "AbortError") {
