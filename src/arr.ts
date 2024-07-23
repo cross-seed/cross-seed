@@ -87,7 +87,7 @@ export async function validateUArrLs() {
 export async function checkArrIsActive(uArrL: string, arrInstance: string) {
 	const arrPingCheck = await makeArrApiCall<{
 		current: string;
-	}>(uArrL, "/api", undefined, arrInstance);
+	}>(uArrL, "/api", { arrInstance: arrInstance });
 
 	if (arrPingCheck.isOk()) {
 		const arrPingResponse = arrPingCheck.unwrap();
@@ -122,14 +122,14 @@ function getBodySampleMessage(text: string): string {
 async function makeArrApiCall<ResponseType>(
 	uArrL: string,
 	resourcePath: string,
-	params = new URLSearchParams(),
-	arrInstance?: string,
+	options: { params?: URLSearchParams; arrInstance?: string },
 ): Promise<Result<ResponseType, Error>> {
+	const urlParams = options.params ?? new URLSearchParams();
 	const apikey = getApikey(uArrL)!;
 	const url = new URL(sanitizeUrl(uArrL));
 
 	url.pathname = posixJoin(url.pathname, resourcePath);
-	for (const [name, value] of params) {
+	for (const [name, value] of urlParams) {
 		url.searchParams.set(name, value);
 	}
 
@@ -148,7 +148,7 @@ async function makeArrApiCall<ResponseType>(
 	if (
 		!response.ok ||
 		//compatibility for native indexer torznab
-		(arrInstance === "Torznab" &&
+		(options.arrInstance === "Torznab" &&
 			![200, 401, 404, 301, 302].includes(response.status))
 	) {
 		const responseText = await response.text();
@@ -176,11 +176,9 @@ async function getMediaFromArr(
 	uArrL: string,
 	title: string,
 ): Promise<Result<ParsedMedia, Error>> {
-	return await makeArrApiCall<ParsedMedia>(
-		uArrL,
-		"/api/v3/parse",
-		new URLSearchParams({ title }),
-	);
+	return await makeArrApiCall<ParsedMedia>(uArrL, "/api/v3/parse", {
+		params: new URLSearchParams({ title }),
+	});
 }
 
 export function formatFoundIds(foundIds: ExternalIds): string {
