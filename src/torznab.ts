@@ -7,6 +7,7 @@ import {
 	getRelevantArrIds,
 	ParsedMedia,
 	formatFoundIds,
+	checkArrIsActive,
 } from "./arr.js";
 import {
 	EP_REGEX,
@@ -631,6 +632,14 @@ export async function validateTorznabUrls() {
 			);
 		}
 	}
+
+	const uniqueUrls = new Set(
+		urls.map((url) => url.origin + "?" + url.searchParams.toString()),
+	);
+	for (const host of uniqueUrls) {
+		await checkArrIsActive(host, "Torznab");
+	}
+
 	await syncWithDb();
 	await updateCaps();
 

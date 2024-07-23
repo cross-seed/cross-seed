@@ -84,10 +84,10 @@ export async function validateUArrLs() {
 	}
 }
 
-async function checkArrIsActive(uArrL: string, arrInstance: string) {
+export async function checkArrIsActive(uArrL: string, arrInstance: string) {
 	const arrPingCheck = await makeArrApiCall<{
 		current: string;
-	}>(uArrL, "/api");
+	}>(uArrL, "/api", undefined, arrInstance);
 
 	if (arrPingCheck.isOk()) {
 		const arrPingResponse = arrPingCheck.unwrap();
@@ -123,6 +123,7 @@ async function makeArrApiCall<ResponseType>(
 	uArrL: string,
 	resourcePath: string,
 	params = new URLSearchParams(),
+	arrInstance?: string,
 ): Promise<Result<ResponseType, Error>> {
 	const apikey = getApikey(uArrL)!;
 	const url = new URL(sanitizeUrl(uArrL));
@@ -144,7 +145,12 @@ async function makeArrApiCall<ResponseType>(
 		}
 		return resultOfErr(networkError);
 	}
-	if (!response.ok) {
+	if (
+		!response.ok ||
+		//compatibility for native indexer torznab
+		(arrInstance === "Torznab" &&
+			![200, 401, 404, 301, 302].includes(response.status))
+	) {
 		const responseText = await response.text();
 		const bodySampleMessage = getBodySampleMessage(responseText);
 		return resultOfErr(
