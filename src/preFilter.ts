@@ -82,7 +82,7 @@ export function filterByContent(
 
 	if (
 		!includeSingleEpisodes &&
-		![Label.ANNOUNCE, Label.RSS].includes(searchee.label) &&
+		searchee.label !== Label.ANNOUNCE &&
 		isSingleEpisode(searchee, mediaType)
 	) {
 		logReason("it is a single episode", searchee, mediaType);
