@@ -26,7 +26,7 @@ const ZodErrorMessages = {
 	qBitAutoTMM:
 		"If using Automatic Torrent Management in qBittorrent, please read: https://www.cross-seed.org/docs/v6-migration#qbittorrent",
 	includeSingleEpisodes:
-		"includeSingleEpisodes is not recommended when using rss or announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
+		"includeSingleEpisodes is not recommended when using announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
 	needsInject: "You need to use the 'inject' action for partial matching.",
 	needsLinkDir:
 		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
