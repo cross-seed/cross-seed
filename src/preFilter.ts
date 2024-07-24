@@ -131,7 +131,7 @@ export function findBlockedStringInReleaseMaybe(
 ): string | undefined {
 	return blockList.find((blockedStr) => {
 		return (
-			searchee.name.includes(blockedStr) ||
+			searchee.title.includes(blockedStr) ||
 			(searchee.path &&
 				basename(dirname(searchee.path)).includes(blockedStr)) ||
 			blockedStr === searchee.infoHash
