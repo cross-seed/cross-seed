@@ -24,6 +24,7 @@ import {
 	filesWithExt,
 	getLogString,
 	isBadTitle,
+	isTruthy,
 	reformatTitleForSearching,
 	WithRequired,
 } from "./utils.js";
