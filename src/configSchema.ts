@@ -144,12 +144,30 @@ export const VALIDATION_SCHEMA = z
 			.string()
 			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
-			.nullish(),
+			.nullish()
+			.or(
+				z
+					.boolean()
+					.refine((value) => value !== true, {
+						message: "Expected string, received boolean (true)",
+					})
+					.transform(() => null),
+			),
+
 		excludeRecentSearch: z
 			.string()
 			.min(1, { message: ZodErrorMessages.emptyString })
 			.transform(transformDurationString)
-			.nullish(),
+			.nullish()
+			.or(
+				z
+					.boolean()
+					.refine((value) => value !== true, {
+						message: "Expected string, received boolean (true)",
+					})
+					.transform(() => null),
+			),
+
 		action: z.nativeEnum(Action),
 		qbittorrentUrl: z.string().url().nullish(),
 		rtorrentRpcUrl: z.string().url().nullish(),
