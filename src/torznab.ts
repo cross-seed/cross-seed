@@ -310,7 +310,7 @@ async function createTorznabSearchQueries(
 }
 
 export async function getSearchString(searchee: Searchee): Promise<string> {
-	const stem = stripExtension(searchee.name);
+	const stem = stripExtension(searchee.title);
 	const mediaType = getMediaType(searchee);
 	const params = (
 		await createTorznabSearchQueries(stem, mediaType, ALL_CAPS)
@@ -327,14 +327,14 @@ export async function getSearchString(searchee: Searchee): Promise<string> {
  * Ensure mediaType is what cross-seed would actually parse the item as.
  */
 export async function logQueries(
-	searcheeName: string,
+	searcheeTitle: string,
 	mediaType: MediaType,
 ): Promise<void> {
-	const stem = stripExtension(searcheeName);
+	const stem = stripExtension(searcheeTitle);
 	logger.info(
 		`RAW: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS))}`,
 	);
-	const res = await scanAllArrsForMedia(searcheeName, mediaType);
+	const res = await scanAllArrsForMedia(searcheeTitle, mediaType);
 	const parsedMedia = res.isOk() ? res.unwrap() : undefined;
 	logger.info(
 		`ID: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS, parsedMedia))}`,
@@ -400,7 +400,7 @@ export async function searchTorznab(
 				categories: JSON.parse(indexer.categories),
 			};
 			return await createTorznabSearchQueries(
-				stripExtension(searchee.name),
+				stripExtension(searchee.title),
 				mediaType,
 				caps,
 				parsedMedia,
@@ -746,7 +746,7 @@ async function getAndLogIndexers(
 	const enabledIndexers = await getEnabledIndexers();
 
 	// search history for name across all indexers
-	const name = searchee.name;
+	const name = searchee.title;
 	const timestampDataSql = await db("searchee")
 		.join("timestamp", "searchee.id", "timestamp.searchee_id")
 		.join("indexer", "timestamp.indexer_id", "indexer.id")

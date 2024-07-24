@@ -21,7 +21,6 @@ import {
 	MediaType,
 	nMsAgo,
 } from "./utils.js";
-import chalk from "chalk";
 
 const MAX_INT = Number.MAX_SAFE_INTEGER;
 
@@ -32,14 +31,14 @@ function logReason(
 ): void {
 	logger.verbose({
 		label: Label.PREFILTER,
-		message: `${getLogString(searchee, chalk.reset)} | MediaType: ${mediaType.toUpperCase()} - was not selected for searching because ${reason}`,
+		message: `${getLogString(searchee)} | MediaType: ${mediaType.toUpperCase()} - was not selected for searching because ${reason}`,
 	});
 }
 
 function isSingleEpisode(searchee: Searchee, mediaType: MediaType): boolean {
 	if (mediaType === MediaType.EPISODE) return true;
 	if (mediaType !== MediaType.ANIME) return false;
-	return filesWithExt(searchee, VIDEO_EXTENSIONS).length === 1;
+	return filesWithExt(searchee.files, VIDEO_EXTENSIONS).length === 1;
 	// if (m === MediaType.EPISODE) return true;
 	// if (!(m === MediaType.ANIME || m === MediaType.VIDEO)) return false;
 	// if (searchee.files.length === 1 && m === MediaType.ANIME) return true;
@@ -148,20 +147,20 @@ export function findBlockedStringInReleaseMaybe(
  */
 export function filterDupesByName<T extends Searchee>(searchees: T[]): T[] {
 	const duplicateMap = searchees.reduce((acc, cur) => {
-		const entry = acc.get(cur.name);
+		const entry = acc.get(cur.title);
 		if (entry === undefined) {
-			acc.set(cur.name, cur);
+			acc.set(cur.title, cur);
 			return acc;
 		}
 		if (cur.files.length > entry.files.length) {
-			acc.set(cur.name, cur);
+			acc.set(cur.title, cur);
 			return acc;
 		}
 		if (cur.files.length < entry.files.length) {
 			return acc;
 		}
 		if (cur.infoHash && !entry.infoHash) {
-			acc.set(cur.name, cur);
+			acc.set(cur.title, cur);
 		}
 		return acc;
 	}, new Map());
@@ -223,7 +222,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			"timestamp.indexer_id": "indexer.id",
 			"timestamp.searchee_id": "searchee.id",
 		})
-		.where("searchee.name", searchee.name)
+		.where("searchee.name", searchee.title)
 		.whereIn(
 			"indexer.id",
 			enabledIndexers

@@ -345,9 +345,10 @@ program
 	.description("Print a torrent's file tree")
 	.argument("torrent")
 	.action(async (fn) => {
-		console.log(
-			createSearcheeFromMetafile(await parseTorrentFromFilename(fn)),
+		const res = createSearcheeFromMetafile(
+			await parseTorrentFromFilename(fn),
 		);
+		res.isOk() ? console.log(res.unwrap()) : console.log(res.unwrapErr());
 	});
 
 program

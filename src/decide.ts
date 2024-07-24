@@ -71,7 +71,7 @@ const createReasonLogger =
 				break;
 			case Decision.RESOLUTION_MISMATCH:
 				reason = `its resolution does not match: ${
-					searchee.name.match(RES_STRICT_REGEX)?.groups?.res
+					searchee.title.match(RES_STRICT_REGEX)?.groups?.res
 				} -> ${candidate.name.match(RES_STRICT_REGEX)?.groups?.res}`;
 				break;
 			case Decision.NO_DOWNLOAD_LINK:
@@ -94,7 +94,7 @@ const createReasonLogger =
 				break;
 			case Decision.RELEASE_GROUP_MISMATCH:
 				reason = `it has a different release group: ${stripExtension(
-					searchee.name,
+					searchee.title,
 				)
 					.match(RELEASE_GROUP_REGEX)
 					?.groups?.group?.trim()} -> ${stripExtension(candidate.name)
@@ -103,12 +103,12 @@ const createReasonLogger =
 				break;
 			case Decision.PROPER_REPACK_MISMATCH:
 				reason = `one is a different subsequent release: ${
-					searchee.name.match(REPACK_PROPER_REGEX)?.groups?.type ??
+					searchee.title.match(REPACK_PROPER_REGEX)?.groups?.type ??
 					"INITIAL"
 				} -> ${candidate.name.match(REPACK_PROPER_REGEX)?.groups?.type ?? "INITIAL"}`;
 				break;
 			case Decision.SOURCE_MISMATCH:
-				reason = `it has a different source: ${parseSource(searchee.name)} -> ${parseSource(candidate.name)}`;
+				reason = `it has a different source: ${parseSource(searchee.title)} -> ${parseSource(candidate.name)}`;
 				break;
 			case Decision.BLOCKED_RELEASE:
 				reason = `it matches the blocklist: "${findBlockedStringInReleaseMaybe(
@@ -206,8 +206,8 @@ function fuzzySizeDoesMatch(resultSize: number, searchee: Searchee) {
 	const upperBound = length + fuzzySizeFactor * length;
 	return resultSize >= lowerBound && resultSize <= upperBound;
 }
-function resolutionDoesMatch(searcheeName: string, candidateName: string) {
-	const searcheeRes = searcheeName
+function resolutionDoesMatch(searcheeTitle: string, candidateName: string) {
+	const searcheeRes = searcheeTitle
 		.match(RES_STRICT_REGEX)
 		?.groups?.res?.trim()
 		?.toLowerCase();
@@ -218,8 +218,8 @@ function resolutionDoesMatch(searcheeName: string, candidateName: string) {
 	if (!searcheeRes || !candidateRes) return true;
 	return extractInt(searcheeRes) === extractInt(candidateRes);
 }
-function releaseGroupDoesMatch(searcheeName: string, candidateName: string) {
-	const searcheeReleaseGroup = stripExtension(searcheeName)
+function releaseGroupDoesMatch(searcheeTitle: string, candidateName: string) {
+	const searcheeReleaseGroup = stripExtension(searcheeTitle)
 		.match(RELEASE_GROUP_REGEX)
 		?.groups?.group?.trim()
 		?.toLowerCase();
@@ -238,7 +238,7 @@ function releaseGroupDoesMatch(searcheeName: string, candidateName: string) {
 	}
 
 	// Anime naming can cause weird things to match as release groups
-	const searcheeAnimeGroup = searcheeName
+	const searcheeAnimeGroup = searcheeTitle
 		.match(ANIME_GROUP_REGEX)
 		?.groups?.group?.trim()
 		?.toLowerCase();
@@ -262,8 +262,8 @@ function releaseGroupDoesMatch(searcheeName: string, candidateName: string) {
 	}
 	return false;
 }
-function sourceDoesMatch(searcheeName: string, candidateName: string) {
-	const searcheeSource = parseSource(searcheeName);
+function sourceDoesMatch(searcheeTitle: string, candidateName: string) {
+	const searcheeSource = parseSource(searcheeTitle);
 	const candidateSource = parseSource(candidateName);
 	if (!searcheeSource || !candidateSource) return true;
 	return searcheeSource === candidateSource;
@@ -283,13 +283,13 @@ async function assessCandidateHelper(
 	const size = isCandidate ? metaOrCandidate.size : metaOrCandidate.length;
 
 	if (isCandidate) {
-		if (!releaseGroupDoesMatch(searchee.name, name)) {
+		if (!releaseGroupDoesMatch(searchee.title, name)) {
 			return { decision: Decision.RELEASE_GROUP_MISMATCH };
 		}
-		if (!resolutionDoesMatch(searchee.name, name)) {
+		if (!resolutionDoesMatch(searchee.title, name)) {
 			return { decision: Decision.RESOLUTION_MISMATCH };
 		}
-		if (!sourceDoesMatch(searchee.name, name)) {
+		if (!sourceDoesMatch(searchee.title, name)) {
 			return { decision: Decision.SOURCE_MISMATCH };
 		}
 		if (size && !fuzzySizeDoesMatch(size, searchee)) {
@@ -405,7 +405,7 @@ async function assessAndSaveResults(
 	await db.transaction(async (trx) => {
 		const { id } = await trx("searchee")
 			.select("id")
-			.where({ name: searchee.name })
+			.where({ name: searchee.title })
 			.first();
 		await trx("decision")
 			.insert({
@@ -429,7 +429,7 @@ async function assessCandidateCaching(
 	infoHashesToExclude: string[],
 ): Promise<ResultAssessment> {
 	const { guid, name, tracker } = candidate;
-	const logReason = createReasonLogger(name, tracker, searchee.name);
+	const logReason = createReasonLogger(name, tracker, searchee.title);
 
 	const cacheEntry = await db("decision")
 		.select({
@@ -440,7 +440,7 @@ async function assessCandidateCaching(
 			fuzzySizeFactor: "decision.fuzzy_size_factor",
 		})
 		.join("searchee", "decision.searchee_id", "searchee.id")
-		.where({ name: searchee.name, guid })
+		.where({ name: searchee.title, guid })
 		.first();
 	const metaInfoHash: string | undefined = (
 		await db("decision")
