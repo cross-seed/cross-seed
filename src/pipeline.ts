@@ -99,7 +99,7 @@ async function findOnOtherSites(
 ): Promise<FoundOnOtherSites> {
 	// make sure searchee is in database
 	await db("searchee")
-		.insert({ name: searchee.name })
+		.insert({ name: searchee.title })
 		.onConflict("name")
 		.ignore();
 
@@ -118,7 +118,7 @@ async function findOnOtherSites(
 	if (response.length) {
 		logger.verbose({
 			label: Label.DECIDE,
-			message: `Assessing ${results.length} candidates for ${searchee.name} from ${searchedIndexers}|${cachedIndexers} indexers by search|cache`,
+			message: `Assessing ${results.length} candidates for ${searchee.title} from ${searchedIndexers}|${cachedIndexers} indexers by search|cache`,
 		});
 	}
 	const assessments = await assessCandidates(
@@ -151,7 +151,7 @@ async function findOnOtherSites(
 		return { searchedIndexers: 0, matches: 0 };
 	}
 
-	await updateSearchTimestamps(searchee.name, Array.from(notRateLimited));
+	await updateSearchTimestamps(searchee.title, Array.from(notRateLimited));
 
 	await updateIndexerStatus(
 		IndexerStatus.RATE_LIMITED,
@@ -215,16 +215,21 @@ export async function searchForLocalTorrentByCriteria(
 ): Promise<number | null> {
 	const { delay, maxDataDepth } = getRuntimeConfig();
 
-	let rawSearchees: Searchee[];
+	const rawSearchees: Searchee[] = [];
 	if (criteria.infoHash || !criteria.path) {
-		rawSearchees = [await getTorrentByCriteria(criteria)];
+		const res = createSearcheeFromMetafile(
+			await getTorrentByCriteria(criteria),
+		);
+		if (res.isOk()) rawSearchees.push(res.unwrap());
 	} else {
 		const searcheeResults = await Promise.all(
 			findPotentialNestedRoots(criteria.path, maxDataDepth).map(
 				createSearcheeFromPath,
 			),
 		);
-		rawSearchees = searcheeResults.filter(isOk).map((t) => t.unwrap());
+		rawSearchees.push(
+			...searcheeResults.filter(isOk).map((r) => r.unwrap()),
+		);
 	}
 	const searchees: SearcheeWithLabel[] = rawSearchees.map((searchee) => ({
 		...searchee,
@@ -285,6 +290,8 @@ export async function checkNewCandidateMatch(
 	const searchees: SearcheeWithLabel[] = filterDupesFromSimilar(
 		metas
 			.map(createSearcheeFromMetafile)
+			.filter(isOk)
+			.map((r) => r.unwrap())
 			.map((searchee) => ({ ...searchee, label: searcheeLabel }))
 			.filter((searchee) => filterByContent(searchee)),
 	);
@@ -297,7 +304,7 @@ export async function checkNewCandidateMatch(
 	}
 	logger.verbose({
 		label: searcheeLabel,
-		message: `Unique entries [${searchees.map((m) => m.name)}] using ${method} for ${candidateLog}`,
+		message: `Unique entries [${searchees.map((m) => m.title)}] using ${method} for ${candidateLog}`,
 	});
 
 	const hashesToExclude = await getInfoHashesToExclude();
@@ -306,7 +313,7 @@ export async function checkNewCandidateMatch(
 	searchees.sort((a, b) => b.files.length - a.files.length);
 	for (const searchee of searchees) {
 		await db("searchee")
-			.insert({ name: searchee.name })
+			.insert({ name: searchee.title })
 			.onConflict("name")
 			.ignore();
 

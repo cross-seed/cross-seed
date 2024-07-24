@@ -239,7 +239,7 @@ function getRelevantArrInstances(mediaType: MediaType): string[] {
 }
 
 export async function scanAllArrsForMedia(
-	searcheeName: string,
+	searcheeTitle: string,
 	mediaType: MediaType,
 ): Promise<Result<ParsedMedia, boolean>> {
 	const uArrLs = getRelevantArrInstances(mediaType);
@@ -248,10 +248,10 @@ export async function scanAllArrsForMedia(
 	}
 	const title =
 		mediaType !== MediaType.VIDEO
-			? searcheeName
+			? searcheeTitle
 			: cleanseSeparators(
 					sourceRegexRemove(
-						stripExtension(searcheeName)
+						stripExtension(searcheeTitle)
 							.replace(RELEASE_GROUP_REGEX, "")
 							.replace(RESOLUTION_REGEX, "")
 							.replace(REPACK_PROPER_REGEX, ""),
@@ -284,7 +284,7 @@ export async function scanAllArrsForMedia(
 			return resultOf(response);
 		}
 	}
-	logArrQueryResult({}, searcheeName, Label.ARRS, error);
+	logArrQueryResult({}, searcheeTitle, Label.ARRS, error);
 	return resultOfErr(false);
 }
 

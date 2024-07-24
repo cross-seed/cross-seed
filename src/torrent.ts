@@ -235,7 +235,7 @@ function getKeysFromName(name: string): {
 	const episodeKey = getEpisodeKey(stem);
 	if (episodeKey) {
 		const keyTitles = [episodeKey.keyTitle];
-		const element = `${episodeKey.season}.${episodeKey.episode}`;
+		const element = `${episodeKey.season ? `${episodeKey.season}.` : ""}${episodeKey.episode}`;
 		return { keyTitles, element, useFallback: false };
 	}
 	const seasonKey = getSeasonKey(stem);
