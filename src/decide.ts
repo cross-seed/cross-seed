@@ -12,18 +12,23 @@ import {
 	parseSource,
 	TORRENT_CACHE_FOLDER,
 	ANIME_GROUP_REGEX,
+	SEASON_REGEX,
 } from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
-import { findBlockedStringInReleaseMaybe } from "./preFilter.js";
+import {
+	findBlockedStringInReleaseMaybe,
+	isSingleEpisode,
+} from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee, SearcheeWithLabel } from "./searchee.js";
 import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
 import {
 	extractInt,
 	getFuzzySizeFactor,
+	getMediaType,
 	getMinSizeRatio,
 	humanReadableSize,
 	stripExtension,
@@ -274,7 +279,7 @@ async function assessCandidateHelper(
 	searchee: SearcheeWithLabel,
 	hashesToExclude: string[],
 ): Promise<ResultAssessment> {
-	const { matchMode, blockList } = getRuntimeConfig();
+	const { blockList, includeSingleEpisodes, matchMode } = getRuntimeConfig();
 
 	// When metaOrCandidate is a Metafile, skip straight to the
 	// main matching algorithms as we don't need pre-download filtering.
@@ -334,6 +339,15 @@ async function assessCandidateHelper(
 
 	if (hashesToExclude.includes(metafile.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS, metafile };
+	}
+
+	// Prevent candidate episodes from matching searchee season packs
+	if (
+		!includeSingleEpisodes &&
+		SEASON_REGEX.test(searchee.title) &&
+		isSingleEpisode(metafile, getMediaType(metafile))
+	) {
+		return { decision: Decision.FILE_TREE_MISMATCH, metafile };
 	}
 
 	const perfectMatch = compareFileTrees(metafile, searchee);

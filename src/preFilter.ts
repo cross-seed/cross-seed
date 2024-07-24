@@ -35,7 +35,10 @@ function logReason(
 	});
 }
 
-function isSingleEpisode(searchee: Searchee, mediaType: MediaType): boolean {
+export function isSingleEpisode(
+	searchee: Searchee,
+	mediaType: MediaType,
+): boolean {
 	if (mediaType === MediaType.EPISODE) return true;
 	if (mediaType !== MediaType.ANIME) return false;
 	return filesWithExt(searchee.files, VIDEO_EXTENSIONS).length === 1;
