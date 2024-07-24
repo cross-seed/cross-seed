@@ -133,6 +133,8 @@ export function findBlockedStringInReleaseMaybe(
 	return blockList.find((blockedStr) => {
 		return (
 			searchee.name.includes(blockedStr) ||
+			(searchee.path &&
+				basename(dirname(searchee.path)).includes(blockedStr)) ||
 			blockedStr === searchee.infoHash
 		);
 	});
