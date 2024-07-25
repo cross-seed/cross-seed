@@ -47,6 +47,10 @@ export class Metafile {
 	infoHash: string;
 	length: number;
 	name: string;
+	/**
+	 * Always name, exists for compatibility with Searchee
+	 */
+	title: string;
 	pieceLength: number;
 	files: File[];
 	isSingleFileTorrent: boolean;
@@ -70,6 +74,7 @@ export class Metafile {
 		this.raw = raw;
 		this.infoHash = sha1(bencode.encode(raw.info));
 		this.name = fallback(raw.info["name.utf-8"], raw.info.name)!.toString();
+		this.title = this.name;
 		this.pieceLength = raw.info["piece length"];
 
 		if (!raw.info.files) {

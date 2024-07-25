@@ -1,5 +1,5 @@
 import { readdirSync, statSync } from "fs";
-import { basename, dirname, extname, join, relative } from "path";
+import { basename, dirname, join, relative } from "path";
 import {
 	ANIME_REGEX,
 	ANIME_GROUP_REGEX,
@@ -21,6 +21,8 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import {
 	extractInt,
+	filesWithExt,
+	getLogString,
 	isBadTitle,
 	reformatTitleForSearching,
 	WithRequired,
@@ -39,12 +41,25 @@ export type SearcheeLabel =
 	| Label.WEBHOOK;
 
 export interface Searchee {
-	// if searchee is torrent based
+	/**
+	 * If searchee is torrent based
+	 */
 	infoHash?: string;
-	// if searchee is data based
+	/**
+	 * If searchee is data based
+	 */
 	path?: string;
 	files: File[];
+	/**
+	 * Original name. Use when interacting with path on disk or client logging
+	 * e.g. during the action stage for sourceRoot
+	 */
 	name: string;
+	/**
+	 * Usually name but can differ if we can parse something better.
+	 * e.g. Season 7 -> Show S7
+	 */
+	title: string;
 	length: number;
 	label?: SearcheeLabel;
 }
@@ -98,13 +113,85 @@ function getFilesFromDataRoot(rootPath: string): File[] {
 	}));
 }
 
-export function createSearcheeFromMetafile(meta: Metafile): Searchee {
-	return {
+/**
+ * Parse title from SXX or Season XX. Return null if no title found.
+ * Also tries to parse titles that are just `Show`, returns `Show` if better not found.
+ * @param files files in the searchee
+ * @param options.seasonMatch if the searchee is a `Season X` folder
+ * @param options.path if data based, the path to the searchee
+ */
+function parseTitle(
+	files: File[],
+	options: { seasonMatch: RegExpMatchArray | null; path?: string },
+): string | null {
+	const videoFiles = filesWithExt(files, VIDEO_EXTENSIONS);
+	for (const videoFile of videoFiles) {
+		const ep = videoFile.name.match(EP_REGEX);
+		if (ep) {
+			const seasonVal =
+				ep.groups!.season ??
+				ep.groups!.year ??
+				options.seasonMatch?.groups!.seasonNum;
+			const season = seasonVal ? `S${extractInt(seasonVal)}` : "";
+			const episode =
+				videoFiles.length === 1
+					? `E${extractInt(ep.groups!.episode) ?? `${ep.groups!.month}.${ep.groups!.day}`}`
+					: "";
+			if (season.length || episode.length || !options.seasonMatch) {
+				return `${ep.groups!.title} ${season}${episode}`.trim();
+			}
+		}
+		if (options.path && options.seasonMatch) {
+			const title = basename(dirname(options.path)).match(ARR_DIR_REGEX)
+				?.groups?.title;
+			if (title?.length) {
+				return `${title} S${options.seasonMatch.groups!.seasonNum}`;
+			}
+		}
+		const anime = videoFile.name.match(ANIME_REGEX);
+		if (anime) {
+			const season = options.seasonMatch
+				? `S${options.seasonMatch.groups!.seasonNum}`
+				: "";
+			if (season.length || !options.seasonMatch) {
+				return `${anime.groups!.title} ${season}`.trim();
+			}
+		}
+	}
+	return null;
+}
+
+export function createSearcheeFromMetafile(
+	meta: Metafile,
+): Result<Searchee, Error> {
+	const seasonMatch =
+		meta.name.length < 12 ? meta.name.match(SONARR_SUBFOLDERS_REGEX) : null;
+	if (!seasonMatch && meta.name.match(/\d/)) {
+		return resultOf({
+			files: meta.files,
+			infoHash: meta.infoHash,
+			name: meta.name,
+			title: meta.name,
+			length: meta.length,
+		});
+	}
+
+	const title = parseTitle(meta.files, { seasonMatch });
+	if (!title) {
+		const msg = `Could not find title for ${getLogString(meta)} from child files`;
+		logger.verbose({
+			label: Label.PREFILTER,
+			message: msg,
+		});
+		return resultOfErr(new Error(msg));
+	}
+	return resultOf({
 		files: meta.files,
 		infoHash: meta.infoHash,
 		name: meta.name,
+		title,
 		length: meta.length,
-	};
+	});
 }
 
 export async function createSearcheeFromTorrentFile(
@@ -112,7 +199,7 @@ export async function createSearcheeFromTorrentFile(
 ): Promise<Result<Searchee, Error>> {
 	try {
 		const meta = await parseTorrentFromFilename(filepath);
-		return resultOf(createSearcheeFromMetafile(meta));
+		return createSearcheeFromMetafile(meta);
 	} catch (e) {
 		logger.error(`Failed to parse ${basename(filepath)}`);
 		logger.debug(e);
@@ -140,23 +227,17 @@ export async function createSearcheeFromPath(
 	const baseName = basename(root);
 	const seasonMatch =
 		baseName.length < 12 ? baseName.match(SONARR_SUBFOLDERS_REGEX) : null;
-	if (!seasonMatch) {
+	if (!seasonMatch && baseName.match(/\d/)) {
 		return resultOf({
 			files: files,
 			path: root,
 			name: baseName,
+			title: baseName,
 			length: totalLength,
 		});
 	}
-	// Name is just SXX or Season XX, need to find title above or below
-	const videoFile = files.find((file) =>
-		VIDEO_EXTENSIONS.includes(extname(file.name)),
-	);
 
-	const title =
-		videoFile?.name.match(EP_REGEX)?.groups?.title ??
-		basename(dirname(root)).match(ARR_DIR_REGEX)?.groups?.title ??
-		videoFile?.name.match(ANIME_REGEX)?.groups?.title;
+	const title = parseTitle(files, { seasonMatch, path: root });
 	if (!title) {
 		const msg = `Could not find title for ${root} in parent directory or child files`;
 		logger.verbose({
@@ -165,11 +246,11 @@ export async function createSearcheeFromPath(
 		});
 		return resultOfErr(new Error(msg));
 	}
-
 	return resultOf({
 		files: files,
 		path: root,
-		name: `${title} S${seasonMatch.groups!.seasonNum}`,
+		name: baseName,
+		title,
 		length: totalLength,
 	});
 }
@@ -226,7 +307,7 @@ export function getSeasonKey(stem: string): {
 export function getEpisodeKey(stem: string): {
 	ensembleTitle: string;
 	keyTitle: string;
-	season: string;
+	season: string | undefined;
 	episode: number | string;
 } | null {
 	const match = stem.match(EP_REGEX);
@@ -236,14 +317,15 @@ export function getEpisodeKey(stem: string): {
 		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
 		.toLowerCase();
 	if (!keyTitle.length) return null;
-	const seasonM = match!.groups!.season;
-	const season = seasonM
-		? `S${extractInt(seasonM)}`
-		: `S${match!.groups!.year}`;
-	const ensembleTitle = `${match!.groups!.title}.${season}`;
-	const episode = seasonM
+	const season = match!.groups!.season
+		? `S${extractInt(match!.groups!.season)}`
+		: match!.groups!.year
+			? `S${match!.groups!.year}`
+			: undefined;
+	const ensembleTitle = `${match!.groups!.title}${season ? `.${season}` : ""}`;
+	const episode = match!.groups!.episode
 		? extractInt(match!.groups!.episode)
-		: `${match!.groups!.month}/${match!.groups!.day}`;
+		: `${match!.groups!.month}.${match!.groups!.day}`;
 	return { ensembleTitle, keyTitle, season, episode };
 }
 

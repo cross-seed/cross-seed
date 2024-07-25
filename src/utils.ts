@@ -13,7 +13,6 @@ import {
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { File, Searchee } from "./searchee.js";
-import { Metafile } from "./parseTorrent.js";
 import chalk, { ChalkInstance } from "chalk";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 
@@ -58,8 +57,8 @@ export function humanReadableSize(bytes: number) {
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
-export function filesWithExt(searchee: Searchee, exts: string[]): File[] {
-	return searchee.files.filter((f) => exts.includes(path.extname(f.name)));
+export function filesWithExt(files: File[], exts: string[]): File[] {
+	return files.filter((f) => exts.includes(path.extname(f.name)));
 }
 export function hasExt(searchee: Searchee, exts: string[]): boolean {
 	return searchee.files.some((f) => exts.includes(path.extname(f.name)));
@@ -77,16 +76,16 @@ export function getMediaType(searchee: Searchee): MediaType {
 
 	/* eslint-disable no-fallthrough */
 	switch (true) {
-		case EP_REGEX.test(searchee.name):
+		case EP_REGEX.test(searchee.title):
 			return MediaType.EPISODE;
-		case SEASON_REGEX.test(searchee.name):
+		case SEASON_REGEX.test(searchee.title):
 			return MediaType.SEASON;
 		case hasExt(searchee, VIDEO_EXTENSIONS):
-			if (MOVIE_REGEX.test(searchee.name)) return MediaType.MOVIE;
-			if (ANIME_REGEX.test(searchee.name)) return MediaType.ANIME;
+			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
+			if (ANIME_REGEX.test(searchee.title)) return MediaType.ANIME;
 			return MediaType.VIDEO;
 		case hasExt(searchee, [".rar"]):
-			if (MOVIE_REGEX.test(searchee.name)) return MediaType.MOVIE;
+			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
 		default:
 			return unsupportedMediaType(searchee);
 	}
@@ -174,17 +173,17 @@ export function humanReadableDate(timestamp: number): string {
 	return new Date(timestamp).toLocaleString("sv");
 }
 
-export function getLogString(data: Metafile | Searchee, color: ChalkInstance) {
-	if (data instanceof Metafile) {
-		return `${color(data.name)} ${chalk.dim(`[${data.infoHash.slice(0, 8)}...]`)}`;
-	}
-	return data.infoHash
-		? `${color(data.name)} ${chalk.dim(`[${data.infoHash.slice(0, 8)}...]`)}`
-		: !data.path
-			? color(data.name)
-			: data.name === path.basename(data.path)
-				? color(data.path)
-				: `${color(data.name)} ${chalk.dim(`[${data.path}]`)}`;
+export function getLogString(
+	searchee: Searchee,
+	color: ChalkInstance = chalk.reset,
+) {
+	return searchee.infoHash
+		? `${color(searchee.title)} ${chalk.dim(`[${searchee.infoHash.slice(0, 8)}...]`)}`
+		: !searchee.path
+			? color(searchee.title)
+			: searchee.title === searchee.name
+				? color(searchee.path)
+				: `${color(searchee.title)} ${chalk.dim(`[${searchee.path}]`)}`;
 }
 
 export function formatAsList(strings: string[]) {
