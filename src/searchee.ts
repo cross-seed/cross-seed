@@ -24,7 +24,6 @@ import {
 	filesWithExt,
 	getLogString,
 	isBadTitle,
-	isTruthy,
 	reformatTitleForSearching,
 	WithRequired,
 } from "./utils.js";
@@ -115,36 +114,48 @@ function getFilesFromDataRoot(rootPath: string): File[] {
 }
 
 /**
- * Parse title from SXX or Season XX
+ * Parse title from SXX or Season XX. Return null if no title found.
+ * Also tries to parse titles that are just `Show`, returns `Show` if better not found.
  * @param files files in the searchee
- * @param options.hasDigit if the searchee has a digit in the name
+ * @param options.seasonMatch if the searchee is a `Season X` folder
  * @param options.path if data based, the path to the searchee
  */
 function parseTitle(
 	files: File[],
-	options: { hasDigit: boolean; path?: string },
+	options: { seasonMatch: RegExpMatchArray | null; path?: string },
 ): string | null {
 	const videoFiles = filesWithExt(files, VIDEO_EXTENSIONS);
 	for (const videoFile of videoFiles) {
 		const ep = videoFile.name.match(EP_REGEX);
 		if (ep) {
-			const season = ep.groups!.season ?? ep.groups!.year;
+			const seasonVal =
+				ep.groups!.season ??
+				ep.groups!.year ??
+				options.seasonMatch?.groups!.seasonNum;
+			const season = seasonVal ? `S${extractInt(seasonVal)}` : "";
 			const episode =
-				ep.groups!.episode ?? `${ep.groups!.month}.${ep.groups!.day}`;
-			return videoFiles.length === 1
-				? `${ep.groups!.title}${season ? ` S${season}` : " "}E${episode}`
-				: ep.groups!.title;
+				videoFiles.length === 1
+					? `E${extractInt(ep.groups!.episode) ?? `${ep.groups!.month}.${ep.groups!.day}`}`
+					: "";
+			if (season.length || episode.length || !options.seasonMatch) {
+				return `${ep.groups!.title} ${season}${episode}`.trim();
+			}
 		}
-		if (options.hasDigit && options.path) {
+		if (options.path && options.seasonMatch) {
 			const title = basename(dirname(options.path)).match(ARR_DIR_REGEX)
 				?.groups?.title;
-			if (title && title.length) return title;
+			if (title?.length) {
+				return `${title} S${options.seasonMatch.groups!.seasonNum}`;
+			}
 		}
 		const anime = videoFile.name.match(ANIME_REGEX);
 		if (anime) {
-			return videoFiles.length === 1
-				? `${anime.groups!.title} ${anime.groups!.release}`
-				: anime.groups!.title;
+			const season = options.seasonMatch
+				? `S${options.seasonMatch.groups!.seasonNum}`
+				: "";
+			if (season.length || !options.seasonMatch) {
+				return `${anime.groups!.title} ${season}`.trim();
+			}
 		}
 	}
 	return null;
@@ -155,8 +166,7 @@ export function createSearcheeFromMetafile(
 ): Result<Searchee, Error> {
 	const seasonMatch =
 		meta.name.length < 12 ? meta.name.match(SONARR_SUBFOLDERS_REGEX) : null;
-	const hasDigit = isTruthy(meta.name.match(/\d/)); // Required for valid titles
-	if (!seasonMatch && hasDigit) {
+	if (!seasonMatch && meta.name.match(/\d/)) {
 		return resultOf({
 			files: meta.files,
 			infoHash: meta.infoHash,
@@ -166,8 +176,8 @@ export function createSearcheeFromMetafile(
 		});
 	}
 
-	const parsedName = parseTitle(meta.files, { hasDigit });
-	if (!parsedName && hasDigit) {
+	const title = parseTitle(meta.files, { seasonMatch });
+	if (!title) {
 		const msg = `Could not find title for ${getLogString(meta)} from child files`;
 		logger.verbose({
 			label: Label.PREFILTER,
@@ -175,12 +185,11 @@ export function createSearcheeFromMetafile(
 		});
 		return resultOfErr(new Error(msg));
 	}
-	const name = parsedName ?? meta.name;
 	return resultOf({
 		files: meta.files,
 		infoHash: meta.infoHash,
 		name: meta.name,
-		title: seasonMatch ? `${name} S${seasonMatch.groups!.seasonNum}` : name,
+		title,
 		length: meta.length,
 	});
 }
@@ -218,8 +227,7 @@ export async function createSearcheeFromPath(
 	const baseName = basename(root);
 	const seasonMatch =
 		baseName.length < 12 ? baseName.match(SONARR_SUBFOLDERS_REGEX) : null;
-	const hasDigit = isTruthy(baseName.match(/\d/)); // Required for valid titles
-	if (!seasonMatch && hasDigit) {
+	if (!seasonMatch && baseName.match(/\d/)) {
 		return resultOf({
 			files: files,
 			path: root,
@@ -229,8 +237,8 @@ export async function createSearcheeFromPath(
 		});
 	}
 
-	const parsedName = parseTitle(files, { hasDigit, path: root });
-	if (!parsedName && hasDigit) {
+	const title = parseTitle(files, { seasonMatch, path: root });
+	if (!title) {
 		const msg = `Could not find title for ${root} in parent directory or child files`;
 		logger.verbose({
 			label: Label.PREFILTER,
@@ -238,12 +246,11 @@ export async function createSearcheeFromPath(
 		});
 		return resultOfErr(new Error(msg));
 	}
-	const name = parsedName ?? baseName;
 	return resultOf({
 		files: files,
 		path: root,
 		name: baseName,
-		title: seasonMatch ? `${name} S${seasonMatch.groups!.seasonNum}` : name,
+		title,
 		length: totalLength,
 	});
 }
@@ -318,7 +325,7 @@ export function getEpisodeKey(stem: string): {
 	const ensembleTitle = `${match!.groups!.title}${season ? `.${season}` : ""}`;
 	const episode = match!.groups!.episode
 		? extractInt(match!.groups!.episode)
-		: `${match!.groups!.month}/${match!.groups!.day}`;
+		: `${match!.groups!.month}.${match!.groups!.day}`;
 	return { ensembleTitle, keyTitle, season, episode };
 }
 
