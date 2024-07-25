@@ -35,7 +35,10 @@ function logReason(
 	});
 }
 
-function isSingleEpisode(searchee: Searchee, mediaType: MediaType): boolean {
+export function isSingleEpisode(
+	searchee: Searchee,
+	mediaType: MediaType,
+): boolean {
 	if (mediaType === MediaType.EPISODE) return true;
 	if (mediaType !== MediaType.ANIME) return false;
 	return filesWithExt(searchee.files, VIDEO_EXTENSIONS).length === 1;
@@ -82,7 +85,7 @@ export function filterByContent(
 
 	if (
 		!includeSingleEpisodes &&
-		![Label.ANNOUNCE, Label.RSS].includes(searchee.label) &&
+		searchee.label !== Label.ANNOUNCE &&
 		isSingleEpisode(searchee, mediaType)
 	) {
 		logReason("it is a single episode", searchee, mediaType);
@@ -131,7 +134,7 @@ export function findBlockedStringInReleaseMaybe(
 ): string | undefined {
 	return blockList.find((blockedStr) => {
 		return (
-			searchee.name.includes(blockedStr) ||
+			searchee.title.includes(blockedStr) ||
 			(searchee.path &&
 				basename(dirname(searchee.path)).includes(blockedStr)) ||
 			blockedStr === searchee.infoHash
