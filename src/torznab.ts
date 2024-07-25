@@ -525,6 +525,7 @@ async function fetchCaps(indexer: {
 	try {
 		response = await fetch(
 			assembleUrl(indexer.url, indexer.apikey, { t: "caps" }),
+			{ signal: AbortSignal.timeout(ms("10 seconds")) },
 		);
 	} catch (e) {
 		const error = new Error(

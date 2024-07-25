@@ -11,6 +11,7 @@ import {
 } from "./pipeline.js";
 import { InjectionResult, SaveResult } from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
+import { existsSync } from "fs";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -90,9 +91,16 @@ async function search(
 	}
 	const criteria: TorrentLocator = pick(data, ["infoHash", "path"]);
 
-	if (!("infoHash" in criteria || "path" in criteria)) {
+	if (
+		!(
+			(criteria.infoHash && criteria.infoHash.length === 40) ||
+			(criteria.path &&
+				criteria.path.length > 0 &&
+				existsSync(criteria.path))
+		)
+	) {
 		const message =
-			"An infoHash or path must be provided (infoHash is preferred).";
+			"A valid infoHash or path must be provided (infoHash is preferred).";
 		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);
