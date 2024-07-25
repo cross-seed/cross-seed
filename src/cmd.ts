@@ -191,6 +191,14 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"Exclude torrents which have been searched more recently than n minutes ago. Bypasses the -a flag.",
 			fileConfig.excludeRecentSearch,
 		)
+		.option(
+			"--no-exclude-older",
+			"Don't Exclude torrents based on when they were first seen.",
+		)
+		.option(
+			"--no-exclude-recent-search",
+			"Don't Exclude torrents based on when they were last searched.",
+		)
 		.option("-v, --verbose", "Log verbose output", false)
 		.addOption(
 			new Option(
