@@ -11,7 +11,12 @@ import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { TorrentClient } from "./TorrentClient.js";
-import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
+import {
+	shouldRecheck,
+	extractCredentialsFromUrl,
+	wait,
+	getLogString,
+} from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 
 interface TorrentInfo {
@@ -277,7 +282,7 @@ export default class Deluge implements TorrentClient {
 			logger.debug(e);
 			logger.warn({
 				label: Label.DELUGE,
-				message: `Failed to label ${newTorrent.name} (${newTorrent.infoHash}) as ${label}`,
+				message: `Failed to label ${getLogString(newTorrent)} as ${label}`,
 			});
 		}
 	}
@@ -307,7 +312,7 @@ export default class Deluge implements TorrentClient {
 			if (!path && (!searchee.infoHash || !torrentInfo!)) {
 				logger.debug({
 					label: Label.DELUGE,
-					message: `Injection failure: ${newTorrent.name} was missing critical data.`,
+					message: `Injection failure: ${getLogString(searchee)} was missing critical data.`,
 				});
 				return InjectionResult.FAILURE;
 			}
@@ -339,7 +344,7 @@ export default class Deluge implements TorrentClient {
 				} else {
 					logger.debug({
 						label: Label.DELUGE,
-						message: `Unknown injection failure: ${newTorrent.name} (${newTorrent.infoHash})`,
+						message: `Unknown injection failure: ${getLogString(newTorrent)}`,
 					});
 					return InjectionResult.FAILURE;
 				}
@@ -490,7 +495,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				label: Label.DELUGE,
-				message: `Failed to fetch torrent data: ${searchee.name} - (${searchee.infoHash})`,
+				message: `Failed to fetch torrent data: ${getLogString(searchee)}`,
 			});
 			logger.debug(e);
 			throw new Error("web.update_ui: failed to fetch data from client", {

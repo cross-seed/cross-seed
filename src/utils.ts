@@ -177,13 +177,18 @@ export function getLogString(
 	searchee: Searchee,
 	color: ChalkInstance = chalk.reset,
 ) {
-	return searchee.infoHash
-		? `${color(searchee.title)} ${chalk.dim(`[${searchee.infoHash.slice(0, 8)}...]`)}`
-		: !searchee.path
-			? color(searchee.title)
-			: searchee.title === searchee.name
+	if (searchee.title === searchee.name) {
+		return searchee.infoHash
+			? `${color(searchee.title)} ${chalk.dim(`[${searchee.infoHash.slice(0, 8)}...]`)}`
+			: searchee.path
 				? color(searchee.path)
-				: `${color(searchee.title)} ${chalk.dim(`[${searchee.path}]`)}`;
+				: color(searchee.title);
+	}
+	return searchee.infoHash
+		? `${color(searchee.title)} ${chalk.dim(`[${searchee.name} [${searchee.infoHash.slice(0, 8)}...]]`)}`
+		: searchee.path
+			? `${color(searchee.title)} ${chalk.dim(`[${searchee.path}]`)}`
+			: `${color(searchee.title)} ${chalk.dim(`[${searchee.name}]`)}`;
 }
 
 export function formatAsList(strings: string[]) {

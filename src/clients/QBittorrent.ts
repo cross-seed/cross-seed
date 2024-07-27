@@ -11,7 +11,12 @@ import ms from "ms";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
+import {
+	shouldRecheck,
+	extractCredentialsFromUrl,
+	wait,
+	getLogString,
+} from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
@@ -369,12 +374,12 @@ export default class QBittorrent implements TorrentClient {
 				if (!path) {
 					// This is never possible, being made explicit here
 					throw new Error(
-						`Searchee torrent may have been deleted: ${searchee.name} [${searchee.infoHash}]`,
+						`Searchee torrent may have been deleted: ${getLogString(searchee)}`,
 					);
 				} else if (searchee.infoHash) {
 					logger.warning({
 						label: Label.QBITTORRENT,
-						message: `Searchee torrent may have been deleted, tagging may not meet expectations: ${searchee.name} [${searchee.infoHash}]`,
+						message: `Searchee torrent may have been deleted, tagging may not meet expectations: ${getLogString(searchee)}`,
 					});
 				}
 			}
