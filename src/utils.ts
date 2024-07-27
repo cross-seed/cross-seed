@@ -60,14 +60,14 @@ export function humanReadableSize(bytes: number) {
 export function filesWithExt(files: File[], exts: string[]): File[] {
 	return files.filter((f) => exts.includes(path.extname(f.name)));
 }
-export function hasExt(searchee: Searchee, exts: string[]): boolean {
-	return searchee.files.some((f) => exts.includes(path.extname(f.name)));
+export function hasExt(files: File[], exts: string[]): boolean {
+	return files.some((f) => exts.includes(path.extname(f.name)));
 }
 export function getMediaType(searchee: Searchee): MediaType {
 	function unsupportedMediaType(searchee: Searchee): MediaType {
-		if (hasExt(searchee, AUDIO_EXTENSIONS)) {
+		if (hasExt(searchee.files, AUDIO_EXTENSIONS)) {
 			return MediaType.AUDIO;
-		} else if (hasExt(searchee, BOOK_EXTENSIONS)) {
+		} else if (hasExt(searchee.files, BOOK_EXTENSIONS)) {
 			return MediaType.BOOK;
 		} else {
 			return MediaType.OTHER;
@@ -80,11 +80,11 @@ export function getMediaType(searchee: Searchee): MediaType {
 			return MediaType.EPISODE;
 		case SEASON_REGEX.test(searchee.title):
 			return MediaType.SEASON;
-		case hasExt(searchee, VIDEO_EXTENSIONS):
+		case hasExt(searchee.files, VIDEO_EXTENSIONS):
 			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
 			if (ANIME_REGEX.test(searchee.title)) return MediaType.ANIME;
 			return MediaType.VIDEO;
-		case hasExt(searchee, [".rar"]):
+		case hasExt(searchee.files, [".rar"]):
 			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
 		default:
 			return unsupportedMediaType(searchee);

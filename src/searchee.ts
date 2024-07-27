@@ -23,6 +23,7 @@ import {
 	extractInt,
 	filesWithExt,
 	getLogString,
+	hasExt,
 	isBadTitle,
 	reformatTitleForSearching,
 	WithRequired,
@@ -135,7 +136,7 @@ function parseTitle(
 			const season = seasonVal ? `S${extractInt(seasonVal)}` : "";
 			const episode =
 				videoFiles.length === 1
-					? `E${extractInt(ep.groups!.episode) ?? `${ep.groups!.month}.${ep.groups!.day}`}`
+					? `E${ep.groups!.episode ? extractInt(ep.groups!.episode) : `${ep.groups!.month}.${ep.groups!.day}`}`
 					: "";
 			if (season.length || episode.length || !options.seasonMatch) {
 				return `${ep.groups!.title} ${season}${episode}`.trim();
@@ -166,7 +167,10 @@ export function createSearcheeFromMetafile(
 ): Result<Searchee, Error> {
 	const seasonMatch =
 		meta.name.length < 12 ? meta.name.match(SONARR_SUBFOLDERS_REGEX) : null;
-	if (!seasonMatch && meta.name.match(/\d/)) {
+	if (
+		!seasonMatch &&
+		(meta.name.match(/\d/) || !hasExt(meta.files, VIDEO_EXTENSIONS))
+	) {
 		return resultOf({
 			files: meta.files,
 			infoHash: meta.infoHash,
@@ -176,7 +180,10 @@ export function createSearcheeFromMetafile(
 		});
 	}
 
-	const title = parseTitle(meta.files, { seasonMatch });
+	const title =
+		parseTitle(meta.files, { seasonMatch }) ?? !seasonMatch
+			? meta.name
+			: null;
 	if (!title) {
 		const msg = `Could not find title for ${getLogString(meta)} from child files`;
 		logger.verbose({
@@ -227,7 +234,10 @@ export async function createSearcheeFromPath(
 	const baseName = basename(root);
 	const seasonMatch =
 		baseName.length < 12 ? baseName.match(SONARR_SUBFOLDERS_REGEX) : null;
-	if (!seasonMatch && baseName.match(/\d/)) {
+	if (
+		!seasonMatch &&
+		(baseName.match(/\d/) || !hasExt(files, VIDEO_EXTENSIONS))
+	) {
 		return resultOf({
 			files: files,
 			path: root,
@@ -237,7 +247,10 @@ export async function createSearcheeFromPath(
 		});
 	}
 
-	const title = parseTitle(files, { seasonMatch, path: root });
+	const title =
+		parseTitle(files, { seasonMatch, path: root }) ?? !seasonMatch
+			? baseName
+			: null;
 	if (!title) {
 		const msg = `Could not find title for ${root} in parent directory or child files`;
 		logger.verbose({
