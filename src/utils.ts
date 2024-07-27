@@ -114,6 +114,14 @@ export function sanitizeUrl(url: string | URL): string {
 	}
 	return url.origin + url.pathname;
 }
+/**
+ * This cannot be done at the log level because of too many false positives.
+ * The caller will need to extract the infoHash from their specific syntax.
+ * @param infoHash The infoHash to sanitize
+ */
+export function sanitizeInfoHash(infoHash: string): string {
+	return `${infoHash.slice(0, 8)}...`;
+}
 
 export function getApikey(url: string) {
 	return new URL(url).searchParams.get("apikey");
@@ -177,13 +185,18 @@ export function getLogString(
 	searchee: Searchee,
 	color: ChalkInstance = chalk.reset,
 ) {
-	return searchee.infoHash
-		? `${color(searchee.title)} ${chalk.dim(`[${searchee.infoHash.slice(0, 8)}...]`)}`
-		: !searchee.path
-			? color(searchee.title)
-			: searchee.title === searchee.name
+	if (searchee.title === searchee.name) {
+		return searchee.infoHash
+			? `${color(searchee.title)} ${chalk.dim(`[${sanitizeInfoHash(searchee.infoHash)}]`)}`
+			: searchee.path
 				? color(searchee.path)
-				: `${color(searchee.title)} ${chalk.dim(`[${searchee.path}]`)}`;
+				: color(searchee.title);
+	}
+	return searchee.infoHash
+		? `${color(searchee.title)} ${chalk.dim(`[${searchee.name} [${sanitizeInfoHash(searchee.infoHash)}]]`)}`
+		: searchee.path
+			? `${color(searchee.title)} ${chalk.dim(`[${searchee.path}]`)}`
+			: `${color(searchee.title)} ${chalk.dim(`[${searchee.name}]`)}`;
 }
 
 export function formatAsList(strings: string[]) {

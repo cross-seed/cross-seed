@@ -123,7 +123,8 @@ function getFilesFromDataRoot(rootPath: string): File[] {
  */
 function parseTitle(
 	files: File[],
-	options: { seasonMatch: RegExpMatchArray | null; path?: string },
+	seasonMatch: RegExpMatchArray | null,
+	path?: string,
 ): string | null {
 	const videoFiles = filesWithExt(files, VIDEO_EXTENSIONS);
 	for (const videoFile of videoFiles) {
@@ -132,29 +133,29 @@ function parseTitle(
 			const seasonVal =
 				ep.groups!.season ??
 				ep.groups!.year ??
-				options.seasonMatch?.groups!.seasonNum;
+				seasonMatch?.groups!.seasonNum;
 			const season = seasonVal ? `S${extractInt(seasonVal)}` : "";
 			const episode =
 				videoFiles.length === 1
 					? `E${ep.groups!.episode ? extractInt(ep.groups!.episode) : `${ep.groups!.month}.${ep.groups!.day}`}`
 					: "";
-			if (season.length || episode.length || !options.seasonMatch) {
+			if (season.length || episode.length || !seasonMatch) {
 				return `${ep.groups!.title} ${season}${episode}`.trim();
 			}
 		}
-		if (options.path && options.seasonMatch) {
-			const title = basename(dirname(options.path)).match(ARR_DIR_REGEX)
-				?.groups?.title;
+		if (path && seasonMatch) {
+			const title = basename(dirname(path)).match(ARR_DIR_REGEX)?.groups
+				?.title;
 			if (title?.length) {
-				return `${title} S${options.seasonMatch.groups!.seasonNum}`;
+				return `${title} S${seasonMatch.groups!.seasonNum}`;
 			}
 		}
 		const anime = videoFile.name.match(ANIME_REGEX);
 		if (anime) {
-			const season = options.seasonMatch
-				? `S${options.seasonMatch.groups!.seasonNum}`
+			const season = seasonMatch
+				? `S${seasonMatch.groups!.seasonNum}`
 				: "";
-			if (season.length || !options.seasonMatch) {
+			if (season.length || !seasonMatch) {
 				return `${anime.groups!.title} ${season}`.trim();
 			}
 		}
@@ -181,9 +182,8 @@ export function createSearcheeFromMetafile(
 	}
 
 	const title =
-		parseTitle(meta.files, { seasonMatch }) ?? !seasonMatch
-			? meta.name
-			: null;
+		parseTitle(meta.files, seasonMatch) ??
+		(!seasonMatch ? meta.name : null);
 	if (!title) {
 		const msg = `Could not find title for ${getLogString(meta)} from child files`;
 		logger.verbose({
@@ -248,9 +248,8 @@ export async function createSearcheeFromPath(
 	}
 
 	const title =
-		parseTitle(files, { seasonMatch, path: root }) ?? !seasonMatch
-			? baseName
-			: null;
+		parseTitle(files, seasonMatch, root) ??
+		(!seasonMatch ? baseName : null);
 	if (!title) {
 		const msg = `Could not find title for ${root} in parent directory or child files`;
 		logger.verbose({

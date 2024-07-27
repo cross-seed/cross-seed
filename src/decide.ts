@@ -31,6 +31,7 @@ import {
 	getMediaType,
 	getMinSizeRatio,
 	humanReadableSize,
+	sanitizeInfoHash,
 	stripExtension,
 	wait,
 } from "./utils.js";
@@ -471,7 +472,7 @@ async function assessCandidateCaching(
 	if (metaOrCandidate instanceof Metafile) {
 		logger.verbose({
 			label: Label.DECIDE,
-			message: `Using ${metaInfoHash}.cached.torrent for ${tracker} assessment ${name}`,
+			message: `Using cached torrent ${sanitizeInfoHash(metaInfoHash!)} for ${tracker} assessment ${name}`,
 		});
 		candidate.size = metaOrCandidate.length; // Trackers can be wrong
 	}

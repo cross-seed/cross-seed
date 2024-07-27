@@ -12,6 +12,7 @@ import {
 import { InjectionResult, SaveResult } from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 import { existsSync } from "fs";
+import { sanitizeInfoHash } from "./utils.js";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -107,7 +108,12 @@ async function search(
 		return;
 	}
 
-	const criteriaStr = inspect(criteria);
+	const criteriaStr = criteria.infoHash
+		? inspect(criteria).replace(
+				/infoHash: '.*'/i,
+				`infoHash: '${sanitizeInfoHash(criteria.infoHash)}'`,
+			)
+		: inspect(criteria);
 
 	res.writeHead(204);
 	res.end();
