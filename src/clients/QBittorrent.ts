@@ -16,6 +16,7 @@ import {
 	extractCredentialsFromUrl,
 	wait,
 	getLogString,
+	sanitizeInfoHash,
 } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
@@ -133,7 +134,11 @@ export default class QBittorrent implements TorrentClient {
 		const bodyStr =
 			body instanceof FormData
 				? JSON.stringify(Object.fromEntries(body))
-				: JSON.stringify(body);
+				: JSON.stringify(body).replace(
+						/(?:hashes=)([a-z0-9]{40})/i,
+						(match, hash) =>
+							match.replace(hash, sanitizeInfoHash(hash)),
+					);
 		logger.verbose({
 			label: Label.QBITTORRENT,
 			message: `Making request (${retries}) to ${path} with body ${bodyStr}`,
