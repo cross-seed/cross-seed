@@ -60,13 +60,13 @@ function logDecision(
 		case Decision.MATCH:
 			return;
 		case Decision.FUZZY_SIZE_MISMATCH:
-			reason = `the sizes are outside of the fuzzySizeThreshold range: ${Math.abs((candidate.size - searchee.length) / searchee.length).toFixed(3)} > ${getFuzzySizeFactor()}`;
+			reason = `the total sizes are outside of the fuzzySizeThreshold range: ${Math.abs((candidate.size - searchee.length) / searchee.length).toFixed(3)} > ${getFuzzySizeFactor()}`;
 			break;
 		case Decision.SIZE_MISMATCH:
 			reason = `some files are missing or have different sizes${compareFileTreesPartial(metafile!, searchee) ? ` (will match in partial match mode)` : ""}`;
 			break;
 		case Decision.PARTIAL_SIZE_MISMATCH:
-			reason = `too many files are missing or have different sizes: torrent progress would be ${getPartialSizeRatio(metafile!, searchee).toFixed(2)}%`;
+			reason = `too many files are missing or have different sizes: torrent progress would be ${(getPartialSizeRatio(metafile!, searchee) * 100).toFixed(3)}%`;
 			break;
 		case Decision.RESOLUTION_MISMATCH:
 			reason = `its resolution does not match: ${
@@ -121,7 +121,7 @@ function logDecision(
 	}
 	logger.verbose({
 		label: Label.DECIDE,
-		message: `${getLogString(searchee)} - no match for ${tracker} torrent ${candidate.name} - ${reason}`,
+		message: `${getLogString(searchee)} - no match for ${tracker} torrent ${candidate.name}${metafile ? ` [${sanitizeInfoHash(metafile.infoHash)}]` : ""} - ${reason}`,
 	});
 }
 
