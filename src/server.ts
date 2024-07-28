@@ -110,8 +110,8 @@ async function search(
 
 	const criteriaStr = criteria.infoHash
 		? inspect(criteria).replace(
-				/infoHash: '.*'/i,
-				`infoHash: '${sanitizeInfoHash(criteria.infoHash)}'`,
+				criteria.infoHash,
+				sanitizeInfoHash(criteria.infoHash),
 			)
 		: inspect(criteria);
 
