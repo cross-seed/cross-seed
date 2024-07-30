@@ -28,7 +28,7 @@ import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee, SearcheeWithLabel } from "./searchee.js";
 import {
-	cleanseSeparators,
+	cleanTitle,
 	extractInt,
 	formatAsList,
 	getAnimeQueries,
@@ -38,7 +38,7 @@ import {
 	isTruthy,
 	MediaType,
 	nMsAgo,
-	reformatNameForSearching,
+	reformatTitleForSearching,
 	sanitizeUrl,
 	stripExtension,
 } from "./utils.js";
@@ -257,7 +257,7 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "tvsearch",
-				q: useIds ? undefined : cleanseSeparators(groups.title),
+				q: useIds ? undefined : reformatTitleForSearching(stem),
 				season: groups.season ? extractInt(groups.season) : groups.year,
 				ep: groups.episode
 					? extractInt(groups.episode)
@@ -271,7 +271,7 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "tvsearch",
-				q: useIds ? undefined : cleanseSeparators(groups.title),
+				q: useIds ? undefined : reformatTitleForSearching(stem),
 				season: extractInt(groups.season),
 				...relevantIds,
 			},
@@ -280,7 +280,7 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "movie",
-				q: useIds ? undefined : reformatNameForSearching(stem),
+				q: useIds ? undefined : reformatTitleForSearching(stem),
 				...relevantIds,
 			},
 		] as const;
@@ -299,14 +299,13 @@ async function createTorznabSearchQueries(
 			t: "search",
 			q: animeQuery,
 		}));
-	} else {
-		return [
-			{
-				t: "search",
-				q: cleanseSeparators(stem),
-			},
-		] as const;
 	}
+	return [
+		{
+			t: "search",
+			q: cleanTitle(stem),
+		},
+	] as const;
 }
 
 export async function getSearchString(searchee: Searchee): Promise<string> {
