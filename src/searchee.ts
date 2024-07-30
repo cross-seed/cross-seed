@@ -11,21 +11,19 @@ import {
 	parseSource,
 	SONARR_SUBFOLDERS_REGEX,
 	MOVIE_REGEX,
-	NON_UNICODE_ALPHANUM_REGEX,
 	VIDEO_EXTENSIONS,
-	YEAR_REGEX,
 } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import {
+	createKeyTitle,
 	extractInt,
 	filesWithExt,
 	getLogString,
 	hasExt,
 	isBadTitle,
-	reformatTitleForSearching,
 	WithRequired,
 } from "./utils.js";
 
@@ -290,10 +288,8 @@ export function getMovieKey(stem: string): {
 } | null {
 	const match = stem.match(MOVIE_REGEX);
 	if (!match) return null;
-	const keyTitle = reformatTitleForSearching(match.groups!.title)
-		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
-		.toLowerCase();
-	if (!keyTitle.length) return null;
+	const keyTitle = createKeyTitle(match.groups!.title);
+	if (!keyTitle) return null;
 	const year = extractInt(match.groups!.year);
 	const ensembleTitle = `${match.groups!.title}.${year}`;
 	return { ensembleTitle, keyTitle, year };
@@ -306,11 +302,8 @@ export function getSeasonKey(stem: string): {
 } | null {
 	const match = stem.match(SEASON_REGEX);
 	if (!match) return null;
-	const keyTitle = reformatTitleForSearching(match.groups!.title)
-		.replace(YEAR_REGEX, "")
-		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
-		.toLowerCase();
-	if (!keyTitle.length) return null;
+	const keyTitle = createKeyTitle(match.groups!.title);
+	if (!keyTitle) return null;
 	const season = `S${extractInt(match.groups!.season)}`;
 	const ensembleTitle = `${match.groups!.title}.${season}`;
 	return { ensembleTitle, keyTitle, season };
@@ -324,11 +317,8 @@ export function getEpisodeKey(stem: string): {
 } | null {
 	const match = stem.match(EP_REGEX);
 	if (!match) return null;
-	const keyTitle = reformatTitleForSearching(match!.groups!.title)
-		.replace(YEAR_REGEX, "")
-		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
-		.toLowerCase();
-	if (!keyTitle.length) return null;
+	const keyTitle = createKeyTitle(match.groups!.title);
+	if (!keyTitle) return null;
 	const season = match!.groups!.season
 		? `S${extractInt(match!.groups!.season)}`
 		: match!.groups!.year
@@ -355,11 +345,8 @@ export function getAnimeKeys(stem: string): {
 	for (const title of [firstTitle, altTitle]) {
 		if (!title) continue;
 		if (isBadTitle(title)) continue;
-		const keyTitle = reformatTitleForSearching(title)
-			.replace(YEAR_REGEX, "")
-			.replace(NON_UNICODE_ALPHANUM_REGEX, "")
-			.toLowerCase();
-		if (!keyTitle.length) continue;
+		const keyTitle = createKeyTitle(title);
+		if (!keyTitle) return null;
 		keyTitles.push(keyTitle);
 		ensembleTitles.push(title);
 	}

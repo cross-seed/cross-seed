@@ -3,7 +3,7 @@ import Fuse from "fuse.js";
 import fs from "fs";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
-import { NON_UNICODE_ALPHANUM_REGEX, USER_AGENT } from "./constants.js";
+import { USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { distance } from "fastest-levenshtein";
 import { logger, logOnce } from "./logger.js";
@@ -19,7 +19,7 @@ import {
 	getMovieKey,
 	getAnimeKeys,
 } from "./searchee.js";
-import { reformatNameForSearching, stripExtension } from "./utils.js";
+import { createKeyTitle, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -298,17 +298,13 @@ export async function getTorrentByFuzzyName(name: string): Promise<Metafile[]> {
 	const allNames: { name: string; file_path: string }[] = await db(
 		"torrent",
 	).select("name", "file_path");
-	const fullMatch = reformatNameForSearching(name)
-		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
-		.toLowerCase();
+	const fullMatch = createKeyTitle(name);
 
 	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
 	let filteredNames: typeof allNames = [];
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
-			const dbMatch = reformatNameForSearching(dbName.name)
-				.replace(NON_UNICODE_ALPHANUM_REGEX, "")
-				.toLowerCase();
+			const dbMatch = createKeyTitle(dbName.name);
 			if (!dbMatch) return false;
 			return fullMatch === dbMatch;
 		});
