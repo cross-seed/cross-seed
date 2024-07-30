@@ -10,7 +10,13 @@ import {
 	checkNewCandidateMatch,
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
-import { Decision, InjectionResult, SaveResult } from "./constants.js";
+import {
+	ActionResult,
+	Decision,
+	DecisionAnyMatch,
+	InjectionResult,
+	SaveResult,
+} from "./constants.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 import { existsSync } from "fs";
 import { sanitizeInfoHash } from "./utils.js";
@@ -152,6 +158,40 @@ async function search(
 	}
 }
 
+function determineResponse(result: {
+	decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null;
+	actionResult: ActionResult | null;
+}): { status: number; state: string } {
+	const injected = result.actionResult === InjectionResult.SUCCESS;
+	const added =
+		injected ||
+		result.actionResult === InjectionResult.FAILURE ||
+		result.actionResult === SaveResult.SAVED;
+	const exists =
+		result.decision === Decision.INFO_HASH_ALREADY_EXISTS ||
+		result.actionResult === InjectionResult.ALREADY_EXISTS;
+	const incomplete =
+		result.actionResult === InjectionResult.TORRENT_NOT_COMPLETE;
+
+	let status: number;
+	let state: string;
+	if (added) {
+		status = 200;
+		state = injected ? "Injected" : "Saved";
+	} else if (exists) {
+		status = 200;
+		state = "Already exists";
+	} else if (incomplete) {
+		status = 202;
+		state = "Saved";
+	} else {
+		throw new Error(
+			`Unexpected result: ${result.decision} | ${result.actionResult}`,
+		);
+	}
+	return { status, state };
+}
+
 async function announce(
 	req: IncomingMessage,
 	res: ServerResponse,
@@ -208,33 +248,7 @@ async function announce(
 			return;
 		}
 
-		const injected = result.actionResult === InjectionResult.SUCCESS;
-		const added =
-			injected ||
-			result.actionResult === InjectionResult.FAILURE ||
-			result.actionResult === SaveResult.SAVED;
-		const exists =
-			result.decision === Decision.INFO_HASH_ALREADY_EXISTS ||
-			result.actionResult === InjectionResult.ALREADY_EXISTS;
-		const incomplete =
-			result.actionResult === InjectionResult.TORRENT_NOT_COMPLETE;
-
-		let status: number;
-		let state: string;
-		if (added) {
-			status = 200;
-			state = injected ? "Injected" : "Saved";
-		} else if (exists) {
-			status = 200;
-			state = "Already exists";
-		} else if (incomplete) {
-			status = 202;
-			state = "Saved";
-		} else {
-			throw new Error(
-				`Unexpected result: ${result.decision} | ${result.actionResult}`,
-			);
-		}
+		const { status, state } = determineResponse(result);
 		logger.info({
 			label: Label.ANNOUNCE,
 			message: `${state} ${candidateLog} (status: ${status})`,

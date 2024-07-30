@@ -85,10 +85,7 @@ export function sendResultsNotification(
 			([assessment]) => assessment.metafile!.infoHash,
 		);
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
-		const trackersListStr = formatAsList(trackers, {
-			sort: true,
-			unit: false,
-		});
+		const trackersListStr = formatAsList(trackers, { sort: true });
 		const performedAction =
 			notableSuccesses[0][2] === InjectionResult.SUCCESS
 				? "Injected"
@@ -113,10 +110,7 @@ export function sendResultsNotification(
 			([assessment]) => assessment.metafile!.infoHash,
 		);
 		const trackers = failures.map(([, tracker]) => tracker);
-		const trackersListStr = formatAsList(trackers, {
-			sort: true,
-			unit: false,
-		});
+		const trackersListStr = formatAsList(trackers, { sort: true });
 
 		pushNotifier.notify({
 			body: `Failed to inject ${name} from ${numTrackers} trackers: ${trackersListStr}`,

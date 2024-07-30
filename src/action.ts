@@ -31,7 +31,8 @@ import {
 	SearcheeWithInfoHash,
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
-import { getLogString, getMediaType } from "./utils.js";
+import { capitalizeFirstLetter, getLogString, getMediaType } from "./utils.js";
+import { AssessmentWithTracker } from "./pipeline.js";
 
 interface LinkResult {
 	contentPath: string;
@@ -302,7 +303,7 @@ export async function performAction(
 			const result = linkedFilesRootResult.unwrapErr();
 			logger.error({
 				label: searchee.label,
-				message: `Failed to link files for ${newMeta.name}: ${result}`,
+				message: `Failed to link files for ${getLogString(newMeta)}: ${result}`,
 			});
 			const injectionResult =
 				result === "TORRENT_NOT_COMPLETE"
@@ -335,10 +336,8 @@ export async function performAction(
 		if (decision === Decision.MATCH_PARTIAL) {
 			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 		}
-	} else {
-		if (result !== InjectionResult.ALREADY_EXISTS) {
-			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
-		}
+	} else if (result !== InjectionResult.ALREADY_EXISTS) {
+		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 		if (unlinkOk && destinationDir) {
 			unlinkMetafile(newMeta, destinationDir);
 		}
@@ -346,12 +345,15 @@ export async function performAction(
 	return { actionResult: result, linkedNewFiles };
 }
 
-export async function performActions(searchee, matches) {
+export async function performActions(
+	searchee: Searchee,
+	matches: AssessmentWithTracker[],
+) {
 	const results: ActionResult[] = [];
 	for (const { tracker, assessment } of matches) {
 		const { actionResult } = await performAction(
-			assessment.metafile,
-			assessment.decision,
+			assessment.metafile!,
+			assessment.decision as DecisionAnyMatch,
 			searchee,
 			tracker,
 		);
@@ -373,6 +375,9 @@ function linkFile(oldPath: string, newPath: string): boolean {
 			// the context of cross-seed's working directory
 			symlinkSync(ogFileResolvedPath, resolve(newPath));
 		}
+		logger.verbose(
+			`${capitalizeFirstLetter(linkType)} ${oldPath} ---> ${newPath}`,
+		);
 		return true;
 	} catch (e) {
 		if (e.code === "EEXIST") return false;

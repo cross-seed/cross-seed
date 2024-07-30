@@ -3,7 +3,7 @@ import Fuse from "fuse.js";
 import fs from "fs";
 import { basename, extname, join, resolve } from "path";
 import { inspect } from "util";
-import { USER_AGENT } from "./constants.js";
+import { LEVENSHTEIN_DIVISOR, USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
 import { distance } from "fastest-levenshtein";
 import { logger, logOnce } from "./logger.js";
@@ -19,11 +19,7 @@ import {
 	getMovieKey,
 	getAnimeKeys,
 } from "./searchee.js";
-import {
-	MediaType,
-	createKeyTitle,
-	stripExtension,
-} from "./utils.js";
+import { MediaType, createKeyTitle, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -299,7 +295,10 @@ export async function getSimilarTorrentsByName(
 	if (!keyTitles.length) {
 		return { keys: [], metas };
 	}
-	const maxDistance = Math.floor(keyTitles[0].length / 4);
+	const candidateMaxDistance = Math.floor(
+		[...keyTitles].sort((a, b) => b.length - a.length)[0].length /
+			LEVENSHTEIN_DIVISOR,
+	);
 
 	const allEntries: { name: string; file_path: string }[] = await db(
 		"torrent",
@@ -307,6 +306,14 @@ export async function getSimilarTorrentsByName(
 	const filteredEntries = allEntries.filter((dbName) => {
 		const entry = getKeysFromName(dbName.name);
 		if (entry.element !== element) return false;
+		if (!entry.keyTitles.length) return false;
+		const maxDistance = Math.max(
+			candidateMaxDistance,
+			Math.floor(
+				[...entry.keyTitles].sort((a, b) => b.length - a.length)[0]
+					.length / LEVENSHTEIN_DIVISOR,
+			),
+		);
 		return entry.keyTitles.some((dbKeyTitle) => {
 			return keyTitles.some(
 				(keyTitle) => distance(keyTitle, dbKeyTitle) <= maxDistance,
