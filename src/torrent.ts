@@ -1,7 +1,7 @@
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import fs from "fs";
-import { extname, join, resolve } from "path";
+import { basename, extname, join, resolve } from "path";
 import { inspect } from "util";
 import { USER_AGENT } from "./constants.js";
 import { db } from "./db.js";
@@ -19,11 +19,21 @@ import {
 	getMovieKey,
 	getAnimeKeys,
 } from "./searchee.js";
-import { createKeyTitle, stripExtension } from "./utils.js";
+import {
+	MediaType,
+	createKeyTitle,
+	stripExtension,
+} from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
 	path?: string;
+}
+
+export interface TorrentNameInfo {
+	name?: string;
+	mediaType?: MediaType;
+	tracker?: string;
 }
 
 export enum SnatchError {
@@ -144,6 +154,7 @@ export async function saveTorrentFile(
 ): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
 	const buf = meta.encode();
+	// Be sure to update parseInfoFromSavedTorrent if changing the format
 	const filePath = join(
 		outputDir,
 		`[${tag}][${tracker}]${stripExtension(
@@ -155,6 +166,28 @@ export async function saveTorrentFile(
 		return;
 	}
 	await writeFile(filePath, buf, { mode: 0o644 });
+}
+
+export async function parseInfoFromSavedTorrent(
+	filename: string,
+): Promise<TorrentNameInfo> {
+	try {
+		const baseName = basename(filename);
+		const name = baseName.split("]")[2].split(".torrent")[0];
+		const mediaType = baseName
+			.split("[")[1]
+			.split("]")[0]
+			.toLowerCase() as MediaType;
+		const tracker = baseName.split("[")[2].split("]")[0];
+		if (!Object.values(MediaType).includes(mediaType)) {
+			throw new Error(`Invalid media type: ${mediaType}`);
+		}
+		return { name, mediaType, tracker };
+	} catch (e) {
+		logger.error(`Failed to parse info from filename: ${filename}`);
+		logger.debug(e);
+		return {};
+	}
 }
 
 export async function findAllTorrentFilesInDir(

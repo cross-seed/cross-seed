@@ -12,6 +12,7 @@ export interface RuntimeConfig {
 	linkCategory: string;
 	torrentDir?: string;
 	outputDir: string;
+	injectDir?: string;
 	includeSingleEpisodes: boolean;
 	verbose: boolean;
 	includeNonVideos: boolean;

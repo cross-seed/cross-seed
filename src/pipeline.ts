@@ -2,20 +2,30 @@ import chalk from "chalk";
 import fs from "fs";
 import { zip } from "lodash-es";
 import ms from "ms";
-import { performAction, performActions } from "./action.js";
+import {
+	linkAllFilesInMetafile,
+	performAction,
+	performActions,
+} from "./action.js";
 import {
 	ActionResult,
 	Decision,
+	DecisionAnyMatch,
 	InjectionResult,
 	isAnyMatchedDecision,
 	SaveResult,
+	UNKNOWN_TRACKER,
 } from "./constants.js";
 import {
 	findPotentialNestedRoots,
 	findSearcheesFromAllDataDirs,
 } from "./dataFiles.js";
 import { db } from "./db.js";
-import { assessCandidate, ResultAssessment } from "./decide.js";
+import {
+	assessCandidate,
+	assessCandidateHelper,
+	ResultAssessment,
+} from "./decide.js";
 import {
 	IndexerStatus,
 	updateIndexerStatus,
@@ -39,11 +49,14 @@ import {
 	SearcheeWithLabel,
 } from "./searchee.js";
 import {
+	findAllTorrentFilesInDir,
 	getInfoHashesToExclude,
 	getTorrentByCriteria,
 	getSimilarTorrentsByName,
 	indexNewTorrents,
 	loadTorrentDirLight,
+	parseInfoFromSavedTorrent,
+	parseTorrentFromFilename,
 	TorrentLocator,
 } from "./torrent.js";
 import {
@@ -52,7 +65,10 @@ import {
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
-import { getLogString, isTruthy, wait } from "./utils.js";
+import { formatAsList, getLogString, isTruthy, wait } from "./utils.js";
+import { Metafile } from "./parseTorrent.js";
+import { getClient } from "./clients/TorrentClient.js";
+import { dirname } from "path";
 
 export interface Candidate {
 	guid: string;
@@ -146,10 +162,6 @@ async function findOnOtherSites(
 		isAnyMatchedDecision(e.assessment.decision),
 	);
 	const actionResults = await performActions(searchee, matches);
-	if (actionResults.includes(InjectionResult.TORRENT_NOT_COMPLETE)) {
-		// If the torrent is not complete, "cancel the search"
-		return { searchedIndexers: 0, matches: 0 };
-	}
 
 	await updateSearchTimestamps(searchee.title, Array.from(notRateLimited));
 
@@ -275,9 +287,12 @@ export async function searchForLocalTorrentByCriteria(
 
 export async function checkNewCandidateMatch(
 	candidate: Candidate,
+	candidateLog: string,
 	searcheeLabel: SearcheeLabel,
-): Promise<InjectionResult | SaveResult | null> {
-	const candidateLog = `${candidate.name} from ${candidate.tracker}`;
+): Promise<{
+	decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null;
+	actionResult: ActionResult | null;
+}> {
 	const { keys, metas } = await getSimilarTorrentsByName(candidate.name);
 	const method = keys.length ? `[${keys}]` : "Fuse fallback";
 	if (!metas.length) {
@@ -285,7 +300,7 @@ export async function checkNewCandidateMatch(
 			label: searcheeLabel,
 			message: `Did not find an existing entry using ${method} for ${candidateLog}`,
 		});
-		return null;
+		return { decision: null, actionResult: null };
 	}
 	const searchees: SearcheeWithLabel[] = filterDupesFromSimilar(
 		metas
@@ -300,7 +315,7 @@ export async function checkNewCandidateMatch(
 			label: searcheeLabel,
 			message: `No valid entries found using ${method} for ${candidateLog}`,
 		});
-		return null;
+		return { decision: null, actionResult: null };
 	}
 	logger.verbose({
 		label: searcheeLabel,
@@ -309,7 +324,9 @@ export async function checkNewCandidateMatch(
 
 	const hashesToExclude = await getInfoHashesToExclude();
 
-	let result: InjectionResult | SaveResult | null = null;
+	let decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null =
+		null;
+	let actionResult: ActionResult | null = null;
 	searchees.sort((a, b) => b.files.length - a.files.length);
 	for (const searchee of searchees) {
 		await db("searchee")
@@ -324,30 +341,46 @@ export async function checkNewCandidateMatch(
 		);
 
 		if (!isAnyMatchedDecision(assessment.decision)) {
+			if (assessment.decision === Decision.SAME_INFO_HASH) {
+				decision = null;
+				break;
+			}
+			if (
+				assessment.decision === Decision.INFO_HASH_ALREADY_EXISTS &&
+				(!decision || !isAnyMatchedDecision(decision))
+			) {
+				decision = assessment.decision;
+			}
 			continue;
 		}
+		decision = assessment.decision;
 
-		result = await performAction(
-			assessment.metafile!,
-			assessment.decision,
-			searchee,
-			candidate.tracker,
-		);
+		actionResult = (
+			await performAction(
+				assessment.metafile!,
+				assessment.decision,
+				searchee,
+				candidate.tracker,
+			)
+		).actionResult;
 		sendResultsNotification(searchee, [
-			[assessment, candidate.tracker, result],
+			[assessment, candidate.tracker, actionResult],
 		]);
 		if (
-			result === SaveResult.SAVED ||
-			result === InjectionResult.SUCCESS ||
-			result === InjectionResult.ALREADY_EXISTS
+			actionResult === SaveResult.SAVED ||
+			actionResult === InjectionResult.SUCCESS ||
+			actionResult === InjectionResult.ALREADY_EXISTS
 		) {
 			break;
 		}
 	}
-	return result;
+	return { decision, actionResult };
 }
 
-async function findSearchableTorrents(searcheeLabel: SearcheeLabel): Promise<{
+async function findSearchableTorrents(
+	searcheeLabel: SearcheeLabel,
+	options: { useFilters: boolean },
+): Promise<{
 	searchees: SearcheeWithLabel[];
 	hashesToExclude: string[];
 }> {
@@ -381,6 +414,13 @@ async function findSearchableTorrents(searcheeLabel: SearcheeLabel): Promise<{
 	const hashesToExclude = allSearchees
 		.map((t) => t.infoHash)
 		.filter(isTruthy);
+
+	if (!options.useFilters) {
+		return {
+			searchees: allSearchees,
+			hashesToExclude,
+		};
+	}
 
 	// Group the exact same search queries together for easy cache use later
 	const grouping = new Map<string, SearcheeWithLabel[]>();
@@ -438,6 +478,7 @@ export async function main(): Promise<void> {
 	const { outputDir, linkDir } = getRuntimeConfig();
 	const { searchees, hashesToExclude } = await findSearchableTorrents(
 		Label.SEARCH,
+		{ useFilters: true },
 	);
 
 	if (!fs.existsSync(outputDir)) {
@@ -489,14 +530,400 @@ export async function scanRssFeeds() {
 		});
 		await indexNewTorrents();
 		for (const [i, candidate] of candidatesSinceLastTime.entries()) {
+			const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 			logger.verbose({
 				label: Label.RSS,
-				message: `Processing release ${i + 1}/${
-					candidatesSinceLastTime.length
-				}`,
+				message: `(${i + 1}/${candidatesSinceLastTime.length}) ${candidateLog}`,
 			});
-			await checkNewCandidateMatch(candidate, Label.RSS);
+			await checkNewCandidateMatch(candidate, candidateLog, Label.RSS);
 		}
 		logger.info({ label: Label.RSS, message: "Scan complete" });
+	}
+}
+
+export async function injectSavedTorrents() {
+	const { flatLinking, injectDir, linkDir, outputDir } = getRuntimeConfig();
+	const targetDir = injectDir ?? outputDir;
+	const targetDirLog = chalk.bold.magenta(targetDir);
+
+	if (injectDir) {
+		// injectDir defined only by `cross-seed inject`
+		logger.warn({
+			label: Label.INJECT,
+			message: `Manually injecting torrents performs minimal filtering which slightly increases chances of false positives, see the docs for more info`,
+		});
+	}
+	if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) {
+		logger.info({
+			label: Label.INJECT,
+			message: `No directory found at ${targetDirLog} - ensure it exists and is accessible (verify docker volumes if applicable)`,
+		});
+		return;
+	}
+	const dirContents = await findAllTorrentFilesInDir(targetDir);
+	if (dirContents.length === 0) {
+		logger.info({
+			label: Label.INJECT,
+			message: `No torrent files found to inject in ${targetDirLog}`,
+		});
+		return;
+	}
+	logger.info({
+		label: Label.INJECT,
+		message: `Found ${chalk.bold.white(dirContents.length)} torrent file(s) to inject in ${targetDirLog}`,
+	});
+
+	const { searchees } = await findSearchableTorrents(Label.INJECT, {
+		useFilters: false,
+	});
+
+	const toDelete = new Set<string>();
+	const toRecheck = new Set<string>();
+
+	// Usually source got deleted or partial injection never completes
+	function shouldCleanUpTorrent(torrentFilePath: string) {
+		return fs.statSync(torrentFilePath).mtimeMs < Date.now() - ms("1 week");
+	}
+
+	let totalInjected = 0;
+	let totalFullMatches = 0;
+	let totalPartialMatches = 0;
+	let totalBlocked = 0;
+	let totalAlreadyExists = 0;
+	let totalCandidateIncomplete = 0;
+	let totalSearcheeIncomplete = 0;
+	let totalFailed = 0;
+	let totalUnmatched = 0;
+	let count = 0;
+	let foundBadFormat = false;
+	for (const torrentFilePath of dirContents) {
+		const progress = chalk.blue(`(${++count}/${dirContents.length})`);
+		const filePathLog = chalk.bold.magenta(torrentFilePath);
+		if (shouldCleanUpTorrent(torrentFilePath)) {
+			toDelete.add(torrentFilePath);
+		}
+		let meta: Metafile;
+		try {
+			meta = await parseTorrentFromFilename(torrentFilePath);
+		} catch (e) {
+			logger.error({
+				label: Label.INJECT,
+				message: `${progress} Failed to parse ${filePathLog}`,
+			});
+			logger.debug(e);
+			continue;
+		}
+		const metaLog = getLogString(meta, chalk.bold.white);
+
+		const torrentNameInfo =
+			await parseInfoFromSavedTorrent(torrentFilePath);
+		const tracker = torrentNameInfo?.tracker ?? UNKNOWN_TRACKER;
+		if (tracker === UNKNOWN_TRACKER) {
+			foundBadFormat = true;
+		}
+
+		// Decide stage
+		const fullMatches: [
+			SearcheeWithLabel,
+			Decision.MATCH | Decision.MATCH_SIZE_ONLY,
+		][] = [];
+		const partialMatches: [SearcheeWithLabel, Decision.MATCH_PARTIAL][] =
+			[];
+		let foundBlocked = false;
+		for (const searchee of searchees) {
+			const { decision } = await assessCandidateHelper(
+				meta,
+				searchee,
+				[],
+			);
+			if (decision === Decision.MATCH) {
+				fullMatches.unshift([searchee, decision]);
+			} else if (decision === Decision.MATCH_SIZE_ONLY) {
+				fullMatches.push([searchee, decision]);
+			} else if (decision === Decision.MATCH_PARTIAL) {
+				partialMatches.push([searchee, decision]);
+			} else if (decision === Decision.BLOCKED_RELEASE) {
+				foundBlocked = true;
+			}
+		}
+		fullMatches.sort((a, b) => {
+			// Prefer torrent over data/virtual
+			if (a[0].infoHash && !b[0].infoHash) {
+				return -1;
+			}
+			if (!a[0].infoHash && b[0].infoHash) {
+				return 1;
+			}
+			return 0; // Should keep MATCH first within a searchee type
+		});
+		partialMatches.sort((a, b) => {
+			// Prefer torrent/data over virtual
+			if ((a[0].infoHash || a[0].path) && !(b[0].infoHash || b[0].path)) {
+				return -1;
+			}
+			if (!(a[0].infoHash || a[0].path) && (b[0].infoHash || b[0].path)) {
+				return 1;
+			}
+			return b[0].files.length - a[0].files.length; // Prefer more files
+		});
+		if (fullMatches.length === 0 && partialMatches.length === 0) {
+			if (foundBlocked) {
+				logger.info({
+					label: Label.INJECT,
+					message: `${progress} ${metaLog} ${chalk.yellow("possibly blocklisted")}: ${filePathLog}`,
+				});
+				totalBlocked++;
+			} else {
+				logger.info({
+					label: Label.INJECT,
+					message: `${progress} ${metaLog} ${chalk.red("has no matches")}: ${filePathLog}`,
+				});
+				totalUnmatched++;
+			}
+			continue;
+		}
+
+		// Action stage
+		let injectionResult = InjectionResult.FAILURE;
+		let matchedSearchee: SearcheeWithLabel;
+		let matchedDecision: DecisionAnyMatch;
+		let linkedNewFiles = false;
+		for (const [searchee, decision] of [
+			...fullMatches,
+			...partialMatches,
+		]) {
+			if (
+				injectionResult === InjectionResult.TORRENT_NOT_COMPLETE &&
+				!searchee.infoHash
+			) {
+				continue; // Data/virtual searchee doesn't know if torrent is complete
+			}
+			const res = await performAction(meta, decision, searchee, tracker);
+			const result = res.actionResult;
+			if (res.linkedNewFiles) {
+				linkedNewFiles = true;
+			}
+			if (
+				injectionResult === InjectionResult.SUCCESS ||
+				result === InjectionResult.FAILURE ||
+				result === SaveResult.SAVED
+			) {
+				continue;
+			}
+			if (result === InjectionResult.ALREADY_EXISTS) {
+				injectionResult = result;
+				continue;
+			}
+			if (result === InjectionResult.TORRENT_NOT_COMPLETE) {
+				if (injectionResult !== InjectionResult.ALREADY_EXISTS) {
+					injectionResult = result;
+					matchedSearchee = searchee;
+					matchedDecision = decision;
+				}
+				continue;
+			}
+			injectionResult = InjectionResult.SUCCESS;
+			matchedSearchee = searchee;
+			matchedDecision = decision;
+		}
+		if (injectionResult === InjectionResult.FAILURE) {
+			logger.error({
+				label: Label.INJECT,
+				message: `${progress} Failed to inject ${filePathLog} - ${chalk.red(injectionResult)}`,
+			});
+			totalFailed++;
+			continue;
+		}
+		if (injectionResult === InjectionResult.TORRENT_NOT_COMPLETE) {
+			if (
+				linkDir &&
+				fs.statSync(torrentFilePath).mtimeMs < Date.now() - ms("1 day")
+			) {
+				// Since source is stalled, add to client paused so user can resume later if desired
+				// Try linking all possible matches as they may have different files
+				let linkedNewFiles = false;
+				let inClient: boolean | null = null;
+				for (const [searchee, decision] of [
+					...fullMatches,
+					...partialMatches,
+				]) {
+					const linkedFilesRootResult = await linkAllFilesInMetafile(
+						searchee,
+						meta,
+						tracker,
+						decision,
+						{ onlyCompleted: false },
+					);
+					const linkResult = linkedFilesRootResult.isOk()
+						? linkedFilesRootResult.unwrap()
+						: null;
+					if (linkResult && linkResult.linkedNewFiles) {
+						linkedNewFiles = true;
+					}
+					if (!inClient) {
+						inClient = (
+							await getClient().isTorrentComplete(meta.infoHash)
+						).isOk();
+					}
+					if (!inClient) {
+						if (linkedFilesRootResult.isOk()) {
+							const destinationDir = dirname(
+								linkResult!.contentPath,
+							);
+							const result = await getClient().inject(
+								meta,
+								searchee,
+								Decision.MATCH_PARTIAL, // Should always be considered partial
+								destinationDir,
+							);
+							// result is only SUCCESS or FAILURE here but still log original injectionResult
+							if (result === InjectionResult.SUCCESS) {
+								logger.info({
+									label: Label.INJECT,
+									message: `${progress} Injected ${filePathLog} using stalled source, you will need to resume or remove from client - ${chalk.green(injectionResult)}`,
+								});
+							} else {
+								logger.warn({
+									label: Label.INJECT,
+									message: `${progress} Failed to inject ${filePathLog} using stalled source - ${chalk.yellow(injectionResult)}`,
+								});
+							}
+						} else {
+							logger.warn({
+								label: Label.INJECT,
+								message: `${progress} Failed to link files for ${filePathLog}, ${linkedFilesRootResult.unwrapErr()} - ${chalk.yellow(injectionResult)}`,
+							});
+						}
+					}
+				}
+				if (inClient) {
+					if (linkedNewFiles) {
+						logger.info({
+							label: Label.INJECT,
+							message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
+						});
+						toRecheck.add(meta.infoHash);
+					} else {
+						logger.warn({
+							label: Label.INJECT,
+							message: `${progress} No new files linked for ${filePathLog}, resume or remove from client - ${chalk.yellow(injectionResult)}`,
+						});
+					}
+				}
+			} else {
+				// Normal case where source is likely still downloading
+				logger.warn({
+					label: Label.INJECT,
+					message: `${progress} Unable to inject ${filePathLog} - ${chalk.yellow(injectionResult)}`,
+				});
+			}
+			totalSearcheeIncomplete++;
+			continue;
+		}
+		const result = await getClient().isTorrentComplete(meta.infoHash);
+		const isComplete = result.isOk() ? result.unwrap() : false;
+		if (isComplete) {
+			toDelete.add(torrentFilePath);
+		}
+		if (injectionResult === InjectionResult.ALREADY_EXISTS) {
+			if (linkedNewFiles) {
+				logger.info({
+					label: Label.INJECT,
+					message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
+				});
+				toRecheck.add(meta.infoHash);
+			} else {
+				logger.warn({
+					label: Label.INJECT,
+					message: `${progress} Unable to inject ${filePathLog} - ${chalk.yellow(injectionResult)}${isComplete ? "" : " (incomplete)"}`,
+				});
+			}
+			totalAlreadyExists++;
+			totalCandidateIncomplete += isComplete ? 0 : 1;
+			continue;
+		}
+		logger.info({
+			label: Label.INJECT,
+			message: `${progress} Injected ${filePathLog} - ${chalk.green(injectionResult)}`,
+		});
+		sendResultsNotification(matchedSearchee!, [
+			[
+				{ decision: matchedDecision!, metafile: meta },
+				tracker,
+				injectionResult,
+			],
+		]);
+		totalInjected++;
+		if (matchedDecision! === Decision.MATCH_PARTIAL) {
+			totalPartialMatches++;
+		} else {
+			totalFullMatches++;
+		}
+	}
+
+	for (const infoHash of toRecheck) {
+		await getClient().recheckTorrent(infoHash);
+	}
+
+	const incompleteMsg = `${chalk.bold.yellow(totalAlreadyExists)} existed in client${
+		totalCandidateIncomplete
+			? chalk.dim(` (${totalCandidateIncomplete} were incomplete)`)
+			: ""
+	}`;
+	const resultMsg = formatAsList(
+		[
+			`Injected ${chalk.bold.green(totalInjected)}/${chalk.bold.white(dirContents.length)} torrents`,
+			totalFullMatches &&
+				`${chalk.bold.green(totalFullMatches)} were full matches`,
+			totalPartialMatches &&
+				`${chalk.bold.yellow(totalPartialMatches)} were partial matches`,
+			totalSearcheeIncomplete &&
+				`${chalk.bold.yellow(totalSearcheeIncomplete)} had incomplete sources`,
+			totalAlreadyExists && incompleteMsg,
+			totalBlocked &&
+				`${chalk.bold.yellow(totalBlocked)} were possibly blocklisted`,
+			totalFailed && `${chalk.bold.red(totalFailed)} failed to inject`,
+			totalUnmatched &&
+				`${chalk.bold.red(totalUnmatched)} had no matches`,
+		].filter(isTruthy),
+		{ sort: false, unit: true },
+	);
+	logger.info({ label: Label.INJECT, message: chalk.cyan(resultMsg) });
+
+	if (totalUnmatched > 0) {
+		logger.info({
+			label: Label.INJECT,
+			message: `Use "${chalk.bold.white("cross-seed diff")}" to get the reasons two torrents are not considered matches`,
+		});
+	}
+
+	if (foundBadFormat && !flatLinking) {
+		logger.warn({
+			label: Label.INJECT,
+			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
+		});
+	}
+
+	for (const torrentFilePath of toDelete) {
+		try {
+			if (shouldCleanUpTorrent(torrentFilePath)) {
+				logger.warn({
+					label: Label.INJECT,
+					message: `Deleting ${torrentFilePath} as it has failed to inject for too long`,
+				});
+			} else {
+				logger.info({
+					label: Label.INJECT,
+					message: `Deleting ${torrentFilePath} as it's in client and complete`,
+				});
+			}
+			fs.unlinkSync(torrentFilePath);
+		} catch (e) {
+			logger.error({
+				label: Label.INJECT,
+				message: `Failed to delete ${torrentFilePath}`,
+			});
+			logger.debug(e);
+		}
 	}
 }
