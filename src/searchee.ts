@@ -36,6 +36,7 @@ export interface File {
 export type SearcheeLabel =
 	| Label.SEARCH
 	| Label.RSS
+	| Label.INJECT
 	| Label.ANNOUNCE
 	| Label.WEBHOOK;
 

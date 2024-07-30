@@ -17,7 +17,7 @@ import { diffCmd } from "./diff.js";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { jobsLoop } from "./jobs.js";
 import { Label, initializeLogger, logger } from "./logger.js";
-import { main, scanRssFeeds } from "./pipeline.js";
+import { injectSavedTorrents, main, scanRssFeeds } from "./pipeline.js";
 import {
 	initializePushNotifier,
 	sendTestNotification,
@@ -432,6 +432,29 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			await db.migrate.latest();
 			await doStartupValidation();
 			await main();
+			await db.destroy();
+		} catch (e) {
+			exitOnCrossSeedErrors(e);
+			await db.destroy();
+		}
+	});
+
+createCommandWithSharedOptions(
+	"inject",
+	"Inject saved cross-seeds into your client (without filtering, see docs)",
+)
+	.addOption(
+		new Option(
+			"--inject-dir <dir>",
+			"Directory of torrent files to try to inject",
+		).default(fileConfig.outputDir),
+	)
+	.action(async (options) => {
+		try {
+			await validateAndSetRuntimeConfig(options);
+			await db.migrate.latest();
+			await doStartupValidation();
+			await injectSavedTorrents();
 			await db.destroy();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);

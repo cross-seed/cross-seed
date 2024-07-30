@@ -236,10 +236,16 @@ export default class QBittorrent implements TorrentClient {
 		await this.request("/torrents/add", formData);
 	}
 
-	async recheckTorrent(torrentInfo: TorrentInfo): Promise<void> {
+	async recheckTorrent(infoHash: string): Promise<void> {
+		// Pause first as it may resume after recheck automatically
+		await this.request(
+			"/torrents/pause",
+			`hashes=${infoHash}`,
+			X_WWW_FORM_URLENCODED,
+		);
 		await this.request(
 			"/torrents/recheck",
-			`hashes=${torrentInfo.hash}`,
+			`hashes=${infoHash}`,
 			X_WWW_FORM_URLENCODED,
 		);
 	}
@@ -334,9 +340,25 @@ export default class QBittorrent implements TorrentClient {
 			if (torrentInfo) {
 				return torrentInfo;
 			}
-			await wait(ms("1 second") * 2 ** i);
+			if (i < retries) {
+				await wait(ms("1 second") * 2 ** i);
+			}
 		}
 		return undefined;
+	}
+
+	/**
+	 * @param infoHash the infohash of the torrent
+	 * @returns whether the torrent is complete
+	 */
+	async isTorrentComplete(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		const torrentInfo = await this.getTorrentInfo(infoHash);
+		if (!torrentInfo) {
+			return resultOfErr("NOT_FOUND");
+		}
+		return resultOf(this.isTorrentInfoComplete(torrentInfo));
 	}
 
 	isTorrentInfoComplete(torrentInfo: TorrentInfo): boolean {
@@ -449,14 +471,14 @@ export default class QBittorrent implements TorrentClient {
 				throw new Error(`Failed to retrieve torrent after adding`);
 			}
 			if (toRecheck) {
-				await this.recheckTorrent(newInfo);
+				await this.recheckTorrent(newInfo.hash);
 			}
 
 			return InjectionResult.SUCCESS;
 		} catch (e) {
-			logger.debug({
+			logger.error({
 				label: Label.QBITTORRENT,
-				message: `Injection failed: ${e.message}`,
+				message: `Injection failed for ${getLogString(newTorrent)}: ${e.message}`,
 			});
 			logger.debug(e);
 			return InjectionResult.FAILURE;
