@@ -6,6 +6,7 @@ import {
 	BOOK_EXTENSIONS,
 	Decision,
 	EP_REGEX,
+	LEVENSHTEIN_DIVISOR,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
 	SCENE_TITLE_REGEX,
@@ -18,6 +19,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { File, Searchee } from "./searchee.js";
 import chalk, { ChalkInstance } from "chalk";
 import { getRuntimeConfig } from "./runtimeConfig.js";
+import { distance } from "fastest-levenshtein";
 
 export enum MediaType {
 	EPISODE = "episode",
@@ -98,6 +100,7 @@ export function getMediaType(searchee: Searchee): MediaType {
 			return unsupportedMediaType(searchee);
 	}
 }
+
 export function shouldRecheck(searchee: Searchee, decision: Decision): boolean {
 	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
 	switch (decision) {
@@ -109,6 +112,46 @@ export function shouldRecheck(searchee: Searchee, decision: Decision): boolean {
 			return true;
 	}
 }
+
+export function areMediaTitlesSimilar(a: string, b: string): boolean {
+	const matchA =
+		a.match(EP_REGEX) ??
+		a.match(SEASON_REGEX) ??
+		a.match(MOVIE_REGEX) ??
+		a.match(ANIME_REGEX);
+	const matchB =
+		b.match(EP_REGEX) ??
+		b.match(SEASON_REGEX) ??
+		b.match(MOVIE_REGEX) ??
+		b.match(ANIME_REGEX);
+	const titlesA: string[] = (
+		matchA
+			? [matchA.groups?.title, matchA.groups?.altTitle].filter(isTruthy)
+			: [a]
+	)
+		.map((title) => createKeyTitle(title))
+		.filter(isTruthy);
+	const titlesB: string[] = (
+		matchB
+			? [matchB.groups?.title, matchB.groups?.altTitle].filter(isTruthy)
+			: [b]
+	)
+		.map((title) => createKeyTitle(title))
+		.filter(isTruthy);
+	const maxDistanceA = Math.floor(
+		[...titlesA].sort((a, b) => b.length - a.length)[0].length /
+			LEVENSHTEIN_DIVISOR,
+	);
+	const maxDistanceB = Math.floor(
+		[...titlesB].sort((a, b) => b.length - a.length)[0].length /
+			LEVENSHTEIN_DIVISOR,
+	);
+	const maxDistance = Math.max(maxDistanceA, maxDistanceB);
+	return titlesA.some((titleA) =>
+		titlesB.some((titleB) => distance(titleA, titleB) <= maxDistance),
+	);
+}
+
 export async function time<R>(cb: () => R, times: number[]) {
 	const before = performance.now();
 	try {
@@ -228,12 +271,12 @@ export function getLogString(
 
 export function formatAsList(
 	strings: string[],
-	options: { sort: boolean; unit: boolean },
+	options: { sort: boolean; type?: Intl.ListFormatType },
 ) {
 	if (options.sort) strings.sort((a, b) => a.localeCompare(b));
 	return new Intl.ListFormat("en", {
 		style: "long",
-		type: options.unit ? "unit" : "conjunction",
+		type: options.type ?? "conjunction",
 	}).format(strings);
 }
 
@@ -264,7 +307,7 @@ export function extractCredentialsFromUrl(
 	}
 }
 
-export function capitalizeFirstLetter(string: string) {
+export function capitalizeFirstLetter(string: string): string {
 	return string.charAt(0).toUpperCase() + string.slice(1);
 }
 

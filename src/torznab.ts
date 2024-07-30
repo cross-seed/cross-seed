@@ -829,7 +829,7 @@ async function getAndLogIndexers(
 		timeFilteredIndexers.length > indexersToUse.length && "category",
 	].filter(isTruthy);
 	const reasonStr = filteringCauses.length
-		? ` (filtered by ${formatAsList(filteringCauses, { sort: true, unit: false })})`
+		? ` (filtered by ${formatAsList(filteringCauses, { sort: true })})`
 		: "";
 	if (!indexersToSearch.length && !cachedSearch.indexerCandidates.length) {
 		cachedSearch.q = null; // Won't scan arrs for multiple skips in a row
