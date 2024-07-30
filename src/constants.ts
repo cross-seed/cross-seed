@@ -103,6 +103,7 @@ export const ALL_EXTENSIONS = [
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 export const UNKNOWN_TRACKER = "UnknownTracker";
+export const LEVENSHTEIN_DIVISOR = 3;
 
 export enum Action {
 	SAVE = "save",
