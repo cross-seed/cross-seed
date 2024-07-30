@@ -225,11 +225,15 @@ export function getLogString(
 			: `${color(searchee.title)} ${chalk.dim(`[${searchee.name}]`)}`;
 }
 
-export function formatAsList(strings: string[]) {
+export function formatAsList(
+	strings: string[],
+	options: { sort: boolean; unit: boolean },
+) {
+	if (options.sort) strings.sort((a, b) => a.localeCompare(b));
 	return new Intl.ListFormat("en", {
 		style: "long",
-		type: "conjunction",
-	}).format(strings.sort((a, b) => a.localeCompare(b)));
+		type: options.unit ? "unit" : "conjunction",
+	}).format(strings);
 }
 
 export function fallback<T>(...args: T[]): T | undefined {

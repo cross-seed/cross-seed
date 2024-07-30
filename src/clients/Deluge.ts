@@ -304,7 +304,7 @@ export default class Deluge implements TorrentClient {
 		try {
 			let torrentInfo: TorrentInfo;
 			if (searchee.infoHash) {
-				torrentInfo = await this.getTorrentInfo(searchee);
+				torrentInfo = await this.getTorrentInfo(searchee.infoHash);
 				if (!torrentInfo.complete) {
 					return InjectionResult.TORRENT_NOT_COMPLETE;
 				}
@@ -360,9 +360,7 @@ export default class Deluge implements TorrentClient {
 					// when paused, libtorrent doesnt start rechecking
 					// leaves torrent ready to download - ~99%
 					await wait(1000);
-					await this.call<string>("core.force_recheck", [
-						[newTorrent.infoHash],
-					]);
+					await this.recheckTorrent(newTorrent.infoHash);
 				}
 			}
 		} catch (error) {
@@ -374,6 +372,12 @@ export default class Deluge implements TorrentClient {
 			return InjectionResult.FAILURE;
 		}
 		return InjectionResult.SUCCESS;
+	}
+
+	async recheckTorrent(infoHash: string): Promise<void> {
+		// Pause first as it may resume after recheck automatically
+		await this.call<string>("core.pause_torrent", [[infoHash]]);
+		await this.call<string>("core.force_recheck", [[infoHash]]);
 	}
 
 	/**
@@ -437,15 +441,27 @@ export default class Deluge implements TorrentClient {
 		return resultOf(torrent.save_path);
 	}
 	/**
+	 * checks if a torrent is complete in deluge
+	 * @param infoHash the infoHash of the torrent to check
+	 * @return Result containing either a boolean or reason it was not provided
+	 */
+	async isTorrentComplete(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		try {
+			const torrentInfo = await this.getTorrentInfo(infoHash);
+			return torrentInfo.complete ? resultOf(true) : resultOf(false);
+		} catch (e) {
+			return resultOfErr("NOT_FOUND");
+		}
+	}
+
+	/**
 	 * returns information needed to complete/validate injection
 	 * @param searchee the Searchee for the torrent you are requesting TorrentInfo from
 	 * @return Promise of TorrentInfo type
 	 */
-	private async getTorrentInfo(searchee: Searchee): Promise<TorrentInfo> {
-		if (!searchee.infoHash) {
-			throw new Error("Can't search a torrent without a infoHash");
-		}
-
+	private async getTorrentInfo(infoHash: string): Promise<TorrentInfo> {
 		let torrent: TorrentInfo;
 		try {
 			const params = [
@@ -457,7 +473,7 @@ export default class Deluge implements TorrentClient {
 					"label",
 					"total_remaining",
 				],
-				{ hash: searchee.infoHash },
+				{ hash: infoHash },
 			];
 
 			const response = (
@@ -465,16 +481,14 @@ export default class Deluge implements TorrentClient {
 			).unwrapOrThrow(new Error("failed to fetch the torrent list"));
 
 			if (response.torrents) {
-				torrent = response.torrents?.[searchee.infoHash];
+				torrent = response.torrents?.[infoHash];
 			} else {
 				throw new Error(
 					"Client returned unexpected response (object missing)",
 				);
 			}
 			if (torrent === undefined) {
-				throw new Error(
-					`Torrent not found in client (${searchee.infoHash})`,
-				);
+				throw new Error(`Torrent not found in client (${infoHash})`);
 			}
 
 			const completedTorrent =
@@ -497,7 +511,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				label: Label.DELUGE,
-				message: `Failed to fetch torrent data: ${getLogString(searchee)}`,
+				message: `Failed to fetch torrent data: ${infoHash}`,
 			});
 			logger.debug(e);
 			throw new Error("web.update_ui: failed to fetch data from client", {
