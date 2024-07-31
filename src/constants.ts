@@ -29,7 +29,7 @@ export const REPACK_PROPER_REGEX =
 export const ARR_PROPER_REGEX = /(?:\b(?<arrtype>(?:Proper|v\d)))\b/;
 export const SCENE_TITLE_REGEX = /^(?:[a-z0-9]{0,5}-)?(?<title>.*)/;
 export const ARR_DIR_REGEX =
-	/^(?<title>(?!.*(?:(\d{3,4}[ipx])|([xh.]+26[4-6])|(mpeg)|(xvid)|(?:(he)|a)vc))[\p{L}\s:\w'’!();.,&–+-]+(?:\(\d{4}\))?)(?<id>\s[{[](?:tm|tv|im)db(?:id)?-\w+?[}\]])?$/iu;
+	/^(?<title>(?!.*(?:(\d{3,4}[ipx])|([xh.]+26[4-6])|(dvd)|(mpeg)|(xvid)|(?:(he)|a)vc))[\p{L}\s:\w'’!();.,&–+-]+(?:\(\d{4}\))?)(?<id>\s[{[](?:tm|tv|im)db(?:id)?-\w+?[}\]])?$/iu;
 export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
 export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
