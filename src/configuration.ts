@@ -65,6 +65,9 @@ export function appDir(): string {
 	try {
 		accessSync(appDir, constants.R_OK | constants.W_OK);
 	} catch (e) {
+		if (e.code === "ENOENT") {
+			return appDir;
+		}
 		const dockerMessage =
 			process.env.DOCKER_ENV === "true"
 				? ` Use chown to set the owner to ${process.getuid!()}:${process.getgid!()}`
