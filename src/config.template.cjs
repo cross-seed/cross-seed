@@ -40,8 +40,8 @@ module.exports = {
 	 *
 	 * Example: sonarr: ["http://sonarr:8989/?apikey=12345"],
 	 *
-	 *			sonarr: ["http://sonarr:8989/?apikey=12345",
-	 *					"http://sonarr4k:8989/?apikey=12345"],
+	 *      sonarr: ["http://sonarr:8989/?apikey=12345",
+	 *               "http://sonarr4k:8989/?apikey=12345"],
 	 */
 	sonarr: undefined,
 
@@ -56,8 +56,8 @@ module.exports = {
 	 *
 	 * Example: radarr: ["http://radarr:7878/?apikey=12345"],
 	 *
-	 * 			radarr: ["http://radarr:7878/?apikey=12345",
-	 * 					"http://radarr4k:7878/?apikey=12345"],
+	 *       radarr: ["http://radarr:7878/?apikey=12345",
+	 *                "http://radarr4k:7878/?apikey=12345"],
 	 */
 	radarr: undefined,
 
@@ -260,18 +260,18 @@ module.exports = {
 	 *
 	 * To search for all video media except individual episodes, use:
 	 *
-	 *		includeSingleEpisodes: false
-	 *		includeNonVideos: false
+	 *    includeSingleEpisodes: false
+	 *    includeNonVideos: false
 	 *
 	 * To search for all video media including individual episodes, use:
 	 *
-	 *		includeSingleEpisodes: true
-	 *		includeNonVideos: false
+	 *    includeSingleEpisodes: true
+	 *    includeNonVideos: false
 	 *
 	 * To search for absolutely ALL types of content, including non-video, configure
 	 * your episode settings based on the above examples and use:
 	 *
-	 * 		includeNonVideos: true
+	 *     includeNonVideos: true
 	 */
 	includeNonVideos: false,
 
@@ -388,10 +388,10 @@ module.exports = {
 	 *
 	 * examples:
 	 *
-	 *		blockList: ["-excludedGroup", "-excludedGroup2"],
-	 *		blocklist: ["x265"],
-	 *		blocklist: ["Release.Name"],
-	 *		blocklist: ["3317e6485454354751555555366a8308c1e92093"],
+	 *    blockList: ["-excludedGroup", "-excludedGroup2"],
+	 *    blocklist: ["x265"],
+	 *    blocklist: ["Release.Name"],
+	 *    blocklist: ["3317e6485454354751555555366a8308c1e92093"],
 	 */
 	blockList: undefined,
 };
