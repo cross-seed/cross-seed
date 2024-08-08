@@ -13,15 +13,9 @@ import {
 	isTruthy,
 	MediaType,
 	sanitizeUrl,
-	stripExtension,
+	stripMetaFromName,
 } from "./utils.js";
-import {
-	RELEASE_GROUP_REGEX,
-	REPACK_PROPER_REGEX,
-	RESOLUTION_REGEX,
-	SCENE_TITLE_REGEX,
-	sourceRegexRemove,
-} from "./constants.js";
+import { SCENE_TITLE_REGEX } from "./constants.js";
 
 export interface ExternalIds {
 	imdbId?: string;
@@ -250,14 +244,7 @@ export async function scanAllArrsForMedia(
 	const title =
 		mediaType !== MediaType.VIDEO
 			? searcheeTitle.match(SCENE_TITLE_REGEX)!.groups!.title
-			: cleanseSeparators(
-					sourceRegexRemove(
-						stripExtension(searcheeTitle)
-							.replace(RELEASE_GROUP_REGEX, "")
-							.replace(RESOLUTION_REGEX, "")
-							.replace(REPACK_PROPER_REGEX, ""),
-					),
-				).match(SCENE_TITLE_REGEX)!.groups!.title;
+			: cleanseSeparators(stripMetaFromName(searcheeTitle));
 	let error = new Error(
 		`No ids found for ${title} | MediaType: ${mediaType.toUpperCase()}`,
 	);

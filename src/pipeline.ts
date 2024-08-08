@@ -23,7 +23,7 @@ import {
 import { db } from "./db.js";
 import {
 	assessCandidate,
-	assessCandidateHelper,
+	assessCandidateCaching,
 	ResultAssessment,
 } from "./decide.js";
 import {
@@ -103,6 +103,21 @@ type FullMatches = [
 ][];
 type PartialMatches = [SearcheeWithLabel, Decision.MATCH_PARTIAL][];
 
+type InjectSummary = {
+	TOTAL: number;
+	INJECTED: number;
+	FULL_MATCHES: number;
+	PARTIAL_MATCHES: number;
+	BLOCKED: number;
+	ALREADY_EXISTS: number;
+	INCOMPLETE_CANDIDATES: number;
+	INCOMPLETE_SEARCHEES: number;
+	FAILED: number;
+	UNMATCHED: number;
+	FOUND_BAD_FORMAT: boolean;
+	FLAT_LINKING: boolean;
+};
+
 async function assessCandidates(
 	candidates: Candidate[],
 	searchee: SearcheeWithLabel,
@@ -110,7 +125,7 @@ async function assessCandidates(
 ): Promise<AssessmentWithTracker[]> {
 	const assessments: AssessmentWithTracker[] = [];
 	for (const result of candidates) {
-		const assessment = await assessCandidate(
+		const assessment = await assessCandidateCaching(
 			result,
 			searchee,
 			hashesToExclude,
@@ -300,12 +315,12 @@ export async function searchForLocalTorrentByCriteria(
 
 export async function checkNewCandidateMatch(
 	candidate: Candidate,
-	candidateLog: string,
 	searcheeLabel: SearcheeLabel,
 ): Promise<{
 	decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null;
 	actionResult: ActionResult | null;
 }> {
+	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	const { keys, metas } = await getSimilarTorrentsByName(candidate.name);
 	const method = keys.length ? `[${keys}]` : "Fuse fallback";
 	if (!metas.length) {
@@ -347,7 +362,7 @@ export async function checkNewCandidateMatch(
 			.onConflict("name")
 			.ignore();
 
-		const assessment: ResultAssessment = await assessCandidate(
+		const assessment: ResultAssessment = await assessCandidateCaching(
 			candidate,
 			searchee,
 			hashesToExclude,
@@ -388,18 +403,14 @@ export async function checkNewCandidateMatch(
 	return { decision, actionResult };
 }
 
-async function findSearchableTorrents(
+async function findAllSearchees(
 	searcheeLabel: SearcheeLabel,
-	options: { useFilters: boolean },
-): Promise<{
-	searchees: SearcheeWithLabel[];
-	hashesToExclude: string[];
-}> {
-	const { torrents, dataDirs, torrentDir, searchLimit } = getRuntimeConfig();
+): Promise<SearcheeWithLabel[]> {
+	const { torrents, dataDirs, torrentDir } = getRuntimeConfig();
 	const rawSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
 		const searcheeResults = await Promise.all(
-			torrents.map(createSearcheeFromTorrentFile), //also create searchee from path
+			torrents.map(createSearcheeFromTorrentFile), // Also create searchee from path
 		);
 		rawSearchees.push(
 			...searcheeResults.filter(isOk).map((r) => r.unwrap()),
@@ -417,25 +428,26 @@ async function findSearchableTorrents(
 			);
 		}
 	}
-	const allSearchees: SearcheeWithLabel[] = rawSearchees.map((searchee) => ({
+	return rawSearchees.map((searchee) => ({
 		...searchee,
 		label: searcheeLabel,
 	}));
+}
 
-	const hashesToExclude = allSearchees
+async function findSearchableTorrents(): Promise<{
+	searchees: SearcheeWithLabel[];
+	hashesToExclude: string[];
+}> {
+	const { searchLimit } = getRuntimeConfig();
+
+	const realSearchees = await findAllSearchees(Label.SEARCH);
+	const hashesToExclude = realSearchees
 		.map((t) => t.infoHash)
 		.filter(isTruthy);
 
-	if (!options.useFilters) {
-		return {
-			searchees: allSearchees,
-			hashesToExclude,
-		};
-	}
-
 	// Group the exact same search queries together for easy cache use later
 	const grouping = new Map<string, SearcheeWithLabel[]>();
-	for (const searchee of allSearchees.filter((s) => filterByContent(s))) {
+	for (const searchee of realSearchees.filter((s) => filterByContent(s))) {
 		const key = await getSearchString(searchee);
 		if (!grouping.has(key)) {
 			grouping.set(key, []);
@@ -445,23 +457,25 @@ async function findSearchableTorrents(
 	const keysToDelete: string[] = [];
 	for (const [key, groupedSearchees] of grouping) {
 		// If one searchee needs to be searched, use the candidates for all
-		const searchees = filterDupesFromSimilar(groupedSearchees);
-		const results = await Promise.all(searchees.map(filterTimestamps));
+		const filteredSearchees = filterDupesFromSimilar(groupedSearchees);
+		const results = await Promise.all(
+			filteredSearchees.map(filterTimestamps),
+		);
 		if (!results.some(isTruthy)) {
 			keysToDelete.push(key);
 			continue;
 		}
 		// Prefer infoHash
-		searchees.sort((a, b) => {
+		filteredSearchees.sort((a, b) => {
 			if (a.infoHash && !b.infoHash) return -1;
 			if (!a.infoHash && b.infoHash) return 1;
 			return 0;
 		});
 		// Sort by most number files (less chance of partial)
-		searchees.sort((a, b) => {
+		filteredSearchees.sort((a, b) => {
 			return b.files.length - a.files.length;
 		});
-		grouping.set(key, searchees);
+		grouping.set(key, filteredSearchees);
 	}
 	for (const key of keysToDelete) {
 		grouping.delete(key);
@@ -470,7 +484,7 @@ async function findSearchableTorrents(
 
 	logger.info({
 		label: Label.SEARCH,
-		message: `Found ${allSearchees.length} torrents, ${finalSearchees.length} suitable to search for matches using ${grouping.size} unique queries`,
+		message: `Found ${realSearchees.length} torrents, ${finalSearchees.length} suitable to search for matches using ${grouping.size} unique queries`,
 	});
 
 	if (searchLimit && finalSearchees.length > searchLimit) {
@@ -478,7 +492,6 @@ async function findSearchableTorrents(
 			label: Label.SEARCH,
 			message: `Limited to ${searchLimit} searches`,
 		});
-
 		finalSearchees = finalSearchees.slice(0, searchLimit);
 	}
 
@@ -487,10 +500,7 @@ async function findSearchableTorrents(
 
 export async function main(): Promise<void> {
 	const { outputDir, linkDir } = getRuntimeConfig();
-	const { searchees, hashesToExclude } = await findSearchableTorrents(
-		Label.SEARCH,
-		{ useFilters: true },
-	);
+	const { searchees, hashesToExclude } = await findSearchableTorrents();
 
 	if (!fs.existsSync(outputDir)) {
 		fs.mkdirSync(outputDir, { recursive: true });
@@ -546,7 +556,7 @@ export async function scanRssFeeds() {
 				label: Label.RSS,
 				message: `(${i + 1}/${candidatesSinceLastTime.length}) ${candidateLog}`,
 			});
-			await checkNewCandidateMatch(candidate, candidateLog, Label.RSS);
+			await checkNewCandidateMatch(candidate, Label.RSS);
 		}
 		logger.info({ label: Label.RSS, message: "Scan complete" });
 	}
@@ -567,7 +577,7 @@ async function injectDecideStage(
 	const partialMatches: [SearcheeWithLabel, Decision.MATCH_PARTIAL][] = [];
 	let foundBlocked = false;
 	for (const searchee of searchees) {
-		const { decision } = await assessCandidateHelper(meta, searchee, []);
+		const { decision } = await assessCandidate(meta, searchee, []);
 		if (!isAnyMatchedDecision(decision)) {
 			if (decision === Decision.BLOCKED_RELEASE) {
 				foundBlocked = true;
@@ -577,23 +587,21 @@ async function injectDecideStage(
 
 		// If name or file names are not similar consider it a false positive
 		if (
-			!areMediaTitlesSimilar(searchee.name, meta.name) &&
+			!areMediaTitlesSimilar(searchee.title, meta.title) &&
 			!areMediaTitlesSimilar(searchee.title, meta.name) &&
+			!areMediaTitlesSimilar(searchee.name, meta.name) &&
+			!areMediaTitlesSimilar(searchee.name, meta.title) &&
 			!meta.files.some((metaFile) =>
 				searchee.files.some((searcheeFile) =>
 					areMediaTitlesSimilar(searcheeFile.name, metaFile.name),
 				),
 			)
 		) {
-			const metaSearcheeRes = createSearcheeFromMetafile(meta);
-			if (metaSearcheeRes.isErr()) continue;
-			const metaSearchee = metaSearcheeRes.unwrap();
-			if (
-				!areMediaTitlesSimilar(searchee.title, metaSearchee.title) &&
-				!areMediaTitlesSimilar(searchee.name, metaSearchee.title)
-			) {
-				continue;
-			}
+			logger.warn({
+				label: Label.INJECT,
+				message: `Skipping potential false positive for ${getLogString(meta, chalk.bold.white)} from ${getLogString(searchee, chalk.bold.white)}`,
+			});
+			continue;
 		}
 
 		if (decision === Decision.MATCH) {
@@ -691,13 +699,12 @@ async function injectInitialAction(
 	};
 }
 
-async function injectStalledTorrent(
+async function injectFromStalledTorrent(
 	meta: Metafile,
 	fullMatches: FullMatches,
 	partialMatches: PartialMatches,
 	tracker: string,
 	injectionResult: InjectionResult,
-	toRecheck: Set<string>,
 	progress: string,
 	filePathLog: string,
 ): Promise<boolean> {
@@ -755,7 +762,7 @@ async function injectStalledTorrent(
 				label: Label.INJECT,
 				message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 			});
-			toRecheck.add(meta.infoHash);
+			await getClient().recheckTorrent(meta.infoHash);
 		} else {
 			logger.warn({
 				label: Label.INJECT,
@@ -766,34 +773,53 @@ async function injectStalledTorrent(
 	return injected;
 }
 
+function injectSummary(summary: InjectSummary): void {
+	const incompleteMsg = `${chalk.bold.yellow(summary.ALREADY_EXISTS)} existed in client${
+		summary.INCOMPLETE_CANDIDATES
+			? chalk.dim(` (${summary.INCOMPLETE_CANDIDATES} were incomplete)`)
+			: ""
+	}`;
+	const resultMsg = formatAsList(
+		[
+			`Injected ${chalk.bold.green(summary.INJECTED)}/${chalk.bold.white(summary.TOTAL)} torrents`,
+			summary.FULL_MATCHES &&
+				`${chalk.bold.green(summary.FULL_MATCHES)} were full matches`,
+			summary.PARTIAL_MATCHES &&
+				`${chalk.bold.yellow(summary.PARTIAL_MATCHES)} were partial matches`,
+			summary.INCOMPLETE_SEARCHEES &&
+				`${chalk.bold.yellow(summary.INCOMPLETE_SEARCHEES)} had incomplete sources`,
+			summary.ALREADY_EXISTS && incompleteMsg,
+			summary.BLOCKED &&
+				`${chalk.bold.yellow(summary.BLOCKED)} were possibly blocklisted`,
+			summary.FAILED &&
+				`${chalk.bold.red(summary.FAILED)} failed to inject`,
+			summary.UNMATCHED &&
+				`${chalk.bold.red(summary.UNMATCHED)} had no matches`,
+		].filter(isTruthy),
+		{ sort: false, type: "unit" },
+	);
+	logger.info({ label: Label.INJECT, message: chalk.cyan(resultMsg) });
+
+	if (summary.UNMATCHED > 0) {
+		logger.info({
+			label: Label.INJECT,
+			message: `Use "${chalk.bold.white("cross-seed diff")}" to get the reasons two torrents are not considered matches`,
+		});
+	}
+
+	if (summary.FOUND_BAD_FORMAT && !summary.FLAT_LINKING) {
+		logger.warn({
+			label: Label.INJECT,
+			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
+		});
+	}
+}
+
 export async function injectSavedTorrents() {
 	const { flatLinking, injectDir, linkDir, outputDir } = getRuntimeConfig();
 	const targetDir = injectDir ?? outputDir;
 	const targetDirLog = chalk.bold.magenta(targetDir);
 
-	if (injectDir) {
-		// injectDir defined only by `cross-seed inject`, regardless if they specify it
-		logger.warn({
-			label: Label.INJECT,
-			message: `Manually injecting torrents performs minimal filtering which slightly increases chances of false positives, see the docs for more info`,
-		});
-	}
-	try {
-		if (!fs.statSync(targetDir).isDirectory()) {
-			logger.error({
-				label: Label.INJECT,
-				message: `${targetDirLog} is not a directory`,
-			});
-			return;
-		}
-	} catch (e) {
-		logger.error({
-			label: Label.INJECT,
-			message: `Error accessing ${targetDirLog} - ensure it exists and is accessible (verify docker volumes if applicable)`,
-		});
-		logger.debug(e);
-		return;
-	}
 	const dirContents = await findAllTorrentFilesInDir(targetDir);
 	if (dirContents.length === 0) {
 		logger.info({
@@ -807,12 +833,9 @@ export async function injectSavedTorrents() {
 		message: `Found ${chalk.bold.white(dirContents.length)} torrent file(s) to inject in ${targetDirLog}`,
 	});
 
-	const { searchees } = await findSearchableTorrents(Label.INJECT, {
-		useFilters: false,
-	});
+	const searchees = await findAllSearchees(Label.INJECT);
 
 	const toDelete = new Set<string>();
-	const toRecheck = new Set<string>();
 
 	// Usually source got deleted or partial injection never completes
 	function shouldCleanUpTorrent(torrentFilePath: string) {
@@ -821,23 +844,27 @@ export async function injectSavedTorrents() {
 	function getTorrentFilePathLog(torrentFilePath: string) {
 		return chalk.bold.magenta(
 			torrentFilePath.replace(
-				/(?:\[)([a-z0-9]{40})(?:].torrent$)/i,
+				/\[([a-z0-9]{40})].torrent$/i,
 				(match, hash) => match.replace(hash, sanitizeInfoHash(hash)),
 			),
 		);
 	}
 
-	let totalInjected = 0;
-	let totalFullMatches = 0;
-	let totalPartialMatches = 0;
-	let totalBlocked = 0;
-	let totalAlreadyExists = 0;
-	let totalCandidateIncomplete = 0;
-	let totalSearcheeIncomplete = 0;
-	let totalFailed = 0;
-	let totalUnmatched = 0;
+	const summary: InjectSummary = {
+		TOTAL: dirContents.length,
+		INJECTED: 0,
+		FULL_MATCHES: 0,
+		PARTIAL_MATCHES: 0,
+		BLOCKED: 0,
+		ALREADY_EXISTS: 0,
+		INCOMPLETE_CANDIDATES: 0,
+		INCOMPLETE_SEARCHEES: 0,
+		FAILED: 0,
+		UNMATCHED: 0,
+		FOUND_BAD_FORMAT: false,
+		FLAT_LINKING: flatLinking,
+	};
 	let count = 0;
-	let foundBadFormat = false;
 	for (const torrentFilePath of dirContents) {
 		const progress = chalk.blue(`(${++count}/${dirContents.length})`);
 		const filePathLog = getTorrentFilePathLog(torrentFilePath);
@@ -861,7 +888,7 @@ export async function injectSavedTorrents() {
 			await parseInfoFromSavedTorrent(torrentFilePath);
 		const tracker = torrentNameInfo?.tracker ?? UNKNOWN_TRACKER;
 		if (tracker === UNKNOWN_TRACKER) {
-			foundBadFormat = true;
+			summary.FOUND_BAD_FORMAT = true;
 		}
 
 		const { fullMatches, partialMatches, foundBlocked } =
@@ -872,13 +899,13 @@ export async function injectSavedTorrents() {
 					label: Label.INJECT,
 					message: `${progress} ${metaLog} ${chalk.yellow("possibly blocklisted")}: ${filePathLog}`,
 				});
-				totalBlocked++;
+				summary.BLOCKED++;
 			} else {
 				logger.info({
 					label: Label.INJECT,
 					message: `${progress} ${metaLog} ${chalk.red("has no matches")}: ${filePathLog}`,
 				});
-				totalUnmatched++;
+				summary.UNMATCHED++;
 			}
 			continue;
 		}
@@ -899,7 +926,8 @@ export async function injectSavedTorrents() {
 				label: Label.INJECT,
 				message: `${progress} Failed to inject ${filePathLog} - ${chalk.red(injectionResult)}`,
 			});
-			totalFailed++;
+			summary.FAILED++;
+			toDelete.delete(torrentFilePath);
 			continue;
 		}
 		if (injectionResult === InjectionResult.TORRENT_NOT_COMPLETE) {
@@ -915,18 +943,17 @@ export async function injectSavedTorrents() {
 			} else {
 				// Since source is stalled, add to client paused so user can resume later if desired
 				// Try linking all possible matches as they may have different files
-				await injectStalledTorrent(
+				await injectFromStalledTorrent(
 					meta,
 					fullMatches,
 					partialMatches,
 					tracker,
 					injectionResult,
-					toRecheck,
 					progress,
 					filePathLog,
 				);
 			}
-			totalSearcheeIncomplete++;
+			summary.INCOMPLETE_SEARCHEES++;
 			continue;
 		}
 		const result = await getClient().isTorrentComplete(meta.infoHash);
@@ -940,14 +967,14 @@ export async function injectSavedTorrents() {
 					label: Label.INJECT,
 					message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 				});
-				toRecheck.add(meta.infoHash);
+				await getClient().recheckTorrent(meta.infoHash);
 			} else if (fullMatches.length && !isComplete) {
 				logger.info({
 					label: Label.INJECT,
 					message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files - ${chalk.green(injectionResult)}`,
 				});
 				isComplete = true;
-				toRecheck.add(meta.infoHash);
+				await getClient().recheckTorrent(meta.infoHash);
 				toDelete.add(torrentFilePath); // Prevent infinite recheck in rare case of corrupted cross seed
 			} else {
 				logger.warn({
@@ -955,8 +982,8 @@ export async function injectSavedTorrents() {
 					message: `${progress} Unable to inject ${filePathLog} - ${chalk.yellow(injectionResult)}${isComplete ? "" : " (incomplete)"}`,
 				});
 			}
-			totalAlreadyExists++;
-			totalCandidateIncomplete += isComplete ? 0 : 1;
+			summary.ALREADY_EXISTS++;
+			summary.INCOMPLETE_CANDIDATES += isComplete ? 0 : 1;
 			continue;
 		}
 		logger.info({
@@ -970,55 +997,12 @@ export async function injectSavedTorrents() {
 				injectionResult,
 			],
 		]);
-		totalInjected++;
+		summary.INJECTED++;
 		if (matchedDecision! === Decision.MATCH_PARTIAL) {
-			totalPartialMatches++;
+			summary.PARTIAL_MATCHES++;
 		} else {
-			totalFullMatches++;
+			summary.FULL_MATCHES++;
 		}
-	}
-
-	for (const infoHash of toRecheck) {
-		await getClient().recheckTorrent(infoHash);
-	}
-
-	const incompleteMsg = `${chalk.bold.yellow(totalAlreadyExists)} existed in client${
-		totalCandidateIncomplete
-			? chalk.dim(` (${totalCandidateIncomplete} were incomplete)`)
-			: ""
-	}`;
-	const resultMsg = formatAsList(
-		[
-			`Injected ${chalk.bold.green(totalInjected)}/${chalk.bold.white(dirContents.length)} torrents`,
-			totalFullMatches &&
-				`${chalk.bold.green(totalFullMatches)} were full matches`,
-			totalPartialMatches &&
-				`${chalk.bold.yellow(totalPartialMatches)} were partial matches`,
-			totalSearcheeIncomplete &&
-				`${chalk.bold.yellow(totalSearcheeIncomplete)} had incomplete sources`,
-			totalAlreadyExists && incompleteMsg,
-			totalBlocked &&
-				`${chalk.bold.yellow(totalBlocked)} were possibly blocklisted`,
-			totalFailed && `${chalk.bold.red(totalFailed)} failed to inject`,
-			totalUnmatched &&
-				`${chalk.bold.red(totalUnmatched)} had no matches`,
-		].filter(isTruthy),
-		{ sort: false, type: "unit" },
-	);
-	logger.info({ label: Label.INJECT, message: chalk.cyan(resultMsg) });
-
-	if (totalUnmatched > 0) {
-		logger.info({
-			label: Label.INJECT,
-			message: `Use "${chalk.bold.white("cross-seed diff")}" to get the reasons two torrents are not considered matches`,
-		});
-	}
-
-	if (foundBadFormat && !flatLinking) {
-		logger.warn({
-			label: Label.INJECT,
-			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
-		});
 	}
 
 	for (const torrentFilePath of toDelete) {
@@ -1044,4 +1028,6 @@ export async function injectSavedTorrents() {
 			logger.debug(e);
 		}
 	}
+
+	injectSummary(summary);
 }

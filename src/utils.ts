@@ -9,8 +9,12 @@ import {
 	LEVENSHTEIN_DIVISOR,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
+	RELEASE_GROUP_REGEX,
+	REPACK_PROPER_REGEX,
+	RESOLUTION_REGEX,
 	SCENE_TITLE_REGEX,
 	SEASON_REGEX,
+	sourceRegexRemove,
 	VIDEO_DISC_EXTENSIONS,
 	VIDEO_EXTENSIONS,
 	YEARS_REGEX,
@@ -129,26 +133,29 @@ export function areMediaTitlesSimilar(a: string, b: string): boolean {
 			? [matchA.groups?.title, matchA.groups?.altTitle].filter(isTruthy)
 			: [a]
 	)
-		.map((title) => createKeyTitle(title))
+		.map((title) => createKeyTitle(stripMetaFromName(title)))
 		.filter(isTruthy);
 	const titlesB: string[] = (
 		matchB
 			? [matchB.groups?.title, matchB.groups?.altTitle].filter(isTruthy)
 			: [b]
 	)
-		.map((title) => createKeyTitle(title))
+		.map((title) => createKeyTitle(stripMetaFromName(title)))
 		.filter(isTruthy);
 	const maxDistanceA = Math.floor(
-		[...titlesA].sort((a, b) => b.length - a.length)[0].length /
-			LEVENSHTEIN_DIVISOR,
+		Math.max(...titlesA.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
 	);
 	const maxDistanceB = Math.floor(
-		[...titlesB].sort((a, b) => b.length - a.length)[0].length /
-			LEVENSHTEIN_DIVISOR,
+		Math.max(...titlesB.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
 	);
 	const maxDistance = Math.max(maxDistanceA, maxDistanceB);
 	return titlesA.some((titleA) =>
-		titlesB.some((titleB) => distance(titleA, titleB) <= maxDistance),
+		titlesB.some(
+			(titleB) =>
+				distance(titleA, titleB) <= maxDistance ||
+				titleA.includes(titleB) ||
+				titleB.includes(titleA),
+		),
 	);
 }
 
@@ -232,6 +239,15 @@ export function getAnimeQueries(name: string): string[] {
 		animeQueries.push(cleanTitle(`${altTitle} ${release}`));
 	}
 	return animeQueries;
+}
+
+export function stripMetaFromName(name: string): string {
+	return sourceRegexRemove(
+		stripExtension(name)
+			.replace(RELEASE_GROUP_REGEX, "")
+			.replace(RESOLUTION_REGEX, "")
+			.replace(REPACK_PROPER_REGEX, ""),
+	).match(SCENE_TITLE_REGEX)!.groups!.title;
 }
 
 export const tap = (fn) => (value) => {

@@ -280,7 +280,7 @@ function sourceDoesMatch(searcheeTitle: string, candidateName: string) {
 	return searcheeSource === candidateSource;
 }
 
-export async function assessCandidateHelper(
+export async function assessCandidate(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
 	hashesToExclude: string[],
@@ -421,7 +421,7 @@ async function assessAndSaveResults(
 	infoHashesToExclude: string[],
 	firstSeen: number,
 ) {
-	const assessment = await assessCandidateHelper(
+	const assessment = await assessCandidate(
 		metaOrCandidate,
 		searchee,
 		infoHashesToExclude,
@@ -448,7 +448,7 @@ async function assessAndSaveResults(
 	return assessment;
 }
 
-async function assessCandidateCaching(
+export async function assessCandidateCaching(
 	candidate: Candidate,
 	searchee: SearcheeWithLabel,
 	infoHashesToExclude: string[],
@@ -544,5 +544,3 @@ async function assessCandidateCaching(
 
 	return assessment;
 }
-
-export { assessCandidateCaching as assessCandidate };

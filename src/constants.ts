@@ -33,6 +33,8 @@ export const ARR_DIR_REGEX =
 export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
 export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
+export const SAVED_TORRENTS_INFO_REGEX =
+	/^\[(?<mediaType>.+?)\]\[(?<tracker>.+?)\](?<name>.+?)(?:\[[^\]]*?\])?\.torrent$/i;
 
 // Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {
@@ -134,7 +136,16 @@ export enum Decision {
 	DOWNLOAD_FAILED = "DOWNLOAD_FAILED",
 	MAGNET_LINK = "MAGNET_LINK",
 	RATE_LIMITED = "RATE_LIMITED",
+	/**
+	 * Searchee and Candidate info hash matches. Usually happens with public
+	 * torrents and torrents added by radarr/sonarr before cross-seed on announces.
+	 * Useful for the inject job as we ignore INFO_HASH_ALREADY_EXISTS and
+	 * for reporting a 204 announe status code instead of 200 from exists.
+	 */
 	SAME_INFO_HASH = "SAME_INFO_HASH",
+	/**
+	 * Checked after SAME_INFO_HASH.
+	 */
 	INFO_HASH_ALREADY_EXISTS = "INFO_HASH_ALREADY_EXISTS",
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
 	RELEASE_GROUP_MISMATCH = "RELEASE_GROUP_MISMATCH",
