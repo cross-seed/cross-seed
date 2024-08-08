@@ -27,6 +27,8 @@ import {
 	ResultAssessment,
 } from "./decide.js";
 import {
+	getEnabledIndexers,
+	Indexer,
 	IndexerStatus,
 	updateIndexerStatus,
 	updateSearchTimestamps,
@@ -69,6 +71,7 @@ import {
 	areMediaTitlesSimilar,
 	formatAsList,
 	getLogString,
+	humanReadableDate,
 	isTruthy,
 	sanitizeInfoHash,
 	wait,
@@ -524,9 +527,8 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const { torznab } = getRuntimeConfig();
+	const { rssCadence, torznab } = getRuntimeConfig();
 	if (torznab.length > 0) {
-		const candidates = await queryRssFeeds();
 		const lastRun =
 			(
 				await db("job_log")
@@ -534,29 +536,113 @@ export async function scanRssFeeds() {
 					.where({ name: "rss" })
 					.first()
 			)?.last_run ?? 0;
-		const candidatesSinceLastTime = candidates.filter(
-			(c) => c.pubDate > lastRun,
-		);
-		logger.verbose({
-			label: Label.RSS,
-			message: `Scan returned ${
-				candidatesSinceLastTime.length
-			} new results, ignoring ${
-				candidates.length - candidatesSinceLastTime.length
-			} already seen`,
-		});
-		logger.verbose({
-			label: Label.RSS,
-			message: "Indexing new torrents...",
-		});
-		await indexNewTorrents();
-		for (const [i, candidate] of candidatesSinceLastTime.entries()) {
-			const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
+		const pageLimit =
+			rssCadence && Date.now() - lastRun > rssCadence + ms("1 minute")
+				? 12
+				: 1;
+		const excludeIndexerIds: Set<number> = new Set();
+		const oldestPerIndexer: Map<number, number> = new Map();
+		const indexerParams: Map<number, { limit: number; offset: number }> =
+			new Map();
+		let indexersToUse: Indexer[] = [];
+		let prevSearchTime = 0;
+		for (let page = 1; page <= pageLimit; page++) {
+			const sleepTime = ms("5 minutes") - (Date.now() - prevSearchTime);
+			if (page > 1) {
+				if (indexersToUse.every((i) => excludeIndexerIds.has(i.id))) {
+					break;
+				}
+				logger.verbose({
+					label: Label.RSS,
+					message: `Getting page #${page} of RSS feeds ${sleepTime > 0 ? `in ${Math.round(sleepTime / 1000)}s` : "now"} (paging until #${pageLimit} or pubDate ${humanReadableDate(lastRun)})`,
+				});
+			}
+			if (sleepTime > 0) {
+				await wait(sleepTime);
+			}
+			const searchTime = Date.now();
+
+			indexersToUse = (await getEnabledIndexers()).filter(
+				(indexer) => !excludeIndexerIds.has(indexer.id),
+			);
+			if (!indexersToUse.length) break;
+			const indexerCandidates = await queryRssFeeds(
+				indexersToUse,
+				indexerParams,
+			);
+			const totalCandidates = indexerCandidates.reduce(
+				(acc, { candidates }) => acc + candidates.length,
+				0,
+			);
+			const candidatesSinceLastTime: Candidate[] = indexerCandidates
+				.flatMap(({ indexerId, candidates }) => {
+					// Exclude indexers that don't support pagination
+					// Only compares indexers own time against itself
+					const prevOldest =
+						oldestPerIndexer.get(indexerId) ?? Infinity;
+					const pagedCandidates = candidates
+						.filter(({ pubDate }) => pubDate < prevOldest)
+						.sort((a, b) => a.pubDate - b.pubDate);
+					const indexerUrl =
+						indexersToUse.find((i) => i.id === indexerId)?.url ??
+						indexerId.toString();
+					if (pagedCandidates.length) {
+						if (page > 1) {
+							logger.verbose({
+								label: Label.RSS,
+								message: `Indexer ${indexerUrl} returned ${pagedCandidates.length} new results for page #${page}`,
+							});
+						}
+						oldestPerIndexer.set(
+							indexerId,
+							pagedCandidates[0].pubDate,
+						);
+					} else {
+						logger.verbose({
+							label: Label.RSS,
+							message: `Indexer ${indexerUrl} returned no new results for page #${page}, no longer paging`,
+						});
+						excludeIndexerIds.add(indexerId);
+					}
+					const limit = candidates.length;
+					const offset =
+						(indexerParams.get(indexerId)?.offset ?? 0) + limit;
+					indexerParams.set(indexerId, { limit, offset });
+					return candidates.map((candidate) => ({
+						...candidate,
+						indexerId,
+					}));
+				})
+				.filter(({ indexerId, pubDate }) => {
+					if (pubDate < lastRun) {
+						excludeIndexerIds.add(indexerId);
+						return false;
+					}
+					return true;
+				})
+				.sort((a, b) => a.pubDate - b.pubDate);
 			logger.verbose({
 				label: Label.RSS,
-				message: `(${i + 1}/${candidatesSinceLastTime.length}) ${candidateLog}`,
+				message: `Scan returned ${
+					candidatesSinceLastTime.length
+				} new results, ignoring ${
+					totalCandidates - candidatesSinceLastTime.length
+				} already seen`,
 			});
-			await checkNewCandidateMatch(candidate, Label.RSS);
+			logger.verbose({
+				label: Label.RSS,
+				message: "Indexing new torrents...",
+			});
+			await indexNewTorrents();
+			for (const [i, candidate] of candidatesSinceLastTime.entries()) {
+				const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
+				logger.verbose({
+					label: Label.RSS,
+					message: `(Page #${page}: ${i + 1}/${candidatesSinceLastTime.length}) ${humanReadableDate(candidate.pubDate)} - ${candidateLog}`,
+				});
+				await checkNewCandidateMatch(candidate, Label.RSS);
+			}
+			prevSearchTime = searchTime;
 		}
 		logger.info({ label: Label.RSS, message: "Scan complete" });
 	}

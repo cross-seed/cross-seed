@@ -45,6 +45,11 @@ import {
 import chalk from "chalk";
 import { inspect } from "util";
 
+export interface TorznabLimits {
+	default: number;
+	max: number;
+}
+
 export interface TorznabCats {
 	tv: boolean;
 	movie: boolean;
@@ -69,6 +74,7 @@ export interface TorznabParams extends IdSearchParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
+	offset?: number;
 	apikey?: string;
 	season?: number | string;
 	ep?: number | string;
@@ -82,6 +88,7 @@ export interface IdSearchCaps {
 }
 
 export interface Caps {
+	limits: TorznabLimits;
 	search: boolean;
 	categories: TorznabCats;
 	tvSearch: boolean;
@@ -91,6 +98,10 @@ export interface Caps {
 }
 
 const ALL_CAPS: Caps = {
+	limits: {
+		default: 100,
+		max: 100,
+	},
 	search: true,
 	categories: {
 		tv: true,
@@ -120,10 +131,11 @@ const ALL_CAPS: Caps = {
 type TorznabSearchTechnique =
 	| []
 	| [{ $: { available: "yes" | "no"; supportedParams: string } }];
-
+type LimitXmlElement = { $: { default: string; max: string } };
 type CategoryXmlElement = { $: { id: string; name: string } };
 type TorznabCaps = {
 	caps?: {
+		limits: LimitXmlElement[];
 		categories: { category: CategoryXmlElement[] }[];
 		searching: [
 			{
@@ -176,6 +188,11 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 }
 
 function parseTorznabCaps(xml: TorznabCaps): Caps {
+	const limits = xml?.caps?.limits?.map((limit) => ({
+		default: parseInt(limit.$.default),
+		max: parseInt(limit.$.max),
+	}))[0] ?? { default: 100, max: 100 };
+
 	const searchingSection = xml?.caps?.searching?.[0];
 	const isAvailable = (searchTechnique: TorznabSearchTechnique | undefined) =>
 		searchTechnique?.[0]?.$?.available === "yes";
@@ -232,6 +249,7 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	}
 
 	return {
+		limits,
 		search: Boolean(isAvailable(searchingSection?.search)),
 		tvSearch: Boolean(isAvailable(searchingSection?.["tv-search"])),
 		movieSearch: Boolean(isAvailable(searchingSection?.["movie-search"])),
@@ -362,12 +380,21 @@ export function indexerDoesSupportMediaType(
 	}
 }
 
-export async function queryRssFeeds(): Promise<Candidate[]> {
-	const candidatesByUrl = await makeRequests(
-		await getEnabledIndexers(),
-		async () => [{ t: "search", q: "" }],
-	);
-	return candidatesByUrl.flatMap((e) => e.candidates);
+export async function queryRssFeeds(
+	indexers: Indexer[],
+	paramsPerIndexer: Map<number, { limit: number; offset: number }>,
+): Promise<IndexerCandidates[]> {
+	return makeRequests(indexers, async (indexer) => {
+		const params = paramsPerIndexer.get(indexer.id);
+		return [
+			{
+				t: "search",
+				q: "",
+				limit: params?.limit ?? JSON.parse(indexer.limits).max,
+				offset: params?.offset,
+			},
+		];
+	});
 }
 
 export async function searchTorznab(
@@ -391,6 +418,7 @@ export async function searchTorznab(
 		indexersToSearch,
 		async (indexer) => {
 			const caps = {
+				limits: JSON.parse(indexer.limits),
 				search: indexer.searchCap,
 				tvSearch: indexer.tvSearchCap,
 				movieSearch: indexer.movieSearchCap,
@@ -427,6 +455,7 @@ export async function syncWithDb() {
 			movieSearchCap: "movie_search_cap",
 			movieIdCaps: "movie_id_caps",
 			categories: "cat_caps",
+			limits: "limits_caps",
 		});
 
 	const inConfigButNotInDb = torznab.filter(
@@ -609,6 +638,7 @@ export async function updateCaps(): Promise<void> {
 				movie_id_caps: JSON.stringify(caps.movieIdSearch),
 				tv_id_caps: JSON.stringify(caps.tvIdSearch),
 				cat_caps: JSON.stringify(caps.categories),
+				limits_caps: JSON.stringify(caps.limits),
 			});
 	}
 }
