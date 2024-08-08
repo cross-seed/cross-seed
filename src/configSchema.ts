@@ -25,6 +25,7 @@ const ZodErrorMessages = {
 		"fuzzySizeThreshold cannot be greater than 0.1 when using searchCadence or rssCadence.",
 	seasonFromEpisodesMin:
 		"seasonFromEpisodes cannot be less than 0.5 when using searchCadence",
+	maxRemainingForResumeMax: "maxRemainingForResume must be between 0 and 50.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
@@ -124,14 +125,16 @@ export const VALIDATION_SCHEMA = z
 	.object({
 		delay: z
 			.number()
-			.nonnegative({
-				message: ZodErrorMessages.delayNegative,
-			})
+			.nonnegative(ZodErrorMessages.delayNegative)
 			.gte(30, ZodErrorMessages.delayUnsupported)
 			.lte(3600, ZodErrorMessages.delayUnsupported),
 		torznab: z.array(z.string().url()),
 		dataDirs: z.array(z.string()).nullish(),
 		matchMode: z.nativeEnum(MatchMode),
+		maxRemainingForResume: z
+			.number()
+			.gte(0, ZodErrorMessages.maxRemainingForResumeMax)
+			.lte(50, ZodErrorMessages.maxRemainingForResumeMax),
 		linkCategory: z.string().nullish(),
 		linkDir: z.string().nullish(),
 		linkType: z.nativeEnum(LinkType),
@@ -148,16 +151,15 @@ export const VALIDATION_SCHEMA = z
 		seasonFromEpisodes: z
 			.number()
 			.positive()
-			.lte(1, {
-				message: ZodErrorMessages.numberMustBeRatio,
-			})
+			.lte(1, ZodErrorMessages.numberMustBeRatio)
 			.nullish(),
-		fuzzySizeThreshold: z.number().positive().lte(1, {
-			message: ZodErrorMessages.numberMustBeRatio,
-		}),
+		fuzzySizeThreshold: z
+			.number()
+			.positive()
+			.lte(1, ZodErrorMessages.numberMustBeRatio),
 		excludeOlder: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish()
 			.or(
@@ -171,7 +173,7 @@ export const VALIDATION_SCHEMA = z
 
 		excludeRecentSearch: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish()
 			.or(
@@ -199,7 +201,7 @@ export const VALIDATION_SCHEMA = z
 		host: z.string().ip().nullish(),
 		rssCadence: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish()
 			.refine(
@@ -210,7 +212,7 @@ export const VALIDATION_SCHEMA = z
 			),
 		searchCadence: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish()
 			.refine(
@@ -219,12 +221,12 @@ export const VALIDATION_SCHEMA = z
 			),
 		snatchTimeout: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish(),
 		searchTimeout: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish(),
 		searchLimit: z.number().nonnegative().nullish(),

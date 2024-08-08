@@ -18,6 +18,7 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	LinkType,
+	MatchMode,
 	SaveResult,
 } from "./constants.js";
 import { logger } from "./logger.js";
@@ -333,7 +334,7 @@ export async function performAction(
 	searchee: Searchee,
 	tracker: string,
 ): Promise<{ actionResult: ActionResult; linkedNewFiles: boolean }> {
-	const { action, linkDir } = getRuntimeConfig();
+	const { action, linkDir, matchMode } = getRuntimeConfig();
 
 	if (action === Action.SAVE) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
@@ -391,8 +392,11 @@ export async function performAction(
 
 	logActionResult(result, newMeta, searchee, tracker, decision);
 	if (result === InjectionResult.SUCCESS) {
-		// For an easy re-injection user workflow when multiple MATCH_PARTIAL
-		if (decision === Decision.MATCH_PARTIAL) {
+		// cross-seed may need to process these with the inject job
+		if (
+			matchMode === MatchMode.SAFE ||
+			decision === Decision.MATCH_PARTIAL
+		) {
 			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 		}
 	} else if (result !== InjectionResult.ALREADY_EXISTS) {

@@ -14,8 +14,8 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { shouldRecheck, extractCredentialsFromUrl, wait } from "../utils.js";
-import { TorrentClient } from "./TorrentClient.js";
+import { extractCredentialsFromUrl, wait } from "../utils.js";
+import { shouldRecheck, TorrentClient } from "./TorrentClient.js";
 
 const COULD_NOT_FIND_INFO_HASH = "Could not find info-hash.";
 
@@ -320,6 +320,15 @@ export default class RTorrent implements TorrentClient {
 		await this.methodCallP<void>("d.check_hash", [infoHash]);
 	}
 
+	async resumeInjection(
+		infoHash: string,
+		options: { checkOnce: boolean },
+	): Promise<void> {
+		if (options.checkOnce) {
+			infoHash;
+		} // Remove for implementation
+	}
+
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,
@@ -352,7 +361,9 @@ export default class RTorrent implements TorrentClient {
 
 		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
 
-		const loadType = shouldRecheck(decision) ? "load" : "load.start";
+		const loadType = shouldRecheck(searchee, decision)
+			? "load"
+			: "load.start";
 
 		for (let i = 0; i < 5; i++) {
 			try {
@@ -363,6 +374,7 @@ export default class RTorrent implements TorrentClient {
 					`d.custom1.set="${TORRENT_TAG}"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
 				]);
+				this.resumeInjection(meta.infoHash, { checkOnce: false });
 				break;
 			} catch (e) {
 				await wait(1000 * Math.pow(2, i));
