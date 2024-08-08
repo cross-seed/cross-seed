@@ -27,6 +27,7 @@ export interface Indexer {
 	tvIdCaps: string;
 	movieIdCaps: string;
 	categories: string;
+	limits: string;
 }
 
 export async function getAllIndexers(): Promise<Indexer[]> {
@@ -43,6 +44,7 @@ export async function getAllIndexers(): Promise<Indexer[]> {
 		tvIdCaps: "tv_id_caps",
 		movieIdCaps: "movie_id_caps",
 		categories: "cat_caps",
+		limits: "limits_caps",
 	});
 }
 
@@ -55,6 +57,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 			tv_id_caps: null,
 			movie_id_caps: null,
 			cat_caps: null,
+			limits_caps: null,
 		})
 		.where({ active: true, search_cap: true })
 		.where((i) =>
@@ -76,6 +79,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 			tvIdCaps: "tv_id_caps",
 			movieIdCaps: "movie_id_caps",
 			categories: "cat_caps",
+			limits: "limits_caps",
 		});
 }
 
