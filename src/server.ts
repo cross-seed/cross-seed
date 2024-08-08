@@ -237,11 +237,7 @@ async function announce(
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	try {
 		await indexNewTorrents();
-		const result = await checkNewCandidateMatch(
-			candidate,
-			candidateLog,
-			Label.ANNOUNCE,
-		);
+		const result = await checkNewCandidateMatch(candidate, Label.ANNOUNCE);
 		if (!result.decision) {
 			res.writeHead(204);
 			res.end();

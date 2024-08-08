@@ -1,7 +1,7 @@
 import bencode from "bencode";
 import { createHash } from "crypto";
 import { join } from "path";
-import { File } from "./searchee.js";
+import { File, parseTitle } from "./searchee.js";
 import { fallback } from "./utils.js";
 
 interface TorrentDirent {
@@ -74,7 +74,6 @@ export class Metafile {
 		this.raw = raw;
 		this.infoHash = sha1(bencode.encode(raw.info));
 		this.name = fallback(raw.info["name.utf-8"], raw.info.name)!.toString();
-		this.title = this.name;
 		this.pieceLength = raw.info["piece length"];
 
 		if (!raw.info.files) {
@@ -112,6 +111,7 @@ export class Metafile {
 			this.length = this.files.reduce(sumLength, 0);
 			this.isSingleFileTorrent = false;
 		}
+		this.title = parseTitle(this.name, this.files) ?? this.name;
 	}
 
 	static decode(buf: Buffer) {
