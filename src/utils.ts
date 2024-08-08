@@ -5,7 +5,6 @@ import {
 	ANIME_REGEX,
 	AUDIO_EXTENSIONS,
 	BOOK_EXTENSIONS,
-	Decision,
 	EP_REGEX,
 	LEVENSHTEIN_DIVISOR,
 	MOVIE_REGEX,
@@ -59,9 +58,12 @@ export function nMsAgo(n: number): number {
 export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
-export function humanReadableSize(bytes: number) {
-	const k = 1000;
-	const sizes = ["B", "kB", "MB", "GB", "TB"];
+export function humanReadableSize(bytes: number, binary = false) {
+	if (bytes === 0) return "0 B";
+	const k = binary ? 1024 : 1000;
+	const sizes = binary
+		? ["B", "KiB", "MiB", "GiB", "TiB"]
+		: ["B", "KB", "MB", "GB", "TB"];
 	// engineering notation: (coefficient) * 1000 ^ (exponent)
 	const exponent = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
 	const coefficient = bytes / Math.pow(k, exponent);
@@ -140,16 +142,6 @@ export function areMediaTitlesSimilar(a: string, b: string): boolean {
 				titleB.includes(titleA),
 		),
 	);
-}
-export function shouldRecheck(decision: Decision): boolean {
-	switch (decision) {
-		case Decision.MATCH:
-		case Decision.MATCH_SIZE_ONLY:
-			return false;
-		case Decision.MATCH_PARTIAL:
-		default:
-			return true;
-	}
 }
 export async function time<R>(cb: () => R, times: number[]) {
 	const before = performance.now();

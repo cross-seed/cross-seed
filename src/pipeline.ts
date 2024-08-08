@@ -13,6 +13,7 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	isAnyMatchedDecision,
+	MatchMode,
 	SaveResult,
 	UNKNOWN_TRACKER,
 } from "./constants.js";
@@ -122,7 +123,11 @@ type InjectSummary = {
 	FAILED: number;
 	UNMATCHED: number;
 	FOUND_BAD_FORMAT: boolean;
+	INJECTED_NON_TORRENT_BASED: boolean;
+	INJECTED_FROM_STALLED_SOURCE: boolean;
 	FLAT_LINKING: boolean;
+	RECHECKING: Set<string>;
+	RESUMING: Set<string>;
 };
 
 async function assessCandidates(
@@ -813,11 +818,13 @@ async function injectInitialAction(
 	matchedSearchee?: SearcheeWithLabel;
 	matchedDecision?: DecisionAnyMatch;
 	linkedNewFiles: boolean;
+	injectedNonTorrentBased: boolean;
 }> {
 	let injectionResult = InjectionResult.FAILURE;
 	let matchedSearchee: SearcheeWithLabel | undefined;
 	let matchedDecision: DecisionAnyMatch | undefined;
 	let linkedNewFiles = false;
+	let injectedNonTorrentBased = false;
 	for (const [searchee, decision] of [...fullMatches, ...partialMatches]) {
 		if (
 			injectionResult === InjectionResult.TORRENT_NOT_COMPLETE &&
@@ -826,6 +833,9 @@ async function injectInitialAction(
 			continue; // Data/virtual searchee doesn't know if torrent is complete
 		}
 		const res = await performAction(meta, decision, searchee, tracker);
+		if (!searchee.infoHash) {
+			injectedNonTorrentBased = true;
+		}
 		const result = res.actionResult;
 		if (res.linkedNewFiles) {
 			linkedNewFiles = true;
@@ -858,6 +868,7 @@ async function injectInitialAction(
 		matchedSearchee,
 		matchedDecision,
 		linkedNewFiles,
+		injectedNonTorrentBased,
 	};
 }
 
@@ -869,6 +880,7 @@ async function injectFromStalledTorrent(
 	injectionResult: InjectionResult,
 	progress: string,
 	filePathLog: string,
+	summary: InjectSummary,
 ): Promise<boolean> {
 	let linkedNewFiles = false;
 	let inClient = (await getClient().isTorrentComplete(meta.infoHash)).isOk();
@@ -925,6 +937,9 @@ async function injectFromStalledTorrent(
 				message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 			});
 			await getClient().recheckTorrent(meta.infoHash);
+			summary.RECHECKING.add(meta.infoHash);
+			getClient().resumeInjection(meta.infoHash, { checkOnce: false });
+			summary.RESUMING.add(meta.infoHash);
 		} else {
 			logger.warn({
 				label: Label.INJECT,
@@ -936,6 +951,8 @@ async function injectFromStalledTorrent(
 }
 
 function injectSummary(summary: InjectSummary): void {
+	const { matchMode } = getRuntimeConfig();
+
 	const incompleteMsg = `${chalk.bold.yellow(summary.ALREADY_EXISTS)} existed in client${
 		summary.INCOMPLETE_CANDIDATES
 			? chalk.dim(` (${summary.INCOMPLETE_CANDIDATES} were incomplete)`)
@@ -973,6 +990,20 @@ function injectSummary(summary: InjectSummary): void {
 		logger.warn({
 			label: Label.INJECT,
 			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
+		});
+	}
+
+	if (
+		matchMode === MatchMode.SAFE ||
+		summary.PARTIAL_MATCHES ||
+		summary.RECHECKING.size ||
+		summary.RESUMING.size ||
+		summary.INJECTED_NON_TORRENT_BASED ||
+		summary.INJECTED_FROM_STALLED_SOURCE
+	) {
+		logger.info({
+			label: Label.INJECT,
+			message: `Waiting for matches to finish rechecking...`,
 		});
 	}
 }
@@ -1028,7 +1059,11 @@ export async function injectSavedTorrents() {
 		FAILED: 0,
 		UNMATCHED: 0,
 		FOUND_BAD_FORMAT: false,
+		INJECTED_NON_TORRENT_BASED: false,
+		INJECTED_FROM_STALLED_SOURCE: false,
 		FLAT_LINKING: flatLinking,
+		RECHECKING: new Set(),
+		RESUMING: new Set(),
 	};
 	let count = 0;
 	for (const torrentFilePath of dirContents) {
@@ -1081,12 +1116,16 @@ export async function injectSavedTorrents() {
 			matchedSearchee,
 			matchedDecision,
 			linkedNewFiles,
+			injectedNonTorrentBased: injectedNonTorrentBasedTemp,
 		} = await injectInitialAction(
 			meta,
 			fullMatches,
 			partialMatches,
 			tracker,
 		);
+		if (injectedNonTorrentBasedTemp) {
+			summary.INJECTED_NON_TORRENT_BASED = true;
+		}
 		if (injectionResult === InjectionResult.FAILURE) {
 			logger.error({
 				label: Label.INJECT,
@@ -1109,15 +1148,20 @@ export async function injectSavedTorrents() {
 			} else {
 				// Since source is stalled, add to client paused so user can resume later if desired
 				// Try linking all possible matches as they may have different files
-				await injectFromStalledTorrent(
-					meta,
-					fullMatches,
-					partialMatches,
-					tracker,
-					injectionResult,
-					progress,
-					filePathLog,
-				);
+				if (
+					await injectFromStalledTorrent(
+						meta,
+						fullMatches,
+						partialMatches,
+						tracker,
+						injectionResult,
+						progress,
+						filePathLog,
+						summary,
+					)
+				) {
+					summary.INJECTED_FROM_STALLED_SOURCE = true;
+				}
 			}
 			summary.INCOMPLETE_SEARCHEES++;
 			continue;
@@ -1134,6 +1178,11 @@ export async function injectSavedTorrents() {
 					message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 				});
 				await getClient().recheckTorrent(meta.infoHash);
+				summary.RECHECKING.add(meta.infoHash);
+				getClient().resumeInjection(meta.infoHash, {
+					checkOnce: false,
+				});
+				summary.RESUMING.add(meta.infoHash);
 			} else if (fullMatches.length && !isComplete) {
 				logger.info({
 					label: Label.INJECT,
@@ -1141,12 +1190,23 @@ export async function injectSavedTorrents() {
 				});
 				isComplete = true;
 				await getClient().recheckTorrent(meta.infoHash);
+				summary.RECHECKING.add(meta.infoHash);
+				getClient().resumeInjection(meta.infoHash, {
+					checkOnce: false,
+				});
+				summary.RESUMING.add(meta.infoHash);
 				toDelete.add(torrentFilePath); // Prevent infinite recheck in rare case of corrupted cross seed
 			} else {
 				logger.warn({
 					label: Label.INJECT,
 					message: `${progress} Unable to inject ${filePathLog} - ${chalk.yellow(injectionResult)}${isComplete ? "" : " (incomplete)"}`,
 				});
+				if (!isComplete) {
+					getClient().resumeInjection(meta.infoHash, {
+						checkOnce: true,
+					});
+					summary.RESUMING.add(meta.infoHash);
+				}
 			}
 			summary.ALREADY_EXISTS++;
 			summary.INCOMPLETE_CANDIDATES += isComplete ? 0 : 1;
