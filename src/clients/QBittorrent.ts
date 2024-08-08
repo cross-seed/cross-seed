@@ -404,7 +404,7 @@ export default class QBittorrent implements TorrentClient {
 						`Searchee torrent may have been deleted: ${getLogString(searchee)}`,
 					);
 				} else if (searchee.infoHash) {
-					logger.warning({
+					logger.warn({
 						label: Label.QBITTORRENT,
 						message: `Searchee torrent may have been deleted, tagging may not meet expectations: ${getLogString(searchee)}`,
 					});

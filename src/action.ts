@@ -31,7 +31,7 @@ import {
 	SearcheeWithInfoHash,
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
-import { capitalizeFirstLetter, getLogString, getMediaType } from "./utils.js";
+import { getLogString, getMediaType } from "./utils.js";
 import { AssessmentWithTracker } from "./pipeline.js";
 
 interface LinkResult {
@@ -375,9 +375,6 @@ function linkFile(oldPath: string, newPath: string): boolean {
 			// the context of cross-seed's working directory
 			symlinkSync(ogFileResolvedPath, resolve(newPath));
 		}
-		logger.verbose(
-			`${capitalizeFirstLetter(linkType)} ${oldPath} ---> ${newPath}`,
-		);
 		return true;
 	} catch (e) {
 		if (e.code === "EEXIST") return false;
