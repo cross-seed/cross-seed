@@ -135,6 +135,7 @@ export const VALIDATION_SCHEMA = z
 		maxDataDepth: z.number().gte(1),
 		torrentDir: z.string().nullable(),
 		outputDir: z.string(),
+		injectDir: z.string().optional(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
 		fuzzySizeThreshold: z.number().positive().lte(1, {

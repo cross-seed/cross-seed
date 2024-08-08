@@ -1,9 +1,13 @@
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import fs from "fs";
-import { extname, join, resolve } from "path";
+import { basename, extname, join, resolve } from "path";
 import { inspect } from "util";
-import { USER_AGENT } from "./constants.js";
+import {
+	LEVENSHTEIN_DIVISOR,
+	SAVED_TORRENTS_INFO_REGEX,
+	USER_AGENT,
+} from "./constants.js";
 import { db } from "./db.js";
 import { distance } from "fastest-levenshtein";
 import { logger, logOnce } from "./logger.js";
@@ -19,11 +23,17 @@ import {
 	getMovieKey,
 	getAnimeKeys,
 } from "./searchee.js";
-import { createKeyTitle, stripExtension } from "./utils.js";
+import { MediaType, createKeyTitle, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
 	path?: string;
+}
+
+export interface TorrentNameInfo {
+	name: string;
+	mediaType: MediaType;
+	tracker: string;
 }
 
 export enum SnatchError {
@@ -144,6 +154,7 @@ export async function saveTorrentFile(
 ): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
 	const buf = meta.encode();
+	// Be sure to update parseInfoFromSavedTorrent if changing the format
 	const filePath = join(
 		outputDir,
 		`[${tag}][${tracker}]${stripExtension(
@@ -155,6 +166,24 @@ export async function saveTorrentFile(
 		return;
 	}
 	await writeFile(filePath, buf, { mode: 0o644 });
+}
+
+export async function parseInfoFromSavedTorrent(
+	filename: string,
+): Promise<TorrentNameInfo | null> {
+	const match = basename(filename).match(SAVED_TORRENTS_INFO_REGEX);
+	if (!match) {
+		logger.error(`Failed to parse info from ${filename}`);
+		return null;
+	}
+	const mediaType = match.groups!.mediaType as MediaType;
+	if (!Object.values(MediaType).includes(mediaType)) {
+		logger.error(`Invalid media type ${mediaType} from ${filename}`);
+		return null;
+	}
+	const tracker = match.groups!.tracker;
+	const name = match.groups!.name;
+	return { name, mediaType, tracker };
 }
 
 export async function findAllTorrentFilesInDir(
@@ -266,7 +295,10 @@ export async function getSimilarTorrentsByName(
 	if (!keyTitles.length) {
 		return { keys: [], metas };
 	}
-	const maxDistance = Math.floor(keyTitles[0].length / 4);
+	const candidateMaxDistance = Math.floor(
+		Math.max(...keyTitles.map((keyTitle) => keyTitle.length)) /
+			LEVENSHTEIN_DIVISOR,
+	);
 
 	const allEntries: { name: string; file_path: string }[] = await db(
 		"torrent",
@@ -274,9 +306,21 @@ export async function getSimilarTorrentsByName(
 	const filteredEntries = allEntries.filter((dbName) => {
 		const entry = getKeysFromName(dbName.name);
 		if (entry.element !== element) return false;
+		if (!entry.keyTitles.length) return false;
+		const maxDistance = Math.max(
+			candidateMaxDistance,
+			Math.floor(
+				Math.max(
+					...entry.keyTitles.map((keyTitle) => keyTitle.length),
+				) / LEVENSHTEIN_DIVISOR,
+			),
+		);
 		return entry.keyTitles.some((dbKeyTitle) => {
 			return keyTitles.some(
-				(keyTitle) => distance(keyTitle, dbKeyTitle) <= maxDistance,
+				(keyTitle) =>
+					distance(keyTitle, dbKeyTitle) <= maxDistance ||
+					keyTitle.includes(dbKeyTitle) ||
+					dbKeyTitle.includes(keyTitle),
 			);
 		});
 	});

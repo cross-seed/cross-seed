@@ -51,8 +51,15 @@ async function verifyPath(
  * @returns true (if paths are valid)
  */
 async function checkConfigPaths(): Promise<void> {
-	const { action, linkDir, dataDirs, torrentDir, outputDir, rtorrentRpcUrl } =
-		getRuntimeConfig();
+	const {
+		action,
+		dataDirs,
+		injectDir,
+		linkDir,
+		outputDir,
+		rtorrentRpcUrl,
+		torrentDir,
+	} = getRuntimeConfig();
 	const READ_ONLY = constants.R_OK;
 	const READ_AND_WRITE = constants.R_OK | constants.W_OK;
 	let pathFailure: number = 0;
@@ -79,6 +86,15 @@ async function checkConfigPaths(): Promise<void> {
 			if (!(await verifyPath(dataDir, "dataDirs", READ_ONLY))) {
 				pathFailure++;
 			}
+		}
+	}
+	if (injectDir) {
+		logger.warn({
+			label: Label.INJECT,
+			message: `Manually injecting torrents performs minimal filtering which slightly increases chances of false positives, see the docs for more info`,
+		});
+		if (!(await verifyPath(injectDir, "injectDir", READ_AND_WRITE))) {
+			pathFailure++;
 		}
 	}
 	if (pathFailure) {

@@ -11,6 +11,9 @@ import { Result } from "../Result.js";
 let activeClient: TorrentClient;
 
 export interface TorrentClient {
+	isTorrentComplete: (
+		infoHash: string,
+	) => Promise<Result<boolean, "NOT_FOUND">>;
 	getDownloadDir: (
 		meta: SearcheeWithInfoHash | Metafile,
 		options: { onlyCompleted: boolean },
@@ -23,6 +26,7 @@ export interface TorrentClient {
 		decision: DecisionAnyMatch,
 		path?: string,
 	) => Promise<InjectionResult>;
+	recheckTorrent: (infoHash: string) => Promise<void>;
 	validateConfig: () => Promise<void>;
 }
 

@@ -36,6 +36,7 @@ export interface File {
 export type SearcheeLabel =
 	| Label.SEARCH
 	| Label.RSS
+	| Label.INJECT
 	| Label.ANNOUNCE
 	| Label.WEBHOOK;
 
@@ -115,15 +116,24 @@ function getFilesFromDataRoot(rootPath: string): File[] {
 /**
  * Parse title from SXX or Season XX. Return null if no title found.
  * Also tries to parse titles that are just `Show`, returns `Show` if better not found.
+ * @param name Original name of the searchee/metafile
  * @param files files in the searchee
- * @param options.seasonMatch if the searchee is a `Season X` folder
- * @param options.path if data based, the path to the searchee
+ * @param path if data based, the path to the searchee
  */
-function parseTitle(
+export function parseTitle(
+	name: string,
 	files: File[],
-	seasonMatch: RegExpMatchArray | null,
 	path?: string,
 ): string | null {
+	const seasonMatch =
+		name.length < 12 ? name.match(SONARR_SUBFOLDERS_REGEX) : null;
+	if (
+		!seasonMatch &&
+		(name.match(/\d/) || !hasExt(files, VIDEO_EXTENSIONS))
+	) {
+		return name;
+	}
+
 	const videoFiles = filesWithExt(files, VIDEO_EXTENSIONS);
 	for (const videoFile of videoFiles) {
 		const ep = videoFile.name.match(EP_REGEX);
@@ -158,45 +168,28 @@ function parseTitle(
 			}
 		}
 	}
-	return null;
+	return !seasonMatch ? name : null;
 }
 
 export function createSearcheeFromMetafile(
 	meta: Metafile,
 ): Result<Searchee, Error> {
-	const seasonMatch =
-		meta.name.length < 12 ? meta.name.match(SONARR_SUBFOLDERS_REGEX) : null;
-	if (
-		!seasonMatch &&
-		(meta.name.match(/\d/) || !hasExt(meta.files, VIDEO_EXTENSIONS))
-	) {
+	const title = parseTitle(meta.name, meta.files);
+	if (title) {
 		return resultOf({
 			files: meta.files,
 			infoHash: meta.infoHash,
 			name: meta.name,
-			title: meta.name,
+			title,
 			length: meta.length,
 		});
 	}
-
-	const title =
-		parseTitle(meta.files, seasonMatch) ??
-		(!seasonMatch ? meta.name : null);
-	if (!title) {
-		const msg = `Could not find title for ${getLogString(meta)} from child files`;
-		logger.verbose({
-			label: Label.PREFILTER,
-			message: msg,
-		});
-		return resultOfErr(new Error(msg));
-	}
-	return resultOf({
-		files: meta.files,
-		infoHash: meta.infoHash,
-		name: meta.name,
-		title,
-		length: meta.length,
+	const msg = `Could not find title for ${getLogString(meta)} from child files`;
+	logger.verbose({
+		label: Label.PREFILTER,
+		message: msg,
 	});
+	return resultOfErr(new Error(msg));
 }
 
 export async function createSearcheeFromTorrentFile(
@@ -229,40 +222,23 @@ export async function createSearcheeFromPath(
 		0,
 	);
 
-	const baseName = basename(root);
-	const seasonMatch =
-		baseName.length < 12 ? baseName.match(SONARR_SUBFOLDERS_REGEX) : null;
-	if (
-		!seasonMatch &&
-		(baseName.match(/\d/) || !hasExt(files, VIDEO_EXTENSIONS))
-	) {
+	const name = basename(root);
+	const title = parseTitle(name, files, root);
+	if (title) {
 		return resultOf({
 			files: files,
 			path: root,
-			name: baseName,
-			title: baseName,
+			name,
+			title,
 			length: totalLength,
 		});
 	}
-
-	const title =
-		parseTitle(files, seasonMatch, root) ??
-		(!seasonMatch ? baseName : null);
-	if (!title) {
-		const msg = `Could not find title for ${root} in parent directory or child files`;
-		logger.verbose({
-			label: Label.PREFILTER,
-			message: msg,
-		});
-		return resultOfErr(new Error(msg));
-	}
-	return resultOf({
-		files: files,
-		path: root,
-		name: baseName,
-		title,
-		length: totalLength,
+	const msg = `Could not find title for ${root} in parent directory or child files`;
+	logger.verbose({
+		label: Label.PREFILTER,
+		message: msg,
 	});
+	return resultOfErr(new Error(msg));
 }
 
 export function getKeyMetaInfo(stem: string): string {
@@ -346,7 +322,7 @@ export function getAnimeKeys(stem: string): {
 		if (!title) continue;
 		if (isBadTitle(title)) continue;
 		const keyTitle = createKeyTitle(title);
-		if (!keyTitle) return null;
+		if (!keyTitle) continue;
 		keyTitles.push(keyTitle);
 		ensembleTitles.push(title);
 	}
