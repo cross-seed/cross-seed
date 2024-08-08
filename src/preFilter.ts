@@ -17,9 +17,11 @@ import {
 	filesWithExt,
 	getLogString,
 	getMediaType,
+	getNewestFileAge,
 	humanReadableDate,
 	MediaType,
 	nMsAgo,
+	stripExtension,
 } from "./utils.js";
 
 const MAX_INT = Number.MAX_SAFE_INTEGER;
@@ -193,6 +195,9 @@ export function filterDupesFromSimilar<T extends Searchee>(
 		const isDupe = filteredSearchees.some((s) => {
 			if (searchee.length !== s.length) return false;
 			if (searchee.files.length !== s.files.length) return false;
+			if (stripExtension(searchee.title) !== stripExtension(s.title)) {
+				return false;
+			}
 			const potentialFiles = s.files.map((f) => f.length);
 			return searchee.files.every((file) => {
 				const index = potentialFiles.indexOf(file.length);
@@ -215,7 +220,8 @@ type TimestampDataSql = {
 };
 
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
-	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
+	const { excludeOlder, excludeRecentSearch, seasonFromEpisodes } =
+		getRuntimeConfig();
 	const enabledIndexers = await getEnabledIndexers();
 	const mediaType = getMediaType(searchee);
 	const timestampDataSql: TimestampDataSql = (await db("searchee")
@@ -256,6 +262,14 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 
 	const { earliest_first_search, latest_first_search, earliest_last_search } =
 		timestampDataSql;
+	if (
+		seasonFromEpisodes &&
+		!searchee.infoHash &&
+		!searchee.path &&
+		earliest_last_search < getNewestFileAge(searchee)
+	) {
+		return true;
+	}
 
 	const skipBefore = excludeOlder
 		? nMsAgo(excludeOlder)

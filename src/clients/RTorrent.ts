@@ -281,6 +281,23 @@ export default class RTorrent implements TorrentClient {
 			.mapErr((error) => (error === "FAILURE" ? "UNKNOWN_ERROR" : error));
 	}
 
+	async getAllDownloadDirs(options: {
+		metas: SearcheeWithInfoHash[] | Metafile[];
+		onlyCompleted: boolean;
+	}): Promise<Map<string, string>> {
+		// TODO: Use a single api call for multiple directories
+		const dirs = new Map<string, string>();
+		for (const item of options.metas) {
+			const result = await this.getDownloadDir(item, {
+				onlyCompleted: options.onlyCompleted,
+			});
+			if (result.isOk()) {
+				dirs.set(item.infoHash, result.unwrap());
+			}
+		}
+		return dirs;
+	}
+
 	async isTorrentComplete(
 		infoHash: string,
 	): Promise<Result<boolean, "NOT_FOUND">> {

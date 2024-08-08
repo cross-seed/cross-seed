@@ -19,17 +19,24 @@ const ZodErrorMessages = {
 		"excludeRecentSearch must be at least 3x searchCadence.",
 	excludeRecentOlder:
 		"excludeOlder and excludeRecentSearch must be defined for searching. excludeOlder must be 2-5x excludeRecentSearch.",
-	fuzzySizeThreshold:
-		"fuzzySizeThreshold must be between 0 and 1 with a maximum of 0.1 when using searchCadence or rssCadence",
+	numberMustBeRatio:
+		"fuzzySizeThreshold and seasonFromEpisodes must be between 0 and 1.",
+	fuzzySizeThresholdMax:
+		"fuzzySizeThreshold cannot be greater than 0.1 when using searchCadence or rssCadence.",
+	seasonFromEpisodesMin:
+		"seasonFromEpisodes cannot be less than 0.5 when using searchCadence",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
 		"If using Automatic Torrent Management in qBittorrent, please read: https://www.cross-seed.org/docs/v6-migration#qbittorrent",
 	includeSingleEpisodes:
 		"includeSingleEpisodes is not recommended when using announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
-	needsInject: "You need to use the 'inject' action for partial matching.",
+	needsInject:
+		"You need to use the 'inject' action for partial matching or seasonFromEpisodes.",
 	needsLinkDir:
-		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
+		"You need to set a linkDir (and have your data accessible) for risky/partial matching and seasonFromEpisodes to work.",
+	needsPartial:
+		"seasonFromEpisodes requires matchMode partial if enabled and value is below 1.",
 	linkDirInDataDir:
 		"You cannot have your linkDir inside of your dataDirs. Please adjust your paths to correct this.",
 	ouputDirInInputDir:
@@ -138,8 +145,15 @@ export const VALIDATION_SCHEMA = z
 		injectDir: z.string().optional(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
+		seasonFromEpisodes: z
+			.number()
+			.positive()
+			.lte(1, {
+				message: ZodErrorMessages.numberMustBeRatio,
+			})
+			.nullish(),
 		fuzzySizeThreshold: z.number().positive().lte(1, {
-			message: ZodErrorMessages.fuzzySizeThreshold,
+			message: ZodErrorMessages.numberMustBeRatio,
 		}),
 		excludeOlder: z
 			.string()
@@ -251,7 +265,14 @@ export const VALIDATION_SCHEMA = z
 		(config) =>
 			config.fuzzySizeThreshold <= 0.1 ||
 			(!config.searchCadence && !config.rssCadence),
-		ZodErrorMessages.fuzzySizeThreshold,
+		ZodErrorMessages.fuzzySizeThresholdMax,
+	)
+	.refine(
+		(config) =>
+			(!config.searchCadence && !config.rssCadence) ||
+			!config.seasonFromEpisodes ||
+			config.seasonFromEpisodes >= 0.5,
+		ZodErrorMessages.seasonFromEpisodesMin,
 	)
 	.refine((config) => {
 		if (
@@ -284,13 +305,22 @@ export const VALIDATION_SCHEMA = z
 	.refine(
 		(config) =>
 			config.action === Action.INJECT ||
-			config.matchMode !== MatchMode.PARTIAL,
+			(config.matchMode !== MatchMode.PARTIAL &&
+				!config.seasonFromEpisodes),
 		ZodErrorMessages.needsInject,
 	)
 	.refine(
-		(config) => config.linkDir || config.matchMode === MatchMode.SAFE,
+		(config) =>
+			config.linkDir ||
+			(config.matchMode === MatchMode.SAFE && !config.seasonFromEpisodes),
 		ZodErrorMessages.needsLinkDir,
 	)
+	.refine((config) => {
+		if (config.seasonFromEpisodes && config.seasonFromEpisodes < 1) {
+			return config.matchMode === MatchMode.PARTIAL;
+		}
+		return true;
+	}, ZodErrorMessages.needsPartial)
 	.refine((config) => {
 		if (config.linkDir && config.dataDirs) {
 			return !isChildPath(config.linkDir, config.dataDirs);

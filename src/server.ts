@@ -20,6 +20,7 @@ import {
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 import { existsSync } from "fs";
 import { sanitizeInfoHash } from "./utils.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -158,20 +159,30 @@ async function search(
 	}
 }
 
-function determineResponse(result: {
-	decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null;
-	actionResult: ActionResult | null;
-}): { status: number; state: string } {
-	const injected = result.actionResult === InjectionResult.SUCCESS;
+function determineResponse(
+	results: {
+		decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null;
+		actionResult: ActionResult | null;
+	}[],
+): { status: number; state: string } {
+	const injected = results.some(
+		(r) => r.actionResult === InjectionResult.SUCCESS,
+	);
 	const added =
 		injected ||
-		result.actionResult === InjectionResult.FAILURE ||
-		result.actionResult === SaveResult.SAVED;
-	const exists =
-		result.decision === Decision.INFO_HASH_ALREADY_EXISTS ||
-		result.actionResult === InjectionResult.ALREADY_EXISTS;
-	const incomplete =
-		result.actionResult === InjectionResult.TORRENT_NOT_COMPLETE;
+		results.some(
+			(r) =>
+				r.actionResult === InjectionResult.FAILURE ||
+				r.actionResult === SaveResult.SAVED,
+		);
+	const exists = results.some(
+		(r) =>
+			r.decision === Decision.INFO_HASH_ALREADY_EXISTS ||
+			r.actionResult === InjectionResult.ALREADY_EXISTS,
+	);
+	const incomplete = results.some(
+		(r) => r.actionResult === InjectionResult.TORRENT_NOT_COMPLETE,
+	);
 
 	let status: number;
 	let state: string;
@@ -186,7 +197,7 @@ function determineResponse(result: {
 		state = "Saved";
 	} else {
 		throw new Error(
-			`Unexpected result: ${result.decision} | ${result.actionResult}`,
+			`Unexpected results: ${results.map((r) => `${r.decision} | ${r.actionResult}`).join(", ")}`,
 		);
 	}
 	return { status, state };
@@ -196,6 +207,7 @@ async function announce(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	const { seasonFromEpisodes } = getRuntimeConfig();
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -237,14 +249,25 @@ async function announce(
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	try {
 		await indexNewTorrents();
-		const result = await checkNewCandidateMatch(candidate, Label.ANNOUNCE);
-		if (!result.decision) {
+		const results = [
+			await checkNewCandidateMatch(candidate, Label.ANNOUNCE, {
+				seasonFromEpisodes: false,
+			}),
+		];
+		if (seasonFromEpisodes) {
+			results.push(
+				await checkNewCandidateMatch(candidate, Label.ANNOUNCE, {
+					seasonFromEpisodes: true,
+				}),
+			);
+		}
+		if (results.every((r) => !r.decision)) {
 			res.writeHead(204);
 			res.end();
 			return;
 		}
 
-		const { status, state } = determineResponse(result);
+		const { status, state } = determineResponse(results);
 		logger.info({
 			label: Label.ANNOUNCE,
 			message: `${state} ${candidateLog} (status: ${status})`,
