@@ -324,6 +324,7 @@ export default class Deluge implements TorrentClient {
 				torrentFileName,
 				encodedTorrentData,
 				torrentPath,
+				searchee,
 				decision,
 			);
 
@@ -355,7 +356,7 @@ export default class Deluge implements TorrentClient {
 					this.calculateLabel(searchee, torrentInfo!),
 				);
 
-				if (shouldRecheck(decision)) {
+				if (shouldRecheck(searchee, decision)) {
 					// when paused, libtorrent doesnt start rechecking
 					// leaves torrent ready to download - ~99%
 					await wait(1000);
@@ -386,9 +387,10 @@ export default class Deluge implements TorrentClient {
 		filename: string,
 		filedump: string,
 		path: string,
+		searchee: Searchee,
 		decision: DecisionAnyMatch,
 	): InjectData {
-		const toRecheck = shouldRecheck(decision);
+		const toRecheck = shouldRecheck(searchee, decision);
 		return [
 			filename,
 			filedump,

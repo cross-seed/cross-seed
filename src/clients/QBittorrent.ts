@@ -407,7 +407,7 @@ export default class QBittorrent implements TorrentClient {
 			const buffer = new Blob([newTorrent.encode()], {
 				type: "application/x-bittorrent",
 			});
-			const toRecheck = shouldRecheck(decision);
+			const toRecheck = shouldRecheck(searchee, decision);
 
 			// ---------------------- Building form data ----------------------
 			const formData = new FormData();

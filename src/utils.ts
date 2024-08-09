@@ -98,7 +98,8 @@ export function getMediaType(searchee: Searchee): MediaType {
 			return unsupportedMediaType(searchee);
 	}
 }
-export function shouldRecheck(decision: Decision): boolean {
+export function shouldRecheck(searchee: Searchee, decision: Decision): boolean {
+	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
 	switch (decision) {
 		case Decision.MATCH:
 		case Decision.MATCH_SIZE_ONLY:
