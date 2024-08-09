@@ -10,6 +10,7 @@ import {
 	NON_UNICODE_ALPHANUM_REGEX,
 	SCENE_TITLE_REGEX,
 	SEASON_REGEX,
+	VIDEO_DISC_EXTENSIONS,
 	VIDEO_EXTENSIONS,
 	YEARS_REGEX,
 } from "./constants.js";
@@ -60,10 +61,12 @@ export function humanReadableSize(bytes: number) {
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
 export function filesWithExt(files: File[], exts: string[]): File[] {
-	return files.filter((f) => exts.includes(path.extname(f.name)));
+	return files.filter((f) =>
+		exts.includes(path.extname(f.name.toLowerCase())),
+	);
 }
 export function hasExt(files: File[], exts: string[]): boolean {
-	return files.some((f) => exts.includes(path.extname(f.name)));
+	return files.some((f) => exts.includes(path.extname(f.name.toLowerCase())));
 }
 export function getMediaType(searchee: Searchee): MediaType {
 	function unsupportedMediaType(searchee: Searchee): MediaType {
@@ -85,6 +88,9 @@ export function getMediaType(searchee: Searchee): MediaType {
 		case hasExt(searchee.files, VIDEO_EXTENSIONS):
 			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
 			if (ANIME_REGEX.test(searchee.title)) return MediaType.ANIME;
+			return MediaType.VIDEO;
+		case hasExt(searchee.files, VIDEO_DISC_EXTENSIONS):
+			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
 			return MediaType.VIDEO;
 		case hasExt(searchee.files, [".rar"]):
 			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
