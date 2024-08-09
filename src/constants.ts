@@ -61,6 +61,7 @@ export function sourceRegexRemove(title: string): string {
 }
 
 export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
+export const VIDEO_DISC_EXTENSIONS = [".m2ts", ".ifo", ".vob", ".bup"];
 export const AUDIO_EXTENSIONS = [
 	".wav",
 	".aiff",
@@ -97,6 +98,7 @@ export const ALL_EXTENSIONS = [
 	...VIDEO_EXTENSIONS,
 	...AUDIO_EXTENSIONS,
 	...BOOK_EXTENSIONS,
+	...VIDEO_DISC_EXTENSIONS,
 ];
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
