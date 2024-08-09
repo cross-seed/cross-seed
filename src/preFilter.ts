@@ -1,11 +1,12 @@
 import ms from "ms";
-import { extname, basename, dirname } from "path";
+import { basename, dirname } from "path";
 import { statSync } from "fs";
 import {
 	ARR_DIR_REGEX,
 	SONARR_SUBFOLDERS_REGEX,
 	SEASON_REGEX,
 	VIDEO_EXTENSIONS,
+	VIDEO_DISC_EXTENSIONS,
 } from "./constants.js";
 import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
@@ -17,6 +18,7 @@ import {
 	filesWithExt,
 	getLogString,
 	getMediaType,
+	hasExt,
 	humanReadableDate,
 	MediaType,
 	nMsAgo,
@@ -94,7 +96,9 @@ export function filterByContent(
 
 	const nonVideoSizeRatio =
 		searchee.files.reduce((acc, cur) => {
-			if (!VIDEO_EXTENSIONS.includes(extname(cur.name))) {
+			if (
+				!hasExt([cur], [...VIDEO_EXTENSIONS, ...VIDEO_DISC_EXTENSIONS])
+			) {
 				return acc + cur.length;
 			}
 			return acc;
