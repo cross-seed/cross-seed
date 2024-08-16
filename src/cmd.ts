@@ -15,9 +15,10 @@ import {
 import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
+import { injectSavedTorrents } from "./inject.js";
 import { jobsLoop } from "./jobs.js";
 import { Label, initializeLogger, logger } from "./logger.js";
-import { injectSavedTorrents, main, scanRssFeeds } from "./pipeline.js";
+import { main, scanRssFeeds } from "./pipeline.js";
 import {
 	initializePushNotifier,
 	sendTestNotification,
