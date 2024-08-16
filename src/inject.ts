@@ -26,6 +26,7 @@ import {
 } from "./torrent.js";
 import {
 	areMediaTitlesSimilar,
+	comparing,
 	formatAsList,
 	getLogString,
 	isTruthy,
@@ -146,32 +147,13 @@ async function injectDecideStage(
 			partialMatches.push({ searchee, decision });
 		}
 	}
-	fullMatches.sort(({ searchee: searcheeA }, { searchee: searcheeB }) => {
-		// Prefer torrent over data/virtual, only torrent knows if it's complete
-		if (searcheeA.infoHash && !searcheeB.infoHash) {
-			return -1;
-		}
-		if (!searcheeA.infoHash && searcheeB.infoHash) {
-			return 1;
-		}
-		return 0; // Should keep MATCH first within a searchee type
-	});
-	partialMatches.sort(({ searchee: searcheeA }, { searchee: searcheeB }) => {
-		// Prefer torrent/data over virtual, partials are always rechecked
-		if (
-			(searcheeA.infoHash || searcheeA.path) &&
-			!(searcheeB.infoHash || searcheeB.path)
-		) {
-			return -1;
-		}
-		if (
-			!(searcheeA.infoHash || searcheeA.path) &&
-			(searcheeB.infoHash || searcheeB.path)
-		) {
-			return 1;
-		}
-		return searcheeB.files.length - searcheeA.files.length; // Prefer more files
-	});
+	fullMatches.sort(comparing((match) => !match.searchee.infoHash));
+	partialMatches.sort(
+		comparing(
+			(match) => !(match.searchee.infoHash || match.searchee.path),
+			(match) => -match.searchee.files.length,
+		),
+	);
 	return { fullMatches, partialMatches, foundBlocked };
 }
 
