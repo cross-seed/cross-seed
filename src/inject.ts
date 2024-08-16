@@ -37,14 +37,6 @@ type AllMatches = {
 	searchee: SearcheeWithLabel;
 	decision: DecisionAnyMatch;
 }[];
-type FullMatches = {
-	searchee: SearcheeWithLabel;
-	decision: Decision.MATCH | Decision.MATCH_SIZE_ONLY;
-}[];
-type PartialMatches = {
-	searchee: SearcheeWithLabel;
-	decision: Decision.MATCH_PARTIAL;
-}[];
 
 type InjectSummary = {
 	TOTAL: number;
@@ -100,23 +92,18 @@ function deleteTorrentFileIfEligible(
 	}
 }
 
-async function injectDecideStage(
+async function whichSearcheesMatchTorrent(
 	meta: Metafile,
 	searchees: SearcheeWithLabel[],
-): Promise<{
-	fullMatches: FullMatches;
-	partialMatches: PartialMatches;
-	foundBlocked: boolean;
-}> {
-	const fullMatches: FullMatches = [];
-	const partialMatches: PartialMatches = [];
+): Promise<{ matches: AllMatches; foundBlocked: boolean }> {
 	let foundBlocked = false;
+	const matches: AllMatches = [];
 	for (const searchee of searchees) {
 		const { decision } = await assessCandidate(meta, searchee, []);
-		if (!isAnyMatchedDecision(decision)) {
-			if (decision === Decision.BLOCKED_RELEASE) {
-				foundBlocked = true;
-			}
+		if (decision === Decision.BLOCKED_RELEASE) {
+			foundBlocked = true;
+			continue;
+		} else if (!isAnyMatchedDecision(decision)) {
 			continue;
 		}
 
@@ -134,27 +121,32 @@ async function injectDecideStage(
 		) {
 			logger.warn({
 				label: Label.INJECT,
-				message: `Skipping potential false positive for ${getLogString(meta, chalk.bold.white)} from ${getLogString(searchee, chalk.bold.white)}`,
+				message: `Skipping likely false positive for ${getLogString(meta, chalk.bold.white)} from ${getLogString(searchee, chalk.bold.white)}`,
 			});
 			continue;
 		}
 
-		if (decision === Decision.MATCH) {
-			fullMatches.unshift({ searchee, decision });
-		} else if (decision === Decision.MATCH_SIZE_ONLY) {
-			fullMatches.push({ searchee, decision });
-		} else {
-			partialMatches.push({ searchee, decision });
-		}
+		matches.push({ searchee, decision });
 	}
-	fullMatches.sort(comparing((match) => !match.searchee.infoHash));
-	partialMatches.sort(
+
+	/**
+	 * full matches, then size only matches, then partial matches
+	 * torrent, then data, then virtual
+	 * prefer more files for partials
+	 */
+	matches.sort(
 		comparing(
-			(match) => !(match.searchee.infoHash || match.searchee.path),
+			(match) =>
+				// indexOf returns -1 for not found
+				-[Decision.MATCH_SIZE_ONLY, Decision.MATCH].indexOf(
+					match.decision,
+				),
+			(match) => !match.searchee.infoHash,
+			(match) => !match.searchee.path,
 			(match) => -match.searchee.files.length,
 		),
 	);
-	return { fullMatches, partialMatches, foundBlocked };
+	return { matches, foundBlocked };
 }
 
 async function injectInitialAction(
@@ -342,7 +334,7 @@ async function injectionAlreadyExists(
 	summary: InjectSummary,
 	linkedNewFiles: boolean,
 	meta: Metafile,
-	fullMatches: FullMatches,
+	anyFullMatch: boolean,
 	isComplete: boolean,
 	torrentFilePath: string,
 	options: { cleanUpOldTorrents: boolean },
@@ -353,7 +345,7 @@ async function injectionAlreadyExists(
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 		});
 		await getClient().recheckTorrent(meta.infoHash);
-	} else if (fullMatches.length && !isComplete) {
+	} else if (anyFullMatch && !isComplete) {
 		logger.info({
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files - ${chalk.green(injectionResult)}`,
@@ -440,9 +432,10 @@ async function injectTorrentFiles(
 			summary.FOUND_BAD_FORMAT = true;
 		}
 
-		const { fullMatches, partialMatches, foundBlocked } =
-			await injectDecideStage(meta, searchees);
-		const matches: AllMatches = [...fullMatches, ...partialMatches];
+		const { matches, foundBlocked } = await whichSearcheesMatchTorrent(
+			meta,
+			searchees,
+		);
 		if (!matches.length) {
 			if (foundBlocked) {
 				logger.info({
@@ -497,6 +490,11 @@ async function injectTorrentFiles(
 			cleanUpOldTorrents: options.cleanUpOldTorrents,
 		});
 		if (injectionResult === InjectionResult.ALREADY_EXISTS) {
+			const anyFullMatch = matches.some(
+				(m) =>
+					m.decision === Decision.MATCH ||
+					m.decision === Decision.MATCH_SIZE_ONLY,
+			);
 			isComplete = await injectionAlreadyExists(
 				progress,
 				filePathLog,
@@ -504,7 +502,7 @@ async function injectTorrentFiles(
 				summary,
 				linkedNewFiles,
 				meta,
-				fullMatches,
+				anyFullMatch,
 				isComplete,
 				torrentFilePath,
 				{ cleanUpOldTorrents: options.cleanUpOldTorrents },
