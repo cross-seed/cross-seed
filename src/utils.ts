@@ -362,3 +362,25 @@ export function getMinSizeRatio(): number {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 	return 1 - fuzzySizeThreshold;
 }
+
+/**
+ * Makes comparators for `Array.prototype.sort`.
+ * Second getter will be used if the first is a tie, etc.
+ * Booleans are treated as 0 and 1,
+ * Ascending by default, use - or ! for descending.
+ * @param getters
+ */
+export function comparing<T>(...getters: ((e: T) => number | boolean)[]) {
+	return function compare(a: T, b: T) {
+		for (const getter of getters) {
+			const x = getter(a);
+			const y = getter(b);
+			if (x < y) {
+				return -1;
+			} else if (x > y) {
+				return 1;
+			}
+		}
+		return 0;
+	};
+}
