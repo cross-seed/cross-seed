@@ -68,7 +68,7 @@ function getTorrentFilePathLog(torrentFilePath: string): string {
 	);
 }
 
-function deleteTorrentFileIfElligible(
+function deleteTorrentFileIfEligible(
 	torrentFilePath: string,
 	options: { isComplete: boolean; cleanUpOldTorrents: boolean },
 ): void {
@@ -379,7 +379,7 @@ async function injectionAlreadyExists(
 		isComplete = true;
 		await getClient().recheckTorrent(meta.infoHash);
 		// Prevent infinite recheck in rare case of corrupted cross seed
-		deleteTorrentFileIfElligible(torrentFilePath, {
+		deleteTorrentFileIfEligible(torrentFilePath, {
 			isComplete,
 			cleanUpOldTorrents: options.cleanUpOldTorrents,
 		});
@@ -443,7 +443,7 @@ async function injectTorrentFiles(
 				message: `${progress} Failed to parse ${filePathLog}`,
 			});
 			logger.debug(e);
-			deleteTorrentFileIfElligible(torrentFilePath, {
+			deleteTorrentFileIfEligible(torrentFilePath, {
 				isComplete: false,
 				cleanUpOldTorrents: options.cleanUpOldTorrents,
 			});
@@ -475,7 +475,7 @@ async function injectTorrentFiles(
 				});
 				summary.UNMATCHED++;
 			}
-			deleteTorrentFileIfElligible(torrentFilePath, {
+			deleteTorrentFileIfEligible(torrentFilePath, {
 				isComplete: false,
 				cleanUpOldTorrents: options.cleanUpOldTorrents,
 			});
@@ -502,7 +502,7 @@ async function injectTorrentFiles(
 				matches,
 				tracker,
 			);
-			deleteTorrentFileIfElligible(torrentFilePath, {
+			deleteTorrentFileIfEligible(torrentFilePath, {
 				isComplete: false,
 				cleanUpOldTorrents: options.cleanUpOldTorrents,
 			});
@@ -510,7 +510,7 @@ async function injectTorrentFiles(
 		}
 		const result = await getClient().isTorrentComplete(meta.infoHash);
 		let isComplete = result.isOk() ? result.unwrap() : false;
-		deleteTorrentFileIfElligible(torrentFilePath, {
+		deleteTorrentFileIfEligible(torrentFilePath, {
 			isComplete,
 			cleanUpOldTorrents: options.cleanUpOldTorrents,
 		});
