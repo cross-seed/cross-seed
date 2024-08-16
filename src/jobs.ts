@@ -1,6 +1,7 @@
 import ms from "ms";
 import { db } from "./db.js";
-import { injectSavedTorrents, main, scanRssFeeds } from "./pipeline.js";
+import { injectSavedTorrents } from "./inject.js";
+import { main, scanRssFeeds } from "./pipeline.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";

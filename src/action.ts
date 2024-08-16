@@ -20,7 +20,7 @@ import {
 	LinkType,
 	SaveResult,
 } from "./constants.js";
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -29,6 +29,7 @@ import {
 	getSearcheeSource,
 	Searchee,
 	SearcheeWithInfoHash,
+	SearcheeWithLabel,
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getLogString, getMediaType } from "./utils.js";
@@ -43,7 +44,7 @@ interface LinkResult {
 function logActionResult(
 	result: ActionResult,
 	newMeta: Metafile,
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	tracker: string,
 	decision: Decision,
 ) {
@@ -52,27 +53,33 @@ function logActionResult(
 	const source = `${getSearcheeSource(searchee)} (${searcheeLog})`;
 	const foundBy = `Found ${metaLog} on ${chalk.bold(tracker)} by`;
 
+	let infoOrVerbose = logger.info;
+	let warnOrVerbose = logger.warn;
+	if (searchee.label === Label.INJECT) {
+		infoOrVerbose = logger.verbose;
+		warnOrVerbose = logger.verbose;
+	}
 	switch (result) {
 		case SaveResult.SAVED:
-			logger.info({
+			infoOrVerbose({
 				label: searchee.label,
 				message: `${foundBy} ${chalk.green.bold(decision)} from ${source} - saved`,
 			});
 			break;
 		case InjectionResult.SUCCESS:
-			logger.info({
+			infoOrVerbose({
 				label: searchee.label,
 				message: `${foundBy} ${chalk.green.bold(decision)} from ${source} - injected`,
 			});
 			break;
 		case InjectionResult.ALREADY_EXISTS:
-			logger.info({
+			infoOrVerbose({
 				label: searchee.label,
 				message: `${foundBy} ${chalk.yellow(decision)} from ${source} - exists`,
 			});
 			break;
 		case InjectionResult.TORRENT_NOT_COMPLETE:
-			logger.warn({
+			warnOrVerbose({
 				label: searchee.label,
 				message: `${foundBy} ${chalk.yellow(
 					decision,
@@ -271,7 +278,7 @@ export async function linkAllFilesInMetafile(
 export async function performAction(
 	newMeta: Metafile,
 	decision: DecisionAnyMatch,
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	tracker: string,
 ): Promise<{ actionResult: ActionResult; linkedNewFiles: boolean }> {
 	const { action, linkDir } = getRuntimeConfig();
@@ -301,7 +308,9 @@ export async function performAction(
 			linkedNewFiles = linkResult.linkedNewFiles;
 		} else {
 			const result = linkedFilesRootResult.unwrapErr();
-			logger.error({
+			const warnOrVerbose =
+				searchee.label !== Label.INJECT ? logger.warn : logger.verbose;
+			warnOrVerbose({
 				label: searchee.label,
 				message: `Failed to link files for ${getLogString(newMeta)}: ${result}`,
 			});
@@ -346,7 +355,7 @@ export async function performAction(
 }
 
 export async function performActions(
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	matches: AssessmentWithTracker[],
 ) {
 	const results: ActionResult[] = [];
