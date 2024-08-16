@@ -542,42 +542,7 @@ async function injectTorrentFiles(
 	}
 }
 
-export async function injectSavedTorrents(): Promise<void> {
-	const { flatLinking, injectDir, outputDir } = getRuntimeConfig();
-	const targetDir = injectDir ?? outputDir;
-	const targetDirLog = chalk.bold.magenta(targetDir);
-
-	const torrentFilePaths = await findAllTorrentFilesInDir(targetDir);
-	if (torrentFilePaths.length === 0) {
-		logger.info({
-			label: Label.INJECT,
-			message: `No torrent files found to inject in ${targetDirLog}`,
-		});
-		return;
-	}
-	logger.info({
-		label: Label.INJECT,
-		message: `Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to inject in ${targetDirLog}`,
-	});
-
-	const summary: InjectSummary = {
-		TOTAL: torrentFilePaths.length,
-		INJECTED: 0,
-		FULL_MATCHES: 0,
-		PARTIAL_MATCHES: 0,
-		BLOCKED: 0,
-		ALREADY_EXISTS: 0,
-		INCOMPLETE_CANDIDATES: 0,
-		INCOMPLETE_SEARCHEES: 0,
-		FAILED: 0,
-		UNMATCHED: 0,
-		FOUND_BAD_FORMAT: false,
-		FLAT_LINKING: flatLinking,
-	};
-	const cleanUpOldTorrents = targetDir === outputDir;
-
-	await injectTorrentFiles(torrentFilePaths, summary, { cleanUpOldTorrents });
-
+function logInjectSummary(summary: InjectSummary) {
 	const incompleteMsg = `${chalk.bold.yellow(summary.ALREADY_EXISTS)} existed in client${
 		summary.INCOMPLETE_CANDIDATES
 			? chalk.dim(` (${summary.INCOMPLETE_CANDIDATES} were incomplete)`)
@@ -617,4 +582,42 @@ export async function injectSavedTorrents(): Promise<void> {
 			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
 		});
 	}
+}
+
+export async function injectSavedTorrents(): Promise<void> {
+	const { flatLinking, injectDir, outputDir } = getRuntimeConfig();
+	const targetDir = injectDir ?? outputDir;
+	const targetDirLog = chalk.bold.magenta(targetDir);
+
+	const torrentFilePaths = await findAllTorrentFilesInDir(targetDir);
+	if (torrentFilePaths.length === 0) {
+		logger.info({
+			label: Label.INJECT,
+			message: `No torrent files found to inject in ${targetDirLog}`,
+		});
+		return;
+	}
+	logger.info({
+		label: Label.INJECT,
+		message: `Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to inject in ${targetDirLog}`,
+	});
+
+	const summary: InjectSummary = {
+		TOTAL: torrentFilePaths.length,
+		INJECTED: 0,
+		FULL_MATCHES: 0,
+		PARTIAL_MATCHES: 0,
+		BLOCKED: 0,
+		ALREADY_EXISTS: 0,
+		INCOMPLETE_CANDIDATES: 0,
+		INCOMPLETE_SEARCHEES: 0,
+		FAILED: 0,
+		UNMATCHED: 0,
+		FOUND_BAD_FORMAT: false,
+		FLAT_LINKING: flatLinking,
+	};
+	const cleanUpOldTorrents = targetDir === outputDir;
+
+	await injectTorrentFiles(torrentFilePaths, summary, { cleanUpOldTorrents });
+	logInjectSummary(summary);
 }
