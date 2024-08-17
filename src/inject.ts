@@ -333,7 +333,6 @@ async function injectionAlreadyExists(
 	meta: Metafile,
 	anyFullMatch: boolean,
 	isComplete: boolean,
-	torrentFilePath: string,
 ): Promise<boolean> {
 	if (linkedNewFiles) {
 		logger.info({
@@ -346,10 +345,8 @@ async function injectionAlreadyExists(
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files - ${chalk.green(injectionResult)}`,
 		});
-		isComplete = true;
 		await getClient().recheckTorrent(meta.infoHash);
-		// Prevent infinite recheck in rare case of corrupted cross seed
-		await deleteTorrentFileIfSafe(torrentFilePath);
+		isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
 	} else {
 		logger.warn({
 			label: Label.INJECT,
@@ -430,13 +427,13 @@ async function injectTorrentFiles(
 			});
 			summary.BLOCKED++;
 			await deleteTorrentFileIfSafe(torrentFilePath);
+			continue;
 		} else if (!matches.length) {
 			logger.info({
 				label: Label.INJECT,
 				message: `${progress} ${metaLog} ${chalk.red("has no matches")}: ${filePathLog}`,
 			});
 			summary.UNMATCHED++;
-
 			await deleteTorrentFileIfSafe(torrentFilePath);
 			continue;
 		}
@@ -448,7 +445,7 @@ async function injectTorrentFiles(
 			linkedNewFiles,
 		} = await injectInitialAction(meta, matches, tracker);
 		switch (injectionResult) {
-			case InjectionResult.SUCCESS:
+			case InjectionResult.SUCCESS: {
 				injectionSuccess(
 					progress,
 					filePathLog,
@@ -459,7 +456,15 @@ async function injectTorrentFiles(
 					meta,
 					tracker,
 				);
+				const result = await getClient().isTorrentComplete(
+					meta.infoHash,
+				);
+				const isComplete = result.isOk() ? result.unwrap() : false;
+				if (isComplete) {
+					await deleteTorrentFileIfSafe(torrentFilePath);
+				}
 				break;
+			}
 			case InjectionResult.FAILURE:
 				injectionFailed(
 					progress,
@@ -487,8 +492,10 @@ async function injectTorrentFiles(
 					meta,
 					anyFullMatch,
 					isComplete,
-					torrentFilePath,
 				);
+				if (isComplete) {
+					await deleteTorrentFileIfSafe(torrentFilePath);
+				}
 				break;
 			}
 			case InjectionResult.TORRENT_NOT_COMPLETE:
@@ -501,6 +508,7 @@ async function injectTorrentFiles(
 					matches,
 					tracker,
 				);
+				break;
 		}
 	}
 }
