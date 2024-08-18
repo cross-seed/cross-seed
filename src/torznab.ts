@@ -42,6 +42,7 @@ import {
 	reformatTitleForSearching,
 	sanitizeUrl,
 	stripExtension,
+	stripMetaFromName,
 } from "./utils.js";
 import chalk from "chalk";
 import { inspect } from "util";
@@ -301,6 +302,13 @@ async function createTorznabSearchQueries(
 			t: "search",
 			q: animeQuery,
 		}));
+	} else if (mediaType === MediaType.VIDEO) {
+		return [
+			{
+				t: "search",
+				q: cleanTitle(stripMetaFromName(stem)),
+			},
+		] as const;
 	} else if (mediaType === MediaType.BOOK) {
 		return [
 			{

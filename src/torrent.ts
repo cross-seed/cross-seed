@@ -317,10 +317,7 @@ export async function getSimilarTorrentsByName(
 		);
 		return entry.keyTitles.some((dbKeyTitle) => {
 			return keyTitles.some(
-				(keyTitle) =>
-					distance(keyTitle, dbKeyTitle) <= maxDistance ||
-					keyTitle.includes(dbKeyTitle) ||
-					dbKeyTitle.includes(keyTitle),
+				(keyTitle) => distance(keyTitle, dbKeyTitle) <= maxDistance,
 			);
 		});
 	});
