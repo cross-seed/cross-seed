@@ -1,7 +1,8 @@
+import { distance } from "fastest-levenshtein";
+import fs from "fs";
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
-import fs from "fs";
-import { basename, extname, join, resolve } from "path";
+import { extname, join, resolve } from "path";
 import { inspect } from "util";
 import {
 	LEVENSHTEIN_DIVISOR,
@@ -9,30 +10,29 @@ import {
 	USER_AGENT,
 } from "./constants.js";
 import { db } from "./db.js";
-import { distance } from "fastest-levenshtein";
 import { logger, logOnce } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
+import { Candidate } from "./pipeline.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Candidate } from "./pipeline.js";
 import {
-	getEpisodeKey,
 	createSearcheeFromTorrentFile,
-	Searchee,
-	getSeasonKey,
-	getMovieKey,
 	getAnimeKeys,
+	getEpisodeKey,
+	getMovieKey,
+	getSeasonKey,
+	Searchee,
 } from "./searchee.js";
-import { MediaType, createKeyTitle, stripExtension } from "./utils.js";
+import { createKeyTitle, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
 	path?: string;
 }
 
-export interface TorrentNameInfo {
+export interface FilenameMetadata {
 	name: string;
-	mediaType: MediaType;
+	mediaType: string;
 	tracker: string;
 }
 
@@ -168,19 +168,14 @@ export async function saveTorrentFile(
 	await writeFile(filePath, buf, { mode: 0o644 });
 }
 
-export async function parseInfoFromSavedTorrent(
+export function parseMetadataFromFilename(
 	filename: string,
-): Promise<TorrentNameInfo | null> {
-	const match = basename(filename).match(SAVED_TORRENTS_INFO_REGEX);
+): Partial<FilenameMetadata> {
+	const match = filename.match(SAVED_TORRENTS_INFO_REGEX);
 	if (!match) {
-		logger.error(`Failed to parse info from ${filename}`);
-		return null;
+		return {};
 	}
-	const mediaType = match.groups!.mediaType as MediaType;
-	if (!Object.values(MediaType).includes(mediaType)) {
-		logger.error(`Invalid media type ${mediaType} from ${filename}`);
-		return null;
-	}
+	const mediaType = match.groups!.mediaType;
 	const tracker = match.groups!.tracker;
 	const name = match.groups!.name;
 	return { name, mediaType, tracker };

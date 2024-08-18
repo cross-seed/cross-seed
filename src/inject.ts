@@ -1,7 +1,8 @@
 import chalk from "chalk";
 import fs from "fs";
+import { unlink } from "fs/promises";
 import ms from "ms";
-import { dirname } from "path";
+import { basename, dirname } from "path";
 import { linkAllFilesInMetafile, performAction } from "./action.js";
 import { getClient } from "./clients/TorrentClient.js";
 import {
@@ -21,7 +22,7 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { SearcheeWithLabel } from "./searchee.js";
 import {
 	findAllTorrentFilesInDir,
-	parseInfoFromSavedTorrent,
+	parseMetadataFromFilename,
 	parseTorrentFromFilename,
 } from "./torrent.js";
 import {
@@ -61,34 +62,30 @@ function getTorrentFilePathLog(torrentFilePath: string): string {
 	);
 }
 
-function deleteTorrentFileIfEligible(
-	torrentFilePath: string,
-	options: { isComplete: boolean; cleanUpOldTorrents: boolean },
-): void {
+async function deleteTorrentFileIfSafe(torrentFilePath: string): Promise<void> {
+	const { tracker, name, mediaType } = parseMetadataFromFilename(
+		basename(torrentFilePath),
+	);
+
+	// we are confident cross-seed created the torrent,
+	// or it is intended for use with cross-seed
+	const isSafeToDelete = tracker && name && mediaType;
+	if (!isSafeToDelete) return;
 	const filePathLog = getTorrentFilePathLog(torrentFilePath);
+	logger.verbose({
+		label: Label.INJECT,
+		message: `Deleting ${filePathLog}`,
+	});
 	try {
-		if (options?.isComplete) {
-			logger.verbose({
-				label: Label.INJECT,
-				message: `Deleting ${filePathLog} as it's in client and complete`,
-			});
-			fs.unlinkSync(torrentFilePath);
-			return;
-		}
-		if (!options.cleanUpOldTorrents) return;
-		if (fs.statSync(torrentFilePath).mtimeMs < Date.now() - ms("1 week")) {
-			logger.warn({
-				label: Label.INJECT,
-				message: `Deleting ${filePathLog} as it has failed to inject for too long`,
-			});
-			fs.unlinkSync(torrentFilePath);
-		}
+		await unlink(torrentFilePath);
 	} catch (e) {
-		logger.error({
-			label: Label.INJECT,
-			message: `Failed to delete ${filePathLog}`,
-		});
-		logger.debug(e);
+		if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+			logger.error({
+				label: Label.INJECT,
+				message: `Failed to delete ${filePathLog}`,
+			});
+			logger.debug(e);
+		}
 	}
 }
 
@@ -336,8 +333,6 @@ async function injectionAlreadyExists(
 	meta: Metafile,
 	anyFullMatch: boolean,
 	isComplete: boolean,
-	torrentFilePath: string,
-	options: { cleanUpOldTorrents: boolean },
 ): Promise<boolean> {
 	if (linkedNewFiles) {
 		logger.info({
@@ -350,13 +345,8 @@ async function injectionAlreadyExists(
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files - ${chalk.green(injectionResult)}`,
 		});
-		isComplete = true;
 		await getClient().recheckTorrent(meta.infoHash);
-		// Prevent infinite recheck in rare case of corrupted cross seed
-		deleteTorrentFileIfEligible(torrentFilePath, {
-			isComplete,
-			cleanUpOldTorrents: options.cleanUpOldTorrents,
-		});
+		isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
 	} else {
 		logger.warn({
 			label: Label.INJECT,
@@ -382,9 +372,9 @@ function injectionSuccess(
 		label: Label.INJECT,
 		message: `${progress} Injected ${filePathLog} - ${chalk.green(injectionResult)}`,
 	});
-	sendResultsNotification(matchedSearchee!, [
+	sendResultsNotification(matchedSearchee, [
 		[
-			{ decision: matchedDecision!, metafile: meta },
+			{ decision: matchedDecision, metafile: meta },
 			tracker,
 			injectionResult,
 		],
@@ -400,7 +390,6 @@ function injectionSuccess(
 async function injectTorrentFiles(
 	torrentFilePaths: string[],
 	summary: InjectSummary,
-	options: { cleanUpOldTorrents: boolean },
 ): Promise<void> {
 	const searchees = await findAllSearchees(Label.INJECT);
 
@@ -417,43 +406,35 @@ async function injectTorrentFiles(
 				message: `${progress} Failed to parse ${filePathLog}`,
 			});
 			logger.debug(e);
-			deleteTorrentFileIfEligible(torrentFilePath, {
-				isComplete: false,
-				cleanUpOldTorrents: options.cleanUpOldTorrents,
-			});
 			continue;
 		}
 		const metaLog = getLogString(meta, chalk.bold.white);
 
-		const torrentNameInfo =
-			await parseInfoFromSavedTorrent(torrentFilePath);
-		const tracker = torrentNameInfo?.tracker ?? UNKNOWN_TRACKER;
-		if (tracker === UNKNOWN_TRACKER) {
-			summary.FOUND_BAD_FORMAT = true;
-		}
+		const { tracker: trackerFromFilename } = parseMetadataFromFilename(
+			basename(torrentFilePath),
+		);
+		summary.FOUND_BAD_FORMAT ||= !trackerFromFilename;
+		const tracker = trackerFromFilename ?? UNKNOWN_TRACKER;
 
 		const { matches, foundBlocked } = await whichSearcheesMatchTorrent(
 			meta,
 			searchees,
 		);
-		if (!matches.length) {
-			if (foundBlocked) {
-				logger.info({
-					label: Label.INJECT,
-					message: `${progress} ${metaLog} ${chalk.yellow("possibly blocklisted")}: ${filePathLog}`,
-				});
-				summary.BLOCKED++;
-			} else {
-				logger.info({
-					label: Label.INJECT,
-					message: `${progress} ${metaLog} ${chalk.red("has no matches")}: ${filePathLog}`,
-				});
-				summary.UNMATCHED++;
-			}
-			deleteTorrentFileIfEligible(torrentFilePath, {
-				isComplete: false,
-				cleanUpOldTorrents: options.cleanUpOldTorrents,
+		if (!matches.length && foundBlocked) {
+			logger.info({
+				label: Label.INJECT,
+				message: `${progress} ${metaLog} ${chalk.yellow("possibly blocklisted")}: ${filePathLog}`,
 			});
+			summary.BLOCKED++;
+			await deleteTorrentFileIfSafe(torrentFilePath);
+			continue;
+		} else if (!matches.length) {
+			logger.info({
+				label: Label.INJECT,
+				message: `${progress} ${metaLog} ${chalk.red("has no matches")}: ${filePathLog}`,
+			});
+			summary.UNMATCHED++;
+			await deleteTorrentFileIfSafe(torrentFilePath);
 			continue;
 		}
 
@@ -463,62 +444,72 @@ async function injectTorrentFiles(
 			matchedDecision,
 			linkedNewFiles,
 		} = await injectInitialAction(meta, matches, tracker);
-		if (injectionResult === InjectionResult.FAILURE) {
-			injectionFailed(progress, filePathLog, injectionResult, summary);
-			continue; // Never delete failed torrent files
+		switch (injectionResult) {
+			case InjectionResult.SUCCESS: {
+				injectionSuccess(
+					progress,
+					filePathLog,
+					injectionResult,
+					summary,
+					matchedSearchee!,
+					matchedDecision!,
+					meta,
+					tracker,
+				);
+				const result = await getClient().isTorrentComplete(
+					meta.infoHash,
+				);
+				const isComplete = result.isOk() ? result.unwrap() : false;
+				if (isComplete) {
+					await deleteTorrentFileIfSafe(torrentFilePath);
+				}
+				break;
+			}
+			case InjectionResult.FAILURE:
+				injectionFailed(
+					progress,
+					filePathLog,
+					injectionResult,
+					summary,
+				);
+				break;
+			case InjectionResult.ALREADY_EXISTS: {
+				const result = await getClient().isTorrentComplete(
+					meta.infoHash,
+				);
+				let isComplete = result.isOk() ? result.unwrap() : false;
+				const anyFullMatch = matches.some(
+					(m) =>
+						m.decision === Decision.MATCH ||
+						m.decision === Decision.MATCH_SIZE_ONLY,
+				);
+				isComplete = await injectionAlreadyExists(
+					progress,
+					filePathLog,
+					injectionResult,
+					summary,
+					linkedNewFiles,
+					meta,
+					anyFullMatch,
+					isComplete,
+				);
+				if (isComplete) {
+					await deleteTorrentFileIfSafe(torrentFilePath);
+				}
+				break;
+			}
+			case InjectionResult.TORRENT_NOT_COMPLETE:
+				await injectionTorrentNotComplete(
+					progress,
+					torrentFilePath,
+					injectionResult,
+					summary,
+					meta,
+					matches,
+					tracker,
+				);
+				break;
 		}
-		if (injectionResult === InjectionResult.TORRENT_NOT_COMPLETE) {
-			await injectionTorrentNotComplete(
-				progress,
-				torrentFilePath,
-				injectionResult,
-				summary,
-				meta,
-				matches,
-				tracker,
-			);
-			deleteTorrentFileIfEligible(torrentFilePath, {
-				isComplete: false,
-				cleanUpOldTorrents: options.cleanUpOldTorrents,
-			});
-			continue;
-		}
-		const result = await getClient().isTorrentComplete(meta.infoHash);
-		let isComplete = result.isOk() ? result.unwrap() : false;
-		deleteTorrentFileIfEligible(torrentFilePath, {
-			isComplete,
-			cleanUpOldTorrents: options.cleanUpOldTorrents,
-		});
-		if (injectionResult === InjectionResult.ALREADY_EXISTS) {
-			const anyFullMatch = matches.some(
-				(m) =>
-					m.decision === Decision.MATCH ||
-					m.decision === Decision.MATCH_SIZE_ONLY,
-			);
-			isComplete = await injectionAlreadyExists(
-				progress,
-				filePathLog,
-				injectionResult,
-				summary,
-				linkedNewFiles,
-				meta,
-				anyFullMatch,
-				isComplete,
-				torrentFilePath,
-				{ cleanUpOldTorrents: options.cleanUpOldTorrents },
-			);
-			continue;
-		}
-		injectionSuccess(
-			progress,
-			filePathLog,
-			injectionResult,
-			summary,
-			matchedSearchee!,
-			matchedDecision!,
-			meta,
-			tracker,
-		);
 	}
 }
 
@@ -596,8 +587,7 @@ export async function injectSavedTorrents(): Promise<void> {
 		FOUND_BAD_FORMAT: false,
 		FLAT_LINKING: flatLinking,
 	};
-	const cleanUpOldTorrents = targetDir === outputDir;
 
-	await injectTorrentFiles(torrentFilePaths, summary, { cleanUpOldTorrents });
+	await injectTorrentFiles(torrentFilePaths, summary);
 	logInjectSummary(summary);
 }
