@@ -65,7 +65,7 @@ describe('getMediaType', () => {
     })
   })
 
-  describe('when fallback behaviour', () => {
+  describe('when testing fallback behaviour', () => {
     it('returns MediaType.AUDIO if the file has an audio extension', () => {
       const file = { name: 'media.mp3', length: 1, path: '/tmp/media.mp3' } as File
       expect(getMediaType({ title: 'unknown', files: [file] } as Searchee)).toBe(MediaType.AUDIO)
