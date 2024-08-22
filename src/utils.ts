@@ -128,9 +128,10 @@ export function getApikey(url: string) {
 }
 export function cleanseSeparators(str: string): string {
 	return str
-		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "")
-		.replace(/[._()[\]]/g, " ")
-		.replace(/\s+/g, " ")
+		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "") // bracketed text
+		.replace(/[._()[\]]/g, " ") // release delimiters (except '-')
+		.replace(/\s+/g, " ") // successive spaces
+		.replace(/^\s*-+|-+\s*$/g, "") // "trim()" hyphens
 		.trim();
 }
 
