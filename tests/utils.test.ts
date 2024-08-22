@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { fileFactory } from './factories/file'
+import { searcheeFactory } from './factories/searchee'
 
-import { Searchee, File } from "../src/searchee"
 import { MediaType, humanReadableSize, getMediaType, sanitizeUrl } from '../src/utils'
 
 describe('humanReadableSize', () => {
@@ -17,68 +18,92 @@ describe('humanReadableSize', () => {
 
 describe('getMediaType', () => {
   it('returns MediaType.EPISODE if the title matches EP_REGEX', () => {
-    expect(getMediaType({ title: 'My.Show.S01E01' } as Searchee)).toBe(MediaType.EPISODE)
+    const searchee = searcheeFactory({ title: 'My.Show.S01E01' })
+    
+    expect(getMediaType(searchee)).toBe(MediaType.EPISODE)
   })
 
   it('returns MediaType.SEASON if the title matches SEASON_REGEX', () => {
-    expect(getMediaType({ title: 'My.Show.S01' } as Searchee)).toBe(MediaType.SEASON)
+    const searchee = searcheeFactory({ title: 'My.Show.S01' })
+    
+    expect(getMediaType(searchee)).toBe(MediaType.SEASON)
   })
 
   describe('when testing for video files by extension', () => {
     it('returns MediaType.MOVIE if the title matches MOVIE_REGEX', () => {
-      const file = { name: 'media.mp4', length: 1, path: '/tmp/media.mp4' }
-      expect(getMediaType({ title: 'My.Movie.2021', files: [file] } as Searchee)).toBe(MediaType.MOVIE)
+      const file = fileFactory({ name: 'media.mp4' })
+      const searchee = searcheeFactory({ title: 'My.Movie.2021', files: [file] })
+      
+      expect(getMediaType(searchee)).toBe(MediaType.MOVIE)
     })
 
     it('returns MediaType.ANIME if the title matches ANIME_REGEX', () => {
       const file = { name: 'media.mp4', length: 1, path: '/tmp/media.mp4' }
-      expect(getMediaType({ title: '[GRP] My.Anime - 001', files: [file] } as Searchee)).toBe(MediaType.ANIME)
+      const searchee = searcheeFactory({ title: '[GRP] My.Anime - 001', files: [file] })
+      
+      expect(getMediaType(searchee)).toBe(MediaType.ANIME)
     })
 
     it('returns MediaType.VIDEO if the title does not match MOVIE_REGEX or ANIME_REGEX', () => {
       const file = { name: 'media.mp4', length: 1, path: '/tmp/media.mp4' }
-      expect(getMediaType({ title: 'My.Video', files: [file] } as Searchee)).toBe(MediaType.VIDEO)
+      const searchee = searcheeFactory({ title: 'My.Video', files: [file] })
+      
+      expect(getMediaType(searchee)).toBe(MediaType.VIDEO)
     })
   })
 
   describe('when testing RAR archives', () => {
     it('returns MediaType.MOVIE if the title matches MOVIE_REGEX', () => {
       const file = { name: 'media.rar', length: 1, path: '/tmp/media.rar' }
-      expect(getMediaType({ title: 'My.Movie.2021', files: [file] } as Searchee)).toBe(MediaType.MOVIE)
+      const searchee = searcheeFactory({ title: 'My.Movie.2021', files: [file] })
+      
+      expect(getMediaType(searchee)).toBe(MediaType.MOVIE)
     })
 
     it('returns MediaType.AUDIO if one of the other files has an audio extension', () => {
       const archive = { name: 'media.rar', length: 1, path: '/tmp/media.rar' }
       const audio = { name: 'media.mp3', length: 1, path: '/tmp/media.mp3' }
-      expect(getMediaType({ title: 'My.Video', files: [archive, audio] } as Searchee)).toBe(MediaType.AUDIO)
+      const searchee = searcheeFactory({ title: 'My.Video', files: [archive, audio] })
+      
+      expect(getMediaType(searchee)).toBe(MediaType.AUDIO)
     })
 
     it('returns MediaType.BOOK if one of the other files has a book extension', () => {
       const archive = { name: 'media.rar', length: 1, path: '/tmp/media.rar' }
       const book = { name: 'media.epub', length: 1, path: '/tmp/media.epub' }
-      expect(getMediaType({ title: 'My.Video', files: [archive, book] } as Searchee)).toBe(MediaType.BOOK)
+      const searchee = searcheeFactory({ title: 'My.Video', files: [archive, book] })
+      
+      expect(getMediaType(searchee)).toBe(MediaType.BOOK)
     })
 
     it('returns MediaType.OTHER if the title does not match MOVIE_REGEX', () => {
       const file = { name: 'media.rar', length: 1, path: '/tmp/media.rar' }
-      expect(getMediaType({ title: 'My.Other', files: [file] } as Searchee)).toBe(MediaType.OTHER)
+      const searchee = searcheeFactory({ title: 'My.Other', files: [file] })
+      
+      expect(getMediaType(searchee)).toBe(MediaType.OTHER)
     })
   })
 
   describe('when testing fallback behaviour', () => {
     it('returns MediaType.AUDIO if the file has an audio extension', () => {
       const file = { name: 'media.mp3', length: 1, path: '/tmp/media.mp3' }
-      expect(getMediaType({ title: 'unknown', files: [file] } as Searchee)).toBe(MediaType.AUDIO)
+      const searchee = searcheeFactory({ title: 'unknown', files: [file] })
+      
+      expect(getMediaType(searchee)).toBe(MediaType.AUDIO)
     })
 
     it('returns MediaType.BOOK if the file has a book extension', () => {
       const file = { name: 'media.epub', length: 1, path: '/tmp/media.epub' }
-      expect(getMediaType({ title: 'unknown', files: [file] } as Searchee)).toBe(MediaType.BOOK)
+      const searchee = searcheeFactory({ title: 'unknown', files: [file] })
+
+      expect(getMediaType(searchee)).toBe(MediaType.BOOK)
     })
 
     it('returns MediaType.OTHER if the media type cannot be determined', () => {
       const file = { name: 'media.xyz', length: 1, path: '/tmp/media.xyz' }
-      expect(getMediaType({ title: 'unknown', files: [file] } as Searchee)).toBe(MediaType.OTHER)
+      const searchee = searcheeFactory({ title: 'unknown', files: [file] })
+
+      expect(getMediaType(searchee)).toBe(MediaType.OTHER)
     })
   })
 })
