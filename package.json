@@ -8,7 +8,7 @@
 		"build": "tsc",
 		"watch": "tsc --watch",
 		"prepublishOnly": "rimraf dist && npm run build && husky install",
-		"lint": "prettier --check 'src/{**/*,*}.{js,ts,cjs,mjs}' && eslint 'src/{**/*,*}.{js,ts,cjs,mjs}'",
+		"lint": "prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' && eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'",
 		"typecheck": "tsc --noEmit"
 	},
 	"bin": {
