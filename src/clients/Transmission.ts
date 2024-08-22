@@ -201,7 +201,7 @@ export default class Transmission implements TorrentClient {
 				{
 					"download-dir": downloadDir,
 					metainfo: newTorrent.encode().toString("base64"),
-					paused: shouldRecheck(decision),
+					paused: shouldRecheck(searchee, decision),
 					labels: [TORRENT_TAG],
 				},
 			);
