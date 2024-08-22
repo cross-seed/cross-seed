@@ -26,58 +26,58 @@ describe('getMediaType', () => {
 
   describe('when testing for video files by extension', () => {
     it('returns MediaType.MOVIE if the title matches MOVIE_REGEX', () => {
-      const file = { name: 'media.mp4', length: 1, path: '/tmp/media.mp4' } as File
+      const file = { name: 'media.mp4', length: 1, path: '/tmp/media.mp4' }
       expect(getMediaType({ title: 'My.Movie.2021', files: [file] } as Searchee)).toBe(MediaType.MOVIE)
     })
 
     it('returns MediaType.ANIME if the title matches ANIME_REGEX', () => {
-      const file = { name: 'media.mp4', length: 1, path: '/tmp/media.mp4' } as File
+      const file = { name: 'media.mp4', length: 1, path: '/tmp/media.mp4' }
       expect(getMediaType({ title: '[GRP] My.Anime - 001', files: [file] } as Searchee)).toBe(MediaType.ANIME)
     })
 
     it('returns MediaType.VIDEO if the title does not match MOVIE_REGEX or ANIME_REGEX', () => {
-      const file = { name: 'media.mp4', length: 1, path: '/tmp/media.mp4' } as File
+      const file = { name: 'media.mp4', length: 1, path: '/tmp/media.mp4' }
       expect(getMediaType({ title: 'My.Video', files: [file] } as Searchee)).toBe(MediaType.VIDEO)
     })
   })
 
   describe('when testing RAR archives', () => {
     it('returns MediaType.MOVIE if the title matches MOVIE_REGEX', () => {
-      const file = { name: 'media.rar', length: 1, path: '/tmp/media.rar' } as File
+      const file = { name: 'media.rar', length: 1, path: '/tmp/media.rar' }
       expect(getMediaType({ title: 'My.Movie.2021', files: [file] } as Searchee)).toBe(MediaType.MOVIE)
     })
 
     it('returns MediaType.AUDIO if one of the other files has an audio extension', () => {
-      const archive = { name: 'media.rar', length: 1, path: '/tmp/media.rar' } as File
-      const audio = { name: 'media.mp3', length: 1, path: '/tmp/media.mp3' } as File
+      const archive = { name: 'media.rar', length: 1, path: '/tmp/media.rar' }
+      const audio = { name: 'media.mp3', length: 1, path: '/tmp/media.mp3' }
       expect(getMediaType({ title: 'My.Video', files: [archive, audio] } as Searchee)).toBe(MediaType.AUDIO)
     })
 
     it('returns MediaType.BOOK if one of the other files has a book extension', () => {
-      const archive = { name: 'media.rar', length: 1, path: '/tmp/media.rar' } as File
-      const book = { name: 'media.epub', length: 1, path: '/tmp/media.epub' } as File
+      const archive = { name: 'media.rar', length: 1, path: '/tmp/media.rar' }
+      const book = { name: 'media.epub', length: 1, path: '/tmp/media.epub' }
       expect(getMediaType({ title: 'My.Video', files: [archive, book] } as Searchee)).toBe(MediaType.BOOK)
     })
 
     it('returns MediaType.OTHER if the title does not match MOVIE_REGEX', () => {
-      const file = { name: 'media.rar', length: 1, path: '/tmp/media.rar' } as File
+      const file = { name: 'media.rar', length: 1, path: '/tmp/media.rar' }
       expect(getMediaType({ title: 'My.Other', files: [file] } as Searchee)).toBe(MediaType.OTHER)
     })
   })
 
   describe('when testing fallback behaviour', () => {
     it('returns MediaType.AUDIO if the file has an audio extension', () => {
-      const file = { name: 'media.mp3', length: 1, path: '/tmp/media.mp3' } as File
+      const file = { name: 'media.mp3', length: 1, path: '/tmp/media.mp3' }
       expect(getMediaType({ title: 'unknown', files: [file] } as Searchee)).toBe(MediaType.AUDIO)
     })
 
     it('returns MediaType.BOOK if the file has a book extension', () => {
-      const file = { name: 'media.epub', length: 1, path: '/tmp/media.epub' } as File
+      const file = { name: 'media.epub', length: 1, path: '/tmp/media.epub' }
       expect(getMediaType({ title: 'unknown', files: [file] } as Searchee)).toBe(MediaType.BOOK)
     })
 
     it('returns MediaType.OTHER if the media type cannot be determined', () => {
-      const file = { name: 'media.xyz', length: 1, path: '/tmp/media.xyz' } as File
+      const file = { name: 'media.xyz', length: 1, path: '/tmp/media.xyz' }
       expect(getMediaType({ title: 'unknown', files: [file] } as Searchee)).toBe(MediaType.OTHER)
     })
   })
