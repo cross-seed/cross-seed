@@ -434,7 +434,15 @@ export default class QBittorrent implements TorrentClient {
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
-			await this.addTorrent(formData);
+			try {
+				await this.addTorrent(formData);
+			} catch (e) {
+				logger.error({
+					label: Label.QBITTORRENT,
+					message: `Failed to add torrent (polling client to confirm): ${e.message}`,
+				});
+				logger.debug(e);
+			}
 
 			const newInfo = await this.getTorrentInfo(newTorrent.infoHash, 5);
 			if (!newInfo) {
