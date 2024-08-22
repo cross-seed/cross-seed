@@ -19,6 +19,7 @@ import {
 	RELEASE_GROUP_REGEX,
 	REPACK_PROPER_REGEX,
 	RESOLUTION_REGEX,
+	SCENE_TITLE_REGEX,
 	sourceRegexRemove,
 } from "./constants.js";
 
@@ -248,7 +249,7 @@ export async function scanAllArrsForMedia(
 	}
 	const title =
 		mediaType !== MediaType.VIDEO
-			? searcheeTitle
+			? searcheeTitle.match(SCENE_TITLE_REGEX)!.groups!.title
 			: cleanseSeparators(
 					sourceRegexRemove(
 						stripExtension(searcheeTitle)
@@ -256,7 +257,7 @@ export async function scanAllArrsForMedia(
 							.replace(RESOLUTION_REGEX, "")
 							.replace(REPACK_PROPER_REGEX, ""),
 					),
-				);
+				).match(SCENE_TITLE_REGEX)!.groups!.title;
 	let error = new Error(
 		`No ids found for ${title} | MediaType: ${mediaType.toUpperCase()}`,
 	);

@@ -7,9 +7,11 @@ import {
 	Decision,
 	EP_REGEX,
 	MOVIE_REGEX,
+	NON_UNICODE_ALPHANUM_REGEX,
 	SCENE_TITLE_REGEX,
 	SEASON_REGEX,
 	VIDEO_EXTENSIONS,
+	YEARS_REGEX,
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { File, Searchee } from "./searchee.js";
@@ -135,6 +137,36 @@ export function cleanseSeparators(str: string): string {
 		.trim();
 }
 
+export function cleanTitle(title: string): string {
+	return cleanseSeparators(title).match(SCENE_TITLE_REGEX)!.groups!.title;
+}
+
+export function reformatTitleForSearching(name: string): string {
+	const seriesTitle =
+		name.match(EP_REGEX)?.groups?.title ??
+		name.match(SEASON_REGEX)?.groups?.title;
+	if (seriesTitle) {
+		const title = cleanTitle(seriesTitle);
+		return title.length > 4
+			? replaceLastOccurrence(title, YEARS_REGEX, "")
+					.replace(/\s+/g, " ")
+					.trim()
+			: title;
+	}
+	return cleanTitle(name.match(MOVIE_REGEX)?.[0] ?? name);
+}
+
+export function createKeyTitle(title: string): string | null {
+	const key = cleanTitle(title)
+		.replace(NON_UNICODE_ALPHANUM_REGEX, "")
+		.toLowerCase();
+	return key.length > 4
+		? replaceLastOccurrence(key, YEARS_REGEX, "")
+		: key.length
+			? key
+			: null;
+}
+
 export function isBadTitle(title: string): boolean {
 	return ["season", "ep"].includes(title.toLowerCase());
 }
@@ -144,26 +176,13 @@ export function getAnimeQueries(name: string): string[] {
 	const animeQueries: string[] = [];
 	const { title, altTitle, release } = name.match(ANIME_REGEX)?.groups ?? {};
 	if (title) {
-		animeQueries.push(cleanseSeparators(`${title} ${release}`));
+		animeQueries.push(cleanTitle(`${title} ${release}`));
 	}
 	if (altTitle) {
 		if (isBadTitle(altTitle)) return animeQueries;
-		animeQueries.push(cleanseSeparators(`${altTitle} ${release}`));
+		animeQueries.push(cleanTitle(`${altTitle} ${release}`));
 	}
 	return animeQueries;
-}
-
-export function reformatTitleForSearching(title: string): string {
-	return cleanseSeparators(title).match(SCENE_TITLE_REGEX)!.groups!.title;
-}
-
-export function reformatNameForSearching(name: string): string {
-	return reformatTitleForSearching(
-		name.match(EP_REGEX)?.groups?.title ??
-			name.match(SEASON_REGEX)?.groups?.title ??
-			name.match(MOVIE_REGEX)?.[0] ??
-			name,
-	);
 }
 
 export const tap = (fn) => (value) => {
@@ -234,8 +253,31 @@ export function extractCredentialsFromUrl(
 	}
 }
 
-export function capitalizeFirstLetter(string) {
+export function capitalizeFirstLetter(string: string) {
 	return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+/**
+ * Replaces the last occurrence of a GLOBAL regex match in a string
+ * @param str The string to replace the last occurrence in
+ * @param globalRegExp The regex to match (must be global)
+ * @param newStr The string to replace the last occurrence with
+ */
+export function replaceLastOccurrence(
+	str: string,
+	globalRegExp: RegExp,
+	newStr: string,
+): string {
+	const matches = Array.from(str.matchAll(globalRegExp));
+	if (matches.length === 0) return str;
+	const lastMatch = matches[matches.length - 1];
+	const lastMatchIndex = lastMatch.index!;
+	const lastMatchStr = lastMatch[0];
+	return (
+		str.slice(0, lastMatchIndex) +
+		newStr +
+		str.slice(lastMatchIndex + lastMatchStr.length)
+	);
 }
 
 export function extractInt(str: string): number {
