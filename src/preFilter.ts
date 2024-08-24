@@ -119,7 +119,8 @@ export function filterByContent(
 		ARR_DIR_REGEX.test(basename(searchee.path)) &&
 		!(
 			searchee.files.length > 1 &&
-			SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path))
+			SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path)) &&
+			nonVideoSizeRatio < 0.02
 		)
 	) {
 		logReason(
