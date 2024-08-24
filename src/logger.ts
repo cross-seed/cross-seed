@@ -61,6 +61,10 @@ function redactMessage(message: string | unknown, options?: RuntimeConfig) {
 		/(?:(?:auto|download)[./]\d+[./])([a-zA-Z0-9]+)/g,
 		(match, key) => match.replace(key, redactionMsg),
 	);
+	ret = ret.replace(
+		/(?:\d+[./](?:auto|download)[./])([a-zA-Z0-9]+)/g,
+		(match, key) => match.replace(key, redactionMsg),
+	);
 	ret = ret.replace(/apiKey: '.+'/g, `apiKey: ${redactionMsg}`);
 
 	ret = ret.replace(
