@@ -471,16 +471,14 @@ async function assessCandidateCaching(
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.title, guid })
 		.first();
-	let metaInfoHash: string | undefined = (
-		await db("decision")
-			.select({ infoHash: "info_hash" })
-			.where({ guid })
-			.whereNotNull("info_hash")
-			.first()
-	)?.infoHash; // Can be from a previous similar searchee's snatch
-	if (!metaInfoHash) {
-		metaInfoHash = await fuzzyGuidLookup(guid);
-	}
+	const metaInfoHash: string | undefined =
+		(
+			await db("decision")
+				.select({ infoHash: "info_hash" })
+				.where({ guid })
+				.whereNotNull("info_hash")
+				.first()
+		)?.infoHash ?? (await fuzzyGuidLookup(guid));
 	const metaOrCandidate = metaInfoHash
 		? existsInTorrentCache(metaInfoHash)
 			? await getCachedTorrentFile(metaInfoHash)
