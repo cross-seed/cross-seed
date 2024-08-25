@@ -393,122 +393,114 @@ async function injectionSuccess(
 	}
 }
 
-async function injectTorrentFiles(
+async function injectSavedTorrent(
+	count: number,
 	torrentFilePaths: string[],
+	torrentFilePath: string,
 	summary: InjectSummary,
 	searchees: SearcheeWithLabel[],
-): Promise<void> {
-	let count = 0;
-	for (const torrentFilePath of torrentFilePaths) {
-		const progress = chalk.blue(`(${++count}/${torrentFilePaths.length})`);
-		const filePathLog = getTorrentFilePathLog(torrentFilePath);
-		let meta: Metafile;
-		try {
-			meta = await parseTorrentFromFilename(torrentFilePath);
-		} catch (e) {
-			logger.error({
-				label: Label.INJECT,
-				message: `${progress} Failed to parse ${filePathLog}`,
-			});
-			logger.debug(e);
-			continue;
+) {
+	const progress = chalk.blue(`(${++count}/${torrentFilePaths.length})`);
+	const filePathLog = getTorrentFilePathLog(torrentFilePath);
+	let meta: Metafile;
+	try {
+		meta = await parseTorrentFromFilename(torrentFilePath);
+	} catch (e) {
+		logger.error({
+			label: Label.INJECT,
+			message: `${progress} Failed to parse ${filePathLog}`,
+		});
+		logger.debug(e);
+		return;
+	}
+	const metaLog = getLogString(meta, chalk.bold.white);
+
+	const { tracker: trackerFromFilename } = parseMetadataFromFilename(
+		basename(torrentFilePath),
+	);
+	summary.FOUND_BAD_FORMAT ||= !trackerFromFilename;
+	const tracker = trackerFromFilename ?? UNKNOWN_TRACKER;
+
+	const { matches, foundBlocked } = await whichSearcheesMatchTorrent(
+		meta,
+		searchees,
+	);
+	if (!matches.length && foundBlocked) {
+		logger.info({
+			label: Label.INJECT,
+			message: `${progress} ${metaLog} ${chalk.yellow("possibly blocklisted")}: ${filePathLog}`,
+		});
+		summary.BLOCKED++;
+		await deleteTorrentFileIfSafe(torrentFilePath);
+		return;
+	} else if (!matches.length) {
+		logger.info({
+			label: Label.INJECT,
+			message: `${progress} ${metaLog} ${chalk.red("has no matches")}: ${filePathLog}`,
+		});
+		summary.UNMATCHED++;
+		await deleteTorrentFileIfSafe(torrentFilePath);
+		return;
+	}
+
+	const {
+		injectionResult,
+		matchedSearchee,
+		matchedDecision,
+		linkedNewFiles,
+	} = await injectInitialAction(meta, matches, tracker);
+	switch (injectionResult) {
+		case InjectionResult.SUCCESS: {
+			await injectionSuccess(
+				progress,
+				filePathLog,
+				injectionResult,
+				summary,
+				matchedSearchee!,
+				matchedDecision!,
+				meta,
+				tracker,
+				torrentFilePath,
+			);
+			break;
 		}
-		const metaLog = getLogString(meta, chalk.bold.white);
-
-		const { tracker: trackerFromFilename } = parseMetadataFromFilename(
-			basename(torrentFilePath),
-		);
-		summary.FOUND_BAD_FORMAT ||= !trackerFromFilename;
-		const tracker = trackerFromFilename ?? UNKNOWN_TRACKER;
-
-		const { matches, foundBlocked } = await whichSearcheesMatchTorrent(
-			meta,
-			searchees,
-		);
-		if (!matches.length && foundBlocked) {
-			logger.info({
-				label: Label.INJECT,
-				message: `${progress} ${metaLog} ${chalk.yellow("possibly blocklisted")}: ${filePathLog}`,
-			});
-			summary.BLOCKED++;
-			await deleteTorrentFileIfSafe(torrentFilePath);
-			continue;
-		} else if (!matches.length) {
-			logger.info({
-				label: Label.INJECT,
-				message: `${progress} ${metaLog} ${chalk.red("has no matches")}: ${filePathLog}`,
-			});
-			summary.UNMATCHED++;
-			await deleteTorrentFileIfSafe(torrentFilePath);
-			continue;
-		}
-
-		const {
-			injectionResult,
-			matchedSearchee,
-			matchedDecision,
-			linkedNewFiles,
-		} = await injectInitialAction(meta, matches, tracker);
-		switch (injectionResult) {
-			case InjectionResult.SUCCESS: {
-				await injectionSuccess(
-					progress,
-					filePathLog,
-					injectionResult,
-					summary,
-					matchedSearchee!,
-					matchedDecision!,
-					meta,
-					tracker,
-					torrentFilePath,
-				);
-				break;
+		case InjectionResult.FAILURE:
+			injectionFailed(progress, filePathLog, injectionResult, summary);
+			break;
+		case InjectionResult.ALREADY_EXISTS: {
+			const result = await getClient().isTorrentComplete(meta.infoHash);
+			let isComplete = result.isOk() ? result.unwrap() : false;
+			const anyFullMatch = matches.some(
+				(m) =>
+					m.decision === Decision.MATCH ||
+					m.decision === Decision.MATCH_SIZE_ONLY,
+			);
+			isComplete = await injectionAlreadyExists(
+				progress,
+				filePathLog,
+				injectionResult,
+				summary,
+				linkedNewFiles,
+				meta,
+				anyFullMatch,
+				isComplete,
+			);
+			if (isComplete) {
+				await deleteTorrentFileIfSafe(torrentFilePath);
 			}
-			case InjectionResult.FAILURE:
-				injectionFailed(
-					progress,
-					filePathLog,
-					injectionResult,
-					summary,
-				);
-				break;
-			case InjectionResult.ALREADY_EXISTS: {
-				const result = await getClient().isTorrentComplete(
-					meta.infoHash,
-				);
-				let isComplete = result.isOk() ? result.unwrap() : false;
-				const anyFullMatch = matches.some(
-					(m) =>
-						m.decision === Decision.MATCH ||
-						m.decision === Decision.MATCH_SIZE_ONLY,
-				);
-				isComplete = await injectionAlreadyExists(
-					progress,
-					filePathLog,
-					injectionResult,
-					summary,
-					linkedNewFiles,
-					meta,
-					anyFullMatch,
-					isComplete,
-				);
-				if (isComplete) {
-					await deleteTorrentFileIfSafe(torrentFilePath);
-				}
-				break;
-			}
-			case InjectionResult.TORRENT_NOT_COMPLETE:
-				await injectionTorrentNotComplete(
-					progress,
-					torrentFilePath,
-					injectionResult,
-					summary,
-					meta,
-					matches,
-					tracker,
-				);
-				break;
+			break;
 		}
+		case InjectionResult.TORRENT_NOT_COMPLETE:
+			await injectionTorrentNotComplete(
+				progress,
+				torrentFilePath,
+				injectionResult,
+				summary,
+				meta,
+				matches,
+				tracker,
+			);
+			break;
 	}
 }
 
@@ -554,8 +546,8 @@ function logInjectSummary(summary: InjectSummary, flatLinking: boolean) {
 	}
 }
 
-function createSummary(total: number) {
-	const summary: InjectSummary = {
+function createSummary(total: number): InjectSummary {
+	return {
 		TOTAL: total,
 		INJECTED: 0,
 		FULL_MATCHES: 0,
@@ -568,7 +560,6 @@ function createSummary(total: number) {
 		UNMATCHED: 0,
 		FOUND_BAD_FORMAT: false,
 	};
-	return summary;
 }
 
 export async function injectSavedTorrents(): Promise<void> {
@@ -590,6 +581,14 @@ export async function injectSavedTorrents(): Promise<void> {
 	});
 	const summary = createSummary(torrentFilePaths.length);
 	const searchees = await findAllSearchees(Label.INJECT);
-	await injectTorrentFiles(torrentFilePaths, summary, searchees);
+	for (const [i, torrentFilePath] of torrentFilePaths.entries()) {
+		await injectSavedTorrent(
+			i,
+			torrentFilePaths,
+			torrentFilePath,
+			summary,
+			searchees,
+		);
+	}
 	logInjectSummary(summary, flatLinking);
 }
