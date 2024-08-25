@@ -435,6 +435,24 @@ async function assessAndSaveResults(
 	return assessment;
 }
 
+/**
+ * Some trackers have alt titles which get their own guid but resolve to same torrent
+ * @param guid The guid of the candidate
+ * @returns The info hash of the torrent if found
+ */
+async function fuzzyGuidLookup(guid: string): Promise<string | undefined> {
+	if (!guid.includes(".tv/torrent/")) return;
+	const torrentIdStr = guid.match(/\.tv\/torrent\/(\d+)\/group/)?.[1];
+	if (!torrentIdStr) return;
+	return (
+		await db("decision")
+			.select({ infoHash: "info_hash" })
+			.where("guid", "like", `%.tv/torrent/${torrentIdStr}/group%`)
+			.whereNotNull("info_hash")
+			.first()
+	)?.infoHash;
+}
+
 async function assessCandidateCaching(
 	candidate: Candidate,
 	searchee: SearcheeWithLabel,
@@ -453,13 +471,14 @@ async function assessCandidateCaching(
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.title, guid })
 		.first();
-	const metaInfoHash: string | undefined = (
-		await db("decision")
-			.select({ infoHash: "decision.info_hash" })
-			.where({ guid })
-			.whereNotNull("info_hash")
-			.first()
-	)?.infoHash; // Can be from a previous similar searchee's snatch
+	const metaInfoHash: string | undefined =
+		(
+			await db("decision")
+				.select({ infoHash: "info_hash" })
+				.where({ guid })
+				.whereNotNull("info_hash")
+				.first()
+		)?.infoHash ?? (await fuzzyGuidLookup(guid));
 	const metaOrCandidate = metaInfoHash
 		? existsInTorrentCache(metaInfoHash)
 			? await getCachedTorrentFile(metaInfoHash)
