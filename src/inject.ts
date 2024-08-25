@@ -51,7 +51,6 @@ type InjectSummary = {
 	FAILED: number;
 	UNMATCHED: number;
 	FOUND_BAD_FORMAT: boolean;
-	FLAT_LINKING: boolean;
 };
 
 function getTorrentFilePathLog(torrentFilePath: string): string {
@@ -358,7 +357,7 @@ async function injectionAlreadyExists(
 	return isComplete;
 }
 
-function injectionSuccess(
+async function injectionSuccess(
 	progress: string,
 	filePathLog: string,
 	injectionResult: InjectionResult,
@@ -367,7 +366,8 @@ function injectionSuccess(
 	matchedDecision: DecisionAnyMatch,
 	meta: Metafile,
 	tracker: string,
-): void {
+	torrentFilePath: string,
+): Promise<void> {
 	logger.info({
 		label: Label.INJECT,
 		message: `${progress} Injected ${filePathLog} - ${chalk.green(injectionResult)}`,
@@ -385,14 +385,19 @@ function injectionSuccess(
 	} else {
 		summary.FULL_MATCHES++;
 	}
+
+	const result = await getClient().isTorrentComplete(meta.infoHash);
+	const isComplete = result.isOk() ? result.unwrap() : false;
+	if (isComplete) {
+		await deleteTorrentFileIfSafe(torrentFilePath);
+	}
 }
 
 async function injectTorrentFiles(
 	torrentFilePaths: string[],
 	summary: InjectSummary,
+	searchees: SearcheeWithLabel[],
 ): Promise<void> {
-	const searchees = await findAllSearchees(Label.INJECT);
-
 	let count = 0;
 	for (const torrentFilePath of torrentFilePaths) {
 		const progress = chalk.blue(`(${++count}/${torrentFilePaths.length})`);
@@ -446,7 +451,7 @@ async function injectTorrentFiles(
 		} = await injectInitialAction(meta, matches, tracker);
 		switch (injectionResult) {
 			case InjectionResult.SUCCESS: {
-				injectionSuccess(
+				await injectionSuccess(
 					progress,
 					filePathLog,
 					injectionResult,
@@ -455,14 +460,8 @@ async function injectTorrentFiles(
 					matchedDecision!,
 					meta,
 					tracker,
+					torrentFilePath,
 				);
-				const result = await getClient().isTorrentComplete(
-					meta.infoHash,
-				);
-				const isComplete = result.isOk() ? result.unwrap() : false;
-				if (isComplete) {
-					await deleteTorrentFileIfSafe(torrentFilePath);
-				}
 				break;
 			}
 			case InjectionResult.FAILURE:
@@ -513,7 +512,7 @@ async function injectTorrentFiles(
 	}
 }
 
-function logInjectSummary(summary: InjectSummary) {
+function logInjectSummary(summary: InjectSummary, flatLinking: boolean) {
 	const incompleteMsg = `${chalk.bold.yellow(summary.ALREADY_EXISTS)} existed in client${
 		summary.INCOMPLETE_CANDIDATES
 			? chalk.dim(` (${summary.INCOMPLETE_CANDIDATES} were incomplete)`)
@@ -547,12 +546,29 @@ function logInjectSummary(summary: InjectSummary) {
 		});
 	}
 
-	if (summary.FOUND_BAD_FORMAT && !summary.FLAT_LINKING) {
+	if (summary.FOUND_BAD_FORMAT && !flatLinking) {
 		logger.warn({
 			label: Label.INJECT,
 			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
 		});
 	}
+}
+
+function createSummary(total: number) {
+	const summary: InjectSummary = {
+		TOTAL: total,
+		INJECTED: 0,
+		FULL_MATCHES: 0,
+		PARTIAL_MATCHES: 0,
+		BLOCKED: 0,
+		ALREADY_EXISTS: 0,
+		INCOMPLETE_CANDIDATES: 0,
+		INCOMPLETE_SEARCHEES: 0,
+		FAILED: 0,
+		UNMATCHED: 0,
+		FOUND_BAD_FORMAT: false,
+	};
+	return summary;
 }
 
 export async function injectSavedTorrents(): Promise<void> {
@@ -572,22 +588,8 @@ export async function injectSavedTorrents(): Promise<void> {
 		label: Label.INJECT,
 		message: `Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to inject in ${targetDirLog}`,
 	});
-
-	const summary: InjectSummary = {
-		TOTAL: torrentFilePaths.length,
-		INJECTED: 0,
-		FULL_MATCHES: 0,
-		PARTIAL_MATCHES: 0,
-		BLOCKED: 0,
-		ALREADY_EXISTS: 0,
-		INCOMPLETE_CANDIDATES: 0,
-		INCOMPLETE_SEARCHEES: 0,
-		FAILED: 0,
-		UNMATCHED: 0,
-		FOUND_BAD_FORMAT: false,
-		FLAT_LINKING: flatLinking,
-	};
-
-	await injectTorrentFiles(torrentFilePaths, summary);
-	logInjectSummary(summary);
+	const summary = createSummary(torrentFilePaths.length);
+	const searchees = await findAllSearchees(Label.INJECT);
+	await injectTorrentFiles(torrentFilePaths, summary, searchees);
+	logInjectSummary(summary, flatLinking);
 }
