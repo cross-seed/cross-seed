@@ -23,7 +23,7 @@ import {
 	getSeasonKey,
 	Searchee,
 } from "./searchee.js";
-import { createKeyTitle, stripExtension } from "./utils.js";
+import { createKeyTitle, MediaType, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -176,6 +176,9 @@ export function parseMetadataFromFilename(
 		return {};
 	}
 	const mediaType = match.groups!.mediaType;
+	if (!Object.values(MediaType).includes(mediaType as MediaType)) {
+		return {};
+	}
 	const tracker = match.groups!.tracker;
 	const name = match.groups!.name;
 	return { name, mediaType, tracker };
