@@ -394,13 +394,11 @@ async function injectionSuccess(
 }
 
 async function injectSavedTorrent(
-	count: number,
-	torrentFilePaths: string[],
+	progress: string,
 	torrentFilePath: string,
 	summary: InjectSummary,
 	searchees: SearcheeWithLabel[],
 ) {
-	const progress = chalk.blue(`(${++count}/${torrentFilePaths.length})`);
 	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 	let meta: Metafile;
 	try {
@@ -582,13 +580,8 @@ export async function injectSavedTorrents(): Promise<void> {
 	const summary = createSummary(torrentFilePaths.length);
 	const searchees = await findAllSearchees(Label.INJECT);
 	for (const [i, torrentFilePath] of torrentFilePaths.entries()) {
-		await injectSavedTorrent(
-			i,
-			torrentFilePaths,
-			torrentFilePath,
-			summary,
-			searchees,
-		);
+		const progress = chalk.blue(`(${i + 1}/${torrentFilePaths.length})`);
+		await injectSavedTorrent(progress, torrentFilePath, summary, searchees);
 	}
 	logInjectSummary(summary, flatLinking);
 }
