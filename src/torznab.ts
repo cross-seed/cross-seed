@@ -9,6 +9,7 @@ import {
 	formatFoundIds,
 } from "./arr.js";
 import {
+	CALIBRE_INDEXNUM_REGEX,
 	EP_REGEX,
 	SEASON_REGEX,
 	UNKNOWN_TRACKER,
@@ -242,11 +243,12 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 }
 
 async function createTorznabSearchQueries(
-	stem: string,
+	searchee: Searchee,
 	mediaType: MediaType,
 	caps: Caps,
 	parsedMedia?: ParsedMedia,
 ): Promise<TorznabParams[]> {
+	const stem = stripExtension(searchee.title);
 	const relevantIds: IdSearchParams = parsedMedia
 		? await getRelevantArrIds(caps, parsedMedia)
 		: {};
@@ -299,6 +301,15 @@ async function createTorznabSearchQueries(
 			t: "search",
 			q: animeQuery,
 		}));
+	} else if (mediaType === MediaType.BOOK) {
+		return [
+			{
+				t: "search",
+				q: searchee.path
+					? cleanTitle(stem).replace(CALIBRE_INDEXNUM_REGEX, "")
+					: cleanTitle(stem),
+			},
+		] as const;
 	}
 	return [
 		{
@@ -309,10 +320,9 @@ async function createTorznabSearchQueries(
 }
 
 export async function getSearchString(searchee: Searchee): Promise<string> {
-	const stem = stripExtension(searchee.title);
 	const mediaType = getMediaType(searchee);
 	const params = (
-		await createTorznabSearchQueries(stem, mediaType, ALL_CAPS)
+		await createTorznabSearchQueries(searchee, mediaType, ALL_CAPS)
 	)[0];
 	const season = params.season !== undefined ? `.S${params.season}` : "";
 	const ep = params.ep !== undefined ? `.E${params.ep}` : "";
@@ -320,7 +330,9 @@ export async function getSearchString(searchee: Searchee): Promise<string> {
 }
 
 /**
- * Only for testing purposes.
+ * Only for testing purposes. (createTorznabSearchQueries now accepts searchee
+ * instead of stem (title))
+ *
  * Logs the queries that would be sent to indexers for id and non-id searches.
  * Ensure that item exists in your arr for the id search example.
  * Ensure mediaType is what cross-seed would actually parse the item as.
@@ -331,11 +343,13 @@ export async function logQueries(
 ): Promise<void> {
 	const stem = stripExtension(searcheeTitle);
 	logger.info(
+		// @ts-expect-error needs conversion to use searchee instead of stem
 		`RAW: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS))}`,
 	);
 	const res = await scanAllArrsForMedia(searcheeTitle, mediaType);
 	const parsedMedia = res.isOk() ? res.unwrap() : undefined;
 	logger.info(
+		// @ts-expect-error needs conversion to use searchee instead of stem
 		`ID: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS, parsedMedia))}`,
 	);
 }
@@ -399,7 +413,7 @@ export async function searchTorznab(
 				categories: JSON.parse(indexer.categories),
 			};
 			return await createTorznabSearchQueries(
-				stripExtension(searchee.title),
+				searchee,
 				mediaType,
 				caps,
 				parsedMedia,

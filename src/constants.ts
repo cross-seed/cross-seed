@@ -33,7 +33,7 @@ export const ARR_DIR_REGEX =
 export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
 export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
-
+export const CALIBRE_INDEXNUM_REGEX = /\s?\(\d+\)$/;
 // Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {
 	AMZN: /\b(amzn|amazon(hd)?)\b[ ._-]web[ ._-]?(dl|rip)?\b/i,
