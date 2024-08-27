@@ -18,6 +18,7 @@ import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { findAllSearchees } from "./pipeline.js";
 import { sendResultsNotification } from "./pushNotifier.js";
+import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { SearcheeWithLabel } from "./searchee.js";
 import {
@@ -393,12 +394,11 @@ async function injectionSuccess(
 	}
 }
 
-async function injectSavedTorrent(
-	progress: string,
+async function loadMetafile(
 	torrentFilePath: string,
+	progress: string,
 	summary: InjectSummary,
-	searchees: SearcheeWithLabel[],
-) {
+): Promise<Result<{ meta: Metafile; tracker: string }, "FAILED_TO_PARSE">> {
 	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 	let meta: Metafile;
 	try {
@@ -409,20 +409,39 @@ async function injectSavedTorrent(
 			message: `${progress} Failed to parse ${filePathLog}`,
 		});
 		logger.debug(e);
-		return;
+		return resultOfErr("FAILED_TO_PARSE");
 	}
-	const metaLog = getLogString(meta, chalk.bold.white);
 
 	const { tracker: trackerFromFilename } = parseMetadataFromFilename(
 		basename(torrentFilePath),
 	);
 	summary.FOUND_BAD_FORMAT ||= !trackerFromFilename;
 	const tracker = trackerFromFilename ?? UNKNOWN_TRACKER;
+	return resultOf({ meta, tracker });
+}
+
+async function injectSavedTorrent(
+	progress: string,
+	torrentFilePath: string,
+	summary: InjectSummary,
+	searchees: SearcheeWithLabel[],
+) {
+	const metafileResult = await loadMetafile(
+		torrentFilePath,
+		progress,
+		summary,
+	);
+	if (metafileResult.isErr()) return;
+	const { meta, tracker } = metafileResult.unwrap();
+
+	const filePathLog = getTorrentFilePathLog(torrentFilePath);
+	const metaLog = getLogString(meta, chalk.bold.white);
 
 	const { matches, foundBlocked } = await whichSearcheesMatchTorrent(
 		meta,
 		searchees,
 	);
+
 	if (!matches.length && foundBlocked) {
 		logger.info({
 			label: Label.INJECT,
