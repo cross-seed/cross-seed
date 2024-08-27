@@ -1,6 +1,5 @@
 import chalk from "chalk";
-import fs from "fs";
-import { unlink } from "fs/promises";
+import { stat, unlink } from "fs/promises";
 import ms from "ms";
 import { basename, dirname } from "path";
 import { linkAllFilesInMetafile, performAction } from "./action.js";
@@ -205,10 +204,11 @@ async function injectInitialAction(
 
 function injectionFailed(
 	progress: string,
-	filePathLog: string,
+	torrentFilePath: string,
 	injectionResult: InjectionResult,
 	summary: InjectSummary,
 ): void {
+	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 	logger.error({
 		label: Label.INJECT,
 		message: `${progress} Failed to inject ${filePathLog} - ${chalk.red(injectionResult)}`,
@@ -302,7 +302,7 @@ async function injectionTorrentNotComplete(
 	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 	if (
 		!linkDir ||
-		fs.statSync(torrentFilePath).mtimeMs >= Date.now() - ms("1 day")
+		(await stat(torrentFilePath)).mtimeMs >= Date.now() - ms("1 day")
 	) {
 		// Normal case where source is likely still downloading
 		logger.warn({
@@ -326,14 +326,21 @@ async function injectionTorrentNotComplete(
 
 async function injectionAlreadyExists(
 	progress: string,
-	filePathLog: string,
+	torrentFilePath: string,
 	injectionResult: InjectionResult,
 	summary: InjectSummary,
 	linkedNewFiles: boolean,
 	meta: Metafile,
-	anyFullMatch: boolean,
-	isComplete: boolean,
-): Promise<boolean> {
+	matches: AllMatches,
+) {
+	const filePathLog = getTorrentFilePathLog(torrentFilePath);
+	const result = await getClient().isTorrentComplete(meta.infoHash);
+	let isComplete = result.isOk() ? result.unwrap() : false;
+	const anyFullMatch = matches.some(
+		(m) =>
+			m.decision === Decision.MATCH ||
+			m.decision === Decision.MATCH_SIZE_ONLY,
+	);
 	if (linkedNewFiles) {
 		logger.info({
 			label: Label.INJECT,
@@ -355,20 +362,22 @@ async function injectionAlreadyExists(
 	}
 	summary.ALREADY_EXISTS++;
 	summary.INCOMPLETE_CANDIDATES += isComplete ? 0 : 1;
-	return isComplete;
+	if (isComplete) {
+		await deleteTorrentFileIfSafe(torrentFilePath);
+	}
 }
 
 async function injectionSuccess(
 	progress: string,
-	filePathLog: string,
+	torrentFilePath: string,
 	injectionResult: InjectionResult,
 	summary: InjectSummary,
 	matchedSearchee: SearcheeWithLabel,
 	matchedDecision: DecisionAnyMatch,
 	meta: Metafile,
 	tracker: string,
-	torrentFilePath: string,
 ): Promise<void> {
+	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 	logger.info({
 		label: Label.INJECT,
 		message: `${progress} Injected ${filePathLog} - ${chalk.green(injectionResult)}`,
@@ -381,14 +390,14 @@ async function injectionSuccess(
 		],
 	]);
 	summary.INJECTED++;
-	if (matchedDecision! === Decision.MATCH_PARTIAL) {
+	if (matchedDecision === Decision.MATCH_PARTIAL) {
 		summary.PARTIAL_MATCHES++;
 	} else {
 		summary.FULL_MATCHES++;
 	}
 
 	const result = await getClient().isTorrentComplete(meta.infoHash);
-	const isComplete = result.isOk() ? result.unwrap() : false;
+	const isComplete = result.orElse(false);
 	if (isComplete) {
 		await deleteTorrentFileIfSafe(torrentFilePath);
 	}
@@ -466,58 +475,39 @@ async function injectSavedTorrent(
 		matchedDecision,
 		linkedNewFiles,
 	} = await injectInitialAction(meta, matches, tracker);
-	switch (injectionResult) {
-		case InjectionResult.SUCCESS: {
-			await injectionSuccess(
-				progress,
-				filePathLog,
-				injectionResult,
-				summary,
-				matchedSearchee!,
-				matchedDecision!,
-				meta,
-				tracker,
-				torrentFilePath,
-			);
-			break;
-		}
-		case InjectionResult.FAILURE:
-			injectionFailed(progress, filePathLog, injectionResult, summary);
-			break;
-		case InjectionResult.ALREADY_EXISTS: {
-			const result = await getClient().isTorrentComplete(meta.infoHash);
-			let isComplete = result.isOk() ? result.unwrap() : false;
-			const anyFullMatch = matches.some(
-				(m) =>
-					m.decision === Decision.MATCH ||
-					m.decision === Decision.MATCH_SIZE_ONLY,
-			);
-			isComplete = await injectionAlreadyExists(
-				progress,
-				filePathLog,
-				injectionResult,
-				summary,
-				linkedNewFiles,
-				meta,
-				anyFullMatch,
-				isComplete,
-			);
-			if (isComplete) {
-				await deleteTorrentFileIfSafe(torrentFilePath);
-			}
-			break;
-		}
-		case InjectionResult.TORRENT_NOT_COMPLETE:
-			await injectionTorrentNotComplete(
-				progress,
-				torrentFilePath,
-				injectionResult,
-				summary,
-				meta,
-				matches,
-				tracker,
-			);
-			break;
+	if (injectionResult === InjectionResult.SUCCESS) {
+		await injectionSuccess(
+			progress,
+			torrentFilePath,
+			injectionResult,
+			summary,
+			matchedSearchee!,
+			matchedDecision!,
+			meta,
+			tracker,
+		);
+	} else if (injectionResult === InjectionResult.FAILURE) {
+		injectionFailed(progress, torrentFilePath, injectionResult, summary);
+	} else if (injectionResult === InjectionResult.ALREADY_EXISTS) {
+		await injectionAlreadyExists(
+			progress,
+			torrentFilePath,
+			injectionResult,
+			summary,
+			linkedNewFiles,
+			meta,
+			matches,
+		);
+	} else if (injectionResult === InjectionResult.TORRENT_NOT_COMPLETE) {
+		await injectionTorrentNotComplete(
+			progress,
+			torrentFilePath,
+			injectionResult,
+			summary,
+			meta,
+			matches,
+			tracker,
+		);
 	}
 }
 
