@@ -229,14 +229,14 @@ function injectionFailed({
 	summary.FAILED++;
 }
 
-async function injectFromStalledTorrent(
-	meta: Metafile,
-	matches: AllMatches,
-	tracker: string,
-	injectionResult: InjectionResult,
-	progress: string,
-	filePathLog: string,
-): Promise<boolean> {
+async function injectFromStalledTorrent({
+	meta,
+	matches,
+	tracker,
+	injectionResult,
+	progress,
+	filePathLog,
+}: InjectionAftermath) {
 	let linkedNewFiles = false;
 	let inClient = (await getClient().isTorrentComplete(meta.infoHash)).isOk();
 	let injected = false;
@@ -299,19 +299,13 @@ async function injectFromStalledTorrent(
 			});
 		}
 	}
-	return injected;
 }
 
-async function injectionTorrentNotComplete({
-	progress,
-	torrentFilePath,
-	injectionResult,
-	summary,
-	meta,
-	matches,
-	tracker,
-	filePathLog,
-}: InjectionAftermath) {
+async function injectionTorrentNotComplete(
+	injectionAftermath: InjectionAftermath,
+) {
+	const { progress, torrentFilePath, injectionResult, summary, filePathLog } =
+		injectionAftermath;
 	const { linkDir } = getRuntimeConfig();
 	if (
 		!linkDir ||
@@ -325,14 +319,7 @@ async function injectionTorrentNotComplete({
 	} else {
 		// Since source is stalled, add to client paused so user can resume later if desired
 		// Try linking all possible matches as they may have different files
-		await injectFromStalledTorrent(
-			meta,
-			matches,
-			tracker,
-			injectionResult,
-			progress,
-			filePathLog,
-		);
+		await injectFromStalledTorrent(injectionAftermath);
 	}
 	summary.INCOMPLETE_SEARCHEES++;
 }
