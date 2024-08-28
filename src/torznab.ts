@@ -309,13 +309,11 @@ async function createTorznabSearchQueries(
 				q: cleanTitle(stripMetaFromName(stem)),
 			},
 		] as const;
-	} else if (mediaType === MediaType.BOOK) {
+	} else if (mediaType === MediaType.BOOK && searchee.path) {
 		return [
 			{
 				t: "search",
-				q: searchee.path
-					? cleanTitle(stem).replace(CALIBRE_INDEXNUM_REGEX, "")
-					: cleanTitle(stem),
+				q: cleanTitle(stem.replace(CALIBRE_INDEXNUM_REGEX, "")),
 			},
 		] as const;
 	}
