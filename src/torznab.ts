@@ -313,7 +313,7 @@ async function createTorznabSearchQueries(
 		return [
 			{
 				t: "search",
-				q: cleanTitle(stem).replace(CALIBRE_INDEXNUM_REGEX, ""),
+				q: cleanTitle(stem.replace(CALIBRE_INDEXNUM_REGEX, "")),
 			},
 		] as const;
 	}
