@@ -1,29 +1,39 @@
+import { distance } from "fastest-levenshtein";
+import fs from "fs";
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
-import fs from "fs";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
-import { USER_AGENT } from "./constants.js";
+import {
+	LEVENSHTEIN_DIVISOR,
+	SAVED_TORRENTS_INFO_REGEX,
+	USER_AGENT,
+} from "./constants.js";
 import { db } from "./db.js";
-import { distance } from "fastest-levenshtein";
 import { logger, logOnce } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
+import { Candidate } from "./pipeline.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Candidate } from "./pipeline.js";
 import {
-	getEpisodeKey,
 	createSearcheeFromTorrentFile,
-	Searchee,
-	getSeasonKey,
-	getMovieKey,
 	getAnimeKeys,
+	getEpisodeKey,
+	getMovieKey,
+	getSeasonKey,
+	Searchee,
 } from "./searchee.js";
-import { createKeyTitle, stripExtension } from "./utils.js";
+import { createKeyTitle, MediaType, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
 	path?: string;
+}
+
+export interface FilenameMetadata {
+	name: string;
+	mediaType: string;
+	tracker: string;
 }
 
 export enum SnatchError {
@@ -144,6 +154,7 @@ export async function saveTorrentFile(
 ): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
 	const buf = meta.encode();
+	// Be sure to update parseInfoFromSavedTorrent if changing the format
 	const filePath = join(
 		outputDir,
 		`[${tag}][${tracker}]${stripExtension(
@@ -155,6 +166,22 @@ export async function saveTorrentFile(
 		return;
 	}
 	await writeFile(filePath, buf, { mode: 0o644 });
+}
+
+export function parseMetadataFromFilename(
+	filename: string,
+): Partial<FilenameMetadata> {
+	const match = filename.match(SAVED_TORRENTS_INFO_REGEX);
+	if (!match) {
+		return {};
+	}
+	const mediaType = match.groups!.mediaType;
+	if (!Object.values(MediaType).includes(mediaType as MediaType)) {
+		return {};
+	}
+	const tracker = match.groups!.tracker;
+	const name = match.groups!.name;
+	return { name, mediaType, tracker };
 }
 
 export async function findAllTorrentFilesInDir(
@@ -266,7 +293,10 @@ export async function getSimilarTorrentsByName(
 	if (!keyTitles.length) {
 		return { keys: [], metas };
 	}
-	const maxDistance = Math.floor(keyTitles[0].length / 4);
+	const candidateMaxDistance = Math.floor(
+		Math.max(...keyTitles.map((keyTitle) => keyTitle.length)) /
+			LEVENSHTEIN_DIVISOR,
+	);
 
 	const allEntries: { name: string; file_path: string }[] = await db(
 		"torrent",
@@ -274,6 +304,15 @@ export async function getSimilarTorrentsByName(
 	const filteredEntries = allEntries.filter((dbName) => {
 		const entry = getKeysFromName(dbName.name);
 		if (entry.element !== element) return false;
+		if (!entry.keyTitles.length) return false;
+		const maxDistance = Math.max(
+			candidateMaxDistance,
+			Math.floor(
+				Math.max(
+					...entry.keyTitles.map((keyTitle) => keyTitle.length),
+				) / LEVENSHTEIN_DIVISOR,
+			),
+		);
 		return entry.keyTitles.some((dbKeyTitle) => {
 			return keyTitles.some(
 				(keyTitle) => distance(keyTitle, dbKeyTitle) <= maxDistance,

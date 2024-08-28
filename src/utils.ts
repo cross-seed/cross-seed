@@ -6,10 +6,15 @@ import {
 	BOOK_EXTENSIONS,
 	Decision,
 	EP_REGEX,
+	LEVENSHTEIN_DIVISOR,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
+	RELEASE_GROUP_REGEX,
+	REPACK_PROPER_REGEX,
+	RESOLUTION_REGEX,
 	SCENE_TITLE_REGEX,
 	SEASON_REGEX,
+	sourceRegexRemove,
 	VIDEO_DISC_EXTENSIONS,
 	VIDEO_EXTENSIONS,
 	YEARS_REGEX,
@@ -18,6 +23,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { File, Searchee } from "./searchee.js";
 import chalk, { ChalkInstance } from "chalk";
 import { getRuntimeConfig } from "./runtimeConfig.js";
+import { distance } from "fastest-levenshtein";
 
 export enum MediaType {
 	EPISODE = "episode",
@@ -98,6 +104,7 @@ export function getMediaType(searchee: Searchee): MediaType {
 			return unsupportedMediaType(searchee);
 	}
 }
+
 export function shouldRecheck(searchee: Searchee, decision: Decision): boolean {
 	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
 	switch (decision) {
@@ -109,6 +116,49 @@ export function shouldRecheck(searchee: Searchee, decision: Decision): boolean {
 			return true;
 	}
 }
+
+export function areMediaTitlesSimilar(a: string, b: string): boolean {
+	const matchA =
+		a.match(EP_REGEX) ??
+		a.match(SEASON_REGEX) ??
+		a.match(MOVIE_REGEX) ??
+		a.match(ANIME_REGEX);
+	const matchB =
+		b.match(EP_REGEX) ??
+		b.match(SEASON_REGEX) ??
+		b.match(MOVIE_REGEX) ??
+		b.match(ANIME_REGEX);
+	const titlesA: string[] = (
+		matchA
+			? [matchA.groups?.title, matchA.groups?.altTitle].filter(isTruthy)
+			: [a]
+	)
+		.map((title) => createKeyTitle(stripMetaFromName(title)))
+		.filter(isTruthy);
+	const titlesB: string[] = (
+		matchB
+			? [matchB.groups?.title, matchB.groups?.altTitle].filter(isTruthy)
+			: [b]
+	)
+		.map((title) => createKeyTitle(stripMetaFromName(title)))
+		.filter(isTruthy);
+	const maxDistanceA = Math.floor(
+		Math.max(...titlesA.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
+	);
+	const maxDistanceB = Math.floor(
+		Math.max(...titlesB.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
+	);
+	const maxDistance = Math.max(maxDistanceA, maxDistanceB);
+	return titlesA.some((titleA) =>
+		titlesB.some(
+			(titleB) =>
+				distance(titleA, titleB) <= maxDistance ||
+				titleA.includes(titleB) ||
+				titleB.includes(titleA),
+		),
+	);
+}
+
 export async function time<R>(cb: () => R, times: number[]) {
 	const before = performance.now();
 	try {
@@ -192,6 +242,16 @@ export function getAnimeQueries(name: string): string[] {
 	return animeQueries;
 }
 
+export function stripMetaFromName(name: string): string {
+	return sourceRegexRemove(
+		stripExtension(name)
+			.replace(RELEASE_GROUP_REGEX, "")
+			.replace(/\s*-\s*$/, "")
+			.replace(RESOLUTION_REGEX, "")
+			.replace(REPACK_PROPER_REGEX, ""),
+	).match(SCENE_TITLE_REGEX)!.groups!.title;
+}
+
 export const tap = (fn) => (value) => {
 	fn(value);
 	return value;
@@ -226,11 +286,15 @@ export function getLogString(
 			: `${color(searchee.title)} ${chalk.dim(`[${searchee.name}]`)}`;
 }
 
-export function formatAsList(strings: string[]) {
+export function formatAsList(
+	strings: string[],
+	options: { sort: boolean; type?: Intl.ListFormatType },
+) {
+	if (options.sort) strings.sort((a, b) => a.localeCompare(b));
 	return new Intl.ListFormat("en", {
 		style: "long",
-		type: "conjunction",
-	}).format(strings.sort((a, b) => a.localeCompare(b)));
+		type: options.type ?? "conjunction",
+	}).format(strings);
 }
 
 export function fallback<T>(...args: T[]): T | undefined {
@@ -260,7 +324,7 @@ export function extractCredentialsFromUrl(
 	}
 }
 
-export function capitalizeFirstLetter(string: string) {
+export function capitalizeFirstLetter(string: string): string {
 	return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
@@ -299,4 +363,26 @@ export function getFuzzySizeFactor(): number {
 export function getMinSizeRatio(): number {
 	const { fuzzySizeThreshold } = getRuntimeConfig();
 	return 1 - fuzzySizeThreshold;
+}
+
+/**
+ * Makes comparators for `Array.prototype.sort`.
+ * Second getter will be used if the first is a tie, etc.
+ * Booleans are treated as 0 and 1,
+ * Ascending by default, use - or ! for descending.
+ * @param getters
+ */
+export function comparing<T>(...getters: ((e: T) => number | boolean)[]) {
+	return function compare(a: T, b: T) {
+		for (const getter of getters) {
+			const x = getter(a);
+			const y = getter(b);
+			if (x < y) {
+				return -1;
+			} else if (x > y) {
+				return 1;
+			}
+		}
+		return 0;
+	};
 }

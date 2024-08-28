@@ -85,6 +85,9 @@ function logDecision(
 		case Decision.MAGNET_LINK:
 			reason = "the torrent is a magnet link";
 			break;
+		case Decision.SAME_INFO_HASH:
+			reason = "the info hash is the same";
+			break;
 		case Decision.INFO_HASH_ALREADY_EXISTS:
 			reason = "the info hash matches a torrent you already have";
 			break;
@@ -145,8 +148,9 @@ export function compareFileTreesIgnoringNames(
 	candidate: Metafile,
 	searchee: Searchee,
 ): boolean {
+	const availableFiles = searchee.files.slice();
 	for (const candidateFile of candidate.files) {
-		let matchedSearcheeFiles = searchee.files.filter(
+		let matchedSearcheeFiles = availableFiles.filter(
 			(searcheeFile) => searcheeFile.length === candidateFile.length,
 		);
 		if (matchedSearcheeFiles.length > 1) {
@@ -157,6 +161,8 @@ export function compareFileTreesIgnoringNames(
 		if (matchedSearcheeFiles.length === 0) {
 			return false;
 		}
+		const index = availableFiles.indexOf(matchedSearcheeFiles[0]);
+		availableFiles.splice(index, 1);
 	}
 	return true;
 }
@@ -182,8 +188,9 @@ export function compareFileTreesPartial(
 	searchee: Searchee,
 ): boolean {
 	let matchedSizes = 0;
+	const availableFiles = searchee.files.slice();
 	for (const candidateFile of candidate.files) {
-		let matchedSearcheeFiles = searchee.files.filter(
+		let matchedSearcheeFiles = availableFiles.filter(
 			(searcheeFile) => searcheeFile.length === candidateFile.length,
 		);
 		if (matchedSearcheeFiles.length > 1) {
@@ -193,6 +200,8 @@ export function compareFileTreesPartial(
 		}
 		if (matchedSearcheeFiles.length) {
 			matchedSizes += candidateFile.length;
+			const index = availableFiles.indexOf(matchedSearcheeFiles[0]);
+			availableFiles.splice(index, 1);
 		}
 	}
 	const totalPieces = Math.ceil(candidate.length / candidate.pieceLength);
@@ -271,7 +280,7 @@ function sourceDoesMatch(searcheeTitle: string, candidateName: string) {
 	return searcheeSource === candidateSource;
 }
 
-async function assessCandidateHelper(
+export async function assessCandidate(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
 	hashesToExclude: string[],
@@ -332,6 +341,10 @@ async function assessCandidateHelper(
 		metaOrCandidate.size = metafile.length; // Trackers can be wrong
 	} else {
 		metafile = metaOrCandidate;
+	}
+
+	if (searchee.infoHash === metafile.infoHash) {
+		return { decision: Decision.SAME_INFO_HASH, metafile };
 	}
 
 	if (hashesToExclude.includes(metafile.infoHash)) {
@@ -408,7 +421,7 @@ async function assessAndSaveResults(
 	infoHashesToExclude: string[],
 	firstSeen: number,
 ) {
-	const assessment = await assessCandidateHelper(
+	const assessment = await assessCandidate(
 		metaOrCandidate,
 		searchee,
 		infoHashesToExclude,
@@ -453,7 +466,7 @@ async function fuzzyGuidLookup(guid: string): Promise<string | undefined> {
 	)?.infoHash;
 }
 
-async function assessCandidateCaching(
+export async function assessCandidateCaching(
 	candidate: Candidate,
 	searchee: SearcheeWithLabel,
 	infoHashesToExclude: string[],
@@ -550,5 +563,3 @@ async function assessCandidateCaching(
 
 	return assessment;
 }
-
-export { assessCandidateCaching as assessCandidate };
