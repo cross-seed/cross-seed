@@ -42,6 +42,7 @@ import {
 	reformatTitleForSearching,
 	sanitizeUrl,
 	stripExtension,
+	stripMetaFromName,
 } from "./utils.js";
 import chalk from "chalk";
 import { inspect } from "util";
@@ -301,6 +302,13 @@ async function createTorznabSearchQueries(
 			t: "search",
 			q: animeQuery,
 		}));
+	} else if (mediaType === MediaType.VIDEO) {
+		return [
+			{
+				t: "search",
+				q: cleanTitle(stripMetaFromName(stem)),
+			},
+		] as const;
 	} else if (mediaType === MediaType.BOOK) {
 		return [
 			{
@@ -829,7 +837,7 @@ async function getAndLogIndexers(
 		timeFilteredIndexers.length > indexersToUse.length && "category",
 	].filter(isTruthy);
 	const reasonStr = filteringCauses.length
-		? ` (filtered by ${formatAsList(filteringCauses)})`
+		? ` (filtered by ${formatAsList(filteringCauses, { sort: true })})`
 		: "";
 	if (!indexersToSearch.length && !cachedSearch.indexerCandidates.length) {
 		cachedSearch.q = null; // Won't scan arrs for multiple skips in a row

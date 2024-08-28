@@ -34,6 +34,9 @@ export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
 export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
 export const CALIBRE_INDEXNUM_REGEX = /\s?\(\d+\)$/;
+export const SAVED_TORRENTS_INFO_REGEX =
+	/^\[(?<mediaType>.+?)\]\[(?<tracker>.+?)\](?<name>.+?)(?:\[[^\]]*?\])?\.torrent$/i;
+
 // Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {
 	AMZN: /\b(amzn|amazon(hd)?)\b[ ._-]web[ ._-]?(dl|rip)?\b/i,
@@ -103,6 +106,7 @@ export const ALL_EXTENSIONS = [
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 export const UNKNOWN_TRACKER = "UnknownTracker";
+export const LEVENSHTEIN_DIVISOR = 3;
 
 export enum Action {
 	SAVE = "save",
@@ -133,6 +137,16 @@ export enum Decision {
 	DOWNLOAD_FAILED = "DOWNLOAD_FAILED",
 	MAGNET_LINK = "MAGNET_LINK",
 	RATE_LIMITED = "RATE_LIMITED",
+	/**
+	 * Searchee and Candidate info hash matches. Usually happens with public
+	 * torrents and torrents added by radarr/sonarr before cross-seed on announces.
+	 * Useful for the inject job as we ignore INFO_HASH_ALREADY_EXISTS and
+	 * for reporting a 204 announe status code instead of 200 from exists.
+	 */
+	SAME_INFO_HASH = "SAME_INFO_HASH",
+	/**
+	 * Checked after SAME_INFO_HASH.
+	 */
 	INFO_HASH_ALREADY_EXISTS = "INFO_HASH_ALREADY_EXISTS",
 	FILE_TREE_MISMATCH = "FILE_TREE_MISMATCH",
 	RELEASE_GROUP_MISMATCH = "RELEASE_GROUP_MISMATCH",

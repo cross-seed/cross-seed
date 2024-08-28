@@ -13,7 +13,12 @@ import { shouldRecheck, extractCredentialsFromUrl } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
-type Method = "session-get" | "torrent-add" | "torrent-get";
+type Method =
+	| "session-get"
+	| "torrent-add"
+	| "torrent-get"
+	| "torrent-stop"
+	| "torrent-verify";
 
 interface Response<T> {
 	result: "success" | string;
@@ -170,6 +175,33 @@ export default class Transmission implements TorrentClient {
 		return result
 			.mapOk((r) => r.downloadDir)
 			.mapErr((err) => (err === "FAILURE" ? "UNKNOWN_ERROR" : err));
+	}
+
+	async isTorrentComplete(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		const queryResponse = await this.request<TorrentGetResponseArgs>(
+			"torrent-get",
+			{
+				fields: ["percentDone"],
+				ids: [infoHash],
+			},
+		);
+		if (queryResponse.torrents.length === 0) {
+			return resultOfErr("NOT_FOUND");
+		}
+		const [{ percentDone }] = queryResponse.torrents;
+		return resultOf(percentDone === 1);
+	}
+
+	async recheckTorrent(infoHash: string): Promise<void> {
+		// Pause first as it may resume after recheck automatically
+		await this.request<void>("torrent-stop", {
+			ids: [infoHash],
+		});
+		await this.request<void>("torrent-verify", {
+			ids: [infoHash],
+		});
 	}
 
 	async inject(
