@@ -41,3 +41,5 @@ cache.json
 docker-compose.yml
 utils.zsh
 test.db
+.tool-versions
+coverage/
