@@ -120,7 +120,7 @@ export const VALIDATION_SCHEMA = z
 			.nonnegative({
 				message: ZodErrorMessages.delayNegative,
 			})
-			.gte(30, ZodErrorMessages.delayUnsupported)
+			.gte(process.env.DEV ? 0 : 30, ZodErrorMessages.delayUnsupported)
 			.lte(3600, ZodErrorMessages.delayUnsupported),
 		torznab: z.array(z.string().url()),
 		dataDirs: z.array(z.string()).nullish(),

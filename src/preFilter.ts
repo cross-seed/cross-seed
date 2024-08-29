@@ -235,10 +235,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 			"indexer.id",
 			enabledIndexers
 				.filter((indexer) =>
-					indexerDoesSupportMediaType(
-						mediaType,
-						JSON.parse(indexer.categories),
-					),
+					indexerDoesSupportMediaType(mediaType, indexer.categories),
 				)
 				.map((indexer) => indexer.id),
 		)

@@ -11,7 +11,7 @@ export enum IndexerStatus {
 	UNKNOWN_ERROR = "UNKNOWN_ERROR",
 }
 
-export interface Indexer {
+export interface DbIndexer {
 	id: number;
 	url: string;
 	apikey: string;
@@ -26,7 +26,7 @@ export interface Indexer {
 	movieSearchCap: boolean;
 	tvIdCaps: string;
 	movieIdCaps: string;
-	categories: string;
+	catCaps: string;
 }
 
 export interface IndexerCategories {
@@ -42,6 +42,15 @@ export interface IndexerCategories {
 	additional: boolean;
 }
 
+export interface Caps {
+	search: boolean;
+	categories: IndexerCategories;
+	tvSearch: boolean;
+	movieSearch: boolean;
+	movieIdSearch: IdSearchCaps;
+	tvIdSearch: IdSearchCaps;
+}
+
 export interface IdSearchCaps {
 	tvdbId?: boolean;
 	tmdbId?: boolean;
@@ -49,7 +58,7 @@ export interface IdSearchCaps {
 	tvMazeId?: boolean;
 }
 
-export interface HydratedIndexer {
+export interface Indexer {
 	id: number;
 	url: string;
 	apikey: string;
@@ -67,8 +76,18 @@ export interface HydratedIndexer {
 	categories: IndexerCategories;
 }
 
+function deserialize(dbIndexer: DbIndexer): Indexer {
+	const { tvIdCaps, movieIdCaps, catCaps, ...rest } = dbIndexer;
+	return {
+		...rest,
+		tvIdCaps: JSON.parse(tvIdCaps),
+		movieIdCaps: JSON.parse(movieIdCaps),
+		categories: JSON.parse(catCaps),
+	};
+}
+
 export async function getAllIndexers(): Promise<Indexer[]> {
-	return db("indexer").where({ active: true }).select({
+	const rawIndexers = await db("indexer").where({ active: true }).select({
 		id: "id",
 		url: "url",
 		apikey: "apikey",
@@ -80,12 +99,13 @@ export async function getAllIndexers(): Promise<Indexer[]> {
 		movieSearchCap: "movie_search_cap",
 		tvIdCaps: "tv_id_caps",
 		movieIdCaps: "movie_id_caps",
-		categories: "cat_caps",
+		catCaps: "cat_caps",
 	});
+	return rawIndexers.map(deserialize);
 }
 
 export async function getEnabledIndexers(): Promise<Indexer[]> {
-	return db("indexer")
+	const rawIndexers = await db("indexer")
 		.whereNot({
 			search_cap: null,
 			tv_search_cap: null,
@@ -113,8 +133,10 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 			movieSearchCap: "movie_search_cap",
 			tvIdCaps: "tv_id_caps",
 			movieIdCaps: "movie_id_caps",
-			categories: "cat_caps",
+			catCaps: "cat_caps",
 		});
+
+	return rawIndexers.map(deserialize);
 }
 
 export async function updateIndexerStatus(
@@ -160,4 +182,17 @@ export async function updateSearchTimestamps(
 				.merge(["searchee_id", "indexer_id", "last_searched"]);
 		});
 	}
+}
+
+export async function updateIndexerCapsById(indexerId: number, caps: Caps) {
+	await db("indexer")
+		.where({ id: indexerId })
+		.update({
+			search_cap: caps.search,
+			tv_search_cap: caps.tvSearch,
+			movie_search_cap: caps.movieSearch,
+			movie_id_caps: JSON.stringify(caps.movieIdSearch),
+			tv_id_caps: JSON.stringify(caps.tvIdSearch),
+			cat_caps: JSON.stringify(caps.categories),
+		});
 }
