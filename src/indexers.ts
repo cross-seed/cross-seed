@@ -1,5 +1,6 @@
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
+import { TorznabLimits } from "./torznab.js";
 import { humanReadableDate } from "./utils.js";
 
 export enum IndexerStatus {
@@ -27,6 +28,7 @@ export interface DbIndexer {
 	tvIdCaps: string;
 	movieIdCaps: string;
 	catCaps: string;
+	limitsCaps: string;
 }
 
 export interface IndexerCategories {
@@ -49,6 +51,7 @@ export interface Caps {
 	movieSearch: boolean;
 	movieIdSearch: IdSearchCaps;
 	tvIdSearch: IdSearchCaps;
+	limits: TorznabLimits;
 }
 
 export interface IdSearchCaps {
@@ -74,6 +77,7 @@ export interface Indexer {
 	tvIdCaps: IdSearchCaps;
 	movieIdCaps: IdSearchCaps;
 	categories: IndexerCategories;
+	limits: TorznabLimits;
 }
 
 const allFields = {
@@ -89,15 +93,17 @@ const allFields = {
 	tvIdCaps: "tv_id_caps",
 	movieIdCaps: "movie_id_caps",
 	catCaps: "cat_caps",
+	limitsCaps: "limits_caps",
 } as const;
 
 function deserialize(dbIndexer: DbIndexer): Indexer {
-	const { tvIdCaps, movieIdCaps, catCaps, ...rest } = dbIndexer;
+	const { tvIdCaps, movieIdCaps, catCaps, limitsCaps, ...rest } = dbIndexer;
 	return {
 		...rest,
 		tvIdCaps: JSON.parse(tvIdCaps),
 		movieIdCaps: JSON.parse(movieIdCaps),
 		categories: JSON.parse(catCaps),
+		limits: JSON.parse(limitsCaps),
 	};
 }
 
@@ -117,6 +123,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 			tv_id_caps: null,
 			movie_id_caps: null,
 			cat_caps: null,
+			limits_caps: null,
 		})
 		.where({ active: true, search_cap: true })
 		.where((i) =>
@@ -185,6 +192,7 @@ export async function updateIndexerCapsById(indexerId: number, caps: Caps) {
 			movie_id_caps: JSON.stringify(caps.movieIdSearch),
 			tv_id_caps: JSON.stringify(caps.tvIdSearch),
 			cat_caps: JSON.stringify(caps.categories),
+			limits_caps: JSON.stringify(caps.limits),
 		});
 }
 

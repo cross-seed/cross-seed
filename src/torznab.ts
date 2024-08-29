@@ -51,6 +51,11 @@ import {
 	stripMetaFromName,
 } from "./utils.js";
 
+export interface TorznabLimits {
+	default: number;
+	max: number;
+}
+
 export interface IdSearchParams {
 	tvdbid?: string;
 	tmdbid?: string;
@@ -62,12 +67,17 @@ export interface TorznabParams extends IdSearchParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
+	offset?: number;
 	apikey?: string;
 	season?: number | string;
 	ep?: number | string;
 }
 
 const ALL_CAPS: Caps = {
+	limits: {
+		default: 100,
+		max: 100,
+	},
 	search: true,
 	categories: {
 		tv: true,
@@ -97,10 +107,11 @@ const ALL_CAPS: Caps = {
 type TorznabSearchTechnique =
 	| []
 	| [{ $: { available: "yes" | "no"; supportedParams: string } }];
-
+type LimitXmlElement = { $: { default: string; max: string } };
 type CategoryXmlElement = { $: { id: string; name: string } };
 type TorznabCaps = {
 	caps?: {
+		limits: LimitXmlElement[];
 		categories: { category: CategoryXmlElement[] }[];
 		searching: [
 			{
@@ -153,6 +164,11 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 }
 
 function parseTorznabCaps(xml: TorznabCaps): Caps {
+	const limits = xml?.caps?.limits?.map((limit) => ({
+		default: parseInt(limit.$.default),
+		max: parseInt(limit.$.max),
+	}))[0] ?? { default: 100, max: 100 };
+
 	const searchingSection = xml?.caps?.searching?.[0];
 	const isAvailable = (searchTechnique: TorznabSearchTechnique | undefined) =>
 		searchTechnique?.[0]?.$?.available === "yes";
@@ -209,6 +225,7 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	}
 
 	return {
+		limits,
 		search: Boolean(isAvailable(searchingSection?.search)),
 		tvSearch: Boolean(isAvailable(searchingSection?.["tv-search"])),
 		movieSearch: Boolean(isAvailable(searchingSection?.["movie-search"])),
@@ -357,12 +374,21 @@ export function indexerDoesSupportMediaType(
 	}
 }
 
-export async function queryRssFeeds(): Promise<Candidate[]> {
-	const candidatesByUrl = await makeRequests(
-		await getEnabledIndexers(),
-		async () => [{ t: "search", q: "" }],
-	);
-	return candidatesByUrl.flatMap((e) => e.candidates);
+export async function queryRssFeeds(
+	indexers: Indexer[],
+	paramsPerIndexer: Map<number, { limit: number; offset: number }>,
+): Promise<IndexerCandidates[]> {
+	return makeRequests(indexers, async (indexer) => {
+		const params = paramsPerIndexer.get(indexer.id);
+		return [
+			{
+				t: "search",
+				q: "",
+				limit: params?.limit ?? indexer.limits.max,
+				offset: params?.offset,
+			},
+		];
+	});
 }
 
 export async function searchTorznab(
@@ -386,6 +412,7 @@ export async function searchTorznab(
 		indexersToSearch,
 		async (indexer) => {
 			const caps = {
+				limits: indexer.limits,
 				search: indexer.searchCap,
 				tvSearch: indexer.tvSearchCap,
 				movieSearch: indexer.movieSearchCap,
