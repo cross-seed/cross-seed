@@ -2,6 +2,7 @@ import chalk from "chalk";
 import ms from "ms";
 import { join as posixJoin } from "node:path/posix";
 import { URLSearchParams } from "node:url";
+import { SCENE_TITLE_REGEX } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { Caps } from "./indexers.js";
 import { Label, logger } from "./logger.js";
@@ -16,7 +17,6 @@ import {
 	sanitizeUrl,
 	stripMetaFromName,
 } from "./utils.js";
-import { SCENE_TITLE_REGEX } from "./constants.js";
 
 export interface ExternalIds {
 	imdbId?: string;

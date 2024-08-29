@@ -187,3 +187,10 @@ export async function updateIndexerCapsById(indexerId: number, caps: Caps) {
 			cat_caps: JSON.stringify(caps.categories),
 		});
 }
+
+export async function clearIndexerFailures() {
+	await db("indexer").update({
+		status: null,
+		retry_after: null,
+	});
+}
