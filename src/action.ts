@@ -203,12 +203,9 @@ export async function linkAllFilesInMetafile(
 	>
 > {
 	const { linkDir, flatLinking } = getRuntimeConfig();
-	const newMetaClientSavePathRes = await getClient()!.getDownloadDir(
-		newMeta,
-		{
-			onlyCompleted: false,
-		},
-	);
+	const newMetaClientSavePathRes = await getClient().getDownloadDir(newMeta, {
+		onlyCompleted: false,
+	});
 	const fullLinkDir = newMetaClientSavePathRes.isOk()
 		? newMetaClientSavePathRes.unwrap() // Use existing if ALREADY_EXISTS
 		: flatLinking
@@ -237,7 +234,7 @@ export async function linkAllFilesInMetafile(
 		}
 		sourceRoot = searchee.path;
 	} else {
-		const downloadDirResult = await getClient()!.getDownloadDir(
+		const downloadDirResult = await getClient().getDownloadDir(
 			searchee as SearcheeWithInfoHash,
 			{ onlyCompleted: options.onlyCompleted },
 		);
@@ -335,7 +332,7 @@ export async function performAction(
 		// should be a MATCH, as risky requires a linkDir to be set
 		destinationDir = dirname(searchee.path);
 	}
-	const result = await getClient()!.inject(
+	const result = await getClient().inject(
 		newMeta,
 		searchee,
 		decision,
