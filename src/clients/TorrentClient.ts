@@ -8,7 +8,7 @@ import Transmission from "./Transmission.js";
 import Deluge from "./Deluge.js";
 import { Result } from "../Result.js";
 
-let activeClient: TorrentClient | null = null;
+let activeClient: TorrentClient;
 
 export interface TorrentClient {
 	isTorrentComplete: (
@@ -44,7 +44,7 @@ function instantiateDownloadClient() {
 	}
 }
 
-export function getClient(): TorrentClient | null {
+export function getClient(): TorrentClient {
 	if (!activeClient) {
 		instantiateDownloadClient();
 	}
