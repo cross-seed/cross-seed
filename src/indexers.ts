@@ -76,6 +76,21 @@ export interface Indexer {
 	categories: IndexerCategories;
 }
 
+const allFields = {
+	id: "id",
+	url: "url",
+	apikey: "apikey",
+	active: "active",
+	status: "status",
+	retryAfter: "retry_after",
+	searchCap: "search_cap",
+	tvSearchCap: "tv_search_cap",
+	movieSearchCap: "movie_search_cap",
+	tvIdCaps: "tv_id_caps",
+	movieIdCaps: "movie_id_caps",
+	catCaps: "cat_caps",
+} as const;
+
 function deserialize(dbIndexer: DbIndexer): Indexer {
 	const { tvIdCaps, movieIdCaps, catCaps, ...rest } = dbIndexer;
 	return {
@@ -87,20 +102,9 @@ function deserialize(dbIndexer: DbIndexer): Indexer {
 }
 
 export async function getAllIndexers(): Promise<Indexer[]> {
-	const rawIndexers = await db("indexer").where({ active: true }).select({
-		id: "id",
-		url: "url",
-		apikey: "apikey",
-		active: "active",
-		status: "status",
-		retryAfter: "retry_after",
-		searchCap: "search_cap",
-		tvSearchCap: "tv_search_cap",
-		movieSearchCap: "movie_search_cap",
-		tvIdCaps: "tv_id_caps",
-		movieIdCaps: "movie_id_caps",
-		catCaps: "cat_caps",
-	});
+	const rawIndexers = await db("indexer")
+		.where({ active: true })
+		.select(allFields);
 	return rawIndexers.map(deserialize);
 }
 
@@ -121,20 +125,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 				.orWhere({ status: IndexerStatus.OK })
 				.orWhere("retry_after", "<", Date.now()),
 		)
-		.select({
-			id: "id",
-			url: "url",
-			apikey: "apikey",
-			active: "active",
-			status: "status",
-			retryAfter: "retry_after",
-			searchCap: "search_cap",
-			tvSearchCap: "tv_search_cap",
-			movieSearchCap: "movie_search_cap",
-			tvIdCaps: "tv_id_caps",
-			movieIdCaps: "movie_id_caps",
-			catCaps: "cat_caps",
-		});
+		.select(allFields);
 
 	return rawIndexers.map(deserialize);
 }

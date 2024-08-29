@@ -21,7 +21,6 @@ import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
 	Caps,
-	DbIndexer,
 	getAllIndexers,
 	getEnabledIndexers,
 	IdSearchCaps,
@@ -408,22 +407,7 @@ export async function searchTorznab(
 export async function syncWithDb() {
 	const { torznab } = getRuntimeConfig();
 
-	const dbIndexers = await db<DbIndexer>("indexer")
-		.where({ active: true })
-		.select({
-			id: "id",
-			url: "url",
-			apikey: "apikey",
-			active: "active",
-			status: "status",
-			retryAfter: "retry_after",
-			searchCap: "search_cap",
-			tvSearchCap: "tv_search_cap",
-			tvIdCaps: "tv_id_caps",
-			movieSearchCap: "movie_search_cap",
-			movieIdCaps: "movie_id_caps",
-			catCaps: "cat_caps",
-		});
+	const dbIndexers = await getAllIndexers();
 
 	const inConfigButNotInDb = torznab.filter(
 		(configIndexer) =>
