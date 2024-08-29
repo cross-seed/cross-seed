@@ -1,12 +1,14 @@
+import chalk from "chalk";
 import ms from "ms";
+import { inspect } from "util";
 import xml2js from "xml2js";
 import {
 	arrIdsEqual,
 	ExternalIds,
-	scanAllArrsForMedia,
+	formatFoundIds,
 	getRelevantArrIds,
 	ParsedMedia,
-	formatFoundIds,
+	scanAllArrsForMedia,
 } from "./arr.js";
 import {
 	CALIBRE_INDEXNUM_REGEX,
@@ -20,7 +22,9 @@ import { CrossSeedError } from "./errors.js";
 import {
 	getAllIndexers,
 	getEnabledIndexers,
+	IdSearchCaps,
 	Indexer,
+	IndexerCategories,
 	IndexerStatus,
 	updateIndexerStatus,
 } from "./indexers.js";
@@ -44,21 +48,6 @@ import {
 	stripExtension,
 	stripMetaFromName,
 } from "./utils.js";
-import chalk from "chalk";
-import { inspect } from "util";
-
-export interface TorznabCats {
-	tv: boolean;
-	movie: boolean;
-	anime: boolean;
-	xxx: boolean;
-	audio: boolean;
-	book: boolean;
-	/**
-	 * If the indexer has a category not covered by the above.
-	 */
-	additional: boolean;
-}
 
 export interface IdSearchParams {
 	tvdbid?: string;
@@ -76,16 +65,9 @@ export interface TorznabParams extends IdSearchParams {
 	ep?: number | string;
 }
 
-export interface IdSearchCaps {
-	tvdbId?: boolean;
-	tmdbId?: boolean;
-	imdbId?: boolean;
-	tvMazeId?: boolean;
-}
-
 export interface Caps {
 	search: boolean;
-	categories: TorznabCats;
+	categories: IndexerCategories;
 	tvSearch: boolean;
 	movieSearch: boolean;
 	movieIdSearch: IdSearchCaps;
@@ -362,7 +344,7 @@ export async function logQueries(
 
 export function indexerDoesSupportMediaType(
 	mediaType: MediaType,
-	caps: TorznabCats,
+	caps: IndexerCategories,
 ) {
 	switch (mediaType) {
 		case MediaType.EPISODE:

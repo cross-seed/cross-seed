@@ -29,6 +29,44 @@ export interface Indexer {
 	categories: string;
 }
 
+export interface IndexerCategories {
+	tv: boolean;
+	movie: boolean;
+	anime: boolean;
+	xxx: boolean;
+	audio: boolean;
+	book: boolean;
+	/**
+	 * If the indexer has a category not covered by the above.
+	 */
+	additional: boolean;
+}
+
+export interface IdSearchCaps {
+	tvdbId?: boolean;
+	tmdbId?: boolean;
+	imdbId?: boolean;
+	tvMazeId?: boolean;
+}
+
+export interface HydratedIndexer {
+	id: number;
+	url: string;
+	apikey: string;
+	/**
+	 * Whether the indexer is currently specified in config
+	 */
+	active: boolean;
+	status: IndexerStatus;
+	retryAfter: number;
+	searchCap: boolean;
+	tvSearchCap: boolean;
+	movieSearchCap: boolean;
+	tvIdCaps: IdSearchCaps;
+	movieIdCaps: IdSearchCaps;
+	categories: IndexerCategories;
+}
+
 export async function getAllIndexers(): Promise<Indexer[]> {
 	return db("indexer").where({ active: true }).select({
 		id: "id",
