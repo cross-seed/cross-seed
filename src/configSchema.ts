@@ -273,7 +273,7 @@ export const VALIDATION_SCHEMA = z
 	.refine(
 		(config) =>
 			!(
-				config.action === Action.INJECT &&
+				(config.action === Action.INJECT || config.injectDir) &&
 				!config.rtorrentRpcUrl &&
 				!config.qbittorrentUrl &&
 				!config.transmissionRpcUrl &&
