@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
+import { inspect } from "util";
 import { getApiKey, resetApiKey } from "./auth.js";
-import { VALIDATION_SCHEMA, customizeErrorMessage } from "./configSchema.js";
+import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
 import { FileConfig, generateConfig, getFileConfig } from "./configuration.js";
 import {
 	Action,
@@ -15,9 +16,10 @@ import {
 import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
+import { clearIndexerFailures } from "./indexers.js";
 import { injectSavedTorrents } from "./inject.js";
 import { jobsLoop } from "./jobs.js";
-import { Label, initializeLogger, logger } from "./logger.js";
+import { initializeLogger, Label, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
 import {
 	initializePushNotifier,
@@ -30,7 +32,6 @@ import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 import { fallback } from "./utils.js";
-import { inspect } from "util";
 
 let fileConfig: FileConfig;
 try {
@@ -301,6 +302,7 @@ program
 		await db("decision").whereNull("info_hash").del();
 		await db.destroy();
 	});
+
 program
 	.command("clear-indexer-failures")
 	.description("Clear the cached details of indexers (failures and caps)")
@@ -313,10 +315,7 @@ program
 			"If you have to do this more than once in a short",
 			"period of time, you have bigger issues that need to be addressed.",
 		);
-		await db("indexer").update({
-			status: null,
-			retry_after: null,
-		});
+		await clearIndexerFailures();
 		await db.destroy();
 	});
 program

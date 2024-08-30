@@ -4,14 +4,19 @@
       <w>backfill</w>
       <w>bencode</w>
       <w>caronc</w>
+      <w>correlator</w>
+      <w>correlators</w>
       <w>dlspeed</w>
+      <w>erro</w>
       <w>imdbid</w>
       <w>infohash</w>
       <w>jackett</w>
+      <w>jackettindexer</w>
       <w>jsified</w>
       <w>knexfile</w>
       <w>leechs</w>
       <w>metainfo</w>
+      <w>prowlarrindexer</w>
       <w>qbittorrent</w>
       <w>rtorrent</w>
       <w>savepath</w>

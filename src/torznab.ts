@@ -1,12 +1,14 @@
+import chalk from "chalk";
 import ms from "ms";
+import { inspect } from "util";
 import xml2js from "xml2js";
 import {
 	arrIdsEqual,
 	ExternalIds,
-	scanAllArrsForMedia,
+	formatFoundIds,
 	getRelevantArrIds,
 	ParsedMedia,
-	formatFoundIds,
+	scanAllArrsForMedia,
 } from "./arr.js";
 import {
 	CALIBRE_INDEXNUM_REGEX,
@@ -18,10 +20,14 @@ import {
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
+	Caps,
 	getAllIndexers,
 	getEnabledIndexers,
+	IdSearchCaps,
 	Indexer,
+	IndexerCategories,
 	IndexerStatus,
+	updateIndexerCapsById,
 	updateIndexerStatus,
 } from "./indexers.js";
 import { Label, logger } from "./logger.js";
@@ -44,21 +50,6 @@ import {
 	stripExtension,
 	stripMetaFromName,
 } from "./utils.js";
-import chalk from "chalk";
-import { inspect } from "util";
-
-export interface TorznabCats {
-	tv: boolean;
-	movie: boolean;
-	anime: boolean;
-	xxx: boolean;
-	audio: boolean;
-	book: boolean;
-	/**
-	 * If the indexer has a category not covered by the above.
-	 */
-	additional: boolean;
-}
 
 export interface IdSearchParams {
 	tvdbid?: string;
@@ -74,22 +65,6 @@ export interface TorznabParams extends IdSearchParams {
 	apikey?: string;
 	season?: number | string;
 	ep?: number | string;
-}
-
-export interface IdSearchCaps {
-	tvdbId?: boolean;
-	tmdbId?: boolean;
-	imdbId?: boolean;
-	tvMazeId?: boolean;
-}
-
-export interface Caps {
-	search: boolean;
-	categories: TorznabCats;
-	tvSearch: boolean;
-	movieSearch: boolean;
-	movieIdSearch: IdSearchCaps;
-	tvIdSearch: IdSearchCaps;
 }
 
 const ALL_CAPS: Caps = {
@@ -362,7 +337,7 @@ export async function logQueries(
 
 export function indexerDoesSupportMediaType(
 	mediaType: MediaType,
-	caps: TorznabCats,
+	caps: IndexerCategories,
 ) {
 	switch (mediaType) {
 		case MediaType.EPISODE:
@@ -414,9 +389,9 @@ export async function searchTorznab(
 				search: indexer.searchCap,
 				tvSearch: indexer.tvSearchCap,
 				movieSearch: indexer.movieSearchCap,
-				tvIdSearch: JSON.parse(indexer.tvIdCaps),
-				movieIdSearch: JSON.parse(indexer.movieIdCaps),
-				categories: JSON.parse(indexer.categories),
+				tvIdSearch: indexer.tvIdCaps,
+				movieIdSearch: indexer.movieIdCaps,
+				categories: indexer.categories,
 			};
 			return await createTorznabSearchQueries(
 				searchee,
@@ -432,22 +407,7 @@ export async function searchTorznab(
 export async function syncWithDb() {
 	const { torznab } = getRuntimeConfig();
 
-	const dbIndexers = await db<Indexer>("indexer")
-		.where({ active: true })
-		.select({
-			id: "id",
-			url: "url",
-			apikey: "apikey",
-			active: "active",
-			status: "status",
-			retryAfter: "retry_after",
-			searchCap: "search_cap",
-			tvSearchCap: "tv_search_cap",
-			tvIdCaps: "tv_id_caps",
-			movieSearchCap: "movie_search_cap",
-			movieIdCaps: "movie_id_caps",
-			categories: "cat_caps",
-		});
+	const dbIndexers = await getAllIndexers();
 
 	const inConfigButNotInDb = torznab.filter(
 		(configIndexer) =>
@@ -540,7 +500,7 @@ async function fetchCaps(indexer: {
 	url: string;
 	apikey: string;
 }): Promise<Caps> {
-	let response;
+	let response: Response;
 	try {
 		response = await fetch(
 			assembleUrl(indexer.url, indexer.apikey, { t: "caps" }),
@@ -620,16 +580,7 @@ export async function updateCaps(): Promise<void> {
 		outcomes,
 	);
 	for (const [indexerId, caps] of fulfilled) {
-		await db("indexer")
-			.where({ id: indexerId })
-			.update({
-				search_cap: caps.search,
-				tv_search_cap: caps.tvSearch,
-				movie_search_cap: caps.movieSearch,
-				movie_id_caps: JSON.stringify(caps.movieIdSearch),
-				tv_id_caps: JSON.stringify(caps.tvIdSearch),
-				cat_caps: JSON.stringify(caps.categories),
-			});
+		await updateIndexerCapsById(indexerId, caps);
 	}
 }
 
@@ -800,10 +751,7 @@ async function getAndLogIndexers(
 	});
 
 	const indexersToUse = timeFilteredIndexers.filter((indexer) => {
-		return indexerDoesSupportMediaType(
-			mediaType,
-			JSON.parse(indexer.categories),
-		);
+		return indexerDoesSupportMediaType(mediaType, indexer.categories);
 	});
 
 	// Invalidate cache if searchStr or ids is different
