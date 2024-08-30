@@ -20,6 +20,7 @@ import {
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
+	ALL_CAPS,
 	Caps,
 	getAllIndexers,
 	getEnabledIndexers,
@@ -62,45 +63,20 @@ export interface TorznabParams extends IdSearchParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
+	offset?: number;
 	apikey?: string;
 	season?: number | string;
 	ep?: number | string;
 }
 
-const ALL_CAPS: Caps = {
-	search: true,
-	categories: {
-		tv: true,
-		movie: true,
-		anime: true,
-		xxx: true,
-		audio: true,
-		book: true,
-		additional: true,
-	},
-	tvSearch: true,
-	movieSearch: true,
-	movieIdSearch: {
-		tvdbId: true,
-		tmdbId: true,
-		imdbId: true,
-		tvMazeId: true,
-	},
-	tvIdSearch: {
-		tvdbId: true,
-		tmdbId: true,
-		imdbId: true,
-		tvMazeId: true,
-	},
-};
-
 type TorznabSearchTechnique =
 	| []
 	| [{ $: { available: "yes" | "no"; supportedParams: string } }];
-
+type LimitXmlElement = { $: { default: string; max: string } };
 type CategoryXmlElement = { $: { id: string; name: string } };
 type TorznabCaps = {
 	caps?: {
+		limits: LimitXmlElement[];
 		categories: { category: CategoryXmlElement[] }[];
 		searching: [
 			{
@@ -153,6 +129,11 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 }
 
 function parseTorznabCaps(xml: TorznabCaps): Caps {
+	const limits = xml?.caps?.limits?.map((limit) => ({
+		default: parseInt(limit.$.default),
+		max: parseInt(limit.$.max),
+	}))[0] ?? { default: 100, max: 100 };
+
 	const searchingSection = xml?.caps?.searching?.[0];
 	const isAvailable = (searchTechnique: TorznabSearchTechnique | undefined) =>
 		searchTechnique?.[0]?.$?.available === "yes";
@@ -215,6 +196,7 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 		movieIdSearch: getSupportedIds(searchingSection?.["movie-search"]),
 		tvIdSearch: getSupportedIds(searchingSection?.["tv-search"]),
 		categories: getCatCaps(categoryCaps),
+		limits,
 	};
 }
 
@@ -357,12 +339,21 @@ export function indexerDoesSupportMediaType(
 	}
 }
 
-export async function queryRssFeeds(): Promise<Candidate[]> {
-	const candidatesByUrl = await makeRequests(
-		await getEnabledIndexers(),
-		async () => [{ t: "search", q: "" }],
-	);
-	return candidatesByUrl.flatMap((e) => e.candidates);
+export async function queryRssFeeds(
+	indexers: Indexer[],
+	paramsPerIndexer: Map<number, { limit: number; offset: number }>,
+): Promise<IndexerCandidates[]> {
+	return makeRequests(indexers, async (indexer) => {
+		const params = paramsPerIndexer.get(indexer.id);
+		return [
+			{
+				t: "search",
+				q: "",
+				limit: params?.limit ?? indexer.limits.max,
+				offset: params?.offset,
+			},
+		];
+	});
 }
 
 export async function searchTorznab(
@@ -392,6 +383,7 @@ export async function searchTorznab(
 				tvIdSearch: indexer.tvIdCaps,
 				movieIdSearch: indexer.movieIdCaps,
 				categories: indexer.categories,
+				limits: indexer.limits,
 			};
 			return await createTorznabSearchQueries(
 				searchee,
