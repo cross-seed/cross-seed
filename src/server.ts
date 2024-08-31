@@ -107,8 +107,13 @@ async function search(
 				existsSync(criteria.path))
 		)
 	) {
+		logger.info({
+			label: Label.WEBHOOK,
+			message: `Received search request: ${inspect(criteria)}`,
+		});
+
 		const message =
-			"A valid infoHash or path must be provided (infoHash is preferred).";
+			"A valid infoHash or accessible path must be provided (infoHash is preferred).";
 		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);
