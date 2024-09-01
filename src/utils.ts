@@ -386,3 +386,46 @@ export function comparing<T>(...getters: ((e: T) => number | boolean)[]) {
 		return 0;
 	};
 }
+
+/**
+ * Given multiple async iterables, this function will merge/interleave
+ * them all into one iterable, yielding on a first-come, first-serve basis.
+ * https://stackoverflow.com/questions/50585456/how-can-i-interleave-merge-async-iterables
+ */
+export async function* combineAsyncIterables<T>(
+	asyncIterables: AsyncIterable<T>[],
+): AsyncGenerator<T> {
+	const asyncIterators = Array.from(asyncIterables, (o) =>
+		o[Symbol.asyncIterator](),
+	);
+	let unfinishedIterators = asyncIterators.length;
+	const alwaysPending: Promise<never> = new Promise(() => {});
+	const getNext = (asyncIterator: AsyncIterator<T>, index: number) =>
+		asyncIterator.next().then((result) => ({ index, result }));
+
+	const nextPromises = asyncIterators.map(getNext);
+	try {
+		while (unfinishedIterators) {
+			const { index, result } = await Promise.race(nextPromises);
+			if (result.done) {
+				nextPromises[index] = alwaysPending;
+				unfinishedIterators--;
+			} else {
+				nextPromises[index] = getNext(asyncIterators[index], index);
+				yield result.value;
+			}
+		}
+	} finally {
+		// cancel unfinished iterators if one throws
+		for (const [index, iterator] of asyncIterators.entries()) {
+			if (
+				nextPromises[index] !== alwaysPending &&
+				iterator.return != null
+			) {
+				// no await here - see https://github.com/tc39/proposal-async-iteration/issues/126
+				void iterator.return();
+			}
+		}
+	}
+	return;
+}
