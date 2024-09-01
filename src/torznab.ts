@@ -346,21 +346,81 @@ export function indexerDoesSupportMediaType(
 	}
 }
 
-export async function queryRssFeeds(
-	indexers: Indexer[],
-	paramsPerIndexer: Map<number, { limit: number; offset: number }>,
-): Promise<IndexerCandidates[]> {
-	return makeRequests(indexers, async (indexer) => {
-		const params = paramsPerIndexer.get(indexer.id);
-		return [
-			{
-				t: "search",
-				q: "",
-				limit: params?.limit ?? indexer.limits.max,
-				offset: params?.offset,
-			},
-		];
+export async function* rssPager(
+	indexer: Indexer,
+	pageBackUntil: number,
+): AsyncGenerator<Candidate, void, undefined> {
+	let earliestSeen = Infinity;
+	const limit = indexer.limits.max;
+	for (let i = 0; i < 10; i++) {
+		let currentPageCandidates: Candidate[];
+
+		try {
+			currentPageCandidates = await makeRequest({
+				indexerId: indexer.id,
+				baseUrl: indexer.url,
+				apikey: indexer.apikey,
+				query: { t: "search", q: "", limit, offset: i * limit },
+			});
+		} catch (e) {
+			logger.error({
+				label: Label.TORZNAB,
+				message: `Paging indexer ${indexer.id} stopped: request failed for page ${i + 1}`,
+			});
+			logger.debug(e);
+			return;
+		}
+
+		const allNewPubDates = currentPageCandidates.map((c) => c.pubDate);
+		const currentPageEarliest = Math.min(...allNewPubDates);
+		const currentPageLatest = Math.max(...allNewPubDates);
+
+		const newCandidates = currentPageCandidates.filter(
+			(c) => c.pubDate < earliestSeen && c.pubDate >= pageBackUntil,
+		);
+
+		if (currentPageLatest > Date.now() + ms("10 minutes")) {
+			logOnce(
+				`timezone-issues-${indexer.id}`,
+				() =>
+					void logger.warn(
+						`Indexer ${indexer.url} reported releases in the future. Its timezone may be misconfigured.`,
+					),
+				ms("10 minutes"),
+			);
+		}
+
+		if (!newCandidates.length) {
+			logger.verbose({
+				label: Label.TORZNAB,
+				message: `Paging indexer ${indexer.id} stopped: nothing new in page ${i + 1}`,
+			});
+			return;
+		}
+
+		logger.verbose({
+			label: Label.TORZNAB,
+			message: `${newCandidates.length} new candidates on indexer ${indexer.id} page ${i + 1}`,
+		});
+
+		// yield each new candidate
+		yield* newCandidates;
+
+		earliestSeen = Math.min(earliestSeen, currentPageEarliest);
+	}
+	logger.verbose({
+		label: Label.TORZNAB,
+		message: `Paging indexer ${indexer.url} stopped: reached 10 pages`,
 	});
+}
+
+export async function* queryRssFeeds(
+	pageBackUntil: number,
+): AsyncGenerator<Candidate> {
+	const indexers = await getEnabledIndexers();
+	yield* combineAsyncIterables(
+		indexers.map((indexer) => rssPager(indexer, pageBackUntil)),
+	);
 }
 
 export async function searchTorznab(
