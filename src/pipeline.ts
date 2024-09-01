@@ -18,8 +18,6 @@ import {
 import { db } from "./db.js";
 import { assessCandidateCaching, ResultAssessment } from "./decide.js";
 import {
-	getEnabledIndexers,
-	Indexer,
 	IndexerStatus,
 	updateIndexerStatus,
 	updateSearchTimestamps,
@@ -482,159 +480,30 @@ export async function main(): Promise<void> {
 	});
 }
 
-/**
- * Exclude indexers that don't support pagination
- * only comparing indexers own time against itself.
- */
-function filterRSSCandidates(
-	indexerId: number,
-	candidates: Candidate[],
-	page: number,
-	indexersToUse: Indexer[],
-	excludeIndexerIds: Set<number>,
-	oldestPerIndexer: Map<number, number>,
-	indexerParams: Map<number, { limit: number; offset: number }>,
-): CandidateWithIndexerId[] {
-	const prevOldest = oldestPerIndexer.get(indexerId) ?? Infinity;
-	const pagedCandidates = candidates.filter(
-		({ pubDate }) => pubDate < prevOldest,
-	);
-	const indexerUrl =
-		indexersToUse.find((i) => i.id === indexerId)?.url ??
-		indexerId.toString();
-	if (pagedCandidates.length) {
-		if (page > 1) {
-			logger.verbose({
-				label: Label.RSS,
-				message: `Indexer ${indexerUrl} returned ${pagedCandidates.length} new results for page #${page}`,
-			});
-		}
-		oldestPerIndexer.set(
-			indexerId,
-			pagedCandidates.reduce(
-				(acc, cur) => Math.min(acc, cur.pubDate),
-				Infinity,
-			),
-		);
-	} else {
-		logger.verbose({
-			label: Label.RSS,
-			message: `Indexer ${indexerUrl} returned no new results for page #${page}, no longer paging`,
-		});
-		excludeIndexerIds.add(indexerId);
-	}
-	const limit = candidates.length; // Override limit with what was actually returned
-	const offset = (indexerParams.get(indexerId)?.offset ?? 0) + limit;
-	indexerParams.set(indexerId, { limit, offset }); // For next page
-	return candidates.map((candidate) => ({
-		...candidate,
-		indexerId,
-	}));
-}
-
-async function parseRSSPage(
-	page: number,
-	lastRun: number,
-	indexersToUse: Indexer[],
-	excludeIndexerIds: Set<number>,
-	oldestPerIndexer: Map<number, number>,
-	indexerParams: Map<number, { limit: number; offset: number }>,
-): Promise<void> {
-	const indexerCandidates = await queryRssFeeds(indexersToUse, indexerParams);
-	const totalCandidates = indexerCandidates.reduce(
-		(acc, { candidates }) => acc + candidates.length,
-		0,
-	);
-	const candidatesSinceLastTime: Candidate[] = indexerCandidates
-		.flatMap(({ indexerId, candidates }) =>
-			filterRSSCandidates(
-				indexerId,
-				candidates,
-				page,
-				indexersToUse,
-				excludeIndexerIds,
-				oldestPerIndexer,
-				indexerParams,
-			),
-		)
-		.filter(({ indexerId, pubDate }) => {
-			if (pubDate < lastRun) {
-				excludeIndexerIds.add(indexerId);
-				return false;
-			}
-			return true;
-		})
-		.sort((a, b) => a.pubDate - b.pubDate);
-	logger.verbose({
-		label: Label.RSS,
-		message: `Scan returned ${
-			candidatesSinceLastTime.length
-		} new results, ignoring ${
-			totalCandidates - candidatesSinceLastTime.length
-		} already seen`,
-	});
+export async function scanRssFeeds() {
+	const { torznab } = getRuntimeConfig();
+	if (!torznab.length) return;
+	const lastRun =
+		(await db("job_log").select("last_run").where({ name: "rss" }).first())
+			?.last_run ?? 0;
 	logger.verbose({
 		label: Label.RSS,
 		message: "Indexing new torrents...",
 	});
 	await indexNewTorrents();
-	for (const [i, candidate] of candidatesSinceLastTime.entries()) {
-		const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
-		logger.verbose({
-			label: Label.RSS,
-			message: `(Page #${page}: ${i + 1}/${candidatesSinceLastTime.length}) ${humanReadableDate(candidate.pubDate)} - ${candidateLog}`,
-		});
+	logger.verbose({
+		label: Label.RSS,
+		message: "Querying RSS feeds...",
+	});
+	const candidates = queryRssFeeds(lastRun);
+	let i = 0;
+	for await (const candidate of candidates) {
 		await checkNewCandidateMatch(candidate, Label.RSS);
+		i++;
 	}
-}
 
-export async function scanRssFeeds() {
-	const { rssCadence, torznab } = getRuntimeConfig();
-	if (torznab.length > 0) {
-		const lastRun =
-			(
-				await db("job_log")
-					.select("last_run")
-					.where({ name: "rss" })
-					.first()
-			)?.last_run ?? 0;
-		const pageLimit =
-			rssCadence && Date.now() - lastRun > rssCadence + ms("1 minute")
-				? 12
-				: 1;
-		const excludeIndexerIds: Set<number> = new Set();
-		const oldestPerIndexer: Map<number, number> = new Map();
-		const indexerParams: Map<number, { limit: number; offset: number }> =
-			new Map();
-		let indexersToUse: Indexer[] = [];
-		let prevSearchTime = 0;
-		for (let page = 1; page <= pageLimit; page++) {
-			const sleepTime = ms("5 minutes") - (Date.now() - prevSearchTime);
-			if (page > 1) {
-				logger.verbose({
-					label: Label.RSS,
-					message: `Getting page #${page} of RSS feeds ${sleepTime > 0 ? `in ${Math.round(sleepTime / 1000)}s` : "now"} (paging until #${pageLimit} or pubDate ${humanReadableDate(lastRun)})`,
-				});
-			}
-			if (sleepTime > 0) {
-				await wait(sleepTime);
-			}
-			const searchTime = Date.now();
-			indexersToUse = (await getEnabledIndexers()).filter(
-				(indexer) => !excludeIndexerIds.has(indexer.id),
-			);
-			if (!indexersToUse.length) break;
-			await parseRSSPage(
-				page,
-				lastRun,
-				indexersToUse,
-				excludeIndexerIds,
-				oldestPerIndexer,
-				indexerParams,
-			);
-			if (indexersToUse.every((i) => excludeIndexerIds.has(i.id))) break;
-			prevSearchTime = searchTime;
-		}
-		logger.info({ label: Label.RSS, message: "Scan complete" });
-	}
+	logger.info({
+		label: Label.RSS,
+		message: `RSS scan complete - checked ${i} new candidates since ${humanReadableDate(lastRun)}`,
+	});
 }
