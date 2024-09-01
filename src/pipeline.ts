@@ -43,8 +43,8 @@ import {
 } from "./searchee.js";
 import {
 	getInfoHashesToExclude,
-	getTorrentByCriteria,
 	getSimilarTorrentsByName,
+	getTorrentByCriteria,
 	indexNewTorrents,
 	loadTorrentDirLight,
 	TorrentLocator,
@@ -55,13 +55,7 @@ import {
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
-import {
-	getLogString,
-	humanReadableDate,
-	isTruthy,
-	wait,
-	WithRequired,
-} from "./utils.js";
+import { getLogString, humanReadableDate, isTruthy, wait } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -72,7 +66,6 @@ export interface Candidate {
 	pubDate: number;
 	indexerId?: number;
 }
-type CandidateWithIndexerId = WithRequired<Candidate, "indexerId">;
 
 export interface AssessmentWithTracker {
 	assessment: ResultAssessment;
@@ -118,7 +111,7 @@ async function findOnOtherSites(
 	const searchedIndexers = response.length - cachedIndexers;
 	cachedSearch.indexerCandidates = response;
 
-	const results: CandidateWithIndexerId[] = response.flatMap((e) =>
+	const results: Candidate[] = response.flatMap((e) =>
 		e.candidates.map((candidate) => ({
 			...candidate,
 			indexerId: e.indexerId,
@@ -141,8 +134,8 @@ async function findOnOtherSites(
 		(acc, cur, idx) => {
 			const candidate = results[idx];
 			if (cur.assessment.decision === Decision.RATE_LIMITED) {
-				acc.rateLimited.add(candidate.indexerId);
-				acc.notRateLimited.delete(candidate.indexerId);
+				acc.rateLimited.add(candidate.indexerId!);
+				acc.notRateLimited.delete(candidate.indexerId!);
 			}
 			return acc;
 		},

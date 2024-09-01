@@ -1,6 +1,5 @@
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
-import { TorznabLimits } from "./torznab.js";
 import { humanReadableDate } from "./utils.js";
 
 export enum IndexerStatus {
@@ -44,14 +43,19 @@ export interface IndexerCategories {
 	additional: boolean;
 }
 
+export interface IndexerLimits {
+	default: number;
+	max: number;
+}
+
 export interface Caps {
 	search: boolean;
-	categories: IndexerCategories;
 	tvSearch: boolean;
 	movieSearch: boolean;
 	movieIdSearch: IdSearchCaps;
 	tvIdSearch: IdSearchCaps;
-	limits: TorznabLimits;
+	categories: IndexerCategories;
+	limits: IndexerLimits;
 }
 
 export interface IdSearchCaps {
@@ -77,7 +81,7 @@ export interface Indexer {
 	tvIdCaps: IdSearchCaps;
 	movieIdCaps: IdSearchCaps;
 	categories: IndexerCategories;
-	limits: TorznabLimits;
+	limits: IndexerLimits;
 }
 
 const allFields = {
@@ -95,6 +99,37 @@ const allFields = {
 	catCaps: "cat_caps",
 	limitsCaps: "limits_caps",
 } as const;
+
+export const ALL_CAPS: Caps = {
+	limits: {
+		default: 100,
+		max: 100,
+	},
+	search: true,
+	categories: {
+		tv: true,
+		movie: true,
+		anime: true,
+		xxx: true,
+		audio: true,
+		book: true,
+		additional: true,
+	},
+	tvSearch: true,
+	movieSearch: true,
+	movieIdSearch: {
+		tvdbId: true,
+		tmdbId: true,
+		imdbId: true,
+		tvMazeId: true,
+	},
+	tvIdSearch: {
+		tvdbId: true,
+		tmdbId: true,
+		imdbId: true,
+		tvMazeId: true,
+	},
+};
 
 function deserialize(dbIndexer: DbIndexer): Indexer {
 	const { tvIdCaps, movieIdCaps, catCaps, limitsCaps, ...rest } = dbIndexer;

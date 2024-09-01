@@ -20,6 +20,7 @@ import {
 import { db } from "./db.js";
 import { CrossSeedError } from "./errors.js";
 import {
+	ALL_CAPS,
 	Caps,
 	getAllIndexers,
 	getEnabledIndexers,
@@ -51,11 +52,6 @@ import {
 	stripMetaFromName,
 } from "./utils.js";
 
-export interface TorznabLimits {
-	default: number;
-	max: number;
-}
-
 export interface IdSearchParams {
 	tvdbid?: string;
 	tmdbid?: string;
@@ -72,37 +68,6 @@ export interface TorznabParams extends IdSearchParams {
 	season?: number | string;
 	ep?: number | string;
 }
-
-const ALL_CAPS: Caps = {
-	limits: {
-		default: 100,
-		max: 100,
-	},
-	search: true,
-	categories: {
-		tv: true,
-		movie: true,
-		anime: true,
-		xxx: true,
-		audio: true,
-		book: true,
-		additional: true,
-	},
-	tvSearch: true,
-	movieSearch: true,
-	movieIdSearch: {
-		tvdbId: true,
-		tmdbId: true,
-		imdbId: true,
-		tvMazeId: true,
-	},
-	tvIdSearch: {
-		tvdbId: true,
-		tmdbId: true,
-		imdbId: true,
-		tvMazeId: true,
-	},
-};
 
 type TorznabSearchTechnique =
 	| []
@@ -225,13 +190,13 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	}
 
 	return {
-		limits,
 		search: Boolean(isAvailable(searchingSection?.search)),
 		tvSearch: Boolean(isAvailable(searchingSection?.["tv-search"])),
 		movieSearch: Boolean(isAvailable(searchingSection?.["movie-search"])),
 		movieIdSearch: getSupportedIds(searchingSection?.["movie-search"]),
 		tvIdSearch: getSupportedIds(searchingSection?.["tv-search"]),
 		categories: getCatCaps(categoryCaps),
+		limits,
 	};
 }
 
@@ -412,13 +377,13 @@ export async function searchTorznab(
 		indexersToSearch,
 		async (indexer) => {
 			const caps = {
-				limits: indexer.limits,
 				search: indexer.searchCap,
 				tvSearch: indexer.tvSearchCap,
 				movieSearch: indexer.movieSearchCap,
 				tvIdSearch: indexer.tvIdCaps,
 				movieIdSearch: indexer.movieIdCaps,
 				categories: indexer.categories,
+				limits: indexer.limits,
 			};
 			return await createTorznabSearchQueries(
 				searchee,
