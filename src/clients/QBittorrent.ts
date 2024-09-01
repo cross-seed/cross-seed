@@ -18,7 +18,7 @@ import {
 	getLogString,
 	sanitizeInfoHash,
 } from "../utils.js";
-import { TorrentClient } from "./TorrentClient.js";
+import { GenericTorrentInfo, TorrentClient } from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
 
@@ -252,9 +252,9 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	/*
-	@param searchee the Searchee we are generating off (in client)
-	@return either a string containing the path or a error mesage
-	*/
+	 * @param searchee the Searchee we are generating off (in client)
+	 * @return either a string containing the path or a error mesage
+	 */
 	async getDownloadDir(
 		meta: SearcheeWithInfoHash | Metafile,
 		options: { onlyCompleted: boolean },
@@ -284,9 +284,9 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	/*
-	@param searchee the Searchee we are generating off (in client)
-	@param torrentInfo the torrent info from the searchee
-	@return string absolute location from client with content layout considered
+	 * @param searchee the Searchee we are generating off (in client)
+	 * @param torrentInfo the torrent info from the searchee
+	 * @return string absolute location from client with content layout considered
 	 */
 	getCorrectSavePath(searchee: Searchee, torrentInfo: TorrentInfo): string {
 		const subfolderContentLayout = this.isSubfolderContentLayout(
@@ -300,7 +300,7 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	/*
-	@return array of all torrents in the client
+	 * @return array of all torrents in the client
 	 */
 	async getAllTorrentInfo(): Promise<TorrentInfo[]> {
 		const responseText = await this.request("/torrents/info", "");
@@ -311,8 +311,8 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	/*
-	@param hash the hash of the torrent
-	@return the torrent if it exists
+	 * @param hash the hash of the torrent
+	 * @return the torrent if it exists
 	 */
 	async getTorrentInfo(
 		hash: string | undefined,
@@ -346,6 +346,19 @@ export default class QBittorrent implements TorrentClient {
 			}
 		}
 		return undefined;
+	}
+
+	/**
+	 * @return array of all torrents in the client
+	 */
+	async getAllTorrents(): Promise<GenericTorrentInfo[]> {
+		const torrents = await this.getAllTorrentInfo();
+		return torrents.map((torrent) => ({
+			infoHash: torrent.hash,
+			category: torrent.category,
+			tags: torrent.tags.split(","),
+			trackers: torrent.tracker.length ? [[torrent.tracker]] : undefined,
+		}));
 	}
 
 	/**

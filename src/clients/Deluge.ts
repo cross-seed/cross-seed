@@ -10,7 +10,7 @@ import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { TorrentClient } from "./TorrentClient.js";
+import { GenericTorrentInfo, TorrentClient } from "./TorrentClient.js";
 import {
 	shouldRecheck,
 	extractCredentialsFromUrl,
@@ -458,6 +458,28 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			return resultOfErr("NOT_FOUND");
 		}
+	}
+	/**
+	 * @return All torrents in the client
+	 */
+	async getAllTorrents(): Promise<GenericTorrentInfo[]> {
+		const params = [["hash", "label"], {}];
+		const response = await this.call<TorrentStatus>(
+			"web.update_ui",
+			params,
+		);
+		if (!response.isOk()) {
+			return [];
+		}
+		const torrents = response.unwrap().torrents;
+		if (!torrents) {
+			return [];
+		}
+		return Object.entries(torrents).map(([hash, torrent]) => ({
+			infoHash: hash,
+			category: "",
+			tags: torrent.label ? [torrent.label] : [],
+		}));
 	}
 
 	/**
