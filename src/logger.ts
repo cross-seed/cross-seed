@@ -87,11 +87,17 @@ function stripAnsiChars(message: string | unknown) {
 	return stripAnsi(message);
 }
 
-const logOnceCache: string[] = [];
-export function logOnce(cacheKey: string, cb: () => void) {
-	if (!logOnceCache.includes(cacheKey)) {
-		logOnceCache.push(cacheKey);
+const logOnceCache: Set<string> = new Set();
+export function logOnce(cacheKey: string, cb: () => void, ttl?: number) {
+	if (!logOnceCache.has(cacheKey)) {
+		logOnceCache.add(cacheKey);
 		cb();
+
+		if (ttl) {
+			setTimeout(() => {
+				logOnceCache.delete(cacheKey);
+			}, ttl).unref();
+		}
 	}
 }
 
