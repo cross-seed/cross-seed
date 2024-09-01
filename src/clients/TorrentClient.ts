@@ -7,10 +7,18 @@ import RTorrent from "./RTorrent.js";
 import Transmission from "./Transmission.js";
 import Deluge from "./Deluge.js";
 import { Result } from "../Result.js";
+import { Label } from "../logger.js";
 
 let activeClient: TorrentClient | null = null;
 
+export type TorrentClientType =
+	| Label.QBITTORRENT
+	| Label.RTORRENT
+	| Label.TRANSMISSION
+	| Label.DELUGE;
+
 export interface TorrentClient {
+	type: TorrentClientType;
 	isTorrentComplete: (
 		infoHash: string,
 	) => Promise<Result<boolean, "NOT_FOUND">>;

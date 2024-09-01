@@ -83,6 +83,7 @@ interface TorrentInfo {
 export default class QBittorrent implements TorrentClient {
 	cookie: string;
 	url: { username: string; password: string; href: string };
+	readonly type = Label.QBITTORRENT;
 
 	constructor() {
 		const { qbittorrentUrl } = getRuntimeConfig();
