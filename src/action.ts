@@ -203,17 +203,12 @@ export async function linkAllFilesInMetafile(
 	>
 > {
 	const { linkDir, flatLinking } = getRuntimeConfig();
-	const newMetaClientSavePathRes = await getClient()!.getDownloadDir(
-		newMeta,
-		{
-			onlyCompleted: false,
-		},
+	const clientSavePathRes = await getClient()!.getDownloadDir(newMeta, {
+		onlyCompleted: false,
+	});
+	const fullLinkDir = clientSavePathRes.orElse(
+		flatLinking ? linkDir : join(linkDir, tracker),
 	);
-	const fullLinkDir = newMetaClientSavePathRes.isOk()
-		? newMetaClientSavePathRes.unwrap() // Use existing if ALREADY_EXISTS
-		: flatLinking
-			? linkDir
-			: join(linkDir, tracker);
 
 	let sourceRoot: string;
 	if (searchee.path) {

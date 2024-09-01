@@ -247,9 +247,7 @@ async function injectFromStalledTorrent({
 			decision,
 			{ onlyCompleted: false },
 		);
-		const linkResult = linkedFilesRootResult.isOk()
-			? linkedFilesRootResult.unwrap()
-			: null;
+		const linkResult = linkedFilesRootResult.orElse(null);
 		if (linkResult && linkResult.linkedNewFiles) {
 			linkedNewFiles = true;
 		}
@@ -334,7 +332,7 @@ async function injectionAlreadyExists({
 	filePathLog,
 }: InjectionAftermath) {
 	const result = await getClient()!.isTorrentComplete(meta.infoHash);
-	let isComplete = result.isOk() ? result.unwrap() : false;
+	let isComplete = result.orElse(false);
 	const anyFullMatch = matches.some(
 		(m) =>
 			m.decision === Decision.MATCH ||
