@@ -7,6 +7,7 @@ import {
 	Decision,
 	EP_REGEX,
 	LEVENSHTEIN_DIVISOR,
+	MediaType,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
 	RELEASE_GROUP_REGEX,
@@ -24,17 +25,6 @@ import { File, Searchee } from "./searchee.js";
 import chalk, { ChalkInstance } from "chalk";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { distance } from "fastest-levenshtein";
-
-export enum MediaType {
-	EPISODE = "episode",
-	SEASON = "pack",
-	MOVIE = "movie",
-	ANIME = "anime",
-	VIDEO = "video",
-	AUDIO = "audio",
-	BOOK = "book",
-	OTHER = "unknown",
-}
 
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 

@@ -3,6 +3,7 @@ import { basename, dirname } from "path";
 import { statSync } from "fs";
 import {
 	ARR_DIR_REGEX,
+	MediaType,
 	SONARR_SUBFOLDERS_REGEX,
 	SEASON_REGEX,
 	VIDEO_EXTENSIONS,
@@ -20,7 +21,6 @@ import {
 	getMediaType,
 	hasExt,
 	humanReadableDate,
-	MediaType,
 	nMsAgo,
 } from "./utils.js";
 
