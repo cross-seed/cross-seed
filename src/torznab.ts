@@ -31,12 +31,13 @@ import {
 	updateIndexerCapsById,
 	updateIndexerStatus,
 } from "./indexers.js";
-import { Label, logger } from "./logger.js";
+import { Label, logger, logOnce } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee, SearcheeWithLabel } from "./searchee.js";
 import {
 	cleanTitle,
+	combineAsyncIterables,
 	extractInt,
 	formatAsList,
 	getAnimeQueries,
@@ -59,14 +60,20 @@ export interface IdSearchParams {
 	tvmazeid?: string;
 }
 
-export interface TorznabParams extends IdSearchParams {
+interface Query extends IdSearchParams {
 	t: "caps" | "search" | "tvsearch" | "movie";
 	q?: string;
 	limit?: number;
 	offset?: number;
-	apikey?: string;
 	season?: number | string;
 	ep?: number | string;
+}
+
+export interface TorznabRequest {
+	indexerId: number;
+	baseUrl: string;
+	apikey: string;
+	query: Query;
 }
 
 type TorznabSearchTechnique =
@@ -205,7 +212,7 @@ async function createTorznabSearchQueries(
 	mediaType: MediaType,
 	caps: Caps,
 	parsedMedia?: ParsedMedia,
-): Promise<TorznabParams[]> {
+): Promise<Query[]> {
 	const stem = stripExtension(searchee.title);
 	const relevantIds: IdSearchParams = parsedMedia
 		? await getRelevantArrIds(caps, parsedMedia)
@@ -375,7 +382,7 @@ export async function searchTorznab(
 	);
 	const indexerCandidates = await makeRequests(
 		indexersToSearch,
-		async (indexer) => {
+		async (indexer): Promise<Query[]> => {
 			const caps = {
 				search: indexer.searchCap,
 				tvSearch: indexer.tvSearchCap,
@@ -470,11 +477,11 @@ export async function syncWithDb() {
 }
 
 export function assembleUrl(
-	urlStr: string,
+	baseUrl: string,
 	apikey: string,
-	params: TorznabParams | IdSearchParams,
+	params: Query,
 ): string {
-	const url = new URL(urlStr);
+	const url = new URL(baseUrl);
 	const searchParams = new URLSearchParams();
 
 	searchParams.set("apikey", apikey);
@@ -613,74 +620,75 @@ export async function validateTorznabUrls() {
 	}
 }
 
+/**
+ * Snooze indexers based on the response headers and status code.
+ * specifically for a search, probably not applicable to a caps fetch.
+ */
+async function onResponseNotOk(response: Response, indexerId: number) {
+	const retryAfterSeconds = Number(response.headers.get("Retry-After"));
+
+	const retryAfter = !Number.isNaN(retryAfterSeconds)
+		? Date.now() + ms(`${retryAfterSeconds} seconds`)
+		: response.status === 429
+			? Date.now() + ms("1 hour")
+			: Date.now() + ms("10 minutes");
+
+	await updateIndexerStatus(
+		response.status === 429
+			? IndexerStatus.RATE_LIMITED
+			: IndexerStatus.UNKNOWN_ERROR,
+		retryAfter,
+		[indexerId],
+	);
+}
+
+async function makeRequest(request: TorznabRequest): Promise<Candidate[]> {
+	const { searchTimeout } = getRuntimeConfig();
+	const url = assembleUrl(request.baseUrl, request.apikey, request.query);
+	const abortSignal =
+		typeof searchTimeout === "number"
+			? AbortSignal.timeout(searchTimeout)
+			: undefined;
+	logger.verbose({
+		label: Label.TORZNAB,
+		message: `Querying indexer ${request.indexerId} at ${request.baseUrl} with ${inspect(request.query)}`,
+	});
+	const response = await fetch(url, {
+		headers: { "User-Agent": USER_AGENT },
+		signal: abortSignal,
+	});
+	if (!response.ok) {
+		await onResponseNotOk(response, request.indexerId);
+		throw new Error(`request failed with code: ${response.status}`);
+	}
+	const xml = await response.text();
+	const torznabResults: unknown = await xml2js.parseStringPromise(xml);
+	return parseTorznabResults(torznabResults as TorznabResults);
+}
+
 async function makeRequests(
 	indexers: Indexer[],
-	getQueries: (indexer: Indexer) => Promise<TorznabParams[]>,
+	getQueriesForIndexer: (indexer: Indexer) => Promise<Query[]>,
 ): Promise<IndexerCandidates[]> {
-	const { searchTimeout } = getRuntimeConfig();
-	const searchUrls = await Promise.all(
-		indexers.flatMap(async (indexer: Indexer) =>
-			(await getQueries(indexer)).map((query) =>
-				assembleUrl(indexer.url, indexer.apikey, query),
-			),
-		),
-	).then((urls) => urls.flat());
-	searchUrls.forEach(
-		(message) => void logger.verbose({ label: Label.TORZNAB, message }),
-	);
-	const abortControllers = searchUrls.map(() => new AbortController());
-	if (typeof searchTimeout === "number") {
-		setTimeout(() => {
-			for (const abortController of abortControllers) {
-				abortController.abort();
-			}
-		}, searchTimeout).unref();
+	const requests: TorznabRequest[] = [];
+	for (const indexer of indexers) {
+		const queries = await getQueriesForIndexer(indexer);
+		requests.push(
+			...queries.map((query) => ({
+				indexerId: indexer.id,
+				baseUrl: indexer.url,
+				apikey: indexer.apikey,
+				query,
+			})),
+		);
 	}
 
 	const outcomes = await Promise.allSettled<Candidate[]>(
-		searchUrls.map((url, i) =>
-			fetch(url, {
-				headers: { "User-Agent": USER_AGENT },
-				signal: abortControllers[i].signal,
-			})
-				.then((response) => {
-					if (!response.ok) {
-						const retryAfterSeconds = Number(
-							response.headers.get("Retry-After"),
-						);
-
-						if (!Number.isNaN(retryAfterSeconds)) {
-							updateIndexerStatus(
-								response.status === 429
-									? IndexerStatus.RATE_LIMITED
-									: IndexerStatus.UNKNOWN_ERROR,
-								Date.now() + ms(`${retryAfterSeconds} seconds`),
-								[indexers[i].id],
-							);
-						} else {
-							updateIndexerStatus(
-								response.status === 429
-									? IndexerStatus.RATE_LIMITED
-									: IndexerStatus.UNKNOWN_ERROR,
-								response.status === 429
-									? Date.now() + ms("1 hour")
-									: Date.now() + ms("10 minutes"),
-								[indexers[i].id],
-							);
-						}
-						throw new Error(
-							`request failed with code: ${response.status}`,
-						);
-					}
-					return response.text();
-				})
-				.then(xml2js.parseStringPromise)
-				.then(parseTorznabResults),
-		),
+		requests.map(makeRequest),
 	);
 
 	const { rejected, fulfilled } = collateOutcomes<number, Candidate[]>(
-		indexers.map((indexer) => indexer.id),
+		requests.map((request) => request.indexerId),
 		outcomes,
 	);
 
@@ -696,6 +704,7 @@ async function makeRequests(
 		candidates: results,
 	}));
 }
+
 async function getAndLogIndexers(
 	searchee: SearcheeWithLabel,
 	cachedSearch: CachedSearch,
