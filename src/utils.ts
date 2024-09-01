@@ -48,22 +48,32 @@ export function nMsAgo(n: number): number {
 export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
-export function humanReadableSize(bytes: number) {
-	const k = 1000;
-	const sizes = ["B", "kB", "MB", "GB", "TB"];
+
+export function humanReadableSize(
+	bytes: number,
+	options?: { binary: boolean },
+) {
+	if (bytes === 0) return "0 B";
+	const k = options?.binary ? 1024 : 1000;
+	const sizes = options?.binary
+		? ["B", "KiB", "MiB", "GiB", "TiB"]
+		: ["B", "KB", "MB", "GB", "TB"];
 	// engineering notation: (coefficient) * 1000 ^ (exponent)
 	const exponent = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
+
 export function filesWithExt(files: File[], exts: string[]): File[] {
 	return files.filter((f) =>
 		exts.includes(path.extname(f.name.toLowerCase())),
 	);
 }
+
 export function hasExt(files: File[], exts: string[]): boolean {
 	return files.some((f) => exts.includes(path.extname(f.name.toLowerCase())));
 }
+
 export function getMediaType(searchee: Searchee): MediaType {
 	function unsupportedMediaType(searchee: Searchee): MediaType {
 		if (hasExt(searchee.files, AUDIO_EXTENSIONS)) {
@@ -145,12 +155,14 @@ export async function time<R>(cb: () => R, times: number[]) {
 		times.push(performance.now() - before);
 	}
 }
+
 export function sanitizeUrl(url: string | URL): string {
 	if (typeof url === "string") {
 		url = new URL(url);
 	}
 	return url.origin + url.pathname;
 }
+
 /**
  * This cannot be done at the log level because of too many false positives.
  * The caller will need to extract the infoHash from their specific syntax.
@@ -163,6 +175,7 @@ export function sanitizeInfoHash(infoHash: string): string {
 export function getApikey(url: string) {
 	return new URL(url).searchParams.get("apikey");
 }
+
 export function cleanseSeparators(str: string): string {
 	return str
 		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "") // bracketed text
