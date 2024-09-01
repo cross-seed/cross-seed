@@ -12,13 +12,16 @@ import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import {
-	shouldRecheck,
 	extractCredentialsFromUrl,
 	wait,
 	getLogString,
 	sanitizeInfoHash,
 } from "../utils.js";
-import { GenericTorrentInfo, TorrentClient } from "./TorrentClient.js";
+import {
+	GenericTorrentInfo,
+	shouldRecheck,
+	TorrentClient,
+} from "./TorrentClient.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { BodyInit } from "undici-types";
 

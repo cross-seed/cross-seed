@@ -5,7 +5,6 @@ import {
 	ANIME_REGEX,
 	AUDIO_EXTENSIONS,
 	BOOK_EXTENSIONS,
-	Decision,
 	EP_REGEX,
 	LEVENSHTEIN_DIVISOR,
 	MediaType,
@@ -93,18 +92,6 @@ export function getMediaType(searchee: Searchee): MediaType {
 			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
 		default:
 			return unsupportedMediaType(searchee);
-	}
-}
-
-export function shouldRecheck(searchee: Searchee, decision: Decision): boolean {
-	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
-	switch (decision) {
-		case Decision.MATCH:
-		case Decision.MATCH_SIZE_ONLY:
-			return false;
-		case Decision.MATCH_PARTIAL:
-		default:
-			return true;
 	}
 }
 

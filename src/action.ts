@@ -10,7 +10,7 @@ import {
 	symlinkSync,
 } from "fs";
 import { dirname, join, resolve } from "path";
-import { getClient } from "./clients/TorrentClient.js";
+import { getClient, shouldRecheck } from "./clients/TorrentClient.js";
 import {
 	Action,
 	ActionResult,
@@ -339,8 +339,8 @@ export async function performAction(
 
 	logActionResult(result, newMeta, searchee, tracker, decision);
 	if (result === InjectionResult.SUCCESS) {
-		// For an easy re-injection user workflow when multiple MATCH_PARTIAL
-		if (decision === Decision.MATCH_PARTIAL) {
+		// cross-seed may need to process these with the inject job
+		if (shouldRecheck(searchee, decision)) {
 			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 		}
 	} else if (result !== InjectionResult.ALREADY_EXISTS) {
