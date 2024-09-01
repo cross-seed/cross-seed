@@ -227,7 +227,7 @@ export async function updateIndexerCapsById(indexerId: number, caps: Caps) {
 			movie_id_caps: JSON.stringify(caps.movieIdSearch),
 			tv_id_caps: JSON.stringify(caps.tvIdSearch),
 			cat_caps: JSON.stringify(caps.categories),
-			limit_caps: JSON.stringify(caps.limits),
+			limits_caps: JSON.stringify(caps.limits),
 		});
 }
 
