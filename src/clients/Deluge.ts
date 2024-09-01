@@ -156,7 +156,10 @@ export default class Deluge implements TorrentClient {
 				signal: AbortSignal.timeout(ms("10 seconds")),
 			});
 		} catch (networkError) {
-			if (networkError.name === "AbortError") {
+			if (
+				networkError.name === "AbortError" ||
+				networkError.name === "TimeoutError"
+			) {
 				throw new Error(
 					`Deluge method ${method} timed out after 10 seconds`,
 				);

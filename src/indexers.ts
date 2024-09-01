@@ -27,6 +27,7 @@ export interface DbIndexer {
 	tvIdCaps: string;
 	movieIdCaps: string;
 	catCaps: string;
+	limitsCaps: string;
 }
 
 export interface IndexerCategories {
@@ -42,13 +43,19 @@ export interface IndexerCategories {
 	additional: boolean;
 }
 
+export interface IndexerLimits {
+	default: number;
+	max: number;
+}
+
 export interface Caps {
 	search: boolean;
-	categories: IndexerCategories;
 	tvSearch: boolean;
 	movieSearch: boolean;
 	movieIdSearch: IdSearchCaps;
 	tvIdSearch: IdSearchCaps;
+	categories: IndexerCategories;
+	limits: IndexerLimits;
 }
 
 export interface IdSearchCaps {
@@ -74,6 +81,7 @@ export interface Indexer {
 	tvIdCaps: IdSearchCaps;
 	movieIdCaps: IdSearchCaps;
 	categories: IndexerCategories;
+	limits: IndexerLimits;
 }
 
 const allFields = {
@@ -89,15 +97,48 @@ const allFields = {
 	tvIdCaps: "tv_id_caps",
 	movieIdCaps: "movie_id_caps",
 	catCaps: "cat_caps",
+	limitsCaps: "limits_caps",
 } as const;
 
+export const ALL_CAPS: Caps = {
+	limits: {
+		default: 100,
+		max: 100,
+	},
+	search: true,
+	categories: {
+		tv: true,
+		movie: true,
+		anime: true,
+		xxx: true,
+		audio: true,
+		book: true,
+		additional: true,
+	},
+	tvSearch: true,
+	movieSearch: true,
+	movieIdSearch: {
+		tvdbId: true,
+		tmdbId: true,
+		imdbId: true,
+		tvMazeId: true,
+	},
+	tvIdSearch: {
+		tvdbId: true,
+		tmdbId: true,
+		imdbId: true,
+		tvMazeId: true,
+	},
+};
+
 function deserialize(dbIndexer: DbIndexer): Indexer {
-	const { tvIdCaps, movieIdCaps, catCaps, ...rest } = dbIndexer;
+	const { tvIdCaps, movieIdCaps, catCaps, limitsCaps, ...rest } = dbIndexer;
 	return {
 		...rest,
 		tvIdCaps: JSON.parse(tvIdCaps),
 		movieIdCaps: JSON.parse(movieIdCaps),
 		categories: JSON.parse(catCaps),
+		limits: JSON.parse(limitsCaps),
 	};
 }
 
@@ -117,6 +158,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 			tv_id_caps: null,
 			movie_id_caps: null,
 			cat_caps: null,
+			limits_caps: null,
 		})
 		.where({ active: true, search_cap: true })
 		.where((i) =>
@@ -185,6 +227,7 @@ export async function updateIndexerCapsById(indexerId: number, caps: Caps) {
 			movie_id_caps: JSON.stringify(caps.movieIdSearch),
 			tv_id_caps: JSON.stringify(caps.tvIdSearch),
 			cat_caps: JSON.stringify(caps.categories),
+			limits_caps: JSON.stringify(caps.limits),
 		});
 }
 

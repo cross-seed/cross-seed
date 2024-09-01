@@ -41,8 +41,8 @@ import {
 } from "./searchee.js";
 import {
 	getInfoHashesToExclude,
-	getTorrentByCriteria,
 	getSimilarTorrentsByName,
+	getTorrentByCriteria,
 	indexNewTorrents,
 	loadTorrentDirLight,
 	TorrentLocator,
@@ -53,7 +53,7 @@ import {
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
-import { getLogString, isTruthy, wait } from "./utils.js";
+import { getLogString, humanReadableDate, isTruthy, wait } from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -482,39 +482,28 @@ export async function main(): Promise<void> {
 
 export async function scanRssFeeds() {
 	const { torznab } = getRuntimeConfig();
-	if (torznab.length > 0) {
-		const candidates = await queryRssFeeds();
-		const lastRun =
-			(
-				await db("job_log")
-					.select("last_run")
-					.where({ name: "rss" })
-					.first()
-			)?.last_run ?? 0;
-		const candidatesSinceLastTime = candidates.filter(
-			(c) => c.pubDate > lastRun,
-		);
-		logger.verbose({
-			label: Label.RSS,
-			message: `Scan returned ${
-				candidatesSinceLastTime.length
-			} new results, ignoring ${
-				candidates.length - candidatesSinceLastTime.length
-			} already seen`,
-		});
-		logger.verbose({
-			label: Label.RSS,
-			message: "Indexing new torrents...",
-		});
-		await indexNewTorrents();
-		for (const [i, candidate] of candidatesSinceLastTime.entries()) {
-			const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
-			logger.verbose({
-				label: Label.RSS,
-				message: `(${i + 1}/${candidatesSinceLastTime.length}) ${candidateLog}`,
-			});
-			await checkNewCandidateMatch(candidate, Label.RSS);
-		}
-		logger.info({ label: Label.RSS, message: "Scan complete" });
+	if (!torznab.length) return;
+	const lastRun =
+		(await db("job_log").select("last_run").where({ name: "rss" }).first())
+			?.last_run ?? 0;
+	logger.verbose({
+		label: Label.RSS,
+		message: "Indexing new torrents...",
+	});
+	await indexNewTorrents();
+	logger.verbose({
+		label: Label.RSS,
+		message: "Querying RSS feeds...",
+	});
+	const candidates = queryRssFeeds(lastRun);
+	let i = 0;
+	for await (const candidate of candidates) {
+		await checkNewCandidateMatch(candidate, Label.RSS);
+		i++;
 	}
+
+	logger.info({
+		label: Label.RSS,
+		message: `RSS scan complete - checked ${i} new candidates since ${humanReadableDate(lastRun)}`,
+	});
 }

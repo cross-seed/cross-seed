@@ -190,6 +190,7 @@ export const VALIDATION_SCHEMA = z
 			.nullish()
 			.refine(
 				(cadence) =>
+					process.env.DEV ||
 					!cadence ||
 					(cadence >= ms("10 minutes") && cadence <= ms("2 hours")),
 				ZodErrorMessages.rssCadenceUnsupported,
@@ -200,7 +201,8 @@ export const VALIDATION_SCHEMA = z
 			.transform(transformDurationString)
 			.nullish()
 			.refine(
-				(cadence) => !cadence || cadence >= ms("1 day"),
+				(cadence) =>
+					process.env.DEV || !cadence || cadence >= ms("1 day"),
 				ZodErrorMessages.searchCadenceUnsupported,
 			),
 		snatchTimeout: z

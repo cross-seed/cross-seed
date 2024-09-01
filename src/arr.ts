@@ -135,7 +135,10 @@ async function makeArrApiCall<ResponseType>(
 			headers: { "X-Api-Key": apikey },
 		});
 	} catch (networkError) {
-		if (networkError.name === "AbortError") {
+		if (
+			networkError.name === "AbortError" ||
+			networkError.name === "TimeoutError"
+		) {
 			return resultOfErr(new Error("connection timeout"));
 		}
 		return resultOfErr(networkError);
