@@ -1,3 +1,4 @@
+import { statSync } from "fs";
 import path from "path";
 import {
 	ALL_EXTENSIONS,
@@ -348,6 +349,17 @@ export function replaceLastOccurrence(
 
 export function extractInt(str: string): number {
 	return parseInt(str.match(/\d+/)![0]);
+}
+
+export function getLargestFile(files: File[]): File {
+	return files.reduce((a, b) => (a.length > b.length ? a : b));
+}
+
+export function getNewestFileAge(files: File[]): number {
+	return files.reduce(
+		(acc, file) => Math.max(acc, statSync(file.path).mtimeMs),
+		0,
+	);
 }
 
 export function getFuzzySizeFactor(): number {
