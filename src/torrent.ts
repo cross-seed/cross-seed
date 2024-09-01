@@ -67,23 +67,21 @@ function isMagnetRedirectError(error: Error): boolean {
 export async function snatch(
 	candidate: Candidate,
 ): Promise<Result<Metafile, SnatchError>> {
-	const abortController = new AbortController();
 	const { snatchTimeout } = getRuntimeConfig();
 	const url = candidate.link;
 	const tracker = candidate.tracker;
-
-	if (typeof snatchTimeout === "number") {
-		setTimeout(() => void abortController.abort(), snatchTimeout).unref();
-	}
 
 	let response: Response;
 	try {
 		response = await fetch(url, {
 			headers: { "User-Agent": USER_AGENT },
-			signal: abortController.signal,
+			signal:
+				typeof snatchTimeout === "number"
+					? AbortSignal.timeout(snatchTimeout)
+					: undefined,
 		});
 	} catch (e) {
-		if (e.name === "AbortError") {
+		if (e.name === "AbortError" || e.name === "TimeoutError") {
 			logger.error(
 				`Snatch timed out from ${tracker} for ${candidate.name}`,
 			);
