@@ -57,7 +57,7 @@ export function humanReadableSize(
 	const k = options?.binary ? 1024 : 1000;
 	const sizes = options?.binary
 		? ["B", "KiB", "MiB", "GiB", "TiB"]
-		: ["B", "KB", "MB", "GB", "TB"];
+		: ["B", "kB", "MB", "GB", "TB"];
 	// engineering notation: (coefficient) * 1000 ^ (exponent)
 	const exponent = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
 	const coefficient = bytes / Math.pow(k, exponent);
