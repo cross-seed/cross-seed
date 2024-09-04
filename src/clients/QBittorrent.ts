@@ -18,7 +18,7 @@ import {
 	sanitizeInfoHash,
 } from "../utils.js";
 import {
-	GenericTorrentInfo,
+	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
 } from "./TorrentClient.js";
@@ -394,7 +394,7 @@ export default class QBittorrent implements TorrentClient {
 	/**
 	 * @return array of all torrents in the client
 	 */
-	async getAllTorrents(): Promise<GenericTorrentInfo[]> {
+	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
 		const torrents = await this.getAllTorrentInfo();
 		return torrents.map((torrent) => ({
 			infoHash: torrent.hash,

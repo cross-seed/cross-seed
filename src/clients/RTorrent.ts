@@ -16,7 +16,7 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { extractCredentialsFromUrl, wait } from "../utils.js";
 import {
-	GenericTorrentInfo,
+	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
 } from "./TorrentClient.js";
@@ -330,12 +330,12 @@ export default class RTorrent implements TorrentClient {
 		metas: SearcheeWithInfoHash[] | Metafile[];
 		onlyCompleted: boolean;
 	}): Promise<Map<string, string>> {
-		const hashes: string[] = options.metas.map((meta) => meta.infoHash);
+		const infoHashes: string[] = options.metas.map((meta) => meta.infoHash);
 		type ReturnType = string[][] | Fault[];
 		let response: ReturnType;
 		try {
 			response = await this.methodCallP<ReturnType>("system.multicall", [
-				hashes.map((hash) => {
+				infoHashes.map((hash) => {
 					return {
 						methodName: "d.directory",
 						params: [hash],
@@ -367,7 +367,7 @@ export default class RTorrent implements TorrentClient {
 			}
 
 			return new Map(
-				hashes.map((hash, index) => {
+				infoHashes.map((hash, index) => {
 					return [hash, response[index][0]];
 				}),
 			);
@@ -397,13 +397,16 @@ export default class RTorrent implements TorrentClient {
 		}
 	}
 
-	async getAllTorrents(): Promise<GenericTorrentInfo[]> {
-		const hashes = await this.methodCallP<string[]>("download_list", []);
+	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
+		const infoHashes = await this.methodCallP<string[]>(
+			"download_list",
+			[],
+		);
 		type ReturnType = string[][] | Fault[];
 		let response: ReturnType;
 		try {
 			response = await this.methodCallP<ReturnType>("system.multicall", [
-				hashes.map((hash) => {
+				infoHashes.map((hash) => {
 					return {
 						methodName: "d.custom1",
 						params: [hash],
@@ -422,19 +425,18 @@ export default class RTorrent implements TorrentClient {
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
+		if (isFault(response)) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: "Fault while getting torrent info for all torrents",
+			});
+			logger.debug(inspect(response));
+			return [];
+		}
 
 		try {
-			if (isFault(response)) {
-				logger.error({
-					Label: Label.RTORRENT,
-					message:
-						"Fault while getting torrent info for all torrents",
-				});
-				logger.debug(inspect(response));
-				return [];
-			}
-
-			return hashes.map((hash, index) => ({
+			// response: [ [tag1], [tag2], ... ], assuming infoHash order is preserved
+			return infoHashes.map((hash, index) => ({
 				infoHash: hash.toLowerCase(),
 				category: "",
 				tags: response[index][0].length
