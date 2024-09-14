@@ -5,7 +5,6 @@ const packageDotJson = require("../package.json");
 export const PROGRAM_NAME = packageDotJson.name;
 export const PROGRAM_VERSION = packageDotJson.version;
 export const USER_AGENT = `CrossSeed/${PROGRAM_VERSION}`;
-export const TORRENT_TAG = "cross-seed";
 export const TORRENT_CATEGORY_SUFFIX = `.cross-seed`;
 export const NEWLINE_INDENT = "\n\t\t\t\t";
 
