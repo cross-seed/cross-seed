@@ -158,6 +158,13 @@ module.exports = {
 	linkCategory: "cross-seed-link",
 
 	/**
+	 * Defines what tag to set on linked torrents
+	 *
+	 * Default is "cross-seed".
+	 */
+	crossSeedTag: "cross-seed",
+
+	/**
 	 * If this is specified, cross-seed will create links to matched files in
 	 * the specified directory.
 	 * It will create a different link for every changed file name or directory

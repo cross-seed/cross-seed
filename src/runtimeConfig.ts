@@ -10,6 +10,7 @@ export interface RuntimeConfig {
 	flatLinking: boolean;
 	maxDataDepth: number;
 	linkCategory: string;
+	crossSeedTag: string;
 	torrentDir?: string;
 	outputDir: string;
 	injectDir?: string;

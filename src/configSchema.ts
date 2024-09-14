@@ -3,6 +3,7 @@ import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
 import { Action, LinkType, MatchMode, NEWLINE_INDENT } from "./constants.js";
 import { logger } from "./logger.js";
 import { resolve, relative, isAbsolute } from "path";
+import { crossSeedTag } from "./config.template.cjs";
 
 /**
  * error messages and map returned upon Zod validation failure
@@ -126,6 +127,7 @@ export const VALIDATION_SCHEMA = z
 		dataDirs: z.array(z.string()).nullish(),
 		matchMode: z.nativeEnum(MatchMode),
 		linkCategory: z.string().nullish(),
+		crossSeedTag: z.string().nullish(),
 		linkDir: z.string().nullish(),
 		linkType: z.nativeEnum(LinkType),
 		flatLinking: z
