@@ -27,6 +27,8 @@ const ZodErrorMessages = {
 		"If using Automatic Torrent Management in qBittorrent, please read: https://www.cross-seed.org/docs/v6-migration#qbittorrent",
 	includeSingleEpisodes:
 		"includeSingleEpisodes is not recommended when using announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
+	needsTorrentDir:
+		"You need to set torrentDir for rss and announce matching to work.",
 	needsInject: "You need to use the 'inject' action for partial matching.",
 	needsLinkDir:
 		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
@@ -288,6 +290,10 @@ export const VALIDATION_SCHEMA = z
 			config.action === Action.INJECT ||
 			config.matchMode !== MatchMode.PARTIAL,
 		ZodErrorMessages.needsInject,
+	)
+	.refine(
+		(config) => config.torrentDir || !config.rssCadence,
+		ZodErrorMessages.needsTorrentDir,
 	)
 	.refine(
 		(config) => config.linkDir || config.matchMode === MatchMode.SAFE,

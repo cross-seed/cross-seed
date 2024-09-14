@@ -20,6 +20,7 @@ import {
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 import { existsSync } from "fs";
 import { sanitizeInfoHash } from "./utils.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -201,6 +202,7 @@ async function announce(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	const { torrentDir } = getRuntimeConfig();
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -241,6 +243,9 @@ async function announce(
 	const candidate = data as Candidate;
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	try {
+		if (!torrentDir) {
+			throw new Error("Announce requires torrentDir");
+		}
 		await indexNewTorrents();
 		const result = await checkNewCandidateMatch(candidate, Label.ANNOUNCE);
 		if (!result.decision) {
