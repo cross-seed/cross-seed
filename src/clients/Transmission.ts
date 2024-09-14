@@ -1,7 +1,6 @@
 import {
 	DecisionAnyMatch,
 	InjectionResult,
-	TORRENT_TAG,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
@@ -211,6 +210,7 @@ export default class Transmission implements TorrentClient {
 		path?: string,
 	): Promise<InjectionResult> {
 		let downloadDir: string;
+		const { crossSeedTag } = getRuntimeConfig();
 		if (path) {
 			downloadDir = path;
 		} else {
@@ -234,7 +234,7 @@ export default class Transmission implements TorrentClient {
 					"download-dir": downloadDir,
 					metainfo: newTorrent.encode().toString("base64"),
 					paused: shouldRecheck(searchee, decision),
-					labels: [TORRENT_TAG],
+					labels: [crossSeedTag],
 				},
 			);
 		} catch (e) {

@@ -6,7 +6,6 @@ import xmlrpc, { Client } from "xmlrpc";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
-	TORRENT_TAG,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
@@ -309,7 +308,7 @@ export default class RTorrent implements TorrentClient {
 		decision: DecisionAnyMatch,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { outputDir } = getRuntimeConfig();
+		const { outputDir, crossSeedTag } = getRuntimeConfig();
 
 		if (await this.checkForInfoHashInClient(meta.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
@@ -345,7 +344,7 @@ export default class RTorrent implements TorrentClient {
 					"",
 					torrentFilePath,
 					`d.directory_base.set="${directoryBase}"`,
-					`d.custom1.set="${TORRENT_TAG}"`,
+					`d.custom1.set="${crossSeedTag}"`,
 					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
 				]);
 				break;

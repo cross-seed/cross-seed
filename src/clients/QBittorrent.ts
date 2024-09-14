@@ -2,7 +2,6 @@ import { dirname, resolve } from "path";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
-	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
@@ -208,26 +207,27 @@ export default class QBittorrent implements TorrentClient {
 		searcheeInfo: TorrentInfo | undefined,
 		path: string | undefined,
 	): string {
-		const { duplicateCategories, linkCategory } = getRuntimeConfig();
+		const { duplicateCategories, linkCategory, crossSeedTag } = getRuntimeConfig();
 
 		if (!duplicateCategories || !searcheeInfo || !path) {
-			return TORRENT_TAG; // Require path to duplicate category using tags
+			return crossSeedTag; // Require path to duplicate category using tags
 		}
 		const searcheeCategory = searcheeInfo.category;
 		if (!searcheeCategory.length || searcheeCategory === linkCategory) {
-			return TORRENT_TAG;
+			return crossSeedTag;
 		}
 
 		if (searcheeCategory.endsWith(TORRENT_CATEGORY_SUFFIX)) {
-			return `${TORRENT_TAG},${searcheeCategory}`;
+			return `${crossSeedTag},${searcheeCategory}`;
 		}
-		return `${TORRENT_TAG},${searcheeCategory}${TORRENT_CATEGORY_SUFFIX}`;
+		return `${crossSeedTag},${searcheeCategory}${TORRENT_CATEGORY_SUFFIX}`;
 	}
 
 	async createTag(): Promise<void> {
+		const { crossSeedTag } = getRuntimeConfig();
 		await this.request(
 			"/torrents/createTags",
-			`tags=${TORRENT_TAG}`,
+			`tags=${crossSeedTag}`,
 			X_WWW_FORM_URLENCODED,
 		);
 	}
@@ -391,7 +391,7 @@ export default class QBittorrent implements TorrentClient {
 		decision: DecisionAnyMatch,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { linkCategory } = getRuntimeConfig();
+		const { linkCategory, crossSeedTag } = getRuntimeConfig();
 		try {
 			if (await this.getTorrentInfo(newTorrent.infoHash)) {
 				return InjectionResult.ALREADY_EXISTS;
@@ -425,7 +425,7 @@ export default class QBittorrent implements TorrentClient {
 						category: searcheeInfo!.category,
 					};
 			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
-			const filename = `${newTorrent.getFileSystemSafeName()}.${TORRENT_TAG}.torrent`;
+			const filename = `${newTorrent.getFileSystemSafeName()}.${crossSeedTag}.torrent`;
 			const buffer = new Blob([newTorrent.encode()], {
 				type: "application/x-bittorrent",
 			});

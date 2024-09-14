@@ -2,7 +2,6 @@ import ms from "ms";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
-	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
@@ -55,7 +54,7 @@ type DelugeJSON<ResultType> = {
 
 export default class Deluge implements TorrentClient {
 	private delugeCookie: string | null = null;
-	private delugeLabel = TORRENT_TAG;
+	private delugeLabel = getRuntimeConfig().crossSeedTag;
 	private delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
 	private isLabelEnabled: boolean;
 	private delugeRequestId: number = 0;
