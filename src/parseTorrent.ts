@@ -98,8 +98,9 @@ export class Metafile {
 	files: File[];
 	isSingleFileTorrent: boolean;
 	category?: string;
-	tags?: string[];
+	tags: string[];
 	trackers: string[];
+	linkdirTracker: string;
 	raw: Torrent;
 
 	constructor(raw: Torrent) {
@@ -169,7 +170,39 @@ export class Metafile {
 	}
 
 	static decode(buf: Buffer) {
-		return new Metafile(bencode.decode(buf));
+		const tracker_keys = {
+			"ther.cc": "aither",
+			"ratio.cc": "alpharatio",
+			"lion.me": "anthelion",
+			"hd.me": "beyondhd",
+			"pia.cc": "blutopia",
+			"list.io": "filelist",
+			thefl: "filelist",
+			"its.org": "hdbits",
+			"of.tv": "broadcasthenet",
+			lst: "lst",
+			"ntv.me": "morethantv",
+			"lance.io": "nebulance",
+			only: "onlyencodes",
+			"orn.me": "passthepopcorn",
+			seedpool: "seedpool",
+			"tv-v": "tvvault",
+			upload: "ulcx",
+		};
+		const meta = new Metafile(bencode.decode(buf));
+
+		const y = meta.trackers.toString();
+
+		for (const key in tracker_keys) {
+			if (y.includes(key)) {
+				meta.linkdirTracker = tracker_keys[key];
+			}
+		}
+		if (!meta.linkdirTracker === undefined) {
+			meta.linkdirTracker = "unknown";
+		}
+		console.log(meta.linkdirTracker);
+		return meta;
 	}
 
 	getFileSystemSafeName(): string {

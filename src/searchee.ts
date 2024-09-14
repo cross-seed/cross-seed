@@ -81,6 +81,7 @@ export interface Searchee {
 	category?: string;
 	tags?: string[];
 	trackers?: string[];
+	trackerdir?: string;
 	label?: SearcheeLabel;
 }
 
@@ -378,6 +379,7 @@ export function createSearcheeFromMetafile(
 			category: meta.category,
 			tags: meta.tags,
 			trackers: meta.trackers,
+			trackerdir: meta.linkdirTracker,
 		});
 	}
 	const msg = `Could not find title for ${getLogString(meta)} from child files`;

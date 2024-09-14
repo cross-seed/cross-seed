@@ -12,6 +12,7 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	MatchMode,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
@@ -21,7 +22,7 @@ import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
 import Transmission from "./Transmission.js";
-import { hasExt } from "../utils.js";
+//import { hasExt } from "../utils.js";
 
 const activeClients: TorrentClient[] = [];
 
@@ -223,14 +224,17 @@ export async function waitForTorrentToComplete(
 }
 
 export function shouldRecheck(
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	searchee: Searchee,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	decision: DecisionAnyMatch,
 ): boolean {
+	return false; /*
 	const { skipRecheck } = getRuntimeConfig();
 	if (!skipRecheck) return true;
 	if (decision === Decision.MATCH_PARTIAL) return true;
 	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
-	return false; // Skip for MATCH | MATCH_SIZE_ONLY
+	return false; // Skip for MATCH | MATCH_SIZE_ONLY*/
 }
 
 // Resuming partials
