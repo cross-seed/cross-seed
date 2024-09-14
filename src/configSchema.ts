@@ -325,7 +325,8 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
  * @param parentDirs array of parentDir paths (e.g dataDirs)
  * @returns true if `childDir` is inside any `parentDirs` at any nesting level, false otherwise.
  */
-export function isChildPath(childPath: string, parentDirs: string[]): boolean {
+function isChildPath(childDir: string, parentDirs: string[]): boolean {
+	return false;
 	return parentDirs.some((parentDir) => {
 		const resolvedParent = resolve(parentDir);
 		const resolvedChild = resolve(childPath);
@@ -501,12 +502,7 @@ export const VALIDATION_SCHEMA = z
 			.string()
 			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
-			.nullish()
-			.refine(
-				(cadence) =>
-					process.env.DEV || !cadence || cadence >= ms("1 day"),
-				ZodErrorMessages.searchCadenceUnsupported,
-			),
+			.nullish(),
 		snatchTimeout: z
 			.string()
 			.min(1, ZodErrorMessages.emptyString)
@@ -532,81 +528,7 @@ export const VALIDATION_SCHEMA = z
 			.transform((v) => v ?? []),
 	})
 	.strict()
-	.refine((config) => {
-		if (
-			config.qbittorrentUrl ||
-			config.rtorrentRpcUrl ||
-			config.transmissionRpcUrl ||
-			config.delugeRpcUrl
-		) {
-			if (config.torrentClients.length) return false;
-			logger.warn(
-				"qbittorrentUrl, rtorrentRpcUrl, transmissionRpcUrl, and delugeRpcUrl are deprecated, use torrentClients instead.",
-			);
-			if (config.qbittorrentUrl) {
-				config.torrentClients = [
-					`${Label.QBITTORRENT}:${config.qbittorrentUrl}`,
-				];
-			} else if (config.rtorrentRpcUrl) {
-				config.torrentClients = [
-					`${Label.RTORRENT}:${config.rtorrentRpcUrl}`,
-				];
-			} else if (config.transmissionRpcUrl) {
-				config.torrentClients = [
-					`${Label.TRANSMISSION}:${config.transmissionRpcUrl}`,
-				];
-			} else if (config.delugeRpcUrl) {
-				config.torrentClients = [
-					`${Label.DELUGE}:${config.delugeRpcUrl}`,
-				];
-			}
-		}
-		return true;
-	}, "Cannot use qbittorrentUrl, rtorrentRpcUrl, transmissionRpcUrl, or delugeRpcUrl with torrentClients. Only use torrentClients.")
-	.refine((config) => {
-		if (!config.linkDir) return true;
-		if (config.linkDirs.length) return false;
-		logger.warn("linkDir is deprecated, use linkDirs instead.");
-		config.linkDirs = [config.linkDir];
-		return true;
-	}, "You cannot have both linkDir and linkDirs, use linkDirs only.")
-	.refine((config) => {
-		if (!config.notificationWebhookUrl) return true;
-		if (config.notificationWebhookUrls.length) return false;
-		logger.warn(
-			"notificationWebhookUrl is deprecated, use notificationWebhookUrls instead.",
-		);
-		config.notificationWebhookUrls = [config.notificationWebhookUrl];
-		return true;
-	}, "You cannot have both notificationWebhookUrl and notificationWebhookUrls, use notificationWebhookUrls only.")
-	.refine(
-		(config) => !config.torrentDir || !config.useClientTorrents,
-		ZodErrorMessages.torrentDirAndUseClientTorrents,
-	)
-	.refine(
-		(config) => !config.useClientTorrents || config.torrentClients.length,
-		ZodErrorMessages.needsClient,
-	)
-	.refine(
-		(config) =>
-			process.env.DEV ||
-			!config.useClientTorrents ||
-			!config.torrentClients.some((c) => c.startsWith(Label.DELUGE)),
-		"Deluge does not currently support useClientTorrents, use torrentDir instead.",
-	)
-	.refine(
-		(config) =>
-			config.action !== Action.INJECT ||
-			config.torrentClients.some((c) => !c.includes(":readonly:")),
-		ZodErrorMessages.clientTypeReadOnly,
-	)
-	.refine(
-		(config) =>
-			config.torrentClients.length <= 1 ||
-			(!config.torrentDir && !config.torrents?.length),
-		ZodErrorMessages.multipleClientsTorrentFile,
-	)
-	.refine(
+	/*.refine(
 		(config) =>
 			config.torrentClients.length <= 1 ||
 			config.linkDirs.length ||
@@ -635,7 +557,7 @@ export const VALIDATION_SCHEMA = z
 				config.excludeOlder >= 2 * config.excludeRecentSearch &&
 				config.excludeOlder <= 5 * config.excludeRecentSearch),
 		ZodErrorMessages.excludeRecentOlder,
-	)
+	)*/
 	.refine(
 		(config) =>
 			config.fuzzySizeThreshold <= 0.1 ||

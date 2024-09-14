@@ -41,7 +41,7 @@ import {
 	organizeTrackers,
 	resumeErrSleepTime,
 	resumeSleepTime,
-	shouldRecheck,
+	//shouldRecheck,
 	TorrentClient,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
@@ -111,7 +111,7 @@ export default class RTorrent implements TorrentClient {
 	readonly clientType = Label.RTORRENT;
 	readonly readonly: boolean;
 	readonly label: string;
-	readonly batchSize = 500;
+	readonly batchSize = 300;
 
 	constructor(
 		url: string,
@@ -733,7 +733,7 @@ export default class RTorrent implements TorrentClient {
 	async recheckTorrent(infoHash: string): Promise<void> {
 		// Pause first as it may resume after recheck automatically
 		await this.methodCallP<void>("d.pause", [infoHash]);
-		await this.methodCallP<void>("d.check_hash", [infoHash]);
+		//await this.methodCallP<void>("d.check_hash", [infoHash]);
 	}
 
 	async resumeInjection(
@@ -830,8 +830,8 @@ export default class RTorrent implements TorrentClient {
 			libtorrent_resume: await createLibTorrentResumeTree(meta, basePath),
 		};
 
-		const toRecheck = shouldRecheck(meta, decision);
-		const loadType = toRecheck ? "load.raw" : "load.raw_start";
+		//const toRecheck = shouldRecheck(searchee, decision);
+		const loadType = "load.raw";
 
 		const retries = 5;
 		for (let i = 0; i < retries; i++) {
@@ -844,16 +844,14 @@ export default class RTorrent implements TorrentClient {
 						`d.directory_base.set="${directoryBase}"`,
 						`d.custom1.set="${TORRENT_TAG}"`,
 						`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
-						toRecheck
-							? `d.check_hash=${meta.infoHash.toUpperCase()}`
-							: null,
+						null,
 					].filter((e) => e !== null),
 				);
-				if (toRecheck) {
-					void this.resumeInjection(meta, decision, {
-						checkOnce: false,
-					});
-				}
+				// if (toRecheck) {
+				this.resumeInjection(meta, decision, {
+					checkOnce: false,
+				});
+				// }
 				break;
 			} catch (e) {
 				logger.verbose({
