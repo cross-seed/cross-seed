@@ -463,6 +463,7 @@ async function injectionSuccess({
 async function loadMetafile(
 	torrentFilePath: string,
 	progress: string,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	summary: InjectSummary,
 ): Promise<Result<{ meta: Metafile; tracker: string }, "FAILED_TO_PARSE">> {
 	const filePathLog = getTorrentFilePathLog(torrentFilePath);
@@ -478,11 +479,7 @@ async function loadMetafile(
 		return resultOfErr("FAILED_TO_PARSE");
 	}
 
-	const { tracker: trackerFromFilename } = parseMetadataFromFilename(
-		basename(torrentFilePath),
-	);
-	summary.FOUND_BAD_FORMAT ||= !trackerFromFilename;
-	const tracker = trackerFromFilename ?? UNKNOWN_TRACKER;
+	const tracker = meta.linkdirTracker ?? "unknown";
 	return resultOf({ meta, tracker });
 }
 
