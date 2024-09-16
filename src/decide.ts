@@ -6,7 +6,6 @@ import {
 	isAnyMatchedDecision,
 	isStaticDecision,
 	MatchMode,
-	RELEASE_GROUP_REGEX,
 	REPACK_PROPER_REGEX,
 	RES_STRICT_REGEX,
 	parseSource,
@@ -23,7 +22,12 @@ import {
 	isSingleEpisode,
 } from "./preFilter.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { File, Searchee, SearcheeWithLabel } from "./searchee.js";
+import {
+	File,
+	getReleaseGroup,
+	Searchee,
+	SearcheeWithLabel,
+} from "./searchee.js";
 import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
 import {
 	extractInt,
@@ -95,13 +99,9 @@ function logDecision(
 			reason = `it has a different file tree${matchMode === MatchMode.SAFE ? " (will match in risky or partial match mode)" : ""}`;
 			break;
 		case Decision.RELEASE_GROUP_MISMATCH:
-			reason = `it has a different release group: ${stripExtension(
-				searchee.title,
-			)
-				.match(RELEASE_GROUP_REGEX)
-				?.groups?.group?.trim()} -> ${stripExtension(candidate.name)
-				.match(RELEASE_GROUP_REGEX)
-				?.groups?.group?.trim()}`;
+			reason = `it has a different release group: ${getReleaseGroup(
+				stripExtension(searchee.title),
+			)} -> ${getReleaseGroup(stripExtension(candidate.name))}`;
 			break;
 		case Decision.PROPER_REPACK_MISMATCH:
 			reason = `one is a different subsequent release: ${
@@ -230,14 +230,13 @@ function resolutionDoesMatch(searcheeTitle: string, candidateName: string) {
 	return extractInt(searcheeRes) === extractInt(candidateRes);
 }
 function releaseGroupDoesMatch(searcheeTitle: string, candidateName: string) {
-	const searcheeReleaseGroup = stripExtension(searcheeTitle)
-		.match(RELEASE_GROUP_REGEX)
-		?.groups?.group?.trim()
-		?.toLowerCase();
-	const candidateReleaseGroup = stripExtension(candidateName)
-		.match(RELEASE_GROUP_REGEX)
-		?.groups?.group?.trim()
-		?.toLowerCase();
+	const searcheeReleaseGroup = getReleaseGroup(
+		stripExtension(searcheeTitle),
+	)?.toLowerCase();
+	const candidateReleaseGroup = getReleaseGroup(
+		stripExtension(candidateName),
+	)?.toLowerCase();
+
 	if (!searcheeReleaseGroup || !candidateReleaseGroup) {
 		return true; // Pass if missing -GRP
 	}

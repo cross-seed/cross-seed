@@ -36,6 +36,8 @@ export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
 export const CALIBRE_INDEXNUM_REGEX = /\s?\(\d+\)$/;
 export const SAVED_TORRENTS_INFO_REGEX =
 	/^\[(?<mediaType>.+?)\]\[(?<tracker>.+?)\](?<name>.+?)(?:\[[^\]]*?\])?\.torrent$/i;
+export const BAD_GROUP_PARSE_REGEX =
+	/^(?<badmatch>(?:dl|DDP?|aac|eac3|atmos|dts|ma|hd|[heav.c]{3.5}|[xh.]{1,2}[2456]|[0-9]+[ip]?|dxva|full|blu|ray|s(?:eason)?\W\d+|\W){3,})$/i;
 
 // Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {
