@@ -229,7 +229,6 @@ export function parseBlocklistEntry(blocklistEntry: string): {
 
 export const IGNORED_FOLDERS_SUBSTRINGS = [
 	"+music",
-	"+non-imp+",
 	"sample",
 	"proof",
 	"bdmv",
