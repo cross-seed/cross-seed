@@ -1,4 +1,4 @@
-import Knex from "knex";
+import { knex } from "knex";
 import { join } from "path";
 import { appDir } from "./configuration.js";
 import { migrations } from "./migrations/migrations.js";
@@ -9,7 +9,7 @@ const rawSqliteHandle = new Sqlite(filename);
 rawSqliteHandle.pragma("journal_mode = WAL");
 rawSqliteHandle.close();
 
-export const db = Knex.knex({
+export const db = knex({
 	client: "better-sqlite3",
 	connection: { filename },
 	migrations: { migrationSource: migrations },
