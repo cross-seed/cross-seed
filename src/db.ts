@@ -1,4 +1,5 @@
-import { knex } from "knex";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import Knex, { knex } from "knex";
 import { join } from "path";
 import { appDir } from "./configuration.js";
 import { migrations } from "./migrations/migrations.js";
@@ -9,7 +10,7 @@ const rawSqliteHandle = new Sqlite(filename);
 rawSqliteHandle.pragma("journal_mode = WAL");
 rawSqliteHandle.close();
 
-export const db = knex({
+export const db = Knex.knex({
 	client: "better-sqlite3",
 	connection: { filename },
 	migrations: { migrationSource: migrations },
