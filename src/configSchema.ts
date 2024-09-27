@@ -39,6 +39,7 @@ const ZodErrorMessages = {
 		"fuzzySizeThreshold cannot be greater than 0.1 when using searchCadence or rssCadence.",
 	seasonFromEpisodesMin:
 		"seasonFromEpisodes cannot be less than 0.5 when using searchCadence",
+	maxRemainingForResumeMax: "maxRemainingForResume must be between 0 and 50.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
@@ -230,6 +231,10 @@ export const VALIDATION_SCHEMA = z
 		torznab: z.array(z.string().url()),
 		dataDirs: z.array(z.string()).nullish(),
 		matchMode: z.nativeEnum(MatchMode),
+		maxRemainingForResume: z
+			.number()
+			.gte(0, ZodErrorMessages.maxRemainingForResumeMax)
+			.lte(50, ZodErrorMessages.maxRemainingForResumeMax),
 		linkCategory: z.string().nullish(),
 		linkDir: z.string().nullish(),
 		linkType: z.nativeEnum(LinkType),
