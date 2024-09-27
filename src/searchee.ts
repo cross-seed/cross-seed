@@ -12,6 +12,7 @@ import {
 	SONARR_SUBFOLDERS_REGEX,
 	MOVIE_REGEX,
 	VIDEO_EXTENSIONS,
+	BAD_GROUP_PARSE_REGEX,
 } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
@@ -246,7 +247,7 @@ export function getKeyMetaInfo(stem: string): string {
 	const res = resM ? `.${resM}` : "";
 	const sourceM = parseSource(stem);
 	const source = sourceM ? `.${sourceM}` : "";
-	const groupM = stem.match(RELEASE_GROUP_REGEX)?.groups?.group;
+	const groupM = getReleaseGroup(stem);
 	if (groupM) {
 		return `${res}${source}-${groupM}`.toLowerCase();
 	}
@@ -329,4 +330,15 @@ export function getAnimeKeys(stem: string): {
 	if (keyTitles.length === 0) return null;
 	const release = extractInt(match!.groups!.release);
 	return { ensembleTitles, keyTitles, release };
+}
+
+export function getReleaseGroup(stem: string): string | null {
+	const predictedGroupMatch = stem.match(RELEASE_GROUP_REGEX);
+	if (!predictedGroupMatch) {
+		return null;
+	}
+	const parsedGroupMatchString = predictedGroupMatch!.groups!.group.trim();
+	return BAD_GROUP_PARSE_REGEX.test(parsedGroupMatchString)
+		? null
+		: parsedGroupMatchString;
 }

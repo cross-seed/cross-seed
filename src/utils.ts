@@ -245,11 +245,12 @@ export function getAnimeQueries(name: string): string[] {
 export function stripMetaFromName(name: string): string {
 	return sourceRegexRemove(
 		stripExtension(name)
-			.replace(RELEASE_GROUP_REGEX, "")
+			.match(SCENE_TITLE_REGEX)!
+			.groups!.title.replace(RELEASE_GROUP_REGEX, "")
 			.replace(/\s*-\s*$/, "")
 			.replace(RESOLUTION_REGEX, "")
 			.replace(REPACK_PROPER_REGEX, ""),
-	).match(SCENE_TITLE_REGEX)!.groups!.title;
+	);
 }
 
 export const tap = (fn) => (value) => {
