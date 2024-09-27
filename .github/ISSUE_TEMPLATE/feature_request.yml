@@ -2,17 +2,6 @@ name: Feature request
 description: "I have an idea for cross-seed"
 labels: ["feature", "triage"]
 body:
-    - type: checkboxes
-      attributes:
-          label: Does an existing issue/feature request already exist?
-          description:
-              Use the search to see if an open or closed issue already exists
-              for the feature you are requesting. If a request exists and is
-              closed please read the existing issue to see why, and if you still
-              wish to make an issue link to it in your issue.
-          options:
-              - label: I've searched far and wide!
-                required: true
     - type: textarea
       attributes:
           label: Does your feature request solve a problem you're facing?
@@ -22,6 +11,17 @@ body:
               is not a version), and any necessary context to the request.
       validations:
           required: true
+    - type: checkboxes
+      attributes:
+        label: Does an existing issue/feature request already exist?
+        description:
+            Use the search to see if an open or closed issue already exists
+            for the feature you are requesting. If a request exists and is
+            closed please read the existing issue to see why, and if you still
+            wish to make an issue link to it in your issue.
+        options:
+            -   label: I've searched far and wide!
+                required: true
     - type: textarea
       attributes:
           label: What would you like for cross-seed to do?
