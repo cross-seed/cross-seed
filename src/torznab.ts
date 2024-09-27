@@ -811,12 +811,17 @@ async function getAndLogIndexers(
 		if (!entry) return true;
 		if (
 			isEnsemble &&
+			entry.lastSearched &&
 			entry.lastSearched < (await getNewestFileAge(searchee))
 		) {
 			return true;
 		}
-		if (entry.firstSearched < skipBefore) return false;
-		if (entry.lastSearched > skipAfter) return false;
+		if (entry.firstSearched && entry.firstSearched < skipBefore) {
+			return false;
+		}
+		if (entry.lastSearched && entry.lastSearched > skipAfter) {
+			return false;
+		}
 		return true;
 	});
 
