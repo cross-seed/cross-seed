@@ -16,3 +16,9 @@ export const db = Knex.knex({
 	migrations: { migrationSource: migrations },
 	useNullAsDefault: true,
 });
+
+export const memDB = Knex.knex({
+	client: "better-sqlite3",
+	connection: ":memory:",
+	useNullAsDefault: true,
+});
