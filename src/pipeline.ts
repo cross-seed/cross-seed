@@ -481,8 +481,14 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const { torznab } = getRuntimeConfig();
-	if (!torznab.length) return;
+	const { torrentDir, torznab } = getRuntimeConfig();
+	if (!torrentDir || !torznab.length) {
+		logger.error({
+			label: Label.RSS,
+			message: "RSS requires torrentDir and torznab to be set",
+		});
+		return;
+	}
 	const lastRun =
 		(await db("job_log").select("last_run").where({ name: "rss" }).first())
 			?.last_run ?? 0;
