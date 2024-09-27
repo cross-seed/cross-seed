@@ -5,6 +5,14 @@ description:
     behavior experienced."
 labels: ["bug", "triage"]
 body:
+    - type: textarea
+      attributes:
+          label: What's happening surrounding the bug? (context)
+          description:
+              Details about your setup, relevant config options, and which
+              clients you are using.
+      validations:
+          required: true
     - type: checkboxes
       attributes:
           label:
@@ -32,14 +40,6 @@ body:
           options:
               - label: I've tried to solve this already
                 required: true
-    - type: textarea
-      attributes:
-          label: What's happening surrounding the bug? (context)
-          description:
-              Details about your setup, relevant config options, and which
-              clients you are using.
-      validations:
-          required: true
     - type: textarea
       attributes:
           label: Reproducing the bug
