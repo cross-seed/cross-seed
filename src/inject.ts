@@ -106,29 +106,28 @@ async function whichSearcheesMatchTorrent(
 	meta: Metafile,
 	searchees: SearcheeWithLabel[],
 ): Promise<{ matches: AllMatches; foundBlocked: boolean }> {
+	const isSimilar = (searchee: SearcheeWithLabel, meta: Metafile) =>
+		areMediaTitlesSimilar(searchee.title, meta.title) ||
+		areMediaTitlesSimilar(searchee.title, meta.name) ||
+		areMediaTitlesSimilar(searchee.name, meta.name) ||
+		areMediaTitlesSimilar(searchee.name, meta.title) ||
+		meta.files.some((metaFile) =>
+			searchee.files.some((searcheeFile) =>
+				areMediaTitlesSimilar(searcheeFile.name, metaFile.name),
+			),
+		);
 	let foundBlocked = false;
 	const matches: AllMatches = [];
 	for (const searchee of searchees) {
 		const { decision } = await assessCandidate(meta, searchee, []);
 		if (decision === Decision.BLOCKED_RELEASE) {
-			foundBlocked = true;
+			if (isSimilar(searchee, meta)) foundBlocked = true;
 			continue;
 		} else if (!isAnyMatchedDecision(decision)) {
 			continue;
 		}
 
-		// If name or file names are not similar consider it a false positive
-		if (
-			!areMediaTitlesSimilar(searchee.title, meta.title) &&
-			!areMediaTitlesSimilar(searchee.title, meta.name) &&
-			!areMediaTitlesSimilar(searchee.name, meta.name) &&
-			!areMediaTitlesSimilar(searchee.name, meta.title) &&
-			!meta.files.some((metaFile) =>
-				searchee.files.some((searcheeFile) =>
-					areMediaTitlesSimilar(searcheeFile.name, metaFile.name),
-				),
-			)
-		) {
+		if (!isSimilar(searchee, meta)) {
 			logger.warn({
 				label: Label.INJECT,
 				message: `Skipping likely false positive for ${getLogString(meta, chalk.bold.white)} from ${getLogString(searchee, chalk.bold.white)}`,
