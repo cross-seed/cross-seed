@@ -33,7 +33,8 @@ export const ARR_DIR_REGEX =
 export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
 export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
-export const CALIBRE_INDEXNUM_REGEX = /\s?\(\d+\)$/;
+export const BOOK_AUDIO_TITLE_REGEX =
+	/(^#?\d{1,2}\b|'s\b|[,_;\b-]|\[.*?]|\(.*?\)|\{.*?}|\d{3,}[\skbps]{0,5}\b|m4b\b|pdf\b|\baudiobook\b|\bebook\b|(a?[\W._-]?(novela?|saga|series))|(Read|Narrated\s)?By\s\w+\s\w+?\b|docx\b|epub\b|mobi\b|azw3\b|m4a\b|mp3\b|flac|\sWEB\b|\s|[^a-zA-Z0-9])/gi;
 export const SAVED_TORRENTS_INFO_REGEX =
 	/^\[(?<mediaType>.+?)\]\[(?<tracker>.+?)\](?<name>.+?)(?:\[[^\]]*?\])?\.torrent$/i;
 export const BAD_GROUP_PARSE_REGEX =

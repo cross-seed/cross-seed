@@ -11,7 +11,7 @@ import {
 	scanAllArrsForMedia,
 } from "./arr.js";
 import {
-	CALIBRE_INDEXNUM_REGEX,
+	BOOK_AUDIO_TITLE_REGEX,
 	EP_REGEX,
 	MediaType,
 	SEASON_REGEX,
@@ -273,11 +273,14 @@ async function createTorznabSearchQueries(
 				q: cleanTitle(stripMetaFromName(stem)),
 			},
 		] as const;
-	} else if (mediaType === MediaType.BOOK && searchee.path) {
+	} else if (mediaType === MediaType.BOOK || mediaType === MediaType.AUDIO) {
 		return [
 			{
 				t: "search",
-				q: cleanTitle(stem.replace(CALIBRE_INDEXNUM_REGEX, "")),
+				q: stripExtension(stem)
+					.replace(BOOK_AUDIO_TITLE_REGEX, " ")
+					.replace(/\s+/, " ")
+					.trim(),
 			},
 		] as const;
 	}
