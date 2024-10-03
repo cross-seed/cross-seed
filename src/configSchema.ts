@@ -1,8 +1,8 @@
 import ms from "ms";
+import { isAbsolute, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
 import { Action, LinkType, MatchMode, NEWLINE_INDENT } from "./constants.js";
 import { logger } from "./logger.js";
-import { resolve, relative, isAbsolute } from "path";
 
 /**
  * error messages and map returned upon Zod validation failure
@@ -34,7 +34,7 @@ const ZodErrorMessages = {
 		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
 	linkDirInDataDir:
 		"You cannot have your linkDir inside of your dataDirs. Please adjust your paths to correct this.",
-	ouputDirInInputDir:
+	outputDirInInputDir:
 		"You cannot have your outputDir inside of your torrentDir/dataDirs. Please adjust your paths to correct this.",
 };
 
@@ -95,9 +95,9 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
 }
 
 /**
- * check a potential child path being inside a array of parent paths
- * @param childDir path of the potential child (e.g linkDir)
- * @param parentDirs array of parentDir paths (e.g dataDirs)
+ * check a potential child path being inside an array of parent paths
+ * @param childDir path of the potential child (e.g. linkDir)
+ * @param parentDirs array of parentDir paths (e.g. dataDirs)
  * @returns true if `childDir` is inside any `parentDirs` at any nesting level, false otherwise.
  */
 function isChildPath(childDir: string, parentDirs: string[]): boolean {
@@ -313,4 +313,4 @@ export const VALIDATION_SCHEMA = z
 			]);
 		}
 		return true;
-	}, ZodErrorMessages.ouputDirInInputDir);
+	}, ZodErrorMessages.outputDirInInputDir);

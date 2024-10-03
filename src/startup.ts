@@ -1,13 +1,13 @@
+import { access, constants, stat } from "fs/promises";
 import { sep } from "path";
+import { inspect } from "util";
+import { validateUArrLs } from "./arr.js";
+import { getClient } from "./clients/TorrentClient.js";
+import { Action } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
-import { Action } from "./constants.js";
-import { validateTorznabUrls } from "./torznab.js";
-import { getClient } from "./clients/TorrentClient.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { inspect } from "util";
-import { stat, access, constants } from "fs/promises";
-import { validateUArrLs } from "./arr.js";
+import { validateTorznabUrls } from "./torznab.js";
 
 /**
  * validates existence, permission, and that a path is a directory

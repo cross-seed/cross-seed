@@ -1,17 +1,18 @@
 import { existsSync, statSync, utimesSync, writeFileSync } from "fs";
+import ms from "ms";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
+	ANIME_GROUP_REGEX,
 	Decision,
 	isAnyMatchedDecision,
 	isStaticDecision,
 	MatchMode,
+	parseSource,
 	REPACK_PROPER_REGEX,
 	RES_STRICT_REGEX,
-	parseSource,
-	TORRENT_CACHE_FOLDER,
-	ANIME_GROUP_REGEX,
 	SEASON_REGEX,
+	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
@@ -39,7 +40,6 @@ import {
 	stripExtension,
 	wait,
 } from "./utils.js";
-import ms from "ms";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -217,6 +217,7 @@ function fuzzySizeDoesMatch(resultSize: number, searchee: Searchee) {
 	const upperBound = length + fuzzySizeFactor * length;
 	return resultSize >= lowerBound && resultSize <= upperBound;
 }
+
 function resolutionDoesMatch(searcheeTitle: string, candidateName: string) {
 	const searcheeRes = searcheeTitle
 		.match(RES_STRICT_REGEX)
@@ -229,6 +230,7 @@ function resolutionDoesMatch(searcheeTitle: string, candidateName: string) {
 	if (!searcheeRes || !candidateRes) return true;
 	return extractInt(searcheeRes) === extractInt(candidateRes);
 }
+
 function releaseGroupDoesMatch(searcheeTitle: string, candidateName: string) {
 	const searcheeReleaseGroup = getReleaseGroup(
 		stripExtension(searcheeTitle),
@@ -272,6 +274,7 @@ function releaseGroupDoesMatch(searcheeTitle: string, candidateName: string) {
 	}
 	return false;
 }
+
 function sourceDoesMatch(searcheeTitle: string, candidateName: string) {
 	const searcheeSource = parseSource(searcheeTitle);
 	const candidateSource = parseSource(candidateName);
@@ -506,7 +509,7 @@ export async function assessCandidateCaching(
 
 	let assessment: ResultAssessment;
 	if (!cacheEntry?.decision) {
-		// New candiate, could be metafile from cache
+		// New candidate, could be metafile from cache
 		assessment = await assessAndSaveResults(
 			metaOrCandidate,
 			searchee,

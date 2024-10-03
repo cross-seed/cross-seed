@@ -1,5 +1,5 @@
-import { uniqBy } from "lodash-es";
 import Knex from "knex";
+import { uniqBy } from "lodash-es";
 import { getCacheFileData, renameCacheFile } from "../cache.js";
 
 async function up(knex: Knex.Knex): Promise<void> {

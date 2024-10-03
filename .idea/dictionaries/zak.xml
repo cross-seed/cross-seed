@@ -1,7 +1,9 @@
 <component name="ProjectDictionaryState">
   <dictionary name="zak">
     <words>
+      <w>addtime</w>
       <w>alac</w>
+      <w>alphanum</w>
       <w>amzn</w>
       <w>arrs</w>
       <w>atvp</w>
@@ -9,14 +11,23 @@
       <w>bdrom</w>
       <w>concats</w>
       <w>configdump</w>
+      <w>datadirs</w>
       <w>dsnp</w>
       <w>exts</w>
       <w>filedump</w>
+      <w>indexnum</w>
+      <w>libtorrent</w>
+      <w>multicall</w>
       <w>pcok</w>
+      <w>pconfig</w>
       <w>pmtp</w>
+      <w>prio</w>
+      <w>prowlarr</w>
       <w>radarr</w>
+      <w>sonarr</w>
       <w>tvmazeid</w>
       <w>undici</w>
+      <w>zod's</w>
     </words>
   </dictionary>
 </component>

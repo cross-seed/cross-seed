@@ -22,6 +22,7 @@ import {
 } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
+import { AssessmentWithTracker } from "./pipeline.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
@@ -33,7 +34,6 @@ import {
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import { getLogString, getMediaType } from "./utils.js";
-import { AssessmentWithTracker } from "./pipeline.js";
 
 interface LinkResult {
 	contentPath: string;

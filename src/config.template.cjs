@@ -33,7 +33,7 @@ module.exports = {
 	 * URL(s) to your Sonarr instance(s), included in the same way as torznab
 	 * URLs but for your Sonarr: note that api is not at the end. see below.
 	 *
-	 * You should order these in most likely to match -> least likely order.
+	 * You should order these in most likely to match -> the least likely order.
 	 * They are searched sequentially as they are listed.
 	 *
 	 * This apikey parameter comes from Sonarr
@@ -49,7 +49,7 @@ module.exports = {
 	 * URL(s) to your Radarr instance(s), included in the same way as torznab
 	 * URLs but for your Radarr: note that api is not at the end. see below.
 	 *
-	 * You should order these in most likely to match -> least likely order.
+	 * You should order these in most likely to match -> the least likely order.
 	 * They are searched sequentially as they are listed.
 	 *
 	 * This apikey parameter comes from Radarr
@@ -129,11 +129,11 @@ module.exports = {
 	delay: 30,
 
 	/**
-	 * To search with already downloaded data, you can enter in the directories
+	 * To search with already downloaded data, you can enter the directories
 	 * to your downloaded torrent data to find matches, rather than relying
 	 * entirely on the .torrent files themselves for matching.
 	 *
-	 * If directories are entered, they must all be in a single option and they
+	 * If directories are entered, they must all be in a single option, and they
 	 * need to be surrounded by brackets.
 	 *
 	 * Windows users will need to use double backslash in all paths in this
@@ -141,7 +141,7 @@ module.exports = {
 	 *
 	 * example:
 	 *     dataDirs: ["/downloads/movies", "/downloads/packs"],
-	 * or for windows users
+	 * or for Windows users
 	 *     dataDirs: ["C:\\My Data\\Downloads\\Movies"],
 	 */
 
@@ -187,7 +187,7 @@ module.exports = {
 	/**
 	 * Enabling this will link files using v5's flat folder style.
 	 *
-	 * Each individual Torznab tracker's cross-seeds, otherwise, will have it's
+	 * Each individual Torznab tracker's cross-seeds, otherwise, will have its
 	 * own folder with the tracker's name and it's links within it.
 	 *
 	 * If using Automatic Torrent Management in qBittorrent, please read:
@@ -312,7 +312,7 @@ module.exports = {
 	excludeRecentSearch: "3 days",
 
 	/**
-	 * What action to take upon a match being found.
+	 * Which action to take upon a match being found.
 	 * Options: "save", "inject".
 	 */
 	action: "inject",
@@ -324,7 +324,7 @@ module.exports = {
 	 *
 	 * qBittorrent: This will apply the category's original category as a tag.
 	 *
-	 * Example: if you have a original label/category called "Movies", this will
+	 * Example: if you have an original label/category called "Movies", this will
 	 * automatically inject cross-seeds to "Movies.cross-seed".
 	 */
 	duplicateCategories: false,

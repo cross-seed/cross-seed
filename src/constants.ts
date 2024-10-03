@@ -1,4 +1,5 @@
 import { createRequire } from "module";
+
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
 
@@ -50,12 +51,14 @@ const SOURCE_REGEXES = {
 	PCOK: /\b(pcok)\b/i,
 	PMTP: /\b(pmtp|Paramount Plus)\b/i,
 };
+
 export function parseSource(title: string): string | null {
 	for (const [source, regex] of Object.entries(SOURCE_REGEXES)) {
 		if (regex.test(title)) return source;
 	}
 	return null;
 }
+
 export function sourceRegexRemove(title: string): string {
 	const originalLength = title.length;
 	for (const regex of Object.values(SOURCE_REGEXES)) {
@@ -143,7 +146,7 @@ export enum Decision {
 	 * Searchee and Candidate info hash matches. Usually happens with public
 	 * torrents and torrents added by radarr/sonarr before cross-seed on announces.
 	 * Useful for the inject job as we ignore INFO_HASH_ALREADY_EXISTS and
-	 * for reporting a 204 announe status code instead of 200 from exists.
+	 * for reporting a 204 announce status code instead of 200 from exists.
 	 */
 	SAME_INFO_HASH = "SAME_INFO_HASH",
 	/**
@@ -157,10 +160,12 @@ export enum Decision {
 	RESOLUTION_MISMATCH = "RESOLUTION_MISMATCH",
 	SOURCE_MISMATCH = "SOURCE_MISMATCH",
 }
+
 export type DecisionAnyMatch =
 	| Decision.MATCH
 	| Decision.MATCH_SIZE_ONLY
 	| Decision.MATCH_PARTIAL;
+
 export function isAnyMatchedDecision(
 	decision: Decision,
 ): decision is DecisionAnyMatch {
@@ -170,6 +175,7 @@ export function isAnyMatchedDecision(
 		decision === Decision.MATCH_PARTIAL
 	);
 }
+
 export function isStaticDecision(decision: Decision): boolean {
 	return (
 		decision === Decision.RELEASE_GROUP_MISMATCH ||

@@ -1,6 +1,6 @@
+import { deepStrictEqual } from "assert";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { parseTorrentFromFilename } from "./torrent.js";
-import { deepStrictEqual } from "assert";
 
 function diff(thing1, thing2) {
 	try {

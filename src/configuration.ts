@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { accessSync, copyFileSync, existsSync, mkdirSync, constants } from "fs";
+import { accessSync, constants, copyFileSync, existsSync, mkdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
