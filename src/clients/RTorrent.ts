@@ -339,7 +339,8 @@ export default class RTorrent implements TorrentClient {
 			? "load"
 			: "load.start";
 
-		for (let i = 0; i < 5; i++) {
+		const retries = 5;
+		for (let i = 0; i < retries; i++) {
 			try {
 				await this.methodCallP<void>(loadType, [
 					"",
@@ -350,6 +351,11 @@ export default class RTorrent implements TorrentClient {
 				]);
 				break;
 			} catch (e) {
+				logger.verbose({
+					label: Label.RTORRENT,
+					message: `Failed to inject torrent ${meta.name} on attempt ${i + 1}/${retries}`,
+				});
+				logger.debug(e);
 				await wait(1000 * Math.pow(2, i));
 			}
 		}
