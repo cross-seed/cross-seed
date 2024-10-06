@@ -13,6 +13,7 @@ function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
 		return !VIDEO_EXTENSIONS.includes(extname(searchBasename));
 	}
 }
+
 export function findPotentialNestedRoots(
 	root: string,
 	depth: number,

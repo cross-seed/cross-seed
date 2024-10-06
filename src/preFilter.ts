@@ -1,12 +1,12 @@
+import { statSync } from "fs";
 import ms from "ms";
 import { basename, dirname } from "path";
-import { statSync } from "fs";
 import {
 	ARR_DIR_REGEX,
-	SONARR_SUBFOLDERS_REGEX,
 	SEASON_REGEX,
-	VIDEO_EXTENSIONS,
+	SONARR_SUBFOLDERS_REGEX,
 	VIDEO_DISC_EXTENSIONS,
+	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";

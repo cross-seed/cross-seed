@@ -9,7 +9,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { shouldRecheck, extractCredentialsFromUrl } from "../utils.js";
+import { extractCredentialsFromUrl, shouldRecheck } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";

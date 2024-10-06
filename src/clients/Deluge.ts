@@ -2,22 +2,22 @@ import ms from "ms";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
-	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
+	TORRENT_TAG,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
+import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { TorrentClient } from "./TorrentClient.js";
 import {
-	shouldRecheck,
 	extractCredentialsFromUrl,
-	wait,
 	getLogString,
+	shouldRecheck,
+	wait,
 } from "../utils.js";
-import { Result, resultOf, resultOfErr } from "../Result.js";
+import { TorrentClient } from "./TorrentClient.js";
 
 interface TorrentInfo {
 	name?: string;
@@ -28,6 +28,7 @@ interface TorrentInfo {
 	label?: string;
 	total_remaining?: number;
 }
+
 enum DelugeErrorCode {
 	NO_AUTH = 1,
 	BAD_METHOD = 2,
@@ -35,6 +36,7 @@ enum DelugeErrorCode {
 	RPC_FAIL = 4,
 	BAD_JSON = 5,
 }
+
 type InjectData = [
 	filename: string,
 	filedump: string,
@@ -219,6 +221,7 @@ export default class Deluge implements TorrentClient {
 			return false;
 		}
 	}
+
 	/**
 	 * generates the label for injection based on searchee and torrentInfo
 	 * @param searchee Searchee that contains the originating torrent
@@ -247,6 +250,7 @@ export default class Deluge implements TorrentClient {
 				? `${ogLabel}${this.delugeLabelSuffix}`
 				: ogLabel;
 	}
+
 	/**
 	 * if Label plugin is loaded, adds (if necessary)
 	 * and sets the label based on torrent hash.
@@ -388,6 +392,7 @@ export default class Deluge implements TorrentClient {
 	 * @param filename filename for the injecting torrent file
 	 * @param filedump string with encoded torrent file
 	 * @param path path to the torrent data
+	 * @param searchee searchee of the original torrent matched
 	 * @param decision decision by which the newTorrent was matched
 	 */
 	private formatData(
@@ -411,8 +416,9 @@ export default class Deluge implements TorrentClient {
 
 	/**
 	 * returns directory of an infohash in deluge as a string
-	 * @param searchee Searchee or Metafile for torrent to lookup in client
 	 * @return Result containing either a string with path or reason it was not provided
+	 * @param meta the metafile or searchee of the original torrent
+	 * @param options object with options relating to filtering
 	 */
 	async getDownloadDir(
 		meta: SearcheeWithInfoHash | Metafile,
@@ -443,6 +449,7 @@ export default class Deluge implements TorrentClient {
 		}
 		return resultOf(torrent.save_path);
 	}
+
 	/**
 	 * checks if a torrent is complete in deluge
 	 * @param infoHash the infoHash of the torrent to check
@@ -461,8 +468,8 @@ export default class Deluge implements TorrentClient {
 
 	/**
 	 * returns information needed to complete/validate injection
-	 * @param searchee the Searchee for the torrent you are requesting TorrentInfo from
 	 * @return Promise of TorrentInfo type
+	 * @param infoHash infohash to query for in the client
 	 */
 	private async getTorrentInfo(infoHash: string): Promise<TorrentInfo> {
 		let torrent: TorrentInfo;

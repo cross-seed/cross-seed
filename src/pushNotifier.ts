@@ -1,8 +1,8 @@
 import {
 	ActionResult,
 	InjectionResult,
-	SaveResult,
 	PROGRAM_NAME,
+	SaveResult,
 	USER_AGENT,
 } from "./constants.js";
 import { ResultAssessment } from "./decide.js";
@@ -12,9 +12,11 @@ import { SearcheeWithLabel } from "./searchee.js";
 import { formatAsList } from "./utils.js";
 
 export let pushNotifier: PushNotifier;
+
 enum Event {
 	RESULTS = "RESULTS",
 }
+
 type TrackerName = string;
 
 interface PushNotification {
@@ -25,6 +27,7 @@ interface PushNotification {
 
 export class PushNotifier {
 	url: string;
+
 	constructor(url: string) {
 		this.url = url;
 	}

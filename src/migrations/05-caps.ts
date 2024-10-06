@@ -15,4 +15,5 @@ async function down(knex: Knex.Knex): Promise<void> {
 		table.dropColumn("cat_caps");
 	});
 }
+
 export default { name: "05-caps", up, down };

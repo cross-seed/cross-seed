@@ -1,12 +1,12 @@
-import { Metafile } from "../parseTorrent.js";
 import { DecisionAnyMatch, InjectionResult } from "../constants.js";
+import { Metafile } from "../parseTorrent.js";
+import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
 import Transmission from "./Transmission.js";
-import Deluge from "./Deluge.js";
-import { Result } from "../Result.js";
 
 let activeClient: TorrentClient;
 

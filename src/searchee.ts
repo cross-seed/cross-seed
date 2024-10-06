@@ -1,18 +1,18 @@
 import { readdirSync, statSync } from "fs";
 import { basename, dirname, join, relative } from "path";
 import {
-	ANIME_REGEX,
 	ANIME_GROUP_REGEX,
+	ANIME_REGEX,
 	ARR_DIR_REGEX,
-	EP_REGEX,
-	RELEASE_GROUP_REGEX,
-	SEASON_REGEX,
-	RES_STRICT_REGEX,
-	parseSource,
-	SONARR_SUBFOLDERS_REGEX,
-	MOVIE_REGEX,
-	VIDEO_EXTENSIONS,
 	BAD_GROUP_PARSE_REGEX,
+	EP_REGEX,
+	MOVIE_REGEX,
+	parseSource,
+	RELEASE_GROUP_REGEX,
+	RES_STRICT_REGEX,
+	SEASON_REGEX,
+	SONARR_SUBFOLDERS_REGEX,
+	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";

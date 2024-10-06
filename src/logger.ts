@@ -88,6 +88,7 @@ function stripAnsiChars(message: string | unknown) {
 }
 
 const logOnceCache: Set<string> = new Set();
+
 export function logOnce(cacheKey: string, cb: () => void, ttl?: number) {
 	if (!logOnceCache.has(cacheKey)) {
 		logOnceCache.add(cacheKey);

@@ -24,6 +24,7 @@ export interface ExternalIds {
 	tvdbId?: string;
 	tvMazeId?: string;
 }
+
 export function arrIdsEqual(
 	a: ExternalIds | undefined,
 	b: ExternalIds | undefined,
@@ -288,11 +289,10 @@ export async function getRelevantArrIds(
 		? caps.movieIdSearch
 		: caps.tvIdSearch;
 	const ids = parsedMedia.movie ?? parsedMedia.series;
-	const x = {
+	return {
 		tvdbid: idSearchCaps.tvdbId ? ids.tvdbId : undefined,
 		tmdbid: idSearchCaps.tmdbId ? ids.tmdbId : undefined,
 		imdbid: idSearchCaps.imdbId ? ids.imdbId : undefined,
 		tvmazeid: idSearchCaps.tvMazeId ? ids.tvMazeId : undefined,
 	};
-	return x;
 }

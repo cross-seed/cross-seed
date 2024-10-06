@@ -1,26 +1,26 @@
+import ms from "ms";
 import { dirname, resolve } from "path";
+import { BodyInit } from "undici-types";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
-	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
+	TORRENT_TAG,
 } from "../constants.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
-import ms from "ms";
 import { Metafile } from "../parseTorrent.js";
+import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import {
-	shouldRecheck,
 	extractCredentialsFromUrl,
-	wait,
 	getLogString,
 	sanitizeInfoHash,
+	shouldRecheck,
+	wait,
 } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
-import { Result, resultOf, resultOfErr } from "../Result.js";
-import { BodyInit } from "undici-types";
 
 const X_WWW_FORM_URLENCODED = {
 	"Content-Type": "application/x-www-form-urlencoded",
@@ -252,7 +252,7 @@ export default class QBittorrent implements TorrentClient {
 
 	/*
 	@param searchee the Searchee we are generating off (in client)
-	@return either a string containing the path or a error mesage
+	@return either a string containing the path or an error message
 	*/
 	async getDownloadDir(
 		meta: SearcheeWithInfoHash | Metafile,

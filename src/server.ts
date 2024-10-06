@@ -1,15 +1,10 @@
 import chalk from "chalk";
+import { existsSync } from "fs";
 import http, { IncomingMessage, ServerResponse } from "http";
 import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
 import { checkApiKey } from "./auth.js";
-import { Label, logger } from "./logger.js";
-import {
-	Candidate,
-	checkNewCandidateMatch,
-	searchForLocalTorrentByCriteria,
-} from "./pipeline.js";
 import {
 	ActionResult,
 	Decision,
@@ -17,10 +12,15 @@ import {
 	InjectionResult,
 	SaveResult,
 } from "./constants.js";
-import { indexNewTorrents, TorrentLocator } from "./torrent.js";
-import { existsSync } from "fs";
-import { sanitizeInfoHash } from "./utils.js";
+import { Label, logger } from "./logger.js";
+import {
+	Candidate,
+	checkNewCandidateMatch,
+	searchForLocalTorrentByCriteria,
+} from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
+import { indexNewTorrents, TorrentLocator } from "./torrent.js";
+import { sanitizeInfoHash } from "./utils.js";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {

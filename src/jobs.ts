@@ -1,18 +1,19 @@
 import ms from "ms";
+import { Action } from "./constants.js";
 import { db } from "./db.js";
-import { injectSavedTorrents } from "./inject.js";
-import { main, scanRssFeeds } from "./pipeline.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
+import { injectSavedTorrents } from "./inject.js";
 import { Label, logger } from "./logger.js";
+import { main, scanRssFeeds } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { updateCaps } from "./torznab.js";
-import { Action } from "./constants.js";
 
 class Job {
 	name: string;
 	cadence: number;
 	exec: () => Promise<void>;
 	isActive: boolean;
+
 	constructor(name, cadence, exec) {
 		this.name = name;
 		this.cadence = cadence;
