@@ -555,7 +555,7 @@ export default class RTorrent implements TorrentClient {
 		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
 
 		const toRecheck = shouldRecheck(searchee, decision);
-		const loadType = toRecheck ? "load" : "load.start";
+		const loadType = toRecheck ? "load.normal" : "load.start";
 
 		const retries = 5;
 		for (let i = 0; i < retries; i++) {
