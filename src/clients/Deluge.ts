@@ -10,13 +10,12 @@ import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { TorrentClient } from "./TorrentClient.js";
 import {
+	TorrentMetadataInClient,
 	shouldRecheck,
-	extractCredentialsFromUrl,
-	wait,
-	getLogString,
-} from "../utils.js";
+	TorrentClient,
+} from "./TorrentClient.js";
+import { extractCredentialsFromUrl, wait, getLogString } from "../utils.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 
 interface TorrentInfo {
@@ -54,6 +53,7 @@ type DelugeJSON<ResultType> = {
 };
 
 export default class Deluge implements TorrentClient {
+	readonly type = Label.DELUGE;
 	private delugeCookie: string | null = null;
 	private delugeLabel = TORRENT_TAG;
 	private delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
@@ -411,7 +411,8 @@ export default class Deluge implements TorrentClient {
 
 	/**
 	 * returns directory of an infohash in deluge as a string
-	 * @param searchee Searchee or Metafile for torrent to lookup in client
+	 * @param meta SearcheeWithInfoHash or Metafile for torrent to lookup in client
+	 * @param options.onlyCompleted boolean to only return a completed torrent
 	 * @return Result containing either a string with path or reason it was not provided
 	 */
 	async getDownloadDir(
@@ -443,6 +444,38 @@ export default class Deluge implements TorrentClient {
 		}
 		return resultOf(torrent.save_path);
 	}
+
+	/**
+	 * returns map of hashes and download directories for all torrents
+	 * @param options.metas array of SearcheeWithInfoHash or Metafile for torrents to lookup in client
+	 * @param options.onlyCompleted boolean to only return completed torrents
+	 * @return Promise of a Map with hashes and download directories
+	 */
+	async getAllDownloadDirs(options: {
+		onlyCompleted: boolean;
+	}): Promise<Map<string, string>> {
+		const dirs = new Map<string, string>();
+		let response: Result<TorrentStatus, ErrorType>;
+		const params = [["save_path", "progress"], {}];
+		try {
+			response = await this.call<TorrentStatus>("web.update_ui", params);
+		} catch (e) {
+			return dirs;
+		}
+		if (!response.isOk()) {
+			return dirs;
+		}
+		const torrentResponse = response.unwrap().torrents;
+		if (!torrentResponse) {
+			return dirs;
+		}
+		for (const [hash, torrent] of Object.entries(torrentResponse)) {
+			if (options.onlyCompleted && torrent.progress !== 100) continue;
+			dirs.set(hash, torrent.save_path);
+		}
+		return dirs;
+	}
+
 	/**
 	 * checks if a torrent is complete in deluge
 	 * @param infoHash the infoHash of the torrent to check
@@ -457,6 +490,29 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			return resultOfErr("NOT_FOUND");
 		}
+	}
+
+	/**
+	 * @return All torrents in the client
+	 */
+	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
+		const params = [["hash", "label"], {}];
+		const response = await this.call<TorrentStatus>(
+			"web.update_ui",
+			params,
+		);
+		if (!response.isOk()) {
+			return [];
+		}
+		const torrents = response.unwrap().torrents;
+		if (!torrents) {
+			return [];
+		}
+		return Object.entries(torrents).map(([hash, torrent]) => ({
+			infoHash: hash,
+			category: "",
+			tags: torrent.label ? [torrent.label] : [],
+		}));
 	}
 
 	/**

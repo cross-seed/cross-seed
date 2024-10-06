@@ -53,7 +53,13 @@ import {
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
-import { getLogString, humanReadableDate, isTruthy, wait } from "./utils.js";
+import {
+	comparing,
+	getLogString,
+	humanReadableDate,
+	isTruthy,
+	wait,
+} from "./utils.js";
 
 export interface Candidate {
 	guid: string;
@@ -312,7 +318,12 @@ export async function checkNewCandidateMatch(
 	let decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null =
 		null;
 	let actionResult: ActionResult | null = null;
-	searchees.sort((a, b) => b.files.length - a.files.length);
+	searchees.sort(
+		comparing(
+			(searchee) => !searchee.infoHash, // Prefer packs over ensemble
+			(searchee) => -searchee.files.length,
+		),
+	);
 	for (const searchee of searchees) {
 		await db("searchee")
 			.insert({ name: searchee.title })
@@ -325,21 +336,18 @@ export async function checkNewCandidateMatch(
 			hashesToExclude,
 		);
 
-		if (!isAnyMatchedDecision(assessment.decision)) {
-			if (assessment.decision === Decision.SAME_INFO_HASH) {
-				decision = null;
-				break;
-			}
-			if (
-				assessment.decision === Decision.INFO_HASH_ALREADY_EXISTS &&
-				(!decision || !isAnyMatchedDecision(decision))
-			) {
-				decision = assessment.decision;
-			}
-			continue;
+		if (
+			assessment.decision === Decision.INFO_HASH_ALREADY_EXISTS &&
+			!decision
+		) {
+			decision = assessment.decision;
+			break; // In client before rss/announce
 		}
-		decision = assessment.decision;
+		if (!isAnyMatchedDecision(assessment.decision)) {
+			continue; // Will report 200 if SAME_INFO_HASH and INFO_HASH_ALREADY_EXISTS
+		}
 
+		decision = assessment.decision;
 		({ actionResult } = await performAction(
 			assessment.metafile!,
 			assessment.decision,
@@ -350,9 +358,8 @@ export async function checkNewCandidateMatch(
 			[assessment, candidate.tracker, actionResult],
 		]);
 		if (
-			actionResult === SaveResult.SAVED ||
 			actionResult === InjectionResult.SUCCESS ||
-			actionResult === InjectionResult.ALREADY_EXISTS
+			actionResult === SaveResult.SAVED
 		) {
 			break;
 		}
@@ -422,16 +429,12 @@ async function findSearchableTorrents(): Promise<{
 			keysToDelete.push(key);
 			continue;
 		}
-		// Prefer infoHash
-		filteredSearchees.sort((a, b) => {
-			if (a.infoHash && !b.infoHash) return -1;
-			if (!a.infoHash && b.infoHash) return 1;
-			return 0;
-		});
-		// Sort by most number files (less chance of partial)
-		filteredSearchees.sort((a, b) => {
-			return b.files.length - a.files.length;
-		});
+		filteredSearchees.sort(
+			comparing(
+				(searchee) => -searchee.files.length, // Assume searchees are complete
+				(searchee) => !searchee.infoHash,
+			),
+		);
 		grouping.set(key, filteredSearchees);
 	}
 	for (const key of keysToDelete) {

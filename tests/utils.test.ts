@@ -2,18 +2,17 @@ import { describe, expect, it } from "vitest";
 import { fileFactory } from "./factories/file";
 import { searcheeFactory } from "./factories/searchee";
 
-import {
-	MediaType,
-	humanReadableSize,
-	getMediaType,
-	sanitizeUrl,
-} from "../src/utils";
+import { MediaType } from "../src/constants";
+import { humanReadableSize, getMediaType, sanitizeUrl } from "../src/utils";
 
 describe("humanReadableSize", () => {
 	it("returns a human-readable size", () => {
 		expect(humanReadableSize(123)).toBe("123 B");
 		expect(humanReadableSize(1234)).toBe("1.23 kB");
 		expect(humanReadableSize(1000 * 1234)).toBe("1.23 MB");
+		expect(humanReadableSize(1024 * 1234, { binary: true })).toBe(
+			"1.21 MiB",
+		);
 	});
 
 	it("truncates number when byte size is exact", () => {

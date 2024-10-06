@@ -4,9 +4,9 @@ import {
 	ANIME_REGEX,
 	AUDIO_EXTENSIONS,
 	BOOK_EXTENSIONS,
-	Decision,
 	EP_REGEX,
 	LEVENSHTEIN_DIVISOR,
+	MediaType,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
 	RELEASE_GROUP_REGEX,
@@ -24,17 +24,6 @@ import { File, Searchee } from "./searchee.js";
 import chalk, { ChalkInstance } from "chalk";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { distance } from "fastest-levenshtein";
-
-export enum MediaType {
-	EPISODE = "episode",
-	SEASON = "pack",
-	MOVIE = "movie",
-	ANIME = "anime",
-	VIDEO = "video",
-	AUDIO = "audio",
-	BOOK = "book",
-	OTHER = "unknown",
-}
 
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
@@ -58,22 +47,32 @@ export function nMsAgo(n: number): number {
 export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
-export function humanReadableSize(bytes: number) {
-	const k = 1000;
-	const sizes = ["B", "kB", "MB", "GB", "TB"];
+
+export function humanReadableSize(
+	bytes: number,
+	options?: { binary: boolean },
+) {
+	if (bytes === 0) return "0 B";
+	const k = options?.binary ? 1024 : 1000;
+	const sizes = options?.binary
+		? ["B", "KiB", "MiB", "GiB", "TiB"]
+		: ["B", "kB", "MB", "GB", "TB"];
 	// engineering notation: (coefficient) * 1000 ^ (exponent)
 	const exponent = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
 	const coefficient = bytes / Math.pow(k, exponent);
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
+
 export function filesWithExt(files: File[], exts: string[]): File[] {
 	return files.filter((f) =>
 		exts.includes(path.extname(f.name.toLowerCase())),
 	);
 }
+
 export function hasExt(files: File[], exts: string[]): boolean {
 	return files.some((f) => exts.includes(path.extname(f.name.toLowerCase())));
 }
+
 export function getMediaType(searchee: Searchee): MediaType {
 	function unsupportedMediaType(searchee: Searchee): MediaType {
 		if (hasExt(searchee.files, AUDIO_EXTENSIONS)) {
@@ -102,18 +101,6 @@ export function getMediaType(searchee: Searchee): MediaType {
 			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
 		default:
 			return unsupportedMediaType(searchee);
-	}
-}
-
-export function shouldRecheck(searchee: Searchee, decision: Decision): boolean {
-	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
-	switch (decision) {
-		case Decision.MATCH:
-		case Decision.MATCH_SIZE_ONLY:
-			return false;
-		case Decision.MATCH_PARTIAL:
-		default:
-			return true;
 	}
 }
 
@@ -167,12 +154,14 @@ export async function time<R>(cb: () => R, times: number[]) {
 		times.push(performance.now() - before);
 	}
 }
+
 export function sanitizeUrl(url: string | URL): string {
 	if (typeof url === "string") {
 		url = new URL(url);
 	}
 	return url.origin + url.pathname;
 }
+
 /**
  * This cannot be done at the log level because of too many false positives.
  * The caller will need to extract the infoHash from their specific syntax.
@@ -185,6 +174,7 @@ export function sanitizeInfoHash(infoHash: string): string {
 export function getApikey(url: string) {
 	return new URL(url).searchParams.get("apikey");
 }
+
 export function cleanseSeparators(str: string): string {
 	return str
 		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "") // bracketed text
@@ -289,11 +279,15 @@ export function getLogString(
 
 export function formatAsList(
 	strings: string[],
-	options: { sort: boolean; type?: Intl.ListFormatType },
+	options: {
+		sort: boolean;
+		style?: Intl.ListFormatStyle;
+		type?: Intl.ListFormatType;
+	},
 ) {
 	if (options.sort) strings.sort((a, b) => a.localeCompare(b));
 	return new Intl.ListFormat("en", {
-		style: "long",
+		style: options.style ?? "long",
 		type: options.type ?? "conjunction",
 	}).format(strings);
 }
