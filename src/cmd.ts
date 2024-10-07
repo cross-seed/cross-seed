@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
-import ms from "ms";
 import { inspect } from "util";
 import { getApiKey, resetApiKey } from "./auth.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
@@ -26,11 +25,7 @@ import {
 	initializePushNotifier,
 	sendTestNotification,
 } from "./pushNotifier.js";
-import {
-	getRuntimeConfig,
-	RuntimeConfig,
-	setRuntimeConfig,
-} from "./runtimeConfig.js";
+import { RuntimeConfig, setRuntimeConfig } from "./runtimeConfig.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
@@ -300,31 +295,17 @@ program
 	)
 	.action(() => void generateConfig());
 
-createCommandWithSharedOptions(
-	"clear-cache",
-	"Clear the cache of downloaded-and-rejected torrents and re-search your library over a few weeks",
-).action(async (options) => {
-	validateAndSetRuntimeConfig(options);
-	const { excludeRecentSearch } = getRuntimeConfig();
-	console.log("Clearing cache, this may take a few minutes...");
-
-	await db("decision").whereNull("info_hash").del();
-	const now = Date.now();
-	const start = now - (excludeRecentSearch ?? 0);
-	const limit = ms("30 days");
-	const rows = await db("timestamp").select("searchee_id").distinct();
-	for (const row of rows) {
-		const offset = Math.floor(Math.random() * limit);
-		await db("timestamp")
-			.where({ searchee_id: row.searchee_id })
-			.update({
-				first_searched: now + offset,
-				last_searched: start + offset,
-			});
-	}
-
-	await db.destroy();
-});
+program
+	.command("clear-cache")
+	.description(
+		"Clear the cache without causing torrents to be re-snatched and reset the timestamps for excludeOlder and excludeRecentSearch",
+	)
+	.action(async () => {
+		console.log("Clearing cache, this may take a few minutes...");
+		await db("decision").whereNull("info_hash").del();
+		await db("timestamp").del();
+		await db.destroy();
+	});
 
 program
 	.command("clear-indexer-failures")
