@@ -3,7 +3,7 @@
 		"outDir": "./dist",
 		"allowJs": true,
 		"target": "es2022",
-		"lib": ["es2022"],
+		"lib": ["es2023"],
 		"module": "nodenext",
 		"esModuleInterop": true,
 		"resolveJsonModule": true,

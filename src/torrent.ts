@@ -286,9 +286,10 @@ export async function cacheEnsembleEntry(
 export async function indexNewTorrents(): Promise<void> {
 	const { seasonFromEpisodes, torrentDir } = getRuntimeConfig();
 	if (typeof torrentDir !== "string") return;
-	const dirContents = await findAllTorrentFilesInDir(torrentDir);
-	// index new torrents in the torrentDir
 
+	const dirContents = new Set(await findAllTorrentFilesInDir(torrentDir));
+
+	// Index new torrents in the torrentDir
 	for (const filepath of dirContents) {
 		const doesAlreadyExist = await db("torrent")
 			.select("id")
@@ -319,9 +320,19 @@ export async function indexNewTorrents(): Promise<void> {
 			}
 		}
 	}
-	// clean up torrents that no longer exist in the torrentDir
-	// this might be a slow query
-	await db("torrent").whereNotIn("file_path", dirContents).del();
+
+	const dbFiles = await db("torrent").select({ filePath: "file_path" });
+	const dbFilePaths: string[] = dbFiles.map((row) => row.filePath);
+
+	const filesToDelete = dbFilePaths.filter(
+		(filePath) => !dirContents.has(filePath),
+	);
+
+	const batchSize = 1000;
+	for (let i = 0; i < filesToDelete.length; i += batchSize) {
+		const batch = filesToDelete.slice(i, i + batchSize);
+		await db("torrent").whereIn("file_path", batch).del();
+	}
 }
 
 export async function indexEnsemble(): Promise<void> {
