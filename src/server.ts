@@ -12,6 +12,7 @@ import {
 	InjectionResult,
 	SaveResult,
 } from "./constants.js";
+import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import {
 	Candidate,
@@ -98,6 +99,22 @@ async function search(
 		res.end(e.message);
 		return;
 	}
+	const { torznab } = getRuntimeConfig();
+	if (torznab.length === 0 || (await getEnabledIndexers()).length === 0) {
+		const searchFailureReason = `No ${torznab.length === 0 ? "configured" : "available"} Torznab indexers`;
+		logger.warn({
+			label: Label.WEBHOOK,
+			message: `Received request but did not search: ${searchFailureReason}`,
+		});
+		logger.verbose({
+			label: Label.WEBHOOK,
+			message: `Received search request: ${inspect(data)}`,
+		});
+		res.writeHead(503);
+		res.end(searchFailureReason);
+		return;
+	}
+
 	const criteria: TorrentLocator = pick(data, ["infoHash", "path"]);
 
 	if (
