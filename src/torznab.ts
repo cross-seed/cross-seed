@@ -806,8 +806,12 @@ async function getAndLogIndexers(
 			(entry) => entry.indexerId === indexer.id,
 		);
 		if (!entry) return true;
-		if (entry.firstSearched < skipBefore) return false;
-		if (entry.lastSearched > skipAfter) return false;
+		if (entry.firstSearched && entry.firstSearched < skipBefore) {
+			return false;
+		}
+		if (entry.lastSearched && entry.lastSearched > skipAfter) {
+			return false;
+		}
 		return true;
 	});
 
