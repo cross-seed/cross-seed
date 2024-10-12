@@ -406,6 +406,7 @@ export const VALIDATION_SCHEMA = z
 	)
 	.refine(
 		(config) =>
+			process.env.DEV ||
 			config.action === Action.INJECT ||
 			(config.matchMode !== MatchMode.PARTIAL &&
 				!config.seasonFromEpisodes),

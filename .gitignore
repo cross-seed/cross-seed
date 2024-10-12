@@ -34,6 +34,7 @@ torrents/
 config.js
 output/
 input/
+links/
 *.heapsnapshot
 qbit/
 docker/
