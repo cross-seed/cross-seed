@@ -1,4 +1,11 @@
-import { existsSync, statSync, utimesSync, writeFileSync } from "fs";
+import {
+	existsSync,
+	statSync,
+	unlinkSync,
+	utimesSync,
+	writeFileSync,
+} from "fs";
+import ms from "ms";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
@@ -21,6 +28,7 @@ import {
 	findBlockedStringInReleaseMaybe,
 	isSingleEpisode,
 } from "./preFilter.js";
+import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	File,
@@ -39,7 +47,6 @@ import {
 	stripExtension,
 	wait,
 } from "./utils.js";
-import ms from "ms";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -414,10 +421,28 @@ function existsInTorrentCache(infoHash: string): boolean {
 	return true;
 }
 
-async function getCachedTorrentFile(infoHash: string): Promise<Metafile> {
-	return parseTorrentFromFilename(
-		path.join(appDir(), TORRENT_CACHE_FOLDER, `${infoHash}.cached.torrent`),
+async function getCachedTorrentFile(
+	infoHash: string,
+	options: { deleteOnFail: boolean } = { deleteOnFail: true },
+): Promise<Result<Metafile, Error>> {
+	const torrentPath = path.join(
+		appDir(),
+		TORRENT_CACHE_FOLDER,
+		`${infoHash}.cached.torrent`,
 	);
+	try {
+		return resultOf(await parseTorrentFromFilename(torrentPath));
+	} catch (e) {
+		logger.error({
+			label: Label.DECIDE,
+			message: `Failed to parse cached torrent ${sanitizeInfoHash(infoHash)}${options.deleteOnFail ? " - deleting" : ""}`,
+		});
+		logger.debug(e);
+		if (options.deleteOnFail) {
+			unlinkSync(torrentPath);
+		}
+		return resultOfErr(e);
+	}
 }
 
 function cacheTorrentFile(meta: Metafile): void {
@@ -510,7 +535,7 @@ export async function assessCandidateCaching(
 		)?.infoHash ?? (await fuzzyGuidLookup(guid));
 	const metaOrCandidate = metaInfoHash
 		? existsInTorrentCache(metaInfoHash)
-			? await getCachedTorrentFile(metaInfoHash)
+			? (await getCachedTorrentFile(metaInfoHash)).orElse(candidate)
 			: candidate
 		: candidate;
 	if (metaOrCandidate instanceof Metafile) {
