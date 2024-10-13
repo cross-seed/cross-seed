@@ -14,7 +14,12 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { extractCredentialsFromUrl, shouldRecheck, wait } from "../utils.js";
+import {
+	extractCredentialsFromUrl,
+	isTruthy,
+	shouldRecheck,
+	wait,
+} from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const COULD_NOT_FIND_INFO_HASH = "Could not find info-hash.";
@@ -48,40 +53,30 @@ async function createLibTorrentResumeTree(
 ): Promise<LibTorrentResume> {
 	async function getFileResumeData(
 		file: File,
-	): Promise<LibTorrentResumeFileEntry> {
+	): Promise<LibTorrentResumeFileEntry | null> {
 		const filePathWithoutFirstSegment = file.path
 			.split(sep)
 			.slice(1)
 			.join(sep);
-
 		const resolvedFilePath = resolve(basePath, filePathWithoutFirstSegment);
 		const fileStat = await stat(resolvedFilePath).catch(
 			() => ({ isFile: () => false }) as Stats,
 		);
 		if (!fileStat.isFile() || fileStat.size !== file.length) {
-			logger.debug({
-				label: Label.RTORRENT,
-				message: `File ${resolvedFilePath} either doesn't exist or is the wrong size.`,
-			});
-			return {
-				completed: 0,
-				mtime: 0,
-				priority: 0,
-			};
+			return null;
 		}
 
 		return {
 			completed: Math.ceil(file.length / meta.pieceLength),
 			mtime: Math.trunc(fileStat.mtimeMs / 1000),
-			priority: 0,
+			priority: 1,
 		};
 	}
 
+	const fileResumes = await Promise.all(meta.files.map(getFileResumeData));
 	return {
 		bitfield: Math.ceil(meta.length / meta.pieceLength),
-		files: await Promise.all<LibTorrentResumeFileEntry>(
-			meta.files.map(getFileResumeData),
-		),
+		files: fileResumes.filter(isTruthy),
 	};
 }
 
@@ -230,7 +225,8 @@ export default class RTorrent implements TorrentClient {
 		>
 	> {
 		if (path) {
-			const basePath = join(path, searchee.name);
+			// resolve to absolute because we send the path to rTorrent
+			const basePath = resolve(path, meta.name);
 			const directoryBase = meta.isSingleFileTorrent ? path : basePath;
 			return resultOf({ downloadDir: path, basePath, directoryBase });
 		} else {
