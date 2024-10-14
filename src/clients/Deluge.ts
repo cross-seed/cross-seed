@@ -237,10 +237,11 @@ export default class Deluge implements TorrentClient {
 	 */
 	async resumeInjection(
 		infoHash: string,
+		decision: DecisionAnyMatch,
 		options: { checkOnce: boolean },
 	): Promise<void> {
 		let sleepTime = resumeSleepTime;
-		const maxRemainingBytes = getMaxRemainingBytes();
+		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
 		while (Date.now() < stopTime) {
@@ -433,7 +434,7 @@ export default class Deluge implements TorrentClient {
 					// leaves torrent ready to download - ~99%
 					await wait(1000);
 					await this.recheckTorrent(newTorrent.infoHash);
-					this.resumeInjection(newTorrent.infoHash, {
+					this.resumeInjection(newTorrent.infoHash, decision, {
 						checkOnce: false,
 					});
 				}
