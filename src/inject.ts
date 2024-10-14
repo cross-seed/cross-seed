@@ -32,6 +32,7 @@ import {
 	getLogString,
 	isTruthy,
 	sanitizeInfoHash,
+	wait,
 } from "./utils.js";
 
 type AllMatches = {
@@ -99,6 +100,27 @@ async function deleteTorrentFileIfSafe(torrentFilePath: string): Promise<void> {
 			});
 			logger.debug(e);
 		}
+	}
+}
+
+async function deleteTorrentFileIfComplete(
+	torrentFilePath: string,
+	infoHash: string,
+	retries: number = 6,
+): Promise<void> {
+	for (let i = 0; i <= retries; i++) {
+		if ((await getClient()!.isTorrentComplete(infoHash)).orElse(false)) {
+			await deleteTorrentFileIfSafe(torrentFilePath);
+			return;
+		}
+		if (i >= retries) {
+			logger.info({
+				label: Label.INJECT,
+				message: `Will not delete ${getTorrentFilePathLog(torrentFilePath)}: torrent is incomplete`,
+			});
+			return;
+		}
+		await wait(ms("1 second") * 2 ** i);
 	}
 }
 
@@ -363,6 +385,8 @@ async function injectionAlreadyExists({
 	summary.INCOMPLETE_CANDIDATES += isComplete ? 0 : 1;
 	if (isComplete) {
 		await deleteTorrentFileIfSafe(torrentFilePath);
+	} else {
+		deleteTorrentFileIfComplete(torrentFilePath, meta.infoHash);
 	}
 }
 
@@ -394,12 +418,7 @@ async function injectionSuccess({
 	} else {
 		summary.FULL_MATCHES++;
 	}
-
-	const result = await getClient().isTorrentComplete(meta.infoHash);
-	const isComplete = result.orElse(false);
-	if (isComplete) {
-		await deleteTorrentFileIfSafe(torrentFilePath);
-	}
+	deleteTorrentFileIfComplete(torrentFilePath, meta.infoHash);
 }
 
 async function loadMetafile(
@@ -545,6 +564,10 @@ function logInjectSummary(summary: InjectSummary, flatLinking: boolean) {
 			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
 		});
 	}
+	logger.info({
+		label: Label.INJECT,
+		message: `Waiting on post-injection tasks to complete...`,
+	});
 }
 
 function createSummary(total: number): InjectSummary {
