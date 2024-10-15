@@ -125,7 +125,6 @@ module.exports = {
 	 * for you and friendlier for trackers.
 	 * Minimum value of 30.
 	 */
-
 	delay: 30,
 
 	/**
@@ -144,7 +143,6 @@ module.exports = {
 	 * or for Windows users
 	 *     dataDirs: ["C:\\My Data\\Downloads\\Movies"],
 	 */
-
 	dataDirs: [],
 
 	/**
