@@ -332,20 +332,25 @@ export default class RTorrent implements TorrentClient {
 
 		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
 
-		const loadType = shouldRecheck(searchee, decision)
-			? "load.normal"
-			: "load.start";
+		const recheck = shouldRecheck(searchee, decision);
+		const loadType = recheck ? "load.normal" : "load.start";
 
 		const retries = 5;
 		for (let i = 0; i < retries; i++) {
 			try {
-				await this.methodCallP<void>(loadType, [
-					"",
-					torrentFilePath,
-					`d.directory_base.set="${directoryBase}"`,
-					`d.custom1.set="${TORRENT_TAG}"`,
-					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
-				]);
+				await this.methodCallP<void>(
+					loadType,
+					[
+						"",
+						torrentFilePath,
+						`d.directory_base.set="${directoryBase}"`,
+						`d.custom1.set="${TORRENT_TAG}"`,
+						`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
+						recheck
+							? `d.check_hash=${meta.infoHash.toUpperCase()}`
+							: null,
+					].filter((e) => e !== null),
+				);
 				break;
 			} catch (e) {
 				logger.verbose({
