@@ -263,7 +263,7 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		? nMsAgo(excludeOlder)
 		: Number.NEGATIVE_INFINITY;
 	// Don't exclude if new indexer was added
-	if (!latest_first_search || latest_first_search !== MAX_INT) {
+	if (latest_first_search !== MAX_INT) {
 		if (earliest_first_search && earliest_first_search < skipBefore) {
 			logReason(
 				`its first search timestamp ${humanReadableDate(
