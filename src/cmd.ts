@@ -17,7 +17,7 @@ import { db } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { clearIndexerFailures } from "./indexers.js";
-import { injectSavedTorrents } from "./inject.js";
+import { injectSavedTorrents, restoreFromTorrentCache } from "./inject.js";
 import { jobsLoop } from "./jobs.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
@@ -465,6 +465,22 @@ createCommandWithSharedOptions(
 			await db.destroy();
 		}
 	});
+
+createCommandWithSharedOptions(
+	"restore",
+	"Use snatched torrents from torrent_cache to attempt to restore cross seeds. Will need to run `cross-seed inject` afterwards with dataDirs configured.",
+).action(async (options) => {
+	try {
+		await validateAndSetRuntimeConfig(options);
+		await db.migrate.latest();
+		await doStartupValidation();
+		await restoreFromTorrentCache();
+		await db.destroy();
+	} catch (e) {
+		exitOnCrossSeedErrors(e);
+		await db.destroy();
+	}
+});
 
 program.showHelpAfterError("(add --help for additional information)");
 
