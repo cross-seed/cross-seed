@@ -1,4 +1,3 @@
-import ms from "ms";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
@@ -10,7 +9,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { extractCredentialsFromUrl, shouldRecheck, wait } from "../utils.js";
+import { extractCredentialsFromUrl, shouldRecheck } from "../utils.js";
 import { TorrentClient } from "./TorrentClient.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
@@ -180,24 +179,19 @@ export default class Transmission implements TorrentClient {
 
 	async isTorrentComplete(
 		infoHash: string,
-		options = { retries: 3 },
 	): Promise<Result<boolean, "NOT_FOUND">> {
-		for (let i = 0; i <= options.retries; i++) {
-			const queryResponse = await this.request<TorrentGetResponseArgs>(
-				"torrent-get",
-				{
-					fields: ["percentDone"],
-					ids: [infoHash],
-				},
-			);
-			if (queryResponse.torrents.length === 0) {
-				return resultOfErr("NOT_FOUND");
-			}
-			const [{ percentDone }] = queryResponse.torrents;
-			if (percentDone === 1) return resultOf(true);
-			if (i < options.retries) await wait(ms("1 second") * 2 ** i);
+		const queryResponse = await this.request<TorrentGetResponseArgs>(
+			"torrent-get",
+			{
+				fields: ["percentDone"],
+				ids: [infoHash],
+			},
+		);
+		if (queryResponse.torrents.length === 0) {
+			return resultOfErr("NOT_FOUND");
 		}
-		return resultOf(false);
+		const [{ percentDone }] = queryResponse.torrents;
+		return resultOf(percentDone === 1);
 	}
 
 	async recheckTorrent(infoHash: string): Promise<void> {

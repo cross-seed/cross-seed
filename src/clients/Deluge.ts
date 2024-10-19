@@ -453,23 +453,17 @@ export default class Deluge implements TorrentClient {
 	/**
 	 * checks if a torrent is complete in deluge
 	 * @param infoHash the infoHash of the torrent to check
-	 * @param options.retries the number of times to retry the check
 	 * @return Result containing either a boolean or reason it was not provided
 	 */
 	async isTorrentComplete(
 		infoHash: string,
-		options = { retries: 3 },
 	): Promise<Result<boolean, "NOT_FOUND">> {
-		for (let i = 0; i <= options.retries; i++) {
-			try {
-				const torrentInfo = await this.getTorrentInfo(infoHash);
-				if (torrentInfo.complete) return resultOf(true);
-				if (i < options.retries) await wait(ms("1 second") * 2 ** i);
-			} catch (e) {
-				return resultOfErr("NOT_FOUND");
-			}
+		try {
+			const torrentInfo = await this.getTorrentInfo(infoHash);
+			return torrentInfo.complete ? resultOf(true) : resultOf(false);
+		} catch (e) {
+			return resultOfErr("NOT_FOUND");
 		}
-		return resultOf(false);
 	}
 
 	/**

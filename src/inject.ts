@@ -3,7 +3,10 @@ import { stat, unlink } from "fs/promises";
 import ms from "ms";
 import { basename, dirname } from "path";
 import { linkAllFilesInMetafile, performAction } from "./action.js";
-import { getClient } from "./clients/TorrentClient.js";
+import {
+	getClient,
+	waitForTorrentToComplete,
+} from "./clients/TorrentClient.js";
 import {
 	Decision,
 	DecisionAnyMatch,
@@ -106,11 +109,7 @@ async function deleteTorrentFileIfComplete(
 	torrentFilePath: string,
 	infoHash: string,
 ): Promise<void> {
-	if (
-		(await getClient().isTorrentComplete(infoHash, { retries: 6 })).orElse(
-			false,
-		)
-	) {
+	if (await waitForTorrentToComplete(infoHash)) {
 		await deleteTorrentFileIfSafe(torrentFilePath);
 	} else {
 		logger.info({
