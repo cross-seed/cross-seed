@@ -32,7 +32,6 @@ import {
 	getLogString,
 	isTruthy,
 	sanitizeInfoHash,
-	wait,
 } from "./utils.js";
 
 type AllMatches = {
@@ -106,21 +105,18 @@ async function deleteTorrentFileIfSafe(torrentFilePath: string): Promise<void> {
 async function deleteTorrentFileIfComplete(
 	torrentFilePath: string,
 	infoHash: string,
-	retries: number = 6,
 ): Promise<void> {
-	for (let i = 0; i <= retries; i++) {
-		if ((await getClient()!.isTorrentComplete(infoHash)).orElse(false)) {
-			await deleteTorrentFileIfSafe(torrentFilePath);
-			return;
-		}
-		if (i >= retries) {
-			logger.info({
-				label: Label.INJECT,
-				message: `Will not delete ${getTorrentFilePathLog(torrentFilePath)}: torrent is incomplete`,
-			});
-			return;
-		}
-		await wait(ms("1 second") * 2 ** i);
+	if (
+		(await getClient().isTorrentComplete(infoHash, { retries: 6 })).orElse(
+			false,
+		)
+	) {
+		await deleteTorrentFileIfSafe(torrentFilePath);
+	} else {
+		logger.info({
+			label: Label.INJECT,
+			message: `Will not delete ${getTorrentFilePathLog(torrentFilePath)}: torrent is incomplete`,
+		});
 	}
 }
 

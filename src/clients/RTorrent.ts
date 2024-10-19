@@ -1,5 +1,6 @@
 import type { Stats } from "fs";
 import { stat, unlink, writeFile } from "fs/promises";
+import ms from "ms";
 import { dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
@@ -280,18 +281,24 @@ export default class RTorrent implements TorrentClient {
 
 	async isTorrentComplete(
 		infoHash: string,
+		options = { retries: 3 },
 	): Promise<Result<boolean, "NOT_FOUND">> {
-		try {
-			const response = await this.methodCallP<string[]>("d.complete", [
-				infoHash,
-			]);
-			if (response.length === 0) {
+		for (let i = 0; i <= options.retries; i++) {
+			try {
+				const response = await this.methodCallP<string[]>(
+					"d.complete",
+					[infoHash],
+				);
+				if (response.length === 0) {
+					return resultOfErr("NOT_FOUND");
+				}
+				if (response[0] === "1") return resultOf(true);
+				if (i < options.retries) await wait(ms("1 second") * 2 ** i);
+			} catch (e) {
 				return resultOfErr("NOT_FOUND");
 			}
-			return resultOf(response[0] === "1");
-		} catch (e) {
-			return resultOfErr("NOT_FOUND");
 		}
+		return resultOf(false);
 	}
 
 	async recheckTorrent(infoHash: string): Promise<void> {

@@ -349,16 +349,20 @@ export default class QBittorrent implements TorrentClient {
 
 	/**
 	 * @param infoHash the infohash of the torrent
+	 * @param options.retries the number of retries to make
 	 * @returns whether the torrent is complete
 	 */
 	async isTorrentComplete(
 		infoHash: string,
+		options = { retries: 3 },
 	): Promise<Result<boolean, "NOT_FOUND">> {
-		const torrentInfo = await this.getTorrentInfo(infoHash);
-		if (!torrentInfo) {
-			return resultOfErr("NOT_FOUND");
+		for (let i = 0; i <= options.retries; i++) {
+			const torrentInfo = await this.getTorrentInfo(infoHash);
+			if (!torrentInfo) return resultOfErr("NOT_FOUND");
+			if (this.isTorrentInfoComplete(torrentInfo)) return resultOf(true);
+			if (i < options.retries) await wait(ms("1 second") * 2 ** i);
 		}
-		return resultOf(this.isTorrentInfoComplete(torrentInfo));
+		return resultOf(false);
 	}
 
 	isTorrentInfoComplete(torrentInfo: TorrentInfo): boolean {

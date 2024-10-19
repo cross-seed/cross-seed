@@ -13,6 +13,7 @@ let activeClient: TorrentClient;
 export interface TorrentClient {
 	isTorrentComplete: (
 		infoHash: string,
+		options?: { retries: number },
 	) => Promise<Result<boolean, "NOT_FOUND">>;
 	getDownloadDir: (
 		meta: SearcheeWithInfoHash | Metafile,
