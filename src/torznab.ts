@@ -430,7 +430,11 @@ export async function searchTorznab(
 ): Promise<IndexerCandidates[]> {
 	const { torznab } = getRuntimeConfig();
 	if (torznab.length === 0) {
-		throw new Error("no indexers are available");
+		logger.warn({
+			label: Label.SEARCH,
+			message: "no indexers are available, skipping search",
+		});
+		return [];
 	}
 
 	const mediaType = getMediaType(searchee);
