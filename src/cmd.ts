@@ -297,9 +297,13 @@ program
 
 program
 	.command("clear-cache")
-	.description("Clear the cache of downloaded-and-rejected torrents")
+	.description(
+		"Clear the cache without causing torrents to be re-snatched and reset the timestamps for excludeOlder and excludeRecentSearch",
+	)
 	.action(async () => {
+		console.log("Clearing cache...");
 		await db("decision").whereNull("info_hash").del();
+		await db("timestamp").del();
 		await db.destroy();
 	});
 
