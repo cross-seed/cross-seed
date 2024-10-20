@@ -1,8 +1,10 @@
+import ms from "ms";
 import { DecisionAnyMatch, InjectionResult } from "../constants.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import { wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
@@ -49,4 +51,19 @@ export function getClient(): TorrentClient {
 		instantiateDownloadClient();
 	}
 	return activeClient;
+}
+
+export async function waitForTorrentToComplete(
+	infoHash: string,
+	options = { retries: 6 },
+): Promise<boolean> {
+	for (let i = 0; i <= options.retries; i++) {
+		if ((await getClient()!.isTorrentComplete(infoHash)).orElse(false)) {
+			return true;
+		}
+		if (i < options.retries) {
+			await wait(ms("1 second") * 2 ** i);
+		}
+	}
+	return false;
 }
