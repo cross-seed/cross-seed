@@ -42,9 +42,9 @@ class Job {
 function getJobs(): Job[] {
 	const { action, rssCadence, searchCadence, torznab } = getRuntimeConfig();
 	const jobs: Job[] = [];
+	if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
+	if (searchCadence) jobs.push(new Job("search", searchCadence, main));
 	if (torznab.length > 0) {
-		if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
-		if (searchCadence) jobs.push(new Job("search", searchCadence, main));
 		jobs.push(new Job("updateIndexerCaps", ms("1 day"), updateCaps));
 	}
 	if (action === Action.INJECT) {
