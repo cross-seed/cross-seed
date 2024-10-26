@@ -15,6 +15,7 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import {
 	extractCredentialsFromUrl,
+	extractInt,
 	getLogString,
 	sanitizeInfoHash,
 	shouldRecheck,
@@ -83,6 +84,8 @@ interface TorrentInfo {
 export default class QBittorrent implements TorrentClient {
 	cookie: string;
 	url: { username: string; password: string; href: string };
+	version: string;
+	versionMajor: number;
 
 	constructor() {
 		const { qbittorrentUrl } = getRuntimeConfig();
@@ -118,6 +121,22 @@ export default class QBittorrent implements TorrentClient {
 				`qBittorrent login failed: Invalid username or password`,
 			);
 		}
+		const version = await this.request(
+			"/app/version",
+			"",
+			X_WWW_FORM_URLENCODED,
+		);
+		if (!version) {
+			throw new CrossSeedError(
+				`qBittorrent login failed: Unable to retrieve version`,
+			);
+		}
+		this.version = version;
+		this.versionMajor = extractInt(this.version);
+		logger.info({
+			label: Label.QBITTORRENT,
+			message: `Logged in to qBittorrent ${this.version}`,
+		});
 	}
 
 	async validateConfig(): Promise<void> {
@@ -239,7 +258,7 @@ export default class QBittorrent implements TorrentClient {
 	async recheckTorrent(infoHash: string): Promise<void> {
 		// Pause first as it may resume after recheck automatically
 		await this.request(
-			"/torrents/pause",
+			`/torrents/${this.versionMajor >= 5 ? "stop" : "pause"}`,
 			`hashes=${infoHash}`,
 			X_WWW_FORM_URLENCODED,
 		);
@@ -452,7 +471,10 @@ export default class QBittorrent implements TorrentClient {
 				this.getLayoutForNewTorrent(searchee, searcheeInfo, path),
 			);
 			formData.append("skip_checking", (!toRecheck).toString());
-			formData.append("paused", toRecheck.toString());
+			formData.append(
+				this.versionMajor >= 5 ? "stopped" : "paused",
+				toRecheck.toString(),
+			);
 			// for some reason the parser parses the last kv pair incorrectly
 			// it concats the value and the sentinel
 			formData.append("foo", "bar");
