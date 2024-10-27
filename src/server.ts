@@ -23,12 +23,14 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
 import { formatAsList, sanitizeInfoHash } from "./utils.js";
 
-const ANNOUNCE_SCHEMA = z.object({
-	guid: z.string(),
-	name: z.string(),
-	link: z.string(),
-	tracker: z.string(),
-});
+const ANNOUNCE_SCHEMA = z
+	.object({
+		guid: z.string(),
+		name: z.string(),
+		link: z.string().url(),
+		tracker: z.string(),
+	})
+	.strict();
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
