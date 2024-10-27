@@ -20,7 +20,7 @@ import {
 } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
-import { sanitizeInfoHash } from "./utils.js";
+import { formatAsList, isTruthy, sanitizeInfoHash } from "./utils.js";
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -217,15 +217,14 @@ async function announce(
 		return;
 	}
 
-	if (
-		!(
-			"guid" in data &&
-			"name" in data &&
-			"link" in data &&
-			"tracker" in data
-		)
-	) {
-		const message = "Missing params: {guid, name, link, tracker} required";
+	const missingParams = [
+		"guid" in data ? "" : "guid",
+		"name" in data ? "" : "name",
+		"link" in data ? "" : "link",
+		"tracker" in data ? "" : "tracker",
+	].filter(isTruthy);
+	if (missingParams.length > 0) {
+		const message = `Missing required params: {${formatAsList(missingParams, { sort: true, type: "unit" })}} in ${inspect(data)}`;
 		logger.error({
 			label: Label.ANNOUNCE,
 			message,
