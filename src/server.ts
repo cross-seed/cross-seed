@@ -4,6 +4,7 @@ import http, { IncomingMessage, ServerResponse } from "http";
 import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
+import { z } from "zod";
 import { checkApiKey } from "./auth.js";
 import {
 	ActionResult,
@@ -20,7 +21,14 @@ import {
 } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
-import { formatAsList, isTruthy, sanitizeInfoHash } from "./utils.js";
+import { formatAsList, sanitizeInfoHash } from "./utils.js";
+
+const ANNOUNCE_SCHEMA = z.object({
+	guid: z.string(),
+	name: z.string(),
+	link: z.string(),
+	tracker: z.string(),
+});
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -217,18 +225,14 @@ async function announce(
 		return;
 	}
 
-	const missingParams = [
-		"guid" in data ? "" : "guid",
-		"name" in data ? "" : "name",
-		"link" in data ? "" : "link",
-		"tracker" in data ? "" : "tracker",
-	].filter(isTruthy);
-	if (missingParams.length > 0) {
-		const message = `Missing required params: {${formatAsList(missingParams, { sort: true, type: "unit" })}} in ${inspect(data)}`;
-		logger.error({
-			label: Label.ANNOUNCE,
-			message,
-		});
+	try {
+		data = ANNOUNCE_SCHEMA.parse(data);
+	} catch ({ errors }) {
+		const message = `Missing required params: {${formatAsList(
+			errors.map(({ path }) => path.join(".")),
+			{ sort: true, type: "unit" },
+		)}} in ${inspect(data)}`;
+		logger.error({ label: Label.ANNOUNCE, message });
 		res.writeHead(400);
 		res.end(message);
 		return;
