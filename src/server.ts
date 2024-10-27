@@ -34,10 +34,10 @@ const ANNOUNCE_SCHEMA = z
 
 const WEBHOOK_SCHEMA = z
 	.object({
-		infoHash: z.string().length(40).nullish(),
+		infoHash: z.string().length(40).optional(),
 		path: z
 			.string()
-			.nullish()
+			.optional()
 			.refine((path) => !path || existsSync(path)),
 	})
 	.strict()
