@@ -32,6 +32,17 @@ const ANNOUNCE_SCHEMA = z
 	})
 	.strict();
 
+const WEBHOOK_SCHEMA = z
+	.object({
+		infoHash: z.string().length(40).nullish(),
+		path: z
+			.string()
+			.nullish()
+			.refine((path) => !path || existsSync(path)),
+	})
+	.strict()
+	.refine((data) => data.infoHash || data.path);
+
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
 		const chunks: string[] = [];
@@ -108,23 +119,12 @@ async function search(
 		res.end(e.message);
 		return;
 	}
-	const criteria: TorrentLocator = pick(data, ["infoHash", "path"]);
+	let criteria: TorrentLocator = pick(data, ["infoHash", "path"]);
 
-	if (
-		!(
-			(criteria.infoHash && criteria.infoHash.length === 40) ||
-			(criteria.path &&
-				criteria.path.length > 0 &&
-				existsSync(criteria.path))
-		)
-	) {
-		logger.info({
-			label: Label.WEBHOOK,
-			message: `Received search request: ${inspect(criteria)}`,
-		});
-
-		const message =
-			"A valid infoHash or accessible path must be provided (infoHash is preferred).";
+	try {
+		criteria = WEBHOOK_SCHEMA.parse(criteria) as TorrentLocator;
+	} catch {
+		const message = `A valid infoHash or accessible path must be provided (infoHash is preferred): ${inspect(criteria)}`;
 		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);
