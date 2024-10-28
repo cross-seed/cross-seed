@@ -34,13 +34,11 @@ const ANNOUNCE_SCHEMA = z
 
 const WEBHOOK_SCHEMA = z
 	.object({
-		infoHash: z.string().length(40).optional(),
-		path: z
-			.string()
-			.optional()
-			.refine((path) => !path || existsSync(path)),
+		infoHash: z.string().length(40),
+		path: z.string().refine((path) => !path || existsSync(path)),
 	})
 	.strict()
+	.partial()
 	.refine((data) => data.infoHash || data.path);
 
 function getData(req: IncomingMessage): Promise<string> {
