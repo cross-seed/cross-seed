@@ -489,11 +489,9 @@ export async function scanRssFeeds() {
 		});
 		return;
 	}
-	const lastRun_db =
+	const lastRun =
 		(await db("job_log").select("last_run").where({ name: "rss" }).first())
 			?.last_run ?? 0;
-	// mitigate RSS publishing lag with a 5 minutes delay
-	const lastRun = lastRun_db - 300000;
 	logger.verbose({
 		label: Label.RSS,
 		message: "Indexing new torrents...",

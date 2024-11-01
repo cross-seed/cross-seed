@@ -415,11 +415,13 @@ export async function* rssPager(
 }
 
 export async function* queryRssFeeds(
-	pageBackUntil: number,
+	previousRunTime: number,
 ): AsyncGenerator<Candidate> {
 	const indexers = await getEnabledIndexers();
+	// offset -5m for delayed RSS -> publishing time
+	const timeWithOffset = previousRunTime - 300000;
 	yield* combineAsyncIterables(
-		indexers.map((indexer) => rssPager(indexer, pageBackUntil)),
+		indexers.map((indexer) => rssPager(indexer, timeWithOffset)),
 	);
 }
 
