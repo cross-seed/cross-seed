@@ -122,7 +122,7 @@ async function search(
 	try {
 		criteria = WEBHOOK_SCHEMA.parse(criteria) as TorrentLocator;
 	} catch {
-		const message = `A valid infoHash or accessible path must be provided (infoHash is preferred): ${inspect(criteria)}`;
+		const message = `A valid infoHash or accessible path must be provided (infoHash is preferred, https://www.cross-seed.org/docs/basics/daemon#set-up-automatic-searches-for-finished-downloads): ${inspect(criteria)}`;
 		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);
@@ -228,7 +228,7 @@ async function announce(
 	try {
 		data = ANNOUNCE_SCHEMA.parse(data);
 	} catch ({ errors }) {
-		const message = `Missing required params: {${formatAsList(
+		const message = `Missing required params (https://www.cross-seed.org/docs/v6-migration#autobrr-update): {${formatAsList(
 			errors.map(({ path }) => path.join(".")),
 			{ sort: true, type: "unit" },
 		)}} in ${inspect(data)}`;
@@ -287,25 +287,17 @@ async function handleRequest(
 		return;
 	}
 
-	switch (req.url!.split("?")[0]) {
-		case "/api/webhook": {
-			logger.verbose({
-				label: Label.SERVER,
-				message: "POST /api/webhook",
-			});
+	const endpoint = req.url!.split("?")[0];
+	switch (endpoint) {
+		case "/api/webhook":
 			return search(req, res);
-		}
-
-		case "/api/announce": {
-			logger.verbose({
-				label: Label.SERVER,
-				message: "POST /api/announce",
-			});
+		case "/api/announce":
 			return announce(req, res);
-		}
 		default: {
+			const message = `Unknown endpoint: ${endpoint}`;
+			logger.error({ label: Label.SERVER, message });
 			res.writeHead(404);
-			res.end("Endpoint not found");
+			res.end(message);
 			return;
 		}
 	}
