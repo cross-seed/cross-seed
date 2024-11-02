@@ -41,7 +41,7 @@ const WEBHOOK_SCHEMA = z
 	})
 	.strict()
 	.partial()
-	.refine((data) => data.infoHash || data.path);
+	.refine((data) => Object.keys(data).length === 1);
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
