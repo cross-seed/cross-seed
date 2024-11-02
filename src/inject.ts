@@ -1,18 +1,21 @@
 import chalk from "chalk";
 import { stat, unlink } from "fs/promises";
 import ms from "ms";
-import { basename, dirname } from "path";
+import { copyFileSync, existsSync } from "fs";
+import path, { basename, dirname } from "path";
 import { linkAllFilesInMetafile, performAction } from "./action.js";
 import {
 	getClient,
 	waitForTorrentToComplete,
 } from "./clients/TorrentClient.js";
+import { appDir } from "./configuration.js";
 import {
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
 	isAnyMatchedDecision,
 	SaveResult,
+	TORRENT_CACHE_FOLDER,
 	UNKNOWN_TRACKER,
 } from "./constants.js";
 import { assessCandidate } from "./decide.js";
@@ -34,6 +37,7 @@ import {
 	formatAsList,
 	getLogString,
 	isTruthy,
+	MediaType,
 	sanitizeInfoHash,
 } from "./utils.js";
 
@@ -605,4 +609,38 @@ export async function injectSavedTorrents(): Promise<void> {
 		await injectSavedTorrent(progress, torrentFilePath, summary, searchees);
 	}
 	logInjectSummary(summary, flatLinking);
+}
+
+export async function restoreFromTorrentCache(): Promise<void> {
+	const { outputDir } = getRuntimeConfig();
+	const torrentFilePaths = await findAllTorrentFilesInDir(
+		path.join(appDir(), TORRENT_CACHE_FOLDER),
+	);
+	if (torrentFilePaths.length === 0) {
+		console.log("No torrent files found to restore from cache");
+		return;
+	}
+	console.log(
+		`Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to restore from cache, copying to outputDir...`,
+	);
+	let existed = 0;
+	for (const [i, torrentFilePath] of torrentFilePaths.entries()) {
+		const dest = path.join(
+			outputDir,
+			`[${MediaType.OTHER}][${UNKNOWN_TRACKER}]${basename(torrentFilePath)}`,
+		);
+		if (existsSync(dest)) {
+			existed++;
+			continue;
+		}
+		copyFileSync(torrentFilePath, dest);
+		if ((i + 1) % 100 === 0) {
+			console.log(
+				`${chalk.blue(`(${i + 1}/${torrentFilePaths.length})`)} ${chalk.bold.magenta(dest)}`,
+			);
+		}
+	}
+	console.log(
+		`Copied ${chalk.bold.green(torrentFilePaths.length - existed)}/${chalk.bold.white(torrentFilePaths.length)} torrent file(s) from cache to outputDir, run "${chalk.bold.white("cross-seed inject")}" to inject into client using your dataDirs`,
+	);
 }
