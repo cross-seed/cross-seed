@@ -124,7 +124,7 @@ async function search(
 	try {
 		criteria = WEBHOOK_SCHEMA.parse(criteria) as TorrentLocator;
 	} catch {
-		const message = `A valid infoHash or accessible path must be provided (infoHash is preferred, https://www.cross-seed.org/docs/basics/daemon#set-up-automatic-searches-for-finished-downloads): ${inspect(criteria)}`;
+		const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/basics/daemon#set-up-automatic-searches-for-finished-downloads): ${inspect(criteria)}`;
 		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);
