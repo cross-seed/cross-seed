@@ -30,7 +30,9 @@ const ANNOUNCE_SCHEMA = z
 		link: z.string().url(),
 		tracker: z.string().refine((tracker) => tracker.trim().length > 0),
 	})
-	.strict();
+	.strict()
+	.required()
+	.refine((data) => data.guid === data.link);
 
 const WEBHOOK_SCHEMA = z
 	.object({
@@ -231,7 +233,7 @@ async function announce(
 		const message = `Missing required params (https://www.cross-seed.org/docs/v6-migration#autobrr-update): {${formatAsList(
 			errors.map(({ path }) => path.join(".")),
 			{ sort: true, type: "unit" },
-		)}} in ${inspect(data)}`;
+		)}} in ${inspect(data)}\n${inspect(errors)}`;
 		logger.error({ label: Label.ANNOUNCE, message });
 		res.writeHead(400);
 		res.end(message);
