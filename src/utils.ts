@@ -8,6 +8,7 @@ import {
 	BOOK_EXTENSIONS,
 	Decision,
 	EP_REGEX,
+	JSON_VALUES_REGEX,
 	LEVENSHTEIN_DIVISOR,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
@@ -356,6 +357,16 @@ export function replaceLastOccurrence(
 		str.slice(0, lastMatchIndex) +
 		newStr +
 		str.slice(lastMatchIndex + lastMatchStr.length)
+	);
+}
+
+export function escapeUnescapedQuotesInJsonValues(jsonStr: string): string {
+	return jsonStr.replace(
+		JSON_VALUES_REGEX,
+		(match, _p1, _offset, _str, groups) => {
+			const escapedValue = groups.value.replace(/(?<!\\)"/g, '\\"');
+			return match.replace(groups.value, escapedValue);
+		},
 	);
 }
 

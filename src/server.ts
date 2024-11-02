@@ -4,6 +4,7 @@ import http, { IncomingMessage, ServerResponse } from "http";
 import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
+import { z } from "zod";
 import { checkApiKey } from "./auth.js";
 import {
 	ActionResult,
@@ -20,7 +21,27 @@ import {
 } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { indexNewTorrents, TorrentLocator } from "./torrent.js";
-import { sanitizeInfoHash } from "./utils.js";
+import { formatAsList, sanitizeInfoHash } from "./utils.js";
+
+const ANNOUNCE_SCHEMA = z
+	.object({
+		name: z.string().refine((name) => name.trim().length > 0),
+		guid: z.string().url(),
+		link: z.string().url(),
+		tracker: z.string().refine((tracker) => tracker.trim().length > 0),
+	})
+	.strict()
+	.required()
+	.refine((data) => data.guid === data.link);
+
+const WEBHOOK_SCHEMA = z
+	.object({
+		infoHash: z.string().length(40),
+		path: z.string().refine((path) => !path || existsSync(path)),
+	})
+	.strict()
+	.partial()
+	.refine((data) => Object.keys(data).length === 1);
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -98,23 +119,12 @@ async function search(
 		res.end(e.message);
 		return;
 	}
-	const criteria: TorrentLocator = pick(data, ["infoHash", "path"]);
+	let criteria: TorrentLocator = pick(data, ["infoHash", "path"]);
 
-	if (
-		!(
-			(criteria.infoHash && criteria.infoHash.length === 40) ||
-			(criteria.path &&
-				criteria.path.length > 0 &&
-				existsSync(criteria.path))
-		)
-	) {
-		logger.info({
-			label: Label.WEBHOOK,
-			message: `Received search request: ${inspect(criteria)}`,
-		});
-
-		const message =
-			"A valid infoHash or accessible path must be provided (infoHash is preferred).";
+	try {
+		criteria = WEBHOOK_SCHEMA.parse(criteria) as TorrentLocator;
+	} catch {
+		const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/basics/daemon#set-up-automatic-searches-for-finished-downloads): ${inspect(criteria)}`;
 		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);
@@ -217,19 +227,14 @@ async function announce(
 		return;
 	}
 
-	if (
-		!(
-			"guid" in data &&
-			"name" in data &&
-			"link" in data &&
-			"tracker" in data
-		)
-	) {
-		const message = "Missing params: {guid, name, link, tracker} required";
-		logger.error({
-			label: Label.ANNOUNCE,
-			message,
-		});
+	try {
+		data = ANNOUNCE_SCHEMA.parse(data);
+	} catch ({ errors }) {
+		const message = `Missing required params (https://www.cross-seed.org/docs/v6-migration#autobrr-update): {${formatAsList(
+			errors.map(({ path }) => path.join(".")),
+			{ sort: true, type: "unit" },
+		)}} in ${inspect(data)}\n${inspect(errors)}`;
+		logger.error({ label: Label.ANNOUNCE, message });
 		res.writeHead(400);
 		res.end(message);
 		return;
@@ -284,25 +289,17 @@ async function handleRequest(
 		return;
 	}
 
-	switch (req.url!.split("?")[0]) {
-		case "/api/webhook": {
-			logger.verbose({
-				label: Label.SERVER,
-				message: "POST /api/webhook",
-			});
+	const endpoint = req.url!.split("?")[0];
+	switch (endpoint) {
+		case "/api/webhook":
 			return search(req, res);
-		}
-
-		case "/api/announce": {
-			logger.verbose({
-				label: Label.SERVER,
-				message: "POST /api/announce",
-			});
+		case "/api/announce":
 			return announce(req, res);
-		}
 		default: {
+			const message = `Unknown endpoint: ${endpoint}`;
+			logger.error({ label: Label.SERVER, message });
 			res.writeHead(404);
-			res.end("Endpoint not found");
+			res.end(message);
 			return;
 		}
 	}
