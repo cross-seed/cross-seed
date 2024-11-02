@@ -25,10 +25,10 @@ import { formatAsList, sanitizeInfoHash } from "./utils.js";
 
 const ANNOUNCE_SCHEMA = z
 	.object({
-		guid: z.string(),
-		name: z.string(),
+		name: z.string().refine((name) => name.trim().length > 0),
+		guid: z.string().url(),
 		link: z.string().url(),
-		tracker: z.string(),
+		tracker: z.string().refine((tracker) => tracker.trim().length > 0),
 	})
 	.strict();
 
