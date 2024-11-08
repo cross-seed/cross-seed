@@ -44,6 +44,7 @@ import {
 	getApikey,
 	getLogString,
 	getMediaType,
+	humanReadableDate,
 	isTruthy,
 	MediaType,
 	nMsAgo,
@@ -365,7 +366,7 @@ export async function* rssPager(
 		} catch (e) {
 			logger.error({
 				label: Label.TORZNAB,
-				message: `Paging indexer ${indexer.id} stopped: request failed for page ${i + 1}`,
+				message: `Paging indexer ${indexer.url} stopped: request failed for page ${i + 1}`,
 			});
 			logger.debug(e);
 			return;
@@ -390,21 +391,38 @@ export async function* rssPager(
 			);
 		}
 
+		// Indexer timestamps cannot be trusted, pubDate could be always < pageBackUntil.
+		if (i === 0) {
+			logger.verbose({
+				label: Label.TORZNAB,
+				message: `${currentPageCandidates.length} candidates on indexer ${indexer.url} page 1`,
+			});
+			yield* currentPageCandidates;
+		}
+
 		if (!newCandidates.length) {
 			logger.verbose({
 				label: Label.TORZNAB,
-				message: `Paging indexer ${indexer.id} stopped: nothing new in page ${i + 1}`,
+				message: `Paging indexer ${indexer.url} stopped: nothing new in page ${i + 1}`,
 			});
 			return;
 		}
 
-		logger.verbose({
-			label: Label.TORZNAB,
-			message: `${newCandidates.length} new candidates on indexer ${indexer.id} page ${i + 1}`,
-		});
+		if (i > 0) {
+			logger.verbose({
+				label: Label.TORZNAB,
+				message: `${newCandidates.length} new candidates on indexer ${indexer.url} page ${i + 1}`,
+			});
+			yield* newCandidates;
+		}
 
-		// yield each new candidate
-		yield* newCandidates;
+		if (currentPageEarliest < pageBackUntil) {
+			logger.verbose({
+				label: Label.TORZNAB,
+				message: `Paging indexer ${indexer.url} stopped: page ${i + 1} oldest candidate ${humanReadableDate(currentPageEarliest)} < ${humanReadableDate(pageBackUntil)}`,
+			});
+			return;
+		}
 
 		earliestSeen = Math.min(earliestSeen, currentPageEarliest);
 	}

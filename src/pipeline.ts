@@ -510,6 +510,6 @@ export async function scanRssFeeds() {
 
 	logger.info({
 		label: Label.RSS,
-		message: `RSS scan complete - checked ${i} new candidates since ${humanReadableDate(lastRun)}`,
+		message: `RSS scan complete: checked ${i} candidates - previous run was at ${humanReadableDate(lastRun)}`,
 	});
 }
