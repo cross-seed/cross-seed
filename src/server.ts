@@ -276,25 +276,33 @@ async function announce(
 		res.end(e.message);
 	}
 }
-
+async function statusCheck(
+	req: IncomingMessage,
+	res: ServerResponse,
+): Promise<void> {
+	res.writeHead(200);
+	res.end("OK");
+}
 async function handleRequest(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
 	if (!(await authorize(req, res))) return;
+	const endpoint = req.url!.split("?")[0];
 
-	if (req.method !== "POST") {
+	if (req.method !== "POST" && endpoint !== "/api/status") {
 		res.writeHead(405);
 		res.end("Methods allowed: POST");
 		return;
 	}
 
-	const endpoint = req.url!.split("?")[0];
 	switch (endpoint) {
 		case "/api/webhook":
 			return search(req, res);
 		case "/api/announce":
 			return announce(req, res);
+		case "/api/status":
+			return statusCheck(req, res);
 		default: {
 			const message = `Unknown endpoint: ${endpoint}`;
 			logger.error({ label: Label.SERVER, message });
