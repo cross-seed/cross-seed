@@ -70,7 +70,7 @@ function logDecision(
 		case Decision.MATCH:
 			return;
 		case Decision.FUZZY_SIZE_MISMATCH:
-			reason = `the total sizes are outside of the fuzzySizeThreshold range: ${Math.abs((candidate.size! - searchee.length) / searchee.length).toFixed(3)} > ${getFuzzySizeFactor()}`;
+			reason = `the total sizes are outside of the fuzzySizeThreshold range: ${Math.abs((candidate.size! - searchee.length) / searchee.length).toFixed(3)} > ${getFuzzySizeFactor(searchee)}`;
 			break;
 		case Decision.SIZE_MISMATCH:
 			reason = `some files are missing or have different sizes${compareFileTreesPartial(metafile!, searchee) ? ` (will match in partial match mode)` : ""}`;
@@ -138,12 +138,21 @@ export function compareFileTrees(
 	candidate: Metafile,
 	searchee: Searchee,
 ): boolean {
-	const cmp = (elOfA: File, elOfB: File) => {
-		const lengthsAreEqual = elOfB.length === elOfA.length;
-		const pathsAreEqual = elOfB.path === elOfA.path;
-
-		return lengthsAreEqual && pathsAreEqual;
-	};
+	let cmp: (elOfA: File, elOfB: File) => boolean;
+	if (!searchee.infoHash && !searchee.path) {
+		// Absolute path so need name
+		cmp = (elOfA: File, elOfB: File) => {
+			const lengthsAreEqual = elOfB.length === elOfA.length;
+			const namesAreEqual = elOfB.name === elOfA.name;
+			return lengthsAreEqual && namesAreEqual;
+		};
+	} else {
+		cmp = (elOfA: File, elOfB: File) => {
+			const lengthsAreEqual = elOfB.length === elOfA.length;
+			const pathsAreEqual = elOfB.path === elOfA.path;
+			return lengthsAreEqual && pathsAreEqual;
+		};
+	}
 
 	return candidate.files.every((elOfA) =>
 		searchee.files.some((elOfB) => cmp(elOfA, elOfB)),
@@ -212,11 +221,11 @@ export function compareFileTreesPartial(
 	}
 	const totalPieces = Math.ceil(candidate.length / candidate.pieceLength);
 	const availablePieces = Math.floor(matchedSizes / candidate.pieceLength);
-	return availablePieces / totalPieces >= getMinSizeRatio();
+	return availablePieces / totalPieces >= getMinSizeRatio(searchee);
 }
 
 function fuzzySizeDoesMatch(resultSize: number, searchee: Searchee) {
-	const fuzzySizeFactor = getFuzzySizeFactor();
+	const fuzzySizeFactor = getFuzzySizeFactor(searchee);
 
 	const { length } = searchee;
 	const lowerBound = length - fuzzySizeFactor * length;
@@ -386,7 +395,8 @@ export async function assessCandidate(
 
 	if (matchMode === MatchMode.PARTIAL) {
 		const partialSizeMatch =
-			getPartialSizeRatio(metafile, searchee) >= getMinSizeRatio();
+			getPartialSizeRatio(metafile, searchee) >=
+			getMinSizeRatio(searchee);
 		if (!partialSizeMatch) {
 			return { decision: Decision.PARTIAL_SIZE_MISMATCH, metafile };
 		}
@@ -475,7 +485,7 @@ async function assessAndSaveResults(
 					decision: assessment.decision,
 					first_seen: firstSeen,
 					last_seen: Date.now(),
-					fuzzy_size_factor: getFuzzySizeFactor(),
+					fuzzy_size_factor: getFuzzySizeFactor(searchee),
 				})
 				.onConflict(["searchee_id", "guid"])
 				.merge();

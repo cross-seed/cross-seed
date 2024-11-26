@@ -34,10 +34,14 @@ const ZodErrorMessages = {
 		"excludeRecentSearch must be at least 3x searchCadence.",
 	excludeRecentOlder:
 		"excludeOlder and excludeRecentSearch must be defined for searching. excludeOlder must be 2-5x excludeRecentSearch.",
-	fuzzySizeThreshold:
-		"fuzzySizeThreshold must be between 0 and 1 with a maximum of 0.1 when using searchCadence or rssCadence",
 	injectNeedsInjectMode: "`cross-seed inject` requires the 'inject' action.",
 	maxRemainingForResumeMax: "maxRemainingForResume must be between 0 and 50.",
+	numberMustBeRatio:
+		"fuzzySizeThreshold and seasonFromEpisodes must be between 0 and 1.",
+	fuzzySizeThresholdMax:
+		"fuzzySizeThreshold cannot be greater than 0.1 when using searchCadence or rssCadence.",
+	seasonFromEpisodesMin:
+		"seasonFromEpisodes cannot be less than 0.5 when using searchCadence",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
@@ -50,9 +54,10 @@ const ZodErrorMessages = {
 		"torrentDir must contain at least one .torrent file (https://www.cross-seed.org/docs/basics/options#torrentdir). If no torrents are in client, set to null for now.",
 	needsTorrentDir:
 		"You need to set torrentDir for rss and announce matching to work.",
-	needsInject: "You need to use the 'inject' action for partial matching.",
+	needsInject:
+		"You need to use the 'inject' action for partial matching or seasonFromEpisodes.",
 	needsLinkDir:
-		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
+		"You need to set a linkDir (and have your data accessible) for risky/partial matching and seasonFromEpisodes to work.",
 	linkDirInOtherDirs:
 		"You cannot have your linkDir inside of your torrentDir/dataDirs/outputDir. Please adjust your paths to correct this.",
 	dataDirsInOtherDirs:
@@ -63,6 +68,8 @@ const ZodErrorMessages = {
 		"You cannot have your outputDir inside of your torrentDir/dataDirs/linkDir. Please adjust your paths to correct this.",
 	relativePaths:
 		"Absolute paths for torrentDir, linkDir, dataDirs, and outputDir are recommended.",
+	needsPartial:
+		"seasonFromEpisodes requires matchMode partial if enabled and value is below 1.",
 };
 
 /**
@@ -268,7 +275,12 @@ export const VALIDATION_SCHEMA = z
 		fuzzySizeThreshold: z
 			.number()
 			.positive()
-			.lte(1, ZodErrorMessages.fuzzySizeThreshold),
+			.lte(1, ZodErrorMessages.numberMustBeRatio),
+		seasonFromEpisodes: z
+			.number()
+			.positive()
+			.lte(1, ZodErrorMessages.numberMustBeRatio)
+			.nullish(),
 		excludeOlder: z
 			.string()
 			.min(1, ZodErrorMessages.emptyString)
@@ -378,7 +390,14 @@ export const VALIDATION_SCHEMA = z
 		(config) =>
 			config.fuzzySizeThreshold <= 0.1 ||
 			(!config.searchCadence && !config.rssCadence),
-		ZodErrorMessages.fuzzySizeThreshold,
+		ZodErrorMessages.fuzzySizeThresholdMax,
+	)
+	.refine(
+		(config) =>
+			(!config.searchCadence && !config.rssCadence) ||
+			!config.seasonFromEpisodes ||
+			config.seasonFromEpisodes >= 0.5,
+		ZodErrorMessages.seasonFromEpisodesMin,
 	)
 	.refine((config) => {
 		if (
@@ -416,7 +435,8 @@ export const VALIDATION_SCHEMA = z
 		(config) =>
 			process.env.DEV ||
 			config.action === Action.INJECT ||
-			config.matchMode !== MatchMode.PARTIAL,
+			(config.matchMode !== MatchMode.PARTIAL &&
+				!config.seasonFromEpisodes),
 		ZodErrorMessages.needsInject,
 	)
 	.refine(
@@ -424,9 +444,17 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.needsTorrentDir,
 	)
 	.refine(
-		(config) => config.linkDir || config.matchMode === MatchMode.SAFE,
+		(config) =>
+			config.linkDir ||
+			(config.matchMode === MatchMode.SAFE && !config.seasonFromEpisodes),
 		ZodErrorMessages.needsLinkDir,
 	)
+	.refine((config) => {
+		if (config.seasonFromEpisodes && config.seasonFromEpisodes < 1) {
+			return config.matchMode === MatchMode.PARTIAL;
+		}
+		return true;
+	}, ZodErrorMessages.needsPartial)
 	.refine((config) => {
 		if (!config.linkDir) return true;
 		if (isChildPath(config.linkDir, [config.outputDir])) return false;
