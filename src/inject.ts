@@ -258,7 +258,7 @@ async function injectFromStalledTorrent({
 	filePathLog,
 }: InjectionAftermath) {
 	let linkedNewFiles = false;
-	let inClient = (await getClient().isTorrentComplete(meta.infoHash)).isOk();
+	let inClient = (await getClient()!.isTorrentComplete(meta.infoHash)).isOk();
 	let injected = false;
 	for (const { searchee, decision } of matches) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
@@ -277,7 +277,7 @@ async function injectFromStalledTorrent({
 		if (!inClient) {
 			if (linkedFilesRootResult.isOk()) {
 				const destinationDir = dirname(linkResult!.contentPath);
-				const result = await getClient().inject(
+				const result = await getClient()!.inject(
 					meta,
 					searchee,
 					Decision.MATCH_PARTIAL, // Should always be considered partial
@@ -311,7 +311,7 @@ async function injectFromStalledTorrent({
 				label: Label.INJECT,
 				message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 			});
-			await getClient().recheckTorrent(meta.infoHash);
+			await getClient()!.recheckTorrent(meta.infoHash);
 		} else {
 			logger.warn({
 				label: Label.INJECT,
@@ -354,7 +354,7 @@ async function injectionAlreadyExists({
 	matches,
 	filePathLog,
 }: InjectionAftermath) {
-	const result = await getClient().isTorrentComplete(meta.infoHash);
+	const result = await getClient()!.isTorrentComplete(meta.infoHash);
 	let isComplete = result.isOk() ? result.unwrap() : false;
 	const anyFullMatch = matches.some(
 		(m) =>
@@ -366,13 +366,13 @@ async function injectionAlreadyExists({
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 		});
-		await getClient().recheckTorrent(meta.infoHash);
+		await getClient()!.recheckTorrent(meta.infoHash);
 	} else if (anyFullMatch && !isComplete) {
 		logger.info({
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files - ${chalk.green(injectionResult)}`,
 		});
-		await getClient().recheckTorrent(meta.infoHash);
+		await getClient()!.recheckTorrent(meta.infoHash);
 		isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
 	} else {
 		logger.warn({
