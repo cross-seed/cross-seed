@@ -19,11 +19,19 @@ export type TorrentClientType =
 	| Label.TRANSMISSION
 	| Label.DELUGE;
 
+export interface GenericTorrentInfo {
+	infoHash: string;
+	category: string;
+	tags: string[];
+	trackers?: string[][];
+}
+
 export interface TorrentClient {
 	type: TorrentClientType;
 	isTorrentComplete: (
 		infoHash: string,
 	) => Promise<Result<boolean, "NOT_FOUND">>;
+	getAllTorrents: () => Promise<GenericTorrentInfo[]>;
 	getDownloadDir: (
 		meta: SearcheeWithInfoHash | Metafile,
 		options: { onlyCompleted: boolean },
