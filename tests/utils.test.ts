@@ -13,12 +13,12 @@ import {
 describe("humanReadableSize", () => {
 	it("returns a human-readable size", () => {
 		expect(humanReadableSize(123)).toBe("123 B");
-		expect(humanReadableSize(1234)).toBe("1.23 kB");
+		expect(humanReadableSize(1234)).toBe("1.23 KB");
 		expect(humanReadableSize(1000 * 1234)).toBe("1.23 MB");
 	});
 
 	it("truncates number when byte size is exact", () => {
-		expect(humanReadableSize(1000)).toBe("1 kB");
+		expect(humanReadableSize(1000)).toBe("1 KB");
 	});
 });
 
