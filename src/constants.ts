@@ -114,6 +114,17 @@ export const TORRENT_CACHE_FOLDER = "torrent_cache";
 export const UNKNOWN_TRACKER = "UnknownTracker";
 export const LEVENSHTEIN_DIVISOR = 3;
 
+export enum MediaType {
+	EPISODE = "episode",
+	SEASON = "pack",
+	MOVIE = "movie",
+	ANIME = "anime",
+	VIDEO = "video",
+	AUDIO = "audio",
+	BOOK = "book",
+	OTHER = "unknown",
+}
+
 export enum Action {
 	SAVE = "save",
 	INJECT = "inject",

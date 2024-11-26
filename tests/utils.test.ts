@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import { fileFactory } from "./factories/file";
 import { searcheeFactory } from "./factories/searchee";
 
-import { SEASON_REGEX } from "../src/constants";
+import { MediaType, SEASON_REGEX } from "../src/constants";
 import {
 	extractInt,
 	getMediaType,
 	humanReadableSize,
-	MediaType,
 	sanitizeUrl,
 } from "../src/utils";
 

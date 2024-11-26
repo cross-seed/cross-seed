@@ -13,6 +13,7 @@ import {
 import {
 	CALIBRE_INDEXNUM_REGEX,
 	EP_REGEX,
+	MediaType,
 	SEASON_REGEX,
 	UNKNOWN_TRACKER,
 	USER_AGENT,
@@ -45,7 +46,6 @@ import {
 	getLogString,
 	getMediaType,
 	isTruthy,
-	MediaType,
 	nMsAgo,
 	reformatTitleForSearching,
 	sanitizeUrl,
