@@ -86,6 +86,7 @@ export default class QBittorrent implements TorrentClient {
 	url: { username: string; password: string; href: string };
 	version: string;
 	versionMajor: number;
+	readonly type = Label.QBITTORRENT;
 
 	constructor() {
 		const { qbittorrentUrl } = getRuntimeConfig();

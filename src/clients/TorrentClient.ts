@@ -1,5 +1,6 @@
 import ms from "ms";
 import { DecisionAnyMatch, InjectionResult } from "../constants.js";
+import { Label } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
@@ -12,7 +13,14 @@ import Transmission from "./Transmission.js";
 
 let activeClient: TorrentClient | null = null;
 
+export type TorrentClientType =
+	| Label.QBITTORRENT
+	| Label.RTORRENT
+	| Label.TRANSMISSION
+	| Label.DELUGE;
+
 export interface TorrentClient {
+	type: TorrentClientType;
 	isTorrentComplete: (
 		infoHash: string,
 	) => Promise<Result<boolean, "NOT_FOUND">>;
