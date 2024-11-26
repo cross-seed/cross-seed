@@ -317,7 +317,7 @@ export async function logQueries(
 		`RAW: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS))}`,
 	);
 	const res = await scanAllArrsForMedia(searcheeTitle, mediaType);
-	const parsedMedia = res.isOk() ? res.unwrap() : undefined;
+	const parsedMedia = res.orElse(undefined);
 	logger.info(
 		// @ts-expect-error needs conversion to use searchee instead of stem
 		`ID: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS, parsedMedia))}`,
@@ -832,7 +832,7 @@ async function getAndLogIndexers(
 	if (cachedSearch.q === searchStr) {
 		shouldScanArr = false;
 		const res = await scanAllArrsForMedia(name, mediaType);
-		parsedMedia = res.isOk() ? res.unwrap() : undefined;
+		parsedMedia = res.orElse(undefined);
 		const ids = parsedMedia?.movie ?? parsedMedia?.series;
 		if (!arrIdsEqual(ids, cachedSearch.ids)) {
 			cachedSearch.indexerCandidates.length = 0;
@@ -867,7 +867,7 @@ async function getAndLogIndexers(
 
 	if (shouldScanArr) {
 		const res = await scanAllArrsForMedia(name, mediaType);
-		parsedMedia = res.isOk() ? res.unwrap() : undefined;
+		parsedMedia = res.orElse(undefined);
 		cachedSearch.ids = parsedMedia?.movie ?? parsedMedia?.series;
 	}
 	const idsStr = cachedSearch.ids ? formatFoundIds(cachedSearch.ids) : "NONE";
