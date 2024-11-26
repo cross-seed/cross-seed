@@ -315,15 +315,20 @@ export default class QBittorrent implements TorrentClient {
 	}): Promise<Map<string, string>> {
 		const torrents = await this.getAllTorrentInfo();
 		const torrentSavePaths = new Map<string, string>();
+		const infoHashMetaMap = options.metas.reduce((acc, meta) => {
+			acc.set(meta.infoHash, meta);
+			return acc;
+		}, new Map<string, SearcheeWithInfoHash | Metafile>());
 		for (const torrent of torrents) {
 			if (options.onlyCompleted && !this.isTorrentInfoComplete(torrent))
 				continue;
-			const meta = options.metas.find(
-				(e) =>
-					e.infoHash === torrent.hash ||
-					e.infoHash === torrent.infohash_v1 ||
-					e.infoHash === torrent.infohash_v2,
-			);
+			const meta =
+				infoHashMetaMap.get(torrent.hash) ||
+				(torrent.infohash_v2 &&
+					infoHashMetaMap.get(torrent.infohash_v2)) ||
+				(torrent.infohash_v1 &&
+					infoHashMetaMap.get(torrent.infohash_v1)) ||
+				undefined;
 			let savePath = dirname(torrent.content_path);
 			if (
 				!meta ||
