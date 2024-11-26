@@ -301,7 +301,7 @@ function sourceDoesMatch(searcheeTitle: string, candidateName: string) {
 export async function assessCandidate(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
-	hashesToExclude: string[],
+	infoHashesToExclude: Set<string>,
 ): Promise<ResultAssessment> {
 	const { blockList, includeSingleEpisodes, matchMode } = getRuntimeConfig();
 
@@ -367,7 +367,7 @@ export async function assessCandidate(
 		return { decision: Decision.SAME_INFO_HASH, metafile };
 	}
 
-	if (hashesToExclude.includes(metafile.infoHash)) {
+	if (infoHashesToExclude.has(metafile.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS, metafile };
 	}
 
@@ -461,7 +461,7 @@ async function assessAndSaveResults(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
 	guid: string,
-	infoHashesToExclude: string[],
+	infoHashesToExclude: Set<string>,
 	firstSeen: number,
 	guidInfoHashMap: Map<string, string>,
 ) {
@@ -538,7 +538,7 @@ async function guidLookup(
 export async function assessCandidateCaching(
 	candidate: Candidate,
 	searchee: SearcheeWithLabel,
-	infoHashesToExclude: string[],
+	infoHashesToExclude: Set<string>,
 	guidInfoHashMap: Map<string, string>,
 ): Promise<ResultAssessment> {
 	const { name, guid, link, tracker } = candidate;
@@ -581,7 +581,7 @@ export async function assessCandidateCaching(
 		);
 	} else if (
 		isAnyMatchedDecision(cacheEntry.decision) &&
-		infoHashesToExclude.includes(cacheEntry.infoHash)
+		infoHashesToExclude.has(cacheEntry.infoHash)
 	) {
 		// Already injected fast path, preserve match decision
 		assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
