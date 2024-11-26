@@ -10,7 +10,7 @@ import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import {
-	GenericTorrentInfo,
+	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
 } from "./TorrentClient.js";
@@ -193,15 +193,18 @@ export default class Transmission implements TorrentClient {
 	async getAllDownloadDirs(options: {
 		onlyCompleted: boolean;
 	}): Promise<Map<string, string>> {
-		const res = await this.request<TorrentGetResponseArgs>("torrent-get", {
-			fields: ["hashString", "downloadDir", "percentDone"],
-		});
-		const downloadDirs = new Map<string, string>();
-		for (const { hashString, downloadDir, percentDone } of res.torrents) {
-			if (options.onlyCompleted && percentDone < 1) continue;
-			downloadDirs.set(hashString, downloadDir);
+		let torrents = (
+			await this.request<TorrentGetResponseArgs>("torrent-get", {
+				fields: ["hashString", "downloadDir", "percentDone"],
+			})
+		).torrents;
+		if (options.onlyCompleted) {
+			torrents = torrents.filter((torrent) => torrent.percentDone === 1);
 		}
-		return downloadDirs;
+		return torrents.reduce((acc, { hashString, downloadDir }) => {
+			acc.set(hashString, downloadDir);
+			return acc;
+		}, new Map());
 	}
 
 	async isTorrentComplete(
@@ -221,7 +224,7 @@ export default class Transmission implements TorrentClient {
 		return resultOf(percentDone === 1);
 	}
 
-	async getAllTorrents(): Promise<GenericTorrentInfo[]> {
+	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
 		const res = await this.request<TorrentGetResponseArgs>("torrent-get", {
 			fields: ["hashString", "labels"],
 		});
