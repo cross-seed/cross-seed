@@ -71,7 +71,7 @@ function logDecision(
 		case Decision.MATCH:
 			return;
 		case Decision.FUZZY_SIZE_MISMATCH:
-			reason = `the total sizes are outside of the fuzzySizeThreshold range: ${Math.abs((candidate.size - searchee.length) / searchee.length).toFixed(3)} > ${getFuzzySizeFactor()}`;
+			reason = `the total sizes are outside of the fuzzySizeThreshold range: ${Math.abs((candidate.size! - searchee.length) / searchee.length).toFixed(3)} > ${getFuzzySizeFactor()}`;
 			break;
 		case Decision.SIZE_MISMATCH:
 			reason = `some files are missing or have different sizes${compareFileTreesPartial(metafile!, searchee) ? ` (will match in partial match mode)` : ""}`;
@@ -299,10 +299,8 @@ export async function assessCandidate(
 	// When metaOrCandidate is a Metafile, skip straight to the
 	// main matching algorithms as we don't need pre-download filtering.
 	const isCandidate = !(metaOrCandidate instanceof Metafile);
-	const name = metaOrCandidate.name;
-	const size = isCandidate ? metaOrCandidate.size : metaOrCandidate.length;
-
 	if (isCandidate) {
+		const name = metaOrCandidate.name;
 		if (!releaseGroupDoesMatch(searchee.title, name)) {
 			return { decision: Decision.RELEASE_GROUP_MISMATCH };
 		}
@@ -312,6 +310,7 @@ export async function assessCandidate(
 		if (!sourceDoesMatch(searchee.title, name)) {
 			return { decision: Decision.SOURCE_MISMATCH };
 		}
+		const size = metaOrCandidate.size;
 		if (size && !fuzzySizeDoesMatch(size, searchee)) {
 			return { decision: Decision.FUZZY_SIZE_MISMATCH };
 		}
@@ -493,23 +492,30 @@ export async function getGuidInfoHashMap(): Promise<Map<string, string>> {
 /**
  * Some trackers have alt titles which get their own guid but resolve to same torrent
  * @param guid The guid of the candidate
+ * @param link The link of the candidate
  * @param guidInfoHashMap The map of guids to info hashes
  * @returns The info hash of the torrent if found
  */
-async function fuzzyGuidLookup(
+async function guidLookup(
 	guid: string,
+	link: string,
 	guidInfoHashMap: Map<string, string>,
 ): Promise<string | undefined> {
-	if (!guid.includes(".tv/torrent/")) return;
-	const torrentIdRegex = /\.tv\/torrent\/(\d+)\/group/;
-	const torrentIdStr = guid.match(torrentIdRegex)?.[1];
-	if (!torrentIdStr) return;
-	for (const [key, value] of guidInfoHashMap) {
-		if (key.match(torrentIdRegex)?.[1] === torrentIdStr) {
-			return value;
+	const infoHash = guidInfoHashMap.get(guid) ?? guidInfoHashMap.get(link);
+	if (infoHash) return infoHash;
+
+	for (const guidOrLink of [guid, link]) {
+		if (!guidOrLink.includes(".tv/torrent/")) continue;
+		const torrentIdRegex = /\.tv\/torrent\/(\d+)\/group/;
+		const torrentIdStr = guidOrLink.match(torrentIdRegex)?.[1];
+		if (!torrentIdStr) continue;
+		for (const [key, value] of guidInfoHashMap) {
+			if (key.match(torrentIdRegex)?.[1] === torrentIdStr) {
+				return value;
+			}
 		}
 	}
-	return undefined;
+	return;
 }
 
 export async function assessCandidateCaching(
@@ -518,7 +524,7 @@ export async function assessCandidateCaching(
 	infoHashesToExclude: string[],
 	guidInfoHashMap: Map<string, string>,
 ): Promise<ResultAssessment> {
-	const { guid, name, tracker } = candidate;
+	const { name, guid, link, tracker } = candidate;
 
 	const cacheEntry = await db("decision")
 		.select({
@@ -531,9 +537,7 @@ export async function assessCandidateCaching(
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.title, guid })
 		.first();
-	const metaInfoHash =
-		guidInfoHashMap.get(guid) ??
-		(await fuzzyGuidLookup(guid, guidInfoHashMap));
+	const metaInfoHash = await guidLookup(guid, link, guidInfoHashMap);
 	const metaOrCandidate = metaInfoHash
 		? existsInTorrentCache(metaInfoHash)
 			? (await getCachedTorrentFile(metaInfoHash)).orElse(candidate)
