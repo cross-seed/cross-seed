@@ -16,6 +16,7 @@ export interface RuntimeConfig {
 	includeSingleEpisodes: boolean;
 	verbose: boolean;
 	includeNonVideos: boolean;
+	seasonFromEpisodes?: number;
 	fuzzySizeThreshold: number;
 	excludeOlder?: number;
 	excludeRecentSearch?: number;
