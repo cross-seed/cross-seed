@@ -35,7 +35,7 @@ export interface RuntimeConfig {
 	rssCadence?: number;
 	snatchTimeout?: number;
 	searchTimeout?: number;
-	searchLimit: number;
+	searchLimit?: number;
 	blockList: string[];
 	apiKey?: string;
 	sonarr: string[];
