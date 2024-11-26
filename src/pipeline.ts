@@ -504,7 +504,7 @@ export async function scanRssFeeds() {
 		label: Label.RSS,
 		message: "Querying RSS feeds...",
 	});
-	const candidates = queryRssFeeds(lastRun);
+	const candidates = queryRssFeeds();
 	let i = 0;
 	for await (const candidate of candidates) {
 		await checkNewCandidateMatch(candidate, Label.RSS);

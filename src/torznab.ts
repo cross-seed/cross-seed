@@ -32,7 +32,7 @@ import {
 	updateIndexerCapsById,
 	updateIndexerStatus,
 } from "./indexers.js";
-import { Label, logger, logOnce } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee, SearcheeWithLabel } from "./searchee.js";
@@ -348,81 +348,86 @@ export function indexerDoesSupportMediaType(
 
 export async function* rssPager(
 	indexer: Indexer,
-	pageBackUntil: number,
 ): AsyncGenerator<Candidate, void, undefined> {
-	let earliestSeen = Infinity;
 	const limit = indexer.limits.max;
-	for (let i = 0; i < 10; i++) {
+	const lastSeenGuid: string | undefined = (
+		await db("rss")
+			.where({ indexer_id: indexer.id })
+			.select("last_seen")
+			.first()
+	)?.last_seen;
+	let newLastSeenGuid: string | undefined = lastSeenGuid;
+	const maxPage = 10;
+	let i = -1;
+	while (++i < maxPage) {
 		let currentPageCandidates: Candidate[];
 
 		try {
-			currentPageCandidates = await makeRequest({
-				indexerId: indexer.id,
-				baseUrl: indexer.url,
-				apikey: indexer.apikey,
-				query: { t: "search", q: "", limit, offset: i * limit },
-			});
+			currentPageCandidates = (
+				await makeRequest({
+					indexerId: indexer.id,
+					baseUrl: indexer.url,
+					apikey: indexer.apikey,
+					query: { t: "search", q: "", limit, offset: i * limit },
+				})
+			).sort((a, b) => b.pubDate - a.pubDate);
 		} catch (e) {
 			logger.error({
 				label: Label.TORZNAB,
-				message: `Paging indexer ${indexer.id} stopped: request failed for page ${i + 1}`,
+				message: `Paging indexer ${indexer.url} stopped: request failed for page ${i + 1}`,
 			});
 			logger.debug(e);
-			return;
+			break;
 		}
 
-		const allNewPubDates = currentPageCandidates.map((c) => c.pubDate);
-		const currentPageEarliest = Math.min(...allNewPubDates);
-		const currentPageLatest = Math.max(...allNewPubDates);
-
-		const newCandidates = currentPageCandidates.filter(
-			(c) => c.pubDate < earliestSeen && c.pubDate >= pageBackUntil,
-		);
-
-		if (currentPageLatest > Date.now() + ms("10 minutes")) {
-			logOnce(
-				`timezone-issues-${indexer.id}`,
-				() =>
-					void logger.warn(
-						`Indexer ${indexer.url} reported releases in the future. Its timezone may be misconfigured.`,
-					),
-				ms("10 minutes"),
-			);
+		const newCandidates: Candidate[] = [];
+		for (const candidate of currentPageCandidates) {
+			if (candidate.guid === lastSeenGuid) {
+				break;
+			}
+			newCandidates.push(candidate);
 		}
 
 		if (!newCandidates.length) {
 			logger.verbose({
 				label: Label.TORZNAB,
-				message: `Paging indexer ${indexer.id} stopped: nothing new in page ${i + 1}`,
+				message: `Paging indexer ${indexer.url} stopped: nothing new in page ${i + 1}`,
 			});
-			return;
+			break;
+		}
+		if (i === 0) {
+			newLastSeenGuid = newCandidates[0].guid;
 		}
 
 		logger.verbose({
 			label: Label.TORZNAB,
-			message: `${newCandidates.length} new candidates on indexer ${indexer.id} page ${i + 1}`,
+			message: `${newCandidates.length} new candidates on indexer ${indexer.url} page ${i + 1}`,
 		});
-
-		// yield each new candidate
 		yield* newCandidates;
 
-		earliestSeen = Math.min(earliestSeen, currentPageEarliest);
+		if (newCandidates.length !== currentPageCandidates.length) {
+			logger.verbose({
+				label: Label.TORZNAB,
+				message: `Paging indexer ${indexer.url} stopped: last seen guid found in page ${i + 1}`,
+			});
+			break;
+		}
 	}
-	logger.verbose({
-		label: Label.TORZNAB,
-		message: `Paging indexer ${indexer.url} stopped: reached 10 pages`,
-	});
+	await db("rss")
+		.insert({ indexer_id: indexer.id, last_seen: newLastSeenGuid })
+		.onConflict("indexer_id")
+		.merge(["last_seen"]);
+	if (i >= maxPage) {
+		logger.verbose({
+			label: Label.TORZNAB,
+			message: `Paging indexer ${indexer.url} stopped: reached ${maxPage} pages`,
+		});
+	}
 }
 
-export async function* queryRssFeeds(
-	previousRunTime: number,
-): AsyncGenerator<Candidate> {
+export async function* queryRssFeeds(): AsyncGenerator<Candidate> {
 	const indexers = await getEnabledIndexers();
-	// offset -5m for delayed RSS -> publishing time
-	const timeWithOffset = previousRunTime - 300000;
-	yield* combineAsyncIterables(
-		indexers.map((indexer) => rssPager(indexer, timeWithOffset)),
-	);
+	yield* combineAsyncIterables(indexers.map((indexer) => rssPager(indexer)));
 }
 
 export async function searchTorznab(
