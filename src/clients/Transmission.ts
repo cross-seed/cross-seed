@@ -10,7 +10,7 @@ import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { extractCredentialsFromUrl, shouldRecheck } from "../utils.js";
-import { TorrentClient } from "./TorrentClient.js";
+import { GenericTorrentInfo, TorrentClient } from "./TorrentClient.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
 type Method =
@@ -26,7 +26,15 @@ interface Response<T> {
 }
 
 interface TorrentGetResponseArgs {
-	torrents: { downloadDir: string; percentDone: number }[];
+	torrents: {
+		downloadDir: string;
+		hashString: string;
+		leftUntilDone: number;
+		name: string;
+		percentDone: number;
+		status: number;
+		labels: string[];
+	}[];
 }
 
 interface TorrentMetadata {
@@ -193,6 +201,17 @@ export default class Transmission implements TorrentClient {
 		}
 		const [{ percentDone }] = queryResponse.torrents;
 		return resultOf(percentDone === 1);
+	}
+
+	async getAllTorrents(): Promise<GenericTorrentInfo[]> {
+		const res = await this.request<TorrentGetResponseArgs>("torrent-get", {
+			fields: ["hashString", "labels"],
+		});
+		return res.torrents.map((torrent) => ({
+			infoHash: torrent.hashString,
+			category: "",
+			tags: torrent.labels,
+		}));
 	}
 
 	async recheckTorrent(infoHash: string): Promise<void> {

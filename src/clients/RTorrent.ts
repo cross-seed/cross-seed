@@ -14,13 +14,13 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import { GenericTorrentInfo, TorrentClient } from "./TorrentClient.js";
 import {
 	extractCredentialsFromUrl,
 	isTruthy,
 	shouldRecheck,
 	wait,
 } from "../utils.js";
-import { TorrentClient } from "./TorrentClient.js";
 
 const COULD_NOT_FIND_INFO_HASH = "Could not find info-hash.";
 
@@ -292,6 +292,60 @@ export default class RTorrent implements TorrentClient {
 			return resultOf(response[0] === "1");
 		} catch (e) {
 			return resultOfErr("NOT_FOUND");
+		}
+	}
+
+	async getAllTorrents(): Promise<GenericTorrentInfo[]> {
+		const hashes = await this.methodCallP<string[]>("download_list", []);
+		type ReturnType = string[][] | Fault[];
+		let response: ReturnType;
+		try {
+			response = await this.methodCallP<ReturnType>("system.multicall", [
+				hashes.map((hash) => {
+					return {
+						methodName: "d.custom1",
+						params: [hash],
+					};
+				}),
+			]);
+		} catch (e) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: "Failed to get torrent info for all torrents",
+			});
+			logger.debug(e);
+			return [];
+		}
+
+		function isFault(response: ReturnType): response is Fault[] {
+			return "faultString" in response[0];
+		}
+
+		try {
+			if (isFault(response)) {
+				logger.error({
+					Label: Label.RTORRENT,
+					message:
+						"Fault while getting torrent info for all torrents",
+				});
+				logger.debug(inspect(response));
+				return [];
+			}
+
+			return hashes.map((hash, index) => ({
+				infoHash: hash.toLowerCase(),
+				category: "",
+				tags: response[index][0].length
+					? (response[index] as string[])
+					: [],
+			}));
+		} catch (e) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: "Error parsing response for all torrents",
+			});
+			logger.debug(e);
+			return [];
 		}
 	}
 
