@@ -47,6 +47,7 @@ function doesAlreadyExist(
 
 export default class Transmission implements TorrentClient {
 	xTransmissionSessionId: string;
+	readonly type = Label.TRANSMISSION;
 
 	private async request<T>(
 		method: Method,

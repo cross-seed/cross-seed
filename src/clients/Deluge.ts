@@ -56,6 +56,7 @@ type DelugeJSON<ResultType> = {
 };
 
 export default class Deluge implements TorrentClient {
+	readonly type = Label.DELUGE;
 	private delugeCookie: string | null = null;
 	private delugeLabel = TORRENT_TAG;
 	private delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
