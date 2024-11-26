@@ -196,6 +196,7 @@ export function filterDupesFromSimilar<T extends Searchee>(
 	const filteredSearchees: T[] = [];
 	for (const searchee of searchees) {
 		const isDupe = filteredSearchees.some((s) => {
+			if (searchee.title !== s.title) return false;
 			if (searchee.length !== s.length) return false;
 			if (searchee.files.length !== s.files.length) return false;
 			const potentialFiles = s.files.map((f) => f.length);
