@@ -17,7 +17,11 @@ import {
 	findSearcheesFromAllDataDirs,
 } from "./dataFiles.js";
 import { db, memDB } from "./db.js";
-import { assessCandidateCaching, ResultAssessment } from "./decide.js";
+import {
+	assessCandidateCaching,
+	getGuidInfoHashMap,
+	ResultAssessment,
+} from "./decide.js";
 import {
 	IndexerStatus,
 	updateIndexerStatus,
@@ -93,11 +97,13 @@ async function assessCandidates(
 	hashesToExclude: string[],
 ): Promise<AssessmentWithTracker[]> {
 	const assessments: AssessmentWithTracker[] = [];
+	const guidInfoHashMap = await getGuidInfoHashMap();
 	for (const result of candidates) {
 		const assessment = await assessCandidateCaching(
 			result,
 			searchee,
 			hashesToExclude,
+			guidInfoHashMap,
 		);
 		assessments.push({ assessment, tracker: result.tracker });
 	}
@@ -445,6 +451,7 @@ export async function checkNewCandidateMatch(
 			(searchee) => -searchee.files.length,
 		),
 	);
+	const guidInfoHashMap = await getGuidInfoHashMap();
 	for (const searchee of searchees) {
 		await db("searchee")
 			.insert({ name: searchee.title })
@@ -455,6 +462,7 @@ export async function checkNewCandidateMatch(
 			candidate,
 			searchee,
 			hashesToExclude,
+			guidInfoHashMap,
 		);
 
 		if (
