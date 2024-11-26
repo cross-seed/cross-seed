@@ -303,13 +303,53 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	/*
+	 * @param metas the Searchees we are generating off (in client)
+	 * @return a map of infohash to path
+	 */
+	async getAllDownloadDirs(options: {
+		metas: SearcheeWithInfoHash[] | Metafile[];
+		onlyCompleted: boolean;
+	}): Promise<Map<string, string>> {
+		const torrents = await this.getAllTorrentInfo();
+		const torrentSavePaths = new Map<string, string>();
+		for (const torrent of torrents) {
+			if (options.onlyCompleted && !this.isTorrentInfoComplete(torrent))
+				continue;
+			const meta = options.metas.find(
+				(e) =>
+					e.infoHash === torrent.hash ||
+					e.infoHash === torrent.infohash_v1 ||
+					e.infoHash === torrent.infohash_v2,
+			);
+			let savePath = dirname(torrent.content_path);
+			if (
+				!meta ||
+				!(await this.isSubfolderContentLayout(meta, torrent))
+			) {
+				savePath = torrent.save_path;
+			}
+			torrentSavePaths.set(torrent.hash, savePath);
+			if (torrent.infohash_v1?.length) {
+				torrentSavePaths.set(torrent.infohash_v1, savePath);
+			}
+			if (torrent.infohash_v2?.length) {
+				torrentSavePaths.set(torrent.infohash_v2, savePath);
+			}
+		}
+		return torrentSavePaths;
+	}
+
+	/*
 	 * @param searchee the Searchee we are generating off (in client)
 	 * @param torrentInfo the torrent info from the searchee
 	 * @return string absolute location from client with content layout considered
 	 */
-	getCorrectSavePath(searchee: Searchee, torrentInfo: TorrentInfo): string {
+	getCorrectSavePath(
+		data: Searchee | Metafile,
+		torrentInfo: TorrentInfo,
+	): string {
 		const subfolderContentLayout = this.isSubfolderContentLayout(
-			searchee,
+			data,
 			torrentInfo,
 		);
 		if (subfolderContentLayout) {
@@ -407,14 +447,14 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	isSubfolderContentLayout(
-		searchee: Searchee,
-		searcheeInfo: TorrentInfo,
+		data: Searchee | Metafile,
+		dataInfo: TorrentInfo,
 	): boolean {
-		if (searchee.files.length > 1) return false;
-		if (dirname(searchee.files[0].path) !== ".") return false;
+		if (data.files.length > 1) return false;
+		if (dirname(data.files[0].path) !== ".") return false;
 		return (
-			resolve(dirname(searcheeInfo.content_path)) !==
-			resolve(searcheeInfo.save_path)
+			resolve(dirname(dataInfo.content_path)) !==
+			resolve(dataInfo.save_path)
 		);
 	}
 

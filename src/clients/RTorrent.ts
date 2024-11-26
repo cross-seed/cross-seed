@@ -279,6 +279,61 @@ export default class RTorrent implements TorrentClient {
 			.mapErr((error) => (error === "FAILURE" ? "UNKNOWN_ERROR" : error));
 	}
 
+	async getAllDownloadDirs(options: {
+		metas: SearcheeWithInfoHash[] | Metafile[];
+		onlyCompleted: boolean;
+	}): Promise<Map<string, string>> {
+		const hashes: string[] = options.metas.map((meta) => meta.infoHash);
+		type ReturnType = string[][] | Fault[];
+		let response: ReturnType;
+		try {
+			response = await this.methodCallP<ReturnType>("system.multicall", [
+				hashes.map((hash) => {
+					return {
+						methodName: "d.directory",
+						params: [hash],
+					};
+				}),
+			]);
+		} catch (e) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: "Failed to get download directories for all torrents",
+			});
+			logger.debug(e);
+			return new Map();
+		}
+
+		function isFault(response: ReturnType): response is Fault[] {
+			return "faultString" in response[0];
+		}
+
+		try {
+			if (isFault(response)) {
+				logger.error({
+					Label: Label.RTORRENT,
+					message:
+						"Fault while getting download directories for all torrents",
+				});
+				logger.debug(inspect(response));
+				return new Map();
+			}
+
+			return new Map(
+				hashes.map((hash, index) => {
+					return [hash, response[index][0]];
+				}),
+			);
+		} catch (e) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: "Error parsing response for all torrents",
+			});
+			logger.debug(e);
+			return new Map();
+		}
+	}
+
 	async isTorrentComplete(
 		infoHash: string,
 	): Promise<Result<boolean, "NOT_FOUND">> {

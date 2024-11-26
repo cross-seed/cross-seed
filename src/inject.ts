@@ -14,6 +14,7 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	isAnyMatchedDecision,
+	MediaType,
 	SaveResult,
 	TORRENT_CACHE_FOLDER,
 	UNKNOWN_TRACKER,
@@ -37,7 +38,6 @@ import {
 	formatAsList,
 	getLogString,
 	isTruthy,
-	MediaType,
 	sanitizeInfoHash,
 } from "./utils.js";
 

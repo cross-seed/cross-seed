@@ -186,6 +186,20 @@ export default class Transmission implements TorrentClient {
 			.mapErr((err) => (err === "FAILURE" ? "UNKNOWN_ERROR" : err));
 	}
 
+	async getAllDownloadDirs(options: {
+		onlyCompleted: boolean;
+	}): Promise<Map<string, string>> {
+		const res = await this.request<TorrentGetResponseArgs>("torrent-get", {
+			fields: ["hashString", "downloadDir", "percentDone"],
+		});
+		const downloadDirs = new Map<string, string>();
+		for (const { hashString, downloadDir, percentDone } of res.torrents) {
+			if (options.onlyCompleted && percentDone < 1) continue;
+			downloadDirs.set(hashString, downloadDir);
+		}
+		return downloadDirs;
+	}
+
 	async isTorrentComplete(
 		infoHash: string,
 	): Promise<Result<boolean, "NOT_FOUND">> {

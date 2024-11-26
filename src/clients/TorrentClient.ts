@@ -38,6 +38,10 @@ export interface TorrentClient {
 	) => Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	>;
+	getAllDownloadDirs: (options: {
+		metas: SearcheeWithInfoHash[] | Metafile[];
+		onlyCompleted: boolean;
+	}) => Promise<Map<string, string>>;
 	inject: (
 		newTorrent: Metafile,
 		searchee: Searchee,
