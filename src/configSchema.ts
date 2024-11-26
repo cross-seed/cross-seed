@@ -19,7 +19,8 @@ const ZodErrorMessages = {
 		"excludeRecentSearch must be at least 3x searchCadence.",
 	excludeRecentOlder:
 		"excludeOlder and excludeRecentSearch must be defined for searching. excludeOlder must be 2-5x excludeRecentSearch.",
-	fuzzySizeThreshold: "fuzzySizeThreshold cannot be greater than 0.1",
+	fuzzySizeThreshold:
+		"fuzzySizeThreshold cannot be greater than 0.1 outside of `cross-seed inject`",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
@@ -139,7 +140,7 @@ export const VALIDATION_SCHEMA = z
 		injectDir: z.string().optional(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
-		fuzzySizeThreshold: z.number().positive().lte(0.1, {
+		fuzzySizeThreshold: z.number().positive().lte(1, {
 			message: ZodErrorMessages.fuzzySizeThreshold,
 		}),
 		excludeOlder: z
@@ -249,6 +250,10 @@ export const VALIDATION_SCHEMA = z
 				config.excludeOlder >= 2 * config.excludeRecentSearch &&
 				config.excludeOlder <= 5 * config.excludeRecentSearch),
 		ZodErrorMessages.excludeRecentOlder,
+	)
+	.refine(
+		(config) => config.fuzzySizeThreshold <= 0.1 || config.injectDir,
+		ZodErrorMessages.fuzzySizeThreshold,
 	)
 	.refine((config) => {
 		if (
