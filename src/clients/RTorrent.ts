@@ -14,13 +14,12 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { GenericTorrentInfo, TorrentClient } from "./TorrentClient.js";
+import { extractCredentialsFromUrl, isTruthy, wait } from "../utils.js";
 import {
-	extractCredentialsFromUrl,
-	isTruthy,
+	GenericTorrentInfo,
 	shouldRecheck,
-	wait,
-} from "../utils.js";
+	TorrentClient,
+} from "./TorrentClient.js";
 
 const COULD_NOT_FIND_INFO_HASH = "Could not find info-hash.";
 

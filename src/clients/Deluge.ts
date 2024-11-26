@@ -11,13 +11,12 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { GenericTorrentInfo, TorrentClient } from "./TorrentClient.js";
+import { extractCredentialsFromUrl, getLogString, wait } from "../utils.js";
 import {
-	extractCredentialsFromUrl,
-	getLogString,
+	GenericTorrentInfo,
 	shouldRecheck,
-	wait,
-} from "../utils.js";
+	TorrentClient,
+} from "./TorrentClient.js";
 
 interface TorrentInfo {
 	name?: string;
