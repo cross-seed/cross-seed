@@ -417,9 +417,9 @@ export default class Deluge implements TorrentClient {
 
 	/**
 	 * returns directory of an infohash in deluge as a string
+	 * @param meta SearcheeWithInfoHash or Metafile for torrent to lookup in client
+	 * @param options.onlyCompleted boolean to only return a completed torrent
 	 * @return Result containing either a string with path or reason it was not provided
-	 * @param meta the metafile or searchee of the original torrent
-	 * @param options object with options relating to filtering
 	 */
 	async getDownloadDir(
 		meta: SearcheeWithInfoHash | Metafile,
@@ -452,6 +452,37 @@ export default class Deluge implements TorrentClient {
 	}
 
 	/**
+	 * returns map of hashes and download directories for all torrents
+	 * @param options.metas array of SearcheeWithInfoHash or Metafile for torrents to lookup in client
+	 * @param options.onlyCompleted boolean to only return completed torrents
+	 * @return Promise of a Map with hashes and download directories
+	 */
+	async getAllDownloadDirs(options: {
+		onlyCompleted: boolean;
+	}): Promise<Map<string, string>> {
+		const dirs = new Map<string, string>();
+		let response: Result<TorrentStatus, ErrorType>;
+		const params = [["save_path", "progress"], {}];
+		try {
+			response = await this.call<TorrentStatus>("web.update_ui", params);
+		} catch (e) {
+			return dirs;
+		}
+		if (!response.isOk()) {
+			return dirs;
+		}
+		const torrentResponse = response.unwrap().torrents;
+		if (!torrentResponse) {
+			return dirs;
+		}
+		for (const [hash, torrent] of Object.entries(torrentResponse)) {
+			if (options.onlyCompleted && torrent.progress !== 100) continue;
+			dirs.set(hash, torrent.save_path);
+		}
+		return dirs;
+	}
+
+	/**
 	 * checks if a torrent is complete in deluge
 	 * @param infoHash the infoHash of the torrent to check
 	 * @return Result containing either a boolean or reason it was not provided
@@ -466,6 +497,7 @@ export default class Deluge implements TorrentClient {
 			return resultOfErr("NOT_FOUND");
 		}
 	}
+
 	/**
 	 * @return All torrents in the client
 	 */
