@@ -14,14 +14,17 @@ import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import {
+	GenericTorrentInfo,
+	shouldRecheck,
+	TorrentClient,
+} from "./TorrentClient.js";
+import {
 	extractCredentialsFromUrl,
 	extractInt,
 	getLogString,
 	sanitizeInfoHash,
-	shouldRecheck,
 	wait,
 } from "../utils.js";
-import { GenericTorrentInfo, TorrentClient } from "./TorrentClient.js";
 
 const X_WWW_FORM_URLENCODED = {
 	"Content-Type": "application/x-www-form-urlencoded",
