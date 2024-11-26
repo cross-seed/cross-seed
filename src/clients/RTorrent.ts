@@ -144,34 +144,65 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	private async checkOriginalTorrent(
-		data: SearcheeWithInfoHash | Metafile,
+		infoHash: string,
 		onlyCompleted: boolean,
 	): Promise<
 		Result<
-			{ directoryBase: string; isMultiFile: boolean },
+			{
+				name: string;
+				directoryBase: string;
+				bytesLeft: number;
+				hashing: number;
+				isMultiFile: boolean;
+				isActive: boolean;
+			},
 			"FAILURE" | "TORRENT_NOT_COMPLETE" | "NOT_FOUND"
 		>
 	> {
-		const infoHash = data.infoHash.toUpperCase();
+		const hash = infoHash.toUpperCase();
 		type ReturnType =
-			| [[string], ["0" | "1"], ["0" | "1"]]
-			| [Fault, Fault, Fault];
+			| [
+					[string],
+					[string],
+					[number],
+					[number],
+					["0" | "1"],
+					["0" | "1"],
+					["0" | "1"],
+			  ]
+			| Fault[];
 
 		let response: ReturnType;
 		try {
 			response = await this.methodCallP<ReturnType>("system.multicall", [
 				[
 					{
+						methodName: "d.name",
+						params: [hash],
+					},
+					{
 						methodName: "d.directory",
-						params: [infoHash],
+						params: [hash],
+					},
+					{
+						methodName: "d.left_bytes",
+						params: [hash],
+					},
+					{
+						methodName: "d.hashing",
+						params: [hash],
 					},
 					{
 						methodName: "d.complete",
-						params: [infoHash],
+						params: [hash],
 					},
 					{
 						methodName: "d.is_multi_file",
-						params: [infoHash],
+						params: [hash],
+					},
+					{
+						methodName: "d.is_active",
+						params: [hash],
 					},
 				],
 			]);
@@ -180,9 +211,7 @@ export default class RTorrent implements TorrentClient {
 			return resultOfErr("FAILURE");
 		}
 
-		function isFault(
-			response: ReturnType,
-		): response is [Fault, Fault, Fault] {
+		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
 
@@ -196,15 +225,26 @@ export default class RTorrent implements TorrentClient {
 					);
 				}
 			}
-			const [[directoryBase], [isCompleteStr], [isMultiFileStr]] =
-				response;
+			const [
+				[name],
+				[directoryBase],
+				[bytesLeft],
+				[hashing],
+				[isCompleteStr],
+				[isMultiFileStr],
+				[isActive],
+			] = response;
 			const isComplete = Boolean(Number(isCompleteStr));
 			if (onlyCompleted && !isComplete) {
 				return resultOfErr("TORRENT_NOT_COMPLETE");
 			}
 			return resultOf({
+				name,
 				directoryBase,
+				bytesLeft,
+				hashing,
 				isMultiFile: Boolean(Number(isMultiFileStr)),
+				isActive: Boolean(Number(isActive)),
 			});
 		} catch (e) {
 			logger.error(e);
@@ -231,7 +271,7 @@ export default class RTorrent implements TorrentClient {
 			return resultOf({ downloadDir: path, basePath, directoryBase });
 		} else {
 			const result = await this.checkOriginalTorrent(
-				searchee as SearcheeWithInfoHash,
+				searchee.infoHash!,
 				true,
 			);
 			return result.mapOk(({ directoryBase }) => ({
@@ -268,7 +308,7 @@ export default class RTorrent implements TorrentClient {
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
 		const result = await this.checkOriginalTorrent(
-			meta,
+			meta.infoHash,
 			options.onlyCompleted,
 		);
 		return result
