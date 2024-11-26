@@ -16,6 +16,7 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee, SearcheeWithLabel } from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
 import {
+	comparing,
 	filesWithExt,
 	getLogString,
 	getMediaType,
@@ -194,7 +195,7 @@ export function filterDupesFromSimilar<T extends Searchee>(
 	searchees: T[],
 ): T[] {
 	const filteredSearchees: T[] = [];
-	for (const searchee of searchees) {
+	for (const searchee of [...searchees].sort(comparing((s) => !s.infoHash))) {
 		const isDupe = filteredSearchees.some((s) => {
 			if (searchee.title !== s.title) return false;
 			if (searchee.length !== s.length) return false;
