@@ -72,12 +72,12 @@ import {
 } from "./utils.js";
 
 export interface Candidate {
+	name: string;
 	guid: string;
 	link: string;
-	size: number;
-	name: string;
 	tracker: string;
-	pubDate: number;
+	size?: number;
+	pubDate?: number;
 	indexerId?: number;
 }
 
