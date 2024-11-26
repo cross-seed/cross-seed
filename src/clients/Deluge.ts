@@ -13,7 +13,7 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { extractCredentialsFromUrl, getLogString, wait } from "../utils.js";
 import {
-	GenericTorrentInfo,
+	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
 } from "./TorrentClient.js";
@@ -500,7 +500,7 @@ export default class Deluge implements TorrentClient {
 	/**
 	 * @return All torrents in the client
 	 */
-	async getAllTorrents(): Promise<GenericTorrentInfo[]> {
+	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
 		const params = [["hash", "label"], {}];
 		const response = await this.call<TorrentStatus>(
 			"web.update_ui",
