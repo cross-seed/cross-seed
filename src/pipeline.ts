@@ -16,7 +16,7 @@ import {
 	findPotentialNestedRoots,
 	findSearcheesFromAllDataDirs,
 } from "./dataFiles.js";
-import { db } from "./db.js";
+import { db, memDB } from "./db.js";
 import {
 	assessCandidateCaching,
 	getGuidInfoHashMap,
@@ -37,9 +37,11 @@ import { sendResultsNotification } from "./pushNotifier.js";
 import { isOk } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
+	createEnsembleSearchees,
 	createSearcheeFromMetafile,
 	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
+	getSeasonKey,
 	Searchee,
 	SearcheeLabel,
 	SearcheeWithLabel,
@@ -60,9 +62,12 @@ import {
 } from "./torznab.js";
 import {
 	comparing,
+	formatAsList,
 	getLogString,
 	humanReadableDate,
+	humanReadableSize,
 	isTruthy,
+	stripExtension,
 	wait,
 } from "./utils.js";
 
@@ -321,13 +326,11 @@ export async function searchForLocalTorrentByCriteria(
 	return totalFound;
 }
 
-export async function checkNewCandidateMatch(
+async function pushSearcheesForCandidate(
 	candidate: Candidate,
+	searchees: SearcheeWithLabel[],
 	searcheeLabel: SearcheeLabel,
-): Promise<{
-	decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null;
-	actionResult: ActionResult | null;
-}> {
+): Promise<string | null> {
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	const { keys, metas } = await getSimilarTorrentsByName(candidate.name);
 	const method = keys.length ? `[${keys}]` : "Fuse fallback";
@@ -336,28 +339,107 @@ export async function checkNewCandidateMatch(
 			label: searcheeLabel,
 			message: `Did not find an existing entry using ${method} for ${candidateLog}`,
 		});
-		return { decision: null, actionResult: null };
+		return null;
 	}
-	const searchees: SearcheeWithLabel[] = filterDupesFromSimilar(
-		metas
-			.map(createSearcheeFromMetafile)
-			.filter(isOk)
-			.map((r) => r.unwrap())
-			.map((searchee) => ({ ...searchee, label: searcheeLabel }))
-			.filter((searchee) => filterByContent(searchee)),
+	searchees.push(
+		...filterDupesFromSimilar(
+			metas
+				.map(createSearcheeFromMetafile)
+				.filter(isOk)
+				.map((r) => r.unwrap())
+				.map((searchee) => ({ ...searchee, label: searcheeLabel }))
+				.filter((searchee) => filterByContent(searchee)),
+		),
 	);
 	if (!searchees.length) {
 		logger.verbose({
 			label: searcheeLabel,
 			message: `No valid entries found using ${method} for ${candidateLog}`,
 		});
-		return { decision: null, actionResult: null };
+		return null;
 	}
+	return method;
+}
+
+async function pushEnsembleForCandidate(
+	candidate: Candidate,
+	searchees: SearcheeWithLabel[],
+	searcheeLabel: SearcheeLabel,
+): Promise<string | null> {
+	const { seasonFromEpisodes } = getRuntimeConfig();
+	if (!seasonFromEpisodes) return null;
+	const seasonKey = getSeasonKey(stripExtension(candidate.name));
+	if (!seasonKey) return null;
+
+	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
+	const { ensembleTitle, keyTitle, season } = seasonKey;
+	const key = `${keyTitle}.${season}`;
+	const ensemble = await memDB("ensemble").where({ ensemble: key });
+	if (ensemble.length === 0) {
+		logger.verbose({
+			label: searcheeLabel,
+			message: `Did not find an ensemble ${ensembleTitle} for ${candidateLog}`,
+		});
+		return null;
+	}
+	const files = ensemble
+		.map((e) => ({
+			path: e.absolute_path,
+			name: e.name,
+			length: e.length,
+		}))
+		.filter((f) => fs.existsSync(f.path));
+	if (files.length === 0) {
+		logger.verbose({
+			label: searcheeLabel,
+			message: `Did not find any files for ensemble ${ensembleTitle} for ${candidateLog}: sources may be incomplete or missing`,
+		});
+		return null;
+	}
+	// Get searchee.length by total size of each episode (average if multiple files for episode)
+	const uniqueElements = new Set(ensemble.map((e) => e.element));
+	const totalLength = [...uniqueElements].reduce((acc, cur) => {
+		const elements = ensemble.filter(
+			(e) =>
+				e.element === cur &&
+				files.some((f) => f.path === e.absolute_path),
+		);
+		const avg =
+			elements.reduce((a, c) => a + c.length, 0) / elements.length;
+		return acc + avg;
+	}, 0);
+	searchees.push({
+		name: ensembleTitle,
+		title: ensembleTitle,
+		files: files,
+		length: totalLength,
+		label: searcheeLabel,
+	});
 	logger.verbose({
 		label: searcheeLabel,
-		message: `Unique entries [${searchees.map((m) => m.title)}] using ${method} for ${candidateLog}`,
+		message: `Using ensemble ${ensembleTitle} for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
 	});
+	return "ensemble";
+}
 
+export async function checkNewCandidateMatch(
+	candidate: Candidate,
+	searcheeLabel: SearcheeLabel,
+): Promise<{
+	decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null;
+	actionResult: ActionResult | null;
+}> {
+	const searchees: SearcheeWithLabel[] = [];
+
+	const methods = [
+		await pushSearcheesForCandidate(candidate, searchees, searcheeLabel),
+		await pushEnsembleForCandidate(candidate, searchees, searcheeLabel),
+	].filter(isTruthy);
+	if (!searchees.length) return { decision: null, actionResult: null };
+	logger.verbose({
+		label: searcheeLabel,
+		message: `Unique entries [${searchees.map((m) => m.title)}] using ${formatAsList(methods, { sort: true })} for ${chalk.bold.white(candidate.name)} from ${candidate.tracker}`,
+	});
 	const infoHashesToExclude = await getInfoHashesToExclude();
 
 	let decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null =
@@ -455,13 +537,20 @@ async function findSearchableTorrents(): Promise<{
 	const { searchLimit } = getRuntimeConfig();
 
 	const realSearchees = await findAllSearchees(Label.SEARCH);
+	const ensembleSearchees = await createEnsembleSearchees(realSearchees, {
+		useFilters: true,
+	});
 	const infoHashesToExclude = new Set(
 		realSearchees.map((t) => t.infoHash).filter(isTruthy),
 	);
 
 	// Group the exact same search queries together for easy cache use later
 	const grouping = new Map<string, SearcheeWithLabel[]>();
-	for (const searchee of realSearchees.filter((s) => filterByContent(s))) {
+	const validSearchees = [
+		...ensembleSearchees,
+		...realSearchees.filter((searchee) => filterByContent(searchee)),
+	];
+	for (const searchee of validSearchees) {
 		const key = await getSearchString(searchee);
 		if (!grouping.has(key)) {
 			grouping.set(key, []);
@@ -490,7 +579,7 @@ async function findSearchableTorrents(): Promise<{
 
 	logger.info({
 		label: Label.SEARCH,
-		message: `Found ${realSearchees.length} torrents, ${finalSearchees.length} suitable to search for matches using ${grouping.size} unique queries`,
+		message: `Found ${realSearchees.length + ensembleSearchees.length} torrents, ${finalSearchees.length} suitable to search for matches using ${grouping.size} unique queries`,
 	});
 
 	if (searchLimit && grouping.size > searchLimit) {

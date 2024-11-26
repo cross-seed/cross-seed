@@ -174,6 +174,44 @@ function linkFuzzyTree(
 	return { contentPath, alreadyExisted, linkedNewFiles };
 }
 
+function linkVirtualSearchee(
+	searchee: Searchee,
+	newMeta: Metafile,
+	destinationDir: string,
+	options: { ignoreMissing: boolean },
+): LinkResult {
+	let alreadyExisted = false;
+	let linkedNewFiles = false;
+	const availableFiles = searchee.files.slice();
+	for (const newFile of newMeta.files) {
+		let matchedSearcheeFiles = availableFiles.filter(
+			(searcheeFile) => searcheeFile.length === newFile.length,
+		);
+		if (matchedSearcheeFiles.length > 1) {
+			matchedSearcheeFiles = matchedSearcheeFiles.filter(
+				(searcheeFile) => searcheeFile.name === newFile.name,
+			);
+		}
+		if (matchedSearcheeFiles.length) {
+			const srcFilePath = matchedSearcheeFiles[0].path; // Absolute path
+			const destFilePath = join(destinationDir, newFile.path);
+			const index = availableFiles.indexOf(matchedSearcheeFiles[0]);
+			availableFiles.splice(index, 1);
+			if (existsSync(destFilePath)) {
+				alreadyExisted = true;
+				continue;
+			}
+			if (options.ignoreMissing && !existsSync(srcFilePath)) continue;
+			mkdirSync(dirname(destFilePath), { recursive: true });
+			if (linkFile(srcFilePath, destFilePath)) {
+				linkedNewFiles = true;
+			}
+		}
+	}
+	const contentPath = join(destinationDir, newMeta.name);
+	return { contentPath, alreadyExisted, linkedNewFiles };
+}
+
 function unlinkMetafile(meta: Metafile, destinationDir: string) {
 	const file = meta.files[0];
 	let rootFolder = file.path;
@@ -213,28 +251,8 @@ export async function linkAllFilesInMetafile(
 		flatLinking ? linkDir! : join(linkDir!, tracker),
 	);
 
-	let sourceRoot: string;
-	if (searchee.path) {
-		if (!existsSync(searchee.path)) {
-			logger.error({
-				label: searchee.label,
-				message: `Linking failed, ${searchee.path} not found. Make sure Docker volume mounts are set up properly.`,
-			});
-			return resultOfErr("MISSING_DATA");
-		}
-		const result = await createSearcheeFromPath(searchee.path);
-		if (result.isErr()) {
-			return resultOfErr("TORRENT_NOT_FOUND");
-		}
-		const refreshedSearchee = result.unwrap();
-		if (
-			options.onlyCompleted &&
-			searchee.length !== refreshedSearchee.length
-		) {
-			return resultOfErr("TORRENT_NOT_COMPLETE");
-		}
-		sourceRoot = searchee.path;
-	} else {
+	let sourceRoot: string | undefined;
+	if (searchee.infoHash) {
 		const downloadDirResult = await getClient()!.getDownloadDir(
 			searchee as SearcheeWithInfoHash,
 			{ onlyCompleted: options.onlyCompleted },
@@ -259,9 +277,50 @@ export async function linkAllFilesInMetafile(
 			});
 			return resultOfErr("MISSING_DATA");
 		}
+	} else if (searchee.path) {
+		if (!existsSync(searchee.path)) {
+			logger.error({
+				label: searchee.label,
+				message: `Linking failed, ${searchee.path} not found. Make sure Docker volume mounts are set up properly.`,
+			});
+			return resultOfErr("MISSING_DATA");
+		}
+		const result = await createSearcheeFromPath(searchee.path);
+		if (result.isErr()) {
+			return resultOfErr("TORRENT_NOT_FOUND");
+		}
+		const refreshedSearchee = result.unwrap();
+		if (
+			options.onlyCompleted &&
+			searchee.length !== refreshedSearchee.length
+		) {
+			return resultOfErr("TORRENT_NOT_COMPLETE");
+		}
+		sourceRoot = searchee.path;
+	} else {
+		for (const file of searchee.files) {
+			if (!existsSync(file.path)) {
+				logger.error(
+					`Linking failed, ${file.path} not found. Make sure Docker volume mounts are set up properly.`,
+				);
+				return resultOfErr("MISSING_DATA");
+			}
+			if (
+				options.onlyCompleted &&
+				file.length !== statSync(file.path).size
+			) {
+				return resultOfErr("TORRENT_NOT_COMPLETE");
+			}
+		}
 	}
 
-	if (decision === Decision.MATCH) {
+	if (!sourceRoot) {
+		return resultOf(
+			linkVirtualSearchee(searchee, newMeta, fullLinkDir, {
+				ignoreMissing: !options.onlyCompleted,
+			}),
+		);
+	} else if (decision === Decision.MATCH) {
 		return resultOf(
 			linkExactTree(newMeta, fullLinkDir, sourceRoot, {
 				ignoreMissing: !options.onlyCompleted,

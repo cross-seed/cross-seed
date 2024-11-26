@@ -289,6 +289,15 @@ module.exports = {
 	includeNonVideos: false,
 
 	/**
+	 * Match season packs from the individual episodes you already have.
+	 *
+	 * undefined or null - disabled
+	 * 1 - must have all episodes
+	 * 0.8 - must have at least 80% of the episodes
+	 */
+	seasonFromEpisodes: 1,
+
+	/**
 	 * You should NOT modify this unless you have good reason.
 	 * The following option is the preliminary value to compare sizes of
 	 * releases for further comparison.

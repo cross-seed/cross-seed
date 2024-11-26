@@ -13,7 +13,7 @@ import {
 	PROGRAM_NAME,
 	PROGRAM_VERSION,
 } from "./constants.js";
-import { db } from "./db.js";
+import { db, memDB } from "./db.js";
 import { diffCmd } from "./diff.js";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { clearIndexerFailures } from "./indexers.js";
@@ -30,7 +30,7 @@ import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
-import { parseTorrentFromFilename } from "./torrent.js";
+import { indexEnsemble, parseTorrentFromFilename } from "./torrent.js";
 import { fallback } from "./utils.js";
 
 let fileConfig: FileConfig;
@@ -187,6 +187,12 @@ function createCommandWithSharedOptions(name: string, description: string) {
 		.option(
 			"--no-include-non-videos",
 			"Don't include torrents which contain non-videos",
+		)
+		.option(
+			"--season-from-episodes <decimal>",
+			"Match season packs from episode torrents",
+			parseFloat,
+			fallback(fileConfig.seasonFromEpisodes, 1),
 		)
 		.option(
 			"--fuzzy-size-threshold <decimal>",
@@ -411,11 +417,13 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
+			await indexEnsemble();
 			serve(options.port, options.host);
 			jobsLoop();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
 			await db.destroy();
+			await memDB.destroy();
 		}
 	});
 
@@ -425,11 +433,14 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
+			await indexEnsemble();
 			await scanRssFeeds();
 			await db.destroy();
+			await memDB.destroy();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
 			await db.destroy();
+			await memDB.destroy();
 		}
 	},
 );

@@ -1,8 +1,9 @@
+import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
 import fs from "fs";
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
-import { extname, join, resolve } from "path";
+import { dirname, extname, join, resolve } from "path";
 import { inspect } from "util";
 import { getClient, TorrentMetadataInClient } from "./clients/TorrentClient.js";
 import {
@@ -11,8 +12,7 @@ import {
 	SAVED_TORRENTS_INFO_REGEX,
 	USER_AGENT,
 } from "./constants.js";
-import { db } from "./db.js";
-import { distance } from "fastest-levenshtein";
+import { db, memDB } from "./db.js";
 import { Label, logger, logOnce } from "./logger.js";
 import { updateMetafileMetadata, Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
@@ -22,6 +22,7 @@ import {
 	createSearcheeFromTorrentFile,
 	getAnimeKeys,
 	getEpisodeKey,
+	getLargestFile,
 	getMovieKey,
 	getSeasonKey,
 	SearcheeWithInfoHash,
@@ -234,8 +235,56 @@ export async function findAllTorrentFilesInDir(
 		.map((fn) => resolve(join(torrentDir, fn)));
 }
 
+export async function cacheEnsembleEntry(
+	meta: Metafile,
+	torrentSavePaths?: Map<string, string>,
+): Promise<void> {
+	const episodeKey = getEpisodeKey(stripExtension(meta.name));
+	if (!episodeKey) return;
+
+	const { keyTitle, season, episode } = episodeKey;
+	const key = `${keyTitle}${season ? `.${season}` : ""}`;
+	const element = episode;
+	const largestFile = getLargestFile(meta.files);
+	const entryExists = await memDB("ensemble")
+		.select("id")
+		.where({ ensemble: key, element, length: largestFile.length })
+		.first();
+	if (entryExists) return;
+
+	let savePath: string | undefined;
+	if (!torrentSavePaths) {
+		const downloadDirResult = await getClient()!.getDownloadDir(meta, {
+			onlyCompleted: false,
+		});
+		if (downloadDirResult.isErr()) return;
+		savePath = downloadDirResult.unwrap();
+	} else {
+		savePath = torrentSavePaths.get(meta.infoHash);
+	}
+	if (!savePath) return;
+	const sourceRoot = join(
+		savePath,
+		meta.files.length === 1 ? meta.files[0].path : meta.name,
+	);
+
+	await memDB("ensemble")
+		.insert({
+			ensemble: key,
+			element,
+			name: largestFile.name,
+			absolute_path:
+				meta.files.length === 1
+					? sourceRoot
+					: join(dirname(sourceRoot), largestFile.path),
+			length: largestFile.length,
+		})
+		.onConflict("absolute_path")
+		.ignore();
+}
+
 export async function indexNewTorrents(): Promise<void> {
-	const { torrentDir } = getRuntimeConfig();
+	const { seasonFromEpisodes, torrentDir } = getRuntimeConfig();
 	if (typeof torrentDir !== "string") return;
 
 	const dirContents = new Set(await findAllTorrentFilesInDir(torrentDir));
@@ -248,7 +297,7 @@ export async function indexNewTorrents(): Promise<void> {
 			.first();
 
 		if (!doesAlreadyExist) {
-			let meta;
+			let meta: Metafile;
 			try {
 				meta = await parseTorrentFromFilename(filepath);
 			} catch (e) {
@@ -266,6 +315,9 @@ export async function indexNewTorrents(): Promise<void> {
 				})
 				.onConflict("file_path")
 				.ignore();
+			if (seasonFromEpisodes) {
+				cacheEnsembleEntry(meta);
+			}
 		}
 	}
 
@@ -281,6 +333,48 @@ export async function indexNewTorrents(): Promise<void> {
 		const batch = filesToDelete.slice(i, i + batchSize);
 		await db("torrent").whereIn("file_path", batch).del();
 	}
+}
+
+export async function indexEnsemble(): Promise<void> {
+	const { seasonFromEpisodes, torrentDir } = getRuntimeConfig();
+	if (!seasonFromEpisodes) return;
+	if (typeof torrentDir !== "string") return;
+	logger.info("Indexing torrents for ensemble lookup...");
+
+	const tableExists = await memDB.schema.hasTable("ensemble");
+	if (!tableExists) {
+		await memDB.schema.createTable("ensemble", (table) => {
+			table.increments("id").primary();
+			table.string("ensemble");
+			table.string("element");
+			table.string("name");
+			table.string("absolute_path").unique();
+			table.integer("length");
+		});
+	}
+
+	const dirContents = await findAllTorrentFilesInDir(torrentDir);
+	const metas: Metafile[] = [];
+	for (const filepath of dirContents) {
+		let meta: Metafile;
+		try {
+			meta = await parseTorrentFromFilename(filepath);
+		} catch (e) {
+			logOnce(`Failed to parse ${filepath}`, () => {
+				logger.error(`Failed to parse ${filepath}`);
+				logger.debug(e);
+			});
+			continue;
+		}
+		metas.push(meta);
+	}
+	const torrentSavePaths = await getClient()!.getAllDownloadDirs({
+		metas,
+		onlyCompleted: false,
+	});
+	await Promise.allSettled(
+		metas.map((meta) => cacheEnsembleEntry(meta, torrentSavePaths)),
+	);
 }
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {

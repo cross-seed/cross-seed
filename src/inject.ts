@@ -27,7 +27,7 @@ import { findAllSearchees } from "./pipeline.js";
 import { sendResultsNotification } from "./pushNotifier.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { SearcheeWithLabel } from "./searchee.js";
+import { createEnsembleSearchees, SearcheeWithLabel } from "./searchee.js";
 import {
 	findAllTorrentFilesInDir,
 	parseMetadataFromFilename,
@@ -631,7 +631,11 @@ export async function injectSavedTorrents(): Promise<void> {
 		message: `Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to inject in ${targetDirLog}`,
 	});
 	const summary = createSummary(torrentFilePaths.length);
-	const searchees = await findAllSearchees(Label.INJECT);
+	const realSearchees = await findAllSearchees(Label.INJECT);
+	const ensembleSearchees = await createEnsembleSearchees(realSearchees, {
+		useFilters: false,
+	});
+	const searchees = [...realSearchees, ...ensembleSearchees];
 	for (const [i, torrentFilePath] of torrentFilePaths.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${torrentFilePaths.length})`);
 		await injectSavedTorrent(progress, torrentFilePath, summary, searchees);
