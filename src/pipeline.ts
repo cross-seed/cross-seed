@@ -95,6 +95,7 @@ async function assessCandidates(
 async function findOnOtherSites(
 	searchee: SearcheeWithLabel,
 	hashesToExclude: string[],
+	indexerSearchCount: Map<number, number>,
 	cachedSearch: CachedSearch,
 	progress: string,
 ): Promise<FoundOnOtherSites> {
@@ -104,7 +105,12 @@ async function findOnOtherSites(
 		.onConflict("name")
 		.ignore();
 
-	const response = await searchTorznab(searchee, cachedSearch, progress);
+	const response = await searchTorznab(
+		searchee,
+		indexerSearchCount,
+		cachedSearch,
+		progress,
+	);
 	const cachedIndexers = cachedSearch.indexerCandidates.length;
 	const searchedIndexers = response.length - cachedIndexers;
 	cachedSearch.indexerCandidates = response;
@@ -170,8 +176,9 @@ async function findMatchesBatch(
 	searchees: SearcheeWithLabel[],
 	hashesToExclude: string[],
 ) {
-	const { delay } = getRuntimeConfig();
+	const { delay, searchLimit } = getRuntimeConfig();
 
+	const indexerSearchCount = new Map<number, number>();
 	let totalFound = 0;
 	let prevSearchTime = 0;
 	const cachedSearch: CachedSearch = { q: null, indexerCandidates: [] };
@@ -187,10 +194,25 @@ async function findMatchesBatch(
 			const { searchedIndexers, matches } = await findOnOtherSites(
 				searchee,
 				hashesToExclude,
+				indexerSearchCount,
 				cachedSearch,
 				progress,
 			);
 			totalFound += matches;
+
+			if (
+				searchLimit &&
+				indexerSearchCount.size &&
+				Array.from(indexerSearchCount.values()).every(
+					(n) => n >= searchLimit,
+				)
+			) {
+				logger.info({
+					label: searchee.label,
+					message: `Reached searchLimit of ${searchLimit} on all indexers`,
+				});
+				break;
+			}
 
 			// if all indexers were rate limited or cached, don't sleep
 			if (searchedIndexers === 0) continue;
@@ -210,7 +232,7 @@ async function findMatchesBatch(
 export async function searchForLocalTorrentByCriteria(
 	criteria: TorrentLocator,
 ): Promise<number | null> {
-	const { delay, maxDataDepth } = getRuntimeConfig();
+	const { delay, maxDataDepth, searchLimit } = getRuntimeConfig();
 
 	const rawSearchees: Searchee[] = [];
 	if (criteria.infoHash || !criteria.path) {
@@ -234,6 +256,7 @@ export async function searchForLocalTorrentByCriteria(
 	}));
 	const includeEpisodes = searchees.length === 1;
 	const hashesToExclude = await getInfoHashesToExclude();
+	const indexerSearchCount = new Map<number, number>();
 	let totalFound = 0;
 	let filtered = 0;
 	const cachedSearch: CachedSearch = { q: null, indexerCandidates: [] };
@@ -249,10 +272,25 @@ export async function searchForLocalTorrentByCriteria(
 			const { matches, searchedIndexers } = await findOnOtherSites(
 				searchee,
 				hashesToExclude,
+				indexerSearchCount,
 				cachedSearch,
 				progress,
 			);
 			totalFound += matches;
+
+			if (
+				searchLimit &&
+				indexerSearchCount.size &&
+				Array.from(indexerSearchCount.values()).every(
+					(n) => n >= searchLimit,
+				)
+			) {
+				logger.info({
+					label: searchee.label,
+					message: `Reached searchLimit of ${searchLimit} on all indexers`,
+				});
+				break;
+			}
 
 			// if all indexers were rate limited, don't sleep
 			if (searchedIndexers === 0 || i === searchees.length - 1) continue;
@@ -437,19 +475,18 @@ async function findSearchableTorrents(): Promise<{
 	for (const key of keysToDelete) {
 		grouping.delete(key);
 	}
-	let finalSearchees = Array.from(grouping.values()).flat();
+	const finalSearchees = Array.from(grouping.values()).flat();
 
 	logger.info({
 		label: Label.SEARCH,
 		message: `Found ${realSearchees.length} torrents, ${finalSearchees.length} suitable to search for matches using ${grouping.size} unique queries`,
 	});
 
-	if (searchLimit && finalSearchees.length > searchLimit) {
+	if (searchLimit && grouping.size > searchLimit) {
 		logger.info({
 			label: Label.SEARCH,
-			message: `Limited to ${searchLimit} searches`,
+			message: `Limited to ${searchLimit} searches (unique queries) per indexer`,
 		});
-		finalSearchees = finalSearchees.slice(0, searchLimit);
 	}
 
 	return { searchees: finalSearchees, hashesToExclude };

@@ -427,6 +427,7 @@ export async function* queryRssFeeds(
 
 export async function searchTorznab(
 	searchee: SearcheeWithLabel,
+	indexerSearchCount: Map<number, number>,
 	cachedSearch: CachedSearch,
 	progress: string,
 ): Promise<IndexerCandidates[]> {
@@ -442,6 +443,7 @@ export async function searchTorznab(
 	const mediaType = getMediaType(searchee);
 	const { indexersToSearch, parsedMedia } = await getAndLogIndexers(
 		searchee,
+		indexerSearchCount,
 		cachedSearch,
 		mediaType,
 		progress,
@@ -773,11 +775,13 @@ async function makeRequests(
 
 async function getAndLogIndexers(
 	searchee: SearcheeWithLabel,
+	indexerSearchCount: Map<number, number>,
 	cachedSearch: CachedSearch,
 	mediaType: MediaType,
 	progress: string,
 ): Promise<{ indexersToSearch: Indexer[]; parsedMedia?: ParsedMedia }> {
-	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
+	const { excludeRecentSearch, excludeOlder, searchLimit } =
+		getRuntimeConfig();
 	const searcheeLog = getLogString(searchee, chalk.bold.white);
 	const mediaTypeLog = chalk.white(mediaType.toUpperCase());
 
@@ -844,20 +848,38 @@ async function getAndLogIndexers(
 		cachedSearch.ids = undefined; // Don't prematurely get ids if skipping
 	}
 	const indexersToSearch = indexersToUse.filter((indexer) => {
-		return !cachedSearch.indexerCandidates.some(
-			(candidates) => candidates.indexerId === indexer.id,
+		if (
+			cachedSearch.indexerCandidates.some(
+				(candidates) => candidates.indexerId === indexer.id,
+			)
+		) {
+			return false;
+		}
+		if (!searchLimit) return true;
+
+		if (!indexerSearchCount.has(indexer.id)) {
+			indexerSearchCount.set(indexer.id, 0);
+		}
+		if (indexerSearchCount.get(indexer.id)! >= searchLimit) return false;
+		indexerSearchCount.set(
+			indexer.id,
+			indexerSearchCount.get(indexer.id)! + 1,
 		);
+		return true;
 	});
 
-	const filteringCauses = [
-		enabledIndexers.length > timeFilteredIndexers.length && "timestamps",
-		timeFilteredIndexers.length > indexersToUse.length && "category",
-	].filter(isTruthy);
-	const reasonStr = filteringCauses.length
-		? ` (filtered by ${formatAsList(filteringCauses, { sort: true })})`
-		: "";
 	if (!indexersToSearch.length && !cachedSearch.indexerCandidates.length) {
 		cachedSearch.q = null; // Won't scan arrs for multiple skips in a row
+		const filteringCauses = [
+			enabledIndexers.length > timeFilteredIndexers.length &&
+				"timestamps",
+			timeFilteredIndexers.length > indexersToUse.length && "category",
+			indexersToSearch.length + cachedSearch.indexerCandidates.length <
+				indexersToUse.length && "searchLimit",
+		].filter(isTruthy);
+		const reasonStr = filteringCauses.length
+			? ` (filtered by ${formatAsList(filteringCauses, { sort: true })})`
+			: "";
 		logger.info({
 			label: searchee.label,
 			message: `${progress}Skipped searching on indexers for ${searcheeLog}${reasonStr} | MediaType: ${mediaTypeLog} | IDs: N/A`,
