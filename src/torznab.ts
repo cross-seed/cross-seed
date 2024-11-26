@@ -35,7 +35,7 @@ import {
 import { Label, logger, logOnce } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee, SearcheeWithLabel } from "./searchee.js";
+import { getNewestFileAge, Searchee, SearcheeWithLabel } from "./searchee.js";
 import {
 	cleanTitle,
 	combineAsyncIterables,
@@ -777,7 +777,8 @@ async function getAndLogIndexers(
 	mediaType: MediaType,
 	progress: string,
 ): Promise<{ indexersToSearch: Indexer[]; parsedMedia?: ParsedMedia }> {
-	const { excludeRecentSearch, excludeOlder } = getRuntimeConfig();
+	const { excludeRecentSearch, excludeOlder, seasonFromEpisodes } =
+		getRuntimeConfig();
 	const searcheeLog = getLogString(searchee, chalk.bold.white);
 	const mediaTypeLog = chalk.white(mediaType.toUpperCase());
 
@@ -807,11 +808,20 @@ async function getAndLogIndexers(
 		searchee.label !== Label.WEBHOOK && excludeRecentSearch
 			? nMsAgo(excludeRecentSearch)
 			: Number.POSITIVE_INFINITY;
-	const timeFilteredIndexers = enabledIndexers.filter((indexer) => {
+	const isEnsemble =
+		seasonFromEpisodes && !searchee.infoHash && !searchee.path;
+	const timeFilteredIndexers = enabledIndexers.filter(async (indexer) => {
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id,
 		);
 		if (!entry) return true;
+		if (
+			isEnsemble &&
+			entry.lastSearched &&
+			entry.lastSearched < (await getNewestFileAge(searchee))
+		) {
+			return true;
+		}
 		if (entry.firstSearched && entry.firstSearched < skipBefore) {
 			return false;
 		}
