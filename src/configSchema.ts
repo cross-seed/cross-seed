@@ -119,9 +119,7 @@ export const VALIDATION_SCHEMA = z
 	.object({
 		delay: z
 			.number()
-			.nonnegative({
-				message: ZodErrorMessages.delayNegative,
-			})
+			.nonnegative(ZodErrorMessages.delayNegative)
 			.gte(process.env.DEV ? 0 : 30, ZodErrorMessages.delayUnsupported)
 			.lte(3600, ZodErrorMessages.delayUnsupported),
 		torznab: z.array(z.string().url()),
@@ -140,12 +138,13 @@ export const VALIDATION_SCHEMA = z
 		injectDir: z.string().optional(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
-		fuzzySizeThreshold: z.number().positive().lte(1, {
-			message: ZodErrorMessages.fuzzySizeThreshold,
-		}),
+		fuzzySizeThreshold: z
+			.number()
+			.positive()
+			.lte(1, ZodErrorMessages.fuzzySizeThreshold),
 		excludeOlder: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish()
 			.or(
@@ -159,7 +158,7 @@ export const VALIDATION_SCHEMA = z
 
 		excludeRecentSearch: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish()
 			.or(
@@ -187,7 +186,7 @@ export const VALIDATION_SCHEMA = z
 		host: z.string().ip().nullish(),
 		rssCadence: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish()
 			.refine(
@@ -199,7 +198,7 @@ export const VALIDATION_SCHEMA = z
 			),
 		searchCadence: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish()
 			.refine(
@@ -209,12 +208,12 @@ export const VALIDATION_SCHEMA = z
 			),
 		snatchTimeout: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish(),
 		searchTimeout: z
 			.string()
-			.min(1, { message: ZodErrorMessages.emptyString })
+			.min(1, ZodErrorMessages.emptyString)
 			.transform(transformDurationString)
 			.nullish(),
 		searchLimit: z.number().nonnegative().nullish(),
