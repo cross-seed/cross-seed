@@ -170,14 +170,14 @@ module.exports = {
 	 * USING THE SAME PATH.
 	 *
 	 * We recommend reading the following FAQ entry:
-	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#what-linktype-should-i-use
+	 * https://www.cross-seed.org/docs/tutorials/linking
 	 */
 	linkDir: undefined,
 
 	/**
 	 * cross-seed will use links of this type to inject data-based matches into
 	 * your client. We recommend reading the following FAQ entry:
-	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#what-linktype-should-i-use
+	 * https://www.cross-seed.org/docs/tutorials/linking#hardlinks-vs-symlinks
 	 * Options: "symlink", "hardlink".
 	 */
 	linkType: "hardlink",
@@ -189,7 +189,7 @@ module.exports = {
 	 * own folder with the tracker's name and it's links within it.
 	 *
 	 * If using Automatic Torrent Management in qBittorrent, please read:
-	 * https://www.cross-seed.org/docs/v6-migration#qbittorrent
+	 * https://www.cross-seed.org/docs/basics/options#flatlinking
 	 *
 	 * Default: false.
 	 */
@@ -205,7 +205,8 @@ module.exports = {
 	 * Options: "safe", "risky", "partial".
 	 *
 	 * We recommend reading the following FAQ entry:
-	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#what-linktype-should-i-use
+	 * https://www.cross-seed.org/docs/basics/options#matchmode
+	 * https://www.cross-seed.org/docs/tutorials/linking#hardlinks-vs-symlinks
 	 */
 	matchMode: "safe",
 
