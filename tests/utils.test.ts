@@ -3,7 +3,13 @@ import { fileFactory } from "./factories/file";
 import { searcheeFactory } from "./factories/searchee";
 
 import { MediaType } from "../src/constants";
-import { humanReadableSize, getMediaType, sanitizeUrl } from "../src/utils";
+import { SEASON_REGEX } from "../src/constants";
+import {
+	extractInt,
+	getMediaType,
+	humanReadableSize,
+	sanitizeUrl,
+} from "../src/utils";
 
 describe("humanReadableSize", () => {
 	it("returns a human-readable size", () => {
@@ -28,9 +34,16 @@ describe("getMediaType", () => {
 	});
 
 	it("returns MediaType.SEASON if the title matches SEASON_REGEX", () => {
-		const searchee = searcheeFactory({ title: "My.Show.S01" });
-
-		expect(getMediaType(searchee)).toBe(MediaType.SEASON);
+		const s1 = searcheeFactory({ title: "My.Show.S01" });
+		expect(getMediaType(s1)).toBe(MediaType.SEASON);
+		expect(extractInt(s1.title.match(SEASON_REGEX)!.groups!.season)).toBe(
+			1,
+		);
+		const s2 = searcheeFactory({ title: "My.Show.Season 2" });
+		expect(getMediaType(s2)).toBe(MediaType.SEASON);
+		expect(extractInt(s2.title.match(SEASON_REGEX)!.groups!.season)).toBe(
+			2,
+		);
 	});
 
 	describe("when testing for video files by extension", () => {
