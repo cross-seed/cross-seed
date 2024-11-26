@@ -287,11 +287,15 @@ export function getLogString(
 
 export function formatAsList(
 	strings: string[],
-	options: { sort: boolean; type?: Intl.ListFormatType },
+	options: {
+		sort: boolean;
+		style?: Intl.ListFormatStyle;
+		type?: Intl.ListFormatType;
+	},
 ) {
 	if (options.sort) strings.sort((a, b) => a.localeCompare(b));
 	return new Intl.ListFormat("en", {
-		style: "long",
+		style: options.style ?? "long",
 		type: options.type ?? "conjunction",
 	}).format(strings);
 }
