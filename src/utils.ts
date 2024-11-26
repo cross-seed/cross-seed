@@ -10,6 +10,7 @@ import {
 	EP_REGEX,
 	JSON_VALUES_REGEX,
 	LEVENSHTEIN_DIVISOR,
+	MediaType,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
 	RELEASE_GROUP_REGEX,
@@ -25,17 +26,6 @@ import {
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
-
-export enum MediaType {
-	EPISODE = "episode",
-	SEASON = "pack",
-	MOVIE = "movie",
-	ANIME = "anime",
-	VIDEO = "video",
-	AUDIO = "audio",
-	BOOK = "book",
-	OTHER = "unknown",
-}
 
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 

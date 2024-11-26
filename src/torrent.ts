@@ -6,6 +6,7 @@ import { extname, join, resolve } from "path";
 import { inspect } from "util";
 import {
 	LEVENSHTEIN_DIVISOR,
+	MediaType,
 	SAVED_TORRENTS_INFO_REGEX,
 	USER_AGENT,
 } from "./constants.js";
@@ -23,7 +24,7 @@ import {
 	getSeasonKey,
 	Searchee,
 } from "./searchee.js";
-import { createKeyTitle, MediaType, stripExtension } from "./utils.js";
+import { createKeyTitle, stripExtension } from "./utils.js";
 
 export interface TorrentLocator {
 	infoHash?: string;

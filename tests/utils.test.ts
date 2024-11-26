@@ -2,12 +2,8 @@ import { describe, expect, it } from "vitest";
 import { fileFactory } from "./factories/file";
 import { searcheeFactory } from "./factories/searchee";
 
-import {
-	MediaType,
-	humanReadableSize,
-	getMediaType,
-	sanitizeUrl,
-} from "../src/utils";
+import { MediaType } from "../src/constants";
+import { humanReadableSize, getMediaType, sanitizeUrl } from "../src/utils";
 
 describe("humanReadableSize", () => {
 	it("returns a human-readable size", () => {

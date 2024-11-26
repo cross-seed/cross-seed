@@ -3,6 +3,7 @@ import ms from "ms";
 import { basename, dirname } from "path";
 import {
 	ARR_DIR_REGEX,
+	MediaType,
 	SEASON_REGEX,
 	SONARR_SUBFOLDERS_REGEX,
 	VIDEO_DISC_EXTENSIONS,
@@ -20,7 +21,6 @@ import {
 	getMediaType,
 	hasExt,
 	humanReadableDate,
-	MediaType,
 	nMsAgo,
 } from "./utils.js";
 
