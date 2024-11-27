@@ -1,6 +1,7 @@
 import { readdirSync, statSync } from "fs";
 import { stat } from "fs/promises";
 import { basename, dirname, join, relative } from "path";
+import { TorrentMetadataInClient } from "./clients/TorrentClient.js";
 import {
 	ANIME_GROUP_REGEX,
 	ANIME_REGEX,
@@ -18,7 +19,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
-import { parseTorrentFromFilename } from "./torrent.js";
+import { parseTorrentWithMetadata } from "./torrent.js";
 import {
 	createKeyTitle,
 	extractInt,
@@ -63,6 +64,9 @@ export interface Searchee {
 	 */
 	title: string;
 	length: number;
+	category?: string;
+	tags?: string[];
+	trackers?: string[][];
 	label?: SearcheeLabel;
 }
 
@@ -206,6 +210,9 @@ export function createSearcheeFromMetafile(
 			name: meta.name,
 			title,
 			length: meta.length,
+			category: meta.category,
+			tags: meta.tags,
+			trackers: meta.trackers,
 		});
 	}
 	const msg = `Could not find title for ${getLogString(meta)} from child files`;
@@ -218,9 +225,10 @@ export function createSearcheeFromMetafile(
 
 export async function createSearcheeFromTorrentFile(
 	filepath: string,
+	torrentInfos: TorrentMetadataInClient[],
 ): Promise<Result<SearcheeWithInfoHash, Error>> {
 	try {
-		const meta = await parseTorrentFromFilename(filepath);
+		const meta = await parseTorrentWithMetadata(filepath, torrentInfos);
 		return createSearcheeFromMetafile(meta);
 	} catch (e) {
 		logger.error(`Failed to parse ${basename(filepath)}`);
