@@ -463,10 +463,11 @@ export default class RTorrent implements TorrentClient {
 
 	async resumeInjection(
 		infoHash: string,
+		decision: DecisionAnyMatch,
 		options: { checkOnce: boolean },
 	): Promise<void> {
 		let sleepTime = resumeSleepTime;
-		const maxRemainingBytes = getMaxRemainingBytes();
+		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
 		while (Date.now() < stopTime) {
@@ -566,7 +567,9 @@ export default class RTorrent implements TorrentClient {
 					].filter((e) => e !== null),
 				);
 				if (toRecheck) {
-					this.resumeInjection(meta.infoHash, { checkOnce: false });
+					this.resumeInjection(meta.infoHash, decision, {
+						checkOnce: false,
+					});
 				}
 				break;
 			} catch (e) {
