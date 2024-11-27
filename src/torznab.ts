@@ -45,6 +45,7 @@ import {
 	getApikey,
 	getLogString,
 	getMediaType,
+	humanReadableDate,
 	isTruthy,
 	nMsAgo,
 	reformatTitleForSearching,
@@ -381,7 +382,7 @@ export async function* rssPager(
 		} catch (e) {
 			logger.error({
 				label: Label.TORZNAB,
-				message: `Paging indexer ${indexer.url} stopped: request failed for page ${i + 1}`,
+				message: `Paging indexer ${indexer.url} stopped at page ${i + 1}: request failed`,
 			});
 			logger.debug(e);
 			break;
@@ -405,7 +406,7 @@ export async function* rssPager(
 		if (!newCandidates.length) {
 			logger.verbose({
 				label: Label.TORZNAB,
-				message: `Paging indexer ${indexer.url} stopped: nothing new in page ${i + 1}`,
+				message: `Paging indexer ${indexer.url} stopped at page ${i + 1}: no new candidates`,
 			});
 			break;
 		}
@@ -419,7 +420,7 @@ export async function* rssPager(
 		if (newCandidates.length !== currentPageCandidates.length) {
 			logger.verbose({
 				label: Label.TORZNAB,
-				message: `Paging indexer ${indexer.url} stopped: last seen guid found in page ${i + 1}`,
+				message: `Paging indexer ${indexer.url} stopped at page ${i + 1}: reached last seen guid or pageBackUntil ${humanReadableDate(pageBackUntil)}`,
 			});
 			break;
 		}
