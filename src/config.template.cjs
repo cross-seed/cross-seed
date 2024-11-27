@@ -199,7 +199,7 @@ module.exports = {
 	/**
 	 * Determines flexibility of naming during matching.
 	 * "safe" will allow only perfect name/size matches using the standard
-	 * matching algorithm.
+	 * matching algorithm. All matches will be checked before resuming.
 	 * "risky" uses filesize as its only comparison point.
 	 * "partial" is like risky but allows matches if they are missing small
 	 * files like .nfo/.srt.
@@ -210,6 +210,12 @@ module.exports = {
 	 * https://www.cross-seed.org/docs/tutorials/linking#hardlinks-vs-symlinks
 	 */
 	matchMode: "safe",
+
+	/**
+	 * The maximum size in MB remaining for a torrent to be resumed.
+	 * Must be in the range of 0MB - 50MB.
+	 */
+	maxRemainingForResume: 50,
 
 	/**
 	 * Determines how deep into the specified dataDirs to go to generate new
