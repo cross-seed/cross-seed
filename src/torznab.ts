@@ -39,6 +39,7 @@ import { Searchee, SearcheeWithLabel } from "./searchee.js";
 import {
 	cleanTitle,
 	combineAsyncIterables,
+	comparing,
 	extractInt,
 	formatAsList,
 	getAnimeQueries,
@@ -373,7 +374,7 @@ export async function* rssPager(
 					apikey: indexer.apikey,
 					query: { t: "search", q: "", limit, offset: i * limit },
 				})
-			).sort((a, b) => b.pubDate - a.pubDate);
+			).sort(comparing((candidate) => -candidate.pubDate));
 			if (i === 0) {
 				newLastSeenGuid = currentPageCandidates[0].guid;
 				pageBackUntil =
