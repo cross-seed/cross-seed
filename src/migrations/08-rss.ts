@@ -7,7 +7,7 @@ async function up(knex: Knex.Knex): Promise<void> {
 			.references("id")
 			.inTable("indexer")
 			.primary();
-		table.string("last_seen");
+		table.string("last_seen_guid");
 	});
 }
 

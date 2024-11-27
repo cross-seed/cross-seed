@@ -354,9 +354,9 @@ export async function* rssPager(
 	const lastSeenGuid: string | undefined = (
 		await db("rss")
 			.where({ indexer_id: indexer.id })
-			.select("last_seen")
+			.select("last_seen_guid")
 			.first()
-	)?.last_seen;
+	)?.last_seen_guid;
 	let newLastSeenGuid: string | undefined = lastSeenGuid;
 	let pageBackUntil = 0;
 	const maxPage = 10;
@@ -425,9 +425,9 @@ export async function* rssPager(
 		}
 	}
 	await db("rss")
-		.insert({ indexer_id: indexer.id, last_seen: newLastSeenGuid })
+		.insert({ indexer_id: indexer.id, last_seen_guid: newLastSeenGuid })
 		.onConflict("indexer_id")
-		.merge(["last_seen"]);
+		.merge(["last_seen_guid"]);
 	if (i >= maxPage) {
 		logger.verbose({
 			label: Label.TORZNAB,
