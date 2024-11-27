@@ -631,7 +631,7 @@ export async function scanRssFeeds() {
 		});
 		return;
 	}
-	const lastRun =
+	const lastRun: number =
 		(await db("job_log").select("last_run").where({ name: "rss" }).first())
 			?.last_run ?? 0;
 	logger.verbose({
@@ -643,7 +643,7 @@ export async function scanRssFeeds() {
 		label: Label.RSS,
 		message: "Querying RSS feeds...",
 	});
-	const candidates = queryRssFeeds();
+	const candidates = queryRssFeeds(lastRun);
 	let i = 0;
 	for await (const candidate of candidates) {
 		await checkNewCandidateMatch(candidate, Label.RSS);
