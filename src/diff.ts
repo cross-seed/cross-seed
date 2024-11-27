@@ -25,9 +25,18 @@ export async function diffCmd(first: string, second: string): Promise<void> {
 		console.log(secondSearcheeRes.unwrapErr());
 		return;
 	}
+
 	const firstSearchee = firstSearcheeRes.unwrap();
-	const secondSearchee = secondSearcheeRes.unwrap();
 	delete firstSearchee.infoHash;
+	delete firstSearchee.category;
+	delete firstSearchee.tags;
+	delete firstSearchee.trackers;
+
+	const secondSearchee = secondSearcheeRes.unwrap();
 	delete secondSearchee.infoHash;
+	delete secondSearchee.category;
+	delete secondSearchee.tags;
+	delete secondSearchee.trackers;
+
 	diff(firstSearchee, secondSearchee);
 }
