@@ -523,10 +523,11 @@ export default class QBittorrent implements TorrentClient {
 
 	async resumeInjection(
 		infoHash: string,
+		decision: DecisionAnyMatch,
 		options: { checkOnce: boolean },
 	): Promise<void> {
 		let sleepTime = resumeSleepTime;
-		const maxRemainingBytes = getMaxRemainingBytes();
+		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
 		while (Date.now() < stopTime) {
@@ -675,7 +676,9 @@ export default class QBittorrent implements TorrentClient {
 			}
 			if (toRecheck) {
 				await this.recheckTorrent(newInfo.hash);
-				this.resumeInjection(newInfo.hash, { checkOnce: false });
+				this.resumeInjection(newInfo.hash, decision, {
+					checkOnce: false,
+				});
 			}
 
 			return InjectionResult.SUCCESS;
