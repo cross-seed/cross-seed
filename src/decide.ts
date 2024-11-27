@@ -495,7 +495,7 @@ export async function getGuidInfoHashMap(): Promise<Map<string, string>> {
  * Some trackers have alt titles which get their own guid but resolve to same torrent
  * @param guid The guid of the candidate
  * @param link The link of the candidate
- * @param guidInfoHashMap The map of guids to info hashes
+ * @param guidInfoHashMap The map of guids to info hashes. Necessary for optimal fuzzy lookups.
  * @returns The info hash of the torrent if found
  */
 async function guidLookup(
@@ -517,7 +517,6 @@ async function guidLookup(
 			}
 		}
 	}
-	return;
 }
 
 export async function assessCandidateCaching(
