@@ -290,7 +290,10 @@ async function handleRequest(
 	if (!(await authorize(req, res))) return;
 	const endpoint = req.url!.split("?")[0];
 
-	if (req.method !== "POST" && endpoint !== "/api/status") {
+	if (
+		(req.method === "POST" && endpoint === "/api/status") ||
+		(req.method === "GET" && endpoint !== "/api/status")
+	) {
 		res.writeHead(405);
 		res.end("Methods allowed: POST");
 		return;
