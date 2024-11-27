@@ -6,10 +6,10 @@ import {
 	ANIME_REGEX,
 	AUDIO_EXTENSIONS,
 	BOOK_EXTENSIONS,
-	Decision,
 	EP_REGEX,
 	JSON_VALUES_REGEX,
 	LEVENSHTEIN_DIVISOR,
+	MediaType,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
 	RELEASE_GROUP_REGEX,
@@ -25,17 +25,6 @@ import {
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
-
-export enum MediaType {
-	EPISODE = "episode",
-	SEASON = "pack",
-	MOVIE = "movie",
-	ANIME = "anime",
-	VIDEO = "video",
-	AUDIO = "audio",
-	BOOK = "book",
-	OTHER = "unknown",
-}
 
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
@@ -60,9 +49,15 @@ export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
 
-export function humanReadableSize(bytes: number) {
-	const k = 1000;
-	const sizes = ["B", "kB", "MB", "GB", "TB"];
+export function humanReadableSize(
+	bytes: number,
+	options?: { binary: boolean },
+) {
+	if (bytes === 0) return "0 B";
+	const k = options?.binary ? 1024 : 1000;
+	const sizes = options?.binary
+		? ["B", "KiB", "MiB", "GiB", "TiB"]
+		: ["B", "kB", "MB", "GB", "TB"];
 	// engineering notation: (coefficient) * 1000 ^ (exponent)
 	const exponent = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
 	const coefficient = bytes / Math.pow(k, exponent);
@@ -107,18 +102,6 @@ export function getMediaType(searchee: Searchee): MediaType {
 			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
 		default:
 			return unsupportedMediaType(searchee);
-	}
-}
-
-export function shouldRecheck(searchee: Searchee, decision: Decision): boolean {
-	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
-	switch (decision) {
-		case Decision.MATCH:
-		case Decision.MATCH_SIZE_ONLY:
-			return false;
-		case Decision.MATCH_PARTIAL:
-		default:
-			return true;
 	}
 }
 
@@ -297,11 +280,15 @@ export function getLogString(
 
 export function formatAsList(
 	strings: string[],
-	options: { sort: boolean; type?: Intl.ListFormatType },
+	options: {
+		sort: boolean;
+		style?: Intl.ListFormatStyle;
+		type?: Intl.ListFormatType;
+	},
 ) {
 	if (options.sort) strings.sort((a, b) => a.localeCompare(b));
 	return new Intl.ListFormat("en", {
-		style: "long",
+		style: options.style ?? "long",
 		type: options.type ?? "conjunction",
 	}).format(strings);
 }

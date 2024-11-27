@@ -3,6 +3,7 @@ import ms from "ms";
 import { basename, dirname } from "path";
 import {
 	ARR_DIR_REGEX,
+	MediaType,
 	SEASON_REGEX,
 	SONARR_SUBFOLDERS_REGEX,
 	VIDEO_DISC_EXTENSIONS,
@@ -15,12 +16,12 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { Searchee, SearcheeWithLabel } from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
 import {
+	comparing,
 	filesWithExt,
 	getLogString,
 	getMediaType,
 	hasExt,
 	humanReadableDate,
-	MediaType,
 	nMsAgo,
 } from "./utils.js";
 
@@ -194,8 +195,9 @@ export function filterDupesFromSimilar<T extends Searchee>(
 	searchees: T[],
 ): T[] {
 	const filteredSearchees: T[] = [];
-	for (const searchee of searchees) {
+	for (const searchee of [...searchees].sort(comparing((s) => !s.infoHash))) {
 		const isDupe = filteredSearchees.some((s) => {
+			if (searchee.title !== s.title) return false;
 			if (searchee.length !== s.length) return false;
 			if (searchee.files.length !== s.files.length) return false;
 			const potentialFiles = s.files.map((f) => f.length);

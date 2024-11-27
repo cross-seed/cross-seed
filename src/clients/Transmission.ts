@@ -9,8 +9,12 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { extractCredentialsFromUrl, shouldRecheck } from "../utils.js";
-import { TorrentClient } from "./TorrentClient.js";
+import {
+	TorrentMetadataInClient,
+	shouldRecheck,
+	TorrentClient,
+} from "./TorrentClient.js";
+import { extractCredentialsFromUrl } from "../utils.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
 type Method =
@@ -26,7 +30,15 @@ interface Response<T> {
 }
 
 interface TorrentGetResponseArgs {
-	torrents: { downloadDir: string; percentDone: number }[];
+	torrents: {
+		downloadDir: string;
+		hashString: string;
+		leftUntilDone: number;
+		name: string;
+		percentDone: number;
+		status: number;
+		labels: string[];
+	}[];
 }
 
 interface TorrentMetadata {
@@ -47,6 +59,7 @@ function doesAlreadyExist(
 
 export default class Transmission implements TorrentClient {
 	xTransmissionSessionId: string;
+	readonly type = Label.TRANSMISSION;
 
 	private async request<T>(
 		method: Method,
@@ -177,6 +190,23 @@ export default class Transmission implements TorrentClient {
 			.mapErr((err) => (err === "FAILURE" ? "UNKNOWN_ERROR" : err));
 	}
 
+	async getAllDownloadDirs(options: {
+		onlyCompleted: boolean;
+	}): Promise<Map<string, string>> {
+		let torrents = (
+			await this.request<TorrentGetResponseArgs>("torrent-get", {
+				fields: ["hashString", "downloadDir", "percentDone"],
+			})
+		).torrents;
+		if (options.onlyCompleted) {
+			torrents = torrents.filter((torrent) => torrent.percentDone === 1);
+		}
+		return torrents.reduce((acc, { hashString, downloadDir }) => {
+			acc.set(hashString, downloadDir);
+			return acc;
+		}, new Map());
+	}
+
 	async isTorrentComplete(
 		infoHash: string,
 	): Promise<Result<boolean, "NOT_FOUND">> {
@@ -192,6 +222,17 @@ export default class Transmission implements TorrentClient {
 		}
 		const [{ percentDone }] = queryResponse.torrents;
 		return resultOf(percentDone === 1);
+	}
+
+	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
+		const res = await this.request<TorrentGetResponseArgs>("torrent-get", {
+			fields: ["hashString", "labels"],
+		});
+		return res.torrents.map((torrent) => ({
+			infoHash: torrent.hashString,
+			category: "",
+			tags: torrent.labels,
+		}));
 	}
 
 	async recheckTorrent(infoHash: string): Promise<void> {

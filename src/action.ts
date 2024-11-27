@@ -10,7 +10,7 @@ import {
 	symlinkSync,
 } from "fs";
 import { dirname, join, resolve } from "path";
-import { getClient } from "./clients/TorrentClient.js";
+import { getClient, shouldRecheck } from "./clients/TorrentClient.js";
 import {
 	Action,
 	ActionResult,
@@ -203,14 +203,12 @@ export async function linkAllFilesInMetafile(
 	>
 > {
 	const { linkDir, flatLinking } = getRuntimeConfig();
-	const newMetaClientSavePathRes = await getClient().getDownloadDir(newMeta, {
+	const clientSavePathRes = await getClient()!.getDownloadDir(newMeta, {
 		onlyCompleted: false,
 	});
-	const fullLinkDir = newMetaClientSavePathRes.isOk()
-		? newMetaClientSavePathRes.unwrap() // Use existing if ALREADY_EXISTS
-		: flatLinking
-			? linkDir
-			: join(linkDir, tracker);
+	const fullLinkDir = clientSavePathRes.orElse(
+		flatLinking ? linkDir : join(linkDir, tracker),
+	);
 
 	let sourceRoot: string;
 	if (searchee.path) {
@@ -234,7 +232,7 @@ export async function linkAllFilesInMetafile(
 		}
 		sourceRoot = searchee.path;
 	} else {
-		const downloadDirResult = await getClient().getDownloadDir(
+		const downloadDirResult = await getClient()!.getDownloadDir(
 			searchee as SearcheeWithInfoHash,
 			{ onlyCompleted: options.onlyCompleted },
 		);
@@ -332,7 +330,7 @@ export async function performAction(
 		// should be a MATCH, as risky requires a linkDir to be set
 		destinationDir = dirname(searchee.path);
 	}
-	const result = await getClient().inject(
+	const result = await getClient()!.inject(
 		newMeta,
 		searchee,
 		decision,
@@ -341,8 +339,8 @@ export async function performAction(
 
 	logActionResult(result, newMeta, searchee, tracker, decision);
 	if (result === InjectionResult.SUCCESS) {
-		// For an easy re-injection user workflow when multiple MATCH_PARTIAL
-		if (decision === Decision.MATCH_PARTIAL) {
+		// cross-seed may need to process these with the inject job
+		if (shouldRecheck(searchee, decision)) {
 			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 		}
 	} else if (result !== InjectionResult.ALREADY_EXISTS) {

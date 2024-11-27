@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import { fileFactory } from "./factories/file";
 import { searcheeFactory } from "./factories/searchee";
 
-import { SEASON_REGEX } from "../src/constants";
+import { MediaType, SEASON_REGEX } from "../src/constants";
 import {
 	extractInt,
 	getMediaType,
 	humanReadableSize,
-	MediaType,
 	sanitizeUrl,
 } from "../src/utils";
 
@@ -16,6 +15,9 @@ describe("humanReadableSize", () => {
 		expect(humanReadableSize(123)).toBe("123 B");
 		expect(humanReadableSize(1234)).toBe("1.23 kB");
 		expect(humanReadableSize(1000 * 1234)).toBe("1.23 MB");
+		expect(humanReadableSize(1024 * 1234, { binary: true })).toBe(
+			"1.21 MiB",
+		);
 	});
 
 	it("truncates number when byte size is exact", () => {

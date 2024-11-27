@@ -1,4 +1,5 @@
 import { readdirSync, statSync } from "fs";
+import { stat } from "fs/promises";
 import { basename, dirname, join, relative } from "path";
 import {
 	ANIME_GROUP_REGEX,
@@ -88,6 +89,23 @@ export function getSearcheeSource(searchee: Searchee): SearcheeSource {
 	} else {
 		return SearcheeSource.VIRTUAL;
 	}
+}
+
+export function getLargestFile(files: File[]): File {
+	return files.reduce((a, b) => (a.length > b.length ? a : b));
+}
+
+export async function getNewestFileAge(searchee: Searchee): Promise<number> {
+	if (searchee.infoHash || searchee.path) {
+		throw new Error("Only virtual searchees have absolute paths");
+	}
+	return Math.max(
+		...(await Promise.all(
+			searchee.files.map((file) =>
+				stat(file.path).then((s) => s.mtimeMs),
+			),
+		)),
+	);
 }
 
 function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {
