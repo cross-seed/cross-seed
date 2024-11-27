@@ -276,36 +276,48 @@ async function announce(
 		res.end(e.message);
 	}
 }
-async function statusCheck(
+
+async function status(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
 	res.writeHead(200);
 	res.end("OK");
 }
+
+async function ping(req: IncomingMessage, res: ServerResponse): Promise<void> {
+	res.writeHead(200);
+	res.end("OK");
+}
+
 async function handleRequest(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
-	if (!(await authorize(req, res))) return;
-	const endpoint = req.url!.split("?")[0];
-
-	if (
-		(req.method === "POST" && endpoint === "/api/status") ||
-		(req.method === "GET" && endpoint !== "/api/status")
-	) {
+	const checkMethod = (method: string, endpoint: string) => {
+		if (req.method === method) return true;
 		res.writeHead(405);
-		res.end("Methods allowed: POST");
-		return;
-	}
+		res.end(`Method ${req.method} not allowed for ${endpoint}`);
+		return false;
+	};
 
+	const endpoint = req.url!.split("?")[0];
 	switch (endpoint) {
-		case "/api/webhook":
-			return search(req, res);
 		case "/api/announce":
+			if (!checkMethod("POST", endpoint)) return;
+			if (!(await authorize(req, res))) return;
 			return announce(req, res);
+		case "/api/webhook":
+			if (!checkMethod("POST", endpoint)) return;
+			if (!(await authorize(req, res))) return;
+			return search(req, res);
+		case "/api/ping":
+			if (!checkMethod("GET", endpoint)) return;
+			return ping(req, res);
 		case "/api/status":
-			return statusCheck(req, res);
+			if (!checkMethod("GET", endpoint)) return;
+			if (!(await authorize(req, res))) return;
+			return status(req, res);
 		default: {
 			const message = `Unknown endpoint: ${endpoint}`;
 			logger.error({ label: Label.SERVER, message });
