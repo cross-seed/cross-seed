@@ -371,12 +371,12 @@ export async function* rssPager(
 			return;
 		}
 
-		const allNewPubDates = currentPageCandidates.map((c) => c.pubDate);
+		const allNewPubDates = currentPageCandidates.map((c) => c.pubDate!);
 		const currentPageEarliest = Math.min(...allNewPubDates);
 		const currentPageLatest = Math.max(...allNewPubDates);
 
 		const newCandidates = currentPageCandidates.filter(
-			(c) => c.pubDate < earliestSeen && c.pubDate >= pageBackUntil,
+			(c) => c.pubDate! < earliestSeen && c.pubDate! >= pageBackUntil,
 		);
 
 		if (currentPageLatest > Date.now() + ms("10 minutes")) {

@@ -16,7 +16,11 @@ import {
 	findSearcheesFromAllDataDirs,
 } from "./dataFiles.js";
 import { db } from "./db.js";
-import { assessCandidateCaching, ResultAssessment } from "./decide.js";
+import {
+	assessCandidateCaching,
+	getGuidInfoHashMap,
+	ResultAssessment,
+} from "./decide.js";
 import {
 	IndexerStatus,
 	updateIndexerStatus,
@@ -62,12 +66,12 @@ import {
 } from "./utils.js";
 
 export interface Candidate {
+	name: string;
 	guid: string;
 	link: string;
-	size: number;
-	name: string;
 	tracker: string;
-	pubDate: number;
+	size?: number;
+	pubDate?: number;
 	indexerId?: number;
 }
 
@@ -84,14 +88,16 @@ interface FoundOnOtherSites {
 async function assessCandidates(
 	candidates: Candidate[],
 	searchee: SearcheeWithLabel,
-	hashesToExclude: string[],
+	infoHashesToExclude: Set<string>,
 ): Promise<AssessmentWithTracker[]> {
 	const assessments: AssessmentWithTracker[] = [];
+	const guidInfoHashMap = await getGuidInfoHashMap();
 	for (const result of candidates) {
 		const assessment = await assessCandidateCaching(
 			result,
 			searchee,
-			hashesToExclude,
+			infoHashesToExclude,
+			guidInfoHashMap,
 		);
 		assessments.push({ assessment, tracker: result.tracker });
 	}
@@ -100,7 +106,7 @@ async function assessCandidates(
 
 async function findOnOtherSites(
 	searchee: SearcheeWithLabel,
-	hashesToExclude: string[],
+	infoHashesToExclude: Set<string>,
 	cachedSearch: CachedSearch,
 	progress: string,
 ): Promise<FoundOnOtherSites> {
@@ -131,7 +137,7 @@ async function findOnOtherSites(
 	const assessments = await assessCandidates(
 		results,
 		searchee,
-		hashesToExclude,
+		infoHashesToExclude,
 	);
 
 	const { rateLimited, notRateLimited } = assessments.reduce(
@@ -174,7 +180,7 @@ async function findOnOtherSites(
 
 async function findMatchesBatch(
 	searchees: SearcheeWithLabel[],
-	hashesToExclude: string[],
+	infoHashesToExclude: Set<string>,
 ) {
 	const { delay } = getRuntimeConfig();
 
@@ -192,7 +198,7 @@ async function findMatchesBatch(
 
 			const { searchedIndexers, matches } = await findOnOtherSites(
 				searchee,
-				hashesToExclude,
+				infoHashesToExclude,
 				cachedSearch,
 				progress,
 			);
@@ -239,7 +245,7 @@ export async function searchForLocalTorrentByCriteria(
 		label: Label.WEBHOOK,
 	}));
 	const includeEpisodes = searchees.length === 1;
-	const hashesToExclude = await getInfoHashesToExclude();
+	const infoHashesToExclude = await getInfoHashesToExclude();
 	let totalFound = 0;
 	let filtered = 0;
 	const cachedSearch: CachedSearch = { q: null, indexerCandidates: [] };
@@ -254,7 +260,7 @@ export async function searchForLocalTorrentByCriteria(
 
 			const { matches, searchedIndexers } = await findOnOtherSites(
 				searchee,
-				hashesToExclude,
+				infoHashesToExclude,
 				cachedSearch,
 				progress,
 			);
@@ -313,7 +319,7 @@ export async function checkNewCandidateMatch(
 		message: `Unique entries [${searchees.map((m) => m.title)}] using ${method} for ${candidateLog}`,
 	});
 
-	const hashesToExclude = await getInfoHashesToExclude();
+	const infoHashesToExclude = await getInfoHashesToExclude();
 
 	let decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null =
 		null;
@@ -324,6 +330,7 @@ export async function checkNewCandidateMatch(
 			(searchee) => -searchee.files.length,
 		),
 	);
+	const guidInfoHashMap = await getGuidInfoHashMap();
 	for (const searchee of searchees) {
 		await db("searchee")
 			.insert({ name: searchee.title })
@@ -333,7 +340,8 @@ export async function checkNewCandidateMatch(
 		const assessment: ResultAssessment = await assessCandidateCaching(
 			candidate,
 			searchee,
-			hashesToExclude,
+			infoHashesToExclude,
+			guidInfoHashMap,
 		);
 
 		if (
@@ -400,14 +408,14 @@ export async function findAllSearchees(
 
 async function findSearchableTorrents(): Promise<{
 	searchees: SearcheeWithLabel[];
-	hashesToExclude: string[];
+	infoHashesToExclude: Set<string>;
 }> {
 	const { searchLimit } = getRuntimeConfig();
 
 	const realSearchees = await findAllSearchees(Label.SEARCH);
-	const hashesToExclude = realSearchees
-		.map((t) => t.infoHash)
-		.filter(isTruthy);
+	const infoHashesToExclude = new Set(
+		realSearchees.map((t) => t.infoHash).filter(isTruthy),
+	);
 
 	// Group the exact same search queries together for easy cache use later
 	const grouping = new Map<string, SearcheeWithLabel[]>();
@@ -455,12 +463,12 @@ async function findSearchableTorrents(): Promise<{
 		finalSearchees = finalSearchees.slice(0, searchLimit);
 	}
 
-	return { searchees: finalSearchees, hashesToExclude };
+	return { searchees: finalSearchees, infoHashesToExclude };
 }
 
 export async function main(): Promise<void> {
 	const { outputDir, linkDir } = getRuntimeConfig();
-	const { searchees, hashesToExclude } = await findSearchableTorrents();
+	const { searchees, infoHashesToExclude } = await findSearchableTorrents();
 
 	if (!fs.existsSync(outputDir)) {
 		fs.mkdirSync(outputDir, { recursive: true });
@@ -469,7 +477,7 @@ export async function main(): Promise<void> {
 		fs.mkdirSync(linkDir, { recursive: true });
 	}
 
-	const totalFound = await findMatchesBatch(searchees, hashesToExclude);
+	const totalFound = await findMatchesBatch(searchees, infoHashesToExclude);
 
 	logger.info({
 		label: Label.SEARCH,

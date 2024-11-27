@@ -241,9 +241,11 @@ export async function indexNewTorrents(): Promise<void> {
 	}
 }
 
-export async function getInfoHashesToExclude(): Promise<string[]> {
-	return (await db("torrent").select({ infoHash: "info_hash" })).map(
-		(t) => t.infoHash,
+export async function getInfoHashesToExclude(): Promise<Set<string>> {
+	return new Set(
+		(await db("torrent").select({ infoHash: "info_hash" })).map(
+			(t) => t.infoHash,
+		),
 	);
 }
 
