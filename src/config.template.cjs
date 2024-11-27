@@ -376,7 +376,7 @@ module.exports = {
 	 *
 	 * Set to null for no limit.
 	 */
-	searchLimit: 100,
+	searchLimit: 400,
 
 	/**
 	 * The list of infohashes or strings which are contained in torrents that
@@ -392,5 +392,5 @@ module.exports = {
 	 *    blocklist: ["Release.Name"],
 	 *    blocklist: ["3317e6485454354751555555366a8308c1e92093"],
 	 */
-	blockList: undefined,
+	blockList: [],
 };
