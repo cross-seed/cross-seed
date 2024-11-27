@@ -348,6 +348,7 @@ export function indexerDoesSupportMediaType(
 
 export async function* rssPager(
 	indexer: Indexer,
+	timeSinceLastRun: number,
 ): AsyncGenerator<Candidate, void, undefined> {
 	const limit = indexer.limits.max;
 	const lastSeenGuid: string | undefined = (
@@ -357,6 +358,7 @@ export async function* rssPager(
 			.first()
 	)?.last_seen;
 	let newLastSeenGuid: string | undefined = lastSeenGuid;
+	let pageBackUntil = 0;
 	const maxPage = 10;
 	let i = -1;
 	while (++i < maxPage) {
@@ -371,6 +373,11 @@ export async function* rssPager(
 					query: { t: "search", q: "", limit, offset: i * limit },
 				})
 			).sort((a, b) => b.pubDate - a.pubDate);
+			if (i === 0) {
+				newLastSeenGuid = currentPageCandidates[0].guid;
+				pageBackUntil =
+					currentPageCandidates[0].pubDate - timeSinceLastRun;
+			}
 		} catch (e) {
 			logger.error({
 				label: Label.TORZNAB,
@@ -380,12 +387,19 @@ export async function* rssPager(
 			break;
 		}
 
-		const newCandidates: Candidate[] = [];
+		let newCandidates: Candidate[] = [];
+		let found = false;
 		for (const candidate of currentPageCandidates) {
 			if (candidate.guid === lastSeenGuid) {
+				found = true;
 				break;
 			}
 			newCandidates.push(candidate);
+		}
+		if (!found) {
+			newCandidates = newCandidates.filter(
+				(candidate) => candidate.pubDate >= pageBackUntil,
+			);
 		}
 
 		if (!newCandidates.length) {
@@ -394,9 +408,6 @@ export async function* rssPager(
 				message: `Paging indexer ${indexer.url} stopped: nothing new in page ${i + 1}`,
 			});
 			break;
-		}
-		if (i === 0) {
-			newLastSeenGuid = newCandidates[0].guid;
 		}
 
 		logger.verbose({
@@ -425,9 +436,14 @@ export async function* rssPager(
 	}
 }
 
-export async function* queryRssFeeds(): AsyncGenerator<Candidate> {
+export async function* queryRssFeeds(
+	lastRun: number,
+): AsyncGenerator<Candidate> {
+	const timeSinceLastRun = Date.now() - lastRun;
 	const indexers = await getEnabledIndexers();
-	yield* combineAsyncIterables(indexers.map((indexer) => rssPager(indexer)));
+	yield* combineAsyncIterables(
+		indexers.map((indexer) => rssPager(indexer, timeSinceLastRun)),
+	);
 }
 
 export async function searchTorznab(
