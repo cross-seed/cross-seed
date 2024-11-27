@@ -59,7 +59,7 @@ function logDecision(
 	metafile: Metafile | undefined,
 	tracker: string,
 ): void {
-	const { matchMode } = getRuntimeConfig();
+	const { blockList, matchMode } = getRuntimeConfig();
 
 	let reason: string;
 	switch (decision) {
@@ -119,10 +119,10 @@ function logDecision(
 			reason = `it has a different source: ${parseSource(searchee.title)} -> ${parseSource(candidate.name)}`;
 			break;
 		case Decision.BLOCKED_RELEASE:
-			reason = `it matches the blocklist: "${findBlockedStringInReleaseMaybe(
-				searchee,
-				getRuntimeConfig().blockList,
-			)}"`;
+			reason = `it matches the blocklist: "${
+				findBlockedStringInReleaseMaybe(searchee, blockList) ??
+				findBlockedStringInReleaseMaybe(metafile!, blockList)
+			}"`;
 			break;
 		default:
 			reason = decision;
@@ -359,6 +359,10 @@ export async function assessCandidate(
 
 	if (infoHashesToExclude.has(metafile.infoHash)) {
 		return { decision: Decision.INFO_HASH_ALREADY_EXISTS, metafile };
+	}
+
+	if (findBlockedStringInReleaseMaybe(metafile, blockList)) {
+		return { decision: Decision.BLOCKED_RELEASE, metafile };
 	}
 
 	// Prevent candidate episodes from matching searchee season packs
