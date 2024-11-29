@@ -82,6 +82,10 @@ async function authorize(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<boolean> {
+	/**
+	 * checks all http API requests for authorized apiKey
+	 * uses param `?apikey=` or as header `x-api-key`
+	 */
 	const url = new URL(req.url!, `http://${req.headers.host}`);
 	const apiKey =
 		(req.headers["x-api-key"] as string) ?? url.searchParams.get("apikey");
@@ -106,6 +110,10 @@ async function search(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	/**
+	 * processes matching a local searchee provided via /api/webhook
+	 * on all currently configured torznab indexers
+	 */
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -212,6 +220,10 @@ async function announce(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	/**
+	 * processes matching a new candidate provided via /api/announce
+	 * to local torrent based on provided criteria
+	 */
 	const { torrentDir } = getRuntimeConfig();
 	const dataStr = await getData(req);
 	let data;
@@ -281,11 +293,19 @@ async function status(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	/**
+	 current: sends "200 OK"
+	 future: respond with current state and job status details via API
+	 uses: potential usage of this in dashbrr
+	 */
 	res.writeHead(200);
 	res.end("OK");
 }
 
 async function ping(req: IncomingMessage, res: ServerResponse): Promise<void> {
+	/**
+	 * sends "200 OK" for external health check via API
+	 */
 	res.writeHead(200);
 	res.end("OK");
 }
@@ -294,6 +314,9 @@ async function handleRequest(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	/**
+	 * request handling upon receiving an http API call
+	 */
 	const checkMethod = (method: string, endpoint: string) => {
 		if (req.method === method) return true;
 		res.writeHead(405);
@@ -329,6 +352,9 @@ async function handleRequest(
 }
 
 export function serve(port: number, host: string | undefined): void {
+	/**
+	 * listens (daemon) on configured port for http API calls
+	 */
 	if (port) {
 		const server = http.createServer(handleRequest);
 		server.listen(port, host);
