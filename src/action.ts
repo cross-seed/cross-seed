@@ -182,7 +182,8 @@ function unlinkMetafile(meta: Metafile, destinationDir: string) {
 	}
 	const fullPath = join(destinationDir, rootFolder);
 	if (!existsSync(fullPath)) return;
-	if (resolve(fullPath) === resolve(destinationDir)) return;
+	if (!fullPath.startsWith(destinationDir)) return; // assert: fullPath is within destinationDir
+	if (statSync(fullPath).ino === statSync(destinationDir).ino) return; // assert: fullPath is not destinationDir
 	logger.verbose(`Unlinking ${fullPath}`);
 	rmSync(fullPath, { recursive: true });
 }
@@ -327,7 +328,6 @@ export async function performAction(
 			return { actionResult: injectionResult, linkedNewFiles };
 		}
 	} else if (searchee.path) {
-		// should be a MATCH, as risky requires a linkDir to be set
 		destinationDir = dirname(searchee.path);
 	}
 	const result = await getClient()!.inject(

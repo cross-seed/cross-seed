@@ -1,7 +1,8 @@
 import ms from "ms";
-import { dirname, resolve } from "path";
+import path from "path";
 import { BodyInit } from "undici-types";
 import {
+	ABS_WIN_PATH_REGEX,
 	DecisionAnyMatch,
 	InjectionResult,
 	TORRENT_CATEGORY_SUFFIX,
@@ -294,8 +295,7 @@ export default class QBittorrent implements TorrentClient {
 			) {
 				return resultOfErr("TORRENT_NOT_COMPLETE");
 			}
-			const savePath = this.getCorrectSavePath(meta, torrentInfo);
-			return resultOf(savePath);
+			return resultOf(this.getCorrectSavePath(meta, torrentInfo));
 		} catch (e) {
 			logger.debug(e);
 			if (e.message.includes("retrieve")) {
@@ -329,13 +329,9 @@ export default class QBittorrent implements TorrentClient {
 				(torrent.infohash_v1 &&
 					infoHashMetaMap.get(torrent.infohash_v1)) ||
 				undefined;
-			let savePath = dirname(torrent.content_path);
-			if (
-				!meta ||
-				!(await this.isSubfolderContentLayout(meta, torrent))
-			) {
-				savePath = torrent.save_path;
-			}
+			const savePath = meta
+				? this.getCorrectSavePath(meta, torrent)
+				: torrent.save_path;
 			torrentSavePaths.set(torrent.hash, savePath);
 			if (torrent.infohash_v1?.length) {
 				torrentSavePaths.set(torrent.infohash_v1, savePath);
@@ -361,7 +357,9 @@ export default class QBittorrent implements TorrentClient {
 			torrentInfo,
 		);
 		if (subfolderContentLayout) {
-			return dirname(torrentInfo.content_path);
+			return ABS_WIN_PATH_REGEX.test(torrentInfo.content_path)
+				? path.win32.dirname(torrentInfo.content_path)
+				: path.posix.dirname(torrentInfo.content_path);
 		}
 		return torrentInfo.save_path;
 	}
@@ -459,7 +457,13 @@ export default class QBittorrent implements TorrentClient {
 		dataInfo: TorrentInfo,
 	): boolean {
 		if (data.files.length > 1) return false;
-		if (dirname(data.files[0].path) !== ".") return false;
+		if (path.dirname(data.files[0].path) !== ".") return false;
+		let dirname = path.posix.dirname;
+		let resolve = path.posix.resolve;
+		if (ABS_WIN_PATH_REGEX.test(dataInfo.content_path)) {
+			dirname = path.win32.dirname;
+			resolve = path.win32.resolve;
+		}
 		return (
 			resolve(dirname(dataInfo.content_path)) !==
 			resolve(dataInfo.save_path)
