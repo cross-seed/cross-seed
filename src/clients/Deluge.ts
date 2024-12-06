@@ -16,6 +16,7 @@ import {
 	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
+	validateSavePaths,
 } from "./TorrentClient.js";
 
 interface TorrentInfo {
@@ -68,6 +69,10 @@ export default class Deluge implements TorrentClient {
 	async validateConfig(): Promise<void> {
 		await this.authenticate();
 		this.isLabelEnabled = await this.labelEnabled();
+		const infoHashPathMap = await this.getAllDownloadDirs({
+			onlyCompleted: false,
+		});
+		validateSavePaths(infoHashPathMap.values());
 	}
 
 	/**
