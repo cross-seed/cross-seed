@@ -33,10 +33,14 @@ const ZodErrorMessages = {
 	needsInject: "You need to use the 'inject' action for partial matching.",
 	needsLinkDir:
 		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
-	linkDirInDataDir:
-		"You cannot have your linkDir inside of your dataDirs. Please adjust your paths to correct this.",
-	outputDirInInputDir:
-		"You cannot have your outputDir inside of your torrentDir/dataDirs. Please adjust your paths to correct this.",
+	linkDirInOtherDirs:
+		"You cannot have your linkDir inside of your torrentDir/dataDirs/outputDir. Please adjust your paths to correct this.",
+	dataDirsInOtherDirs:
+		"You cannot have your dataDirs inside of your torrentDir/linkDir/outputDir. Please adjust your paths to correct this.",
+	torrentDirInOtherDirs:
+		"You cannot have your torrentDir inside of your dataDirs/linkDir/outputDir. Please adjust your paths to correct this.",
+	outputDirInOtherDirs:
+		"You cannot have your outputDir inside of your torrentDir/dataDirs/linkDir. Please adjust your paths to correct this.",
 	dataDirToLinkDir:
 		"Failed to create a test linkType in linkDir from dataDirs. Ensure that linkType is supported between these paths (hardlink requires same drive, partition, and volume).",
 };
@@ -303,11 +307,67 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.needsLinkDir,
 	)
 	.refine((config) => {
-		if (config.linkDir && config.dataDirs) {
-			return !isChildPath(config.linkDir, config.dataDirs);
+		if (!config.linkDir) return true;
+		if (isChildPath(config.linkDir, [config.outputDir])) return false;
+		if (config.dataDirs && isChildPath(config.linkDir, config.dataDirs)) {
+			return false;
+		}
+		if (
+			config.torrentDir &&
+			isChildPath(config.linkDir, [config.torrentDir])
+		) {
+			return false;
 		}
 		return true;
-	}, ZodErrorMessages.linkDirInDataDir)
+	}, ZodErrorMessages.linkDirInOtherDirs)
+	.refine((config) => {
+		if (!config.dataDirs) return true;
+		for (const dataDir of config.dataDirs) {
+			if (isChildPath(dataDir, [config.outputDir])) return false;
+			if (
+				config.torrentDir &&
+				isChildPath(dataDir, [config.torrentDir])
+			) {
+				return false;
+			}
+			if (config.linkDir && isChildPath(dataDir, [config.linkDir])) {
+				return false;
+			}
+		}
+		return true;
+	}, ZodErrorMessages.dataDirsInOtherDirs)
+	.refine((config) => {
+		if (!config.torrentDir) return true;
+		if (isChildPath(config.torrentDir, [config.outputDir])) return false;
+		if (
+			config.dataDirs &&
+			isChildPath(config.torrentDir, config.dataDirs)
+		) {
+			return false;
+		}
+		if (
+			config.linkDir &&
+			isChildPath(config.torrentDir, [config.linkDir])
+		) {
+			return false;
+		}
+		return true;
+	}, ZodErrorMessages.torrentDirInOtherDirs)
+	.refine((config) => {
+		if (
+			config.torrentDir &&
+			isChildPath(config.outputDir, [config.torrentDir])
+		) {
+			return false;
+		}
+		if (config.dataDirs && isChildPath(config.outputDir, config.dataDirs)) {
+			return false;
+		}
+		if (config.linkDir && isChildPath(config.outputDir, [config.linkDir])) {
+			return false;
+		}
+		return true;
+	}, ZodErrorMessages.outputDirInOtherDirs)
 	.refine((config) => {
 		if (!config.linkDir || !config.dataDirs) return true;
 		for (const dataDir of config.dataDirs) {
@@ -320,13 +380,4 @@ export const VALIDATION_SCHEMA = z
 			}
 		}
 		return true;
-	}, ZodErrorMessages.dataDirToLinkDir)
-	.refine((config) => {
-		if (config.torrentDir) {
-			return !isChildPath(config.outputDir, [
-				config.torrentDir,
-				...(config.dataDirs ?? []),
-			]);
-		}
-		return true;
-	}, ZodErrorMessages.outputDirInInputDir);
+	}, ZodErrorMessages.dataDirToLinkDir);
