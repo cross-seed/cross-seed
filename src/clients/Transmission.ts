@@ -17,6 +17,7 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
+	validateSavePaths,
 } from "./TorrentClient.js";
 import {
 	extractCredentialsFromUrl,
@@ -149,6 +150,10 @@ export default class Transmission implements TorrentClient {
 				`Failed to reach Transmission at ${transmissionRpcUrl}`,
 			);
 		}
+		const infoHashPathMap = await this.getAllDownloadDirs({
+			onlyCompleted: false,
+		});
+		validateSavePaths(infoHashPathMap.values());
 	}
 
 	async checkOriginalTorrent(
