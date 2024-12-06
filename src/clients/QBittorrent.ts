@@ -18,6 +18,7 @@ import {
 	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
+	validateSavePaths,
 } from "./TorrentClient.js";
 import {
 	extractCredentialsFromUrl,
@@ -147,6 +148,11 @@ export default class QBittorrent implements TorrentClient {
 	async validateConfig(): Promise<void> {
 		await this.login();
 		await this.createTag();
+		const infoHashPathMap = await this.getAllDownloadDirs({
+			metas: [], // Don't need to account for subfolder layout
+			onlyCompleted: false,
+		});
+		validateSavePaths(infoHashPathMap.values());
 	}
 
 	private async request(

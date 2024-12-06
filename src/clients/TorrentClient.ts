@@ -1,8 +1,12 @@
+import path from "path";
 import ms from "ms";
-import { Label } from "../logger.js";
+import { testLinking } from "../action.js";
+import { CrossSeedError } from "../errors.js";
+import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result } from "../Result.js";
 import {
+	ABS_WIN_PATH_REGEX,
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
@@ -77,6 +81,26 @@ export function getClient(): TorrentClient | null {
 		instantiateDownloadClient();
 	}
 	return activeClient;
+}
+
+export function validateSavePaths(rawSavePaths: Iterable<string>): void {
+	const { linkDir, linkType } = getRuntimeConfig();
+	logger.info(`Validating all existing torrent save paths...`);
+	if (!linkDir) return;
+	const uniqueSavePaths = new Set(rawSavePaths);
+	if (!uniqueSavePaths.size) return;
+	for (const savePath of uniqueSavePaths) {
+		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
+			throw new CrossSeedError(
+				`Cannot use linkDir with cross platform cross-seed and torrent client: ${savePath}`,
+			);
+		}
+		try {
+			testLinking(savePath, linkDir, linkType);
+		} catch (e) {
+			logger.error(e); // We need to check that this torrent wasn't blocklisted so only log for now
+		}
+	}
 }
 
 export async function waitForTorrentToComplete(
