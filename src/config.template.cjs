@@ -237,7 +237,7 @@ module.exports = {
 	outputDir: ".",
 
 	/**
-	 * Whether to include single episode torrents in a search (not those from
+	 * Whether to include single episodes during a search (not those from
 	 * season packs).
 	 *
 	 * This setting does not affect matching episodes from rss and
@@ -246,7 +246,7 @@ module.exports = {
 	includeSingleEpisodes: false,
 
 	/**
-	 * Include torrents which are comprised of non-video files.
+	 * Include torrents/data comprised of non-video files.
 	 *
 	 * If this option is set to false, any folders or torrents whose
 	 * totalNonVideoFilesSize / totalSize > fuzzySizeThreshold
@@ -267,8 +267,8 @@ module.exports = {
 	 *    includeSingleEpisodes: true
 	 *    includeNonVideos: false
 	 *
-	 * To search for absolutely ALL types of content, including non-video, configure
-	 * your episode settings based on the above examples and use:
+	 * To search for absolutely ALL types of content, including non-video,
+	 * configure your episode settings based on the above examples and use:
 	 *
 	 *     includeNonVideos: true
 	 */
@@ -289,7 +289,7 @@ module.exports = {
 	 */
 
 	/**
-	 * Exclude torrents first seen by cross-seed more than this long ago.
+	 * Exclude torrents or data first seen by cross-seed more than this long ago.
 	 * Examples:
 	 * "5 days"
 	 * "2 weeks"
@@ -299,8 +299,9 @@ module.exports = {
 	excludeOlder: "2 weeks",
 
 	/**
-	 * Exclude torrents which have been searched more recently than this long
-	 * ago.
+	 * Exclude torrents or data which has been searched more recently than this
+	 * long ago.
+	 *
 	 * Doesn't exclude previously failed searches.
 	 * Examples:
 	 * "2 days"
@@ -321,10 +322,14 @@ module.exports = {
 	 * Whether to inject using the same labels/categories as the original
 	 * torrent.
 	 *
-	 * qBittorrent: This will apply the category's original category as a tag.
+	 * qBittorrent: When using linking, the original category will be applied as
+	 * an additional tag, and the cross-seed's category will always be
+	 * linkCategory. If duplicateCategories is set to true, '.cross-seed' would
+	 * be added/appended to the end of the original category tag.
 	 *
-	 * Example: if you have an original label/category called "Movies", this will
-	 * automatically inject cross-seeds to "Movies.cross-seed".
+	 * Example (Non-Linking): if you have an original label/category called
+	 * "Movies", this will automatically inject cross-seeds to
+	 * "Movies.cross-seed".
 	 */
 	duplicateCategories: false,
 
@@ -379,9 +384,11 @@ module.exports = {
 	searchLimit: 400,
 
 	/**
-	 * The list of infohashes or strings which are contained in torrents that
-	 * you want to be excluded from cross-seed. This is the same format as
-	 * torznab, surround the entire set of quoted strings in square brackets
+	 * The list of infohashes or strings which are contained in torrents or data
+	 * searches that you want to be excluded from cross-seed. This is the same
+	 * format as torznab, surround the entire set of quoted strings in square
+	 * brackets.
+	 *
 	 * You can use any combination which must be entered on the one line.
 	 * Leave as undefined to disable.
 	 *
