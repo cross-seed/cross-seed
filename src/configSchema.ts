@@ -23,6 +23,7 @@ const ZodErrorMessages = {
 		"excludeOlder and excludeRecentSearch must be defined for searching. excludeOlder must be 2-5x excludeRecentSearch.",
 	fuzzySizeThreshold:
 		"fuzzySizeThreshold must be between 0 and 1 with a maximum of 0.1 when using searchCadence or rssCadence",
+	injectNeedsInjectMode: "`cross-seed inject` requires the 'inject' action.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
@@ -297,9 +298,13 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	})
 	.refine(
+		(config) => config.action === Action.INJECT || !config.injectDir,
+		ZodErrorMessages.injectNeedsInjectMode,
+	)
+	.refine(
 		(config) =>
 			!(
-				(config.action === Action.INJECT || config.injectDir) &&
+				config.action === Action.INJECT &&
 				!config.rtorrentRpcUrl &&
 				!config.qbittorrentUrl &&
 				!config.transmissionRpcUrl &&
