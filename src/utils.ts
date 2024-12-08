@@ -2,6 +2,7 @@ import chalk, { ChalkInstance } from "chalk";
 import { distance } from "fastest-levenshtein";
 import path from "path";
 import {
+	ABS_WIN_PATH_REGEX,
 	ALL_EXTENSIONS,
 	ANIME_REGEX,
 	AUDIO_EXTENSIONS,
@@ -434,4 +435,15 @@ export async function* combineAsyncIterables<T>(
 		}
 	}
 	return;
+}
+
+/**
+ * Converts a path to a unix-style path if absolute windows path and cross-seed is on linux.
+ * @param rawPath The path to convert
+ * @returns The converted path
+ */
+export function upath(rawPath: string): string {
+	if (path.sep === "\\") return rawPath; // cross-seed on windows but linux client can never work, assume client is windows
+	if (ABS_WIN_PATH_REGEX.test(rawPath)) return rawPath.replace(/\\/g, "/");
+	return rawPath;
 }
