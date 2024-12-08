@@ -42,6 +42,7 @@ const ZodErrorMessages = {
 		"fuzzySizeThreshold cannot be greater than 0.1 when using searchCadence or rssCadence.",
 	seasonFromEpisodesMin:
 		"seasonFromEpisodes cannot be less than 0.5 when using searchCadence",
+	injectNeedsInjectMode: "`cross-seed inject` requires the 'inject' action.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
@@ -417,9 +418,13 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	})
 	.refine(
+		(config) => config.action === Action.INJECT || !config.injectDir,
+		ZodErrorMessages.injectNeedsInjectMode,
+	)
+	.refine(
 		(config) =>
 			!(
-				(config.action === Action.INJECT || config.injectDir) &&
+				config.action === Action.INJECT &&
 				!config.rtorrentRpcUrl &&
 				!config.qbittorrentUrl &&
 				!config.transmissionRpcUrl &&
