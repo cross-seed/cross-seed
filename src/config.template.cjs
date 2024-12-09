@@ -322,10 +322,8 @@ module.exports = {
 	 * Whether to inject using the same labels/categories as the original
 	 * torrent.
 	 *
-	 * qBittorrent: When using linking, the original category will be applied as
-	 * an additional tag, and the cross-seed's category will always be
-	 * linkCategory. If duplicateCategories is set to true, '.cross-seed' would
-	 * be added/appended to the end of the original category tag.
+	 * qBittorrent (linking): The category will always be linkCategory.
+	 * If set to true, a tag of category.cross-seed will be added.
 	 *
 	 * Example (Non-Linking): if you have an original label/category called
 	 * "Movies", this will automatically inject cross-seeds to
