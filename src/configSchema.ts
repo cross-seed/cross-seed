@@ -49,6 +49,8 @@ const ZodErrorMessages = {
 		"You cannot have your outputDir inside of your torrentDir/dataDirs/linkDir. Please adjust your paths to correct this.",
 	dataDirToLinkDir:
 		"Failed to create a test linkType in linkDir from dataDirs. Ensure that linkType is supported between these paths (hardlink requires same drive, partition, and volume).",
+	relativePaths:
+		"Paths for torrentDir, linkDir, and dataDirs must be absolute.",
 };
 
 /**
@@ -401,4 +403,10 @@ export const VALIDATION_SCHEMA = z
 			}
 		}
 		return true;
-	}, ZodErrorMessages.dataDirToLinkDir);
+	}, ZodErrorMessages.dataDirToLinkDir)
+	.refine((config) => {
+		if (config.torrentDir && !isAbsolute(config.torrentDir)) return false;
+		if (config.linkDir && !isAbsolute(config.linkDir)) return false;
+		if (config.dataDirs && !config.dataDirs.every(isAbsolute)) return false;
+		return true;
+	}, ZodErrorMessages.relativePaths);
