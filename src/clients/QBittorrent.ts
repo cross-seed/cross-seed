@@ -15,6 +15,10 @@ import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import {
 	TorrentMetadataInClient,
+	getMaxRemainingBytes,
+	getResumeStopTime,
+	resumeErrSleepTime,
+	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
 } from "./TorrentClient.js";
@@ -22,6 +26,7 @@ import {
 	extractCredentialsFromUrl,
 	extractInt,
 	getLogString,
+	humanReadableSize,
 	sanitizeInfoHash,
 	wait,
 } from "../utils.js";
@@ -466,6 +471,65 @@ export default class QBittorrent implements TorrentClient {
 		);
 	}
 
+	async resumeInjection(
+		infoHash: string,
+		decision: DecisionAnyMatch,
+		options: { checkOnce: boolean },
+	): Promise<void> {
+		let sleepTime = resumeSleepTime;
+		const maxRemainingBytes = getMaxRemainingBytes(decision);
+		const stopTime = getResumeStopTime();
+		let stop = false;
+		while (Date.now() < stopTime) {
+			if (options.checkOnce) {
+				if (stop) return;
+				stop = true;
+			}
+			await wait(sleepTime);
+			const torrentInfo = await this.getTorrentInfo(infoHash);
+			if (!torrentInfo) {
+				sleepTime = resumeErrSleepTime; // Dropping connections or restart
+				continue;
+			}
+			if (["checkingDL", "checkingUP"].includes(torrentInfo.state)) {
+				continue;
+			}
+			const torrentLog = `${torrentInfo.name} [${sanitizeInfoHash(infoHash)}]`;
+			if (
+				!["pausedDL", "stoppedDL", "pausedUP", "stoppedUP"].includes(
+					torrentInfo.state,
+				)
+			) {
+				logger.warn({
+					label: Label.QBITTORRENT,
+					message: `Will not resume ${torrentLog}: state is ${torrentInfo.state}`,
+				});
+				return;
+			}
+			if (torrentInfo.amount_left > maxRemainingBytes) {
+				logger.warn({
+					label: Label.QBITTORRENT,
+					message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
+				});
+				return;
+			}
+			logger.info({
+				label: Label.QBITTORRENT,
+				message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, { binary: true })} remaining`,
+			});
+			await this.request(
+				`/torrents/${this.versionMajor >= 5 ? "start" : "resume"}`,
+				`hashes=${infoHash}`,
+				X_WWW_FORM_URLENCODED,
+			);
+			return;
+		}
+		logger.warn({
+			label: Label.QBITTORRENT,
+			message: `Will not resume torrent ${infoHash}: timeout`,
+		});
+	}
+
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
@@ -556,6 +620,9 @@ export default class QBittorrent implements TorrentClient {
 			}
 			if (toRecheck) {
 				await this.recheckTorrent(newInfo.hash);
+				this.resumeInjection(newInfo.hash, decision, {
+					checkOnce: false,
+				});
 			}
 
 			return InjectionResult.SUCCESS;
