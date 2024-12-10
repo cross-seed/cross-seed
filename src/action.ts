@@ -4,22 +4,25 @@ import {
 	linkSync,
 	lstatSync,
 	mkdirSync,
+	readdirSync,
 	readlinkSync,
 	rmSync,
 	statSync,
 	symlinkSync,
 } from "fs";
-import { dirname, join, resolve } from "path";
+import { dirname, extname, join, resolve } from "path";
 import { getClient, shouldRecheck } from "./clients/TorrentClient.js";
 import {
 	Action,
 	ActionResult,
+	ALL_EXTENSIONS,
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
 	LinkType,
 	SaveResult,
 } from "./constants.js";
+import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { AssessmentWithTracker } from "./pipeline.js";
@@ -182,7 +185,8 @@ function unlinkMetafile(meta: Metafile, destinationDir: string) {
 	}
 	const fullPath = join(destinationDir, rootFolder);
 	if (!existsSync(fullPath)) return;
-	if (resolve(fullPath) === resolve(destinationDir)) return;
+	if (!fullPath.startsWith(destinationDir)) return; // assert: fullPath is within destinationDir
+	if (statSync(fullPath).ino === statSync(destinationDir).ino) return; // assert: fullPath is not destinationDir
 	logger.verbose(`Unlinking ${fullPath}`);
 	rmSync(fullPath, { recursive: true });
 }
@@ -327,7 +331,6 @@ export async function performAction(
 			return { actionResult: injectionResult, linkedNewFiles };
 		}
 	} else if (searchee.path) {
-		// should be a MATCH, as risky requires a linkDir to be set
 		destinationDir = dirname(searchee.path);
 	}
 	const result = await getClient()!.inject(
@@ -370,8 +373,12 @@ export async function performActions(
 	return results;
 }
 
-function linkFile(oldPath: string, newPath: string): boolean {
-	const { linkType } = getRuntimeConfig();
+function linkFile(
+	oldPath: string,
+	newPath: string,
+	linkType?: LinkType,
+): boolean {
+	if (!linkType) linkType = getRuntimeConfig().linkType; // testLinking is used during config validation
 	try {
 		const ogFileResolvedPath = unwrapSymlinks(oldPath);
 
@@ -402,4 +409,45 @@ function unwrapSymlinks(path: string): string {
 		path = resolve(dirname(path), readlinkSync(path));
 	}
 	throw new Error(`too many levels of symbolic links at ${path}`);
+}
+
+/**
+ * Tests if a file can be linked to a directory.
+ * Used during config validation, cannot depend on runtimeConfig.
+ * @param srcDir The directory to link from to linkDir
+ * @param linkDir The directory to link to
+ * @param linkType The type of link to test
+ */
+export function testLinking(
+	srcDir: string,
+	linkDir: string,
+	linkType: LinkType,
+): void {
+	const findAFile = (dir: string) => {
+		const entries = readdirSync(dir, { withFileTypes: true });
+		for (const entry of entries) {
+			const fullPath = join(dir, entry.name);
+			if (entry.isFile() && ALL_EXTENSIONS.includes(extname(fullPath))) {
+				return fullPath;
+			}
+			if (entry.isDirectory()) {
+				const file = findAFile(fullPath);
+				if (file) return file;
+			}
+		}
+		return null;
+	};
+	const srcFile = findAFile(srcDir);
+	if (!srcFile) return;
+
+	try {
+		const testPath = join(linkDir, "cross-seed.test");
+		linkFile(srcFile, testPath, linkType);
+		rmSync(testPath);
+	} catch (e) {
+		logger.error(e);
+		throw new CrossSeedError(
+			`Failed to create a test ${linkType} in linkDir from ${srcDir}. Ensure that ${linkType} is supported between these two paths (hardlink requires same drive, partition, and volume).`,
+		);
+	}
 }
