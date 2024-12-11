@@ -86,6 +86,11 @@ interface TorrentInfo {
 	upspeed: number;
 }
 
+interface CategoryInfo {
+	name: string;
+	savePath: string;
+}
+
 export default class QBittorrent implements TorrentClient {
 	cookie: string;
 	url: { username: string; password: string; href: string };
@@ -218,7 +223,11 @@ export default class QBittorrent implements TorrentClient {
 				: "Original";
 	}
 
-	private getCategoryForNewTorrent(category: string): string {
+	private async getCategoryForNewTorrent(
+		category: string,
+		savePath: string,
+		autoTMM: boolean,
+	): Promise<string> {
 		const { duplicateCategories, linkCategory } = getRuntimeConfig();
 
 		if (!duplicateCategories) {
@@ -227,11 +236,21 @@ export default class QBittorrent implements TorrentClient {
 		if (!category.length || category === linkCategory) {
 			return category; // Use tags for category duplication if linking
 		}
-		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
-			return category;
-		}
 
-		return `${category}${TORRENT_CATEGORY_SUFFIX}`;
+		const dupeCategory = category.endsWith(TORRENT_CATEGORY_SUFFIX)
+			? category
+			: `${category}${TORRENT_CATEGORY_SUFFIX}`;
+		if (!autoTMM) return dupeCategory;
+
+		// savePath is guaranteed to be the base category's save path due to autoTMM
+		const categories = await this.getAllCategories();
+		const newRes = categories.find((c) => c.name === dupeCategory);
+		if (!newRes) {
+			await this.createCategory(dupeCategory, savePath);
+		} else if (newRes.savePath !== savePath) {
+			await this.editCategory(dupeCategory, savePath);
+		}
+		return dupeCategory;
 	}
 
 	private getTagsForNewTorrent(
@@ -260,6 +279,27 @@ export default class QBittorrent implements TorrentClient {
 			`tags=${TORRENT_TAG}`,
 			X_WWW_FORM_URLENCODED,
 		);
+	}
+
+	async createCategory(category: string, savePath: string): Promise<void> {
+		await this.request(
+			"/torrents/createCategory",
+			`category=${category}&savePath=${savePath}`,
+			X_WWW_FORM_URLENCODED,
+		);
+	}
+
+	async editCategory(category: string, savePath: string): Promise<void> {
+		await this.request(
+			"/torrents/editCategory",
+			`category=${category}&savePath=${savePath}`,
+			X_WWW_FORM_URLENCODED,
+		);
+	}
+
+	async getAllCategories(): Promise<CategoryInfo[]> {
+		const responseText = await this.request("/torrents/categories", "");
+		return responseText ? Object.values(JSON.parse(responseText)) : [];
 	}
 
 	async addTorrent(formData: FormData): Promise<void> {
@@ -530,10 +570,16 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("savepath", savePath);
 			}
 			formData.append("autoTMM", autoTMM.toString());
-			formData.append(
-				"category",
-				this.getCategoryForNewTorrent(category),
-			);
+			if (category?.length) {
+				formData.append(
+					"category",
+					await this.getCategoryForNewTorrent(
+						category,
+						savePath,
+						autoTMM,
+					),
+				);
+			}
 			formData.append(
 				"tags",
 				this.getTagsForNewTorrent(searcheeInfo, path),
