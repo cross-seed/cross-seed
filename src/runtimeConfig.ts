@@ -11,7 +11,7 @@ export interface RuntimeConfig {
 	linkType: LinkType;
 	flatLinking: boolean;
 	maxDataDepth: number;
-	linkCategory: string;
+	linkCategory?: string;
 	torrentDir?: string;
 	outputDir: string;
 	injectDir?: string;
