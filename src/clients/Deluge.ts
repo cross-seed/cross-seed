@@ -16,6 +16,7 @@ import {
 	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
+	validateSavePaths,
 } from "./TorrentClient.js";
 
 interface TorrentInfo {
@@ -68,6 +69,10 @@ export default class Deluge implements TorrentClient {
 	async validateConfig(): Promise<void> {
 		await this.authenticate();
 		this.isLabelEnabled = await this.labelEnabled();
+		const infoHashPathMap = await this.getAllDownloadDirs({
+			onlyCompleted: false,
+		});
+		validateSavePaths(infoHashPathMap.values());
 	}
 
 	/**
@@ -245,7 +250,7 @@ export default class Deluge implements TorrentClient {
 			ogLabel !== linkCategory; // not data
 
 		return !searchee.infoHash
-			? linkCategory
+			? linkCategory ?? ""
 			: shouldSuffixLabel
 				? `${ogLabel}${this.delugeLabelSuffix}`
 				: ogLabel;
