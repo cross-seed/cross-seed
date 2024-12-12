@@ -4,13 +4,12 @@ import {
 	linkSync,
 	lstatSync,
 	mkdirSync,
-	readdirSync,
 	readlinkSync,
 	rmSync,
 	statSync,
 	symlinkSync,
 } from "fs";
-import { dirname, extname, join, resolve } from "path";
+import { dirname, join, resolve } from "path";
 import { getClient, shouldRecheck } from "./clients/TorrentClient.js";
 import {
 	Action,
@@ -36,7 +35,7 @@ import {
 	SearcheeWithLabel,
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
-import { getLogString, getMediaType } from "./utils.js";
+import { findAFileWithExt, getLogString, getMediaType } from "./utils.js";
 
 interface LinkResult {
 	contentPath: string;
@@ -423,24 +422,9 @@ export function testLinking(
 	linkDir: string,
 	linkType: LinkType,
 ): void {
-	const findAFile = (dir: string) => {
-		const entries = readdirSync(dir, { withFileTypes: true });
-		for (const entry of entries) {
-			const fullPath = join(dir, entry.name);
-			if (entry.isFile() && ALL_EXTENSIONS.includes(extname(fullPath))) {
-				return fullPath;
-			}
-			if (entry.isDirectory()) {
-				const file = findAFile(fullPath);
-				if (file) return file;
-			}
-		}
-		return null;
-	};
-	const srcFile = findAFile(srcDir);
-	if (!srcFile) return;
-
 	try {
+		const srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
+		if (!srcFile) return;
 		const testPath = join(linkDir, "cross-seed.test");
 		linkFile(srcFile, testPath, linkType);
 		rmSync(testPath);

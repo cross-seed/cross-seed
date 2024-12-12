@@ -1,8 +1,8 @@
 import chalk, { ChalkInstance } from "chalk";
 import { distance } from "fastest-levenshtein";
+import { readdirSync } from "fs";
 import path from "path";
 import {
-	ABS_WIN_PATH_REGEX,
 	ALL_EXTENSIONS,
 	ANIME_REGEX,
 	AUDIO_EXTENSIONS,
@@ -437,13 +437,17 @@ export async function* combineAsyncIterables<T>(
 	return;
 }
 
-/**
- * Converts a path to a unix-style path if absolute windows path and cross-seed is on linux.
- * @param rawPath The path to convert
- * @returns The converted path
- */
-export function upath(rawPath: string): string {
-	if (path.sep === "\\") return rawPath; // cross-seed on windows but linux client can never work, assume client is windows
-	if (ABS_WIN_PATH_REGEX.test(rawPath)) return rawPath.replace(/\\/g, "/");
-	return rawPath;
+export function findAFileWithExt(dir: string, exts: string[]): string | null {
+	const entries = readdirSync(dir, { withFileTypes: true });
+	for (const entry of entries) {
+		const fullPath = path.join(dir, entry.name);
+		if (entry.isFile() && exts.includes(path.extname(fullPath))) {
+			return fullPath;
+		}
+		if (entry.isDirectory()) {
+			const file = findAFileWithExt(fullPath, exts);
+			if (file) return file;
+		}
+	}
+	return null;
 }
