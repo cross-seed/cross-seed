@@ -128,6 +128,7 @@ module.exports = {
 	delay: 30,
 
 	/**
+	 * Usually unnecessary: https://www.cross-seed.org/docs/v6-migration#data-based-matching-use-cases
 	 * To search with already downloaded data, you can enter the directories
 	 * to your downloaded torrent data to find matches, rather than relying
 	 * entirely on the .torrent files themselves for matching.
@@ -237,11 +238,10 @@ module.exports = {
 	outputDir: ".",
 
 	/**
-	 * Whether to include single episodes during a search (not those from
-	 * season packs).
+	 * Whether to include single episode torrents in search/webhook/rss.
 	 *
-	 * This setting does not affect matching episodes from rss and
-	 * announce.
+	 * This setting does not affect matching episodes from announce. Read more about usage:
+	 * https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior
 	 */
 	includeSingleEpisodes: false,
 
