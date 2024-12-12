@@ -50,7 +50,7 @@ const ZodErrorMessages = {
 	dataDirToLinkDir:
 		"Failed to create a test linkType in linkDir from dataDirs. Ensure that linkType is supported between these paths (hardlink requires same drive, partition, and volume).",
 	relativePaths:
-		"Paths for torrentDir, linkDir, and dataDirs must be absolute.",
+		"Absolute paths for torrentDir, linkDir, dataDirs, and outputDir are recommended.",
 };
 
 /**
@@ -405,8 +405,13 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	}, ZodErrorMessages.dataDirToLinkDir)
 	.refine((config) => {
-		if (config.torrentDir && !isAbsolute(config.torrentDir)) return false;
-		if (config.linkDir && !isAbsolute(config.linkDir)) return false;
-		if (config.dataDirs && !config.dataDirs.every(isAbsolute)) return false;
+		if (
+			!isAbsolute(config.outputDir) ||
+			(config.torrentDir && !isAbsolute(config.torrentDir)) ||
+			(config.linkDir && !isAbsolute(config.linkDir)) ||
+			(config.dataDirs && !config.dataDirs.every(isAbsolute))
+		) {
+			logger.warn(ZodErrorMessages.relativePaths);
+		}
 		return true;
-	}, ZodErrorMessages.relativePaths);
+	});

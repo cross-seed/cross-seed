@@ -88,7 +88,6 @@ export function validateSavePaths(rawSavePaths: Iterable<string>): void {
 	logger.info(`Validating all existing torrent save paths...`);
 	if (!linkDir) return;
 	const uniqueSavePaths = new Set(rawSavePaths);
-	if (!uniqueSavePaths.size) return;
 	for (const savePath of uniqueSavePaths) {
 		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
 			throw new CrossSeedError(
