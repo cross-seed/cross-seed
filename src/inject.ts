@@ -140,7 +140,7 @@ async function whichSearcheesMatchTorrent(
 	let foundBlocked = false;
 	const matches: AllMatches = [];
 	for (const searchee of searchees) {
-		const { decision } = await assessCandidate(meta, searchee, []);
+		const { decision } = await assessCandidate(meta, searchee, new Set());
 		if (decision === Decision.BLOCKED_RELEASE) {
 			if (isSimilar(searchee, meta)) foundBlocked = true;
 			continue;
