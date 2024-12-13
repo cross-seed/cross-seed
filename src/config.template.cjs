@@ -370,7 +370,7 @@ module.exports = {
 	searchTimeout: "2 minutes",
 
 	/**
-	 * The number of searches to make in one run/batch.
+	 * The number of searches (unique queries) to make in one run/batch per indexer.
 	 * If more than this many searches are queued,
 	 * "searchCadence" will determine how long until the next batch.
 	 *
