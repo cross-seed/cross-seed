@@ -12,7 +12,6 @@ import {
 	ANIME_GROUP_REGEX,
 	Decision,
 	isAnyMatchedDecision,
-	isStaticDecision,
 	MatchMode,
 	parseSource,
 	REPACK_PROPER_REGEX,
@@ -320,7 +319,10 @@ export async function assessCandidate(
 	}
 
 	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
-		return { decision: Decision.BLOCKED_RELEASE };
+		return {
+			decision: Decision.BLOCKED_RELEASE,
+			metafile: !isCandidate ? metaOrCandidate : undefined,
+		};
 	}
 
 	let metafile: Metafile;
@@ -454,28 +456,28 @@ async function assessAndSaveResults(
 		infoHashesToExclude,
 	);
 
-	if (assessment.metafile && !guidInfoHashMap.has(guid)) {
+	if (assessment.metafile) {
 		guidInfoHashMap.set(guid, assessment.metafile.infoHash);
+		await db.transaction(async (trx) => {
+			const { id } = await trx("searchee")
+				.select("id")
+				.where({ name: searchee.title })
+				.first();
+			await trx("decision")
+				.insert({
+					searchee_id: id,
+					guid: guid,
+					info_hash: assessment.metafile!.infoHash,
+					decision: assessment.decision,
+					first_seen: firstSeen,
+					last_seen: Date.now(),
+					fuzzy_size_factor: getFuzzySizeFactor(),
+				})
+				.onConflict(["searchee_id", "guid"])
+				.merge();
+		});
 	}
 
-	await db.transaction(async (trx) => {
-		const { id } = await trx("searchee")
-			.select("id")
-			.where({ name: searchee.title })
-			.first();
-		await trx("decision")
-			.insert({
-				searchee_id: id,
-				guid: guid,
-				info_hash: assessment.metafile?.infoHash ?? null,
-				decision: assessment.decision,
-				first_seen: firstSeen,
-				last_seen: Date.now(),
-				fuzzy_size_factor: getFuzzySizeFactor(),
-			})
-			.onConflict(["searchee_id", "guid"])
-			.merge();
-	});
 	return assessment;
 }
 
@@ -552,62 +554,35 @@ export async function assessCandidateCaching(
 	}
 
 	let assessment: ResultAssessment;
-	if (!cacheEntry?.decision) {
-		// New candidate, could be metafile from cache
+	if (infoHashesToExclude.has(cacheEntry?.infoHash)) {
+		// Already injected fast path, preserve match decision
+		assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
+		await db("decision")
+			.where({ id: cacheEntry.id })
+			.update({
+				last_seen: Date.now(),
+				decision: isAnyMatchedDecision(cacheEntry.decision)
+					? cacheEntry.decision
+					: Decision.INFO_HASH_ALREADY_EXISTS,
+			});
+	} else {
 		assessment = await assessAndSaveResults(
 			metaOrCandidate,
 			searchee,
 			guid,
 			infoHashesToExclude,
-			Date.now(),
+			cacheEntry?.firstSeen ?? Date.now(),
 			guidInfoHashMap,
 		);
-	} else if (
-		isAnyMatchedDecision(cacheEntry.decision) &&
-		infoHashesToExclude.has(cacheEntry.infoHash)
-	) {
-		// Already injected fast path, preserve match decision
-		assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
-		await db("decision").where({ id: cacheEntry.id }).update({
-			last_seen: Date.now(),
-		});
-	} else if (isStaticDecision(cacheEntry.decision)) {
-		// These decisions will never change unless we update their logic
-		assessment = { decision: cacheEntry.decision };
-		await db("decision").where({ id: cacheEntry.id }).update({
-			last_seen: Date.now(),
-		});
-	} else {
-		// Re-assess decisions using Metafile if cached
-		if (
-			cacheEntry.decision !== Decision.FUZZY_SIZE_MISMATCH ||
-			cacheEntry.fuzzySizeFactor < getFuzzySizeFactor()
-		) {
-			assessment = await assessAndSaveResults(
-				metaOrCandidate,
-				searchee,
-				guid,
-				infoHashesToExclude,
-				cacheEntry.firstSeen,
-				guidInfoHashMap,
-			);
-		} else {
-			assessment = { decision: Decision.FUZZY_SIZE_MISMATCH };
-			await db("decision").where({ id: cacheEntry.id }).update({
-				last_seen: Date.now(),
-			});
-		}
 	}
-	const wasCached = cacheEntry?.decision === assessment.decision;
-	if (!wasCached) {
-		logDecision(
-			searchee,
-			candidate,
-			assessment.decision,
-			assessment.metafile,
-			tracker,
-		);
-	}
+
+	logDecision(
+		searchee,
+		candidate,
+		assessment.decision,
+		assessment.metafile,
+		tracker,
+	);
 
 	return assessment;
 }
