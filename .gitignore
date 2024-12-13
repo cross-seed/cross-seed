@@ -44,3 +44,4 @@ utils.zsh
 test.db
 .tool-versions
 coverage/
+.vscode/
