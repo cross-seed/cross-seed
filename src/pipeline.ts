@@ -492,7 +492,7 @@ export async function scanRssFeeds() {
 		});
 		return;
 	}
-	const lastRun =
+	const lastRun: number =
 		(await db("job_log").select("last_run").where({ name: "rss" }).first())
 			?.last_run ?? 0;
 	logger.verbose({
