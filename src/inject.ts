@@ -256,10 +256,11 @@ async function injectFromStalledTorrent({
 	injectionResult,
 	progress,
 	filePathLog,
-}: InjectionAftermath) {
+}: InjectionAftermath): Promise<boolean> {
 	let linkedNewFiles = false;
 	let inClient = (await getClient()!.isTorrentComplete(meta.infoHash)).isOk();
 	let injected = false;
+	const stalledDecision = Decision.MATCH_PARTIAL; // Should always be considered partial
 	for (const { searchee, decision } of matches) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
 			searchee,
@@ -278,7 +279,7 @@ async function injectFromStalledTorrent({
 				const result = await getClient()!.inject(
 					meta,
 					searchee,
-					Decision.MATCH_PARTIAL, // Should always be considered partial
+					stalledDecision,
 					destinationDir,
 				);
 				// result is only SUCCESS or FAILURE here but still log original injectionResult
@@ -310,6 +311,7 @@ async function injectFromStalledTorrent({
 				message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 			});
 			await getClient()!.recheckTorrent(meta.infoHash);
+			getClient()!.resumeInjection(meta.infoHash, { checkOnce: false });
 		} else {
 			logger.warn({
 				label: Label.INJECT,
@@ -317,6 +319,7 @@ async function injectFromStalledTorrent({
 			});
 		}
 	}
+	return injected;
 }
 
 async function injectionTorrentNotComplete(
@@ -365,18 +368,29 @@ async function injectionAlreadyExists({
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
+		getClient()!.resumeInjection(meta.infoHash, {
+			checkOnce: false,
+		});
 	} else if (anyFullMatch && !isComplete) {
 		logger.info({
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files - ${chalk.green(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
+		getClient()!.resumeInjection(meta.infoHash, {
+			checkOnce: false,
+		});
 		isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
 	} else {
 		logger.warn({
 			label: Label.INJECT,
 			message: `${progress} Unable to inject ${filePathLog} - ${chalk.yellow(injectionResult)}${isComplete ? "" : " (incomplete)"}`,
 		});
+		if (!isComplete) {
+			getClient()!.resumeInjection(meta.infoHash, {
+				checkOnce: true,
+			});
+		}
 	}
 	summary.ALREADY_EXISTS++;
 	summary.INCOMPLETE_CANDIDATES += isComplete ? 0 : 1;

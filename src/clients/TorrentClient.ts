@@ -11,6 +11,7 @@ import {
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
+	MatchMode,
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
@@ -53,6 +54,10 @@ export interface TorrentClient {
 		metas: SearcheeWithInfoHash[] | Metafile[];
 		onlyCompleted: boolean;
 	}) => Promise<Map<string, string>>;
+	resumeInjection: (
+		infoHash: string,
+		options: { checkOnce: boolean },
+	) => Promise<void>;
 	inject: (
 		newTorrent: Metafile,
 		searchee: Searchee,
@@ -145,7 +150,22 @@ export function shouldRecheck(
 	searchee: Searchee,
 	decision: DecisionAnyMatch,
 ): boolean {
+	const { matchMode } = getRuntimeConfig();
+	if (matchMode === MatchMode.SAFE) return true;
 	if (decision === Decision.MATCH_PARTIAL) return true;
+	if (!searchee.infoHash) return true;
 	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
 	return false; // Skip for MATCH | MATCH_SIZE_ONLY
+}
+
+// Resuming partials
+export function getMaxRemainingBytes() {
+	const { matchMode, maxRemainingForResume } = getRuntimeConfig();
+	if (matchMode !== MatchMode.PARTIAL) return 0;
+	return maxRemainingForResume * 1024 * 1024;
+}
+export const resumeSleepTime = ms("15 seconds");
+export const resumeErrSleepTime = ms("5 minutes");
+export function getResumeStopTime() {
+	return Date.now() + ms("1 hour");
 }

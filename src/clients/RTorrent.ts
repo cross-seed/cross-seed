@@ -14,9 +14,19 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { extractCredentialsFromUrl, isTruthy, wait } from "../utils.js";
+import {
+	extractCredentialsFromUrl,
+	humanReadableSize,
+	isTruthy,
+	sanitizeInfoHash,
+	wait,
+} from "../utils.js";
 import {
 	TorrentMetadataInClient,
+	getMaxRemainingBytes,
+	getResumeStopTime,
+	resumeErrSleepTime,
+	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
 	validateSavePaths,
@@ -468,6 +478,59 @@ export default class RTorrent implements TorrentClient {
 		await this.methodCallP<void>("d.check_hash", [infoHash]);
 	}
 
+	async resumeInjection(
+		infoHash: string,
+		options: { checkOnce: boolean },
+	): Promise<void> {
+		let sleepTime = resumeSleepTime;
+		const maxRemainingBytes = getMaxRemainingBytes();
+		const stopTime = getResumeStopTime();
+		let stop = false;
+		while (Date.now() < stopTime) {
+			if (options.checkOnce) {
+				if (stop) return;
+				stop = true;
+			}
+			await wait(sleepTime);
+			const torrentInfoRes = await this.checkOriginalTorrent(
+				infoHash,
+				false,
+			);
+			if (torrentInfoRes.isErr()) {
+				sleepTime = resumeErrSleepTime; // Dropping connections or restart
+				continue;
+			}
+			const torrentInfo = torrentInfoRes.unwrap();
+			if (torrentInfo.hashing) {
+				continue;
+			}
+			const torrentLog = `${torrentInfo.name} [${sanitizeInfoHash(infoHash)}]`;
+			if (torrentInfo.isActive) {
+				logger.warn({
+					label: Label.RTORRENT,
+					message: `Will not resume torrent ${torrentLog}: active`,
+				});
+				return;
+			}
+			if (torrentInfo.bytesLeft > maxRemainingBytes) {
+				logger.warn({
+					label: Label.RTORRENT,
+					message: `Will not resume torrent ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
+				});
+				return;
+			}
+			logger.info({
+				label: Label.RTORRENT,
+				message: `Resuming torrent ${torrentLog}`,
+			});
+			await this.methodCallP<void>("d.resume", [infoHash]);
+		}
+		logger.warn({
+			label: Label.RTORRENT,
+			message: `Will not resume torrent ${infoHash}: timeout`,
+		});
+	}
+
 	async inject(
 		meta: Metafile,
 		searchee: Searchee,
@@ -500,8 +563,8 @@ export default class RTorrent implements TorrentClient {
 
 		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
 
-		const recheck = shouldRecheck(searchee, decision);
-		const loadType = recheck ? "load.normal" : "load.start";
+		const toRecheck = shouldRecheck(searchee, decision);
+		const loadType = toRecheck ? "load.normal" : "load.start";
 
 		const retries = 5;
 		for (let i = 0; i < retries; i++) {
@@ -514,11 +577,14 @@ export default class RTorrent implements TorrentClient {
 						`d.directory_base.set="${directoryBase}"`,
 						`d.custom1.set="${TORRENT_TAG}"`,
 						`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
-						recheck
+						toRecheck
 							? `d.check_hash=${meta.infoHash.toUpperCase()}`
 							: null,
 					].filter((e) => e !== null),
 				);
+				if (toRecheck) {
+					this.resumeInjection(meta.infoHash, { checkOnce: false });
+				}
 				break;
 			} catch (e) {
 				logger.verbose({
