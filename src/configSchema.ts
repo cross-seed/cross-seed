@@ -1,3 +1,4 @@
+import { readdirSync } from "fs";
 import ms from "ms";
 import { isAbsolute, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
@@ -21,21 +22,32 @@ const ZodErrorMessages = {
 		"excludeOlder and excludeRecentSearch must be defined for searching. excludeOlder must be 2-5x excludeRecentSearch.",
 	fuzzySizeThreshold:
 		"fuzzySizeThreshold must be between 0 and 1 with a maximum of 0.1 when using searchCadence or rssCadence",
+	injectNeedsInjectMode: "`cross-seed inject` requires the 'inject' action.",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
 		"If using Automatic Torrent Management in qBittorrent, please read: https://www.cross-seed.org/docs/v6-migration#qbittorrent",
 	includeSingleEpisodes:
 		"includeSingleEpisodes is not recommended when using announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
+	invalidOutputDir:
+		"outputDir should only contain .torrent files, cross-seed will populate and manage (https://www.cross-seed.org/docs/basics/options#outputdir)",
+	invalidTorrentDir:
+		"torrentDir must contain at least one .torrent file (https://www.cross-seed.org/docs/basics/options#torrentdir). If no torrents are in client, set to null for now.",
 	needsTorrentDir:
 		"You need to set torrentDir for rss and announce matching to work.",
 	needsInject: "You need to use the 'inject' action for partial matching.",
 	needsLinkDir:
 		"You need to set a linkDir (and have your data accessible) for risky or partial matching to work.",
-	linkDirInDataDir:
-		"You cannot have your linkDir inside of your dataDirs. Please adjust your paths to correct this.",
-	outputDirInInputDir:
-		"You cannot have your outputDir inside of your torrentDir/dataDirs. Please adjust your paths to correct this.",
+	linkDirInOtherDirs:
+		"You cannot have your linkDir inside of your torrentDir/dataDirs/outputDir. Please adjust your paths to correct this.",
+	dataDirsInOtherDirs:
+		"You cannot have your dataDirs inside of your torrentDir/linkDir/outputDir. Please adjust your paths to correct this.",
+	torrentDirInOtherDirs:
+		"You cannot have your torrentDir inside of your dataDirs/linkDir/outputDir. Please adjust your paths to correct this.",
+	outputDirInOtherDirs:
+		"You cannot have your outputDir inside of your torrentDir/dataDirs/linkDir. Please adjust your paths to correct this.",
+	relativePaths:
+		"Absolute paths for torrentDir, linkDir, dataDirs, and outputDir are recommended.",
 };
 
 /**
@@ -133,8 +145,19 @@ export const VALIDATION_SCHEMA = z
 			.nullish()
 			.transform((value) => (typeof value === "boolean" ? value : false)),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z.string().nullable(),
-		outputDir: z.string(),
+		torrentDir: z
+			.string()
+			.nullable()
+			.refine(
+				(d) => !d || readdirSync(d).some((f) => f.endsWith(".torrent")),
+				ZodErrorMessages.invalidTorrentDir,
+			),
+		outputDir: z.string().refine((dir) => {
+			if (readdirSync(dir).some((f) => !f.endsWith(".torrent"))) {
+				logger.warn(ZodErrorMessages.invalidOutputDir);
+			}
+			return true;
+		}),
 		injectDir: z.string().optional(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
@@ -274,9 +297,13 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	})
 	.refine(
+		(config) => config.action === Action.INJECT || !config.injectDir,
+		ZodErrorMessages.injectNeedsInjectMode,
+	)
+	.refine(
 		(config) =>
 			!(
-				(config.action === Action.INJECT || config.injectDir) &&
+				config.action === Action.INJECT &&
 				!config.rtorrentRpcUrl &&
 				!config.qbittorrentUrl &&
 				!config.transmissionRpcUrl &&
@@ -300,17 +327,75 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.needsLinkDir,
 	)
 	.refine((config) => {
-		if (config.linkDir && config.dataDirs) {
-			return !isChildPath(config.linkDir, config.dataDirs);
+		if (!config.linkDir) return true;
+		if (isChildPath(config.linkDir, [config.outputDir])) return false;
+		if (config.dataDirs && isChildPath(config.linkDir, config.dataDirs)) {
+			return false;
+		}
+		if (
+			config.torrentDir &&
+			isChildPath(config.linkDir, [config.torrentDir])
+		) {
+			return false;
 		}
 		return true;
-	}, ZodErrorMessages.linkDirInDataDir)
+	}, ZodErrorMessages.linkDirInOtherDirs)
 	.refine((config) => {
-		if (config.torrentDir) {
-			return !isChildPath(config.outputDir, [
-				config.torrentDir,
-				...(config.dataDirs ?? []),
-			]);
+		if (!config.dataDirs) return true;
+		for (const dataDir of config.dataDirs) {
+			if (isChildPath(dataDir, [config.outputDir])) return false;
+			if (
+				config.torrentDir &&
+				isChildPath(dataDir, [config.torrentDir])
+			) {
+				return false;
+			}
+			if (config.linkDir && isChildPath(dataDir, [config.linkDir])) {
+				return false;
+			}
 		}
 		return true;
-	}, ZodErrorMessages.outputDirInInputDir);
+	}, ZodErrorMessages.dataDirsInOtherDirs)
+	.refine((config) => {
+		if (!config.torrentDir) return true;
+		if (isChildPath(config.torrentDir, [config.outputDir])) return false;
+		if (
+			config.dataDirs &&
+			isChildPath(config.torrentDir, config.dataDirs)
+		) {
+			return false;
+		}
+		if (
+			config.linkDir &&
+			isChildPath(config.torrentDir, [config.linkDir])
+		) {
+			return false;
+		}
+		return true;
+	}, ZodErrorMessages.torrentDirInOtherDirs)
+	.refine((config) => {
+		if (
+			config.torrentDir &&
+			isChildPath(config.outputDir, [config.torrentDir])
+		) {
+			return false;
+		}
+		if (config.dataDirs && isChildPath(config.outputDir, config.dataDirs)) {
+			return false;
+		}
+		if (config.linkDir && isChildPath(config.outputDir, [config.linkDir])) {
+			return false;
+		}
+		return true;
+	}, ZodErrorMessages.outputDirInOtherDirs)
+	.refine((config) => {
+		if (
+			!isAbsolute(config.outputDir) ||
+			(config.torrentDir && !isAbsolute(config.torrentDir)) ||
+			(config.linkDir && !isAbsolute(config.linkDir)) ||
+			(config.dataDirs && !config.dataDirs.every(isAbsolute))
+		) {
+			logger.warn(ZodErrorMessages.relativePaths);
+		}
+		return true;
+	});

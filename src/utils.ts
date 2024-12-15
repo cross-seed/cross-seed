@@ -1,5 +1,6 @@
 import chalk, { ChalkInstance } from "chalk";
 import { distance } from "fastest-levenshtein";
+import { readdirSync } from "fs";
 import path from "path";
 import {
 	ALL_EXTENSIONS,
@@ -434,4 +435,19 @@ export async function* combineAsyncIterables<T>(
 		}
 	}
 	return;
+}
+
+export function findAFileWithExt(dir: string, exts: string[]): string | null {
+	const entries = readdirSync(dir, { withFileTypes: true });
+	for (const entry of entries) {
+		const fullPath = path.join(dir, entry.name);
+		if (entry.isFile() && exts.includes(path.extname(fullPath))) {
+			return fullPath;
+		}
+		if (entry.isDirectory()) {
+			const file = findAFileWithExt(fullPath, exts);
+			if (file) return file;
+		}
+	}
+	return null;
 }

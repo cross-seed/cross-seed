@@ -14,12 +14,14 @@ import { getClient, shouldRecheck } from "./clients/TorrentClient.js";
 import {
 	Action,
 	ActionResult,
+	ALL_EXTENSIONS,
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
 	LinkType,
 	SaveResult,
 } from "./constants.js";
+import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { AssessmentWithTracker } from "./pipeline.js";
@@ -33,7 +35,7 @@ import {
 	SearcheeWithLabel,
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
-import { getLogString, getMediaType } from "./utils.js";
+import { findAFileWithExt, getLogString, getMediaType } from "./utils.js";
 
 interface LinkResult {
 	contentPath: string;
@@ -182,7 +184,8 @@ function unlinkMetafile(meta: Metafile, destinationDir: string) {
 	}
 	const fullPath = join(destinationDir, rootFolder);
 	if (!existsSync(fullPath)) return;
-	if (resolve(fullPath) === resolve(destinationDir)) return;
+	if (!fullPath.startsWith(destinationDir)) return; // assert: fullPath is within destinationDir
+	if (statSync(fullPath).ino === statSync(destinationDir).ino) return; // assert: fullPath is not destinationDir
 	logger.verbose(`Unlinking ${fullPath}`);
 	rmSync(fullPath, { recursive: true });
 }
@@ -207,7 +210,7 @@ export async function linkAllFilesInMetafile(
 		onlyCompleted: false,
 	});
 	const fullLinkDir = clientSavePathRes.orElse(
-		flatLinking ? linkDir : join(linkDir, tracker),
+		flatLinking ? linkDir! : join(linkDir!, tracker),
 	);
 
 	let sourceRoot: string;
@@ -327,7 +330,6 @@ export async function performAction(
 			return { actionResult: injectionResult, linkedNewFiles };
 		}
 	} else if (searchee.path) {
-		// should be a MATCH, as risky requires a linkDir to be set
 		destinationDir = dirname(searchee.path);
 	}
 	const result = await getClient()!.inject(
@@ -402,4 +404,24 @@ function unwrapSymlinks(path: string): string {
 		path = resolve(dirname(path), readlinkSync(path));
 	}
 	throw new Error(`too many levels of symbolic links at ${path}`);
+}
+
+/**
+ * Tests if srcDir supports linkType.
+ * @param srcDir The directory to link from
+ */
+export function testLinking(srcDir: string): void {
+	const { linkDir, linkType } = getRuntimeConfig();
+	try {
+		const srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
+		if (!srcFile) return;
+		const testPath = join(linkDir!, "cross-seed.test");
+		linkFile(srcFile, testPath);
+		rmSync(testPath);
+	} catch (e) {
+		logger.error(e);
+		throw new CrossSeedError(
+			`Failed to create a test ${linkType} in linkDir from ${srcDir}. Ensure that ${linkType} is supported between these two paths (hardlink requires same drive, partition, and volume).`,
+		);
+	}
 }

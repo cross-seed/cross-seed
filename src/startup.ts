@@ -1,6 +1,7 @@
 import { access, constants, stat } from "fs/promises";
 import { sep } from "path";
 import { inspect } from "util";
+import { testLinking } from "./action.js";
 import { validateUArrLs } from "./arr.js";
 import { getClient } from "./clients/TorrentClient.js";
 import { Action } from "./constants.js";
@@ -95,6 +96,17 @@ async function checkConfigPaths(): Promise<void> {
 		});
 		if (!(await verifyPath(injectDir, "injectDir", READ_AND_WRITE))) {
 			pathFailure++;
+		}
+	}
+	if (linkDir && dataDirs) {
+		for (const dataDir of dataDirs) {
+			try {
+				testLinking(dataDir);
+			} catch (e) {
+				logger.error(e);
+				logger.error("Failed to link from dataDirs to linkDir.");
+				// pathFailure++; We need to check that this torrent wasn't blocklisted so only log for now
+			}
 		}
 	}
 	if (pathFailure) {

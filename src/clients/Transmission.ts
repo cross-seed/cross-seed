@@ -13,6 +13,7 @@ import {
 	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
+	validateSavePaths,
 } from "./TorrentClient.js";
 import { extractCredentialsFromUrl } from "../utils.js";
 
@@ -69,7 +70,7 @@ export default class Transmission implements TorrentClient {
 		const { transmissionRpcUrl } = getRuntimeConfig();
 
 		const { username, password, href } = extractCredentialsFromUrl(
-			transmissionRpcUrl,
+			transmissionRpcUrl!,
 		).unwrapOrThrow(
 			new CrossSeedError("Transmission rpc url must be percent-encoded"),
 		);
@@ -139,6 +140,10 @@ export default class Transmission implements TorrentClient {
 				`Failed to reach Transmission at ${transmissionRpcUrl}`,
 			);
 		}
+		const infoHashPathMap = await this.getAllDownloadDirs({
+			onlyCompleted: false,
+		});
+		validateSavePaths(infoHashPathMap.values());
 	}
 
 	async checkOriginalTorrent(

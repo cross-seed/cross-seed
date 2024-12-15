@@ -16,6 +16,7 @@ import {
 	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
+	validateSavePaths,
 } from "./TorrentClient.js";
 
 interface TorrentInfo {
@@ -68,6 +69,10 @@ export default class Deluge implements TorrentClient {
 	async validateConfig(): Promise<void> {
 		await this.authenticate();
 		this.isLabelEnabled = await this.labelEnabled();
+		const infoHashPathMap = await this.getAllDownloadDirs({
+			onlyCompleted: false,
+		});
+		validateSavePaths(infoHashPathMap.values());
 	}
 
 	/**
@@ -76,7 +81,7 @@ export default class Deluge implements TorrentClient {
 	private async authenticate(): Promise<void> {
 		const { delugeRpcUrl } = getRuntimeConfig();
 		const { href, password } = extractCredentialsFromUrl(
-			delugeRpcUrl,
+			delugeRpcUrl!,
 		).unwrapOrThrow(
 			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
 		);
@@ -138,7 +143,7 @@ export default class Deluge implements TorrentClient {
 		retries = 1,
 	): Promise<Result<ResultType, ErrorType>> {
 		const { delugeRpcUrl } = getRuntimeConfig();
-		const { href } = extractCredentialsFromUrl(delugeRpcUrl).unwrapOrThrow(
+		const { href } = extractCredentialsFromUrl(delugeRpcUrl!).unwrapOrThrow(
 			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
 		);
 		const headers = new Headers({ "Content-Type": "application/json" });
@@ -245,7 +250,7 @@ export default class Deluge implements TorrentClient {
 			ogLabel !== linkCategory; // not data
 
 		return !searchee.infoHash
-			? linkCategory
+			? linkCategory ?? ""
 			: shouldSuffixLabel
 				? `${ogLabel}${this.delugeLabelSuffix}`
 				: ogLabel;

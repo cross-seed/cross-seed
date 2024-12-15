@@ -1,7 +1,8 @@
 import ms from "ms";
-import { dirname, resolve } from "path";
+import path from "path";
 import { BodyInit } from "undici-types";
 import {
+	ABS_WIN_PATH_REGEX,
 	DecisionAnyMatch,
 	InjectionResult,
 	TORRENT_CATEGORY_SUFFIX,
@@ -17,6 +18,7 @@ import {
 	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
+	validateSavePaths,
 } from "./TorrentClient.js";
 import {
 	extractCredentialsFromUrl,
@@ -84,6 +86,11 @@ interface TorrentInfo {
 	upspeed: number;
 }
 
+interface CategoryInfo {
+	name: string;
+	savePath: string;
+}
+
 export default class QBittorrent implements TorrentClient {
 	cookie: string;
 	url: { username: string; password: string; href: string };
@@ -94,7 +101,7 @@ export default class QBittorrent implements TorrentClient {
 	constructor() {
 		const { qbittorrentUrl } = getRuntimeConfig();
 		this.url = extractCredentialsFromUrl(
-			qbittorrentUrl,
+			qbittorrentUrl!,
 			"/api/v2",
 		).unwrapOrThrow(
 			new CrossSeedError("qBittorrent url must be percent-encoded"),
@@ -146,6 +153,11 @@ export default class QBittorrent implements TorrentClient {
 	async validateConfig(): Promise<void> {
 		await this.login();
 		await this.createTag();
+		const infoHashPathMap = await this.getAllDownloadDirs({
+			metas: [], // Don't need to account for subfolder layout
+			onlyCompleted: false,
+		});
+		validateSavePaths(infoHashPathMap.values());
 	}
 
 	private async request(
@@ -211,7 +223,11 @@ export default class QBittorrent implements TorrentClient {
 				: "Original";
 	}
 
-	private getCategoryForNewTorrent(category: string): string {
+	private async getCategoryForNewTorrent(
+		category: string,
+		savePath: string,
+		autoTMM: boolean,
+	): Promise<string> {
 		const { duplicateCategories, linkCategory } = getRuntimeConfig();
 
 		if (!duplicateCategories) {
@@ -220,11 +236,21 @@ export default class QBittorrent implements TorrentClient {
 		if (!category.length || category === linkCategory) {
 			return category; // Use tags for category duplication if linking
 		}
-		if (category.endsWith(TORRENT_CATEGORY_SUFFIX)) {
-			return category;
-		}
 
-		return `${category}${TORRENT_CATEGORY_SUFFIX}`;
+		const dupeCategory = category.endsWith(TORRENT_CATEGORY_SUFFIX)
+			? category
+			: `${category}${TORRENT_CATEGORY_SUFFIX}`;
+		if (!autoTMM) return dupeCategory;
+
+		// savePath is guaranteed to be the base category's save path due to autoTMM
+		const categories = await this.getAllCategories();
+		const newRes = categories.find((c) => c.name === dupeCategory);
+		if (!newRes) {
+			await this.createCategory(dupeCategory, savePath);
+		} else if (newRes.savePath !== savePath) {
+			await this.editCategory(dupeCategory, savePath);
+		}
+		return dupeCategory;
 	}
 
 	private getTagsForNewTorrent(
@@ -253,6 +279,27 @@ export default class QBittorrent implements TorrentClient {
 			`tags=${TORRENT_TAG}`,
 			X_WWW_FORM_URLENCODED,
 		);
+	}
+
+	async createCategory(category: string, savePath: string): Promise<void> {
+		await this.request(
+			"/torrents/createCategory",
+			`category=${category}&savePath=${savePath}`,
+			X_WWW_FORM_URLENCODED,
+		);
+	}
+
+	async editCategory(category: string, savePath: string): Promise<void> {
+		await this.request(
+			"/torrents/editCategory",
+			`category=${category}&savePath=${savePath}`,
+			X_WWW_FORM_URLENCODED,
+		);
+	}
+
+	async getAllCategories(): Promise<CategoryInfo[]> {
+		const responseText = await this.request("/torrents/categories", "");
+		return responseText ? Object.values(JSON.parse(responseText)) : [];
 	}
 
 	async addTorrent(formData: FormData): Promise<void> {
@@ -294,8 +341,7 @@ export default class QBittorrent implements TorrentClient {
 			) {
 				return resultOfErr("TORRENT_NOT_COMPLETE");
 			}
-			const savePath = this.getCorrectSavePath(meta, torrentInfo);
-			return resultOf(savePath);
+			return resultOf(this.getCorrectSavePath(meta, torrentInfo));
 		} catch (e) {
 			logger.debug(e);
 			if (e.message.includes("retrieve")) {
@@ -329,13 +375,9 @@ export default class QBittorrent implements TorrentClient {
 				(torrent.infohash_v1 &&
 					infoHashMetaMap.get(torrent.infohash_v1)) ||
 				undefined;
-			let savePath = dirname(torrent.content_path);
-			if (
-				!meta ||
-				!(await this.isSubfolderContentLayout(meta, torrent))
-			) {
-				savePath = torrent.save_path;
-			}
+			const savePath = meta
+				? this.getCorrectSavePath(meta, torrent)
+				: torrent.save_path;
 			torrentSavePaths.set(torrent.hash, savePath);
 			if (torrent.infohash_v1?.length) {
 				torrentSavePaths.set(torrent.infohash_v1, savePath);
@@ -361,7 +403,9 @@ export default class QBittorrent implements TorrentClient {
 			torrentInfo,
 		);
 		if (subfolderContentLayout) {
-			return dirname(torrentInfo.content_path);
+			return ABS_WIN_PATH_REGEX.test(torrentInfo.content_path)
+				? path.win32.dirname(torrentInfo.content_path)
+				: path.posix.dirname(torrentInfo.content_path);
 		}
 		return torrentInfo.save_path;
 	}
@@ -459,7 +503,13 @@ export default class QBittorrent implements TorrentClient {
 		dataInfo: TorrentInfo,
 	): boolean {
 		if (data.files.length > 1) return false;
-		if (dirname(data.files[0].path) !== ".") return false;
+		if (path.dirname(data.files[0].path) !== ".") return false;
+		let dirname = path.posix.dirname;
+		let resolve = path.posix.resolve;
+		if (ABS_WIN_PATH_REGEX.test(dataInfo.content_path)) {
+			dirname = path.win32.dirname;
+			resolve = path.win32.resolve;
+		}
 		return (
 			resolve(dirname(dataInfo.content_path)) !==
 			resolve(dataInfo.save_path)
@@ -520,10 +570,16 @@ export default class QBittorrent implements TorrentClient {
 				formData.append("savepath", savePath);
 			}
 			formData.append("autoTMM", autoTMM.toString());
-			formData.append(
-				"category",
-				this.getCategoryForNewTorrent(category),
-			);
+			if (category?.length) {
+				formData.append(
+					"category",
+					await this.getCategoryForNewTorrent(
+						category,
+						savePath,
+						autoTMM,
+					),
+				);
+			}
 			formData.append(
 				"tags",
 				this.getTagsForNewTorrent(searcheeInfo, path),
