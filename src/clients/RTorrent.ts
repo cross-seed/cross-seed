@@ -99,7 +99,7 @@ export default class RTorrent implements TorrentClient {
 		const { rtorrentRpcUrl } = getRuntimeConfig();
 
 		const { href, username, password } = extractCredentialsFromUrl(
-			rtorrentRpcUrl,
+			rtorrentRpcUrl!,
 		).unwrapOrThrow(
 			new CrossSeedError("rTorrent url must be percent-encoded"),
 		);

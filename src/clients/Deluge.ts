@@ -81,7 +81,7 @@ export default class Deluge implements TorrentClient {
 	private async authenticate(): Promise<void> {
 		const { delugeRpcUrl } = getRuntimeConfig();
 		const { href, password } = extractCredentialsFromUrl(
-			delugeRpcUrl,
+			delugeRpcUrl!,
 		).unwrapOrThrow(
 			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
 		);
@@ -143,7 +143,7 @@ export default class Deluge implements TorrentClient {
 		retries = 1,
 	): Promise<Result<ResultType, ErrorType>> {
 		const { delugeRpcUrl } = getRuntimeConfig();
-		const { href } = extractCredentialsFromUrl(delugeRpcUrl).unwrapOrThrow(
+		const { href } = extractCredentialsFromUrl(delugeRpcUrl!).unwrapOrThrow(
 			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
 		);
 		const headers = new Headers({ "Content-Type": "application/json" });

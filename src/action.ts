@@ -210,7 +210,7 @@ export async function linkAllFilesInMetafile(
 		onlyCompleted: false,
 	});
 	const fullLinkDir = clientSavePathRes.orElse(
-		flatLinking ? linkDir : join(linkDir, tracker),
+		flatLinking ? linkDir! : join(linkDir!, tracker),
 	);
 
 	let sourceRoot: string;
@@ -415,7 +415,7 @@ export function testLinking(srcDir: string): void {
 	try {
 		const srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
 		if (!srcFile) return;
-		const testPath = join(linkDir, "cross-seed.test");
+		const testPath = join(linkDir!, "cross-seed.test");
 		linkFile(srcFile, testPath);
 		rmSync(testPath);
 	} catch (e) {

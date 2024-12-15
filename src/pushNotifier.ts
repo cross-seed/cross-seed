@@ -26,9 +26,9 @@ interface PushNotification {
 }
 
 export class PushNotifier {
-	url: string;
+	url?: string;
 
-	constructor(url: string) {
+	constructor(url?: string) {
 		this.url = url;
 	}
 

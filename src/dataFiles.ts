@@ -49,7 +49,7 @@ export function findPotentialNestedRoots(
 
 export function findSearcheesFromAllDataDirs(): string[] {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
-	return dataDirs.flatMap((dataDir) =>
+	return dataDirs!.flatMap((dataDir) =>
 		readdirSync(dataDir)
 			.map((dirent) => join(dataDir, dirent))
 			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth)),

@@ -70,7 +70,7 @@ export default class Transmission implements TorrentClient {
 		const { transmissionRpcUrl } = getRuntimeConfig();
 
 		const { username, password, href } = extractCredentialsFromUrl(
-			transmissionRpcUrl,
+			transmissionRpcUrl!,
 		).unwrapOrThrow(
 			new CrossSeedError("Transmission rpc url must be percent-encoded"),
 		);

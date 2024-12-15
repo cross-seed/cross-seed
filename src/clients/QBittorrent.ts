@@ -101,7 +101,7 @@ export default class QBittorrent implements TorrentClient {
 	constructor() {
 		const { qbittorrentUrl } = getRuntimeConfig();
 		this.url = extractCredentialsFromUrl(
-			qbittorrentUrl,
+			qbittorrentUrl!,
 			"/api/v2",
 		).unwrapOrThrow(
 			new CrossSeedError("qBittorrent url must be percent-encoded"),
