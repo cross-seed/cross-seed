@@ -56,6 +56,7 @@ export interface TorrentClient {
 	}) => Promise<Map<string, string>>;
 	resumeInjection: (
 		infoHash: string,
+		decision: DecisionAnyMatch,
 		options: { checkOnce: boolean },
 	) => Promise<void>;
 	inject: (
@@ -150,8 +151,8 @@ export function shouldRecheck(
 	searchee: Searchee,
 	decision: DecisionAnyMatch,
 ): boolean {
-	const { matchMode } = getRuntimeConfig();
-	if (matchMode === MatchMode.SAFE) return true;
+	const { skipRecheck } = getRuntimeConfig();
+	if (!skipRecheck) return true;
 	if (decision === Decision.MATCH_PARTIAL) return true;
 	if (!searchee.infoHash) return true;
 	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
@@ -159,8 +160,9 @@ export function shouldRecheck(
 }
 
 // Resuming partials
-export function getMaxRemainingBytes() {
+export function getMaxRemainingBytes(decision: DecisionAnyMatch) {
 	const { matchMode, maxRemainingForResume } = getRuntimeConfig();
+	if (decision !== Decision.MATCH_PARTIAL) return 0;
 	if (matchMode !== MatchMode.PARTIAL) return 0;
 	return maxRemainingForResume * 1024 * 1024;
 }

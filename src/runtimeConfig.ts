@@ -5,6 +5,7 @@ export interface RuntimeConfig {
 	torznab: string[];
 	dataDirs?: string[];
 	matchMode: MatchMode;
+	skipRecheck: boolean;
 	maxRemainingForResume: number;
 	linkDir?: string;
 	linkType: LinkType;

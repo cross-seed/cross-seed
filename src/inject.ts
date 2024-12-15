@@ -14,6 +14,7 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	isAnyMatchedDecision,
+	MatchMode,
 	MediaType,
 	SaveResult,
 	TORRENT_CACHE_FOLDER,
@@ -311,7 +312,9 @@ async function injectFromStalledTorrent({
 				message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 			});
 			await getClient()!.recheckTorrent(meta.infoHash);
-			getClient()!.resumeInjection(meta.infoHash, { checkOnce: false });
+			getClient()!.resumeInjection(meta.infoHash, stalledDecision, {
+				checkOnce: false,
+			});
 		} else {
 			logger.warn({
 				label: Label.INJECT,
@@ -355,6 +358,13 @@ async function injectionAlreadyExists({
 	matches,
 	filePathLog,
 }: InjectionAftermath) {
+	const { matchMode } = getRuntimeConfig();
+	const existsDecision =
+		matchMode === MatchMode.PARTIAL
+			? Decision.MATCH_PARTIAL
+			: matchMode === MatchMode.RISKY
+				? Decision.MATCH_SIZE_ONLY
+				: Decision.MATCH;
 	const result = await getClient()!.isTorrentComplete(meta.infoHash);
 	let isComplete = result.orElse(false);
 	const anyFullMatch = matches.some(
@@ -368,7 +378,7 @@ async function injectionAlreadyExists({
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
-		getClient()!.resumeInjection(meta.infoHash, {
+		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
 			checkOnce: false,
 		});
 	} else if (anyFullMatch && !isComplete) {
@@ -377,7 +387,7 @@ async function injectionAlreadyExists({
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files - ${chalk.green(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
-		getClient()!.resumeInjection(meta.infoHash, {
+		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
 			checkOnce: false,
 		});
 		isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
@@ -387,7 +397,7 @@ async function injectionAlreadyExists({
 			message: `${progress} Unable to inject ${filePathLog} - ${chalk.yellow(injectionResult)}${isComplete ? "" : " (incomplete)"}`,
 		});
 		if (!isComplete) {
-			getClient()!.resumeInjection(meta.infoHash, {
+			getClient()!.resumeInjection(meta.infoHash, existsDecision, {
 				checkOnce: true,
 			});
 		}

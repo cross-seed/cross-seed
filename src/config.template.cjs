@@ -199,7 +199,7 @@ module.exports = {
 	/**
 	 * Determines flexibility of naming during matching.
 	 * "safe" will allow only perfect name/size matches using the standard
-	 * matching algorithm. All matches will be checked before resuming.
+	 * matching algorithm.
 	 * "risky" uses filesize as its only comparison point.
 	 * "partial" is like risky but allows matches if they are missing small
 	 * files like .nfo/.srt.
@@ -212,8 +212,16 @@ module.exports = {
 	matchMode: "safe",
 
 	/**
+	 * Skip rechecking on injection if unnecessary. Certain matches will
+	 * always be rechecked such as: partial, data based, and disc files.
+	 * Set to false to recheck all torrents before resuming, usually unnecessary.
+	 * Torrents will be resumed regardless of this setting.
+	 */
+	skipRecheck: true,
+
+	/**
 	 * The maximum size in MB remaining for a torrent to be resumed.
-	 * Must be in the range of 0MB - 50MB.
+	 * Must be in the range of 0 to 50.
 	 */
 	maxRemainingForResume: 50,
 

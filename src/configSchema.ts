@@ -136,6 +136,7 @@ export const VALIDATION_SCHEMA = z
 		torznab: z.array(z.string().url()),
 		dataDirs: z.array(z.string()).nullish(),
 		matchMode: z.nativeEnum(MatchMode),
+		skipRecheck: z.boolean(),
 		maxRemainingForResume: z
 			.number()
 			.gte(0, ZodErrorMessages.maxRemainingForResumeMax)

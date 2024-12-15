@@ -124,6 +124,11 @@ function createCommandWithSharedOptions(name: string, description: string) {
 				.makeOptionMandatory(),
 		)
 		.option(
+			"--no-skip-recheck",
+			"Recheck every torrent before resuming. Leave this off to only recheck those that are necessary.",
+			fallback(fileConfig.skipRecheck, true),
+		)
+		.option(
 			"--max-remaining-for-resume <decimal>",
 			"The maximum size in MB remaining for a torrent to be resumed",
 			parseFloat,
