@@ -372,12 +372,8 @@ export async function performActions(
 	return results;
 }
 
-function linkFile(
-	oldPath: string,
-	newPath: string,
-	linkType?: LinkType,
-): boolean {
-	if (!linkType) linkType = getRuntimeConfig().linkType; // testLinking is used during config validation
+function linkFile(oldPath: string, newPath: string): boolean {
+	const { linkType } = getRuntimeConfig();
 	try {
 		const ogFileResolvedPath = unwrapSymlinks(oldPath);
 
@@ -411,22 +407,16 @@ function unwrapSymlinks(path: string): string {
 }
 
 /**
- * Tests if a file can be linked to a directory.
- * Used during config validation, cannot depend on runtimeConfig.
- * @param srcDir The directory to link from to linkDir
- * @param linkDir The directory to link to
- * @param linkType The type of link to test
+ * Tests if srcDir supports linkType.
+ * @param srcDir The directory to link from
  */
-export function testLinking(
-	srcDir: string,
-	linkDir: string,
-	linkType: LinkType,
-): void {
+export function testLinking(srcDir: string): void {
+	const { linkDir, linkType } = getRuntimeConfig();
 	try {
 		const srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
 		if (!srcFile) return;
 		const testPath = join(linkDir, "cross-seed.test");
-		linkFile(srcFile, testPath, linkType);
+		linkFile(srcFile, testPath);
 		rmSync(testPath);
 	} catch (e) {
 		logger.error(e);

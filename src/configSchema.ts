@@ -2,7 +2,6 @@ import { readdirSync } from "fs";
 import ms from "ms";
 import { isAbsolute, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
-import { testLinking } from "./action.js";
 import { Action, LinkType, MatchMode, NEWLINE_INDENT } from "./constants.js";
 import { logger } from "./logger.js";
 
@@ -47,8 +46,6 @@ const ZodErrorMessages = {
 		"You cannot have your torrentDir inside of your dataDirs/linkDir/outputDir. Please adjust your paths to correct this.",
 	outputDirInOtherDirs:
 		"You cannot have your outputDir inside of your torrentDir/dataDirs/linkDir. Please adjust your paths to correct this.",
-	dataDirToLinkDir:
-		"Failed to create a test linkType in linkDir from dataDirs. Ensure that linkType is supported between these paths (hardlink requires same drive, partition, and volume).",
 	relativePaths:
 		"Absolute paths for torrentDir, linkDir, dataDirs, and outputDir are recommended.",
 };
@@ -391,19 +388,6 @@ export const VALIDATION_SCHEMA = z
 		}
 		return true;
 	}, ZodErrorMessages.outputDirInOtherDirs)
-	.refine((config) => {
-		if (!config.linkDir || !config.dataDirs) return true;
-		for (const dataDir of config.dataDirs) {
-			try {
-				testLinking(dataDir, config.linkDir, config.linkType);
-			} catch (e) {
-				logger.error(e);
-				logger.error(ZodErrorMessages.dataDirToLinkDir);
-				// return false; We need to check that this torrent wasn't blocklisted so only log for now
-			}
-		}
-		return true;
-	}, ZodErrorMessages.dataDirToLinkDir)
 	.refine((config) => {
 		if (
 			!isAbsolute(config.outputDir) ||

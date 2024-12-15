@@ -84,7 +84,7 @@ export function getClient(): TorrentClient | null {
 }
 
 export function validateSavePaths(rawSavePaths: Iterable<string>): void {
-	const { linkDir, linkType } = getRuntimeConfig();
+	const { linkDir } = getRuntimeConfig();
 	logger.info(`Validating all existing torrent save paths...`);
 	if (!linkDir) return;
 	const uniqueSavePaths = new Set(rawSavePaths);
@@ -95,9 +95,12 @@ export function validateSavePaths(rawSavePaths: Iterable<string>): void {
 			);
 		}
 		try {
-			testLinking(savePath, linkDir, linkType);
+			testLinking(savePath);
 		} catch (e) {
 			logger.error(e); // We need to check that this torrent wasn't blocklisted so only log for now
+			logger.error(
+				"Failed to link from torrent client save paths to linkDir.",
+			);
 		}
 	}
 }
