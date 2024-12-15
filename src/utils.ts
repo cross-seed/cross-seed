@@ -30,6 +30,9 @@ import { File, Searchee } from "./searchee.js";
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };
+export type WithUndefined<T, K extends keyof T> = Omit<T, K> & {
+	[P in K]: undefined;
+};
 
 export function isTruthy<T>(value: T): value is Truthy<T> {
 	return Boolean(value);

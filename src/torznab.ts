@@ -35,7 +35,12 @@ import {
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { getNewestFileAge, Searchee, SearcheeWithLabel } from "./searchee.js";
+import {
+	getSearcheeNewestFileAge,
+	Searchee,
+	SearcheeWithLabel,
+	SearcheeWithoutInfoHash,
+} from "./searchee.js";
 import {
 	cleanTitle,
 	combineAsyncIterables,
@@ -848,7 +853,10 @@ async function getAndLogIndexers(
 		if (
 			isEnsemble &&
 			entry.lastSearched &&
-			entry.lastSearched < (await getNewestFileAge(searchee))
+			entry.lastSearched <
+				(await getSearcheeNewestFileAge(
+					searchee as SearcheeWithoutInfoHash,
+				))
 		) {
 			return true;
 		}
