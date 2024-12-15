@@ -33,6 +33,7 @@ import {
 	isBadTitle,
 	stripExtension,
 	WithRequired,
+	WithUndefined,
 } from "./utils.js";
 
 export interface File {
@@ -69,6 +70,7 @@ export interface Searchee {
 	 */
 	title: string;
 	length: number;
+	mtimeMs?: number;
 	category?: string;
 	tags?: string[];
 	trackers?: string[][];
@@ -76,6 +78,7 @@ export interface Searchee {
 }
 
 export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
+export type SearcheeWithoutInfoHash = WithUndefined<Searchee, "infoHash">;
 export type SearcheeWithLabel = WithRequired<Searchee, "label">;
 
 export function hasInfoHash(
@@ -104,16 +107,38 @@ export function getLargestFile(files: File[]): File {
 	return files.reduce((a, b) => (a.length > b.length ? a : b));
 }
 
-export async function getNewestFileAge(searchee: Searchee): Promise<number> {
-	if (searchee.infoHash || searchee.path) {
-		throw new Error("Only virtual searchees have absolute paths");
-	}
+export function getAbsoluteFilePath(
+	sourceRoot: string,
+	filePath: string,
+	sourceRootIsFileHint?: boolean,
+): string {
+	return sourceRootIsFileHint ?? statSync(sourceRoot).isFile()
+		? sourceRoot
+		: join(dirname(sourceRoot), filePath);
+}
+
+export async function getNewestFileAge(
+	absoluteFilePaths: string[],
+): Promise<number> {
 	return Math.max(
 		...(await Promise.all(
-			searchee.files.map((file) =>
-				stat(file.path).then((s) => s.mtimeMs),
-			),
+			absoluteFilePaths.map((file) => stat(file).then((s) => s.mtimeMs)),
 		)),
+	);
+}
+
+export async function getSearcheeNewestFileAge(
+	searchee: SearcheeWithoutInfoHash,
+): Promise<number> {
+	if (!searchee.path) {
+		return getNewestFileAge(searchee.files.map((file) => file.path));
+	}
+	const pathStat = statSync(searchee.path);
+	if (pathStat.isFile()) return pathStat.mtimeMs;
+	return getNewestFileAge(
+		searchee.files.map((file) =>
+			getAbsoluteFilePath(searchee.path!, file.path, false),
+		),
 	);
 }
 
@@ -262,13 +287,16 @@ export async function createSearcheeFromPath(
 	const name = basename(root);
 	const title = parseTitle(name, files, root);
 	if (title) {
-		return resultOf({
-			files: files,
+		const searchee: SearcheeWithoutInfoHash = {
+			infoHash: undefined,
 			path: root,
+			files: files,
 			name,
 			title,
 			length: totalLength,
-		});
+		};
+		searchee.mtimeMs = await getSearcheeNewestFileAge(searchee);
+		return resultOf(searchee);
 	}
 	const msg = `Could not find title for ${root} in parent directory or child files`;
 	logger.verbose({
@@ -507,9 +535,7 @@ function pushEnsembleEpisode(
 	const absoluteFile: File = {
 		length: largestFile.length,
 		name: largestFile.name,
-		path: statSync(sourceRoot).isFile()
-			? sourceRoot
-			: join(dirname(sourceRoot), largestFile.path),
+		path: getAbsoluteFilePath(sourceRoot, largestFile.path),
 	};
 	if (!existsSync(absoluteFile.path)) return;
 
@@ -571,6 +597,7 @@ function createVirtualSeasonSearchee(
 		const fileAges = episodeFiles.map((f) => statSync(f.path).mtimeMs);
 		newestFileAge = Math.max(newestFileAge, ...fileAges);
 	}
+	seasonSearchee.mtimeMs = newestFileAge;
 	if (seasonSearchee.files.length < minEpisodes) {
 		logReason(
 			`Skipping virtual searchee for ${ensembleTitle} episodes as only ${seasonSearchee.files.length} episode files were found (min: ${minEpisodes})`,

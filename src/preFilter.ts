@@ -15,7 +15,12 @@ import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { getNewestFileAge, Searchee, SearcheeWithLabel } from "./searchee.js";
+import {
+	getSearcheeNewestFileAge,
+	Searchee,
+	SearcheeWithLabel,
+	SearcheeWithoutInfoHash,
+} from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
 import {
 	comparing,
@@ -305,7 +310,10 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 		seasonFromEpisodes &&
 		!searchee.infoHash &&
 		!searchee.path &&
-		earliest_last_search < (await getNewestFileAge(searchee))
+		earliest_last_search <
+			(await getSearcheeNewestFileAge(
+				searchee as SearcheeWithoutInfoHash,
+			))
 	) {
 		return true;
 	}

@@ -29,6 +29,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromPath,
+	getAbsoluteFilePath,
 	getSearcheeSource,
 	Searchee,
 	SearcheeWithInfoHash,
@@ -112,9 +113,7 @@ function linkExactTree(
 	let alreadyExisted = false;
 	let linkedNewFiles = false;
 	for (const newFile of newMeta.files) {
-		const srcFilePath = statSync(sourceRoot).isFile()
-			? sourceRoot
-			: join(dirname(sourceRoot), newFile.path);
+		const srcFilePath = getAbsoluteFilePath(sourceRoot, newFile.path);
 		const destFilePath = join(destinationDir, newFile.path);
 		if (existsSync(destFilePath)) {
 			alreadyExisted = true;
@@ -153,9 +152,10 @@ function linkFuzzyTree(
 			);
 		}
 		if (matchedSearcheeFiles.length) {
-			const srcFilePath = statSync(sourceRoot).isFile()
-				? sourceRoot
-				: join(dirname(sourceRoot), matchedSearcheeFiles[0].path);
+			const srcFilePath = getAbsoluteFilePath(
+				sourceRoot,
+				matchedSearcheeFiles[0].path,
+			);
 			const destFilePath = join(destinationDir, newFile.path);
 			const index = availableFiles.indexOf(matchedSearcheeFiles[0]);
 			availableFiles.splice(index, 1);
@@ -292,7 +292,8 @@ export async function linkAllFilesInMetafile(
 		const refreshedSearchee = result.unwrap();
 		if (
 			options.onlyCompleted &&
-			searchee.length !== refreshedSearchee.length
+			(searchee.mtimeMs !== refreshedSearchee.mtimeMs ||
+				searchee.length !== refreshedSearchee.length)
 		) {
 			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}
@@ -305,11 +306,11 @@ export async function linkAllFilesInMetafile(
 				);
 				return resultOfErr("MISSING_DATA");
 			}
-			if (
-				options.onlyCompleted &&
-				file.length !== statSync(file.path).size
-			) {
-				return resultOfErr("TORRENT_NOT_COMPLETE");
+			if (options.onlyCompleted) {
+				const f = statSync(file.path);
+				if (searchee.mtimeMs! < f.mtimeMs || file.length !== f.size) {
+					return resultOfErr("TORRENT_NOT_COMPLETE");
+				}
 			}
 		}
 	}
