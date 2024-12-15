@@ -40,6 +40,7 @@ import {
 	createSearcheeFromMetafile,
 	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
+	getNewestFileAge,
 	getSeasonKey,
 	Searchee,
 	SearcheeLabel,
@@ -412,6 +413,7 @@ async function pushEnsembleForCandidate(
 		title: ensembleTitle,
 		files: files,
 		length: totalLength,
+		mtimeMs: await getNewestFileAge(files.map((f) => f.path)),
 		label: searcheeLabel,
 	});
 	logger.verbose({
