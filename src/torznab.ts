@@ -374,11 +374,11 @@ export async function* rssPager(
 					apikey: indexer.apikey,
 					query: { t: "search", q: "", limit, offset: i * limit },
 				})
-			).sort(comparing((candidate) => -candidate.pubDate));
+			).sort(comparing((candidate) => -candidate.pubDate!));
 			if (i === 0) {
 				newLastSeenGuid = currentPageCandidates[0].guid;
 				pageBackUntil =
-					currentPageCandidates[0].pubDate - timeSinceLastRun;
+					currentPageCandidates[0].pubDate! - timeSinceLastRun;
 			}
 		} catch (e) {
 			logger.error({
@@ -400,7 +400,7 @@ export async function* rssPager(
 		}
 		if (!found) {
 			newCandidates = newCandidates.filter(
-				(candidate) => candidate.pubDate >= pageBackUntil,
+				(candidate) => candidate.pubDate! >= pageBackUntil,
 			);
 		}
 
