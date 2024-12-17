@@ -124,8 +124,8 @@ export async function validateSavePaths(
 		try {
 			testLinking(savePath);
 		} catch (e) {
-			logger.error(e); // We need to check that this torrent wasn't blocklisted so only log for now
-			logger.error(
+			logger.error(e);
+			throw new CrossSeedError(
 				"Failed to link from torrent client save paths to linkDir.",
 			);
 		}
