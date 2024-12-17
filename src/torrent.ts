@@ -22,7 +22,7 @@ import {
 	getEpisodeKey,
 	getMovieKey,
 	getSeasonKey,
-	Searchee,
+	SearcheeWithInfoHash,
 } from "./searchee.js";
 import { createKeyTitle, stripExtension } from "./utils.js";
 
@@ -251,10 +251,10 @@ export async function getInfoHashesToExclude(): Promise<Set<string>> {
 
 export async function loadTorrentDirLight(
 	torrentDir: string,
-): Promise<Searchee[]> {
+): Promise<SearcheeWithInfoHash[]> {
 	const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
 
-	const searchees: Searchee[] = [];
+	const searchees: SearcheeWithInfoHash[] = [];
 	for (const torrentFilePath of torrentFilePaths) {
 		const searcheeResult =
 			await createSearcheeFromTorrentFile(torrentFilePath);

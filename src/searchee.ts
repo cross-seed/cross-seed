@@ -197,7 +197,7 @@ export function parseTitle(
 
 export function createSearcheeFromMetafile(
 	meta: Metafile,
-): Result<Searchee, Error> {
+): Result<SearcheeWithInfoHash, Error> {
 	const title = parseTitle(meta.name, meta.files);
 	if (title) {
 		return resultOf({
@@ -218,7 +218,7 @@ export function createSearcheeFromMetafile(
 
 export async function createSearcheeFromTorrentFile(
 	filepath: string,
-): Promise<Result<Searchee, Error>> {
+): Promise<Result<SearcheeWithInfoHash, Error>> {
 	try {
 		const meta = await parseTorrentFromFilename(filepath);
 		return createSearcheeFromMetafile(meta);

@@ -31,8 +31,6 @@ const ZodErrorMessages = {
 		"includeSingleEpisodes is not recommended when using announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
 	invalidOutputDir:
 		"outputDir should only contain .torrent files, cross-seed will populate and manage (https://www.cross-seed.org/docs/basics/options#outputdir)",
-	invalidTorrentDir:
-		"torrentDir must contain at least one .torrent file (https://www.cross-seed.org/docs/basics/options#torrentdir). If no torrents are in client, set to null for now.",
 	needsTorrentDir:
 		"You need to set torrentDir for rss and announce matching to work.",
 	needsInject: "You need to use the 'inject' action for partial matching.",
@@ -145,13 +143,7 @@ export const VALIDATION_SCHEMA = z
 			.nullish()
 			.transform((value) => (typeof value === "boolean" ? value : false)),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z
-			.string()
-			.nullable()
-			.refine(
-				(d) => !d || readdirSync(d).some((f) => f.endsWith(".torrent")),
-				ZodErrorMessages.invalidTorrentDir,
-			),
+		torrentDir: z.string().nullable(),
 		outputDir: z.string().refine((dir) => {
 			if (readdirSync(dir).some((f) => !f.endsWith(".torrent"))) {
 				logger.warn(ZodErrorMessages.invalidOutputDir);
