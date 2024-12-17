@@ -105,7 +105,7 @@ async function checkConfigPaths(): Promise<void> {
 			} catch (e) {
 				logger.error(e);
 				logger.error("Failed to link from dataDirs to linkDir.");
-				// pathFailure++; We need to check that this torrent wasn't blocklisted so only log for now
+				pathFailure++;
 			}
 		}
 	}

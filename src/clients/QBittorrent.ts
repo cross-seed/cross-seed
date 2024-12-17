@@ -1,3 +1,4 @@
+import { readdirSync } from "fs";
 import ms from "ms";
 import path from "path";
 import { BodyInit } from "undici-types";
@@ -14,6 +15,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import { loadTorrentDirLight } from "../torrent.js";
 import {
 	TorrentMetadataInClient,
 	shouldRecheck,
@@ -151,13 +153,23 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async validateConfig(): Promise<void> {
+		const { torrentDir } = getRuntimeConfig();
 		await this.login();
 		await this.createTag();
+
+		if (!torrentDir) return;
+		if (!readdirSync(torrentDir).some((f) => f.endsWith(".fastresume"))) {
+			throw new CrossSeedError(
+				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
+			);
+		}
+		const searcheesRes = loadTorrentDirLight(torrentDir);
 		const infoHashPathMap = await this.getAllDownloadDirs({
 			metas: [], // Don't need to account for subfolder layout
 			onlyCompleted: false,
+			v1HashOnly: true,
 		});
-		validateSavePaths(infoHashPathMap.values());
+		await validateSavePaths(infoHashPathMap, await searcheesRes);
 	}
 
 	private async request(
@@ -358,6 +370,7 @@ export default class QBittorrent implements TorrentClient {
 	async getAllDownloadDirs(options: {
 		metas: SearcheeWithInfoHash[] | Metafile[];
 		onlyCompleted: boolean;
+		v1HashOnly?: boolean;
 	}): Promise<Map<string, string>> {
 		const torrents = await this.getAllTorrentInfo();
 		const torrentSavePaths = new Map<string, string>();
@@ -366,8 +379,9 @@ export default class QBittorrent implements TorrentClient {
 			return acc;
 		}, new Map<string, SearcheeWithInfoHash | Metafile>());
 		for (const torrent of torrents) {
-			if (options.onlyCompleted && !this.isTorrentInfoComplete(torrent))
+			if (options.onlyCompleted && !this.isTorrentInfoComplete(torrent)) {
 				continue;
+			}
 			const meta =
 				infoHashMetaMap.get(torrent.hash) ||
 				(torrent.infohash_v2 &&
@@ -378,10 +392,11 @@ export default class QBittorrent implements TorrentClient {
 			const savePath = meta
 				? this.getCorrectSavePath(meta, torrent)
 				: torrent.save_path;
-			torrentSavePaths.set(torrent.hash, savePath);
 			if (torrent.infohash_v1?.length) {
 				torrentSavePaths.set(torrent.infohash_v1, savePath);
 			}
+			if (options.v1HashOnly) continue;
+			torrentSavePaths.set(torrent.hash, savePath);
 			if (torrent.infohash_v2?.length) {
 				torrentSavePaths.set(torrent.infohash_v2, savePath);
 			}

@@ -468,7 +468,6 @@ async function findSearchableTorrents(): Promise<{
 		}
 		grouping.get(key)!.push(searchee);
 	}
-	const keysToDelete: string[] = [];
 	for (const [key, groupedSearchees] of grouping) {
 		// If one searchee needs to be searched, use the candidates for all
 		const filteredSearchees = filterDupesFromSimilar(groupedSearchees);
@@ -476,7 +475,7 @@ async function findSearchableTorrents(): Promise<{
 			filteredSearchees.map(filterTimestamps),
 		);
 		if (!results.some(isTruthy)) {
-			keysToDelete.push(key);
+			grouping.delete(key);
 			continue;
 		}
 		filteredSearchees.sort(
@@ -486,9 +485,6 @@ async function findSearchableTorrents(): Promise<{
 			),
 		);
 		grouping.set(key, filteredSearchees);
-	}
-	for (const key of keysToDelete) {
-		grouping.delete(key);
 	}
 	const finalSearchees = Array.from(grouping.values()).flat();
 
