@@ -129,10 +129,10 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			fallback(fileConfig.skipRecheck, true),
 		)
 		.option(
-			"--max-remaining-for-resume <decimal>",
-			"The maximum size in MB remaining for a torrent to be resumed",
-			parseFloat,
-			fallback(fileConfig.maxRemainingForResume, 50),
+			"--auto-resume-max-download <number>",
+			"The maximum size in bytes remaining for a torrent to be resumed",
+			parseInt,
+			fallback(fileConfig.autoResumeMaxDownload, 52428800),
 		)
 		.option(
 			"--link-category <cat>",
