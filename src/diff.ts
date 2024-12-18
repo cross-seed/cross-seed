@@ -1,5 +1,5 @@
 import { deepStrictEqual } from "assert";
-import { createSearcheeFromMetafile } from "./searchee.js";
+import { createSearcheeFromMetafile, Searchee } from "./searchee.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 
 function diff(thing1, thing2) {
@@ -25,8 +25,8 @@ export async function diffCmd(first: string, second: string): Promise<void> {
 		console.log(secondSearcheeRes.unwrapErr());
 		return;
 	}
-	const firstSearchee = firstSearcheeRes.unwrap();
-	const secondSearchee = secondSearcheeRes.unwrap();
+	const firstSearchee: Searchee = firstSearcheeRes.unwrap();
+	const secondSearchee: Searchee = secondSearcheeRes.unwrap();
 	delete firstSearchee.infoHash;
 	delete secondSearchee.infoHash;
 	diff(firstSearchee, secondSearchee);

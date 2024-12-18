@@ -4,6 +4,7 @@ import { testLinking } from "../action.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
+import { findBlockedStringInReleaseMaybe } from "../preFilter.js";
 import { Result } from "../Result.js";
 import {
 	ABS_WIN_PATH_REGEX,
@@ -83,12 +84,32 @@ export function getClient(): TorrentClient | null {
 	return activeClient;
 }
 
-export function validateSavePaths(rawSavePaths: Iterable<string>): void {
-	const { linkDir } = getRuntimeConfig();
+export async function validateSavePaths(
+	infoHashPathMap: Map<string, string>,
+	searchees: SearcheeWithInfoHash[],
+): Promise<void> {
+	const { blockList, linkDir } = getRuntimeConfig();
 	logger.info(`Validating all existing torrent save paths...`);
+
+	const entry = searchees.find((s) => !infoHashPathMap.has(s.infoHash));
+	if (entry) {
+		logger.warn(
+			`Not all torrents from torrentDir are in the torrent client (missing ${entry.name} [${entry.infoHash}]): https://www.cross-seed.org/docs/basics/options#torrentdir`,
+		);
+	}
+	if (infoHashPathMap.size !== searchees.length) {
+		logger.warn(
+			"Could not ensure all torrents from the torrent client are in torrentDir (likely incorrect torrentDir or torrents with infohash_v2): https://www.cross-seed.org/docs/basics/options#torrentdir",
+		);
+	}
 	if (!linkDir) return;
-	const uniqueSavePaths = new Set(rawSavePaths);
-	for (const savePath of uniqueSavePaths) {
+
+	for (const searchee of searchees) {
+		if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
+			infoHashPathMap.delete(searchee.infoHash);
+		}
+	}
+	for (const savePath of new Set(infoHashPathMap.values())) {
 		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
 			throw new CrossSeedError(
 				`Cannot use linkDir with cross platform cross-seed and torrent client: ${savePath}`,
