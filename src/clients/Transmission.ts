@@ -13,11 +13,20 @@ import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import { loadTorrentDirLight } from "../torrent.js";
 import {
 	TorrentMetadataInClient,
+	getMaxRemainingBytes,
+	getResumeStopTime,
+	resumeErrSleepTime,
+	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
 	validateSavePaths,
 } from "./TorrentClient.js";
-import { extractCredentialsFromUrl } from "../utils.js";
+import {
+	extractCredentialsFromUrl,
+	humanReadableSize,
+	sanitizeInfoHash,
+	wait,
+} from "../utils.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
 type Method =
@@ -25,7 +34,8 @@ type Method =
 	| "torrent-add"
 	| "torrent-get"
 	| "torrent-stop"
-	| "torrent-verify";
+	| "torrent-verify"
+	| "torrent-start";
 
 interface Response<T> {
 	result: "success" | string;
@@ -261,6 +271,66 @@ export default class Transmission implements TorrentClient {
 		});
 	}
 
+	async resumeInjection(
+		infoHash: string,
+		decision: DecisionAnyMatch,
+		options: { checkOnce: boolean },
+	): Promise<void> {
+		let sleepTime = resumeSleepTime;
+		const maxRemainingBytes = getMaxRemainingBytes(decision);
+		const stopTime = getResumeStopTime();
+		let stop = false;
+		while (Date.now() < stopTime) {
+			if (options.checkOnce) {
+				if (stop) return;
+				stop = true;
+			}
+			await wait(sleepTime);
+			const queryResponse = await this.request<TorrentGetResponseArgs>(
+				"torrent-get",
+				{
+					fields: ["leftUntilDone", "name", "status"],
+					ids: [infoHash],
+				},
+			);
+			if (queryResponse.torrents.length === 0) {
+				sleepTime = resumeErrSleepTime; // Dropping connections or restart
+				continue;
+			}
+			const [{ leftUntilDone, name, status }] = queryResponse.torrents;
+			if ([1, 2].includes(status)) {
+				continue;
+			}
+			const torrentLog = `${name} [${sanitizeInfoHash(infoHash)}]`;
+			if (status !== 0) {
+				logger.warn({
+					label: Label.TRANSMISSION,
+					message: `Will not resume ${torrentLog}: status is ${status}`,
+				});
+				return;
+			}
+			if (leftUntilDone > maxRemainingBytes) {
+				logger.warn({
+					label: Label.TRANSMISSION,
+					message: `Will not resume ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
+				});
+				return;
+			}
+			logger.info({
+				label: Label.TRANSMISSION,
+				message: `Resuming ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining`,
+			});
+			await this.request<void>("torrent-start", {
+				ids: [infoHash],
+			});
+			return;
+		}
+		logger.warn({
+			label: Label.TRANSMISSION,
+			message: `Will not resume torrent ${infoHash}: timeout`,
+		});
+	}
+
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
@@ -294,6 +364,9 @@ export default class Transmission implements TorrentClient {
 					labels: [TORRENT_TAG],
 				},
 			);
+			this.resumeInjection(newTorrent.infoHash, decision, {
+				checkOnce: false,
+			});
 		} catch (e) {
 			return InjectionResult.FAILURE;
 		}
