@@ -1,4 +1,4 @@
-import type { Stats } from "fs";
+import { readdirSync, type Stats } from "fs";
 import { stat, unlink, writeFile } from "fs/promises";
 import { dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
@@ -19,7 +19,9 @@ import {
 	TorrentMetadataInClient,
 	shouldRecheck,
 	TorrentClient,
+	validateSavePaths,
 } from "./TorrentClient.js";
+import { loadTorrentDirLight } from "../torrent.js";
 
 const COULD_NOT_FIND_INFO_HASH = "Could not find info-hash.";
 
@@ -287,10 +289,7 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	async validateConfig(): Promise<void> {
-		const { rtorrentRpcUrl } = getRuntimeConfig();
-		// no validation to do
-		if (!rtorrentRpcUrl) return;
-
+		const { rtorrentRpcUrl, torrentDir } = getRuntimeConfig();
 		try {
 			await this.methodCallP<string[]>("download_list", []);
 		} catch (e) {
@@ -299,6 +298,20 @@ export default class RTorrent implements TorrentClient {
 				`Failed to reach rTorrent at ${rtorrentRpcUrl}`,
 			);
 		}
+
+		if (!torrentDir) return;
+		if (!readdirSync(torrentDir).some((f) => f.endsWith("_resume"))) {
+			throw new CrossSeedError(
+				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
+			);
+		}
+		const searcheesRes = loadTorrentDirLight(torrentDir);
+		const allTorrents = await this.getAllTorrents();
+		const infoHashPathMap = await this.getAllDownloadDirs({
+			metas: allTorrents.map((torrent) => torrent.infoHash),
+			onlyCompleted: false,
+		});
+		await validateSavePaths(infoHashPathMap, await searcheesRes);
 	}
 
 	async getDownloadDir(
@@ -319,10 +332,14 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	async getAllDownloadDirs(options: {
-		metas: SearcheeWithInfoHash[] | Metafile[];
+		metas: SearcheeWithInfoHash[] | Metafile[] | string[];
 		onlyCompleted: boolean;
 	}): Promise<Map<string, string>> {
-		const infoHashes: string[] = options.metas.map((meta) => meta.infoHash);
+		if (options.metas.length === 0) return new Map();
+		const infoHashes: string[] =
+			typeof options.metas[0] === "string"
+				? options.metas
+				: options.metas.map((meta) => meta.infoHash);
 		type ReturnType = string[][] | Fault[];
 		let response: ReturnType;
 		try {

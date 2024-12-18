@@ -2,13 +2,27 @@ import { readdirSync } from "fs";
 import ms from "ms";
 import { isAbsolute, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
-import { Action, LinkType, MatchMode, NEWLINE_INDENT } from "./constants.js";
+import {
+	Action,
+	BlocklistType,
+	LinkType,
+	MatchMode,
+	NEWLINE_INDENT,
+	parseBlocklistEntry,
+} from "./constants.js";
 import { logger } from "./logger.js";
+import { formatAsList } from "./utils.js";
 
 /**
  * error messages and map returned upon Zod validation failure
  */
 const ZodErrorMessages = {
+	blocklistType: `Blocklist item does not start with a valid prefix. Must be of ${formatAsList(Object.values(BlocklistType), { sort: false, style: "narrow", type: "unit" })}`,
+	blocklistRegex: `Blocklist regex is not a valid regex.`,
+	blocklistFolder: `Blocklist folder must not contain path separators`,
+	blocklistTracker: `Blocklist tracker is not a valid URL host. If URL is https://user:pass@tracker.example.com:8080/announce/key, you must use "tracker:tracker.example.com:8080"`,
+	blocklistHash: `Blocklist hash must be 40 characters and alphanumeric`,
+	blocklistSize: `Blocklist size must be an integer for the number of bytes. You can only have one sizeBelow, one sizeAbove, and sizeBelow <= sizeAbove.`,
 	vercel: "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
 	emptyString:
 		"cannot have an empty string. If you want to unset it, use null or undefined.",
@@ -31,8 +45,6 @@ const ZodErrorMessages = {
 		"includeSingleEpisodes is not recommended when using announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
 	invalidOutputDir:
 		"outputDir should only contain .torrent files, cross-seed will populate and manage (https://www.cross-seed.org/docs/basics/options#outputdir)",
-	invalidTorrentDir:
-		"torrentDir must contain at least one .torrent file (https://www.cross-seed.org/docs/basics/options#torrentdir). If no torrents are in client, set to null for now.",
 	needsTorrentDir:
 		"You need to set torrentDir for rss and announce matching to work.",
 	needsInject: "You need to use the 'inject' action for partial matching.",
@@ -94,9 +106,10 @@ function addZodIssue(
 
 /**
  * helper function for ms time validation
+ * @param durationStr the duration string to validate
+ * @param ctx ZodError map
  * @return transformed duration (string -> milliseconds)
  */
-
 function transformDurationString(durationStr: string, ctx: RefinementCtx) {
 	const duration = ms(durationStr);
 	if (isNaN(duration)) {
@@ -107,9 +120,92 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
 }
 
 /**
- * check a potential child path being inside an array of parent paths
- * @param childDir path of the potential child (e.g. linkDir)
- * @param parentDirs array of parentDir paths (e.g. dataDirs)
+ * helper function for verifying blocklist types
+ * @param blockList the blocklist to validate
+ * @param ctx ZodError map
+ * @return blocklist (string array)
+ */
+function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
+	if (!Array.isArray(blockList)) {
+		return [];
+	}
+	const sizeTest = (value: string, existing: number) => {
+		if (!existing) {
+			const match = value.match(/^\d+$/);
+			if (match) return parseInt(match[0]);
+		}
+		addZodIssue(value, ZodErrorMessages.blocklistSize, ctx);
+		return existing;
+	};
+	let sizeBelow = 0;
+	let sizeAbove = 0;
+	for (const [index, blockRaw] of blockList.entries()) {
+		const entry = parseBlocklistEntry(blockRaw);
+		if (!entry) {
+			addZodIssue(blockRaw, ZodErrorMessages.blocklistType, ctx);
+			continue;
+		}
+		const { blocklistType, blocklistValue } = entry;
+		switch (blocklistType) {
+			case BlocklistType.NAME_REGEX:
+			case BlocklistType.FOLDER_REGEX:
+				try {
+					new RegExp(blocklistValue);
+				} catch (e) {
+					addZodIssue(blockRaw, ZodErrorMessages.blocklistRegex, ctx);
+				}
+				break;
+			case BlocklistType.TRACKER:
+				if (/[/@]|^[^.]*$/.test(blocklistValue)) {
+					addZodIssue(
+						blockRaw,
+						ZodErrorMessages.blocklistTracker,
+						ctx,
+					);
+				}
+				break;
+			case BlocklistType.FOLDER:
+				if (/[/\\]/.test(blocklistValue)) {
+					addZodIssue(
+						blockRaw,
+						ZodErrorMessages.blocklistFolder,
+						ctx,
+					);
+				}
+				break;
+			case BlocklistType.HASH:
+				if (!/^[a-z0-9]{40}$/i.test(blocklistValue)) {
+					addZodIssue(blockRaw, ZodErrorMessages.blocklistHash, ctx);
+				}
+				blockList[index] =
+					`${blocklistType}${blocklistValue.toLowerCase()}`;
+				break;
+			case BlocklistType.SIZE_BELOW: {
+				sizeBelow = sizeTest(blocklistValue, sizeBelow);
+				break;
+			}
+			case BlocklistType.SIZE_ABOVE: {
+				sizeAbove = sizeTest(blocklistValue, sizeAbove);
+				break;
+			}
+			default:
+				break;
+		}
+	}
+	if (sizeBelow && sizeAbove && sizeBelow > sizeAbove) {
+		addZodIssue(
+			"sizeBelow > sizeAbove",
+			ZodErrorMessages.blocklistSize,
+			ctx,
+		);
+	}
+	return blockList;
+}
+
+/**
+ * check a potential child path being inside a array of parent paths
+ * @param childDir path of the potential child (e.g linkDir)
+ * @param parentDirs array of parentDir paths (e.g dataDirs)
  * @returns true if `childDir` is inside any `parentDirs` at any nesting level, false otherwise.
  */
 function isChildPath(childDir: string, parentDirs: string[]): boolean {
@@ -145,13 +241,7 @@ export const VALIDATION_SCHEMA = z
 			.nullish()
 			.transform((value) => (typeof value === "boolean" ? value : false)),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z
-			.string()
-			.nullable()
-			.refine(
-				(d) => !d || readdirSync(d).some((f) => f.endsWith(".torrent")),
-				ZodErrorMessages.invalidTorrentDir,
-			),
+		torrentDir: z.string().nullable(),
 		outputDir: z.string().refine((dir) => {
 			if (readdirSync(dir).some((f) => !f.endsWith(".torrent"))) {
 				logger.warn(ZodErrorMessages.invalidOutputDir);
@@ -242,10 +332,7 @@ export const VALIDATION_SCHEMA = z
 		searchLimit: z.number().nonnegative().nullish(),
 		verbose: z.boolean(),
 		torrents: z.array(z.string()).optional(),
-		blockList: z
-			.array(z.string())
-			.nullish()
-			.transform((value) => (Array.isArray(value) ? value : [])),
+		blockList: z.array(z.string()).nullish().transform(transformBlocklist),
 		apiKey: z.string().min(24).nullish(),
 		radarr: z
 			.array(z.string().url())

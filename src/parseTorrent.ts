@@ -3,6 +3,8 @@ import { createHash } from "crypto";
 import { join } from "path";
 import { File, parseTitle } from "./searchee.js";
 import { fallback } from "./utils.js";
+import { readFileSync } from "fs";
+import { isOk, Result, resultOf, resultOfErr } from "./Result.js";
 
 interface TorrentDirent {
 	length: number;
@@ -23,9 +25,78 @@ interface Torrent {
 
 		private: number;
 	};
-	comment: Buffer | string;
-	announce: Buffer;
-	"announce-list": Buffer[][];
+	// qBittorrent only keeps info dict, everything else in fastresume
+	comment?: Buffer | string;
+	announce?: Buffer;
+	"announce-list"?: Buffer[][];
+}
+
+/**
+ * "Fastresume" for all clients. Used to get torrent info.
+ * qBittorrent: .fastresume, Transmission: .resume, rTorrent: .rtorrent
+ * Deluge doesn't store labels in fastresume, but in label.conf
+ */
+interface TorrentMetadata {
+	trackers?: Buffer[][];
+	"qBt-category"?: Buffer;
+	"qBt-tags"?: Buffer;
+	custom1?: Buffer;
+	label?: Buffer;
+	labels?: Buffer;
+}
+
+interface DelugeLabelConf {
+	torrent_labels: {
+		[key: string]: string;
+	};
+}
+
+export function parseDelugeLabelConf(filepath: string): DelugeLabelConf {
+	const lines = readFileSync(filepath).toString().split("\n");
+	lines.splice(0, 3);
+	lines[0] = "{";
+	return JSON.parse(lines.join("\n"));
+}
+
+function sanitizeTrackerUrl(url: string): Result<string, Error> {
+	try {
+		return resultOf(new URL(url).host);
+	} catch (err) {
+		return resultOfErr(err);
+	}
+}
+
+export function updateMetafileMetadata(
+	metafile: Metafile,
+	metadata: TorrentMetadata,
+): void {
+	if (metadata.label) {
+		metafile.tags = [metadata.label.toString()];
+		return; // Deluge
+	}
+	if (metadata.custom1) {
+		metafile.tags = [metadata.custom1.toString()];
+		return; // rTorrent
+	}
+	if (metadata.labels) {
+		metafile.tags = metadata.labels.toString().split(",");
+		return; // Transmission
+	}
+	// qBittorrent
+	if (metadata["qBt-category"]) {
+		metafile.category = metadata["qBt-category"].toString();
+	}
+	if (metadata["qBt-tags"]) {
+		metafile.tags = metadata["qBt-tags"].toString().split(",");
+	}
+	if (metadata.trackers) {
+		metafile.trackers = metadata.trackers.map((tier) =>
+			tier
+				.map((url) => sanitizeTrackerUrl(url.toString()))
+				.filter(isOk)
+				.map((r) => r.unwrap()),
+		);
+	}
 }
 
 function sumLength(sum: number, file: { length: number }): number {
@@ -54,6 +125,9 @@ export class Metafile {
 	pieceLength: number;
 	files: File[];
 	isSingleFileTorrent: boolean;
+	category?: string;
+	tags: string[];
+	trackers: string[][];
 	raw: Torrent;
 
 	constructor(raw: Torrent) {
@@ -112,6 +186,21 @@ export class Metafile {
 			this.isSingleFileTorrent = false;
 		}
 		this.title = parseTitle(this.name, this.files) ?? this.name;
+		this.tags = [];
+		this.trackers =
+			raw["announce-list"]?.map((tier) =>
+				tier
+					.map((url) => sanitizeTrackerUrl(url.toString()))
+					.filter(isOk)
+					.map((r) => r.unwrap()),
+			) ??
+			(raw.announce
+				? [
+						[sanitizeTrackerUrl(raw.announce.toString())]
+							.filter(isOk)
+							.map((r) => r.unwrap()),
+					]
+				: []);
 	}
 
 	static decode(buf: Buffer) {

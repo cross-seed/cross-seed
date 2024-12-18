@@ -1,3 +1,4 @@
+import { readdirSync } from "fs";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
@@ -9,6 +10,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import { loadTorrentDirLight } from "../torrent.js";
 import {
 	TorrentMetadataInClient,
 	shouldRecheck,
@@ -132,6 +134,7 @@ export default class Transmission implements TorrentClient {
 	}
 
 	async validateConfig(): Promise<void> {
+		const { torrentDir } = getRuntimeConfig();
 		try {
 			await this.request("session-get");
 		} catch (e) {
@@ -140,10 +143,18 @@ export default class Transmission implements TorrentClient {
 				`Failed to reach Transmission at ${transmissionRpcUrl}`,
 			);
 		}
+
+		if (!torrentDir) return;
+		if (!readdirSync(torrentDir).some((f) => f.endsWith(".torrent"))) {
+			throw new CrossSeedError(
+				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
+			);
+		}
+		const searcheesRes = loadTorrentDirLight(torrentDir);
 		const infoHashPathMap = await this.getAllDownloadDirs({
 			onlyCompleted: false,
 		});
-		validateSavePaths(infoHashPathMap.values());
+		await validateSavePaths(infoHashPathMap, await searcheesRes);
 	}
 
 	async checkOriginalTorrent(

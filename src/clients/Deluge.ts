@@ -1,3 +1,4 @@
+import { readdirSync } from "fs";
 import ms from "ms";
 import {
 	DecisionAnyMatch,
@@ -11,6 +12,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import { loadTorrentDirLight } from "../torrent.js";
 import { extractCredentialsFromUrl, getLogString, wait } from "../utils.js";
 import {
 	TorrentMetadataInClient,
@@ -67,12 +69,21 @@ export default class Deluge implements TorrentClient {
 	 * validates the login and host for deluge webui
 	 */
 	async validateConfig(): Promise<void> {
+		const { torrentDir } = getRuntimeConfig();
 		await this.authenticate();
 		this.isLabelEnabled = await this.labelEnabled();
+
+		if (!torrentDir) return;
+		if (!readdirSync(torrentDir).some((f) => f.endsWith(".state"))) {
+			throw new CrossSeedError(
+				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
+			);
+		}
+		const searcheesRes = loadTorrentDirLight(torrentDir);
 		const infoHashPathMap = await this.getAllDownloadDirs({
 			onlyCompleted: false,
 		});
-		validateSavePaths(infoHashPathMap.values());
+		await validateSavePaths(infoHashPathMap, await searcheesRes);
 	}
 
 	/**
