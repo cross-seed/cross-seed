@@ -30,6 +30,9 @@ import { File, Searchee } from "./searchee.js";
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };
+export type WithUndefined<T, K extends keyof T> = Omit<T, K> & {
+	[P in K]: undefined;
+};
 
 export function isTruthy<T>(value: T): value is Truthy<T> {
 	return Boolean(value);
@@ -362,14 +365,18 @@ export function extractInt(str: string): number {
 	return parseInt(str.match(/\d+/)![0]);
 }
 
-export function getFuzzySizeFactor(): number {
-	const { fuzzySizeThreshold } = getRuntimeConfig();
-	return fuzzySizeThreshold;
+export function getFuzzySizeFactor(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? 1 - seasonFromEpisodes
+		: fuzzySizeThreshold;
 }
 
-export function getMinSizeRatio(): number {
-	const { fuzzySizeThreshold } = getRuntimeConfig();
-	return 1 - fuzzySizeThreshold;
+export function getMinSizeRatio(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? seasonFromEpisodes
+		: 1 - fuzzySizeThreshold;
 }
 
 /**
