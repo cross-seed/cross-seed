@@ -124,12 +124,17 @@ function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {
 }
 
 function getFilesFromDataRoot(rootPath: string): File[] {
-	const parentDir = join(rootPath, "..");
-	return getFileNamesFromRootRec(rootPath).map((file) => ({
-		path: relative(parentDir, file),
-		name: basename(file),
-		length: statSync(file).size,
-	}));
+	const parentDir = dirname(rootPath);
+	try {
+		return getFileNamesFromRootRec(rootPath).map((file) => ({
+			path: relative(parentDir, file),
+			name: basename(file),
+			length: statSync(file).size,
+		}));
+	} catch (e) {
+		logger.debug(e);
+		return [];
+	}
 }
 
 /**
@@ -229,7 +234,7 @@ export async function createSearcheeFromPath(
 ): Promise<Result<Searchee, Error>> {
 	const files = getFilesFromDataRoot(root);
 	if (files.length === 0) {
-		const msg = `No files found in ${root}`;
+		const msg = `Failed to retrieve files in ${root}`;
 		logger.verbose({
 			label: Label.PREFILTER,
 			message: msg,
