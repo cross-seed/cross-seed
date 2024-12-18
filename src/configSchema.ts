@@ -35,7 +35,8 @@ const ZodErrorMessages = {
 	excludeRecentOlder:
 		"excludeOlder and excludeRecentSearch must be defined for searching. excludeOlder must be 2-5x excludeRecentSearch.",
 	injectNeedsInjectMode: "`cross-seed inject` requires the 'inject' action.",
-	autoResumeMaxDownloadUnsupported: "autoResumeMaxDownload must be between 0 and 52428800.",
+	autoResumeMaxDownloadUnsupported:
+		"autoResumeMaxDownload must be an integer between 0 and 52428800 bytes (0 MiB to 50 MiB).",
 	numberMustBeRatio:
 		"fuzzySizeThreshold and seasonFromEpisodes must be between 0 and 1.",
 	fuzzySizeThresholdMax:
@@ -244,6 +245,7 @@ export const VALIDATION_SCHEMA = z
 		skipRecheck: z.boolean(),
 		autoResumeMaxDownload: z
 			.number()
+			.int()
 			.gte(0, ZodErrorMessages.autoResumeMaxDownloadUnsupported)
 			.lte(52428800, ZodErrorMessages.autoResumeMaxDownloadUnsupported),
 		linkCategory: z.string().nullish(),
