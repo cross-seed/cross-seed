@@ -220,10 +220,10 @@ module.exports = {
 	skipRecheck: true,
 
 	/**
-	 * The maximum size in MB remaining for a torrent to be resumed.
-	 * Must be in the range of 0 to 50.
+	 * The maximum size in bytes remaining for a torrent to be resumed.
+	 * Must be in the range of 0 to 52428800 (50 MiB).
 	 */
-	maxRemainingForResume: 50,
+	autoResumeMaxDownload: 52428800,
 
 	/**
 	 * Determines how deep into the specified dataDirs to go to generate new

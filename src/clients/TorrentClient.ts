@@ -161,10 +161,10 @@ export function shouldRecheck(
 
 // Resuming partials
 export function getMaxRemainingBytes(decision: DecisionAnyMatch) {
-	const { matchMode, maxRemainingForResume } = getRuntimeConfig();
+	const { matchMode, autoResumeMaxDownload } = getRuntimeConfig();
 	if (decision !== Decision.MATCH_PARTIAL) return 0;
 	if (matchMode !== MatchMode.PARTIAL) return 0;
-	return maxRemainingForResume * 1024 * 1024;
+	return autoResumeMaxDownload;
 }
 export const resumeSleepTime = ms("15 seconds");
 export const resumeErrSleepTime = ms("5 minutes");

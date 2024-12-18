@@ -6,7 +6,7 @@ export interface RuntimeConfig {
 	dataDirs?: string[];
 	matchMode: MatchMode;
 	skipRecheck: boolean;
-	maxRemainingForResume: number;
+	autoResumeMaxDownload: number;
 	linkDir?: string;
 	linkType: LinkType;
 	flatLinking: boolean;
