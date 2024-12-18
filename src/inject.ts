@@ -545,7 +545,11 @@ async function injectSavedTorrent(
 	}
 }
 
-function logInjectSummary(summary: InjectSummary, flatLinking: boolean) {
+function logInjectSummary(
+	summary: InjectSummary,
+	flatLinking: boolean,
+	injectDir: string | undefined,
+) {
 	const incompleteMsg = `${chalk.bold.yellow(summary.ALREADY_EXISTS)} existed in client${
 		summary.INCOMPLETE_CANDIDATES
 			? chalk.dim(` (${summary.INCOMPLETE_CANDIDATES} were incomplete)`)
@@ -585,10 +589,12 @@ function logInjectSummary(summary: InjectSummary, flatLinking: boolean) {
 			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
 		});
 	}
-	logger.info({
-		label: Label.INJECT,
-		message: `Waiting on post-injection tasks to complete...`,
-	});
+	if (injectDir) {
+		logger.info({
+			label: Label.INJECT,
+			message: `Waiting on post-injection tasks to complete...`,
+		});
+	}
 }
 
 function createSummary(total: number): InjectSummary {
@@ -630,7 +636,7 @@ export async function injectSavedTorrents(): Promise<void> {
 		const progress = chalk.blue(`(${i + 1}/${torrentFilePaths.length})`);
 		await injectSavedTorrent(progress, torrentFilePath, summary, searchees);
 	}
-	logInjectSummary(summary, flatLinking);
+	logInjectSummary(summary, flatLinking, injectDir);
 }
 
 export async function restoreFromTorrentCache(): Promise<void> {
