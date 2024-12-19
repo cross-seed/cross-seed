@@ -212,6 +212,20 @@ module.exports = {
 	matchMode: "safe",
 
 	/**
+	 * Skip rechecking on injection if unnecessary. Certain matches will
+	 * always be rechecked such as: partial, data based, and disc files.
+	 * Set to false to recheck all torrents before resuming, usually unnecessary.
+	 * Torrents will be resumed regardless of this setting.
+	 */
+	skipRecheck: true,
+
+	/**
+	 * The maximum size in bytes remaining for a torrent to be resumed.
+	 * Must be in the range of 0 to 52428800 (50 MiB).
+	 */
+	autoResumeMaxDownload: 52428800,
+
+	/**
 	 * Determines how deep into the specified dataDirs to go to generate new
 	 * searchees. Setting this to higher values will result in more searchees
 	 * and more API hits to your indexers.

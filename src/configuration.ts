@@ -22,6 +22,8 @@ export interface FileConfig {
 	excludeRecentSearch?: string;
 	dataDirs?: string[];
 	matchMode?: MatchMode;
+	skipRecheck?: boolean;
+	autoResumeMaxDownload?: number;
 	linkDir?: string;
 	linkType?: string;
 	flatLinking?: boolean;
