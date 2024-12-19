@@ -24,7 +24,7 @@ const ZodErrorMessages = {
 		"fuzzySizeThreshold must be between 0 and 1 with a maximum of 0.1 when using searchCadence or rssCadence",
 	injectNeedsInjectMode: "`cross-seed inject` requires the 'inject' action.",
 	autoResumeMaxDownloadUnsupported:
-		"autoResumeMaxDownload must be between 0 and 52428800.",
+		"autoResumeMaxDownload must be an integer of bytes between between 0 and 52428800 (50 MiB).",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
@@ -140,6 +140,7 @@ export const VALIDATION_SCHEMA = z
 		skipRecheck: z.boolean(),
 		autoResumeMaxDownload: z
 			.number()
+			.int()
 			.gte(0, ZodErrorMessages.autoResumeMaxDownloadUnsupported)
 			.lte(52428800, ZodErrorMessages.autoResumeMaxDownloadUnsupported),
 		linkCategory: z.string().nullish(),
