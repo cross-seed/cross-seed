@@ -3,7 +3,7 @@ import bencode from "bencode";
 import fs from "fs";
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
-import { dirname, extname, join, resolve } from "path";
+import { extname, join, resolve } from "path";
 import { inspect } from "util";
 import { getClient, TorrentMetadataInClient } from "./clients/TorrentClient.js";
 import {
@@ -20,6 +20,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromTorrentFile,
+	getAbsoluteFilePath,
 	getAnimeKeys,
 	getEpisodeKey,
 	getLargestFile,
@@ -263,20 +264,23 @@ export async function cacheEnsembleEntry(
 		savePath = torrentSavePaths.get(meta.infoHash);
 	}
 	if (!savePath) return;
+
+	// Don't want to statSync(sourceRoot).isFile() now as it might be downloading.
+	// The path will get checked when rss/announce has a potential match.
 	const sourceRoot = join(
 		savePath,
 		meta.files.length === 1 ? meta.files[0].path : meta.name,
 	);
-
 	await memDB("ensemble")
 		.insert({
 			ensemble: key,
 			element,
 			name: largestFile.name,
-			absolute_path:
-				meta.files.length === 1
-					? sourceRoot
-					: join(dirname(sourceRoot), largestFile.path),
+			absolute_path: getAbsoluteFilePath(
+				sourceRoot,
+				largestFile.path,
+				meta.files.length === 1,
+			),
 			length: largestFile.length,
 		})
 		.onConflict("absolute_path")
