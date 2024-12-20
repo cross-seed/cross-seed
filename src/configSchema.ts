@@ -148,6 +148,15 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 		}
 		const { blocklistType, blocklistValue } = parseBlocklistEntry(blockRaw);
 		switch (blocklistType) {
+			case BlocklistType.FOLDER:
+				if (/[/\\]/.test(blocklistValue)) {
+					addZodIssue(
+						blockRaw,
+						ZodErrorMessages.blocklistFolder,
+						ctx,
+					);
+				}
+				break;
 			case BlocklistType.NAME_REGEX:
 			case BlocklistType.FOLDER_REGEX:
 				try {
@@ -161,15 +170,6 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 					addZodIssue(
 						blockRaw,
 						ZodErrorMessages.blocklistTracker,
-						ctx,
-					);
-				}
-				break;
-			case BlocklistType.FOLDER:
-				if (/[/\\]/.test(blocklistValue)) {
-					addZodIssue(
-						blockRaw,
-						ZodErrorMessages.blocklistFolder,
 						ctx,
 					);
 				}
@@ -195,6 +195,10 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 				);
 				break;
 			}
+			case BlocklistType.NAME:
+			case BlocklistType.CATEGORY:
+			case BlocklistType.TAG:
+				break;
 			default:
 				addZodIssue(blockRaw, ZodErrorMessages.blocklistType, ctx);
 		}
