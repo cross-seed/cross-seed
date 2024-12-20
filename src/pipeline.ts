@@ -399,16 +399,18 @@ async function pushEnsembleForCandidate(
 	}
 	// Get searchee.length by total size of each episode (average if multiple files for episode)
 	const uniqueElements = new Set(ensemble.map((e) => e.element));
-	const totalLength = [...uniqueElements].reduce((acc, cur) => {
-		const elements = ensemble.filter(
-			(e) =>
-				e.element === cur &&
-				files.some((f) => f.path === e.absolute_path),
-		);
-		const avg =
-			elements.reduce((a, c) => a + c.length, 0) / elements.length;
-		return acc + avg;
-	}, 0);
+	const totalLength = Math.round(
+		[...uniqueElements].reduce((acc, cur) => {
+			const elements = ensemble.filter(
+				(e) =>
+					e.element === cur &&
+					files.some((f) => f.path === e.absolute_path),
+			);
+			const avg =
+				elements.reduce((a, c) => a + c.length, 0) / elements.length;
+			return acc + avg;
+		}, 0),
+	);
 	searchees.push({
 		name: ensembleTitle,
 		title: ensembleTitle,
