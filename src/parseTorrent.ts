@@ -3,7 +3,6 @@ import { createHash } from "crypto";
 import { join } from "path";
 import { File, parseTitle } from "./searchee.js";
 import { fallback, isTruthy } from "./utils.js";
-import { readFileSync } from "fs";
 
 interface TorrentDirent {
 	length: number;
@@ -39,22 +38,6 @@ interface TorrentMetadata {
 	trackers?: Buffer[][];
 	"qBt-category"?: Buffer;
 	"qBt-tags"?: Buffer;
-	custom1?: Buffer;
-	label?: Buffer;
-	labels?: Buffer;
-}
-
-interface DelugeLabelConf {
-	torrent_labels: {
-		[key: string]: string;
-	};
-}
-
-export function parseDelugeLabelConf(filepath: string): DelugeLabelConf {
-	const lines = readFileSync(filepath).toString().split("\n");
-	lines.splice(0, 3);
-	lines[0] = "{";
-	return JSON.parse(lines.join("\n"));
 }
 
 function sanitizeTrackerUrls(urls: Buffer[]): string[] {
@@ -74,19 +57,6 @@ export function updateMetafileMetadata(
 	metafile: Metafile,
 	metadata: TorrentMetadata,
 ): void {
-	if (metadata.label) {
-		metafile.tags = [metadata.label.toString()];
-		return; // Deluge
-	}
-	if (metadata.custom1) {
-		metafile.tags = [metadata.custom1.toString()];
-		return; // rTorrent
-	}
-	if (metadata.labels) {
-		metafile.tags = metadata.labels.toString().split(",");
-		return; // Transmission
-	}
-	// qBittorrent
 	if (metadata["qBt-category"]) {
 		metafile.category = metadata["qBt-category"].toString();
 	}
