@@ -315,7 +315,10 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.needsTorrentDir,
 	)
 	.refine(
-		(config) => config.linkDir || config.matchMode === MatchMode.SAFE,
+		(config) =>
+			config.linkDir ||
+			config.matchMode === MatchMode.SAFE ||
+			config.action !== Action.INJECT,
 		ZodErrorMessages.needsLinkDir,
 	)
 	.refine((config) => {
