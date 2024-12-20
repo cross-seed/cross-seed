@@ -130,14 +130,15 @@ export async function getNewestFileAge(
 export async function getSearcheeNewestFileAge(
 	searchee: SearcheeWithoutInfoHash,
 ): Promise<number> {
-	if (!searchee.path) {
+	const { path } = searchee;
+	if (!path) {
 		return getNewestFileAge(searchee.files.map((file) => file.path));
 	}
-	const pathStat = statSync(searchee.path);
+	const pathStat = statSync(path);
 	if (pathStat.isFile()) return pathStat.mtimeMs;
 	return getNewestFileAge(
 		searchee.files.map((file) =>
-			getAbsoluteFilePath(searchee.path!, file.path, false),
+			getAbsoluteFilePath(path, file.path, false),
 		),
 	);
 }

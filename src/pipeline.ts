@@ -327,11 +327,10 @@ export async function searchForLocalTorrentByCriteria(
 	return totalFound;
 }
 
-async function pushSearcheesForCandidate(
+async function getSearcheesForCandidate(
 	candidate: Candidate,
-	searchees: SearcheeWithLabel[],
 	searcheeLabel: SearcheeLabel,
-): Promise<string | null> {
+): Promise<{ searchees: SearcheeWithLabel[]; method: string } | null> {
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	const { keys, metas } = await getSimilarTorrentsByName(candidate.name);
 	const method = keys.length ? `[${keys}]` : "Fuse fallback";
@@ -342,15 +341,13 @@ async function pushSearcheesForCandidate(
 		});
 		return null;
 	}
-	searchees.push(
-		...filterDupesFromSimilar(
-			metas
-				.map(createSearcheeFromMetafile)
-				.filter(isOk)
-				.map((r) => r.unwrap())
-				.map((searchee) => ({ ...searchee, label: searcheeLabel }))
-				.filter((searchee) => filterByContent(searchee)),
-		),
+	const searchees = filterDupesFromSimilar(
+		metas
+			.map(createSearcheeFromMetafile)
+			.filter(isOk)
+			.map((r) => r.unwrap())
+			.map((searchee) => ({ ...searchee, label: searcheeLabel }))
+			.filter((searchee) => filterByContent(searchee)),
 	);
 	if (!searchees.length) {
 		logger.verbose({
@@ -359,18 +356,18 @@ async function pushSearcheesForCandidate(
 		});
 		return null;
 	}
-	return method;
+	return { searchees, method };
 }
 
-async function pushEnsembleForCandidate(
+async function getEnsembleForCandidate(
 	candidate: Candidate,
-	searchees: SearcheeWithLabel[],
 	searcheeLabel: SearcheeLabel,
-): Promise<string | null> {
+): Promise<{ searchees: SearcheeWithLabel[]; method: string } | null> {
 	const { seasonFromEpisodes } = getRuntimeConfig();
 	if (!seasonFromEpisodes) return null;
 	const seasonKey = getSeasonKey(stripExtension(candidate.name));
 	if (!seasonKey) return null;
+	const method = "ensemble";
 
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	const { ensembleTitle, keyTitle, season } = seasonKey;
@@ -379,7 +376,7 @@ async function pushEnsembleForCandidate(
 	if (ensemble.length === 0) {
 		logger.verbose({
 			label: searcheeLabel,
-			message: `Did not find an ensemble ${ensembleTitle} for ${candidateLog}`,
+			message: `Did not find an ${method} ${ensembleTitle} for ${candidateLog}`,
 		});
 		return null;
 	}
@@ -393,7 +390,7 @@ async function pushEnsembleForCandidate(
 	if (files.length === 0) {
 		logger.verbose({
 			label: searcheeLabel,
-			message: `Did not find any files for ensemble ${ensembleTitle} for ${candidateLog}: sources may be incomplete or missing`,
+			message: `Did not find any files for ${method} ${ensembleTitle} for ${candidateLog}: sources may be incomplete or missing`,
 		});
 		return null;
 	}
@@ -411,19 +408,21 @@ async function pushEnsembleForCandidate(
 			return acc + avg;
 		}, 0),
 	);
-	searchees.push({
-		name: ensembleTitle,
-		title: ensembleTitle,
-		files: files,
-		length: totalLength,
-		mtimeMs: await getNewestFileAge(files.map((f) => f.path)),
-		label: searcheeLabel,
-	});
+	const searchees: SearcheeWithLabel[] = [
+		{
+			name: ensembleTitle,
+			title: ensembleTitle,
+			files: files,
+			length: totalLength,
+			mtimeMs: await getNewestFileAge(files.map((f) => f.path)),
+			label: searcheeLabel,
+		},
+	];
 	logger.verbose({
 		label: searcheeLabel,
-		message: `Using ensemble ${ensembleTitle} for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
+		message: `Using ${method} ${ensembleTitle} for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
 	});
-	return "ensemble";
+	return { searchees, method };
 }
 
 export async function checkNewCandidateMatch(
@@ -434,12 +433,19 @@ export async function checkNewCandidateMatch(
 	actionResult: ActionResult | null;
 }> {
 	const searchees: SearcheeWithLabel[] = [];
-
-	const methods = [
-		await pushSearcheesForCandidate(candidate, searchees, searcheeLabel),
-		await pushEnsembleForCandidate(candidate, searchees, searcheeLabel),
-	].filter(isTruthy);
+	const methods: string[] = [];
+	const lookup = await getSearcheesForCandidate(candidate, searcheeLabel);
+	if (lookup) {
+		searchees.push(...lookup.searchees);
+		methods.push(lookup.method);
+	}
+	const ensemble = await getEnsembleForCandidate(candidate, searcheeLabel);
+	if (ensemble) {
+		searchees.push(...ensemble.searchees);
+		methods.push(ensemble.method);
+	}
 	if (!searchees.length) return { decision: null, actionResult: null };
+
 	logger.verbose({
 		label: searcheeLabel,
 		message: `Unique entries [${searchees.map((m) => m.title)}] using ${formatAsList(methods, { sort: true })} for ${chalk.bold.white(candidate.name)} from ${candidate.tracker}`,
