@@ -7,6 +7,8 @@ import {
 	SEASON_REGEX,
 	SONARR_SUBFOLDERS_REGEX,
 	VIDEO_DISC_EXTENSIONS,
+	BlocklistType,
+	parseBlocklistEntry,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -139,12 +141,50 @@ export function findBlockedStringInReleaseMaybe(
 	blockList: string[],
 ): string | undefined {
 	return blockList.find((blockedStr) => {
-		return (
-			searchee.title.includes(blockedStr) ||
-			(searchee.path &&
-				basename(dirname(searchee.path)).includes(blockedStr)) ||
-			blockedStr === searchee.infoHash
-		);
+		const { blocklistType, blocklistValue } =
+			parseBlocklistEntry(blockedStr);
+		switch (blocklistType) {
+			case BlocklistType.NAME:
+				return searchee.title.includes(blocklistValue);
+			case BlocklistType.NAME_REGEX:
+				return new RegExp(blocklistValue).test(searchee.title);
+			case BlocklistType.FOLDER:
+				return (
+					searchee.path &&
+					dirname(searchee.path).includes(blocklistValue)
+				);
+			case BlocklistType.FOLDER_REGEX:
+				return (
+					searchee.path &&
+					new RegExp(blocklistValue).test(dirname(searchee.path))
+				);
+			case BlocklistType.CATEGORY:
+				return blocklistValue === searchee.category;
+			case BlocklistType.TAG:
+				return searchee.tags?.includes(blocklistValue);
+			case BlocklistType.TRACKER:
+				return searchee.trackers?.some((tier) =>
+					tier.some((url) => url === blocklistValue),
+				);
+			case BlocklistType.INFOHASH:
+				return blocklistValue === searchee.infoHash;
+			case BlocklistType.SIZE_BELOW:
+				return searchee.length < parseInt(blocklistValue);
+			case BlocklistType.SIZE_ABOVE:
+				return searchee.length > parseInt(blocklistValue);
+			case BlocklistType.LEGACY:
+				if (searchee.title.includes(blockedStr)) return true;
+				if (blocklistValue === searchee.infoHash) return true;
+				if (
+					searchee.path &&
+					dirname(searchee.path).includes(blockedStr)
+				) {
+					return true;
+				}
+				return false;
+			default:
+				throw new Error(`Unknown blocklist type: ${blockedStr}`);
+		}
 	});
 }
 

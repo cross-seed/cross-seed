@@ -3,6 +3,7 @@ import fs from "fs";
 import { zip } from "lodash-es";
 import ms from "ms";
 import { performAction, performActions } from "./action.js";
+import { getClient } from "./clients/TorrentClient.js";
 import {
 	ActionResult,
 	Decision,
@@ -419,8 +420,11 @@ export async function findAllSearchees(
 	const { torrents, dataDirs, torrentDir } = getRuntimeConfig();
 	const rawSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
+		const torrentInfos = (await getClient()?.getAllTorrents()) ?? [];
 		const searcheeResults = await Promise.all(
-			torrents.map(createSearcheeFromTorrentFile), // Also create searchee from path
+			torrents.map((torrent) =>
+				createSearcheeFromTorrentFile(torrent, torrentInfos),
+			),
 		);
 		rawSearchees.push(
 			...searcheeResults.filter(isOk).map((r) => r.unwrap()),

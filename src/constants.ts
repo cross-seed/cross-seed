@@ -210,6 +210,37 @@ export enum LinkType {
 	HARDLINK = "hardlink",
 }
 
+export enum BlocklistType {
+	NAME = "name",
+	NAME_REGEX = "nameRegex",
+	FOLDER = "folder",
+	FOLDER_REGEX = "folderRegex",
+	CATEGORY = "category",
+	TAG = "tag",
+	TRACKER = "tracker",
+	INFOHASH = "infoHash",
+	SIZE_BELOW = "sizeBelow",
+	SIZE_ABOVE = "sizeAbove",
+	LEGACY = "legacy",
+}
+const PARSE_BLOCKLIST_REGEX = /^(?<blocklistType>.+?):(?<blocklistValue>.+)$/;
+export function parseBlocklistEntry(blocklistEntry: string): {
+	blocklistType: BlocklistType;
+	blocklistValue: string;
+} {
+	const match = blocklistEntry.match(PARSE_BLOCKLIST_REGEX);
+	if (match?.groups) {
+		return {
+			blocklistType: match.groups.blocklistType as BlocklistType,
+			blocklistValue: match.groups.blocklistValue,
+		};
+	}
+	return {
+		blocklistType: BlocklistType.LEGACY,
+		blocklistValue: blocklistEntry,
+	};
+}
+
 export const IGNORED_FOLDERS_SUBSTRINGS = [
 	"sample",
 	"proof",

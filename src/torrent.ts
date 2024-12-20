@@ -1,9 +1,10 @@
-import { distance } from "fastest-levenshtein";
+import bencode from "bencode";
 import fs from "fs";
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
+import { getClient, TorrentMetadataInClient } from "./clients/TorrentClient.js";
 import {
 	LEVENSHTEIN_DIVISOR,
 	MediaType,
@@ -11,8 +12,9 @@ import {
 	USER_AGENT,
 } from "./constants.js";
 import { db } from "./db.js";
-import { logger, logOnce } from "./logger.js";
-import { Metafile } from "./parseTorrent.js";
+import { distance } from "fastest-levenshtein";
+import { Label, logger, logOnce } from "./logger.js";
+import { updateMetafileMetadata, Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -48,8 +50,48 @@ export enum SnatchError {
 export async function parseTorrentFromFilename(
 	filename: string,
 ): Promise<Metafile> {
-	const data = await readFile(filename);
-	return Metafile.decode(data);
+	return Metafile.decode(await readFile(filename));
+}
+
+export async function parseTorrentWithMetadata(
+	filename: string,
+	torrentInfos: TorrentMetadataInClient[],
+): Promise<Metafile> {
+	const meta = await parseTorrentFromFilename(filename);
+	const client = getClient();
+	if (client?.type === Label.QBITTORRENT) {
+		const fastResumePath = filename.replace(
+			extname(filename),
+			".fastresume",
+		);
+		if (fs.existsSync(fastResumePath)) {
+			updateMetafileMetadata(
+				meta,
+				bencode.decode(await readFile(fastResumePath)),
+			);
+			return meta;
+		} else {
+			logger.verbose(
+				`No .fastresume found at ${fastResumePath} from ${filename}, using client to get metadata without trackers`,
+			);
+		}
+	}
+	// All other clients keep trackers in their .torrent files
+	// Also fallback for qBittorrent if .fastresume is missing e.g cross-seed search --torrents ...
+	// Getting all trackers for qbit require individual torrent requests but we do have the first active one
+	const torrentInfo = torrentInfos.find((t) => t.infoHash === meta.infoHash);
+	if (torrentInfo) {
+		meta.category = torrentInfo.category;
+		meta.tags = torrentInfo.tags;
+		if (!meta.trackers.length && torrentInfo.trackers) {
+			meta.trackers = torrentInfo.trackers;
+		}
+	} else if (client) {
+		logger.verbose(
+			`No torrent info found for ${meta.infoHash} from ${filename}`,
+		);
+	}
+	return meta;
 }
 
 function isMagnetRedirectError(error: Error): boolean {
@@ -255,9 +297,16 @@ export async function loadTorrentDirLight(
 	const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
 
 	const searchees: SearcheeWithInfoHash[] = [];
+	const client = getClient();
+	const torrentInfos =
+		client && client.type !== Label.QBITTORRENT
+			? await client.getAllTorrents()
+			: [];
 	for (const torrentFilePath of torrentFilePaths) {
-		const searcheeResult =
-			await createSearcheeFromTorrentFile(torrentFilePath);
+		const searcheeResult = await createSearcheeFromTorrentFile(
+			torrentFilePath,
+			torrentInfos,
+		);
 		if (searcheeResult.isOk()) {
 			searchees.push(searcheeResult.unwrap());
 		}
@@ -331,14 +380,20 @@ export async function getSimilarTorrentsByName(
 			);
 		});
 	});
-
 	const keys = element
 		? keyTitles.map((keyTitle) => `${keyTitle}.${element}`)
 		: keyTitles;
+	if (!filteredEntries.length) return { keys, metas };
+
+	const client = getClient();
+	const torrentInfos =
+		client && client.type !== Label.QBITTORRENT
+			? await client.getAllTorrents()
+			: [];
 	metas.push(
 		...(await Promise.all(
 			filteredEntries.map(async (dbName) => {
-				return parseTorrentFromFilename(dbName.file_path);
+				return parseTorrentWithMetadata(dbName.file_path, torrentInfos);
 			}),
 		)),
 	);
@@ -371,7 +426,17 @@ export async function getTorrentByFuzzyName(name: string): Promise<Metafile[]> {
 		threshold: 0.25,
 	}).search(name);
 	if (potentialMatches.length === 0) return [];
-	return [await parseTorrentFromFilename(potentialMatches[0].item.file_path)];
+	const client = getClient();
+	const torrentInfos =
+		client && client.type !== Label.QBITTORRENT
+			? await client.getAllTorrents()
+			: [];
+	return [
+		await parseTorrentWithMetadata(
+			potentialMatches[0].item.file_path,
+			torrentInfos,
+		),
+	];
 }
 
 export async function getTorrentByCriteria(
@@ -387,5 +452,10 @@ export async function getTorrentByCriteria(
 		)}`;
 		throw new Error(message);
 	}
-	return parseTorrentFromFilename(findResult.file_path);
+	const client = getClient();
+	const torrentInfos =
+		client && client.type !== Label.QBITTORRENT
+			? await client.getAllTorrents()
+			: [];
+	return parseTorrentWithMetadata(findResult.file_path, torrentInfos);
 }

@@ -2,7 +2,7 @@ import bencode from "bencode";
 import { createHash } from "crypto";
 import { join } from "path";
 import { File, parseTitle } from "./searchee.js";
-import { fallback } from "./utils.js";
+import { fallback, isTruthy } from "./utils.js";
 
 interface TorrentDirent {
 	length: number;
@@ -23,9 +23,51 @@ interface Torrent {
 
 		private: number;
 	};
-	comment: Buffer | string;
-	announce: Buffer;
-	"announce-list": Buffer[][];
+	// qBittorrent only keeps info dict, everything else in fastresume
+	comment?: Buffer | string;
+	announce?: Buffer;
+	"announce-list"?: Buffer[][];
+}
+
+/**
+ * "Fastresume" for all clients. Used to get torrent info.
+ * qBittorrent: .fastresume, Transmission: .resume, rTorrent: .rtorrent
+ * Deluge doesn't store labels in fastresume, but in label.conf
+ */
+interface TorrentMetadata {
+	trackers?: Buffer[][];
+	"qBt-category"?: Buffer;
+	"qBt-tags"?: Buffer;
+}
+
+function sanitizeTrackerUrls(urls: Buffer[]): string[] {
+	const sanitizeTrackerUrl = (url: string) => {
+		try {
+			return new URL(url).host;
+		} catch {
+			return null;
+		}
+	};
+	return urls
+		.map((url) => sanitizeTrackerUrl(url.toString()))
+		.filter(isTruthy);
+}
+
+export function updateMetafileMetadata(
+	metafile: Metafile,
+	metadata: TorrentMetadata,
+): void {
+	if (metadata["qBt-category"]) {
+		metafile.category = metadata["qBt-category"].toString();
+	}
+	if (metadata["qBt-tags"]) {
+		metafile.tags = metadata["qBt-tags"].toString().split(",");
+	}
+	if (metadata.trackers) {
+		metafile.trackers = metadata.trackers.map((tier) =>
+			sanitizeTrackerUrls(tier),
+		);
+	}
 }
 
 function sumLength(sum: number, file: { length: number }): number {
@@ -54,6 +96,9 @@ export class Metafile {
 	pieceLength: number;
 	files: File[];
 	isSingleFileTorrent: boolean;
+	category?: string;
+	tags: string[];
+	trackers: string[][];
 	raw: Torrent;
 
 	constructor(raw: Torrent) {
@@ -112,6 +157,10 @@ export class Metafile {
 			this.isSingleFileTorrent = false;
 		}
 		this.title = parseTitle(this.name, this.files) ?? this.name;
+		this.tags = [];
+		this.trackers =
+			raw["announce-list"]?.map((tier) => sanitizeTrackerUrls(tier)) ??
+			(raw.announce ? [sanitizeTrackerUrls([raw.announce])] : []);
 	}
 
 	static decode(buf: Buffer) {
