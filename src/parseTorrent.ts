@@ -2,9 +2,8 @@ import bencode from "bencode";
 import { createHash } from "crypto";
 import { join } from "path";
 import { File, parseTitle } from "./searchee.js";
-import { fallback } from "./utils.js";
+import { fallback, isTruthy } from "./utils.js";
 import { readFileSync } from "fs";
-import { isOk, Result, resultOf, resultOfErr } from "./Result.js";
 
 interface TorrentDirent {
 	length: number;
@@ -58,12 +57,17 @@ export function parseDelugeLabelConf(filepath: string): DelugeLabelConf {
 	return JSON.parse(lines.join("\n"));
 }
 
-function sanitizeTrackerUrl(url: string): Result<string, Error> {
-	try {
-		return resultOf(new URL(url).host);
-	} catch (err) {
-		return resultOfErr(err);
-	}
+function sanitizeTrackerUrls(urls: Buffer[]): string[] {
+	const sanitizeTrackerUrl = (url: string) => {
+		try {
+			return new URL(url).host;
+		} catch {
+			return null;
+		}
+	};
+	return urls
+		.map((url) => sanitizeTrackerUrl(url.toString()))
+		.filter(isTruthy);
 }
 
 export function updateMetafileMetadata(
@@ -91,10 +95,7 @@ export function updateMetafileMetadata(
 	}
 	if (metadata.trackers) {
 		metafile.trackers = metadata.trackers.map((tier) =>
-			tier
-				.map((url) => sanitizeTrackerUrl(url.toString()))
-				.filter(isOk)
-				.map((r) => r.unwrap()),
+			sanitizeTrackerUrls(tier),
 		);
 	}
 }
@@ -188,19 +189,8 @@ export class Metafile {
 		this.title = parseTitle(this.name, this.files) ?? this.name;
 		this.tags = [];
 		this.trackers =
-			raw["announce-list"]?.map((tier) =>
-				tier
-					.map((url) => sanitizeTrackerUrl(url.toString()))
-					.filter(isOk)
-					.map((r) => r.unwrap()),
-			) ??
-			(raw.announce
-				? [
-						[sanitizeTrackerUrl(raw.announce.toString())]
-							.filter(isOk)
-							.map((r) => r.unwrap()),
-					]
-				: []);
+			raw["announce-list"]?.map((tier) => sanitizeTrackerUrls(tier)) ??
+			(raw.announce ? [sanitizeTrackerUrls([raw.announce])] : []);
 	}
 
 	static decode(buf: Buffer) {
