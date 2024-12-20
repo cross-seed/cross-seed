@@ -5,6 +5,8 @@ export interface RuntimeConfig {
 	torznab: string[];
 	dataDirs?: string[];
 	matchMode: MatchMode;
+	skipRecheck: boolean;
+	autoResumeMaxDownload: number;
 	linkDir?: string;
 	linkType: LinkType;
 	flatLinking: boolean;

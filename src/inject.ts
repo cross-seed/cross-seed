@@ -14,6 +14,7 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	isAnyMatchedDecision,
+	MatchMode,
 	MediaType,
 	SaveResult,
 	TORRENT_CACHE_FOLDER,
@@ -256,10 +257,11 @@ async function injectFromStalledTorrent({
 	injectionResult,
 	progress,
 	filePathLog,
-}: InjectionAftermath) {
+}: InjectionAftermath): Promise<boolean> {
 	let linkedNewFiles = false;
 	let inClient = (await getClient()!.isTorrentComplete(meta.infoHash)).isOk();
 	let injected = false;
+	const stalledDecision = Decision.MATCH_PARTIAL; // Should always be considered partial
 	for (const { searchee, decision } of matches) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
 			searchee,
@@ -278,7 +280,7 @@ async function injectFromStalledTorrent({
 				const result = await getClient()!.inject(
 					meta,
 					searchee,
-					Decision.MATCH_PARTIAL, // Should always be considered partial
+					stalledDecision,
 					destinationDir,
 				);
 				// result is only SUCCESS or FAILURE here but still log original injectionResult
@@ -310,6 +312,9 @@ async function injectFromStalledTorrent({
 				message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 			});
 			await getClient()!.recheckTorrent(meta.infoHash);
+			getClient()!.resumeInjection(meta.infoHash, stalledDecision, {
+				checkOnce: false,
+			});
 		} else {
 			logger.warn({
 				label: Label.INJECT,
@@ -317,6 +322,7 @@ async function injectFromStalledTorrent({
 			});
 		}
 	}
+	return injected;
 }
 
 async function injectionTorrentNotComplete(
@@ -352,6 +358,13 @@ async function injectionAlreadyExists({
 	matches,
 	filePathLog,
 }: InjectionAftermath) {
+	const { matchMode } = getRuntimeConfig();
+	const existsDecision =
+		matchMode === MatchMode.PARTIAL
+			? Decision.MATCH_PARTIAL
+			: matchMode === MatchMode.RISKY
+				? Decision.MATCH_SIZE_ONLY
+				: Decision.MATCH;
 	const result = await getClient()!.isTorrentComplete(meta.infoHash);
 	let isComplete = result.orElse(false);
 	const anyFullMatch = matches.some(
@@ -365,18 +378,29 @@ async function injectionAlreadyExists({
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
+		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+			checkOnce: false,
+		});
 	} else if (anyFullMatch && !isComplete) {
 		logger.info({
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files - ${chalk.green(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
+		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+			checkOnce: false,
+		});
 		isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
 	} else {
 		logger.warn({
 			label: Label.INJECT,
 			message: `${progress} Unable to inject ${filePathLog} - ${chalk.yellow(injectionResult)}${isComplete ? "" : " (incomplete)"}`,
 		});
+		if (!isComplete) {
+			getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+				checkOnce: true,
+			});
+		}
 	}
 	summary.ALREADY_EXISTS++;
 	summary.INCOMPLETE_CANDIDATES += isComplete ? 0 : 1;
@@ -521,7 +545,11 @@ async function injectSavedTorrent(
 	}
 }
 
-function logInjectSummary(summary: InjectSummary, flatLinking: boolean) {
+function logInjectSummary(
+	summary: InjectSummary,
+	flatLinking: boolean,
+	injectDir: string | undefined,
+) {
 	const incompleteMsg = `${chalk.bold.yellow(summary.ALREADY_EXISTS)} existed in client${
 		summary.INCOMPLETE_CANDIDATES
 			? chalk.dim(` (${summary.INCOMPLETE_CANDIDATES} were incomplete)`)
@@ -561,10 +589,12 @@ function logInjectSummary(summary: InjectSummary, flatLinking: boolean) {
 			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
 		});
 	}
-	logger.info({
-		label: Label.INJECT,
-		message: `Waiting on post-injection tasks to complete...`,
-	});
+	if (injectDir) {
+		logger.info({
+			label: Label.INJECT,
+			message: `Waiting on post-injection tasks to complete...`,
+		});
+	}
 }
 
 function createSummary(total: number): InjectSummary {
@@ -606,7 +636,7 @@ export async function injectSavedTorrents(): Promise<void> {
 		const progress = chalk.blue(`(${i + 1}/${torrentFilePaths.length})`);
 		await injectSavedTorrent(progress, torrentFilePath, summary, searchees);
 	}
-	logInjectSummary(summary, flatLinking);
+	logInjectSummary(summary, flatLinking, injectDir);
 }
 
 export async function restoreFromTorrentCache(): Promise<void> {
