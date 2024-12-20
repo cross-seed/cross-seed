@@ -173,12 +173,12 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 					);
 				}
 				break;
-			case BlocklistType.HASH:
+			case BlocklistType.INFOHASH:
 				if (!/^[a-z0-9]{40}$/i.test(blocklistValue)) {
 					addZodIssue(blockRaw, ZodErrorMessages.blocklistHash, ctx);
 				}
 				blockList[index] =
-					`${blocklistType}${blocklistValue.toLowerCase()}`;
+					`${blocklistType}:${blocklistValue.toLowerCase()}`;
 				break;
 			case BlocklistType.SIZE_BELOW: {
 				sizeBelow = sizeTest(blocklistValue, sizeBelow);
@@ -189,7 +189,7 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 				break;
 			}
 			default:
-				break;
+				addZodIssue(blockRaw, ZodErrorMessages.blocklistType, ctx);
 		}
 	}
 	if (sizeBelow && sizeAbove && sizeBelow > sizeAbove) {
