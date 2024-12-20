@@ -407,7 +407,10 @@ export function getReleaseGroup(stem: string): string | null {
 		: parsedGroupMatchString;
 }
 
-const logReason = (reason: string, options: { useFilters: boolean }): void => {
+const logEnsemble = (
+	reason: string,
+	options: { useFilters: boolean },
+): void => {
 	if (!options.useFilters) return;
 	logger.verbose({
 		label: Label.PREFILTER,
@@ -570,7 +573,7 @@ function createVirtualSeasonSearchee(
 		const highestEpisode = Math.max(...(episodes as number[]));
 		const availPct = episodes.length / highestEpisode;
 		if (options.useFilters && availPct < seasonFromEpisodes) {
-			logReason(
+			logEnsemble(
 				`Skipping virtual searchee for ${ensembleTitle} episodes as there's only ${episodes.length}/${highestEpisode} (${availPct.toFixed(2)} < ${seasonFromEpisodes.toFixed(2)})`,
 				options,
 			);
@@ -599,20 +602,20 @@ function createVirtualSeasonSearchee(
 	}
 	seasonSearchee.mtimeMs = newestFileAge;
 	if (seasonSearchee.files.length < minEpisodes) {
-		logReason(
+		logEnsemble(
 			`Skipping virtual searchee for ${ensembleTitle} episodes as only ${seasonSearchee.files.length} episode files were found (min: ${minEpisodes})`,
 			options,
 		);
 		return null;
 	}
 	if (options.useFilters && Date.now() - newestFileAge < ms("8 days")) {
-		logReason(
+		logEnsemble(
 			`Skipping virtual searchee for ${ensembleTitle} episodes as some are below the minimum age of 8 days: ${humanReadableDate(newestFileAge)}`,
 			options,
 		);
 		return null;
 	}
-	logReason(
+	logEnsemble(
 		`Created virtual searchee for ${ensembleTitle}: ${episodeSearchees.size} episodes - ${seasonSearchee.files.length} files - ${humanReadableSize(seasonSearchee.length)}`,
 		options,
 	);
@@ -625,7 +628,7 @@ export async function createEnsembleSearchees(
 ): Promise<SearcheeWithLabel[]> {
 	const { seasonFromEpisodes } = getRuntimeConfig();
 	if (!seasonFromEpisodes) return [];
-	logReason(`Creating virtual searchees for seasons...`, options);
+	logEnsemble(`Creating virtual searchees for seasons...`, options);
 
 	const { keyMap, ensembleTitleMap } = organizeEnsembleKeys(
 		allSearchees,
@@ -647,7 +650,7 @@ export async function createEnsembleSearchees(
 		);
 		if (seasonSearchee) seasonSearchees.push(seasonSearchee);
 	}
-	logReason(
+	logEnsemble(
 		`Created ${seasonSearchees.length} virtual season searchees...`,
 		options,
 	);
