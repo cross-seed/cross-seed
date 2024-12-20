@@ -15,7 +15,12 @@ import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { Searchee, SearcheeWithLabel } from "./searchee.js";
+import {
+	getSearcheeNewestFileAge,
+	Searchee,
+	SearcheeWithLabel,
+	SearcheeWithoutInfoHash,
+} from "./searchee.js";
 import { indexerDoesSupportMediaType } from "./torznab.js";
 import {
 	comparing,
@@ -262,7 +267,8 @@ type TimestampDataSql = {
 };
 
 export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
-	const { excludeOlder, excludeRecentSearch } = getRuntimeConfig();
+	const { excludeOlder, excludeRecentSearch, seasonFromEpisodes } =
+		getRuntimeConfig();
 	const enabledIndexers = await getEnabledIndexers();
 	const mediaType = getMediaType(searchee);
 	const timestampDataSql: TimestampDataSql = (await db("searchee")
@@ -300,6 +306,17 @@ export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
 
 	const { earliest_first_search, latest_first_search, earliest_last_search } =
 		timestampDataSql;
+	if (
+		seasonFromEpisodes &&
+		!searchee.infoHash &&
+		!searchee.path &&
+		earliest_last_search <
+			(await getSearcheeNewestFileAge(
+				searchee as SearcheeWithoutInfoHash,
+			))
+	) {
+		return true;
+	}
 
 	const skipBefore = excludeOlder
 		? nMsAgo(excludeOlder)

@@ -1,7 +1,8 @@
-import { readdirSync, statSync } from "fs";
 import { stat } from "fs/promises";
+import { existsSync, readdirSync, statSync } from "fs";
 import { basename, dirname, join, relative } from "path";
-import { TorrentMetadataInClient } from "./clients/TorrentClient.js";
+import ms from "ms";
+import { getClient, TorrentMetadataInClient } from "./clients/TorrentClient.js";
 import {
 	ANIME_GROUP_REGEX,
 	ANIME_REGEX,
@@ -19,6 +20,7 @@ import {
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 import { parseTorrentWithMetadata } from "./torrent.js";
 import {
 	createKeyTitle,
@@ -26,8 +28,12 @@ import {
 	filesWithExt,
 	getLogString,
 	hasExt,
+	humanReadableDate,
+	humanReadableSize,
 	isBadTitle,
+	stripExtension,
 	WithRequired,
+	WithUndefined,
 } from "./utils.js";
 
 export interface File {
@@ -45,11 +51,11 @@ export type SearcheeLabel =
 
 export interface Searchee {
 	/**
-	 * If searchee is torrent based
+	 * If searchee is torrent based, !infoHash && !path for virtual
 	 */
 	infoHash?: string;
 	/**
-	 * If searchee is data based
+	 * If searchee is data based, !infoHash && !path for virtual
 	 */
 	path?: string;
 	files: File[];
@@ -64,6 +70,7 @@ export interface Searchee {
 	 */
 	title: string;
 	length: number;
+	mtimeMs?: number;
 	category?: string;
 	tags?: string[];
 	trackers?: string[][];
@@ -71,6 +78,7 @@ export interface Searchee {
 }
 
 export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
+export type SearcheeWithoutInfoHash = WithUndefined<Searchee, "infoHash">;
 export type SearcheeWithLabel = WithRequired<Searchee, "label">;
 
 export function hasInfoHash(
@@ -99,16 +107,39 @@ export function getLargestFile(files: File[]): File {
 	return files.reduce((a, b) => (a.length > b.length ? a : b));
 }
 
-export async function getNewestFileAge(searchee: Searchee): Promise<number> {
-	if (searchee.infoHash || searchee.path) {
-		throw new Error("Only virtual searchees have absolute paths");
-	}
+export function getAbsoluteFilePath(
+	sourceRoot: string,
+	filePath: string,
+	sourceRootIsFileHint?: boolean,
+): string {
+	return sourceRootIsFileHint ?? statSync(sourceRoot).isFile()
+		? sourceRoot
+		: join(dirname(sourceRoot), filePath);
+}
+
+export async function getNewestFileAge(
+	absoluteFilePaths: string[],
+): Promise<number> {
 	return Math.max(
 		...(await Promise.all(
-			searchee.files.map((file) =>
-				stat(file.path).then((s) => s.mtimeMs),
-			),
+			absoluteFilePaths.map((file) => stat(file).then((s) => s.mtimeMs)),
 		)),
+	);
+}
+
+export async function getSearcheeNewestFileAge(
+	searchee: SearcheeWithoutInfoHash,
+): Promise<number> {
+	const { path } = searchee;
+	if (!path) {
+		return getNewestFileAge(searchee.files.map((file) => file.path));
+	}
+	const pathStat = statSync(path);
+	if (pathStat.isFile()) return pathStat.mtimeMs;
+	return getNewestFileAge(
+		searchee.files.map((file) =>
+			getAbsoluteFilePath(path, file.path, false),
+		),
 	);
 }
 
@@ -257,13 +288,16 @@ export async function createSearcheeFromPath(
 	const name = basename(root);
 	const title = parseTitle(name, files, root);
 	if (title) {
-		return resultOf({
-			files: files,
+		const searchee: SearcheeWithoutInfoHash = {
+			infoHash: undefined,
 			path: root,
+			files: files,
 			name,
 			title,
 			length: totalLength,
-		});
+		};
+		searchee.mtimeMs = await getSearcheeNewestFileAge(searchee);
+		return resultOf(searchee);
 	}
 	const msg = `Could not find title for ${root} in parent directory or child files`;
 	logger.verbose({
@@ -372,4 +406,255 @@ export function getReleaseGroup(stem: string): string | null {
 	return BAD_GROUP_PARSE_REGEX.test(parsedGroupMatchString)
 		? null
 		: parsedGroupMatchString;
+}
+
+const logEnsemble = (
+	reason: string,
+	options: { useFilters: boolean },
+): void => {
+	if (!options.useFilters) return;
+	logger.verbose({
+		label: Label.PREFILTER,
+		message: reason,
+	});
+};
+
+function parseEnsembleKeys(
+	searchee: SearcheeWithLabel,
+	keys: string[],
+	ensembleTitles: string[],
+	episode: number | string,
+	existingSeasonMap: Map<string, SearcheeWithLabel[]>,
+	keyMap: Map<string, Map<number | string, SearcheeWithLabel[]>>,
+	ensembleTitleMap: Map<string, string>,
+): void {
+	for (let i = 0; i < keys.length; i++) {
+		const key = keys[i];
+		if (existingSeasonMap.has(key)) continue;
+		if (!ensembleTitleMap.has(key)) {
+			ensembleTitleMap.set(key, ensembleTitles[i]);
+		}
+		const episodesMap = keyMap.get(key);
+		if (!episodesMap) {
+			keyMap.set(key, new Map([[episode, [searchee]]]));
+			continue;
+		}
+		const episodeSearchees = episodesMap.get(episode);
+		if (!episodeSearchees) {
+			episodesMap.set(episode, [searchee]);
+			continue;
+		}
+		episodeSearchees.push(searchee);
+	}
+}
+
+/**
+ * Organize episodes by {key: {episode: [searchee]}}
+ */
+function organizeEnsembleKeys(
+	allSearchees: SearcheeWithLabel[],
+	options: { useFilters: boolean },
+): {
+	keyMap: Map<string, Map<number | string, SearcheeWithLabel[]>>;
+	ensembleTitleMap: Map<string, string>;
+} {
+	const existingSeasonMap = new Map<string, SearcheeWithLabel[]>();
+	if (options.useFilters) {
+		for (const searchee of allSearchees) {
+			const stem = stripExtension(searchee.name);
+			const seasonKey = getSeasonKey(stem);
+			if (!seasonKey) continue;
+			const info = getKeyMetaInfo(stem);
+			const key = `${seasonKey.keyTitle}.${seasonKey.season}${info}`;
+			if (!existingSeasonMap.has(key)) {
+				existingSeasonMap.set(key, []);
+			}
+			existingSeasonMap.get(key)!.push(searchee);
+		}
+	}
+	const keyMap = new Map<string, Map<number | string, SearcheeWithLabel[]>>();
+	const ensembleTitleMap = new Map<string, string>();
+	for (const searchee of allSearchees) {
+		const stem = stripExtension(searchee.name);
+		const episodeKey = getEpisodeKey(stem);
+		if (episodeKey) {
+			const info = getKeyMetaInfo(stem);
+			const key = `${episodeKey.keyTitle}${episodeKey.season ? `.${episodeKey.season}` : ""}${info}`;
+			const ensembleTitle = `${episodeKey.ensembleTitle}${info}`;
+			parseEnsembleKeys(
+				searchee,
+				[key],
+				[ensembleTitle],
+				episodeKey.episode,
+				existingSeasonMap,
+				keyMap,
+				ensembleTitleMap,
+			);
+			if (options.useFilters) continue;
+		}
+		if (options.useFilters && SEASON_REGEX.test(stem)) continue;
+		const animeKeys = getAnimeKeys(stem);
+		if (animeKeys) {
+			const info = getKeyMetaInfo(stem);
+			const keys = animeKeys.keyTitles.map((k) => `${k}${info}`);
+			const ensembleTitles = animeKeys.ensembleTitles.map(
+				(t) => `${t}${info}`,
+			);
+			parseEnsembleKeys(
+				searchee,
+				keys,
+				ensembleTitles,
+				animeKeys.release,
+				existingSeasonMap,
+				keyMap,
+				ensembleTitleMap,
+			);
+			if (options.useFilters) continue;
+		}
+	}
+	return { keyMap, ensembleTitleMap };
+}
+
+function pushEnsembleEpisode(
+	searchee: SearcheeWithLabel,
+	episodeFiles: File[],
+	torrentSavePaths: Map<string, string>,
+): void {
+	let sourceRoot: string;
+	if (searchee.path) {
+		sourceRoot = searchee.path;
+	} else {
+		const savePath = torrentSavePaths.get(searchee.infoHash!);
+		if (!savePath) return;
+		sourceRoot = join(
+			savePath,
+			searchee.files.length === 1
+				? searchee.files[0].path
+				: searchee.name,
+		);
+	}
+	if (!existsSync(sourceRoot)) return;
+	const largestFile = getLargestFile(searchee.files);
+	if (largestFile.length / searchee.length < 0.5) return;
+	const absoluteFile: File = {
+		length: largestFile.length,
+		name: largestFile.name,
+		path: getAbsoluteFilePath(sourceRoot, largestFile.path),
+	};
+	if (!existsSync(absoluteFile.path)) return;
+
+	// Use the oldest file for episode if dupe (cross seeds)
+	const duplicateFile = episodeFiles.find(
+		(file) => file.length === absoluteFile.length,
+	);
+	if (duplicateFile) {
+		const dupeFileAge = statSync(duplicateFile.path).mtimeMs;
+		const newFileAge = statSync(absoluteFile.path).mtimeMs;
+		if (dupeFileAge <= newFileAge) return;
+		episodeFiles.splice(episodeFiles.indexOf(duplicateFile), 1);
+	}
+	episodeFiles.push(absoluteFile);
+}
+
+function createVirtualSeasonSearchee(
+	key: string,
+	episodeSearchees: Map<string | number, SearcheeWithLabel[]>,
+	ensembleTitleMap: Map<string, string>,
+	torrentSavePaths: Map<string, string>,
+	options: { useFilters: boolean },
+): SearcheeWithLabel | null {
+	const seasonFromEpisodes = getRuntimeConfig().seasonFromEpisodes!;
+	const minEpisodes = 3;
+	if (options.useFilters && episodeSearchees.size < minEpisodes) {
+		return null;
+	}
+	const ensembleTitle = ensembleTitleMap.get(key)!;
+	const episodes = Array.from(episodeSearchees.keys());
+	if (typeof episodes[0] === "number") {
+		const highestEpisode = Math.max(...(episodes as number[]));
+		const availPct = episodes.length / highestEpisode;
+		if (options.useFilters && availPct < seasonFromEpisodes) {
+			logEnsemble(
+				`Skipping virtual searchee for ${ensembleTitle} episodes as there's only ${episodes.length}/${highestEpisode} (${availPct.toFixed(2)} < ${seasonFromEpisodes.toFixed(2)})`,
+				options,
+			);
+			return null;
+		}
+	}
+	const seasonSearchee: SearcheeWithLabel = {
+		name: ensembleTitle,
+		title: ensembleTitle,
+		files: [], // Can have multiple files per episode
+		length: 0, // Total length of episodes (uses average for multi-file episodes)
+		label: episodeSearchees.values().next().value[0].label,
+	};
+	let newestFileAge = 0;
+	for (const [, searchees] of episodeSearchees) {
+		const episodeFiles: File[] = [];
+		for (const searchee of searchees) {
+			pushEnsembleEpisode(searchee, episodeFiles, torrentSavePaths);
+		}
+		if (episodeFiles.length === 0) continue;
+		const total = episodeFiles.reduce((a, b) => a + b.length, 0);
+		seasonSearchee.length += Math.round(total / episodeFiles.length);
+		seasonSearchee.files.push(...episodeFiles);
+		const fileAges = episodeFiles.map((f) => statSync(f.path).mtimeMs);
+		newestFileAge = Math.max(newestFileAge, ...fileAges);
+	}
+	seasonSearchee.mtimeMs = newestFileAge;
+	if (seasonSearchee.files.length < minEpisodes) {
+		logEnsemble(
+			`Skipping virtual searchee for ${ensembleTitle} episodes as only ${seasonSearchee.files.length} episode files were found (min: ${minEpisodes})`,
+			options,
+		);
+		return null;
+	}
+	if (options.useFilters && Date.now() - newestFileAge < ms("8 days")) {
+		logEnsemble(
+			`Skipping virtual searchee for ${ensembleTitle} episodes as some are below the minimum age of 8 days: ${humanReadableDate(newestFileAge)}`,
+			options,
+		);
+		return null;
+	}
+	logEnsemble(
+		`Created virtual searchee for ${ensembleTitle}: ${episodeSearchees.size} episodes - ${seasonSearchee.files.length} files - ${humanReadableSize(seasonSearchee.length)}`,
+		options,
+	);
+	return seasonSearchee;
+}
+
+export async function createEnsembleSearchees(
+	allSearchees: SearcheeWithLabel[],
+	options: { useFilters: boolean },
+): Promise<SearcheeWithLabel[]> {
+	const { seasonFromEpisodes } = getRuntimeConfig();
+	if (!seasonFromEpisodes) return [];
+	logEnsemble(`Creating virtual searchees for seasons...`, options);
+
+	const { keyMap, ensembleTitleMap } = organizeEnsembleKeys(
+		allSearchees,
+		options,
+	);
+	const torrentSavePaths = await getClient()!.getAllDownloadDirs({
+		metas: allSearchees.filter(hasInfoHash) as SearcheeWithInfoHash[],
+		onlyCompleted: false,
+	});
+
+	const seasonSearchees: SearcheeWithLabel[] = [];
+	for (const [key, episodeSearchees] of keyMap) {
+		const seasonSearchee = createVirtualSeasonSearchee(
+			key,
+			episodeSearchees,
+			ensembleTitleMap,
+			torrentSavePaths,
+			options,
+		);
+		if (seasonSearchee) seasonSearchees.push(seasonSearchee);
+	}
+	logEnsemble(
+		`Created ${seasonSearchees.length} virtual season searchees...`,
+		options,
+	);
+
+	return seasonSearchees;
 }

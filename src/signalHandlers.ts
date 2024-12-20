@@ -1,7 +1,8 @@
-import { db } from "./db.js";
+import { db, memDB } from "./db.js";
 
 async function exitGracefully() {
 	await db.destroy();
+	await memDB.destroy();
 	process.exit();
 }
 
