@@ -419,7 +419,7 @@ module.exports = {
 	 *
 	 * Each string must be prefixed with the type of block you want to use,
 	 * followed by a colon. Labels are considered tags.
-	 * "name:", "folder:", "category:", "tag:", "tracker:", "hash:", "sizeBelow:", "sizeAbove:"
+	 * "name:", "folder:", "category:", "tag:", "tracker:", "infoHash:", "sizeBelow:", "sizeAbove:"
 	 * Note that sizes are an integer for the number of bytes.
 	 * There are additional prefixes that take in a regex for more complex matching.
 	 * Read more: https://www.cross-seed.org/docs/basics/options#blocklist
@@ -436,7 +436,7 @@ module.exports = {
 		"category:icycool",
 		"tag:everybody",
 		"tracker:tracker.example.com:8080",
-		"hash:3317e6485454354751555555366a8308c1e92093",
+		"infoHash:3317e6485454354751555555366a8308c1e92093",
 		"sizeBelow:12345",
 		"sizeAbove:98765",
 	],
