@@ -142,7 +142,7 @@ export function findBlockedStringInReleaseMaybe(
 ): string | undefined {
 	return blockList.find((blockedStr) => {
 		const { blocklistType, blocklistValue } =
-			parseBlocklistEntry(blockedStr)!;
+			parseBlocklistEntry(blockedStr);
 		switch (blocklistType) {
 			case BlocklistType.NAME:
 				return searchee.title.includes(blocklistValue);
@@ -172,6 +172,16 @@ export function findBlockedStringInReleaseMaybe(
 				return searchee.length < parseInt(blocklistValue);
 			case BlocklistType.SIZE_ABOVE:
 				return searchee.length > parseInt(blocklistValue);
+			case BlocklistType.LEGACY:
+				if (searchee.title.includes(blockedStr)) return true;
+				if (blocklistValue === searchee.infoHash) return true;
+				if (
+					searchee.path &&
+					dirname(searchee.path).includes(blockedStr)
+				) {
+					return true;
+				}
+				return false;
 			default:
 				throw new Error(`Unknown blocklist type: ${blockedStr}`);
 		}

@@ -221,17 +221,23 @@ export enum BlocklistType {
 	INFOHASH = "infoHash",
 	SIZE_BELOW = "sizeBelow",
 	SIZE_ABOVE = "sizeAbove",
+	LEGACY = "legacy",
 }
 const PARSE_BLOCKLIST_REGEX = /^(?<blocklistType>.+?):(?<blocklistValue>.+)$/;
 export function parseBlocklistEntry(blocklistEntry: string): {
 	blocklistType: BlocklistType;
 	blocklistValue: string;
-} | null {
+} {
 	const match = blocklistEntry.match(PARSE_BLOCKLIST_REGEX);
-	if (!match?.groups) return null;
+	if (match?.groups) {
+		return {
+			blocklistType: match.groups.blocklistType as BlocklistType,
+			blocklistValue: match.groups.blocklistValue,
+		};
+	}
 	return {
-		blocklistType: match.groups.blocklistType as BlocklistType,
-		blocklistValue: match.groups.blocklistValue,
+		blocklistType: BlocklistType.LEGACY,
+		blocklistValue: blocklistEntry,
 	};
 }
 

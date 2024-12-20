@@ -140,12 +140,11 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 	let sizeBelow = 0;
 	let sizeAbove = 0;
 	for (const [index, blockRaw] of blockList.entries()) {
-		const entry = parseBlocklistEntry(blockRaw);
-		if (!entry) {
+		if (!blockRaw.trim().length) {
 			addZodIssue(blockRaw, ZodErrorMessages.blocklistType, ctx);
 			continue;
 		}
-		const { blocklistType, blocklistValue } = entry;
+		const { blocklistType, blocklistValue } = parseBlocklistEntry(blockRaw);
 		switch (blocklistType) {
 			case BlocklistType.NAME_REGEX:
 			case BlocklistType.FOLDER_REGEX:
@@ -186,6 +185,12 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 			}
 			case BlocklistType.SIZE_ABOVE: {
 				sizeAbove = sizeTest(blocklistValue, sizeAbove);
+				break;
+			}
+			case BlocklistType.LEGACY: {
+				logger.error(
+					`Legacy style blocklist is deprecated, specify a specific type followed by a colon (e.g infoHash:) for ${blockRaw}`,
+				);
 				break;
 			}
 			default:
