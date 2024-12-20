@@ -42,7 +42,7 @@ const ZodErrorMessages = {
 	fuzzySizeThresholdMax:
 		"fuzzySizeThreshold cannot be greater than 0.1 when using searchCadence or rssCadence.",
 	seasonFromEpisodesMin:
-		"seasonFromEpisodes cannot be less than 0.5 when using searchCadence",
+		"seasonFromEpisodes cannot be less than 0.5 when using searchCadence or rssCadence",
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
@@ -53,10 +53,9 @@ const ZodErrorMessages = {
 		"outputDir should only contain .torrent files, cross-seed will populate and manage (https://www.cross-seed.org/docs/basics/options#outputdir)",
 	needsTorrentDir:
 		"You need to set torrentDir for rss and announce matching to work.",
-	needsInject:
-		"You need to use the 'inject' action for partial matching or seasonFromEpisodes.",
+	needsInject: "You need to use the 'inject' action for seasonFromEpisodes.",
 	needsLinkDir:
-		"You need to set a linkDir (and have your data accessible) for risky/partial matching and seasonFromEpisodes to work.",
+		"When using action 'inject', you need to set a linkDir (and have your data accessible) for risky/partial matching and seasonFromEpisodes.",
 	linkDirInOtherDirs:
 		"You cannot have your linkDir inside of your torrentDir/dataDirs/outputDir. Please adjust your paths to correct this.",
 	dataDirsInOtherDirs:
@@ -434,8 +433,7 @@ export const VALIDATION_SCHEMA = z
 		(config) =>
 			process.env.DEV ||
 			config.action === Action.INJECT ||
-			(config.matchMode !== MatchMode.PARTIAL &&
-				!config.seasonFromEpisodes),
+			!config.seasonFromEpisodes,
 		ZodErrorMessages.needsInject,
 	)
 	.refine(
@@ -445,7 +443,9 @@ export const VALIDATION_SCHEMA = z
 	.refine(
 		(config) =>
 			config.linkDir ||
-			(config.matchMode === MatchMode.SAFE && !config.seasonFromEpisodes),
+			(!config.seasonFromEpisodes &&
+				(config.action === Action.SAVE ||
+					config.matchMode === MatchMode.SAFE)),
 		ZodErrorMessages.needsLinkDir,
 	)
 	.refine((config) => {
