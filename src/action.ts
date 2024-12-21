@@ -344,7 +344,10 @@ export async function performAction(
 ): Promise<{ actionResult: ActionResult; linkedNewFiles: boolean }> {
 	const { action, linkDir } = getRuntimeConfig();
 
-	if (action === Action.SAVE) {
+	if (
+		action === Action.SAVE ||
+		(!linkDir && !searchee.infoHash && !searchee.path)
+	) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 		logActionResult(SaveResult.SAVED, newMeta, searchee, tracker, decision);
 		return { actionResult: SaveResult.SAVED, linkedNewFiles: false };
