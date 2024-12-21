@@ -603,8 +603,8 @@ export default class Deluge implements TorrentClient {
 		}
 		return Object.entries(torrents).map(([hash, torrent]) => ({
 			infoHash: hash,
-			category: "",
-			tags: torrent.label ? [torrent.label] : [],
+			category: torrent.label ?? "",
+			tags: [],
 		}));
 	}
 
