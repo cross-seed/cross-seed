@@ -195,6 +195,10 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			fallback(fileConfig.seasonFromEpisodes, 1),
 		)
 		.option(
+			"--no-season-from-episodes",
+			"Don't match season packs from episode torrents",
+		)
+		.option(
 			"--fuzzy-size-threshold <decimal>",
 			"The size difference allowed to be considered a match.",
 			parseFloat,
