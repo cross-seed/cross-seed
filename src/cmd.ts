@@ -261,7 +261,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"-d, --delay <delay>",
 			"Pause duration (seconds) between searches",
 			parseFloat,
-			fallback(fileConfig.delay, 10),
+			fallback(fileConfig.delay, 30),
 		)
 		.option(
 			"--snatch-timeout <timeout>",
@@ -271,7 +271,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 		.option(
 			"--search-timeout <timeout>",
 			"Timeout for unresponsive searches",
-			fallback(fileConfig.searchTimeout, "30 seconds"),
+			fallback(fileConfig.searchTimeout, "2 minutes"),
 		)
 		.option(
 			"--search-limit <number>",

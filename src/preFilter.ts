@@ -75,7 +75,7 @@ export function filterByContent(
 	const blockedNote = findBlockedStringInReleaseMaybe(searchee, blockList);
 	if (blockedNote) {
 		logReason(
-			`it matched the blocklist - ("${blockedNote}")`,
+			`it matches the blocklist: ${blockedNote}`,
 			searchee,
 			mediaType,
 		);

@@ -120,11 +120,11 @@ export function getAbsoluteFilePath(
 export async function getNewestFileAge(
 	absoluteFilePaths: string[],
 ): Promise<number> {
-	return Math.max(
-		...(await Promise.all(
+	return (
+		await Promise.all(
 			absoluteFilePaths.map((file) => stat(file).then((s) => s.mtimeMs)),
-		)),
-	);
+		)
+	).reduce((a, b) => Math.max(a, b), 0);
 }
 
 export async function getSearcheeNewestFileAge(

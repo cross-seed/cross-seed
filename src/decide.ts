@@ -119,10 +119,10 @@ function logDecision(
 			reason = `it has a different source: ${parseSource(searchee.title)} -> ${parseSource(candidate.name)}`;
 			break;
 		case Decision.BLOCKED_RELEASE:
-			reason = `it matches the blocklist: "${
+			reason = `it matches the blocklist: ${
 				findBlockedStringInReleaseMaybe(searchee, blockList) ??
 				findBlockedStringInReleaseMaybe(metafile!, blockList)
-			}"`;
+			}`;
 			break;
 		default:
 			reason = decision;
