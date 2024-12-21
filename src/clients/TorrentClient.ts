@@ -16,7 +16,7 @@ import {
 } from "../constants.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { wait } from "../utils.js";
+import { formatAsList, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
@@ -110,12 +110,26 @@ export async function validateSavePaths(
 	}
 	if (!linkDir) return;
 
+	const removedSavePaths = new Set<string>();
 	for (const searchee of searchees) {
 		if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
-			infoHashPathMap.delete(searchee.infoHash);
+			if (infoHashPathMap.has(searchee.infoHash)) {
+				removedSavePaths.add(infoHashPathMap.get(searchee.infoHash)!);
+				infoHashPathMap.delete(searchee.infoHash);
+			}
 		}
 	}
-	for (const savePath of new Set(infoHashPathMap.values())) {
+	const uniqueSavePaths = new Set(infoHashPathMap.values());
+	const ignoredSavePaths = Array.from(removedSavePaths).filter(
+		(savePath) => !uniqueSavePaths.has(savePath),
+	);
+	if (ignoredSavePaths.length) {
+		logger.verbose(
+			`Excluded save paths from linking test due to blockList: ${formatAsList(ignoredSavePaths, { sort: true, type: "unit" })}`,
+		);
+	}
+
+	for (const savePath of uniqueSavePaths) {
 		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
 			throw new CrossSeedError(
 				`Cannot use linkDir with cross platform cross-seed and torrent client: ${savePath}`,
