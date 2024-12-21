@@ -53,7 +53,6 @@ const ZodErrorMessages = {
 		"outputDir should only contain .torrent files, cross-seed will populate and manage (https://www.cross-seed.org/docs/basics/options#outputdir)",
 	needsTorrentDir:
 		"You need to set torrentDir for rss and announce matching to work.",
-	needsInject: "You need to use the 'inject' action for seasonFromEpisodes.",
 	needsLinkDir:
 		"When using action 'inject', you need to set a linkDir (and have your data accessible) for risky/partial matching and seasonFromEpisodes.",
 	linkDirInOtherDirs:
@@ -434,22 +433,14 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.injectUrl,
 	)
 	.refine(
-		(config) =>
-			process.env.DEV ||
-			config.action === Action.INJECT ||
-			!config.seasonFromEpisodes,
-		ZodErrorMessages.needsInject,
-	)
-	.refine(
 		(config) => config.torrentDir || !config.rssCadence,
 		ZodErrorMessages.needsTorrentDir,
 	)
 	.refine(
 		(config) =>
 			config.linkDir ||
-			(!config.seasonFromEpisodes &&
-				(config.action === Action.SAVE ||
-					config.matchMode === MatchMode.SAFE)),
+			config.matchMode === MatchMode.SAFE ||
+			config.action === Action.SAVE,
 		ZodErrorMessages.needsLinkDir,
 	)
 	.refine((config) => {
