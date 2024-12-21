@@ -291,7 +291,7 @@ module.exports = {
 	/**
 	 * Match season packs from the individual episodes you already have.
 	 *
-	 * undefined or null - disabled
+	 * null - disabled
 	 * 1 - must have all episodes
 	 * 0.8 - must have at least 80% of the episodes
 	 */
