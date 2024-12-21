@@ -27,7 +27,7 @@ const ZodErrorMessages = {
 	emptyString:
 		"cannot have an empty string. If you want to unset it, use null or undefined.",
 	delayNegative: "delay is in seconds, you can't travel back in time.",
-	delayUnsupported: `delay must be 30 seconds to 1 hour.${NEWLINE_INDENT}To even out search loads please see the following documentation:${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/daemon#set-up-periodic-searches)`,
+	delayUnsupported: `delay must be 30 seconds to 1 hour.${NEWLINE_INDENT}To even out search loads please see the following documentation:${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options#delay)`,
 	rssCadenceUnsupported: "rssCadence must be 10-120 minutes",
 	searchCadenceUnsupported: "searchCadence must be at least 1 day.",
 	searchCadenceExcludeRecent:
