@@ -112,7 +112,14 @@ export async function validateSavePaths(
 
 	const removedSavePaths = new Set<string>();
 	for (const searchee of searchees) {
-		if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
+		const blockedString = findBlockedStringInReleaseMaybe(
+			searchee,
+			blockList,
+		);
+		if (blockedString) {
+			logger.info(
+				`Blocked torrent: ${searchee.name} [${searchee.infoHash}] (${blockedString})`,
+			);
 			if (infoHashPathMap.has(searchee.infoHash)) {
 				removedSavePaths.add(infoHashPathMap.get(searchee.infoHash)!);
 				infoHashPathMap.delete(searchee.infoHash);
@@ -124,7 +131,7 @@ export async function validateSavePaths(
 		(savePath) => !uniqueSavePaths.has(savePath),
 	);
 	if (ignoredSavePaths.length) {
-		logger.verbose(
+		logger.info(
 			`Excluded save paths from linking test due to blockList: ${formatAsList(ignoredSavePaths, { sort: true, type: "unit" })}`,
 		);
 	}
