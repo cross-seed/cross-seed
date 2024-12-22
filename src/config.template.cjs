@@ -418,7 +418,8 @@ module.exports = {
 	 * which must be entered on the one line. Leave as undefined to disable.
 	 *
 	 * Each string must be prefixed with the type of block you want to use,
-	 * followed by a colon. Labels are considered tags.
+	 * followed by a colon. Labels are considered as category: for deluge and rTorrent,
+	 * and as tag: for transmission.
 	 * "name:", "folder:", "category:", "tag:", "tracker:", "infoHash:", "sizeBelow:", "sizeAbove:"
 	 * Note that sizes are an integer for the number of bytes.
 	 * There are additional prefixes that take in a regex for more complex matching.
