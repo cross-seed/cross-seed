@@ -433,6 +433,34 @@ export const VALIDATION_SCHEMA = z
 			),
 		ZodErrorMessages.injectUrl,
 	)
+	.refine((config) => {
+		if (
+			(config.delugeRpcUrl || config.rtorrentRpcUrl) &&
+			config.blockList.some((b) => b.startsWith(`${BlocklistType.TAG}:`))
+		) {
+			logger.error(
+				`${BlocklistType.TAG}: blocklisting is deprecated for this client, please use ${BlocklistType.CATEGORY}: instead (all ${BlocklistType.TAG}: blocklist items has being automatically converted to ${BlocklistType.CATEGORY}:).`,
+			);
+			config.blockList = config.blockList.map((b) => {
+				if (b.startsWith(`${BlocklistType.TAG}:`)) {
+					return b.replace(BlocklistType.TAG, BlocklistType.CATEGORY);
+				}
+				return b;
+			});
+		}
+		if (
+			config.transmissionRpcUrl &&
+			config.blockList.some((b) =>
+				b.startsWith(`${BlocklistType.CATEGORY}:`),
+			)
+		) {
+			logger.error(
+				`Transmission does not support ${BlocklistType.CATEGORY}: blocklisting, use ${BlocklistType.TAG}: instead for labels.`,
+			);
+			return false;
+		}
+		return true;
+	})
 	.refine(
 		(config) =>
 			process.env.DEV ||
