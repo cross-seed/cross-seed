@@ -289,7 +289,7 @@ export async function cacheEnsembleEntry(
 
 export async function indexNewTorrents(): Promise<void> {
 	const { seasonFromEpisodes, torrentDir } = getRuntimeConfig();
-	if (typeof torrentDir !== "string") return;
+	if (!torrentDir) return;
 
 	const dirContents = new Set(await findAllTorrentFilesInDir(torrentDir));
 
@@ -342,7 +342,7 @@ export async function indexNewTorrents(): Promise<void> {
 export async function indexEnsemble(): Promise<void> {
 	const { seasonFromEpisodes, torrentDir } = getRuntimeConfig();
 	if (!seasonFromEpisodes) return;
-	if (typeof torrentDir !== "string") return;
+	if (!torrentDir) return;
 	logger.info("Indexing torrents for ensemble lookup...");
 
 	const tableExists = await memDB.schema.hasTable("ensemble");

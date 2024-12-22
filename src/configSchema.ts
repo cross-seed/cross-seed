@@ -53,8 +53,14 @@ const ZodErrorMessages = {
 		"outputDir should only contain .torrent files, cross-seed will populate and manage (https://www.cross-seed.org/docs/basics/options#outputdir)",
 	needsTorrentDir:
 		"You need to set torrentDir for rss and announce matching to work.",
-	needsLinkDir:
-		"When using action 'inject', you need to set a linkDir (and have your data accessible) for risky/partial matching and seasonFromEpisodes.",
+	matchModeNeedsLinkDir:
+		"When using action 'inject', you need to set a linkDir (and have your data accessible) for risky and partial matchMode.",
+	ensembleNeedsClient:
+		"seasonFromEpisodes requires a torrent client to connect to when using torrentDir.",
+	ensembleNeedsLinkDir:
+		"When using action 'inject', you need to set a linkDir (and have your data accessible) for seasonFromEpisodes. Set seasonFromEpisodes to null to disable.",
+	ensembleNeedsPartial:
+		"seasonFromEpisodes requires matchMode partial if enabled and value is below 1.",
 	linkDirInOtherDirs:
 		"You cannot have your linkDir inside of your torrentDir/dataDirs/outputDir. Please adjust your paths to correct this.",
 	dataDirsInOtherDirs:
@@ -65,8 +71,6 @@ const ZodErrorMessages = {
 		"You cannot have your outputDir inside of your torrentDir/dataDirs/linkDir. Please adjust your paths to correct this.",
 	relativePaths:
 		"Absolute paths for torrentDir, linkDir, dataDirs, and outputDir are recommended.",
-	needsPartial:
-		"seasonFromEpisodes requires matchMode partial if enabled and value is below 1.",
 };
 
 /**
@@ -441,14 +445,34 @@ export const VALIDATION_SCHEMA = z
 			config.linkDir ||
 			config.matchMode === MatchMode.SAFE ||
 			config.action === Action.SAVE,
-		ZodErrorMessages.needsLinkDir,
+		ZodErrorMessages.matchModeNeedsLinkDir,
 	)
+	.refine(
+		(config) =>
+			!config.seasonFromEpisodes ||
+			!config.torrentDir ||
+			config.qbittorrentUrl ||
+			config.delugeRpcUrl ||
+			config.transmissionRpcUrl ||
+			config.rtorrentRpcUrl,
+		ZodErrorMessages.ensembleNeedsClient,
+	)
+	.refine((config) => {
+		if (!config.seasonFromEpisodes) return true;
+		if (config.action === Action.SAVE) {
+			logger.warn(
+				"Using action 'save' with seasonFromEpisodes is not recommended as these matches are extremely complicated, you will need to run 'cross-seed inject' to add to client.",
+			);
+			return true;
+		}
+		return config.linkDir;
+	}, ZodErrorMessages.ensembleNeedsLinkDir)
 	.refine((config) => {
 		if (config.seasonFromEpisodes && config.seasonFromEpisodes < 1) {
 			return config.matchMode === MatchMode.PARTIAL;
 		}
 		return true;
-	}, ZodErrorMessages.needsPartial)
+	}, ZodErrorMessages.ensembleNeedsPartial)
 	.refine((config) => {
 		if (!config.linkDir) return true;
 		if (isChildPath(config.linkDir, [config.outputDir])) return false;
