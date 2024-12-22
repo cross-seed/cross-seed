@@ -458,10 +458,15 @@ export default class RTorrent implements TorrentClient {
 			return infoHashes.map((hash, index) => ({
 				infoHash: hash.toLowerCase(),
 				category: "",
-				tags: response[index][0].length
-					? (response[index] as string[])
-					: [],
-			}));
+				tags:
+					(response[index] as string[]).length !== 1
+						? response[index]
+						: response[index][0].length
+							? decodeURIComponent(response[index][0])
+									.split(",")
+									.map((tag) => tag.trim())
+							: [],
+			})) as TorrentMetadataInClient[];
 		} catch (e) {
 			logger.error({
 				Label: Label.RTORRENT,

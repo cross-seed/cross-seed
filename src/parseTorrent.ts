@@ -97,7 +97,7 @@ export class Metafile {
 	files: File[];
 	isSingleFileTorrent: boolean;
 	category?: string;
-	tags: string[];
+	tags?: string[];
 	trackers: string[][];
 	raw: Torrent;
 
@@ -157,7 +157,6 @@ export class Metafile {
 			this.isSingleFileTorrent = false;
 		}
 		this.title = parseTitle(this.name, this.files) ?? this.name;
-		this.tags = [];
 		this.trackers =
 			raw["announce-list"]?.map((tier) => sanitizeTrackerUrls(tier)) ??
 			(raw.announce ? [sanitizeTrackerUrls([raw.announce])] : []);

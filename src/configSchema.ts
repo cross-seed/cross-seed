@@ -27,7 +27,7 @@ const ZodErrorMessages = {
 	emptyString:
 		"cannot have an empty string. If you want to unset it, use null or undefined.",
 	delayNegative: "delay is in seconds, you can't travel back in time.",
-	delayUnsupported: `delay must be 30 seconds to 1 hour.${NEWLINE_INDENT}To even out search loads please see the following documentation:${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/daemon#set-up-periodic-searches)`,
+	delayUnsupported: `delay must be 30 seconds to 1 hour.${NEWLINE_INDENT}To even out search loads please see the following documentation:${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options#delay)`,
 	rssCadenceUnsupported: "rssCadence must be 10-120 minutes",
 	searchCadenceUnsupported: "searchCadence must be at least 1 day.",
 	searchCadenceExcludeRecent:
@@ -157,6 +157,8 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 		}
 		const { blocklistType, blocklistValue } = parseBlocklistEntry(blockRaw);
 		switch (blocklistType) {
+			case BlocklistType.NAME:
+				break;
 			case BlocklistType.FOLDER:
 				if (/[/\\]/.test(blocklistValue)) {
 					addZodIssue(
@@ -172,6 +174,20 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 					new RegExp(blocklistValue);
 				} catch (e) {
 					addZodIssue(blockRaw, ZodErrorMessages.blocklistRegex, ctx);
+				}
+				break;
+			case BlocklistType.CATEGORY:
+				if (blocklistValue.length === 0) {
+					logger.info(
+						`Blocklisting all torrents without a category due to empty ${blockRaw}`,
+					);
+				}
+				break;
+			case BlocklistType.TAG:
+				if (blocklistValue.length === 0) {
+					logger.info(
+						`Blocklisting all torrents without a tag due to empty ${blockRaw}`,
+					);
 				}
 				break;
 			case BlocklistType.TRACKER:
@@ -204,10 +220,6 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 				);
 				break;
 			}
-			case BlocklistType.NAME:
-			case BlocklistType.CATEGORY:
-			case BlocklistType.TAG:
-				break;
 			default:
 				addZodIssue(blockRaw, ZodErrorMessages.blocklistType, ctx);
 		}
@@ -436,6 +448,34 @@ export const VALIDATION_SCHEMA = z
 			),
 		ZodErrorMessages.injectUrl,
 	)
+	.refine((config) => {
+		if (
+			config.delugeRpcUrl &&
+			config.blockList.some((b) => b.startsWith(`${BlocklistType.TAG}:`))
+		) {
+			logger.error(
+				`${BlocklistType.TAG}: blocklisting is deprecated for Deluge, please use ${BlocklistType.CATEGORY}: instead (all ${BlocklistType.TAG}: blocklist items has being automatically converted to ${BlocklistType.CATEGORY}:).`,
+			);
+			config.blockList = config.blockList.map((b) => {
+				if (b.startsWith(`${BlocklistType.TAG}:`)) {
+					return b.replace(BlocklistType.TAG, BlocklistType.CATEGORY);
+				}
+				return b;
+			});
+		}
+		if (
+			config.transmissionRpcUrl &&
+			config.blockList.some((b) =>
+				b.startsWith(`${BlocklistType.CATEGORY}:`),
+			)
+		) {
+			logger.error(
+				`Transmission does not support ${BlocklistType.CATEGORY}: blocklisting, use ${BlocklistType.TAG}: instead for labels.`,
+			);
+			return false;
+		}
+		return true;
+	})
 	.refine(
 		(config) => config.torrentDir || !config.rssCadence,
 		ZodErrorMessages.needsTorrentDir,

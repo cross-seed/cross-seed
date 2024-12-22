@@ -223,7 +223,7 @@ export enum BlocklistType {
 	SIZE_ABOVE = "sizeAbove",
 	LEGACY = "legacy",
 }
-const PARSE_BLOCKLIST_REGEX = /^(?<blocklistType>.+?):(?<blocklistValue>.+)$/;
+const PARSE_BLOCKLIST_REGEX = /^(?<blocklistType>.+?):(?<blocklistValue>.*)$/;
 export function parseBlocklistEntry(blocklistEntry: string): {
 	blocklistType: BlocklistType;
 	blocklistValue: string;
