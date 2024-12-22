@@ -635,10 +635,11 @@ export async function createEnsembleSearchees(
 		allSearchees,
 		options,
 	);
-	const torrentSavePaths = await getClient()!.getAllDownloadDirs({
-		metas: allSearchees.filter(hasInfoHash) as SearcheeWithInfoHash[],
-		onlyCompleted: false,
-	});
+	const torrentSavePaths =
+		(await getClient()?.getAllDownloadDirs({
+			metas: allSearchees.filter(hasInfoHash) as SearcheeWithInfoHash[],
+			onlyCompleted: false,
+		})) ?? new Map();
 
 	const seasonSearchees: SearcheeWithLabel[] = [];
 	for (const [key, episodeSearchees] of keyMap) {

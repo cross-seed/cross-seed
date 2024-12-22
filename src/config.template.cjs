@@ -208,6 +208,7 @@ module.exports = {
 	 * We recommend reading the following FAQ entry:
 	 * https://www.cross-seed.org/docs/basics/options#matchmode
 	 * https://www.cross-seed.org/docs/tutorials/linking#hardlinks-vs-symlinks
+	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
 	 */
 	matchMode: "safe",
 
@@ -215,13 +216,14 @@ module.exports = {
 	 * Skip rechecking on injection if unnecessary. Certain matches will
 	 * always be rechecked such as: partial, data based, and disc files.
 	 * Set to false to recheck all torrents before resuming, usually unnecessary.
-	 * Torrents will be resumed regardless of this setting.
+	 * Torrents will be resumed regardless of this setting per autoResumeMaxDownload.
 	 */
 	skipRecheck: true,
 
 	/**
 	 * The maximum size in bytes remaining for a torrent to be resumed.
 	 * Must be in the range of 0 to 52428800 (50 MiB).
+	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
 	 */
 	autoResumeMaxDownload: 52428800,
 
@@ -290,6 +292,7 @@ module.exports = {
 
 	/**
 	 * Match season packs from the individual episodes you already have.
+	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
 	 *
 	 * null - disabled
 	 * 1 - must have all episodes

@@ -66,7 +66,7 @@ async function checkConfigPaths(): Promise<void> {
 	let pathFailure: number = 0;
 
 	if (
-		typeof torrentDir === "string" &&
+		torrentDir &&
 		!(await verifyPath(torrentDir, "torrentDir", READ_ONLY))
 	) {
 		pathFailure++;

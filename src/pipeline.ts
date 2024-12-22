@@ -522,7 +522,7 @@ export async function findAllSearchees(
 			...searcheeResults.filter(isOk).map((r) => r.unwrap()),
 		);
 	} else {
-		if (typeof torrentDir === "string") {
+		if (torrentDir) {
 			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
 		}
 		if (Array.isArray(dataDirs)) {

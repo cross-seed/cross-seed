@@ -192,7 +192,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"--season-from-episodes <decimal>",
 			"Match season packs from episode torrents",
 			parseFloat,
-			fallback(fileConfig.seasonFromEpisodes, 1),
+			fallback(fileConfig.seasonFromEpisodes, null),
 		)
 		.option(
 			"--no-season-from-episodes",
