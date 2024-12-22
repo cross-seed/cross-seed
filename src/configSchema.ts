@@ -447,11 +447,11 @@ export const VALIDATION_SCHEMA = z
 	)
 	.refine((config) => {
 		if (
-			(config.delugeRpcUrl || config.rtorrentRpcUrl) &&
+			config.delugeRpcUrl &&
 			config.blockList.some((b) => b.startsWith(`${BlocklistType.TAG}:`))
 		) {
 			logger.error(
-				`${BlocklistType.TAG}: blocklisting is deprecated for this client, please use ${BlocklistType.CATEGORY}: instead (all ${BlocklistType.TAG}: blocklist items has being automatically converted to ${BlocklistType.CATEGORY}:).`,
+				`${BlocklistType.TAG}: blocklisting is deprecated for Deluge, please use ${BlocklistType.CATEGORY}: instead (all ${BlocklistType.TAG}: blocklist items has being automatically converted to ${BlocklistType.CATEGORY}:).`,
 			);
 			config.blockList = config.blockList.map((b) => {
 				if (b.startsWith(`${BlocklistType.TAG}:`)) {
