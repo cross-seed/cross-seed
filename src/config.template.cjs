@@ -405,43 +405,8 @@ module.exports = {
 	searchLimit: 400,
 
 	/**
-	 * The list of infohashes, categories, tags, labels, tracker urls, sizes, folders, and substrings
-	 * of names you want to be excluded from cross-seed.
-	 *
-	 * IMPORTANT: The tracker urls are NOT the same as the website,
-	 * you need to look at the url in client which may be different.
-	 * If the announce url is https://user:pass@tracker.example.com:8080/announce/key,
-	 * you must use "tracker:tracker.example.com:8080".
-	 *
-	 * This is the same format as torznab, surround the entire set of
-	 * quoted strings in square brackets. You can use any combination
-	 * which must be entered on the one line. Leave as undefined to disable.
-	 *
-	 * Each string must be prefixed with the type of block you want to use,
-	 * followed by a colon. Labels are considered as category: for deluge and rTorrent,
-	 * and as tag: for transmission.
-	 * "name:", "folder:", "category:", "tag:", "tracker:", "infoHash:", "sizeBelow:", "sizeAbove:"
-	 * Note that sizes are an integer for the number of bytes.
-	 * There are additional prefixes that take in a regex for more complex matching.
-	 * Read more: https://www.cross-seed.org/docs/basics/options#blocklist
-	 *
-	 * examples:
-	 *
-	blockList: [
-		"name:Release.Name",
-		"name:-excludedGroup",
-		"name:x265",
-		"nameRegex:[Rr]elease[.\s][Nn]ame",
-		"folder:folderName",
-		"folderRegex:folder\d+",
-		"category:icycool",
-		"tag:everybody",
-		"tracker:tracker.example.com:8080",
-		"infoHash:3317e6485454354751555555366a8308c1e92093",
-		"sizeBelow:12345",
-		"sizeAbove:98765",
-	],
-	 * 
+	 * Ignore torrents or data containing these properties:
+	 * https://www.cross-seed.org/docs/basics/options#blocklist
 	 */
 	blockList: [],
 };

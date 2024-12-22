@@ -487,7 +487,7 @@ export default class QBittorrent implements TorrentClient {
 		return torrents.map((torrent) => ({
 			infoHash: torrent.hash,
 			category: torrent.category,
-			tags: torrent.tags.split(","),
+			tags: torrent.tags.length ? torrent.tags.split(",") : [],
 			trackers: torrent.tracker.length ? [[torrent.tracker]] : undefined,
 		}));
 	}

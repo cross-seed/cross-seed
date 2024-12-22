@@ -154,6 +154,8 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 		}
 		const { blocklistType, blocklistValue } = parseBlocklistEntry(blockRaw);
 		switch (blocklistType) {
+			case BlocklistType.NAME:
+				break;
 			case BlocklistType.FOLDER:
 				if (/[/\\]/.test(blocklistValue)) {
 					addZodIssue(
@@ -169,6 +171,20 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 					new RegExp(blocklistValue);
 				} catch (e) {
 					addZodIssue(blockRaw, ZodErrorMessages.blocklistRegex, ctx);
+				}
+				break;
+			case BlocklistType.CATEGORY:
+				if (blocklistValue.length === 0) {
+					logger.info(
+						`Blocklisting all torrents without a category due to empty ${blockRaw}`,
+					);
+				}
+				break;
+			case BlocklistType.TAG:
+				if (blocklistValue.length === 0) {
+					logger.info(
+						`Blocklisting all torrents without a tag due to empty ${blockRaw}`,
+					);
 				}
 				break;
 			case BlocklistType.TRACKER:
@@ -201,10 +217,6 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 				);
 				break;
 			}
-			case BlocklistType.NAME:
-			case BlocklistType.CATEGORY:
-			case BlocklistType.TAG:
-				break;
 			default:
 				addZodIssue(blockRaw, ZodErrorMessages.blocklistType, ctx);
 		}

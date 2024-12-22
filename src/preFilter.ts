@@ -166,7 +166,10 @@ export function findBlockedStringInReleaseMaybe(
 			case BlocklistType.CATEGORY:
 				return blocklistValue === searchee.category;
 			case BlocklistType.TAG:
-				return searchee.tags?.includes(blocklistValue);
+				if (!searchee.tags) return false; // Data based or snatched metafile
+				return blocklistValue.length
+					? searchee.tags.includes(blocklistValue)
+					: !searchee.tags.length;
 			case BlocklistType.TRACKER:
 				return searchee.trackers?.some((tier) =>
 					tier.some((url) => url === blocklistValue),
