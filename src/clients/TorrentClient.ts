@@ -170,7 +170,6 @@ export function shouldRecheck(
 	const { skipRecheck } = getRuntimeConfig();
 	if (!skipRecheck) return true;
 	if (decision === Decision.MATCH_PARTIAL) return true;
-	if (!searchee.infoHash) return true;
 	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
 	return false; // Skip for MATCH | MATCH_SIZE_ONLY
 }
