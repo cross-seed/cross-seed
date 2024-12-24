@@ -213,10 +213,8 @@ module.exports = {
 	matchMode: "safe",
 
 	/**
-	 * Skip rechecking on injection if unnecessary. Certain matches will
-	 * always be rechecked such as: partial, data based, and disc files.
-	 * Set to false to recheck all torrents before resuming, usually unnecessary.
-	 * Torrents will be resumed regardless of this setting per autoResumeMaxDownload.
+	 * Skip rechecking on injection if unnecessary. Certain matches, such as partial,
+	 * will always be rechecked. Set to false to recheck all torrents before resuming.
 	 */
 	skipRecheck: true,
 
