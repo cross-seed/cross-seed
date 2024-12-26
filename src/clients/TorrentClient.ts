@@ -134,7 +134,7 @@ export async function validateSavePaths(
 	for (const savePath of uniqueSavePaths) {
 		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
 			throw new CrossSeedError(
-				`Cannot use linkDir with cross platform cross-seed and torrent client: ${savePath}`,
+				`Cannot use linkDir with cross platform cross-seed and torrent client, please run cross-seed in docker or natively to match your torrent client (https://www.cross-seed.org/docs/basics/managing-the-daemon): ${savePath}`,
 			);
 		}
 		try {
@@ -170,7 +170,6 @@ export function shouldRecheck(
 	const { skipRecheck } = getRuntimeConfig();
 	if (!skipRecheck) return true;
 	if (decision === Decision.MATCH_PARTIAL) return true;
-	if (!searchee.infoHash) return true;
 	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
 	return false; // Skip for MATCH | MATCH_SIZE_ONLY
 }

@@ -197,13 +197,17 @@ module.exports = {
 	flatLinking: false,
 
 	/**
-	 * Determines flexibility of naming during matching.
+	 * Determines flexibility of naming during matching, all options will have
+	 * no false positives. Using partial can double the amount of cross seeds found.
+	 * Options: "safe", "risky", "partial".
+	 *
 	 * "safe" will allow only perfect name/size matches using the standard
 	 * matching algorithm.
+	 *
 	 * "risky" uses filesize as its only comparison point.
+	 *
 	 * "partial" is like risky but allows matches if they are missing small
 	 * files like .nfo/.srt.
-	 * Options: "safe", "risky", "partial".
 	 *
 	 * We recommend reading the following FAQ entry:
 	 * https://www.cross-seed.org/docs/basics/options#matchmode
@@ -213,10 +217,8 @@ module.exports = {
 	matchMode: "safe",
 
 	/**
-	 * Skip rechecking on injection if unnecessary. Certain matches will
-	 * always be rechecked such as: partial, data based, and disc files.
-	 * Set to false to recheck all torrents before resuming, usually unnecessary.
-	 * Torrents will be resumed regardless of this setting per autoResumeMaxDownload.
+	 * Skip rechecking on injection if unnecessary. Certain matches, such as partial,
+	 * will always be rechecked. Set to false to recheck all torrents before resuming.
 	 */
 	skipRecheck: true,
 

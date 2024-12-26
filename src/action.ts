@@ -402,7 +402,7 @@ export async function performAction(
 	logActionResult(result, newMeta, searchee, tracker, decision);
 	if (result === InjectionResult.SUCCESS) {
 		// cross-seed may need to process these with the inject job
-		if (shouldRecheck(searchee, decision)) {
+		if (shouldRecheck(searchee, decision) || !searchee.infoHash) {
 			await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
 		}
 	} else if (result !== InjectionResult.ALREADY_EXISTS) {
