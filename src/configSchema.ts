@@ -513,30 +513,45 @@ export const VALIDATION_SCHEMA = z
 		}
 		return true;
 	})
-	.refine(
-		(config) =>
+	.refine((config) => {
+		if (
 			!config.blockList.some(
 				(b) =>
 					b.startsWith(`${BlocklistType.CATEGORY}:`) ||
 					b.startsWith(`${BlocklistType.TAG}:`) ||
 					b.startsWith(`${BlocklistType.TRACKER}:`),
-			) ||
-			(config.torrentDir &&
+			)
+		) {
+			return true;
+		}
+		if (
+			!(
+				config.torrentDir &&
 				(config.qbittorrentUrl ||
 					config.delugeRpcUrl ||
 					config.transmissionRpcUrl ||
-					config.rtorrentRpcUrl)),
-		ZodErrorMessages.blocklistNeedsClient,
-	)
-	.refine(
-		(config) =>
+					config.rtorrentRpcUrl)
+			)
+		) {
+			logger.error(ZodErrorMessages.blocklistNeedsClient);
+		}
+		return true;
+	}, ZodErrorMessages.blocklistNeedsClient)
+	.refine((config) => {
+		if (
 			!config.blockList.some(
 				(b) =>
 					b.startsWith(`${BlocklistType.FOLDER}:`) ||
 					b.startsWith(`${BlocklistType.FOLDER_REGEX}:`),
-			) || config.dataDirs?.length,
-		ZodErrorMessages.blocklistNeedsDataDirs,
-	)
+			)
+		) {
+			return true;
+		}
+		if (!config.dataDirs?.length) {
+			logger.error(ZodErrorMessages.blocklistNeedsDataDirs);
+		}
+		return true;
+	}, ZodErrorMessages.blocklistNeedsDataDirs)
 	.refine(
 		(config) => config.torrentDir || !config.rssCadence,
 		ZodErrorMessages.needsTorrentDir,
