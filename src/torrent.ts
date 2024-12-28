@@ -1,6 +1,6 @@
 import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
-import fs from "fs";
+import fs, { existsSync } from "fs";
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
@@ -16,10 +16,12 @@ import { db, memDB } from "./db.js";
 import { Label, logger, logOnce } from "./logger.js";
 import { updateMetafileMetadata, Metafile } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
-import { Result, resultOf, resultOfErr } from "./Result.js";
+import { isOk, Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
+	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
+	File,
 	getAbsoluteFilePath,
 	getAnimeKeys,
 	getEpisodeKey,
@@ -27,8 +29,10 @@ import {
 	getMovieKey,
 	getSeasonKey,
 	SearcheeWithInfoHash,
+	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import { createKeyTitle, stripExtension } from "./utils.js";
+import { getDataByFuzzyName, indexDataDirs } from "./dataFiles.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -47,6 +51,12 @@ export enum SnatchError {
 	MAGNET_LINK = "MAGNET_LINK",
 	INVALID_CONTENTS = "INVALID_CONTENTS",
 	UNKNOWN_ERROR = "UNKNOWN_ERROR",
+}
+
+export interface EnsembleEntry {
+	path: string;
+	ensemble: string;
+	element: string | number;
 }
 
 export async function parseTorrentFromFilename(
@@ -236,34 +246,42 @@ export async function findAllTorrentFilesInDir(
 		.map((fn) => resolve(join(torrentDir, fn)));
 }
 
-export async function cacheEnsembleEntry(
-	meta: Metafile,
-	torrentSavePaths?: Map<string, string>,
-): Promise<void> {
-	const episodeKey = getEpisodeKey(stripExtension(meta.name));
-	if (!episodeKey) return;
-
+export async function createEnsemblePieces(
+	title: string,
+	files: File[],
+): Promise<{
+	key: string;
+	element: string | number;
+	largestFile: File;
+} | null> {
+	const episodeKey = getEpisodeKey(stripExtension(title));
+	if (!episodeKey) return null;
 	const { keyTitle, season, episode } = episodeKey;
 	const key = `${keyTitle}${season ? `.${season}` : ""}`;
 	const element = episode;
-	const largestFile = getLargestFile(meta.files);
-	const entryExists = await memDB("ensemble")
-		.select("id")
-		.where({ ensemble: key, element, length: largestFile.length })
-		.first();
-	if (entryExists) return;
+	const largestFile = getLargestFile(files);
+	return { key, element, largestFile };
+}
+
+async function cacheEnsembleTorrentEntry(
+	meta: Metafile,
+	torrentSavePaths?: Map<string, string>,
+): Promise<EnsembleEntry | null> {
+	const ensemblePieces = await createEnsemblePieces(meta.title, meta.files);
+	if (!ensemblePieces) return null;
+	const { key, element, largestFile } = ensemblePieces;
 
 	let savePath: string | undefined;
 	if (!torrentSavePaths) {
 		const downloadDirResult = await getClient()!.getDownloadDir(meta, {
 			onlyCompleted: false,
 		});
-		if (downloadDirResult.isErr()) return;
+		if (downloadDirResult.isErr()) return null;
 		savePath = downloadDirResult.unwrap();
 	} else {
 		savePath = torrentSavePaths.get(meta.infoHash);
 	}
-	if (!savePath) return;
+	if (!savePath) return null;
 
 	// Don't want to statSync(sourceRoot).isFile() now as it might be downloading.
 	// The path will get checked when rss/announce has a potential match.
@@ -271,29 +289,25 @@ export async function cacheEnsembleEntry(
 		savePath,
 		meta.files.length === 1 ? meta.files[0].path : meta.name,
 	);
-	await memDB("ensemble")
-		.insert({
-			ensemble: key,
-			element,
-			name: largestFile.name,
-			absolute_path: getAbsoluteFilePath(
-				sourceRoot,
-				largestFile.path,
-				meta.files.length === 1,
-			),
-			length: largestFile.length,
-		})
-		.onConflict("absolute_path")
-		.ignore();
+	return {
+		path: getAbsoluteFilePath(
+			sourceRoot,
+			largestFile.path,
+			meta.files.length === 1,
+		),
+		ensemble: key,
+		element,
+	};
 }
 
-export async function indexNewTorrents(): Promise<void> {
+async function indexNewTorrents(): Promise<void> {
 	const { seasonFromEpisodes, torrentDir } = getRuntimeConfig();
 	if (!torrentDir) return;
 
 	const dirContents = new Set(await findAllTorrentFilesInDir(torrentDir));
 
 	// Index new torrents in the torrentDir
+	let firstNewTorrent = true;
 	for (const filepath of dirContents) {
 		const doesAlreadyExist = await db("torrent")
 			.select("id")
@@ -301,6 +315,10 @@ export async function indexNewTorrents(): Promise<void> {
 			.first();
 
 		if (!doesAlreadyExist) {
+			if (firstNewTorrent) {
+				logger.verbose("Indexing torrentDir due to recent changes...");
+				firstNewTorrent = false;
+			}
 			let meta: Metafile;
 			try {
 				meta = await parseTorrentFromFilename(filepath);
@@ -320,7 +338,10 @@ export async function indexNewTorrents(): Promise<void> {
 				.onConflict("file_path")
 				.ignore();
 			if (seasonFromEpisodes) {
-				cacheEnsembleEntry(meta);
+				await memDB("ensemble")
+					.insert(cacheEnsembleTorrentEntry(meta))
+					.onConflict("path")
+					.ignore();
 			}
 		}
 	}
@@ -332,9 +353,10 @@ export async function indexNewTorrents(): Promise<void> {
 		(filePath) => !dirContents.has(filePath),
 	);
 
-	const batchSize = 1000;
+	const batchSize = 100;
 	for (let i = 0; i < filesToDelete.length; i += batchSize) {
 		const batch = filesToDelete.slice(i, i + batchSize);
+		if (!batch.length) break;
 		await db("torrent").whereIn("file_path", batch).del();
 	}
 }
@@ -342,21 +364,18 @@ export async function indexNewTorrents(): Promise<void> {
 export async function indexEnsemble(): Promise<void> {
 	const { seasonFromEpisodes, torrentDir } = getRuntimeConfig();
 	if (!seasonFromEpisodes) return;
-	if (!torrentDir) return;
-	logger.info("Indexing torrents for ensemble lookup...");
 
 	const tableExists = await memDB.schema.hasTable("ensemble");
 	if (!tableExists) {
 		await memDB.schema.createTable("ensemble", (table) => {
-			table.increments("id").primary();
+			table.string("path").primary();
 			table.string("ensemble");
 			table.string("element");
-			table.string("name");
-			table.string("absolute_path").unique();
-			table.integer("length");
 		});
 	}
+	if (!torrentDir) return;
 
+	logger.info("Indexing ensemble for reverse lookup...");
 	const dirContents = await findAllTorrentFilesInDir(torrentDir);
 	const metas: Metafile[] = [];
 	for (const filepath of dirContents) {
@@ -376,9 +395,29 @@ export async function indexEnsemble(): Promise<void> {
 		metas,
 		onlyCompleted: false,
 	});
-	await Promise.allSettled(
-		metas.map((meta) => cacheEnsembleEntry(meta, torrentSavePaths)),
-	);
+	const ensembleRows = (
+		await Promise.allSettled(
+			metas.map((meta) =>
+				cacheEnsembleTorrentEntry(meta, torrentSavePaths),
+			),
+		)
+	).reduce<EnsembleEntry[]>((acc, result) => {
+		if (result.status === "fulfilled" && result.value) {
+			acc.push(result.value);
+		}
+		return acc;
+	}, []);
+	const batchSize = 100;
+	for (let i = 0; i < ensembleRows.length; i += batchSize) {
+		const batch = ensembleRows.slice(i, i + batchSize);
+		if (!batch.length) break;
+		await memDB("ensemble").insert(batch).onConflict("path").ignore();
+	}
+}
+
+export async function indexTorrentsAndDataDirs(): Promise<void> {
+	await indexNewTorrents();
+	await indexDataDirs();
 }
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {
@@ -444,68 +483,105 @@ function getKeysFromName(name: string): {
 	return { keyTitles: [], useFallback: true };
 }
 
-export async function getSimilarTorrentsByName(
-	name: string,
-): Promise<{ keys: string[]; metas: Metafile[] }> {
+export async function getSimilarByName(name: string): Promise<{
+	keys: string[];
+	metas: Metafile[];
+	dataSearchees: SearcheeWithoutInfoHash[];
+}> {
+	const { torrentDir, dataDirs } = getRuntimeConfig();
 	const { keyTitles, element, useFallback } = getKeysFromName(name);
 	const metas = useFallback ? await getTorrentByFuzzyName(name) : [];
+	const dataSearchees = useFallback ? await getDataByFuzzyName(name) : [];
 	if (!keyTitles.length) {
-		return { keys: [], metas };
+		return { keys: [], metas, dataSearchees };
 	}
 	const candidateMaxDistance = Math.floor(
 		Math.max(...keyTitles.map((keyTitle) => keyTitle.length)) /
 			LEVENSHTEIN_DIVISOR,
 	);
 
-	const allEntries: { name: string; file_path: string }[] = await db(
-		"torrent",
-	).select("name", "file_path");
-	const filteredEntries = allEntries.filter((dbName) => {
-		const entry = getKeysFromName(dbName.name);
-		if (entry.element !== element) return false;
-		if (!entry.keyTitles.length) return false;
-		const maxDistance = Math.max(
-			candidateMaxDistance,
-			Math.floor(
-				Math.max(
-					...entry.keyTitles.map((keyTitle) => keyTitle.length),
-				) / LEVENSHTEIN_DIVISOR,
-			),
-		);
-		return entry.keyTitles.some((dbKeyTitle) => {
-			return keyTitles.some(
-				(keyTitle) => distance(keyTitle, dbKeyTitle) <= maxDistance,
+	const filterEntries = async (
+		dbEntries: { name?: string; title?: string }[],
+	) => {
+		return dbEntries.filter((dbEntry) => {
+			const entry = getKeysFromName(dbEntry.name ?? dbEntry.title!);
+			if (entry.element !== element) return false;
+			if (!entry.keyTitles.length) return false;
+			const maxDistance = Math.max(
+				candidateMaxDistance,
+				Math.floor(
+					Math.max(
+						...entry.keyTitles.map((keyTitle) => keyTitle.length),
+					) / LEVENSHTEIN_DIVISOR,
+				),
 			);
+			return entry.keyTitles.some((dbKeyTitle) => {
+				return keyTitles.some(
+					(keyTitle) => distance(keyTitle, dbKeyTitle) <= maxDistance,
+				);
+			});
 		});
+	};
+
+	const filteredTorrentEntries = (await filterEntries(
+		torrentDir ? await db("torrent").select("name", "file_path") : [],
+	)) as { name: string; file_path: string }[];
+	if (filteredTorrentEntries.length) {
+		const client = getClient();
+		const torrentInfos =
+			client && client.type !== Label.QBITTORRENT
+				? await client.getAllTorrents()
+				: [];
+		metas.push(
+			...(
+				await Promise.allSettled(
+					filteredTorrentEntries.map(async (dbTorrent) => {
+						return parseTorrentWithMetadata(
+							dbTorrent.file_path,
+							torrentInfos,
+						);
+					}),
+				)
+			)
+				.filter((p) => p.status === "fulfilled")
+				.map((p) => p.value),
+		);
+	}
+
+	const entriesToDelete: string[] = [];
+	const filteredDataEntries = (
+		(await filterEntries(dataDirs ? await memDB("data") : [])) as {
+			title: string;
+			path: string;
+		}[]
+	).filter(({ path }) => {
+		if (existsSync(path)) return true;
+		entriesToDelete.push(path);
+		return false;
 	});
+	if (entriesToDelete.length > 0) {
+		await memDB("data").whereIn("path", entriesToDelete).del();
+	}
+	if (filteredDataEntries.length) {
+		dataSearchees.push(
+			...(
+				await Promise.all(
+					filteredDataEntries.map(async (dbData) => {
+						return createSearcheeFromPath(dbData.path);
+					}),
+				)
+			)
+				.filter(isOk)
+				.map((r) => r.unwrap()),
+		);
+	}
 	const keys = element
 		? keyTitles.map((keyTitle) => `${keyTitle}.${element}`)
 		: keyTitles;
-	if (!filteredEntries.length) return { keys, metas };
-
-	const client = getClient();
-	const torrentInfos =
-		client && client.type !== Label.QBITTORRENT
-			? await client.getAllTorrents()
-			: [];
-	metas.push(
-		...(
-			await Promise.allSettled(
-				filteredEntries.map(async (dbName) => {
-					return parseTorrentWithMetadata(
-						dbName.file_path,
-						torrentInfos,
-					);
-				}),
-			)
-		)
-			.filter((r) => r.status === "fulfilled")
-			.map((r) => r.value),
-	);
-	return { keys, metas };
+	return { keys, metas, dataSearchees };
 }
 
-export async function getTorrentByFuzzyName(name: string): Promise<Metafile[]> {
+async function getTorrentByFuzzyName(name: string): Promise<Metafile[]> {
 	const allNames: { name: string; file_path: string }[] = await db(
 		"torrent",
 	).select("name", "file_path");
@@ -516,7 +592,6 @@ export async function getTorrentByFuzzyName(name: string): Promise<Metafile[]> {
 	if (fullMatch) {
 		filteredNames = allNames.filter((dbName) => {
 			const dbMatch = createKeyTitle(dbName.name);
-			if (!dbMatch) return false;
 			return fullMatch === dbMatch;
 		});
 	}

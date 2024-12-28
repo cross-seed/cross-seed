@@ -19,9 +19,9 @@ import {
 	checkNewCandidateMatch,
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
-import { indexNewTorrents, TorrentLocator } from "./torrent.js";
+import { indexTorrentsAndDataDirs, TorrentLocator } from "./torrent.js";
 import { formatAsList, sanitizeInfoHash } from "./utils.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 const ANNOUNCE_SCHEMA = z
 	.object({
@@ -154,7 +154,7 @@ async function search(
 		message: `Received search request: ${criteriaStr}`,
 	});
 
-	await indexNewTorrents();
+	await indexTorrentsAndDataDirs();
 
 	try {
 		let numFound: number | null = null;
@@ -220,11 +220,11 @@ async function announce(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	const { dataDirs, torrentDir } = getRuntimeConfig();
 	/**
 	 * processes matching a new candidate provided via /api/announce
 	 * to local torrent based on provided criteria
 	 */
-	const { torrentDir } = getRuntimeConfig();
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -260,10 +260,12 @@ async function announce(
 	const candidate = data as Candidate;
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	try {
-		if (!torrentDir) {
-			throw new Error("Announce requires torrentDir");
+		if (!torrentDir && !dataDirs?.length) {
+			throw new Error(
+				`Announce requires at least one of torrentDir (recommended) or dataDirs to be set`,
+			);
 		}
-		await indexNewTorrents();
+		await indexTorrentsAndDataDirs();
 		const result = await checkNewCandidateMatch(candidate, Label.ANNOUNCE);
 		if (!result.decision) {
 			res.writeHead(204);

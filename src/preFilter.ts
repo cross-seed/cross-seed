@@ -86,6 +86,7 @@ export function filterByContent(
 		(!includeEpisodes || !includeSingleEpisodes) &&
 		searchee.path &&
 		searchee.files.length === 1 &&
+		[Label.SEARCH, Label.WEBHOOK].includes(searchee.label) &&
 		(SEASON_REGEX.test(basename(dirname(searchee.path))) ||
 			SONARR_SUBFOLDERS_REGEX.test(basename(dirname(searchee.path))))
 	) {

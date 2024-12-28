@@ -124,7 +124,7 @@ export async function getNewestFileAge(
 		await Promise.all(
 			absoluteFilePaths.map((file) => stat(file).then((s) => s.mtimeMs)),
 		)
-	).reduce((a, b) => Math.max(a, b), 0);
+	).reduce((a, b) => Math.max(a, b));
 }
 
 export async function getSearcheeNewestFileAge(
@@ -158,7 +158,7 @@ function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {
 	}
 }
 
-function getFilesFromDataRoot(rootPath: string): File[] {
+export function getFilesFromDataRoot(rootPath: string): File[] {
 	const parentDir = dirname(rootPath);
 	try {
 		return getFileNamesFromRootRec(rootPath).map((file) => ({
@@ -270,7 +270,7 @@ export async function createSearcheeFromTorrentFile(
 
 export async function createSearcheeFromPath(
 	root: string,
-): Promise<Result<Searchee, Error>> {
+): Promise<Result<SearcheeWithoutInfoHash, Error>> {
 	const files = getFilesFromDataRoot(root);
 	if (files.length === 0) {
 		const msg = `Failed to retrieve files in ${root}`;
@@ -280,7 +280,7 @@ export async function createSearcheeFromPath(
 		});
 		return resultOfErr(new Error(msg));
 	}
-	const totalLength = files.reduce<number>(
+	const totalLength = files.reduce(
 		(runningTotal, file) => runningTotal + file.length,
 		0,
 	);
