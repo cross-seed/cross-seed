@@ -18,11 +18,14 @@ import { formatAsList } from "./utils.js";
  */
 const ZodErrorMessages = {
 	blocklistType: `Blocklist item does not start with a valid prefix. Must be of ${formatAsList(Object.values(BlocklistType), { sort: false, style: "narrow", type: "unit" })}`,
+	blocklistEmptyValue: `Blocklist item must have a value after the colon.`,
 	blocklistRegex: `Blocklist regex is not a valid regex.`,
 	blocklistFolder: `Blocklist folder must not contain path separators`,
 	blocklistTracker: `Blocklist tracker is not a valid URL host. If URL is https://user:pass@tracker.example.com:8080/announce/key, you must use "tracker:tracker.example.com:8080"`,
 	blocklistHash: `Blocklist hash must be 40 characters and alphanumeric`,
 	blocklistSize: `Blocklist size must be an integer for the number of bytes. You can only have one sizeBelow, one sizeAbove, and sizeBelow <= sizeAbove.`,
+	blocklistNeedsClient: `Blocklist ${BlocklistType.CATEGORY}:, ${BlocklistType.TAG}:, and ${BlocklistType.TRACKER}: requires torrentDir and a torrent client to connect to.`,
+	blocklistNeedsDataDirs: `Blocklist ${BlocklistType.FOLDER}: and ${BlocklistType.FOLDER_REGEX}: only applies to searchees from dataDirs.`,
 	vercel: "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
 	emptyString:
 		"cannot have an empty string. If you want to unset it, use null or undefined.",
@@ -158,8 +161,22 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 		const { blocklistType, blocklistValue } = parseBlocklistEntry(blockRaw);
 		switch (blocklistType) {
 			case BlocklistType.NAME:
+				if (blocklistValue.length === 0) {
+					addZodIssue(
+						blockRaw,
+						ZodErrorMessages.blocklistEmptyValue,
+						ctx,
+					);
+				}
 				break;
 			case BlocklistType.FOLDER:
+				if (blocklistValue.length === 0) {
+					addZodIssue(
+						blockRaw,
+						ZodErrorMessages.blocklistEmptyValue,
+						ctx,
+					);
+				}
 				if (/[/\\]/.test(blocklistValue)) {
 					addZodIssue(
 						blockRaw,
@@ -170,6 +187,13 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 				break;
 			case BlocklistType.NAME_REGEX:
 			case BlocklistType.FOLDER_REGEX:
+				if (blocklistValue.length === 0) {
+					addZodIssue(
+						blockRaw,
+						ZodErrorMessages.blocklistEmptyValue,
+						ctx,
+					);
+				}
 				try {
 					new RegExp(blocklistValue);
 				} catch (e) {
@@ -191,6 +215,13 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 				}
 				break;
 			case BlocklistType.TRACKER:
+				if (blocklistValue.length === 0) {
+					addZodIssue(
+						blockRaw,
+						ZodErrorMessages.blocklistEmptyValue,
+						ctx,
+					);
+				}
 				if (/[/@]|^[^.]*$/.test(blocklistValue)) {
 					addZodIssue(
 						blockRaw,
@@ -214,12 +245,18 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 				sizeAbove = sizeTest(blocklistValue, sizeAbove);
 				break;
 			}
-			case BlocklistType.LEGACY: {
+			case BlocklistType.LEGACY:
+				if (blocklistValue.length === 0) {
+					addZodIssue(
+						blockRaw,
+						ZodErrorMessages.blocklistEmptyValue,
+						ctx,
+					);
+				}
 				logger.error(
 					`Legacy style blocklist is deprecated, specify a specific type followed by a colon (e.g infoHash:) for ${blockRaw}`,
 				);
 				break;
-			}
 			default:
 				addZodIssue(blockRaw, ZodErrorMessages.blocklistType, ctx);
 		}
@@ -464,18 +501,57 @@ export const VALIDATION_SCHEMA = z
 			});
 		}
 		if (
-			config.transmissionRpcUrl &&
+			(config.transmissionRpcUrl || config.rtorrentRpcUrl) &&
 			config.blockList.some((b) =>
 				b.startsWith(`${BlocklistType.CATEGORY}:`),
 			)
 		) {
 			logger.error(
-				`Transmission does not support ${BlocklistType.CATEGORY}: blocklisting, use ${BlocklistType.TAG}: instead for labels.`,
+				`Your client does not support ${BlocklistType.CATEGORY}: blocklisting, use ${BlocklistType.TAG}: instead for labels.`,
 			);
 			return false;
 		}
 		return true;
 	})
+	.refine((config) => {
+		if (
+			!config.blockList.some(
+				(b) =>
+					b.startsWith(`${BlocklistType.CATEGORY}:`) ||
+					b.startsWith(`${BlocklistType.TAG}:`) ||
+					b.startsWith(`${BlocklistType.TRACKER}:`),
+			)
+		) {
+			return true;
+		}
+		if (
+			!(
+				config.torrentDir &&
+				(config.qbittorrentUrl ||
+					config.delugeRpcUrl ||
+					config.transmissionRpcUrl ||
+					config.rtorrentRpcUrl)
+			)
+		) {
+			logger.error(ZodErrorMessages.blocklistNeedsClient);
+		}
+		return true;
+	}, ZodErrorMessages.blocklistNeedsClient)
+	.refine((config) => {
+		if (
+			!config.blockList.some(
+				(b) =>
+					b.startsWith(`${BlocklistType.FOLDER}:`) ||
+					b.startsWith(`${BlocklistType.FOLDER_REGEX}:`),
+			)
+		) {
+			return true;
+		}
+		if (!config.dataDirs?.length) {
+			logger.error(ZodErrorMessages.blocklistNeedsDataDirs);
+		}
+		return true;
+	}, ZodErrorMessages.blocklistNeedsDataDirs)
 	.refine(
 		(config) => config.torrentDir || !config.rssCadence,
 		ZodErrorMessages.needsTorrentDir,
