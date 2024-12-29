@@ -41,7 +41,6 @@
 		"@trpc/server": "^11.8.0",
 		"bcryptjs": "^3.0.2",
 		"bencode": "^2.0.1",
-		"better-sqlite3": "^12.5.0",
 		"chalk": "^5.0.0",
 		"commander": "^8.3.0",
 		"fastest-levenshtein": "^1.0.16",
