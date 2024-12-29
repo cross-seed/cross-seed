@@ -53,13 +53,19 @@ async function indexDataDir(
 	if (prevWatcher) return;
 	logger.verbose(`Indexing ${dataDir} due to recent changes...`);
 	watchers.set(dataDir, startWatcher(dataDir));
+	const memoizedPaths = new Map<string, string[]>();
+	const memoizedLengths = new Map<string, number>();
 	for (const dirent of readdirSync(dataDir)) {
 		const entry = join(dataDir, dirent);
 		const paths = findPotentialNestedRoots(entry, maxDataDepth);
 		const dataRows: DataEntry[] = [];
 		const ensembleRows: EnsembleEntry[] = [];
 		for (const path of paths) {
-			const files = getFilesFromDataRoot(path);
+			const files = getFilesFromDataRoot(
+				path,
+				memoizedPaths,
+				memoizedLengths,
+			);
 			const title = parseTitle(basename(path), files, path);
 			if (!title) continue;
 			dataRows.push({ title, path });
@@ -183,7 +189,7 @@ export function findPotentialNestedRoots(
 					dirent.isDirectory(),
 				),
 			);
-			return [root, ...allDescendants];
+			return [...allDescendants, root]; // deepest paths first for memoization
 		} else {
 			return [root];
 		}

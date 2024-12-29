@@ -143,28 +143,40 @@ export async function getSearcheeNewestFileAge(
 	);
 }
 
-function getFileNamesFromRootRec(root: string, isDirHint?: boolean): string[] {
+function getFileNamesFromRootRec(
+	root: string,
+	memoizedPaths: Map<string, string[]>,
+	isDirHint?: boolean,
+): string[] {
+	if (memoizedPaths.has(root)) return memoizedPaths.get(root)!;
 	const isDir =
 		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
-	if (isDir) {
-		return readdirSync(root, { withFileTypes: true }).flatMap((dirent) =>
-			getFileNamesFromRootRec(
-				join(root, dirent.name),
-				dirent.isDirectory(),
-			),
-		);
-	} else {
-		return [root];
-	}
+	const paths = !isDir
+		? [root]
+		: readdirSync(root, { withFileTypes: true }).flatMap((dirent) =>
+				getFileNamesFromRootRec(
+					join(root, dirent.name),
+					memoizedPaths,
+					dirent.isDirectory(),
+				),
+			);
+	memoizedPaths.set(root, paths);
+	return paths;
 }
 
-export function getFilesFromDataRoot(rootPath: string): File[] {
+export function getFilesFromDataRoot(
+	rootPath: string,
+	memoizedPaths: Map<string, string[]>,
+	memoizedLengths: Map<string, number>,
+): File[] {
 	const parentDir = dirname(rootPath);
 	try {
-		return getFileNamesFromRootRec(rootPath).map((file) => ({
+		return getFileNamesFromRootRec(rootPath, memoizedPaths).map((file) => ({
 			path: relative(parentDir, file),
 			name: basename(file),
-			length: statSync(file).size,
+			length:
+				memoizedLengths.get(file) ??
+				memoizedLengths.set(file, statSync(file).size).get(file)!,
 		}));
 	} catch (e) {
 		logger.debug(e);
@@ -270,8 +282,10 @@ export async function createSearcheeFromTorrentFile(
 
 export async function createSearcheeFromPath(
 	root: string,
+	memoizedPaths = new Map<string, string[]>(),
+	memoizedLengths = new Map<string, number>(),
 ): Promise<Result<SearcheeWithoutInfoHash, Error>> {
-	const files = getFilesFromDataRoot(root);
+	const files = getFilesFromDataRoot(root, memoizedPaths, memoizedLengths);
 	if (files.length === 0) {
 		const msg = `Failed to retrieve files in ${root}`;
 		logger.verbose({

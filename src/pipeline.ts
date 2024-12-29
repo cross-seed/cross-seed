@@ -262,9 +262,11 @@ export async function searchForLocalTorrentByCriteria(
 		);
 		if (res.isOk()) rawSearchees.push(res.unwrap());
 	} else {
+		const memoizedPaths = new Map<string, string[]>();
+		const memoizedLengths = new Map<string, number>();
 		const searcheeResults = await Promise.all(
-			findPotentialNestedRoots(criteria.path, maxDataDepth).map(
-				createSearcheeFromPath,
+			findPotentialNestedRoots(criteria.path, maxDataDepth).map((path) =>
+				createSearcheeFromPath(path, memoizedPaths, memoizedLengths),
 			),
 		);
 		rawSearchees.push(
@@ -543,8 +545,16 @@ export async function findAllSearchees(
 			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
 		}
 		if (Array.isArray(dataDirs)) {
+			const memoizedPaths = new Map<string, string[]>();
+			const memoizedLengths = new Map<string, number>();
 			const searcheeResults = await Promise.all(
-				findSearcheesFromAllDataDirs().map(createSearcheeFromPath),
+				findSearcheesFromAllDataDirs().map((path) =>
+					createSearcheeFromPath(
+						path,
+						memoizedPaths,
+						memoizedLengths,
+					),
+				),
 			);
 			rawSearchees.push(
 				...searcheeResults.filter(isOk).map((r) => r.unwrap()),
