@@ -38,6 +38,7 @@ import {
 	comparing,
 	formatAsList,
 	getLogString,
+	humanReadableDate,
 	isTruthy,
 	sanitizeInfoHash,
 } from "./utils.js";
@@ -195,12 +196,6 @@ async function injectInitialAction(
 	let matchedDecision: DecisionAnyMatch | undefined;
 	let linkedNewFiles = false;
 	for (const { searchee, decision } of matches) {
-		if (
-			injectionResult === InjectionResult.TORRENT_NOT_COMPLETE &&
-			!searchee.infoHash
-		) {
-			continue; // Data/virtual searchee doesn't know if torrent is complete
-		}
 		const res = await performAction(meta, decision, searchee, tracker);
 		const result = res.actionResult;
 		if (res.linkedNewFiles) {
@@ -382,15 +377,19 @@ async function injectionAlreadyExists({
 			checkOnce: false,
 		});
 	} else if (anyFullMatch && !isComplete) {
+		const finalCheckTime =
+			(await stat(torrentFilePath)).mtimeMs + ms("1 day");
 		logger.info({
 			label: Label.INJECT,
-			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files - ${chalk.green(injectionResult)}`,
+			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.green(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
 		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
 			checkOnce: false,
 		});
-		isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
+		if (Date.now() >= finalCheckTime) {
+			isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
+		}
 	} else {
 		logger.warn({
 			label: Label.INJECT,
