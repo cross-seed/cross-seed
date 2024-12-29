@@ -489,11 +489,18 @@ export async function getSimilarTorrentsByName(
 			? await client.getAllTorrents()
 			: [];
 	metas.push(
-		...(await Promise.all(
-			filteredEntries.map(async (dbName) => {
-				return parseTorrentWithMetadata(dbName.file_path, torrentInfos);
-			}),
-		)),
+		...(
+			await Promise.allSettled(
+				filteredEntries.map(async (dbName) => {
+					return parseTorrentWithMetadata(
+						dbName.file_path,
+						torrentInfos,
+					);
+				}),
+			)
+		)
+			.filter((r) => r.status === "fulfilled")
+			.map((r) => r.value),
 	);
 	return { keys, metas };
 }
