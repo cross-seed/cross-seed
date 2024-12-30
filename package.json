@@ -15,7 +15,7 @@
 		"cross-seed": "dist/cmd.js"
 	},
 	"engines": {
-		"node": ">=20"
+		"node": ">=22"
 	},
 	"files": [
 		"dist/"
@@ -47,7 +47,7 @@
 		"@types/bencode": "^2.0.1",
 		"@types/lowdb": "^1.0.9",
 		"@types/ms": "^0.7.34",
-		"@types/node": "^20.10.6",
+		"@types/node": "^22.10.2",
 		"@types/xml2js": "^0.4.9",
 		"@types/xmlrpc": "^1.3.6",
 		"@typescript-eslint/eslint-plugin": "^6.16.0",
