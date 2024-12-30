@@ -1,6 +1,6 @@
 import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
-import fs, { existsSync } from "fs";
+import fs, { existsSync, statSync } from "fs";
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
@@ -33,7 +33,11 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import { createKeyTitle, stripExtension } from "./utils.js";
-import { getDataByFuzzyName, indexDataDirs } from "./dataFiles.js";
+import {
+	getDataByFuzzyName,
+	indexDataDirs,
+	shouldIgnorePathHeuristically,
+} from "./dataFiles.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -565,9 +569,14 @@ export async function getSimilarByName(name: string): Promise<{
 			path: string;
 		}[]
 	).filter(({ path }) => {
-		if (existsSync(path)) return true;
-		entriesToDelete.push(path);
-		return false;
+		if (
+			!existsSync(path) ||
+			shouldIgnorePathHeuristically(path, statSync(path).isDirectory())
+		) {
+			entriesToDelete.push(path);
+			return false;
+		}
+		return true;
 	});
 	if (entriesToDelete.length > 0) {
 		await memDB("data").whereIn("path", entriesToDelete).del();
