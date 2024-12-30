@@ -79,6 +79,7 @@ export interface Searchee {
 
 export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
 export type SearcheeWithoutInfoHash = WithUndefined<Searchee, "infoHash">;
+export type SearcheeVirtual = WithUndefined<Searchee, "infoHash" | "path">;
 export type SearcheeWithLabel = WithRequired<Searchee, "label">;
 
 export function hasInfoHash(

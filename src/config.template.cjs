@@ -157,23 +157,24 @@ module.exports = {
 	linkCategory: "cross-seed-link",
 
 	/**
-	 * If this is specified, cross-seed will create links to matched files in
-	 * the specified directory.
-	 * It will create a different link for every changed file name or directory
-	 * structure.
+	 * cross-seed will create links to matched files in the specified directories.
+	 * If using hardlinks, you will need as many linkDirs as drives/partion/volumes
+	 * as your dataDirs and torrent client download directories.
 	 *
-	 * Unlike dataDirs, this is just a quoted string WITHOUT []'s around it.
+	 * Ideally, you should only have a single linkDir and use drive pooling.
+	 * Using multiple linkDirs is only for those with cache/temp drives or those that
+	 * cannot use drive pooling.
 	 *
 	 * If you are a Windows user you need to put double '\' (e.g. "C:\\links")
 	 *
-	 * IF YOU ARE USING HARDLINKS, THIS MUST BE UNDER THE SAME VOLUME AS YOUR
+	 * IF YOU ARE USING HARDLINKS, THIS MUST BE UNDER THE SAME VOLUMES AS YOUR
 	 * DATADIRS. THIS PATH MUST ALSO BE ACCESSIBLE VIA YOUR TORRENT CLIENT
 	 * USING THE SAME PATH.
 	 *
 	 * We recommend reading the following FAQ entry:
 	 * https://www.cross-seed.org/docs/tutorials/linking
 	 */
-	linkDir: undefined,
+	linkDirs: [],
 
 	/**
 	 * cross-seed will use links of this type to inject data-based matches into

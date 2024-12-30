@@ -1,3 +1,4 @@
+import { existsSync, mkdirSync } from "fs";
 import { access, constants, stat } from "fs/promises";
 import { sep } from "path";
 import { inspect } from "util";
@@ -56,7 +57,7 @@ async function checkConfigPaths(): Promise<void> {
 		action,
 		dataDirs,
 		injectDir,
-		linkDir,
+		linkDirs,
 		outputDir,
 		rtorrentRpcUrl,
 		torrentDir,
@@ -79,8 +80,14 @@ async function checkConfigPaths(): Promise<void> {
 		pathFailure++;
 	}
 
-	if (linkDir && !(await verifyPath(linkDir, "linkDir", READ_AND_WRITE))) {
-		pathFailure++;
+	for (const linkDir of linkDirs) {
+		if (!existsSync(linkDir)) {
+			logger.info(`Creating linkDir: ${linkDir}`);
+			mkdirSync(linkDir, { recursive: true });
+		}
+		if (!(await verifyPath(linkDir, "linkDir", READ_AND_WRITE))) {
+			pathFailure++;
+		}
 	}
 	if (dataDirs) {
 		for (const dataDir of dataDirs) {
@@ -98,7 +105,7 @@ async function checkConfigPaths(): Promise<void> {
 			pathFailure++;
 		}
 	}
-	if (linkDir && dataDirs) {
+	if (linkDirs.length && dataDirs) {
 		for (const dataDir of dataDirs) {
 			try {
 				testLinking(dataDir);

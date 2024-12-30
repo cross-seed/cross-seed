@@ -142,8 +142,14 @@ function createCommandWithSharedOptions(name: string, description: string) {
 		)
 		.option(
 			"--link-dir <dir>",
-			"Directory to output data-matched hardlinks to",
+			"Directory to link the data for matches to",
 			fileConfig.linkDir,
+		)
+		.option(
+			"--link-dirs <dirs...>",
+			"Directories to link the data for matches to",
+			// @ts-expect-error commander supports non-string defaults
+			fallback(fileConfig.linkDirs),
 		)
 		.option(
 			"--flat-linking",

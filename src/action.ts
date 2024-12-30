@@ -32,11 +32,18 @@ import {
 	getAbsoluteFilePath,
 	getSearcheeSource,
 	Searchee,
+	SearcheeVirtual,
 	SearcheeWithInfoHash,
 	SearcheeWithLabel,
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
-import { findAFileWithExt, getLogString, getMediaType } from "./utils.js";
+import {
+	findAFileWithExt,
+	getLinkDir,
+	getLinkDirVirtual,
+	getLogString,
+	getMediaType,
+} from "./utils.js";
 
 interface LinkResult {
 	contentPath: string;
@@ -243,13 +250,7 @@ export async function linkAllFilesInMetafile(
 		| "UNKNOWN_ERROR"
 	>
 > {
-	const { linkDir, flatLinking } = getRuntimeConfig();
-	const clientSavePathRes = await getClient()!.getDownloadDir(newMeta, {
-		onlyCompleted: false,
-	});
-	const fullLinkDir = clientSavePathRes.orElse(
-		flatLinking ? linkDir! : join(linkDir!, tracker),
-	);
+	const { flatLinking } = getRuntimeConfig();
 
 	let sourceRoot: string | undefined;
 	if (searchee.infoHash) {
@@ -315,21 +316,35 @@ export async function linkAllFilesInMetafile(
 		}
 	}
 
+	const clientSavePathRes = await getClient()!.getDownloadDir(newMeta, {
+		onlyCompleted: false,
+	});
+	let destinationDir: string | null = null;
+	if (clientSavePathRes.isOk()) {
+		destinationDir = clientSavePathRes.unwrap();
+	} else {
+		const linkDir = sourceRoot
+			? getLinkDir(sourceRoot)
+			: getLinkDirVirtual(searchee as SearcheeVirtual);
+		if (!linkDir) return resultOfErr("MISSING_DATA");
+		destinationDir = flatLinking ? linkDir : join(linkDir, tracker);
+	}
+
 	if (!sourceRoot) {
 		return resultOf(
-			linkVirtualSearchee(searchee, newMeta, fullLinkDir, {
+			linkVirtualSearchee(searchee, newMeta, destinationDir, {
 				ignoreMissing: !options.onlyCompleted,
 			}),
 		);
 	} else if (decision === Decision.MATCH) {
 		return resultOf(
-			linkExactTree(newMeta, fullLinkDir, sourceRoot, {
+			linkExactTree(newMeta, destinationDir, sourceRoot, {
 				ignoreMissing: !options.onlyCompleted,
 			}),
 		);
 	} else {
 		return resultOf(
-			linkFuzzyTree(searchee, newMeta, fullLinkDir, sourceRoot, {
+			linkFuzzyTree(searchee, newMeta, destinationDir, sourceRoot, {
 				ignoreMissing: !options.onlyCompleted,
 			}),
 		);
@@ -342,7 +357,7 @@ export async function performAction(
 	searchee: SearcheeWithLabel,
 	tracker: string,
 ): Promise<{ actionResult: ActionResult; linkedNewFiles: boolean }> {
-	const { action, linkDir } = getRuntimeConfig();
+	const { action, linkDirs } = getRuntimeConfig();
 
 	if (action === Action.SAVE) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
@@ -354,7 +369,7 @@ export async function performAction(
 	let unlinkOk = false;
 	let linkedNewFiles = false;
 
-	if (linkDir) {
+	if (linkDirs.length) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
 			searchee,
 			newMeta,
@@ -471,17 +486,19 @@ function unwrapSymlinks(path: string): string {
  * @param srcDir The directory to link from
  */
 export function testLinking(srcDir: string): void {
-	const { linkDir, linkType } = getRuntimeConfig();
+	const { linkType } = getRuntimeConfig();
 	try {
+		const linkDir = getLinkDir(srcDir);
+		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
 		const srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
 		if (!srcFile) return;
-		const testPath = join(linkDir!, "cross-seed.test");
+		const testPath = join(linkDir, "cross-seed.test");
 		linkFile(srcFile, testPath);
 		rmSync(testPath);
 	} catch (e) {
 		logger.error(e);
 		throw new CrossSeedError(
-			`Failed to create a test ${linkType} in linkDir from ${srcDir}. Ensure that ${linkType} is supported between these two paths (hardlink requires same drive, partition, and volume).`,
+			`Failed to create a test ${linkType} in any linkDirs from ${srcDir}. Ensure that ${linkType} is supported between these paths (hardlink requires same drive, partition, and volume).`,
 		);
 	}
 }

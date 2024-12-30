@@ -630,14 +630,11 @@ async function findSearchableTorrents(): Promise<{
 }
 
 export async function main(): Promise<void> {
-	const { outputDir, linkDir } = getRuntimeConfig();
+	const { outputDir } = getRuntimeConfig();
 	const { searchees, infoHashesToExclude } = await findSearchableTorrents();
 
 	if (!fs.existsSync(outputDir)) {
 		fs.mkdirSync(outputDir, { recursive: true });
-	}
-	if (linkDir && !fs.existsSync(linkDir)) {
-		fs.mkdirSync(linkDir, { recursive: true });
 	}
 
 	const totalFound = await findMatchesBatch(searchees, infoHashesToExclude);
