@@ -113,10 +113,11 @@ export function initializeLogger(options: RuntimeConfig): void {
 			winston.format.errors({ stack: true }),
 			winston.format.splat(),
 			winston.format.printf(
-				({ level, message, label, timestamp, stack }) => {
+				({ level, message, label, timestamp, stack, cause }) => {
+					const msg = `${message}${stack ? `\n${stack}` : ""}${cause ? `\n${cause}` : ""}`;
 					return `${timestamp} ${level}: ${
 						label ? `[${label}] ` : ""
-					}${stripAnsiChars(redactMessage(stack ? stack : message, options))}`;
+					}${stripAnsiChars(redactMessage(msg, options))}`;
 				},
 			),
 		),
@@ -151,13 +152,18 @@ export function initializeLogger(options: RuntimeConfig): void {
 					winston.format.splat(),
 					winston.format.colorize(),
 					winston.format.printf(
-						({ level, message, label, timestamp, stack }) => {
+						({
+							level,
+							message,
+							label,
+							timestamp,
+							stack,
+							cause,
+						}) => {
+							const msg = `${message}${stack ? `\n${stack}` : ""}${cause ? `\n${cause}` : ""}`;
 							return `${timestamp} ${level}: ${
 								label ? `[${label}] ` : ""
-							}${redactMessage(
-								stack ? stack : message,
-								options,
-							)}`;
+							}${redactMessage(msg, options)}`;
 						},
 					),
 				),

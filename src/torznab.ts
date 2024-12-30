@@ -612,10 +612,18 @@ async function fetchCaps(indexer: {
 
 	const responseText = await response.text();
 	if (!response.ok) {
-		const error = new Error(
-			`Indexer ${indexer.url} responded with code ${response.status} when fetching caps, check verbose logs`,
-		);
-		logger.error(error.message);
+		let error: Error;
+		if (response.status === 429) {
+			error = new Error(
+				`Indexer ${indexer.url} was rate limited when fetching caps`,
+			);
+			logger.warn(error.message);
+		} else {
+			error = new Error(
+				`Indexer ${indexer.url} responded with code ${response.status} when fetching caps, check verbose logs`,
+			);
+			logger.error(error.message);
+		}
 		logger.debug(
 			`Response body first 1000 characters: ${responseText.substring(
 				0,
@@ -789,9 +797,10 @@ async function makeRequests(
 	);
 
 	for (const [indexerId, reason] of rejected) {
-		logger.warn(
-			`Failed to reach ${indexers.find((i) => i.id === indexerId)!.url}`,
-		);
+		logger.warn({
+			label: Label.TORZNAB,
+			message: `Failed to reach ${indexers.find((i) => i.id === indexerId)!.url}`,
+		});
 		logger.debug(reason);
 	}
 

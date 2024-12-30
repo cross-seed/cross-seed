@@ -336,7 +336,7 @@ export async function assessCandidate(
 
 	let metafile: Metafile;
 	if (isCandidate) {
-		let res = await snatch(metaOrCandidate);
+		let res = await snatch(metaOrCandidate, searchee.label);
 		if (res.isErr()) {
 			const e = res.unwrapErr();
 			if (
@@ -344,7 +344,7 @@ export async function assessCandidate(
 				![SnatchError.RATE_LIMITED, SnatchError.MAGNET_LINK].includes(e)
 			) {
 				await wait(ms("30 seconds"));
-				res = await snatch(metaOrCandidate);
+				res = await snatch(metaOrCandidate, searchee.label);
 			}
 			if (res.isErr()) {
 				const err = res.unwrapErr();
