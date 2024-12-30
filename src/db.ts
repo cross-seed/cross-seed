@@ -13,6 +13,7 @@ export class NodeSqliteClient extends BetterSqlite3Client {
 
 	// Get a raw connection from the database, returning a promise with the connection object.
 	async acquireRawConnection() {
+		// @ts-expect-error these exist on the parent class
 		const connection = new this.driver(this.connectionSettings.filename);
 		connection.exec("pragma journal_mode = WAL;");
 		return connection;
@@ -34,6 +35,7 @@ export class NodeSqliteClient extends BetterSqlite3Client {
 		}
 
 		const statement = connection.prepare(obj.sql);
+		// @ts-expect-error _formatBindings exists on the parent class
 		const bindings = this._formatBindings(obj.bindings);
 
 		// hack - if we use an INSERT…RETURNING statement it won't work
@@ -58,6 +60,7 @@ NodeSqliteClient.prototype.driverName = "node:sqlite";
 const filename = join(appDir(), "cross-seed.db");
 
 export const db = Knex.knex({
+	// @ts-expect-error types don't allow customizable client but it works
 	client: NodeSqliteClient,
 	connection: { filename },
 	migrations: { migrationSource: migrations },
@@ -65,6 +68,7 @@ export const db = Knex.knex({
 });
 
 export const memDB = Knex.knex({
+	// @ts-expect-error types don't allow customizable client but it works
 	client: NodeSqliteClient,
 	connection: ":memory:",
 	useNullAsDefault: true,
