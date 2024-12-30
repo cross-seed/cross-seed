@@ -29,11 +29,6 @@ const modifiedPaths: Map<string, Set<string>> = new Map();
  */
 export async function initializeDataDirs(): Promise<void> {
 	const { dataDirs } = getRuntimeConfig();
-	if (await memDB.schema.hasTable("data")) return;
-	await memDB.schema.createTable("data", (table) => {
-		table.string("path").primary();
-		table.string("title");
-	});
 	if (!dataDirs?.length) return;
 	for (const dataDir of dataDirs) {
 		modifiedPaths.set(dataDir, new Set());

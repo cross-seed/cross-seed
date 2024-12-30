@@ -377,17 +377,7 @@ async function indexNewTorrents(): Promise<void> {
 
 export async function indexEnsemble(): Promise<void> {
 	const { seasonFromEpisodes, torrentDir } = getRuntimeConfig();
-	if (!seasonFromEpisodes) return;
-
-	const tableExists = await memDB.schema.hasTable("ensemble");
-	if (!tableExists) {
-		await memDB.schema.createTable("ensemble", (table) => {
-			table.string("path").primary();
-			table.string("ensemble");
-			table.string("element");
-		});
-	}
-	if (!torrentDir) return;
+	if (!seasonFromEpisodes || !torrentDir) return;
 
 	logger.info("Indexing ensemble for reverse lookup...");
 	const dirContents = await findAllTorrentFilesInDir(torrentDir);
