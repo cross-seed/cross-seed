@@ -453,9 +453,11 @@ export function getLinkDir(path: string): string | null {
 		);
 		return null;
 	}
-	logger.warn(
-		`Cannot find any linkDir from linkDirs on the same drive, using first linkDir for symlink: ${path}`,
-	);
+	if (linkDirs.length > 1) {
+		logger.warn(
+			`Cannot find any linkDir from linkDirs on the same drive, using first linkDir for symlink: ${path}`,
+		);
+	}
 	return linkDirs[0];
 }
 
