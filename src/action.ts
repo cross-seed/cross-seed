@@ -37,13 +37,7 @@ import {
 	SearcheeWithLabel,
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
-import {
-	findAFileWithExt,
-	getLinkDir,
-	getLinkDirVirtual,
-	getLogString,
-	getMediaType,
-} from "./utils.js";
+import { findAFileWithExt, getLogString, getMediaType } from "./utils.js";
 
 interface LinkResult {
 	contentPath: string;
@@ -445,6 +439,38 @@ export async function performActions(
 		if (actionResult === InjectionResult.TORRENT_NOT_COMPLETE) break;
 	}
 	return results;
+}
+
+export function getLinkDir(path: string): string | null {
+	const { linkDirs, linkType } = getRuntimeConfig();
+	const pathDev = statSync(path).dev;
+	for (const linkDir of linkDirs) {
+		if (statSync(linkDir).dev === pathDev) return linkDir;
+	}
+	if (linkType === LinkType.HARDLINK) {
+		logger.error(
+			`Cannot find any linkDir from linkDirs on the same drive to hardlink ${path}`,
+		);
+		return null;
+	}
+	logger.warn(
+		`Cannot find any linkDir from linkDirs on the same drive, using first linkDir for symlink: ${path}`,
+	);
+	return linkDirs[0];
+}
+
+export function getLinkDirVirtual(searchee: SearcheeVirtual): string | null {
+	const linkDir = getLinkDir(searchee.files[0].path);
+	if (!linkDir) return null;
+	for (let i = 1; i < searchee.files.length; i++) {
+		if (getLinkDir(searchee.files[i].path) !== linkDir) {
+			logger.error(
+				`Cannot hardlink files to multiple linkDirs for seasonFromEpisodes aggregation, source episodes are spread across multiple drives.`,
+			);
+			return null;
+		}
+	}
+	return linkDir;
 }
 
 function linkFile(oldPath: string, newPath: string): boolean {

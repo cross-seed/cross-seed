@@ -1,6 +1,6 @@
 import chalk, { ChalkInstance } from "chalk";
 import { distance } from "fastest-levenshtein";
-import { readdirSync, statSync } from "fs";
+import { readdirSync } from "fs";
 import path from "path";
 import {
 	ALL_EXTENSIONS,
@@ -10,7 +10,6 @@ import {
 	EP_REGEX,
 	JSON_VALUES_REGEX,
 	LEVENSHTEIN_DIVISOR,
-	LinkType,
 	MediaType,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
@@ -26,8 +25,7 @@ import {
 } from "./constants.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { File, Searchee, SearcheeVirtual } from "./searchee.js";
-import { logger } from "./logger.js";
+import { File, Searchee } from "./searchee.js";
 
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
@@ -38,38 +36,6 @@ export type WithUndefined<T, K extends keyof T> = Omit<T, K> & {
 
 export function isTruthy<T>(value: T): value is Truthy<T> {
 	return Boolean(value);
-}
-
-export function getLinkDir(path: string): string | null {
-	const { linkDirs, linkType } = getRuntimeConfig();
-	const pathDev = statSync(path).dev;
-	for (const linkDir of linkDirs) {
-		if (statSync(linkDir).dev === pathDev) return linkDir;
-	}
-	if (linkType === LinkType.HARDLINK) {
-		logger.error(
-			`Cannot find any linkDir from linkDirs on the same drive to hardlink ${path}`,
-		);
-		return null;
-	}
-	logger.warn(
-		`Cannot find any linkDir from linkDirs on the same drive, using first linkDir for symlink: ${path}`,
-	);
-	return linkDirs[0];
-}
-
-export function getLinkDirVirtual(searchee: SearcheeVirtual): string | null {
-	const linkDir = getLinkDir(searchee.files[0].path);
-	if (!linkDir) return null;
-	for (let i = 1; i < searchee.files.length; i++) {
-		if (getLinkDir(searchee.files[i].path) !== linkDir) {
-			logger.error(
-				`Cannot hardlink files to multiple linkDirs for seasonFromEpisodes aggregation, source episodes are spread across multiple drives.`,
-			);
-			return null;
-		}
-	}
-	return linkDir;
 }
 
 export function stripExtension(filename: string): string {
