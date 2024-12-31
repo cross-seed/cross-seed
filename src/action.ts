@@ -32,6 +32,7 @@ import {
 	getAbsoluteFilePath,
 	getSearcheeSource,
 	Searchee,
+	SearcheeVirtual,
 	SearcheeWithInfoHash,
 	SearcheeWithLabel,
 } from "./searchee.js";
@@ -243,13 +244,7 @@ export async function linkAllFilesInMetafile(
 		| "UNKNOWN_ERROR"
 	>
 > {
-	const { linkDir, flatLinking } = getRuntimeConfig();
-	const clientSavePathRes = await getClient()!.getDownloadDir(newMeta, {
-		onlyCompleted: false,
-	});
-	const fullLinkDir = clientSavePathRes.orElse(
-		flatLinking ? linkDir! : join(linkDir!, tracker),
-	);
+	const { flatLinking } = getRuntimeConfig();
 
 	let sourceRoot: string | undefined;
 	if (searchee.infoHash) {
@@ -315,21 +310,35 @@ export async function linkAllFilesInMetafile(
 		}
 	}
 
+	const clientSavePathRes = await getClient()!.getDownloadDir(newMeta, {
+		onlyCompleted: false,
+	});
+	let destinationDir: string | null = null;
+	if (clientSavePathRes.isOk()) {
+		destinationDir = clientSavePathRes.unwrap();
+	} else {
+		const linkDir = sourceRoot
+			? getLinkDir(sourceRoot)
+			: getLinkDirVirtual(searchee as SearcheeVirtual);
+		if (!linkDir) return resultOfErr("MISSING_DATA");
+		destinationDir = flatLinking ? linkDir : join(linkDir, tracker);
+	}
+
 	if (!sourceRoot) {
 		return resultOf(
-			linkVirtualSearchee(searchee, newMeta, fullLinkDir, {
+			linkVirtualSearchee(searchee, newMeta, destinationDir, {
 				ignoreMissing: !options.onlyCompleted,
 			}),
 		);
 	} else if (decision === Decision.MATCH) {
 		return resultOf(
-			linkExactTree(newMeta, fullLinkDir, sourceRoot, {
+			linkExactTree(newMeta, destinationDir, sourceRoot, {
 				ignoreMissing: !options.onlyCompleted,
 			}),
 		);
 	} else {
 		return resultOf(
-			linkFuzzyTree(searchee, newMeta, fullLinkDir, sourceRoot, {
+			linkFuzzyTree(searchee, newMeta, destinationDir, sourceRoot, {
 				ignoreMissing: !options.onlyCompleted,
 			}),
 		);
@@ -342,7 +351,7 @@ export async function performAction(
 	searchee: SearcheeWithLabel,
 	tracker: string,
 ): Promise<{ actionResult: ActionResult; linkedNewFiles: boolean }> {
-	const { action, linkDir } = getRuntimeConfig();
+	const { action, linkDirs } = getRuntimeConfig();
 
 	if (action === Action.SAVE) {
 		await saveTorrentFile(tracker, getMediaType(searchee), newMeta);
@@ -354,7 +363,7 @@ export async function performAction(
 	let unlinkOk = false;
 	let linkedNewFiles = false;
 
-	if (linkDir) {
+	if (linkDirs.length) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
 			searchee,
 			newMeta,
@@ -432,6 +441,40 @@ export async function performActions(
 	return results;
 }
 
+export function getLinkDir(path: string): string | null {
+	const { linkDirs, linkType } = getRuntimeConfig();
+	const pathDev = statSync(path).dev;
+	for (const linkDir of linkDirs) {
+		if (statSync(linkDir).dev === pathDev) return linkDir;
+	}
+	if (linkType === LinkType.HARDLINK) {
+		logger.error(
+			`Cannot find any linkDir from linkDirs on the same drive to hardlink ${path}`,
+		);
+		return null;
+	}
+	if (linkDirs.length > 1) {
+		logger.warn(
+			`Cannot find any linkDir from linkDirs on the same drive, using first linkDir for symlink: ${path}`,
+		);
+	}
+	return linkDirs[0];
+}
+
+export function getLinkDirVirtual(searchee: SearcheeVirtual): string | null {
+	const linkDir = getLinkDir(searchee.files[0].path);
+	if (!linkDir) return null;
+	for (let i = 1; i < searchee.files.length; i++) {
+		if (getLinkDir(searchee.files[i].path) !== linkDir) {
+			logger.error(
+				`Cannot hardlink files to multiple linkDirs for seasonFromEpisodes aggregation, source episodes are spread across multiple drives.`,
+			);
+			return null;
+		}
+	}
+	return linkDir;
+}
+
 function linkFile(oldPath: string, newPath: string): boolean {
 	const { linkType } = getRuntimeConfig();
 	try {
@@ -471,17 +514,19 @@ function unwrapSymlinks(path: string): string {
  * @param srcDir The directory to link from
  */
 export function testLinking(srcDir: string): void {
-	const { linkDir, linkType } = getRuntimeConfig();
+	const { linkType } = getRuntimeConfig();
 	try {
+		const linkDir = getLinkDir(srcDir);
+		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
 		const srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
 		if (!srcFile) return;
-		const testPath = join(linkDir!, "cross-seed.test");
+		const testPath = join(linkDir, "cross-seed.test");
 		linkFile(srcFile, testPath);
 		rmSync(testPath);
 	} catch (e) {
 		logger.error(e);
 		throw new CrossSeedError(
-			`Failed to create a test ${linkType} in linkDir from ${srcDir}. Ensure that ${linkType} is supported between these two paths (hardlink requires same drive, partition, and volume).`,
+			`Failed to create a test ${linkType} in any linkDirs from ${srcDir}. Ensure that ${linkType} is supported between these paths (hardlink requires same drive, partition, and volume).`,
 		);
 	}
 }

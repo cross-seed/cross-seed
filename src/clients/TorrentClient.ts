@@ -94,7 +94,7 @@ export async function validateSavePaths(
 	infoHashPathMap: Map<string, string>,
 	searchees: SearcheeWithInfoHash[],
 ): Promise<void> {
-	const { blockList, linkDir } = getRuntimeConfig();
+	const { blockList, linkDirs } = getRuntimeConfig();
 	logger.info(`Validating all existing torrent save paths...`);
 
 	const entryDir = searchees.find((s) => !infoHashPathMap.has(s.infoHash));
@@ -112,7 +112,7 @@ export async function validateSavePaths(
 			`Could not ensure all torrents from the torrent client are in torrentDir (missing ${entryClient} with savePath ${infoHashPathMap.get(entryClient)}): https://www.cross-seed.org/docs/basics/options#torrentdir`,
 		);
 	}
-	if (!linkDir) return;
+	if (!linkDirs.length) return;
 
 	const removedSavePaths = new Set<string>();
 	for (const searchee of searchees) {

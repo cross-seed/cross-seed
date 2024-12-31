@@ -26,6 +26,7 @@ export interface FileConfig {
 	skipRecheck?: boolean;
 	autoResumeMaxDownload?: number;
 	linkDir?: string;
+	linkDirs?: string[];
 	linkType?: string;
 	flatLinking?: boolean;
 	maxDataDepth?: number;

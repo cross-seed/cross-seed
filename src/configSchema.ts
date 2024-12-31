@@ -56,24 +56,24 @@ const ZodErrorMessages = {
 		"outputDir should only contain .torrent files, cross-seed will populate and manage (https://www.cross-seed.org/docs/basics/options#outputdir)",
 	needsInputDir:
 		"You need to set at least one of torrentDir (recommended) or dataDirs for search/rss/announce matching to work.",
-	matchModeNeedsLinkDir:
-		"When using action 'inject', you need to set a linkDir (and have your data accessible) for risky and partial matchMode.",
+	matchModeNeedsLinkDirs:
+		"When using action 'inject', you need to set linkDirs (and have your data accessible) for risky and partial matchMode.",
 	ensembleNeedsClient:
 		"seasonFromEpisodes requires a torrent client to connect to when using torrentDir.",
-	ensembleNeedsLinkDir:
-		"When using action 'inject', you need to set a linkDir (and have your data accessible) for seasonFromEpisodes. Set seasonFromEpisodes to null to disable.",
+	ensembleNeedsLinkDirs:
+		"When using action 'inject', you need to set linkDirs (and have your data accessible) for seasonFromEpisodes. Set seasonFromEpisodes to null to disable.",
 	ensembleNeedsPartial:
 		"seasonFromEpisodes requires matchMode partial if enabled and value is below 1.",
-	linkDirInOtherDirs:
-		"You cannot have your linkDir inside of your torrentDir/dataDirs/outputDir. Please adjust your paths to correct this.",
+	linkDirsInOtherDirs:
+		"You cannot have your linkDirs inside of your torrentDir/dataDirs/outputDir. Please adjust your paths to correct this.",
 	dataDirsInOtherDirs:
-		"You cannot have your dataDirs inside of your torrentDir/linkDir/outputDir. Please adjust your paths to correct this.",
+		"You cannot have your dataDirs inside of your torrentDir/linkDirs/outputDir. Please adjust your paths to correct this.",
 	torrentDirInOtherDirs:
-		"You cannot have your torrentDir inside of your dataDirs/linkDir/outputDir. Please adjust your paths to correct this.",
+		"You cannot have your torrentDir inside of your dataDirs/linkDirs/outputDir. Please adjust your paths to correct this.",
 	outputDirInOtherDirs:
-		"You cannot have your outputDir inside of your torrentDir/dataDirs/linkDir. Please adjust your paths to correct this.",
+		"You cannot have your outputDir inside of your torrentDir/dataDirs/linkDirs. Please adjust your paths to correct this.",
 	relativePaths:
-		"Absolute paths for torrentDir, linkDir, dataDirs, and outputDir are recommended.",
+		"Absolute paths for torrentDir, linkDirs, dataDirs, and outputDir are recommended.",
 };
 
 /**
@@ -273,7 +273,7 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 
 /**
  * check a potential child path being inside a array of parent paths
- * @param childDir path of the potential child (e.g linkDir)
+ * @param childDir path of the potential child (e.g outputDir)
  * @param parentDirs array of parentDir paths (e.g dataDirs)
  * @returns true if `childDir` is inside any `parentDirs` at any nesting level, false otherwise.
  */
@@ -310,11 +310,9 @@ export const VALIDATION_SCHEMA = z
 			.lte(52428800, ZodErrorMessages.autoResumeMaxDownloadUnsupported),
 		linkCategory: z.string().nullish(),
 		linkDir: z.string().nullish(),
+		linkDirs: z.array(z.string()).optional().default([]),
 		linkType: z.nativeEnum(LinkType),
-		flatLinking: z
-			.boolean()
-			.nullish()
-			.transform((value) => (typeof value === "boolean" ? value : false)),
+		flatLinking: z.boolean().nullish().default(false),
 		maxDataDepth: z.number().gte(1),
 		torrentDir: z.string().nullable(),
 		outputDir: z.string().refine((dir) => {
@@ -414,16 +412,18 @@ export const VALIDATION_SCHEMA = z
 		torrents: z.array(z.string()).optional(),
 		blockList: z.array(z.string()).nullish().transform(transformBlocklist),
 		apiKey: z.string().min(24).nullish(),
-		radarr: z
-			.array(z.string().url())
-			.nullish()
-			.transform((value) => value ?? []),
-		sonarr: z
-			.array(z.string().url())
-			.nullish()
-			.transform((value) => value ?? []),
+		radarr: z.array(z.string().url()).nullish().default([]),
+		sonarr: z.array(z.string().url()).nullish().default([]),
 	})
 	.strict()
+	.refine((config) => {
+		if (config.linkDir && config.linkDirs.length) return false;
+		if (config.linkDir) {
+			logger.warn("linkDir is deprecated, use linkDirs instead.");
+			config.linkDirs = [config.linkDir];
+		}
+		return true;
+	}, "You cannot have both linkDir and linkDirs, use linkDirs only.")
 	.refine(
 		(config) =>
 			!config.searchCadence ||
@@ -458,7 +458,7 @@ export const VALIDATION_SCHEMA = z
 			config.action === Action.INJECT &&
 			config.qbittorrentUrl &&
 			!config.flatLinking &&
-			config.linkDir
+			config.linkDirs.length
 		) {
 			logger.warn(ZodErrorMessages.qBitAutoTMM);
 		}
@@ -561,10 +561,10 @@ export const VALIDATION_SCHEMA = z
 	)
 	.refine(
 		(config) =>
-			config.linkDir ||
+			config.linkDirs.length ||
 			config.matchMode === MatchMode.SAFE ||
 			config.action === Action.SAVE,
-		ZodErrorMessages.matchModeNeedsLinkDir,
+		ZodErrorMessages.matchModeNeedsLinkDirs,
 	)
 	.refine(
 		(config) =>
@@ -584,8 +584,8 @@ export const VALIDATION_SCHEMA = z
 			);
 			return true;
 		}
-		return config.linkDir;
-	}, ZodErrorMessages.ensembleNeedsLinkDir)
+		return config.linkDirs.length;
+	}, ZodErrorMessages.ensembleNeedsLinkDirs)
 	.refine((config) => {
 		if (config.seasonFromEpisodes && config.seasonFromEpisodes < 1) {
 			return config.matchMode === MatchMode.PARTIAL;
@@ -603,19 +603,21 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	})
 	.refine((config) => {
-		if (!config.linkDir) return true;
-		if (isChildPath(config.linkDir, [config.outputDir])) return false;
-		if (config.dataDirs && isChildPath(config.linkDir, config.dataDirs)) {
-			return false;
-		}
-		if (
-			config.torrentDir &&
-			isChildPath(config.linkDir, [config.torrentDir])
-		) {
-			return false;
+		if (!config.linkDirs.length) return true;
+		for (const linkDir of config.linkDirs) {
+			if (isChildPath(linkDir, [config.outputDir])) return false;
+			if (config.dataDirs && isChildPath(linkDir, config.dataDirs)) {
+				return false;
+			}
+			if (
+				config.torrentDir &&
+				isChildPath(linkDir, [config.torrentDir])
+			) {
+				return false;
+			}
 		}
 		return true;
-	}, ZodErrorMessages.linkDirInOtherDirs)
+	}, ZodErrorMessages.linkDirsInOtherDirs)
 	.refine((config) => {
 		if (!config.dataDirs) return true;
 		for (const dataDir of config.dataDirs) {
@@ -626,7 +628,10 @@ export const VALIDATION_SCHEMA = z
 			) {
 				return false;
 			}
-			if (config.linkDir && isChildPath(dataDir, [config.linkDir])) {
+			if (
+				config.linkDirs.length &&
+				isChildPath(dataDir, config.linkDirs)
+			) {
 				return false;
 			}
 		}
@@ -642,8 +647,8 @@ export const VALIDATION_SCHEMA = z
 			return false;
 		}
 		if (
-			config.linkDir &&
-			isChildPath(config.torrentDir, [config.linkDir])
+			config.linkDirs.length &&
+			isChildPath(config.torrentDir, config.linkDirs)
 		) {
 			return false;
 		}
@@ -659,7 +664,10 @@ export const VALIDATION_SCHEMA = z
 		if (config.dataDirs && isChildPath(config.outputDir, config.dataDirs)) {
 			return false;
 		}
-		if (config.linkDir && isChildPath(config.outputDir, [config.linkDir])) {
+		if (
+			config.linkDirs.length &&
+			isChildPath(config.outputDir, config.linkDirs)
+		) {
 			return false;
 		}
 		return true;
@@ -667,8 +675,8 @@ export const VALIDATION_SCHEMA = z
 	.refine((config) => {
 		if (
 			!isAbsolute(config.outputDir) ||
+			!config.linkDirs.every(isAbsolute) ||
 			(config.torrentDir && !isAbsolute(config.torrentDir)) ||
-			(config.linkDir && !isAbsolute(config.linkDir)) ||
 			(config.dataDirs && !config.dataDirs.every(isAbsolute))
 		) {
 			logger.warn(ZodErrorMessages.relativePaths);

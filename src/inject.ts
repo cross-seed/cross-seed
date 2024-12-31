@@ -325,9 +325,9 @@ async function injectionTorrentNotComplete(
 ) {
 	const { progress, torrentFilePath, injectionResult, summary, filePathLog } =
 		injectionAftermath;
-	const { linkDir } = getRuntimeConfig();
+	const { linkDirs } = getRuntimeConfig();
 	if (
-		!linkDir ||
+		!linkDirs.length ||
 		(await stat(torrentFilePath)).mtimeMs >= Date.now() - ms("1 day")
 	) {
 		// Normal case where source is likely still downloading
