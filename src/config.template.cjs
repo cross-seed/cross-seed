@@ -233,8 +233,9 @@ module.exports = {
 	 * Determines how deep into the specified dataDirs to go to generate new
 	 * searchees. Setting this to higher values will result in more searchees
 	 * and more API hits to your indexers.
+	 * https://www.cross-seed.org/docs/tutorials/data-based-matching#setting-up-data-based-matching
 	 */
-	maxDataDepth: 2,
+	maxDataDepth: 3,
 
 	/**
 	 * Directory containing .torrent files.

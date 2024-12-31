@@ -22,3 +22,12 @@ export const memDB = Knex.knex({
 	connection: ":memory:",
 	useNullAsDefault: true,
 });
+await memDB.schema.createTable("data", (table) => {
+	table.string("path").primary();
+	table.string("title");
+});
+await memDB.schema.createTable("ensemble", (table) => {
+	table.string("path").primary();
+	table.string("ensemble");
+	table.string("element");
+});

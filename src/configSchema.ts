@@ -49,13 +49,13 @@ const ZodErrorMessages = {
 	injectUrl:
 		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
 	qBitAutoTMM:
-		"If using Automatic Torrent Management in qBittorrent, please read: https://www.cross-seed.org/docs/v6-migration#qbittorrent",
+		"If using Automatic Torrent Management in qBittorrent, please read: https://www.cross-seed.org/docs/v6-migration#new-folder-structure-for-links",
 	includeSingleEpisodes:
 		"includeSingleEpisodes is not recommended when using announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
 	invalidOutputDir:
 		"outputDir should only contain .torrent files, cross-seed will populate and manage (https://www.cross-seed.org/docs/basics/options#outputdir)",
-	needsTorrentDir:
-		"You need to set torrentDir for rss and announce matching to work.",
+	needsInputDir:
+		"You need to set at least one of torrentDir (recommended) or dataDirs for search/rss/announce matching to work.",
 	matchModeNeedsLinkDir:
 		"When using action 'inject', you need to set a linkDir (and have your data accessible) for risky and partial matchMode.",
 	ensembleNeedsClient:
@@ -553,8 +553,11 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	}, ZodErrorMessages.blocklistNeedsDataDirs)
 	.refine(
-		(config) => config.torrentDir || !config.rssCadence,
-		ZodErrorMessages.needsTorrentDir,
+		(config) =>
+			config.torrentDir ||
+			config.dataDirs?.length ||
+			(!config.rssCadence && !config.searchCadence),
+		ZodErrorMessages.needsInputDir,
 	)
 	.refine(
 		(config) =>
@@ -589,6 +592,16 @@ export const VALIDATION_SCHEMA = z
 		}
 		return true;
 	}, ZodErrorMessages.ensembleNeedsPartial)
+	.refine((config) => {
+		if (!config.dataDirs?.length) return true;
+		if (!config.seasonFromEpisodes && !config.includeSingleEpisodes) {
+			return true;
+		}
+		logger.warn(
+			`Using seasonFromEpisodes or includeSingleEpisodes with dataDirs requires a specific data structure${config.maxDataDepth < 3 ? " and likely needs a maxDataDepth of 3" : ""}, please read: https://www.cross-seed.org/docs/tutorials/data-based-matching#setting-up-data-based-matching`,
+		);
+		return true;
+	})
 	.refine((config) => {
 		if (!config.linkDir) return true;
 		if (isChildPath(config.linkDir, [config.outputDir])) return false;

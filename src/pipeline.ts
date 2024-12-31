@@ -2,6 +2,7 @@ import chalk from "chalk";
 import fs from "fs";
 import { zip } from "lodash-es";
 import ms from "ms";
+import { basename } from "path";
 import { performAction, performActions } from "./action.js";
 import { getClient } from "./clients/TorrentClient.js";
 import {
@@ -41,6 +42,7 @@ import {
 	createSearcheeFromMetafile,
 	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
+	File,
 	getNewestFileAge,
 	getSeasonKey,
 	Searchee,
@@ -49,9 +51,9 @@ import {
 } from "./searchee.js";
 import {
 	getInfoHashesToExclude,
-	getSimilarTorrentsByName,
+	getSimilarByName,
 	getTorrentByCriteria,
-	indexNewTorrents,
+	indexTorrentsAndDataDirs,
 	loadTorrentDirLight,
 	TorrentLocator,
 } from "./torrent.js";
@@ -260,9 +262,11 @@ export async function searchForLocalTorrentByCriteria(
 		);
 		if (res.isOk()) rawSearchees.push(res.unwrap());
 	} else {
+		const memoizedPaths = new Map<string, string[]>();
+		const memoizedLengths = new Map<string, number>();
 		const searcheeResults = await Promise.all(
-			findPotentialNestedRoots(criteria.path, maxDataDepth).map(
-				createSearcheeFromPath,
+			findPotentialNestedRoots(criteria.path, maxDataDepth).map((path) =>
+				createSearcheeFromPath(path, memoizedPaths, memoizedLengths),
 			),
 		);
 		rawSearchees.push(
@@ -332,20 +336,23 @@ async function getSearcheesForCandidate(
 	searcheeLabel: SearcheeLabel,
 ): Promise<{ searchees: SearcheeWithLabel[]; method: string } | null> {
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
-	const { keys, metas } = await getSimilarTorrentsByName(candidate.name);
+	const { keys, metas, dataSearchees } = await getSimilarByName(
+		candidate.name,
+	);
 	const method = keys.length ? `[${keys}]` : "Fuse fallback";
-	if (!metas.length) {
+	if (!metas.length && !dataSearchees.length) {
 		logger.verbose({
 			label: searcheeLabel,
 			message: `Did not find an existing entry using ${method} for ${candidateLog}`,
 		});
 		return null;
 	}
+	const torrentSearchees = metas
+		.map(createSearcheeFromMetafile)
+		.filter(isOk)
+		.map((r) => r.unwrap());
 	const searchees = filterDupesFromSimilar(
-		metas
-			.map(createSearcheeFromMetafile)
-			.filter(isOk)
-			.map((r) => r.unwrap())
+		[...torrentSearchees, ...dataSearchees]
 			.map((searchee) => ({ ...searchee, label: searcheeLabel }))
 			.filter((searchee) => filterByContent(searchee)),
 	);
@@ -380,13 +387,25 @@ async function getEnsembleForCandidate(
 		});
 		return null;
 	}
-	const files = ensemble
-		.map((e) => ({
-			path: e.absolute_path,
-			name: e.name,
-			length: e.length,
-		}))
-		.filter((f) => fs.existsSync(f.path));
+	const duplicateFiles = new Set<string>();
+	const entriesToDelete: string[] = [];
+	const files = ensemble.reduce<File[]>((acc, entry) => {
+		const path = entry.path;
+		if (!fs.existsSync(path)) {
+			entriesToDelete.push(path);
+			return acc;
+		}
+		const length = fs.statSync(path).size;
+		const name = basename(path);
+		const test = `${entry.element}-${length}`;
+		if (duplicateFiles.has(test)) return acc; // cross seeded file
+		duplicateFiles.add(test);
+		acc.push({ length, name, path });
+		return acc;
+	}, []);
+	if (entriesToDelete.length) {
+		await memDB("ensemble").whereIn("path", entriesToDelete).del();
+	}
 	if (files.length === 0) {
 		logger.verbose({
 			label: searcheeLabel,
@@ -398,14 +417,14 @@ async function getEnsembleForCandidate(
 	const uniqueElements = new Set(ensemble.map((e) => e.element));
 	const totalLength = Math.round(
 		[...uniqueElements].reduce((acc, cur) => {
-			const elements = ensemble.filter(
-				(e) =>
-					e.element === cur &&
-					files.some((f) => f.path === e.absolute_path),
-			);
-			const avg =
-				elements.reduce((a, c) => a + c.length, 0) / elements.length;
-			return acc + avg;
+			const lengths = ensemble.reduce<number[]>((lengths, e) => {
+				if (e.element !== cur) return lengths;
+				const file = files.find((f) => f.path === e.path);
+				if (!file) return lengths; // Was an ignored cross seeded file
+				lengths.push(file.length);
+				return lengths;
+			}, []);
+			return acc + lengths.reduce((a, b) => a + b) / lengths.length;
 		}, 0),
 	);
 	const searchees: SearcheeWithLabel[] = [
@@ -526,8 +545,16 @@ export async function findAllSearchees(
 			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
 		}
 		if (Array.isArray(dataDirs)) {
+			const memoizedPaths = new Map<string, string[]>();
+			const memoizedLengths = new Map<string, number>();
 			const searcheeResults = await Promise.all(
-				findSearcheesFromAllDataDirs().map(createSearcheeFromPath),
+				findSearcheesFromAllDataDirs().map((path) =>
+					createSearcheeFromPath(
+						path,
+						memoizedPaths,
+						memoizedLengths,
+					),
+				),
 			);
 			rawSearchees.push(
 				...searcheeResults.filter(isOk).map((r) => r.unwrap()),
@@ -628,11 +655,12 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const { torrentDir, torznab } = getRuntimeConfig();
-	if (!torrentDir || !torznab.length) {
+	const { dataDirs, torrentDir, torznab } = getRuntimeConfig();
+	if (!torznab.length || (!torrentDir && !dataDirs?.length)) {
 		logger.error({
 			label: Label.RSS,
-			message: "RSS requires torrentDir and torznab to be set",
+			message:
+				"RSS requires torznab and at least one of torrentDir (recommended) or dataDirs to be set",
 		});
 		return;
 	}
@@ -643,7 +671,7 @@ export async function scanRssFeeds() {
 		label: Label.RSS,
 		message: "Indexing new torrents...",
 	});
-	await indexNewTorrents();
+	await indexTorrentsAndDataDirs();
 	logger.verbose({
 		label: Label.RSS,
 		message: "Querying RSS feeds...",

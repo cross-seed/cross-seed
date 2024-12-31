@@ -32,6 +32,7 @@ import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
 import { indexEnsemble, parseTorrentFromFilename } from "./torrent.js";
 import { fallback } from "./utils.js";
+import { initializeDataDirs } from "./dataFiles.js";
 
 let fileConfig: FileConfig;
 try {
@@ -162,7 +163,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"--max-data-depth <depth>",
 			"Max depth to look for searchees in dataDirs",
 			(n) => parseInt(n),
-			fallback(fileConfig.maxDataDepth, 2),
+			fallback(fileConfig.maxDataDepth, 3),
 		)
 		.option(
 			"-i, --torrent-dir <dir>",
@@ -422,6 +423,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			await db.migrate.latest();
 			await doStartupValidation();
 			await indexEnsemble();
+			await initializeDataDirs();
 			serve(options.port, options.host);
 			jobsLoop();
 		} catch (e) {
@@ -438,6 +440,7 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 			await db.migrate.latest();
 			await doStartupValidation();
 			await indexEnsemble();
+			await initializeDataDirs();
 			await scanRssFeeds();
 			await db.destroy();
 			await memDB.destroy();
