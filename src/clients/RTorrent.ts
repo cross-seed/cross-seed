@@ -354,12 +354,18 @@ export default class RTorrent implements TorrentClient {
 		let response: ReturnType;
 		try {
 			response = await this.methodCallP<ReturnType>("system.multicall", [
-				infoHashes.map((hash) => {
-					return {
-						methodName: "d.directory",
-						params: [hash],
-					};
-				}),
+				infoHashes
+					.map((hash) => [
+						{
+							methodName: "d.directory",
+							params: [hash],
+						},
+						{
+							methodName: "d.is_multi_file",
+							params: [hash],
+						},
+					])
+					.flat(),
 			]);
 		} catch (e) {
 			logger.error({
@@ -387,7 +393,11 @@ export default class RTorrent implements TorrentClient {
 
 			return new Map(
 				infoHashes.map((hash, index) => {
-					return [hash, response[index][0]];
+					const directory = response[index * 2][0];
+					const isMultiFile = Boolean(
+						Number(response[index * 2 + 1][0]),
+					);
+					return [hash, isMultiFile ? dirname(directory) : directory];
 				}),
 			);
 		} catch (e) {
