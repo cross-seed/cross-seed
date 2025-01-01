@@ -106,6 +106,7 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 			memoizedPaths,
 			memoizedLengths,
 		);
+		if (!files.length) continue;
 		const title = parseTitle(basename(path), files, path);
 		if (!title) continue;
 		dataRows.push({ title, path });

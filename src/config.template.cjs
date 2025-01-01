@@ -162,8 +162,8 @@ module.exports = {
 	 * as your dataDirs and torrent client download directories.
 	 *
 	 * Ideally, you should only have a single linkDir and use drive pooling.
-	 * Using multiple linkDirs is only for those with cache/temp drives or those that
-	 * cannot use drive pooling.
+	 * Using multiple linkDirs should be reserved for setups with cache/temp drives
+	 * or where drive pooling is impossible.
 	 *
 	 * If you are a Windows user you need to put double '\' (e.g. "C:\\links")
 	 *
@@ -171,14 +171,13 @@ module.exports = {
 	 * DATADIRS. THIS PATH MUST ALSO BE ACCESSIBLE VIA YOUR TORRENT CLIENT
 	 * USING THE SAME PATH.
 	 *
-	 * We recommend reading the following FAQ entry:
-	 * https://www.cross-seed.org/docs/tutorials/linking
+	 * https://www.cross-seed.org/docs/basics/options#linkdirs
 	 */
 	linkDirs: [],
 
 	/**
 	 * cross-seed will use links of this type to inject data-based matches into
-	 * your client. We recommend reading the following FAQ entry:
+	 * your client. We recommend reading the following entry:
 	 * https://www.cross-seed.org/docs/tutorials/linking#hardlinks-vs-symlinks
 	 * Options: "symlink", "hardlink".
 	 */
@@ -210,9 +209,8 @@ module.exports = {
 	 * "partial" is like risky but allows matches if they are missing small
 	 * files like .nfo/.srt.
 	 *
-	 * We recommend reading the following FAQ entry:
+	 * We recommend reading the following entries:
 	 * https://www.cross-seed.org/docs/basics/options#matchmode
-	 * https://www.cross-seed.org/docs/tutorials/linking#hardlinks-vs-symlinks
 	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
 	 */
 	matchMode: "safe",
