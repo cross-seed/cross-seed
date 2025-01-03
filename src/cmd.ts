@@ -325,7 +325,11 @@ program
 		"-d, --docker",
 		"Generate the docker config instead of the normal one",
 	)
-	.action(() => void generateConfig());
+	.action(async () => {
+		void generateConfig();
+		await db.destroy();
+		await memDB.destroy();
+	});
 
 program
 	.command("clear-cache")
@@ -337,6 +341,7 @@ program
 		await db("decision").whereNull("info_hash").del();
 		await db("timestamp").del();
 		await db.destroy();
+		await memDB.destroy();
 	});
 
 program
@@ -353,6 +358,7 @@ program
 		);
 		await clearIndexerFailures();
 		await db.destroy();
+		await memDB.destroy();
 	});
 program
 	.command("test-notification")
@@ -362,11 +368,13 @@ program
 		"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
 		fileConfig.notificationWebhookUrl,
 	)
-	.action((options) => {
+	.action(async (options) => {
 		setRuntimeConfig(options);
 		initializeLogger(options);
 		initializePushNotifier();
 		sendTestNotification();
+		await db.destroy();
+		await memDB.destroy();
 	});
 
 program
@@ -374,7 +382,11 @@ program
 	.description("Analyze two torrent files for cross-seed compatibility")
 	.argument("searchee")
 	.argument("candidate")
-	.action(diffCmd);
+	.action(async (searchee, candidate) => {
+		diffCmd(searchee, candidate);
+		await db.destroy();
+		await memDB.destroy();
+	});
 
 program
 	.command("tree")
@@ -385,6 +397,8 @@ program
 			await parseTorrentFromFilename(fn),
 		);
 		res.isOk() ? console.log(res.unwrap()) : console.log(res.unwrapErr());
+		await db.destroy();
+		await memDB.destroy();
 	});
 
 program
@@ -396,6 +410,7 @@ program
 		await db.migrate.latest();
 		console.log(await getApiKey());
 		await db.destroy();
+		await memDB.destroy();
 	});
 
 program
@@ -405,6 +420,7 @@ program
 		await db.migrate.latest();
 		console.log(await resetApiKey());
 		await db.destroy();
+		await memDB.destroy();
 	});
 
 createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
@@ -476,9 +492,11 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			await doStartupValidation();
 			await main();
 			await db.destroy();
+			await memDB.destroy();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
 			await db.destroy();
+			await memDB.destroy();
 		}
 	});
 
@@ -499,9 +517,11 @@ createCommandWithSharedOptions(
 			await doStartupValidation();
 			await injectSavedTorrents();
 			await db.destroy();
+			await memDB.destroy();
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
 			await db.destroy();
+			await memDB.destroy();
 		}
 	});
 
@@ -515,9 +535,11 @@ createCommandWithSharedOptions(
 		await doStartupValidation();
 		await restoreFromTorrentCache();
 		await db.destroy();
+		await memDB.destroy();
 	} catch (e) {
 		exitOnCrossSeedErrors(e);
 		await db.destroy();
+		await memDB.destroy();
 	}
 });
 
