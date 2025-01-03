@@ -21,6 +21,7 @@ export interface FileConfig {
 	fuzzySizeThreshold?: number;
 	excludeOlder?: string;
 	excludeRecentSearch?: string;
+	useClientTorrents?: boolean;
 	dataDirs?: string[];
 	matchMode?: MatchMode;
 	skipRecheck?: boolean;

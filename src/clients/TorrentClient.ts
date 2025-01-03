@@ -3,7 +3,7 @@ import ms from "ms";
 import { testLinking } from "../action.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
-import { Metafile } from "../parseTorrent.js";
+import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
 import { findBlockedStringInReleaseMaybe } from "../preFilter.js";
 import { Result } from "../Result.js";
 import {
@@ -15,7 +15,7 @@ import {
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
 import { formatAsList, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
@@ -31,11 +31,20 @@ export type TorrentClientType =
 	| Label.TRANSMISSION
 	| Label.DELUGE;
 
+export type Tracker =
+	| { url: string; announce?: string; tier: number }
+	| { url?: string; announce: string; tier: number };
+
 export interface TorrentMetadataInClient {
 	infoHash: string;
 	category: string;
 	tags: string[];
 	trackers?: string[][];
+}
+
+export interface ClientSearcheeResult {
+	searchees: SearcheeClient[];
+	newSearchees: SearcheeClient[];
 }
 
 export interface TorrentClient {
@@ -44,6 +53,9 @@ export interface TorrentClient {
 		infoHash: string,
 	) => Promise<Result<boolean, "NOT_FOUND">>;
 	getAllTorrents: () => Promise<TorrentMetadataInClient[]>;
+	getClientSearchees: (options?: {
+		refresh: string[];
+	}) => Promise<ClientSearcheeResult>;
 	getDownloadDir: (
 		meta: SearcheeWithInfoHash | Metafile,
 		options: { onlyCompleted: boolean },
@@ -53,6 +65,7 @@ export interface TorrentClient {
 	getAllDownloadDirs: (options: {
 		metas: SearcheeWithInfoHash[] | Metafile[];
 		onlyCompleted: boolean;
+		v1HashOnly?: boolean;
 	}) => Promise<Map<string, string>>;
 	resumeInjection: (
 		infoHash: string,
@@ -90,9 +103,9 @@ export function getClient(): TorrentClient | null {
 	return activeClient;
 }
 
-export async function validateSavePaths(
-	infoHashPathMap: Map<string, string>,
+export async function validateClientSavePaths(
 	searchees: SearcheeWithInfoHash[],
+	infoHashPathMap: Map<string, string>,
 ): Promise<void> {
 	const { blockList, linkDirs } = getRuntimeConfig();
 	logger.info(`Validating all existing torrent save paths...`);
@@ -146,6 +159,19 @@ export async function validateSavePaths(
 			);
 		}
 	}
+}
+
+export function organizeTrackers(trackers: Tracker[]): string[][] {
+	return trackers
+		.reduce<string[][]>((acc, tracker) => {
+			if (tracker.tier < 0) return acc;
+			const url = sanitizeTrackerUrl(tracker.url ?? tracker.announce!);
+			if (!url) return acc;
+			if (!acc[tracker.tier]) acc[tracker.tier] = [];
+			acc[tracker.tier].push(url);
+			return acc;
+		}, [])
+		.filter((tier) => tier.length); // Cleanup sparse array
 }
 
 export async function waitForTorrentToComplete(
