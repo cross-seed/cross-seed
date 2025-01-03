@@ -125,9 +125,13 @@ function createCommandWithSharedOptions(name: string, description: string) {
 				.makeOptionMandatory(),
 		)
 		.option(
-			"--no-skip-recheck",
-			"Recheck every torrent before resuming. Leave this off to only recheck those that are necessary.",
+			"--skip-recheck",
+			"Skip rechecking torrents before resuming, unless necessary.",
 			fallback(fileConfig.skipRecheck, true),
+		)
+		.option(
+			"--no-skip-recheck",
+			"Recheck every torrent before resuming, even if unnecessary.",
 		)
 		.option(
 			"--auto-resume-max-download <number>",
