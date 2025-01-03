@@ -121,6 +121,13 @@ module.exports = {
 	 */
 
 	/**
+	 * Use the torrents already in your torrent client to find matches.
+	 * This is the preferred method of cross-seeding, only set to false
+	 * if you want to EXCLUSIVELY use dataDirs.
+	 */
+	useClientTorrents: true,
+
+	/**
 	 * Pause at least this many seconds in between each search. Higher is safer
 	 * for you and friendlier for trackers.
 	 * Minimum value of 30.

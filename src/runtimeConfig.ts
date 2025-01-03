@@ -3,6 +3,7 @@ import { Action, LinkType, MatchMode } from "./constants.js";
 export interface RuntimeConfig {
 	delay: number;
 	torznab: string[];
+	useClientTorrents: boolean;
 	dataDirs?: string[];
 	matchMode: MatchMode;
 	skipRecheck: boolean;

@@ -9,22 +9,31 @@ import {
 	TORRENT_CATEGORY_SUFFIX,
 	TORRENT_TAG,
 } from "../constants.js";
+import { memDB } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { loadTorrentDirLight } from "../torrent.js";
 import {
-	TorrentMetadataInClient,
+	createSearcheeFromDB,
+	File,
+	parseTitle,
+	Searchee,
+	SearcheeClient,
+	SearcheeWithInfoHash,
+	updateSearcheeClientDB,
+} from "../searchee.js";
+import {
+	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
+	organizeTrackers,
 	resumeErrSleepTime,
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
-	validateSavePaths,
+	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 import {
 	extractCredentialsFromUrl,
@@ -163,18 +172,17 @@ export default class QBittorrent implements TorrentClient {
 		await this.createTag();
 
 		if (!torrentDir) return;
-		if (!readdirSync(torrentDir).some((f) => f.endsWith(".fastresume"))) {
+		const dirContents = readdirSync(torrentDir);
+		if (dirContents.some((f) => f.endsWith(".db"))) {
+			throw new CrossSeedError(
+				"torrentDir is not compatible with sqlite mode in qBittorrent, use: https://www.cross-seed.org/docs/basics/options#useclienttorrents",
+			);
+		}
+		if (!dirContents.some((f) => f.endsWith(".fastresume"))) {
 			throw new CrossSeedError(
 				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
 			);
 		}
-		const searcheesRes = loadTorrentDirLight(torrentDir);
-		const infoHashPathMap = await this.getAllDownloadDirs({
-			metas: [], // Don't need to account for subfolder layout
-			onlyCompleted: false,
-			v1HashOnly: true,
-		});
-		await validateSavePaths(infoHashPathMap, await searcheesRes);
 	}
 
 	private async request(
@@ -317,6 +325,30 @@ export default class QBittorrent implements TorrentClient {
 	async getAllCategories(): Promise<CategoryInfo[]> {
 		const responseText = await this.request("/torrents/categories", "");
 		return responseText ? Object.values(JSON.parse(responseText)) : [];
+	}
+
+	async getFiles(infoHash: string): Promise<File[] | null> {
+		const responseText = await this.request(
+			"/torrents/files",
+			`hash=${infoHash}`,
+			X_WWW_FORM_URLENCODED,
+		);
+		if (!responseText) return null;
+		return JSON.parse(responseText).map((file) => ({
+			name: path.basename(file.name),
+			path: file.name,
+			length: file.size,
+		}));
+	}
+
+	async getTrackers(infoHash: string): Promise<string[][] | null> {
+		const responseText = await this.request(
+			"/torrents/trackers",
+			`hash=${infoHash}`,
+			X_WWW_FORM_URLENCODED,
+		);
+		if (!responseText) return null;
+		return organizeTrackers(JSON.parse(responseText));
 	}
 
 	async addTorrent(formData: FormData): Promise<void> {
@@ -490,6 +522,70 @@ export default class QBittorrent implements TorrentClient {
 			tags: torrent.tags.length ? torrent.tags.split(",") : [],
 			trackers: torrent.tracker.length ? [[torrent.tracker]] : undefined,
 		}));
+	}
+
+	/**
+	 * Get all searchees from the client and update the db
+	 * @param options.refresh infoHashes of torrents to update even if they are in the db
+	 * @return array of searchees
+	 */
+	async getClientSearchees(options?: {
+		refresh: string[];
+	}): Promise<ClientSearcheeResult> {
+		const searchees: SearcheeClient[] = [];
+		const newSearchees: SearcheeClient[] = [];
+		const infoHashes = new Set<string>();
+		const torrents = await this.getAllTorrentInfo();
+		if (!torrents.length) {
+			logger.error({
+				label: Label.QBITTORRENT,
+				message: "No torrents found in client",
+			});
+			return { searchees, newSearchees };
+		}
+		for (const torrent of torrents) {
+			const infoHash = (
+				torrent.infohash_v1 || torrent.hash
+			).toLowerCase();
+			infoHashes.add(infoHash);
+			const dbTorrent = await memDB("torrent")
+				.where("info_hash", infoHash)
+				.first();
+			if (dbTorrent && !options?.refresh.includes(infoHash)) {
+				searchees.push(createSearcheeFromDB(dbTorrent));
+				continue;
+			}
+			const files = await this.getFiles(torrent.hash);
+			const trackers = await this.getTrackers(torrent.hash);
+			if (!files || !trackers) {
+				logger.verbose({
+					label: Label.QBITTORRENT,
+					message: `Failed to get files or trackers for ${torrent.name} [${torrent.hash}] (likely transient)`,
+				});
+				continue;
+			}
+			const { name } = torrent;
+			const title = parseTitle(name, files) ?? name;
+			const length = torrent.total_size;
+			const savePath = torrent.save_path;
+			const category = torrent.category;
+			const tags = torrent.tags.length ? torrent.tags.split(",") : [];
+			const searchee: SearcheeClient = {
+				infoHash,
+				name,
+				title,
+				files,
+				length,
+				savePath,
+				category,
+				tags,
+				trackers,
+			};
+			newSearchees.push(searchee);
+			searchees.push(searchee);
+		}
+		await updateSearcheeClientDB(newSearchees, infoHashes);
+		return { searchees, newSearchees };
 	}
 
 	/**

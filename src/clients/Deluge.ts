@@ -1,4 +1,5 @@
 import { readdirSync } from "fs";
+import { basename } from "path";
 import ms from "ms";
 import {
 	DecisionAnyMatch,
@@ -6,13 +7,20 @@ import {
 	TORRENT_CATEGORY_SUFFIX,
 	TORRENT_TAG,
 } from "../constants.js";
+import { memDB } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { loadTorrentDirLight } from "../torrent.js";
+import {
+	createSearcheeFromDB,
+	parseTitle,
+	Searchee,
+	SearcheeClient,
+	SearcheeWithInfoHash,
+	updateSearcheeClientDB,
+} from "../searchee.js";
 import {
 	extractCredentialsFromUrl,
 	getLogString,
@@ -21,24 +29,28 @@ import {
 	wait,
 } from "../utils.js";
 import {
-	TorrentMetadataInClient,
+	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
+	organizeTrackers,
 	resumeErrSleepTime,
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
-	validateSavePaths,
+	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 
 interface TorrentInfo {
 	name?: string;
 	complete?: boolean;
-	save_path: string;
+	save_path?: string;
 	state?: string;
 	progress?: number;
 	label?: string;
+	total_size?: number;
 	total_remaining?: number;
+	files?: { path: string; size: number }[];
+	trackers?: { url: string; tier: number }[];
 }
 
 enum DelugeErrorCode {
@@ -89,11 +101,6 @@ export default class Deluge implements TorrentClient {
 				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
 			);
 		}
-		const searcheesRes = loadTorrentDirLight(torrentDir);
-		const infoHashPathMap = await this.getAllDownloadDirs({
-			onlyCompleted: false,
-		});
-		await validateSavePaths(infoHashPathMap, await searcheesRes);
 	}
 
 	/**
@@ -411,7 +418,7 @@ export default class Deluge implements TorrentClient {
 
 			const torrentFileName = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
 			const encodedTorrentData = newTorrent.encode().toString("base64");
-			const torrentPath = path ? path : torrentInfo!.save_path;
+			const torrentPath = path ? path : torrentInfo!.save_path!;
 			const params = this.formatData(
 				torrentFileName,
 				encodedTorrentData,
@@ -535,7 +542,7 @@ export default class Deluge implements TorrentClient {
 		if (options.onlyCompleted && torrent.progress !== 100) {
 			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}
-		return resultOf(torrent.save_path);
+		return resultOf(torrent.save_path!);
 	}
 
 	/**
@@ -564,7 +571,7 @@ export default class Deluge implements TorrentClient {
 		}
 		for (const [hash, torrent] of Object.entries(torrentResponse)) {
 			if (options.onlyCompleted && torrent.progress !== 100) continue;
-			dirs.set(hash, torrent.save_path);
+			dirs.set(hash, torrent.save_path!);
 		}
 		return dirs;
 	}
@@ -606,6 +613,77 @@ export default class Deluge implements TorrentClient {
 			category: torrent.label ?? "",
 			tags: [],
 		}));
+	}
+
+	/**
+	 * Get all searchees from the client and update the db
+	 * @param options.refresh infoHashes of torrents to update even if they are in the db
+	 * @return array of searchees
+	 */
+	async getClientSearchees(options?: {
+		refresh: string[];
+	}): Promise<ClientSearcheeResult> {
+		const searchees: SearcheeClient[] = [];
+		const newSearchees: SearcheeClient[] = [];
+		const infoHashes = new Set<string>();
+		const torrentsRes = await this.call<TorrentStatus>("web.update_ui", [
+			["name", "label", "save_path", "total_size", "files", "trackers"],
+			{},
+		]);
+		if (torrentsRes.isErr()) {
+			logger.error({
+				label: Label.DELUGE,
+				message: "Failed to get torrents from client",
+			});
+			logger.debug(torrentsRes.unwrapErr());
+			return { searchees, newSearchees };
+		}
+		const torrents = torrentsRes.unwrap().torrents;
+		if (!torrents || !Object.keys(torrents).length) {
+			logger.verbose({
+				label: Label.DELUGE,
+				message: "No torrents found in client",
+			});
+			return { searchees, newSearchees };
+		}
+		for (const [hash, torrent] of Object.entries(torrents)) {
+			const infoHash = hash.toLowerCase();
+			infoHashes.add(infoHash);
+			const dbTorrent = await memDB("torrent")
+				.where("info_hash", infoHash)
+				.first();
+			if (dbTorrent && !options?.refresh.includes(infoHash)) {
+				searchees.push(createSearcheeFromDB(dbTorrent));
+				continue;
+			}
+			const files = torrent.files!.map((file) => ({
+				name: basename(file.path),
+				path: file.path,
+				length: file.size,
+			}));
+			const trackers = organizeTrackers(torrent.trackers!);
+			const name = torrent.name!;
+			const title = parseTitle(name, files) ?? name;
+			const length = torrent.total_size!;
+			const savePath = torrent.save_path!;
+			const category = torrent.label ?? "";
+			const tags = [];
+			const searchee: SearcheeClient = {
+				infoHash,
+				name,
+				title,
+				files,
+				length,
+				savePath,
+				category,
+				tags,
+				trackers,
+			};
+			newSearchees.push(searchee);
+			searchees.push(searchee);
+		}
+		await updateSearcheeClientDB(newSearchees, infoHashes);
+		return { searchees, newSearchees };
 	}
 
 	/**
