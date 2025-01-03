@@ -302,7 +302,7 @@ export const VALIDATION_SCHEMA = z
 		torznab: z.array(z.string().url()),
 		dataDirs: z.array(z.string()).nullish(),
 		matchMode: z.nativeEnum(MatchMode),
-		skipRecheck: z.boolean(),
+		skipRecheck: z.boolean().optional().default(true),
 		autoResumeMaxDownload: z
 			.number()
 			.int()
@@ -312,7 +312,10 @@ export const VALIDATION_SCHEMA = z
 		linkDir: z.string().nullish(),
 		linkDirs: z.array(z.string()).optional().default([]),
 		linkType: z.nativeEnum(LinkType),
-		flatLinking: z.boolean().nullish().default(false),
+		flatLinking: z
+			.boolean()
+			.nullish()
+			.transform((v) => (typeof v === "boolean" ? v : false)),
 		maxDataDepth: z.number().gte(1),
 		torrentDir: z.string().nullable(),
 		outputDir: z.string().refine((dir) => {
@@ -412,8 +415,14 @@ export const VALIDATION_SCHEMA = z
 		torrents: z.array(z.string()).optional(),
 		blockList: z.array(z.string()).nullish().transform(transformBlocklist),
 		apiKey: z.string().min(24).nullish(),
-		radarr: z.array(z.string().url()).nullish().default([]),
-		sonarr: z.array(z.string().url()).nullish().default([]),
+		radarr: z
+			.array(z.string().url())
+			.nullish()
+			.transform((v) => v ?? []),
+		sonarr: z
+			.array(z.string().url())
+			.nullish()
+			.transform((v) => v ?? []),
 	})
 	.strict()
 	.refine((config) => {
