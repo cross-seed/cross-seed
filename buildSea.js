@@ -5,4 +5,13 @@ await esbuild.build({
 	bundle: true,
 	platform: "node",
 	outfile: "out.js",
+	external: [
+		"pg",
+		"oracledb",
+		"sqlite3",
+		"tedious",
+		"pg-query-stream",
+		"mysql2",
+		"mysql",
+	],
 });
