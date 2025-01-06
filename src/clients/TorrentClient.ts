@@ -4,7 +4,7 @@ import { testLinking } from "../action.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
-import { findBlockedStringInReleaseMaybe } from "../preFilter.js";
+import { filterByContent } from "../preFilter.js";
 import { Result } from "../Result.js";
 import {
 	ABS_WIN_PATH_REGEX,
@@ -94,7 +94,7 @@ export async function validateSavePaths(
 	infoHashPathMap: Map<string, string>,
 	searchees: SearcheeWithInfoHash[],
 ): Promise<void> {
-	const { blockList, linkDirs } = getRuntimeConfig();
+	const { linkDirs } = getRuntimeConfig();
 	logger.info(`Validating all existing torrent save paths...`);
 
 	const entryDir = searchees.find((s) => !infoHashPathMap.has(s.infoHash));
@@ -116,7 +116,7 @@ export async function validateSavePaths(
 
 	const removedSavePaths = new Set<string>();
 	for (const searchee of searchees) {
-		if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
+		if (!filterByContent({ ...searchee, label: Label.SEARCH })) {
 			if (infoHashPathMap.has(searchee.infoHash)) {
 				removedSavePaths.add(infoHashPathMap.get(searchee.infoHash)!);
 				infoHashPathMap.delete(searchee.infoHash);
@@ -128,7 +128,7 @@ export async function validateSavePaths(
 		(savePath) => !uniqueSavePaths.has(savePath),
 	);
 	logger.verbose(
-		`Excluded save paths from linking test due to blockList: ${formatAsList(ignoredSavePaths, { sort: true, type: "unit" })}`,
+		`Excluded save paths from linking test due to filters: ${formatAsList(ignoredSavePaths, { sort: true, type: "unit" })}`,
 	);
 
 	for (const savePath of uniqueSavePaths) {
