@@ -118,7 +118,7 @@ async function deleteTorrentFileIfComplete(
 	if (await waitForTorrentToComplete(infoHash)) {
 		await deleteTorrentFileIfSafe(torrentFilePath);
 	} else {
-		logger.info({
+		logger.warn({
 			label: Label.INJECT,
 			message: `Will not delete ${getTorrentFilePathLog(torrentFilePath)}: torrent is incomplete`,
 		});
@@ -280,20 +280,20 @@ async function injectFromStalledTorrent({
 				);
 				// result is only SUCCESS or FAILURE here but still log original injectionResult
 				if (result === InjectionResult.SUCCESS) {
-					logger.info({
+					logger.warn({
 						label: Label.INJECT,
 						message: `${progress} Injected ${filePathLog} using stalled source, you will need to resume or remove from client - ${chalk.green(injectionResult)}`,
 					});
 					inClient = true;
 					injected = true;
 				} else {
-					logger.warn({
+					logger.error({
 						label: Label.INJECT,
 						message: `${progress} Failed to inject ${filePathLog} using stalled source - ${chalk.yellow(injectionResult)}`,
 					});
 				}
 			} else {
-				logger.warn({
+				logger.error({
 					label: Label.INJECT,
 					message: `${progress} Failed to link files for ${filePathLog}, ${linkedFilesRootResult.unwrapErr()} - ${chalk.yellow(injectionResult)}`,
 				});
@@ -391,11 +391,16 @@ async function injectionAlreadyExists({
 			isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
 		}
 	} else {
-		logger.warn({
-			label: Label.INJECT,
-			message: `${progress} Unable to inject ${filePathLog} - ${chalk.yellow(injectionResult)}${isComplete ? "" : " (incomplete)"}`,
-		});
-		if (!isComplete) {
+		if (isComplete) {
+			logger.info({
+				label: Label.INJECT,
+				message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)}`,
+			});
+		} else {
+			logger.warn({
+				label: Label.INJECT,
+				message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)} (incomplete)`,
+			});
 			getClient()!.resumeInjection(meta.infoHash, existsDecision, {
 				checkOnce: true,
 			});
@@ -490,7 +495,7 @@ async function injectSavedTorrent(
 	);
 
 	if (!matches.length && foundBlocked) {
-		logger.info({
+		logger.warn({
 			label: Label.INJECT,
 			message: `${progress} ${metaLog} ${chalk.yellow("possibly blocklisted")}: ${filePathLog}`,
 		});
@@ -498,7 +503,7 @@ async function injectSavedTorrent(
 		await deleteTorrentFileIfSafe(torrentFilePath);
 		return;
 	} else if (!matches.length) {
-		logger.info({
+		logger.error({
 			label: Label.INJECT,
 			message: `${progress} ${metaLog} ${chalk.red("has no matches")}: ${filePathLog}`,
 		});
