@@ -1,13 +1,9 @@
 import chalk from "chalk";
 import { accessSync, constants, copyFileSync, existsSync, mkdirSync } from "fs";
-import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
-import { Action, MatchMode } from "./constants.js";
+import { Action, MatchMode, PROGRAM_NAME } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
-
-const require = createRequire(import.meta.url);
-const packageDotJson = require("../package.json");
 
 export interface FileConfig {
 	action?: Action;
@@ -63,8 +59,8 @@ export function appDir(): string {
 	const appDir =
 		process.env.CONFIG_DIR ||
 		(process.platform === "win32"
-			? path.resolve(process.env.LOCALAPPDATA!, packageDotJson.name)
-			: path.resolve(process.env.HOME!, `.${packageDotJson.name}`));
+			? path.resolve(process.env.LOCALAPPDATA!, PROGRAM_NAME)
+			: path.resolve(process.env.HOME!, `.${PROGRAM_NAME}`));
 	try {
 		accessSync(appDir, constants.R_OK | constants.W_OK);
 	} catch (e) {
