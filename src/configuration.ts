@@ -100,9 +100,11 @@ export function getFileConfig(): FileConfig {
 		generateConfig();
 	}
 
-	const require = createRequire(appDir());
+	// cwd is not special, it's just a stand in.
+	// We only pass an absolute path to require so it doesn't matter.
+	const require = createRequire(process.cwd());
 	try {
-		return require("./config.js");
+		return require(path.join(appDir(), "config.js"));
 	} catch (e) {
 		if (e.code === "ERR_MODULE_NOT_FOUND") {
 			return {};

@@ -4,7 +4,7 @@ await esbuild.build({
 	entryPoints: ["dist/cmd.js"],
 	bundle: true,
 	platform: "node",
-	outfile: "out.js",
+	outfile: "bundle.js",
 	external: [
 		"pg",
 		"oracledb",
