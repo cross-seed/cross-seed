@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { accessSync, constants, copyFileSync, existsSync, mkdirSync } from "fs";
+import { createRequire } from "module";
 import path from "path";
-import { pathToFileURL } from "url";
 import { Action, MatchMode, PROGRAM_NAME } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 
@@ -95,15 +95,14 @@ export function generateConfig(): void {
 	console.log("Configuration file created at", chalk.yellow.bold(dest));
 }
 
-export async function getFileConfig(): Promise<FileConfig> {
+export function getFileConfig(): FileConfig {
 	if (process.env.DOCKER_ENV === "true") {
 		generateConfig();
 	}
 
-	const configPath = path.join(appDir(), "config.js");
-
+	const require = createRequire(appDir());
 	try {
-		return (await import(pathToFileURL(configPath).toString())).default;
+		return require("./config.js");
 	} catch (e) {
 		if (e.code === "ERR_MODULE_NOT_FOUND") {
 			return {};
