@@ -458,3 +458,13 @@ export function findAFileWithExt(dir: string, exts: string[]): string | null {
 	}
 	return null;
 }
+
+export async function inBatches<T>(
+	items: T[],
+	cb: (batch: T[]) => Promise<void>,
+	batchSize = 100,
+): Promise<void> {
+	for (let i = 0; i < items.length; i += batchSize) {
+		await cb(items.slice(i, i + batchSize));
+	}
+}

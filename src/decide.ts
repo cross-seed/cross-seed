@@ -1,5 +1,6 @@
 import {
 	existsSync,
+	readdirSync,
 	statSync,
 	unlinkSync,
 	utimesSync,
@@ -42,6 +43,7 @@ import {
 	getLogString,
 	getMediaType,
 	getMinSizeRatio,
+	inBatches,
 	sanitizeInfoHash,
 	stripExtension,
 	wait,
@@ -360,7 +362,7 @@ export async function assessCandidate(
 			}
 		}
 		metafile = res.unwrap();
-		metaCached = cacheTorrentFile(metafile);
+		metaCached = await cacheTorrentFile(metafile);
 		metaOrCandidate.size = metafile.length; // Trackers can be wrong
 	} else {
 		metafile = metaOrCandidate;
@@ -458,10 +460,25 @@ async function getCachedTorrentFile(
 	}
 }
 
-function cacheTorrentFile(meta: Metafile): boolean {
+async function cacheTorrentFile(meta: Metafile): Promise<boolean> {
+	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
+	const files = readdirSync(torrentCacheDir);
+	const now = Date.now();
+	const entriesToDelete: string[] = [];
+	for (const file of files) {
+		const filePath = path.join(torrentCacheDir, file);
+		if (now - statSync(filePath).atimeMs > ms("1 year")) {
+			logger.verbose(`Deleting ${file}`);
+			entriesToDelete.push(file.split(".")[0]);
+			unlinkSync(filePath);
+		}
+	}
+	await inBatches(entriesToDelete, async (batch) => {
+		await db("decision").whereIn("info_hash", batch).del();
+	});
+
 	const torrentPath = path.join(
-		appDir(),
-		TORRENT_CACHE_FOLDER,
+		torrentCacheDir,
 		`${meta.infoHash}.cached.torrent`,
 	);
 	if (existsInTorrentCache(meta.infoHash)) return false;
