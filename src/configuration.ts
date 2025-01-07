@@ -1,9 +1,17 @@
 import chalk from "chalk";
-import { accessSync, constants, copyFileSync, existsSync, mkdirSync } from "fs";
+import {
+	accessSync,
+	constants,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	writeFileSync,
+} from "fs";
 import { createRequire } from "module";
 import path from "path";
 import { Action, MatchMode, PROGRAM_NAME } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
+import { isSea, getAsset } from "node:sea";
 
 export interface FileConfig {
 	action?: Action;
@@ -86,12 +94,18 @@ export function createAppDir(): void {
 export function generateConfig(): void {
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
-	const templatePath = path.join("./config.template.cjs");
+	const templatePath = "./config.template.cjs";
 	if (existsSync(dest)) {
 		console.log("Configuration file already exists.");
 		return;
 	}
-	copyFileSync(new URL(templatePath, import.meta.url), dest);
+
+	if (isSea()) {
+		writeFileSync(dest, getAsset(templatePath, "utf8"));
+	} else {
+		copyFileSync(new URL(templatePath, import.meta.url), dest);
+	}
+
 	console.log("Configuration file created at", chalk.yellow.bold(dest));
 }
 
