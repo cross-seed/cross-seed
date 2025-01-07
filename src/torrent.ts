@@ -35,7 +35,7 @@ import {
 import { createKeyTitle, getLogString, stripExtension } from "./utils.js";
 import {
 	getDataByFuzzyName,
-	indexDataDirs,
+	// indexDataDirs,
 	shouldIgnorePathHeuristically,
 } from "./dataFiles.js";
 
@@ -432,7 +432,7 @@ export async function indexEnsemble(): Promise<void> {
 
 export async function indexTorrentsAndDataDirs(): Promise<void> {
 	await indexNewTorrents();
-	await indexDataDirs();
+	// await indexDataDirs();
 }
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {

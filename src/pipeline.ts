@@ -653,6 +653,7 @@ export async function main(): Promise<void> {
 
 export async function scanRssFeeds() {
 	const { dataDirs, torrentDir, torznab } = getRuntimeConfig();
+	await indexTorrentsAndDataDirs();
 	if (!torznab.length || (!torrentDir && !dataDirs?.length)) {
 		logger.error({
 			label: Label.RSS,
@@ -668,7 +669,6 @@ export async function scanRssFeeds() {
 		label: Label.RSS,
 		message: "Indexing new torrents...",
 	});
-	await indexTorrentsAndDataDirs();
 	logger.verbose({
 		label: Label.RSS,
 		message: "Querying RSS feeds...",

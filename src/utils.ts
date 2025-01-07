@@ -27,6 +27,8 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 
+const mutexes = new Map<string, Promise<unknown>>();
+
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };
@@ -457,4 +459,45 @@ export function findAFileWithExt(dir: string, exts: string[]): string | null {
 		}
 	}
 	return null;
+}
+
+export async function inBatches<T>(
+	items: T[],
+	cb: (batch: T[]) => Promise<void>,
+	options = { batchSize: 100 },
+): Promise<void> {
+	for (let i = 0; i < items.length; i += options.batchSize) {
+		await cb(items.slice(i, i + options.batchSize));
+	}
+}
+
+/**
+ * Executes a callback function within a mutex for the given name.
+ * @param name The name of the mutex to create/use.
+ * @param cb The callback to execute.
+ * @param options.useQueue If false, concurrent calls will share the pending result.
+ * @returns The result of the callback.
+ */
+export async function withMutex<T>(
+	name: string,
+	cb: () => Promise<T>,
+	options?: { useQueue: boolean },
+): Promise<T> {
+	const existingMutex = mutexes.get(name) as Promise<T> | undefined;
+	if (existingMutex) {
+		if (options?.useQueue) {
+			while (mutexes.has(name)) await mutexes.get(name);
+		} else {
+			return existingMutex;
+		}
+	}
+	const mutex = (async () => {
+		try {
+			return await cb();
+		} finally {
+			mutexes.delete(name);
+		}
+	})();
+	mutexes.set(name, mutex);
+	return mutex;
 }

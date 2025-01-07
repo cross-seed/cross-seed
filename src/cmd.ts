@@ -30,9 +30,11 @@ import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
-import { indexEnsemble, parseTorrentFromFilename } from "./torrent.js";
+import {
+	// indexTorrentsAndDataDirs,
+	parseTorrentFromFilename,
+} from "./torrent.js";
 import { fallback } from "./utils.js";
-import { initializeDataDirs } from "./dataFiles.js";
 
 let fileConfig: FileConfig;
 try {
@@ -108,6 +110,15 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"Torznab urls with apikey included (separated by spaces)",
 			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.torznab),
+		)
+		.option(
+			"--use-client-torrents",
+			"Use torrents from your client for matching",
+			fallback(fileConfig.useClientTorrents, false),
+		)
+		.option(
+			"--no-use-client-torrents",
+			"Don't use torrents from your client for matching",
 		)
 		.option(
 			"--data-dirs <dirs...>",
@@ -448,8 +459,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
-			await indexEnsemble();
-			await initializeDataDirs();
+			// await indexTorrentsAndDataDirs({ startup: true });
 			serve(options.port, options.host);
 			jobsLoop();
 		} catch (e) {
@@ -465,8 +475,7 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
-			await indexEnsemble();
-			await initializeDataDirs();
+			// await indexTorrentsAndDataDirs({ startup: true });
 			await scanRssFeeds();
 			await db.destroy();
 			await memDB.destroy();

@@ -13,7 +13,7 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import { createEnsemblePieces, EnsembleEntry } from "./torrent.js";
-import { createKeyTitle, isTruthy } from "./utils.js";
+import { createKeyTitle, inBatches, isTruthy } from "./utils.js";
 import { isOk } from "./Result.js";
 
 interface DataEntry {
@@ -24,35 +24,35 @@ interface DataEntry {
 const watchers: Map<string, FSWatcher> = new Map();
 const modifiedPaths: Map<string, Set<string>> = new Map();
 
-/**
- * Only call this function once at the start of the program.
- */
-export async function initializeDataDirs(): Promise<void> {
-	const { dataDirs } = getRuntimeConfig();
+export async function indexDataDirs(options: {
+	startup: boolean;
+}): Promise<void> {
+	const { dataDirs, maxDataDepth } = getRuntimeConfig();
 	if (!dataDirs?.length) return;
-	for (const dataDir of dataDirs) {
-		modifiedPaths.set(dataDir, new Set());
-		watchers.set(
-			dataDir,
-			watch(dataDir, { recursive: true, persistent: false }, (_, f) => {
-				if (!f) return;
-				const fullPath = resolve(join(dataDir, f));
-				if (fullPath === resolve(dataDir)) return;
-				modifiedPaths.get(dataDir)!.add(fullPath);
-			}),
-		);
-	}
-	logger.info("Indexing dataDirs for reverse lookup...");
-	await indexDataPaths(findSearcheesFromAllDataDirs());
-}
 
-/**
- * This gets called on each rss/webhook/announce event.
- */
-export async function indexDataDirs(): Promise<void> {
-	const { maxDataDepth } = getRuntimeConfig();
+	if (options.startup) {
+		logger.info("Indexing dataDirs for reverse lookup...");
+		for (const dataDir of dataDirs) {
+			modifiedPaths.set(dataDir, new Set());
+			watchers.set(
+				dataDir,
+				watch(
+					dataDir,
+					{ recursive: true, persistent: false },
+					(_, f) => {
+						if (!f) return;
+						const fullPath = resolve(join(dataDir, f));
+						if (fullPath === resolve(dataDir)) return;
+						modifiedPaths.get(dataDir)!.add(fullPath);
+					},
+				),
+			);
+		}
+		return await indexDataPaths(findSearcheesFromAllDataDirs());
+	}
+
 	await Promise.all(
-		Array.from(watchers.keys()).map((dataDir) => {
+		dataDirs.map(async (dataDir) => {
 			const modified = modifiedPaths.get(dataDir)!;
 			const eventPaths: string[] = [];
 			while (modified.size) {
@@ -71,20 +71,33 @@ export async function indexDataDirs(): Promise<void> {
 					a.split(sep).filter(isTruthy).length,
 			);
 			const seenPaths = new Set<string>();
-			const paths = eventPaths.reduce<string[]>((acc, path) => {
-				const affectedPaths: string[] = [path];
-				let parentPath = dirname(path);
-				while (resolve(parentPath) !== resolve(dataDir)) {
-					affectedPaths.push(parentPath);
-					parentPath = dirname(parentPath);
-				}
-				for (const affectedPath of affectedPaths.slice(-maxDataDepth)) {
-					if (seenPaths.has(affectedPath)) continue;
-					seenPaths.add(affectedPath);
-					acc.push(affectedPath);
-				}
-				return acc;
-			}, []);
+			const deletedPaths: string[] = [];
+			const paths = eventPaths
+				.reduce<string[]>((acc, path) => {
+					const affectedPaths: string[] = [path];
+					let parentPath = dirname(path);
+					while (resolve(parentPath) !== resolve(dataDir)) {
+						affectedPaths.push(parentPath);
+						parentPath = dirname(parentPath);
+					}
+					for (const affectedPath of affectedPaths.slice(
+						-maxDataDepth,
+					)) {
+						if (seenPaths.has(affectedPath)) continue;
+						seenPaths.add(affectedPath);
+						acc.push(affectedPath);
+					}
+					return acc;
+				}, [])
+				.filter((path) => {
+					if (existsSync(path)) return true;
+					deletedPaths.push(path);
+					return false;
+				});
+			await inBatches(deletedPaths, async (batch) => {
+				await memDB("data").whereIn("path", batch).del();
+				await memDB("ensemble").whereIn("path", batch).del();
+			});
 			return indexDataPaths(paths);
 		}),
 	);
@@ -119,17 +132,12 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 			if (ensembleEntry) ensembleRows.push(ensembleEntry);
 		}
 	}
-	const batchSize = 100;
-	for (let i = 0; i < dataRows.length; i += batchSize) {
-		const batch = dataRows.slice(i, i + batchSize);
-		if (!batch.length) break;
+	await inBatches(dataRows, async (batch) => {
 		await memDB("data").insert(batch).onConflict("path").merge();
-	}
-	for (let i = 0; i < ensembleRows.length; i += batchSize) {
-		const batch = ensembleRows.slice(i, i + batchSize);
-		if (!batch.length) break;
+	});
+	await inBatches(ensembleRows, async (batch) => {
 		await memDB("ensemble").insert(batch).onConflict("path").merge();
-	}
+	});
 }
 
 async function indexEnsembleDataEntry(
@@ -142,6 +150,7 @@ async function indexEnsembleDataEntry(
 	const { key, element, largestFile } = ensemblePieces;
 	return {
 		path: join(dirname(path), largestFile.path),
+		// info_hash: null,
 		ensemble: key,
 		element,
 	};
@@ -180,9 +189,10 @@ export async function getDataByFuzzyName(
 			entriesToDelete.push(path);
 			return false;
 		});
-	if (entriesToDelete.length > 0) {
-		await memDB("data").whereIn("path", entriesToDelete).del();
-	}
+	await inBatches(entriesToDelete, async (batch) => {
+		await memDB("data").whereIn("path", batch).del();
+		await memDB("ensemble").whereIn("path", batch).del();
+	});
 	if (potentialMatches.length === 0) return [];
 	return [await createSearcheeFromPath(potentialMatches[0].item.path)]
 		.filter(isOk)

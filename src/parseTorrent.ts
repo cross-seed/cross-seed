@@ -40,19 +40,6 @@ interface TorrentMetadata {
 	"qBt-tags"?: Buffer;
 }
 
-function sanitizeTrackerUrls(urls: Buffer[]): string[] {
-	const sanitizeTrackerUrl = (url: string) => {
-		try {
-			return new URL(url).host;
-		} catch {
-			return null;
-		}
-	};
-	return urls
-		.map((url) => sanitizeTrackerUrl(url.toString()))
-		.filter(isTruthy);
-}
-
 export function updateMetafileMetadata(
 	metafile: Metafile,
 	metadata: TorrentMetadata,
@@ -68,6 +55,20 @@ export function updateMetafileMetadata(
 			sanitizeTrackerUrls(tier),
 		);
 	}
+}
+
+export function sanitizeTrackerUrl(url: string): string | null {
+	try {
+		return new URL(url).host;
+	} catch {
+		return null;
+	}
+}
+
+function sanitizeTrackerUrls(urls: Buffer[]): string[] {
+	return urls
+		.map((url) => sanitizeTrackerUrl(url.toString()))
+		.filter(isTruthy);
 }
 
 function sumLength(sum: number, file: { length: number }): number {
