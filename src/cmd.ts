@@ -510,4 +510,4 @@ createCommandWithSharedOptions(
 
 program.showHelpAfterError("(add --help for additional information)");
 
-await program.parseAsync();
+program.parseAsync().catch(console.error);
