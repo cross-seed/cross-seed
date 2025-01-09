@@ -106,7 +106,7 @@ async function main() {
 	await writeFile(
 		"sea/sea-config.json",
 		JSON.stringify({
-			main: "bundle.js",
+			main: "sea/bundle.js",
 			disableExperimentalSEAWarning: true,
 			output: "sea/sea-prep.blob",
 			assets: {

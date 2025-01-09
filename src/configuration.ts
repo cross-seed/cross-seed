@@ -94,7 +94,7 @@ export function createAppDir(): void {
 export function generateConfig(): void {
 	createAppDir();
 	const dest = path.join(appDir(), "config.js");
-	const templatePath = "./config.template.cjs";
+	const templatePath = "config.template.cjs";
 	if (existsSync(dest)) {
 		console.log("Configuration file already exists.");
 		return;
@@ -120,7 +120,10 @@ export function getFileConfig(): FileConfig {
 	try {
 		return require(path.join(appDir(), "config.js"));
 	} catch (e) {
-		if (e.code === "ERR_MODULE_NOT_FOUND") {
+		if (
+			e.code === "ERR_MODULE_NOT_FOUND" ||
+			e.code === "MODULE_NOT_FOUND"
+		) {
 			return {};
 		} else if (e instanceof SyntaxError) {
 			const location = e.stack!.split("\n").slice(0, 3).join("\n");

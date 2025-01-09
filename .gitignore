@@ -46,3 +46,4 @@ test.db
 coverage/
 .vscode/
 bundle.js
+sea/
