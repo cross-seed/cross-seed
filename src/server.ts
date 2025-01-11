@@ -25,10 +25,16 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 
 const ANNOUNCE_SCHEMA = z
 	.object({
-		name: z.string().refine((name) => name.trim().length > 0),
+		name: z
+			.string()
+			.transform((name) => name.trim())
+			.refine((name) => name.length > 0),
 		guid: z.string().url(),
 		link: z.string().url(),
-		tracker: z.string().refine((tracker) => tracker.trim().length > 0),
+		tracker: z
+			.string()
+			.transform((tracker) => tracker.trim())
+			.refine((tracker) => tracker.length > 0),
 	})
 	.strict()
 	.required()
