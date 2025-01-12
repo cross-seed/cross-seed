@@ -157,9 +157,14 @@ export class Metafile {
 			this.isSingleFileTorrent = false;
 		}
 		this.title = parseTitle(this.name, this.files) ?? this.name;
+
+		const announceList = raw["announce-list"];
 		this.trackers =
-			raw["announce-list"]?.map((tier) => sanitizeTrackerUrls(tier)) ??
-			(raw.announce ? [sanitizeTrackerUrls([raw.announce])] : []);
+			Array.isArray(announceList) && announceList.length > 0
+				? announceList.map((tier) => sanitizeTrackerUrls(tier))
+				: raw.announce
+					? [sanitizeTrackerUrls([raw.announce])]
+					: [];
 	}
 
 	static decode(buf: Buffer) {
