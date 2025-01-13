@@ -362,7 +362,7 @@ export async function assessCandidate(
 			}
 		}
 		metafile = res.unwrap();
-		metaCached = await cacheTorrentFile(metafile);
+		metaCached = cacheTorrentFile(metafile);
 		metaOrCandidate.size = metafile.length; // Trackers can be wrong
 	} else {
 		metafile = metaOrCandidate;
@@ -460,7 +460,18 @@ async function getCachedTorrentFile(
 	}
 }
 
-async function cacheTorrentFile(meta: Metafile): Promise<boolean> {
+function cacheTorrentFile(meta: Metafile): boolean {
+	if (existsInTorrentCache(meta.infoHash)) return false;
+	const torrentPath = path.join(
+		appDir(),
+		TORRENT_CACHE_FOLDER,
+		`${meta.infoHash}.cached.torrent`,
+	);
+	writeFileSync(torrentPath, meta.encode());
+	return true;
+}
+
+export async function cleanupTorrentCache(): Promise<void> {
 	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
 	const files = readdirSync(torrentCacheDir);
 	const now = Date.now();
@@ -476,14 +487,6 @@ async function cacheTorrentFile(meta: Metafile): Promise<boolean> {
 	await inBatches(entriesToDelete, async (batch) => {
 		await db("decision").whereIn("info_hash", batch).del();
 	});
-
-	const torrentPath = path.join(
-		torrentCacheDir,
-		`${meta.infoHash}.cached.torrent`,
-	);
-	if (existsInTorrentCache(meta.infoHash)) return false;
-	writeFileSync(torrentPath, meta.encode());
-	return true;
 }
 
 async function assessAndSaveResults(
