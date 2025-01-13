@@ -131,11 +131,12 @@ function parseTorznabResults(xml: TorznabResults): Candidate[] {
 	return items.map((item) => ({
 		guid: item.guid[0],
 		name: item.title[0],
-		tracker:
+		tracker: (
 			item?.prowlarrindexer?.[0]?._ ??
 			item?.jackettindexer?.[0]?._ ??
 			item?.indexer?.[0]?._ ??
-			UNKNOWN_TRACKER,
+			UNKNOWN_TRACKER
+		).trim(),
 		link: item.link[0],
 		size: Number(item.size[0]),
 		pubDate: new Date(item.pubDate[0]).getTime(),
