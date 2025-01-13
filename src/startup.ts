@@ -5,7 +5,6 @@ import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { validateUArrLs } from "./arr.js";
 import { getClient } from "./clients/TorrentClient.js";
-import { Action } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -53,15 +52,8 @@ async function verifyPath(
  * @returns true (if paths are valid)
  */
 async function checkConfigPaths(): Promise<void> {
-	const {
-		action,
-		dataDirs,
-		injectDir,
-		linkDirs,
-		outputDir,
-		rtorrentRpcUrl,
-		torrentDir,
-	} = getRuntimeConfig();
+	const { dataDirs, injectDir, linkDirs, outputDir, torrentDir } =
+		getRuntimeConfig();
 	const READ_ONLY = constants.R_OK;
 	const READ_AND_WRITE = constants.R_OK | constants.W_OK;
 	let pathFailure: number = 0;
@@ -73,10 +65,7 @@ async function checkConfigPaths(): Promise<void> {
 		pathFailure++;
 	}
 
-	if (
-		(action === Action.SAVE || rtorrentRpcUrl) &&
-		!(await verifyPath(outputDir, "outputDir", READ_AND_WRITE))
-	) {
+	if (!(await verifyPath(outputDir, "outputDir", READ_AND_WRITE))) {
 		pathFailure++;
 	}
 
