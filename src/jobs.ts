@@ -7,6 +7,7 @@ import { Label, logger } from "./logger.js";
 import { main, scanRssFeeds } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { updateCaps } from "./torznab.js";
+import { cleanupTorrentCache } from "./decide.js";
 
 class Job {
 	name: string;
@@ -50,6 +51,7 @@ function getJobs(): Job[] {
 	if (action === Action.INJECT) {
 		jobs.push(new Job("inject", ms("1 hour"), injectSavedTorrents));
 	}
+	jobs.push(new Job("cleanup", ms("1 day"), cleanupTorrentCache));
 	return jobs;
 }
 

@@ -1,5 +1,6 @@
 import {
 	existsSync,
+	readdirSync,
 	statSync,
 	unlinkSync,
 	utimesSync,
@@ -50,6 +51,7 @@ import {
 export interface ResultAssessment {
 	decision: Decision;
 	metafile?: Metafile;
+	metaCached?: boolean;
 }
 
 function logDecision(
@@ -327,10 +329,13 @@ export async function assessCandidate(
 		}
 	}
 
+	let metaCached = !isCandidate;
+
 	if (findBlockedStringInReleaseMaybe(searchee, blockList)) {
 		return {
 			decision: Decision.BLOCKED_RELEASE,
 			metafile: !isCandidate ? metaOrCandidate : undefined,
+			metaCached,
 		};
 	}
 
@@ -356,22 +361,26 @@ export async function assessCandidate(
 			}
 		}
 		metafile = res.unwrap();
-		cacheTorrentFile(metafile);
+		metaCached = cacheTorrentFile(metafile);
 		metaOrCandidate.size = metafile.length; // Trackers can be wrong
 	} else {
 		metafile = metaOrCandidate;
 	}
 
 	if (searchee.infoHash === metafile.infoHash) {
-		return { decision: Decision.SAME_INFO_HASH, metafile };
+		return { decision: Decision.SAME_INFO_HASH, metafile, metaCached };
 	}
 
 	if (infoHashesToExclude.has(metafile.infoHash)) {
-		return { decision: Decision.INFO_HASH_ALREADY_EXISTS, metafile };
+		return {
+			decision: Decision.INFO_HASH_ALREADY_EXISTS,
+			metafile,
+			metaCached,
+		};
 	}
 
 	if (findBlockedStringInReleaseMaybe(metafile, blockList)) {
-		return { decision: Decision.BLOCKED_RELEASE, metafile };
+		return { decision: Decision.BLOCKED_RELEASE, metafile, metaCached };
 	}
 
 	// Prevent candidate episodes from matching searchee season packs
@@ -380,17 +389,17 @@ export async function assessCandidate(
 		SEASON_REGEX.test(searchee.title) &&
 		isSingleEpisode(metafile, getMediaType(metafile))
 	) {
-		return { decision: Decision.FILE_TREE_MISMATCH, metafile };
+		return { decision: Decision.FILE_TREE_MISMATCH, metafile, metaCached };
 	}
 
 	const perfectMatch = compareFileTrees(metafile, searchee);
 	if (perfectMatch) {
-		return { decision: Decision.MATCH, metafile };
+		return { decision: Decision.MATCH, metafile, metaCached };
 	}
 
 	const sizeMatch = compareFileTreesIgnoringNames(metafile, searchee);
 	if (sizeMatch && matchMode !== MatchMode.SAFE) {
-		return { decision: Decision.MATCH_SIZE_ONLY, metafile };
+		return { decision: Decision.MATCH_SIZE_ONLY, metafile, metaCached };
 	}
 
 	if (matchMode === MatchMode.PARTIAL) {
@@ -398,17 +407,21 @@ export async function assessCandidate(
 			getPartialSizeRatio(metafile, searchee) >=
 			getMinSizeRatio(searchee);
 		if (!partialSizeMatch) {
-			return { decision: Decision.PARTIAL_SIZE_MISMATCH, metafile };
+			return {
+				decision: Decision.PARTIAL_SIZE_MISMATCH,
+				metafile,
+				metaCached,
+			};
 		}
 		const partialMatch = compareFileTreesPartial(metafile, searchee);
 		if (partialMatch) {
-			return { decision: Decision.MATCH_PARTIAL, metafile };
+			return { decision: Decision.MATCH_PARTIAL, metafile, metaCached };
 		}
 	} else if (!sizeMatch) {
-		return { decision: Decision.SIZE_MISMATCH, metafile };
+		return { decision: Decision.SIZE_MISMATCH, metafile, metaCached };
 	}
 
-	return { decision: Decision.FILE_TREE_MISMATCH, metafile };
+	return { decision: Decision.FILE_TREE_MISMATCH, metafile, metaCached };
 }
 
 function existsInTorrentCache(infoHash: string): boolean {
@@ -446,14 +459,29 @@ async function getCachedTorrentFile(
 	}
 }
 
-function cacheTorrentFile(meta: Metafile): void {
+function cacheTorrentFile(meta: Metafile): boolean {
+	if (existsInTorrentCache(meta.infoHash)) return false;
 	const torrentPath = path.join(
 		appDir(),
 		TORRENT_CACHE_FOLDER,
 		`${meta.infoHash}.cached.torrent`,
 	);
-	if (existsInTorrentCache(meta.infoHash)) return;
 	writeFileSync(torrentPath, meta.encode());
+	return true;
+}
+
+export async function cleanupTorrentCache(): Promise<void> {
+	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
+	const files = readdirSync(torrentCacheDir);
+	const now = Date.now();
+	for (const file of files) {
+		const filePath = path.join(torrentCacheDir, file);
+		if (now - statSync(filePath).atimeMs > ms("1 year")) {
+			logger.verbose(`Deleting ${filePath}`);
+			await db("decision").where("info_hash", file.split(".")[0]).del();
+			unlinkSync(filePath);
+		}
+	}
 }
 
 async function assessAndSaveResults(
@@ -470,7 +498,7 @@ async function assessAndSaveResults(
 		infoHashesToExclude,
 	);
 
-	if (assessment.metafile) {
+	if (assessment.metaCached && assessment.metafile) {
 		guidInfoHashMap.set(guid, assessment.metafile.infoHash);
 		await db.transaction(async (trx) => {
 			const { id } = await trx("searchee")
