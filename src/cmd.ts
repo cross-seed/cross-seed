@@ -31,7 +31,7 @@ import { serve } from "./server.js";
 import "./signalHandlers.js";
 import { doStartupValidation } from "./startup.js";
 import {
-	// indexTorrentsAndDataDirs,
+	indexTorrentsAndDataDirs,
 	parseTorrentFromFilename,
 } from "./torrent.js";
 import { fallback } from "./utils.js";
@@ -459,7 +459,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
-			// await indexTorrentsAndDataDirs({ startup: true });
+			await indexTorrentsAndDataDirs({ startup: true });
 			serve(options.port, options.host);
 			jobsLoop();
 		} catch (e) {
@@ -475,7 +475,7 @@ createCommandWithSharedOptions("rss", "Run an rss scan").action(
 			await validateAndSetRuntimeConfig(options);
 			await db.migrate.latest();
 			await doStartupValidation();
-			// await indexTorrentsAndDataDirs({ startup: true });
+			await indexTorrentsAndDataDirs({ startup: true });
 			await scanRssFeeds();
 			await db.destroy();
 			await memDB.destroy();

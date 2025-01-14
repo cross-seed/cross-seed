@@ -150,7 +150,7 @@ async function indexEnsembleDataEntry(
 	const { key, element, largestFile } = ensemblePieces;
 	return {
 		path: join(dirname(path), largestFile.path),
-		// info_hash: null,
+		info_hash: null,
 		ensemble: key,
 		element,
 	};

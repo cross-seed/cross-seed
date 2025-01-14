@@ -12,7 +12,6 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { loadTorrentDirLight } from "../torrent.js";
 import {
 	extractCredentialsFromUrl,
 	getLogString,
@@ -28,7 +27,6 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
-	validateSavePaths,
 } from "./TorrentClient.js";
 
 interface TorrentInfo {
@@ -89,11 +87,6 @@ export default class Deluge implements TorrentClient {
 				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
 			);
 		}
-		const searcheesRes = loadTorrentDirLight(torrentDir);
-		const infoHashPathMap = await this.getAllDownloadDirs({
-			onlyCompleted: false,
-		});
-		await validateSavePaths(infoHashPathMap, await searcheesRes);
 	}
 
 	/**
