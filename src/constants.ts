@@ -1,7 +1,6 @@
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-const packageDotJson = require("../package.json");
+// @ts-expect-error tsconfig intentionally does not see package.json
+// in order to preserve hierarchy parity between src and dist
+import packageDotJson from "../package.json" with { type: "json" };
 
 export const PROGRAM_NAME = packageDotJson.name;
 export const PROGRAM_VERSION = packageDotJson.version;
