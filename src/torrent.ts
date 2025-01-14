@@ -41,6 +41,7 @@ import {
 	getLogString,
 	inBatches,
 	isTruthy,
+	Mutex,
 	stripExtension,
 	withMutex,
 } from "./utils.js";
@@ -423,26 +424,30 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 export async function indexTorrentsAndDataDirs(
 	options = { startup: false },
 ): Promise<void> {
-	return withMutex("indexTorrentsAndDataDirs", async () => {
-		const maxRetries = 3;
-		for (let attempt = 1; attempt <= maxRetries; attempt++) {
-			try {
-				await Promise.all([
-					indexTorrents(options),
-					indexDataDirs(options),
-				]);
-				break;
-			} catch (e) {
-				const msg = `Indexing failed (${maxRetries - attempt}): ${e.message}`;
-				if (attempt !== maxRetries) {
-					logger.verbose(msg);
-				} else {
-					logger.error(msg);
+	return withMutex(
+		Mutex.INDEX_TORRENTS_AND_DATA_DIRS,
+		async () => {
+			const maxRetries = 3;
+			for (let attempt = 1; attempt <= maxRetries; attempt++) {
+				try {
+					await Promise.all([
+						indexTorrents(options),
+						indexDataDirs(options),
+					]);
+					break;
+				} catch (e) {
+					const msg = `Indexing failed (${maxRetries - attempt}): ${e.message}`;
+					if (attempt !== maxRetries) {
+						logger.verbose(msg);
+					} else {
+						logger.error(msg);
+					}
+					logger.debug(e);
 				}
-				logger.debug(e);
 			}
-		}
-	});
+		},
+		{ useQueue: false },
+	);
 }
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {
