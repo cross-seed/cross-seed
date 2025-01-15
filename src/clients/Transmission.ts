@@ -1,29 +1,42 @@
 import { readdirSync } from "fs";
+import { basename } from "path";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
 	TORRENT_TAG,
 } from "../constants.js";
+import { memDB } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import {
-	TorrentMetadataInClient,
+	createSearcheeFromDB,
+	parseTitle,
+	Searchee,
+	SearcheeClient,
+	SearcheeWithInfoHash,
+	updateSearcheeClientDB,
+} from "../searchee.js";
+import {
+	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
+	organizeTrackers,
 	resumeErrSleepTime,
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
+	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 import {
 	extractCredentialsFromUrl,
 	humanReadableSize,
+	Mutex,
 	sanitizeInfoHash,
 	wait,
+	withMutex,
 } from "../utils.js";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
@@ -42,13 +55,16 @@ interface Response<T> {
 
 interface TorrentGetResponseArgs {
 	torrents: {
-		downloadDir: string;
 		hashString: string;
-		leftUntilDone: number;
 		name: string;
-		percentDone: number;
 		status: number;
+		totalSize: number;
 		labels: string[];
+		downloadDir: string;
+		files: { name: string; length: number }[];
+		trackers: { announce: string; tier: number }[];
+		leftUntilDone: number;
+		percentDone: number;
 	}[];
 }
 
@@ -252,6 +268,112 @@ export default class Transmission implements TorrentClient {
 			category: "",
 			tags: torrent.labels,
 		}));
+	}
+
+	async getClientSearchees(options?: {
+		newSearcheesOnly?: boolean;
+		refresh?: string[];
+	}): Promise<ClientSearcheeResult> {
+		return withMutex(
+			Mutex.QUERY_CLIENT,
+			async () => {
+				const searchees: SearcheeClient[] = [];
+				const newSearchees: SearcheeClient[] = [];
+				const infoHashes = new Set<string>();
+				let torrents: TorrentGetResponseArgs["torrents"];
+				try {
+					torrents = (
+						await this.request<TorrentGetResponseArgs>(
+							"torrent-get",
+							{
+								fields: [
+									"hashString",
+									"name",
+									"files",
+									"totalSize",
+									"downloadDir",
+									"labels",
+									"trackers",
+								],
+							},
+						)
+					).torrents;
+				} catch (e) {
+					logger.error({
+						label: Label.TRANSMISSION,
+						message: "Failed to get torrents from client",
+					});
+					logger.debug(e);
+					return { searchees, newSearchees };
+				}
+				if (!torrents.length) {
+					logger.error({
+						label: Label.TRANSMISSION,
+						message: "No torrents found in client",
+					});
+					return { searchees, newSearchees };
+				}
+				for (const torrent of torrents) {
+					const infoHash = torrent.hashString.toLowerCase();
+					infoHashes.add(infoHash);
+					const dbTorrent = await memDB("torrent")
+						.where("info_hash", infoHash)
+						.first();
+					const refresh =
+						options?.refresh === undefined
+							? false
+							: options.refresh.length === 0
+								? true
+								: options.refresh.includes(infoHash);
+					if (dbTorrent && !refresh) {
+						if (!options?.newSearcheesOnly) {
+							searchees.push(createSearcheeFromDB(dbTorrent));
+						}
+						continue;
+					}
+					const files = torrent.files.map((file) => ({
+						name: basename(file.name),
+						path: file.name,
+						length: file.length,
+					}));
+					if (!files.length) {
+						logger.verbose({
+							label: Label.TRANSMISSION,
+							message: `No files found for ${torrent.name} [${sanitizeInfoHash(infoHash)}]: skipping`,
+						});
+						continue;
+					}
+					const trackers = organizeTrackers(
+						torrent.trackers.map((tracker) => ({
+							url: tracker.announce,
+							tier: tracker.tier,
+						})),
+					);
+					const { name } = torrent;
+					const title = parseTitle(name, files) ?? name;
+					const length = torrent.totalSize;
+					const savePath = torrent.downloadDir;
+					const category = "";
+					const tags = torrent.labels;
+					const searchee: SearcheeClient = {
+						infoHash,
+						name,
+						title,
+						files,
+						length,
+						savePath,
+						category,
+						tags,
+						trackers,
+					};
+					newSearchees.push(searchee);
+					searchees.push(searchee);
+				}
+				await updateSearcheeClientDB(newSearchees, infoHashes);
+				return { searchees, newSearchees };
+			},
+			{ useQueue: true },
+		);
 	}
 
 	async recheckTorrent(infoHash: string): Promise<void> {
