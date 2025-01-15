@@ -84,14 +84,14 @@ function parseData(data: string) {
 	return parsed;
 }
 
+/**
+ * Checks all http API requests for authorized apiKey
+ * uses param `?apikey=` or as header `x-api-key`
+ */
 async function authorize(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<boolean> {
-	/**
-	 * checks all http API requests for authorized apiKey
-	 * uses param `?apikey=` or as header `x-api-key`
-	 */
 	const url = new URL(req.url!, `http://${req.headers.host}`);
 	const apiKey =
 		(req.headers["x-api-key"] as string) ?? url.searchParams.get("apikey");
@@ -112,14 +112,14 @@ async function authorize(
 	return isAuthorized;
 }
 
+/**
+ * Trigger a search for a torrent
+ */
 async function search(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
-	/**
-	 * processes matching a local searchee provided via /api/webhook
-	 * on all currently configured torznab indexers
-	 */
+	await indexTorrentsAndDataDirs();
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -159,8 +159,6 @@ async function search(
 		label: Label.WEBHOOK,
 		message: `Received search request: ${criteriaStr}`,
 	});
-
-	await indexTorrentsAndDataDirs();
 
 	try {
 		let numFound: number | null = null;
@@ -222,15 +220,15 @@ function determineResponse(result: {
 	return { status, state };
 }
 
+/**
+ * Reverse lookup for a torrent
+ */
 async function announce(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
-	const { dataDirs, torrentDir } = getRuntimeConfig();
-	/**
-	 * processes matching a new candidate provided via /api/announce
-	 * to local torrent based on provided criteria
-	 */
+	const { dataDirs, torrentDir, useClientTorrents } = getRuntimeConfig();
+	await indexTorrentsAndDataDirs();
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -266,12 +264,11 @@ async function announce(
 	const candidate = data as Candidate;
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	try {
-		if (!torrentDir && !dataDirs?.length) {
+		if (!useClientTorrents && !torrentDir && !dataDirs?.length) {
 			throw new Error(
-				`Announce requires at least one of torrentDir (recommended) or dataDirs to be set`,
+				`Announce requires at least one of useClientTorrents, torrentDir, or dataDirs to be set`,
 			);
 		}
-		await indexTorrentsAndDataDirs();
 		const result = await checkNewCandidateMatch(candidate, Label.ANNOUNCE);
 		if (!result.decision) {
 			res.writeHead(204);
@@ -297,34 +294,34 @@ async function announce(
 	}
 }
 
+/**
+ * current: sends "200 OK"
+ * future: respond with current state and job status details via API
+ * uses: potential usage of this in dashbrr
+ */
 async function status(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
-	/**
-	 current: sends "200 OK"
-	 future: respond with current state and job status details via API
-	 uses: potential usage of this in dashbrr
-	 */
 	res.writeHead(200);
 	res.end("OK");
 }
 
+/**
+ * cross-seed health check
+ */
 async function ping(req: IncomingMessage, res: ServerResponse): Promise<void> {
-	/**
-	 * sends "200 OK" for external health check via API
-	 */
 	res.writeHead(200);
 	res.end("OK");
 }
 
+/**
+ * Request router
+ */
 async function handleRequest(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
-	/**
-	 * request handling upon receiving an http API call
-	 */
 	const checkMethod = (method: string, endpoint: string) => {
 		if (req.method === method) return true;
 		res.writeHead(405);
@@ -359,10 +356,10 @@ async function handleRequest(
 	}
 }
 
+/**
+ * Listens (daemon) on configured port for http API calls
+ */
 export function serve(port: number, host: string | undefined): void {
-	/**
-	 * listens (daemon) on configured port for http API calls
-	 */
 	if (port) {
 		const server = http.createServer(handleRequest);
 		server.listen(port, host);

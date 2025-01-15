@@ -22,12 +22,24 @@ export const memDB = Knex.knex({
 	connection: ":memory:",
 	useNullAsDefault: true,
 });
+await memDB.schema.createTable("torrent", (table) => {
+	table.string("info_hash").primary();
+	table.string("name");
+	table.string("title");
+	table.json("files");
+	table.integer("length");
+	table.string("save_path");
+	table.string("category");
+	table.json("tags");
+	table.json("trackers");
+});
 await memDB.schema.createTable("data", (table) => {
 	table.string("path").primary();
 	table.string("title");
 });
 await memDB.schema.createTable("ensemble", (table) => {
 	table.string("path").primary();
+	table.string("info_hash").unique();
 	table.string("ensemble");
 	table.string("element");
 });

@@ -121,6 +121,13 @@ module.exports = {
 	 */
 
 	/**
+	 * Use the torrents already in your torrent client to find matches.
+	 * This is the preferred method of cross-seeding, only set to false
+	 * if you want to EXCLUSIVELY use dataDirs.
+	 */
+	useClientTorrents: true,
+
+	/**
 	 * Pause at least this many seconds in between each search. Higher is safer
 	 * for you and friendlier for trackers.
 	 * Minimum value of 30.
@@ -237,7 +244,7 @@ module.exports = {
 	maxDataDepth: 3,
 
 	/**
-	 * Directory containing .torrent files.
+	 * Directory containing .torrent files. This is unnecessary with useClientTorrents.
 	 * For qBittorrent, this is BT_Backup.
 	 * For rtorrent, this is your session directory as configured in your
 	 * .rtorrent.rc file.
@@ -246,7 +253,7 @@ module.exports = {
 	 *
 	 * If you are a Windows user you need to put double '\' (e.g. "C:\\torrents")
 	 */
-	torrentDir: "/path/to/torrent/file/dir",
+	torrentDir: null,
 
 	/**
 	 * Where to save the torrent files that cross-seed finds for you.
