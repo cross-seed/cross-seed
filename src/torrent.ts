@@ -32,7 +32,7 @@ import {
 	SearcheeWithInfoHash,
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
-import { createKeyTitle, stripExtension } from "./utils.js";
+import { createKeyTitle, getLogString, stripExtension } from "./utils.js";
 import {
 	getDataByFuzzyName,
 	indexDataDirs,
@@ -290,12 +290,20 @@ async function cacheEnsembleTorrentEntry(
 		const downloadDirResult = await getClient()!.getDownloadDir(meta, {
 			onlyCompleted: false,
 		});
-		if (downloadDirResult.isErr()) return null;
+		if (downloadDirResult.isErr()) {
+			logger.error(
+				`Failed to get download dir for ${getLogString(meta)}`,
+			);
+			return null;
+		}
 		savePath = downloadDirResult.unwrap();
 	} else {
 		savePath = torrentSavePaths.get(meta.infoHash);
 	}
-	if (!savePath) return null;
+	if (!savePath) {
+		logger.error(`Failed to get save path for ${getLogString(meta)}`);
+		return null;
+	}
 
 	// Don't want to statSync(sourceRoot).isFile() now as it might be downloading.
 	// The path will get checked when rss/announce has a potential match.
@@ -352,10 +360,13 @@ async function indexNewTorrents(): Promise<void> {
 				.onConflict("file_path")
 				.ignore();
 			if (seasonFromEpisodes) {
-				await memDB("ensemble")
-					.insert(cacheEnsembleTorrentEntry(meta))
-					.onConflict("path")
-					.ignore();
+				const ensembleEntry = await cacheEnsembleTorrentEntry(meta);
+				if (ensembleEntry) {
+					await memDB("ensemble")
+						.insert(ensembleEntry)
+						.onConflict("path")
+						.ignore();
+				}
 			}
 		}
 	}
