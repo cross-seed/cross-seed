@@ -27,7 +27,11 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 
-const mutexes = new Map<string, Promise<unknown>>();
+export enum Mutex {
+	INDEX_TORRENTS_AND_DATA_DIRS = "INDEX_TORRENTS_AND_DATA_DIRS",
+	CREATE_ALL_SEARCHEES = "CREATE_ALL_SEARCHEES",
+}
+const mutexes = new Map<Mutex, Promise<unknown>>();
 
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
@@ -479,13 +483,13 @@ export async function inBatches<T>(
  * @returns The result of the callback.
  */
 export async function withMutex<T>(
-	name: string,
+	name: Mutex,
 	cb: () => Promise<T>,
-	options?: { useQueue: boolean },
+	options: { useQueue: boolean },
 ): Promise<T> {
 	const existingMutex = mutexes.get(name) as Promise<T> | undefined;
 	if (existingMutex) {
-		if (options?.useQueue) {
+		if (options.useQueue) {
 			while (mutexes.has(name)) await mutexes.get(name);
 		} else {
 			return existingMutex;

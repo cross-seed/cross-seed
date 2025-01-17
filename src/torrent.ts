@@ -41,6 +41,7 @@ import {
 	getLogString,
 	inBatches,
 	isTruthy,
+	Mutex,
 	stripExtension,
 	withMutex,
 } from "./utils.js";
@@ -353,7 +354,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 			onlyCompleted: false,
 			v1HashOnly: true,
 		});
-		await validateClientSavePaths(searchees, { ...infoHashPathMap });
+		await validateClientSavePaths(searchees, new Map(infoHashPathMap));
 	} else {
 		searchees = await indexTorrentDir(torrentDir!);
 	}
@@ -423,27 +424,31 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 export async function indexTorrentsAndDataDirs(
 	options = { startup: false },
 ): Promise<void> {
-	return withMutex("indexTorrentsAndDataDirs", async () => {
-		const maxRetries = 3;
-		for (let attempt = 1; attempt <= maxRetries; attempt++) {
-			try {
-				await Promise.all([
-					indexTorrents(options),
-					indexDataDirs(options),
-				]);
-				break;
-			} catch (e) {
-				const msg = `Indexing failed (${maxRetries - attempt}): ${e.message}`;
-				if (attempt < maxRetries) {
-					logger.verbose(msg);
-				} else {
-					logger.error(msg);
-					if (options.startup) throw e;
+	return withMutex(
+		Mutex.INDEX_TORRENTS_AND_DATA_DIRS,
+		async () => {
+			const maxRetries = 3;
+			for (let attempt = 1; attempt <= maxRetries; attempt++) {
+				try {
+					await Promise.all([
+						indexTorrents(options),
+						indexDataDirs(options),
+					]);
+					break;
+				} catch (e) {
+					const msg = `Indexing failed (${maxRetries - attempt}): ${e.message}`;
+					if (attempt < maxRetries) {
+						logger.verbose(msg);
+					} else {
+						logger.error(msg);
+						if (options.startup) throw e;
+					}
+					logger.debug(e);
 				}
-				logger.debug(e);
 			}
-		}
-	});
+		},
+		{ useQueue: false },
+	);
 }
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {
