@@ -29,9 +29,7 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
-	validateSavePaths,
 } from "./TorrentClient.js";
-import { loadTorrentDirLight } from "../torrent.js";
 
 const COULD_NOT_FIND_INFO_HASH = "Could not find info-hash.";
 
@@ -315,13 +313,6 @@ export default class RTorrent implements TorrentClient {
 				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
 			);
 		}
-		const searcheesRes = loadTorrentDirLight(torrentDir);
-		const allTorrents = await this.getAllTorrents();
-		const infoHashPathMap = await this.getAllDownloadDirs({
-			metas: allTorrents.map((torrent) => torrent.infoHash),
-			onlyCompleted: false,
-		});
-		await validateSavePaths(infoHashPathMap, await searcheesRes);
 	}
 
 	async getDownloadDir(
