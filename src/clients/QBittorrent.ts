@@ -479,7 +479,7 @@ export default class QBittorrent implements TorrentClient {
 			infoHash: torrent.hash,
 			category: torrent.category,
 			tags: torrent.tags.length ? torrent.tags.split(",") : [],
-			trackers: torrent.tracker.length ? [[torrent.tracker]] : undefined,
+			trackers: torrent.tracker.length ? [torrent.tracker] : undefined,
 		}));
 	}
 

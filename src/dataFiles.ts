@@ -70,10 +70,9 @@ export async function indexDataDirs(options: {
 					b.split(sep).filter(isTruthy).length -
 					a.split(sep).filter(isTruthy).length,
 			);
-			const seenPaths = new Set<string>();
 			const deletedPaths: string[] = [];
-			const paths = eventPaths
-				.reduce<string[]>((acc, path) => {
+			const paths = Array.from(
+				eventPaths.reduce<Set<string>>((acc, path) => {
 					const affectedPaths: string[] = [path];
 					let parentPath = dirname(path);
 					while (resolve(parentPath) !== resolve(dataDir)) {
@@ -83,17 +82,15 @@ export async function indexDataDirs(options: {
 					for (const affectedPath of affectedPaths.slice(
 						-maxDataDepth,
 					)) {
-						if (seenPaths.has(affectedPath)) continue;
-						seenPaths.add(affectedPath);
-						acc.push(affectedPath);
+						acc.add(affectedPath);
 					}
 					return acc;
-				}, [])
-				.filter((path) => {
-					if (existsSync(path)) return true;
-					deletedPaths.push(path);
-					return false;
-				});
+				}, new Set()),
+			).filter((path) => {
+				if (existsSync(path)) return true;
+				deletedPaths.push(path);
+				return false;
+			});
 			await inBatches(deletedPaths, async (batch) => {
 				await memDB("data").whereIn("path", batch).del();
 				await memDB("ensemble").whereIn("path", batch).del();

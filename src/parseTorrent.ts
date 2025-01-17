@@ -51,9 +51,9 @@ export function updateMetafileMetadata(
 		metafile.tags = metadata["qBt-tags"].toString().split(",");
 	}
 	if (metadata.trackers) {
-		metafile.trackers = metadata.trackers.map((tier) =>
-			sanitizeTrackerUrls(tier),
-		);
+		metafile.trackers = metadata.trackers
+			.map((tier) => sanitizeTrackerUrls(tier))
+			.flat();
 	}
 }
 
@@ -99,7 +99,7 @@ export class Metafile {
 	isSingleFileTorrent: boolean;
 	category?: string;
 	tags?: string[];
-	trackers: string[][];
+	trackers: string[];
 	raw: Torrent;
 
 	constructor(raw: Torrent) {
@@ -162,9 +162,9 @@ export class Metafile {
 		const announceList = raw["announce-list"];
 		this.trackers =
 			Array.isArray(announceList) && announceList.length > 0
-				? announceList.map((tier) => sanitizeTrackerUrls(tier))
+				? announceList.map((tier) => sanitizeTrackerUrls(tier)).flat()
 				: raw.announce
-					? [sanitizeTrackerUrls([raw.announce])]
+					? sanitizeTrackerUrls([raw.announce])
 					: [];
 	}
 

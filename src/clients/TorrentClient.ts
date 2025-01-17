@@ -35,7 +35,7 @@ export interface TorrentMetadataInClient {
 	infoHash: string;
 	category: string;
 	tags: string[];
-	trackers?: string[][];
+	trackers?: string[];
 }
 
 export interface TorrentClient {
