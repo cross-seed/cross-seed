@@ -9,33 +9,50 @@ import {
 	TORRENT_CATEGORY_SUFFIX,
 	TORRENT_TAG,
 } from "../constants.js";
+import { memDB } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
 import {
-	TorrentMetadataInClient,
+	createSearcheeFromDB,
+	File,
+	parseTitle,
+	Searchee,
+	SearcheeClient,
+	SearcheeWithInfoHash,
+	updateSearcheeClientDB,
+} from "../searchee.js";
+import {
+	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
+	organizeTrackers,
 	resumeErrSleepTime,
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
+	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 import {
 	extractCredentialsFromUrl,
 	extractInt,
 	getLogString,
 	humanReadableSize,
+	Mutex,
 	sanitizeInfoHash,
 	wait,
+	withMutex,
 } from "../utils.js";
 
 const X_WWW_FORM_URLENCODED = {
 	"Content-Type": "application/x-www-form-urlencoded",
 };
+
+interface Preferences {
+	resume_data_storage_type?: "Legacy" | "SQLite";
+}
 
 interface TorrentInfo {
 	added_on: number;
@@ -161,6 +178,12 @@ export default class QBittorrent implements TorrentClient {
 		await this.createTag();
 
 		if (!torrentDir) return;
+		const { resume_data_storage_type } = await this.getPreferences();
+		if (resume_data_storage_type === "SQLite") {
+			throw new CrossSeedError(
+				"torrentDir is not compatible with SQLite mode in qBittorrent, use: https://www.cross-seed.org/docs/basics/options#useclienttorrents",
+			);
+		}
 		if (!readdirSync(torrentDir).some((f) => f.endsWith(".fastresume"))) {
 			throw new CrossSeedError(
 				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
@@ -217,6 +240,20 @@ export default class QBittorrent implements TorrentClient {
 			});
 		}
 		return response?.text();
+	}
+
+	async getPreferences(): Promise<Preferences> {
+		const responseText = await this.request(
+			"/app/preferences",
+			"",
+			X_WWW_FORM_URLENCODED,
+		);
+		if (!responseText) {
+			throw new CrossSeedError(
+				`qBittorrent failed to retrieve preferences`,
+			);
+		}
+		return JSON.parse(responseText);
 	}
 
 	private getLayoutForNewTorrent(
@@ -308,6 +345,40 @@ export default class QBittorrent implements TorrentClient {
 	async getAllCategories(): Promise<CategoryInfo[]> {
 		const responseText = await this.request("/torrents/categories", "");
 		return responseText ? Object.values(JSON.parse(responseText)) : [];
+	}
+
+	async getFiles(infoHash: string): Promise<File[] | null> {
+		const responseText = await this.request(
+			"/torrents/files",
+			`hash=${infoHash}`,
+			X_WWW_FORM_URLENCODED,
+		);
+		if (!responseText) return null;
+		try {
+			return JSON.parse(responseText).map((file) => ({
+				name: path.basename(file.name),
+				path: file.name,
+				length: file.size,
+			}));
+		} catch (e) {
+			logger.debug(e);
+			return null;
+		}
+	}
+
+	async getTrackers(infoHash: string): Promise<string[][] | null> {
+		const responseText = await this.request(
+			"/torrents/trackers",
+			`hash=${infoHash}`,
+			X_WWW_FORM_URLENCODED,
+		);
+		if (!responseText) return null;
+		try {
+			return organizeTrackers(JSON.parse(responseText));
+		} catch (e) {
+			logger.debug(e);
+			return null;
+		}
 	}
 
 	async addTorrent(formData: FormData): Promise<void> {
@@ -481,6 +552,102 @@ export default class QBittorrent implements TorrentClient {
 			tags: torrent.tags.length ? torrent.tags.split(",") : [],
 			trackers: torrent.tracker.length ? [torrent.tracker] : undefined,
 		}));
+	}
+
+	/**
+	 * Get all searchees from the client and update the db
+	 * @param options.newSearcheesOnly only return searchees that are not in the db
+	 * @param options.refresh undefined uses the cache, [] refreshes all searchees, or a list of infoHashes to refresh
+	 * @return an object containing all searchees and new searchees (refreshed searchees are considered new)
+	 */
+	async getClientSearchees(options?: {
+		newSearcheesOnly?: boolean;
+		refresh?: string[];
+	}): Promise<ClientSearcheeResult> {
+		return withMutex(
+			Mutex.QUERY_CLIENT,
+			async () => {
+				const searchees: SearcheeClient[] = [];
+				const newSearchees: SearcheeClient[] = [];
+				const infoHashes = new Set<string>();
+				const torrents = await this.getAllTorrentInfo();
+				if (!torrents.length) {
+					logger.error({
+						label: Label.QBITTORRENT,
+						message: "No torrents found in client",
+					});
+					return { searchees, newSearchees };
+				}
+				for (const torrent of torrents) {
+					const infoHash = (
+						torrent.infohash_v1 || torrent.hash
+					).toLowerCase();
+					infoHashes.add(infoHash);
+					const dbTorrent = await memDB("torrent")
+						.where("info_hash", infoHash)
+						.first();
+					const refresh =
+						options?.refresh === undefined
+							? false
+							: options.refresh.length === 0
+								? true
+								: options.refresh.includes(infoHash);
+					if (dbTorrent && !refresh) {
+						if (!options?.newSearcheesOnly) {
+							searchees.push(createSearcheeFromDB(dbTorrent));
+						}
+						continue;
+					}
+					const files = await this.getFiles(torrent.hash);
+					if (!files) {
+						logger.verbose({
+							label: Label.QBITTORRENT,
+							message: `Failed to get files for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}] (likely transient)`,
+						});
+						continue;
+					}
+					if (!files.length) {
+						logger.verbose({
+							label: Label.QBITTORRENT,
+							message: `No files found for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}]: skipping`,
+						});
+						continue;
+					}
+					const trackers = await this.getTrackers(torrent.hash);
+					if (!trackers) {
+						logger.verbose({
+							label: Label.QBITTORRENT,
+							message: `Failed to get trackers for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}] (likely transient)`,
+						});
+						continue;
+					}
+					const { name } = torrent;
+					const title = parseTitle(name, files) ?? name;
+					const length = torrent.total_size;
+					const savePath = torrent.save_path;
+					const category = torrent.category;
+					const tags = torrent.tags.length
+						? torrent.tags.split(",")
+						: [];
+					const searchee: SearcheeClient = {
+						infoHash,
+						name,
+						title,
+						files,
+						length,
+						savePath,
+						category,
+						tags,
+						trackers,
+					};
+					newSearchees.push(searchee);
+					searchees.push(searchee);
+				}
+				await updateSearcheeClientDB(newSearchees, infoHashes);
+				return { searchees, newSearchees };
+			},
+			{ useQueue: true },
+		);
 	}
 
 	/**

@@ -245,22 +245,46 @@ export async function linkAllFilesInMetafile(
 	>
 > {
 	const { flatLinking } = getRuntimeConfig();
+	const client = getClient()!;
 
 	let sourceRoot: string | undefined;
 	if (searchee.infoHash) {
-		const downloadDirResult = await getClient()!.getDownloadDir(
-			searchee as SearcheeWithInfoHash,
-			{ onlyCompleted: options.onlyCompleted },
-		);
-		if (downloadDirResult.isErr()) {
-			return downloadDirResult.mapErr((e) =>
-				e === "NOT_FOUND" || e === "UNKNOWN_ERROR"
-					? "TORRENT_NOT_FOUND"
-					: e,
+		let savePath: string;
+		if (searchee.savePath) {
+			const refreshedSearchee = (
+				await client.getClientSearchees({
+					newSearcheesOnly: true,
+					refresh: [searchee.infoHash],
+				})
+			).newSearchees.find((s) => s.infoHash === searchee.infoHash);
+			if (!refreshedSearchee) return resultOfErr("TORRENT_NOT_FOUND");
+			for (const [key, value] of Object.entries(refreshedSearchee)) {
+				searchee[key] = value;
+			}
+			if (
+				!(await client.isTorrentComplete(searchee.infoHash)).orElse(
+					false,
+				)
+			) {
+				return resultOfErr("TORRENT_NOT_COMPLETE");
+			}
+			savePath = searchee.savePath;
+		} else {
+			const downloadDirResult = await client.getDownloadDir(
+				searchee as SearcheeWithInfoHash,
+				{ onlyCompleted: options.onlyCompleted },
 			);
+			if (downloadDirResult.isErr()) {
+				return downloadDirResult.mapErr((e) =>
+					e === "NOT_FOUND" || e === "UNKNOWN_ERROR"
+						? "TORRENT_NOT_FOUND"
+						: e,
+				);
+			}
+			savePath = downloadDirResult.unwrap();
 		}
 		sourceRoot = join(
-			downloadDirResult.unwrap(),
+			savePath,
 			searchee.files.length === 1
 				? searchee.files[0].path
 				: searchee.name,
@@ -310,7 +334,7 @@ export async function linkAllFilesInMetafile(
 		}
 	}
 
-	const clientSavePathRes = await getClient()!.getDownloadDir(newMeta, {
+	const clientSavePathRes = await client.getDownloadDir(newMeta, {
 		onlyCompleted: false,
 	});
 	let destinationDir: string | null = null;

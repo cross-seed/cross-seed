@@ -438,10 +438,6 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	}, "You cannot have both linkDir and linkDirs, use linkDirs only.")
 	.refine(
-		(config) => !config.useClientTorrents,
-		"useClientTorrents has not yet been implemented.",
-	)
-	.refine(
 		(config) => !config.torrentDir || !config.useClientTorrents,
 		ZodErrorMessages.torrentDirAndUseClientTorrents,
 	)

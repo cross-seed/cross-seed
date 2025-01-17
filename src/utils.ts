@@ -28,6 +28,7 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
 
 export enum Mutex {
+	QUERY_CLIENT = "QUERY_CLIENT",
 	INDEX_TORRENTS_AND_DATA_DIRS = "INDEX_TORRENTS_AND_DATA_DIRS",
 	CREATE_ALL_SEARCHEES = "CREATE_ALL_SEARCHEES",
 }

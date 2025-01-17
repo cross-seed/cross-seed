@@ -18,11 +18,12 @@ import {
 } from "./constants.js";
 import { db, memDB } from "./db.js";
 import { Label, logger, logOnce } from "./logger.js";
-import { updateMetafileMetadata, Metafile } from "./parseTorrent.js";
+import { Metafile, updateMetafileMetadata } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
 import { isOk, Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
+	createSearcheeFromDB,
 	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
 	File,
@@ -37,7 +38,6 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import {
-	createKeyTitle,
 	getLogString,
 	inBatches,
 	isTruthy,
@@ -302,7 +302,9 @@ async function cacheEnsembleTorrentEntry(
 	const { key, element, largestFile } = ensemblePieces;
 
 	let savePath: string | undefined;
-	if (torrentSavePaths) {
+	if (searchee.savePath) {
+		savePath = searchee.savePath;
+	} else if (torrentSavePaths) {
 		savePath = torrentSavePaths.get(searchee.infoHash);
 	} else {
 		const downloadDirResult = await getClient()!.getDownloadDir(searchee, {
@@ -347,16 +349,33 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 	let infoHashPathMap: Map<string, string> | undefined;
 
 	if (options.startup) {
-		logger.info("Indexing torrentDir for reverse lookup...");
-		searchees = await loadTorrentDirLight(torrentDir!);
-		infoHashPathMap = await getClient()!.getAllDownloadDirs({
-			metas: searchees,
-			onlyCompleted: false,
-			v1HashOnly: true,
-		});
+		if (torrentDir) {
+			logger.info("Indexing torrentDir for reverse lookup...");
+			searchees = await loadTorrentDirLight(torrentDir);
+			infoHashPathMap = await getClient()!.getAllDownloadDirs({
+				metas: searchees,
+				onlyCompleted: false,
+				v1HashOnly: true,
+			});
+		} else {
+			logger.info("Indexing client torrents for reverse lookup...");
+			searchees = (await getClient()!.getClientSearchees()).searchees;
+			infoHashPathMap = searchees.reduce((map, searchee) => {
+				map.set(searchee.infoHash, searchee.savePath!);
+				return map;
+			}, new Map<string, string>());
+		}
 		await validateClientSavePaths(searchees, new Map(infoHashPathMap));
 	} else {
-		searchees = await indexTorrentDir(torrentDir!);
+		if (torrentDir) {
+			searchees = await indexTorrentDir(torrentDir);
+		} else {
+			searchees = (
+				await getClient()!.getClientSearchees({
+					newSearcheesOnly: true,
+				})
+			).newSearchees;
+		}
 	}
 	if (!seasonFromEpisodes) return;
 
@@ -452,9 +471,11 @@ export async function indexTorrentsAndDataDirs(
 }
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {
+	const { useClientTorrents } = getRuntimeConfig();
+	const database = useClientTorrents ? memDB : db;
 	return new Set(
-		(await db("torrent").select({ infoHash: "info_hash" })).map(
-			(t) => t.infoHash,
+		(await database("torrent").select({ infoHash: "info_hash" })).map(
+			(e) => e.infoHash,
 		),
 	);
 }
@@ -516,15 +537,17 @@ function getKeysFromName(name: string): {
 
 export async function getSimilarByName(name: string): Promise<{
 	keys: string[];
-	metas: Metafile[];
+	clientSearchees: SearcheeWithInfoHash[];
 	dataSearchees: SearcheeWithoutInfoHash[];
 }> {
-	const { torrentDir, dataDirs } = getRuntimeConfig();
+	const { torrentDir, useClientTorrents } = getRuntimeConfig();
 	const { keyTitles, element, useFallback } = getKeysFromName(name);
-	const metas = useFallback ? await getTorrentByFuzzyName(name) : [];
+	const clientSearchees = useFallback
+		? await getTorrentByFuzzyName(name)
+		: [];
 	const dataSearchees = useFallback ? await getDataByFuzzyName(name) : [];
 	if (!keyTitles.length) {
-		return { keys: [], metas, dataSearchees };
+		return { keys: [], clientSearchees, dataSearchees };
 	}
 	const candidateMaxDistance = Math.floor(
 		Math.max(...keyTitles.map((keyTitle) => keyTitle.length)) /
@@ -532,10 +555,10 @@ export async function getSimilarByName(name: string): Promise<{
 	);
 
 	const filterEntries = async (
-		dbEntries: { name?: string; title?: string }[],
+		dbEntries: { title?: string; name?: string }[],
 	) => {
 		return dbEntries.filter((dbEntry) => {
-			const entry = getKeysFromName(dbEntry.name ?? dbEntry.title!);
+			const entry = getKeysFromName(dbEntry.title ?? dbEntry.name!);
 			if (entry.element !== element) return false;
 			if (!entry.keyTitles.length) return false;
 			const maxDistance = Math.max(
@@ -554,34 +577,42 @@ export async function getSimilarByName(name: string): Promise<{
 		});
 	};
 
-	const filteredTorrentEntries = (await filterEntries(
-		torrentDir ? await db("torrent").select("name", "file_path") : [],
-	)) as { name: string; file_path: string }[];
-	if (filteredTorrentEntries.length) {
-		const client = getClient();
-		const torrentInfos =
-			client && client.type !== Label.QBITTORRENT
-				? await client.getAllTorrents()
-				: [];
-		metas.push(
-			...(
-				await Promise.allSettled(
-					filteredTorrentEntries.map(async (dbTorrent) => {
-						return parseTorrentWithMetadata(
-							dbTorrent.file_path,
-							torrentInfos,
-						);
-					}),
-				)
-			)
-				.filter((p) => p.status === "fulfilled")
-				.map((p) => p.value),
+	if (useClientTorrents) {
+		clientSearchees.push(
+			...(await filterEntries(await memDB("torrent"))).map(
+				createSearcheeFromDB,
+			),
 		);
+	} else if (torrentDir) {
+		const filteredTorrentEntries = (await filterEntries(
+			await db("torrent").select("name", "file_path"),
+		)) as { name: string; file_path: string }[];
+		if (filteredTorrentEntries.length) {
+			const client = getClient();
+			const torrentInfos =
+				client && client.type !== Label.QBITTORRENT
+					? await client.getAllTorrents()
+					: [];
+			clientSearchees.push(
+				...(
+					await Promise.all(
+						filteredTorrentEntries.map(async (dbTorrent) => {
+							return (
+								await createSearcheeFromTorrentFile(
+									dbTorrent.file_path,
+									torrentInfos,
+								)
+							).orElse(null);
+						}),
+					)
+				).filter(isTruthy),
+			);
+		}
 	}
 
 	const entriesToDelete: string[] = [];
 	const filteredDataEntries = (
-		(await filterEntries(dataDirs ? await memDB("data") : [])) as {
+		(await filterEntries(await memDB("data"))) as {
 			title: string;
 			path: string;
 		}[]
@@ -595,9 +626,10 @@ export async function getSimilarByName(name: string): Promise<{
 		}
 		return true;
 	});
-	if (entriesToDelete.length > 0) {
-		await memDB("data").whereIn("path", entriesToDelete).del();
-	}
+	await inBatches(entriesToDelete, async (batch) => {
+		await memDB("data").whereIn("path", batch).del();
+		await memDB("ensemble").whereIn("path", batch).del();
+	});
 	if (filteredDataEntries.length) {
 		dataSearchees.push(
 			...(
@@ -614,64 +646,65 @@ export async function getSimilarByName(name: string): Promise<{
 	const keys = element
 		? keyTitles.map((keyTitle) => `${keyTitle}.${element}`)
 		: keyTitles;
-	return { keys, metas, dataSearchees };
+	return { keys, clientSearchees, dataSearchees };
 }
 
-async function getTorrentByFuzzyName(name: string): Promise<Metafile[]> {
-	const allNames: { name: string; file_path: string }[] = await db(
-		"torrent",
-	).select("name", "file_path");
-	const fullMatch = createKeyTitle(name);
+async function getTorrentByFuzzyName(
+	name: string,
+): Promise<SearcheeWithInfoHash[]> {
+	const { useClientTorrents } = getRuntimeConfig();
 
-	// Attempt to filter torrents in DB to match incoming torrent before fuzzy check
-	let filteredNames: typeof allNames = [];
-	if (fullMatch) {
-		filteredNames = allNames.filter((dbName) => {
-			const dbMatch = createKeyTitle(dbName.name);
-			return fullMatch === dbMatch;
-		});
-	}
-
-	// If none match, proceed with fuzzy name check on all names.
-	filteredNames = filteredNames.length > 0 ? filteredNames : allNames;
+	const database = useClientTorrents
+		? await memDB("torrent")
+		: await db("torrent");
 
 	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(filteredNames, {
-		keys: ["name"],
+	const potentialMatches = new Fuse(database, {
+		keys: ["title", "name"],
 		distance: 6,
 		threshold: 0.25,
 	}).search(name);
 	if (potentialMatches.length === 0) return [];
-	const client = getClient();
-	const torrentInfos =
-		client && client.type !== Label.QBITTORRENT
-			? await client.getAllTorrents()
-			: [];
-	return [
-		await parseTorrentWithMetadata(
-			potentialMatches[0].item.file_path,
-			torrentInfos,
-		),
-	];
-}
-
-export async function getTorrentByCriteria(
-	criteria: TorrentLocator,
-): Promise<Metafile> {
-	const findResult = await db("torrent")
-		.where((b) => b.where({ info_hash: criteria.infoHash }))
-		.first();
-
-	if (findResult === undefined) {
-		const message = `torrentDir does not have any torrent with criteria ${inspect(
-			criteria,
-		)}`;
-		throw new Error(message);
+	if (useClientTorrents) {
+		return [createSearcheeFromDB(potentialMatches[0].item)];
 	}
 	const client = getClient();
 	const torrentInfos =
 		client && client.type !== Label.QBITTORRENT
 			? await client.getAllTorrents()
 			: [];
-	return parseTorrentWithMetadata(findResult.file_path, torrentInfos);
+	const res = await createSearcheeFromTorrentFile(
+		potentialMatches[0].item.file_path,
+		torrentInfos,
+	);
+	if (res.isOk()) return [res.unwrap()];
+	return [];
+}
+
+export async function getTorrentByCriteria(
+	criteria: TorrentLocator,
+): Promise<SearcheeWithInfoHash> {
+	const { useClientTorrents } = getRuntimeConfig();
+	const database = useClientTorrents ? memDB : db;
+	const dbTorrent = await database("torrent")
+		.where((b) => b.where({ info_hash: criteria.infoHash }))
+		.first();
+	if (!dbTorrent) {
+		const message = `Torrent client does not have any torrent with criteria ${inspect(
+			criteria,
+		)}`;
+		throw new Error(message);
+	}
+	if (useClientTorrents) return createSearcheeFromDB(dbTorrent);
+
+	const client = getClient();
+	const torrentInfos =
+		client && client.type !== Label.QBITTORRENT
+			? await client.getAllTorrents()
+			: [];
+	return (
+		await createSearcheeFromTorrentFile(dbTorrent.file_path, torrentInfos)
+	).unwrapOrThrow(
+		new Error(`Failed to create searchee from ${dbTorrent.file_path}`),
+	);
 }
