@@ -299,6 +299,18 @@ function sourceDoesMatch(searcheeTitle: string, candidateName: string) {
 	return searcheeSource === candidateSource;
 }
 
+function releaseVersionDoesMatch(searcheeName: string, candidateName: string) {
+	const searcheeVersionType = stripExtension(searcheeName)
+		.match(REPACK_PROPER_REGEX)
+		?.groups?.type?.trim()
+		?.toLowerCase();
+	const candidateVersionType = stripExtension(candidateName)
+		.match(REPACK_PROPER_REGEX)
+		?.groups?.type?.trim()
+		?.toLowerCase();
+	return searcheeVersionType === candidateVersionType;
+}
+
 export async function assessCandidate(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
@@ -319,6 +331,9 @@ export async function assessCandidate(
 		}
 		if (!sourceDoesMatch(searchee.title, name)) {
 			return { decision: Decision.SOURCE_MISMATCH };
+		}
+		if (!releaseVersionDoesMatch(searchee.title, name)) {
+			return { decision: Decision.PROPER_REPACK_MISMATCH };
 		}
 		const size = metaOrCandidate.size;
 		if (size && !fuzzySizeDoesMatch(size, searchee)) {

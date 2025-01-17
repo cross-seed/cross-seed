@@ -26,8 +26,8 @@ export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[pix](?:\d{3,4}[pi]?)?)\b/i;
 export const RES_STRICT_REGEX = /(?<res>(?:2160|1080|720)[pi])/;
 export const YEARS_REGEX = /(?<year>(?:19|20)\d{2})(?![pix])/gi;
 export const REPACK_PROPER_REGEX =
-	/(?:\b(?<type>(?:REPACK|PROPER|\d\v\d)\d?))\b/i;
-export const ARR_PROPER_REGEX = /(?:\b(?<arrtype>(?:Proper|v\d)))\b/;
+	/(?:\b(?<type>(?:REPACK|PROPER|\dv\d)\d?))\b/i;
+export const ARR_PROPER_REGEX = /(?:\b(?<arrtype>(?:Proper|\dv\d)))\b/;
 export const SCENE_TITLE_REGEX = /^(?:[a-z0-9]{0,5}-)?(?<title>.*)/;
 export const ARR_DIR_REGEX =
 	/^(?<title>(?!.*(?:(\d{3,4}[ipx])|([xh.]+26[4-6])|(dvd)|(mpeg)|(xvid)|(?:(he)|a)vc))[\p{L}\s:\w'’!();.,&–+-]+(?:\(\d{4}\))?)(?<id>\s[{[](?:tm|tv|im)db(?:id)?-\w+?[}\]])?$/iu;
