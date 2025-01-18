@@ -366,7 +366,7 @@ export default class QBittorrent implements TorrentClient {
 		}
 	}
 
-	async getTrackers(infoHash: string): Promise<string[][] | null> {
+	async getTrackers(infoHash: string): Promise<string[] | null> {
 		const responseText = await this.request(
 			"/torrents/trackers",
 			`hash=${infoHash}`,

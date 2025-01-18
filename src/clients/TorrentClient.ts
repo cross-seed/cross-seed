@@ -16,7 +16,7 @@ import {
 } from "../constants.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
-import { formatAsList, wait } from "../utils.js";
+import { formatAsList, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
@@ -165,17 +165,8 @@ export async function validateClientSavePaths(
 	}
 }
 
-export function organizeTrackers(trackers: Tracker[]): string[][] {
-	return trackers
-		.reduce<string[][]>((acc, tracker) => {
-			if (tracker.tier < 0) return acc;
-			const url = sanitizeTrackerUrl(tracker.url);
-			if (!url) return acc;
-			if (!acc[tracker.tier]) acc[tracker.tier] = [];
-			acc[tracker.tier].push(url);
-			return acc;
-		}, [])
-		.filter((tier) => tier.length); // Cleanup sparse array
+export function organizeTrackers(trackers: Tracker[]): string[] {
+	return trackers.map((t) => sanitizeTrackerUrl(t.url)).filter(isTruthy);
 }
 
 export async function waitForTorrentToComplete(
