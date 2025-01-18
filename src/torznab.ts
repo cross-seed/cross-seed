@@ -855,7 +855,10 @@ async function getAndLogIndexers(
 			: Number.POSITIVE_INFINITY;
 	const isEnsemble =
 		seasonFromEpisodes && !searchee.infoHash && !searchee.path;
-	const timeFilteredIndexers = enabledIndexers.filter(async (indexer) => {
+	const newestFileAge = isEnsemble
+		? await getSearcheeNewestFileAge(searchee as SearcheeWithoutInfoHash)
+		: Number.POSITIVE_INFINITY;
+	const timeFilteredIndexers = enabledIndexers.filter((indexer) => {
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id,
 		);
@@ -863,10 +866,7 @@ async function getAndLogIndexers(
 		if (
 			isEnsemble &&
 			entry.lastSearched &&
-			entry.lastSearched <
-				(await getSearcheeNewestFileAge(
-					searchee as SearcheeWithoutInfoHash,
-				))
+			entry.lastSearched < newestFileAge
 		) {
 			return true;
 		}
