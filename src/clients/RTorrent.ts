@@ -196,39 +196,43 @@ export default class RTorrent implements TorrentClient {
 			| Fault[];
 
 		let response: ReturnType;
+		const args = [
+			[
+				{
+					methodName: "d.name",
+					params: [hash],
+				},
+				{
+					methodName: "d.directory",
+					params: [hash],
+				},
+				{
+					methodName: "d.left_bytes",
+					params: [hash],
+				},
+				{
+					methodName: "d.hashing",
+					params: [hash],
+				},
+				{
+					methodName: "d.complete",
+					params: [hash],
+				},
+				{
+					methodName: "d.is_multi_file",
+					params: [hash],
+				},
+				{
+					methodName: "d.is_active",
+					params: [hash],
+				},
+			],
+		];
 		try {
-			response = await this.methodCallP<ReturnType>("system.multicall", [
-				[
-					{
-						methodName: "d.name",
-						params: [hash],
-					},
-					{
-						methodName: "d.directory",
-						params: [hash],
-					},
-					{
-						methodName: "d.left_bytes",
-						params: [hash],
-					},
-					{
-						methodName: "d.hashing",
-						params: [hash],
-					},
-					{
-						methodName: "d.complete",
-						params: [hash],
-					},
-					{
-						methodName: "d.is_multi_file",
-						params: [hash],
-					},
-					{
-						methodName: "d.is_active",
-						params: [hash],
-					},
-				],
-			]);
+			response = await this.methodCallP<ReturnType>(
+				"system.multicall",
+				args,
+			);
 		} catch (e) {
 			logger.debug(e);
 			return resultOfErr("FAILURE");
@@ -354,25 +358,29 @@ export default class RTorrent implements TorrentClient {
 		);
 		type ReturnType = string[][] | Fault[];
 		let response: ReturnType;
+		const args = [
+			infoHashes
+				.map((hash) => [
+					{
+						methodName: "d.directory",
+						params: [hash],
+					},
+					{
+						methodName: "d.is_multi_file",
+						params: [hash],
+					},
+					{
+						methodName: "d.complete",
+						params: [hash],
+					},
+				])
+				.flat(),
+		];
 		try {
-			response = await this.methodCallP<ReturnType>("system.multicall", [
-				infoHashes
-					.map((hash) => [
-						{
-							methodName: "d.directory",
-							params: [hash],
-						},
-						{
-							methodName: "d.is_multi_file",
-							params: [hash],
-						},
-						{
-							methodName: "d.complete",
-							params: [hash],
-						},
-					])
-					.flat(),
-			]);
+			response = await this.methodCallP<ReturnType>(
+				"system.multicall",
+				args,
+			);
 		} catch (e) {
 			logger.error({
 				Label: Label.RTORRENT,
@@ -442,15 +450,19 @@ export default class RTorrent implements TorrentClient {
 		);
 		type ReturnType = string[][] | Fault[];
 		let response: ReturnType;
+		const args = [
+			infoHashes.map((hash) => {
+				return {
+					methodName: "d.custom1",
+					params: [hash],
+				};
+			}),
+		];
 		try {
-			response = await this.methodCallP<ReturnType>("system.multicall", [
-				infoHashes.map((hash) => {
-					return {
-						methodName: "d.custom1",
-						params: [hash],
-					};
-				}),
-			]);
+			response = await this.methodCallP<ReturnType>(
+				"system.multicall",
+				args,
+			);
 		} catch (e) {
 			logger.error({
 				Label: Label.RTORRENT,
@@ -511,53 +523,44 @@ export default class RTorrent implements TorrentClient {
 				);
 				type ReturnType = any[][] | Fault[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 				let response: ReturnType;
+				const args = [
+					hashes
+						.map((hash) => [
+							{
+								methodName: "d.name",
+								params: [hash],
+							},
+							{
+								methodName: "d.size_bytes",
+								params: [hash],
+							},
+							{
+								methodName: "d.directory",
+								params: [hash],
+							},
+							{
+								methodName: "d.is_multi_file",
+								params: [hash],
+							},
+							{
+								methodName: "d.custom1",
+								params: [hash],
+							},
+							{
+								methodName: "f.multicall",
+								params: [hash, "", "f.path=", "f.size_bytes="],
+							},
+							{
+								methodName: "t.multicall",
+								params: [hash, "", "t.url=", "t.group="],
+							},
+						])
+						.flat(),
+				];
 				try {
 					response = await this.methodCallP<ReturnType>(
 						"system.multicall",
-						[
-							hashes
-								.map((hash) => [
-									{
-										methodName: "d.name",
-										params: [hash],
-									},
-									{
-										methodName: "d.size_bytes",
-										params: [hash],
-									},
-									{
-										methodName: "d.directory",
-										params: [hash],
-									},
-									{
-										methodName: "d.is_multi_file",
-										params: [hash],
-									},
-									{
-										methodName: "d.custom1",
-										params: [hash],
-									},
-									{
-										methodName: "f.multicall",
-										params: [
-											hash,
-											"",
-											"f.path=",
-											"f.size_bytes=",
-										],
-									},
-									{
-										methodName: "t.multicall",
-										params: [
-											hash,
-											"",
-											"t.url=",
-											"t.group=",
-										],
-									},
-								])
-								.flat(),
-						],
+						args,
 					);
 				} catch (e) {
 					logger.error({
