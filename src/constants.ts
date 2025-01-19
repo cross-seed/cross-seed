@@ -208,6 +208,7 @@ export enum MatchMode {
 export enum LinkType {
 	SYMLINK = "symlink",
 	HARDLINK = "hardlink",
+	REFLINK = "reflink",
 }
 
 export enum BlocklistType {
