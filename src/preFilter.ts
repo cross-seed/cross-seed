@@ -172,9 +172,7 @@ export function findBlockedStringInReleaseMaybe(
 					? searchee.tags.includes(blocklistValue)
 					: !searchee.tags.length;
 			case BlocklistType.TRACKER:
-				return searchee.trackers?.some((tier) =>
-					tier.some((url) => url === blocklistValue),
-				);
+				return searchee.trackers?.some((url) => url === blocklistValue);
 			case BlocklistType.INFOHASH:
 				return blocklistValue === searchee.infoHash;
 			case BlocklistType.SIZE_BELOW:

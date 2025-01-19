@@ -40,7 +40,9 @@ import {
 	getLogString,
 	humanReadableDate,
 	isTruthy,
+	Mutex,
 	sanitizeInfoHash,
+	withMutex,
 } from "./utils.js";
 
 type AllMatches = {
@@ -635,10 +637,20 @@ export async function injectSavedTorrents(): Promise<void> {
 		message: `Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to inject in ${targetDirLog}`,
 	});
 	const summary = createSummary(torrentFilePaths.length);
-	const realSearchees = await findAllSearchees(Label.INJECT);
-	const ensembleSearchees = await createEnsembleSearchees(realSearchees, {
-		useFilters: false,
-	});
+	const { realSearchees, ensembleSearchees } = await withMutex(
+		Mutex.CREATE_ALL_SEARCHEES,
+		async () => {
+			const realSearchees = await findAllSearchees(Label.INJECT);
+			const ensembleSearchees = await createEnsembleSearchees(
+				realSearchees,
+				{
+					useFilters: false,
+				},
+			);
+			return { realSearchees, ensembleSearchees };
+		},
+		{ useQueue: true },
+	);
 	const searchees = [...realSearchees, ...ensembleSearchees];
 	for (const [i, torrentFilePath] of torrentFilePaths.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${torrentFilePaths.length})`);

@@ -24,7 +24,7 @@ const ZodErrorMessages = {
 	blocklistTracker: `Blocklist tracker is not a valid URL host. If URL is https://user:pass@tracker.example.com:8080/announce/key, you must use "tracker:tracker.example.com:8080"`,
 	blocklistHash: `Blocklist hash must be 40 characters and alphanumeric`,
 	blocklistSize: `Blocklist size must be an integer for the number of bytes. You can only have one sizeBelow, one sizeAbove, and sizeBelow <= sizeAbove.`,
-	blocklistNeedsClient: `Blocklist ${BlocklistType.CATEGORY}:, ${BlocklistType.TAG}:, and ${BlocklistType.TRACKER}: requires torrentDir and a torrent client to connect to.`,
+	blocklistNeedsClient: `Blocklist ${BlocklistType.CATEGORY}:, ${BlocklistType.TAG}:, and ${BlocklistType.TRACKER}: requires torrentDir or useClientTorrents.`,
 	blocklistNeedsDataDirs: `Blocklist ${BlocklistType.FOLDER}: and ${BlocklistType.FOLDER_REGEX}: only applies to searchees from dataDirs.`,
 	vercel: "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
 	emptyString:
@@ -54,12 +54,15 @@ const ZodErrorMessages = {
 		"includeSingleEpisodes is not recommended when using announce, please read: https://www.cross-seed.org/docs/v6-migration#updated-includesingleepisodes-behavior",
 	invalidOutputDir:
 		"outputDir should only contain .torrent files, cross-seed will populate and manage (https://www.cross-seed.org/docs/basics/options#outputdir)",
-	needsInputDir:
-		"You need to set at least one of torrentDir (recommended) or dataDirs for search/rss/announce matching to work.",
+	torrentDirAndUseClientTorrents:
+		"You cannot have both torrentDir and useClientTorrents.",
+	needsClient: "You need to have a client configured for useClientTorrents.",
+	needSearchees:
+		"You need to have torrentDir, useClientTorrents or dataDirs for search/rss/announce matching to work.",
 	matchModeNeedsLinkDirs:
 		"When using action 'inject', you need to set linkDirs (and have your data accessible) for risky and partial matchMode.",
 	ensembleNeedsClient:
-		"seasonFromEpisodes requires a torrent client to connect to when using torrentDir.",
+		"seasonFromEpisodes requires a torrent client to connect to when using torrentDir or useClientTorrents.",
 	ensembleNeedsLinkDirs:
 		"When using action 'inject', you need to set linkDirs (and have your data accessible) for seasonFromEpisodes. Set seasonFromEpisodes to null to disable.",
 	ensembleNeedsPartial:
@@ -300,6 +303,7 @@ export const VALIDATION_SCHEMA = z
 			.gte(process.env.DEV ? 0 : 30, ZodErrorMessages.delayUnsupported)
 			.lte(3600, ZodErrorMessages.delayUnsupported),
 		torznab: z.array(z.string().url()),
+		useClientTorrents: z.boolean().optional().default(false),
 		dataDirs: z.array(z.string()).nullish(),
 		matchMode: z.nativeEnum(MatchMode),
 		skipRecheck: z.boolean().optional().default(true),
@@ -434,6 +438,27 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	}, "You cannot have both linkDir and linkDirs, use linkDirs only.")
 	.refine(
+		(config) => !config.useClientTorrents,
+		"useClientTorrents has not yet been implemented.",
+	)
+	.refine(
+		(config) => !config.torrentDir || !config.useClientTorrents,
+		ZodErrorMessages.torrentDirAndUseClientTorrents,
+	)
+	.refine(
+		(config) =>
+			!config.useClientTorrents ||
+			config.qbittorrentUrl ||
+			config.delugeRpcUrl ||
+			config.transmissionRpcUrl ||
+			config.rtorrentRpcUrl,
+		ZodErrorMessages.needsClient,
+	)
+	.refine(
+		(config) => !config.useClientTorrents || !config.delugeRpcUrl,
+		"Deluge is not supported for useClientTorrents.",
+	)
+	.refine(
 		(config) =>
 			!config.searchCadence ||
 			!config.excludeRecentSearch ||
@@ -535,7 +560,7 @@ export const VALIDATION_SCHEMA = z
 		}
 		if (
 			!(
-				config.torrentDir &&
+				(config.useClientTorrents || config.torrentDir) &&
 				(config.qbittorrentUrl ||
 					config.delugeRpcUrl ||
 					config.transmissionRpcUrl ||
@@ -563,10 +588,11 @@ export const VALIDATION_SCHEMA = z
 	}, ZodErrorMessages.blocklistNeedsDataDirs)
 	.refine(
 		(config) =>
+			config.useClientTorrents ||
 			config.torrentDir ||
 			config.dataDirs?.length ||
 			(!config.rssCadence && !config.searchCadence),
-		ZodErrorMessages.needsInputDir,
+		ZodErrorMessages.needSearchees,
 	)
 	.refine(
 		(config) =>
@@ -578,7 +604,7 @@ export const VALIDATION_SCHEMA = z
 	.refine(
 		(config) =>
 			!config.seasonFromEpisodes ||
-			!config.torrentDir ||
+			(!config.torrentDir && !config.useClientTorrents) ||
 			config.qbittorrentUrl ||
 			config.delugeRpcUrl ||
 			config.transmissionRpcUrl ||

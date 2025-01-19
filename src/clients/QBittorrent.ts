@@ -15,7 +15,6 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { loadTorrentDirLight } from "../torrent.js";
 import {
 	TorrentMetadataInClient,
 	getMaxRemainingBytes,
@@ -24,7 +23,6 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
-	validateSavePaths,
 } from "./TorrentClient.js";
 import {
 	extractCredentialsFromUrl,
@@ -168,13 +166,6 @@ export default class QBittorrent implements TorrentClient {
 				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
 			);
 		}
-		const searcheesRes = loadTorrentDirLight(torrentDir);
-		const infoHashPathMap = await this.getAllDownloadDirs({
-			metas: [], // Don't need to account for subfolder layout
-			onlyCompleted: false,
-			v1HashOnly: true,
-		});
-		await validateSavePaths(infoHashPathMap, await searcheesRes);
 	}
 
 	private async request(
@@ -488,7 +479,7 @@ export default class QBittorrent implements TorrentClient {
 			infoHash: torrent.hash,
 			category: torrent.category,
 			tags: torrent.tags.length ? torrent.tags.split(",") : [],
-			trackers: torrent.tracker.length ? [[torrent.tracker]] : undefined,
+			trackers: torrent.tracker.length ? [torrent.tracker] : undefined,
 		}));
 	}
 

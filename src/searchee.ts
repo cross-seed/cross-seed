@@ -73,7 +73,7 @@ export interface Searchee {
 	mtimeMs?: number;
 	category?: string;
 	tags?: string[];
-	trackers?: string[][];
+	trackers?: string[];
 	label?: SearcheeLabel;
 }
 

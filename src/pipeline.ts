@@ -70,8 +70,10 @@ import {
 	humanReadableDate,
 	humanReadableSize,
 	isTruthy,
+	Mutex,
 	stripExtension,
 	wait,
+	withMutex,
 } from "./utils.js";
 
 export interface Candidate {
@@ -573,10 +575,20 @@ async function findSearchableTorrents(): Promise<{
 }> {
 	const { searchLimit } = getRuntimeConfig();
 
-	const realSearchees = await findAllSearchees(Label.SEARCH);
-	const ensembleSearchees = await createEnsembleSearchees(realSearchees, {
-		useFilters: true,
-	});
+	const { realSearchees, ensembleSearchees } = await withMutex(
+		Mutex.CREATE_ALL_SEARCHEES,
+		async () => {
+			const realSearchees = await findAllSearchees(Label.SEARCH);
+			const ensembleSearchees = await createEnsembleSearchees(
+				realSearchees,
+				{
+					useFilters: true,
+				},
+			);
+			return { realSearchees, ensembleSearchees };
+		},
+		{ useQueue: true },
+	);
 	const infoHashesToExclude = new Set(
 		realSearchees.map((t) => t.infoHash).filter(isTruthy),
 	);
@@ -653,6 +665,7 @@ export async function main(): Promise<void> {
 
 export async function scanRssFeeds() {
 	const { dataDirs, torrentDir, torznab } = getRuntimeConfig();
+	await indexTorrentsAndDataDirs();
 	if (!torznab.length || (!torrentDir && !dataDirs?.length)) {
 		logger.error({
 			label: Label.RSS,
@@ -668,7 +681,6 @@ export async function scanRssFeeds() {
 		label: Label.RSS,
 		message: "Indexing new torrents...",
 	});
-	await indexTorrentsAndDataDirs();
 	logger.verbose({
 		label: Label.RSS,
 		message: "Querying RSS feeds...",

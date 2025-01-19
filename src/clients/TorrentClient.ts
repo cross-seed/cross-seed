@@ -35,7 +35,7 @@ export interface TorrentMetadataInClient {
 	infoHash: string;
 	category: string;
 	tags: string[];
-	trackers?: string[][];
+	trackers?: string[];
 }
 
 export interface TorrentClient {
@@ -53,6 +53,7 @@ export interface TorrentClient {
 	getAllDownloadDirs: (options: {
 		metas: SearcheeWithInfoHash[] | Metafile[];
 		onlyCompleted: boolean;
+		v1HashOnly?: boolean;
 	}) => Promise<Map<string, string>>;
 	resumeInjection: (
 		infoHash: string,
@@ -90,9 +91,9 @@ export function getClient(): TorrentClient | null {
 	return activeClient;
 }
 
-export async function validateSavePaths(
-	infoHashPathMap: Map<string, string>,
+export async function validateClientSavePaths(
 	searchees: SearcheeWithInfoHash[],
+	infoHashPathMap: Map<string, string>,
 ): Promise<void> {
 	const { linkDirs } = getRuntimeConfig();
 	logger.info(`Validating all existing torrent save paths...`);

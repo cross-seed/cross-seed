@@ -40,19 +40,6 @@ interface TorrentMetadata {
 	"qBt-tags"?: Buffer;
 }
 
-function sanitizeTrackerUrls(urls: Buffer[]): string[] {
-	const sanitizeTrackerUrl = (url: string) => {
-		try {
-			return new URL(url).host;
-		} catch {
-			return null;
-		}
-	};
-	return urls
-		.map((url) => sanitizeTrackerUrl(url.toString()))
-		.filter(isTruthy);
-}
-
 export function updateMetafileMetadata(
 	metafile: Metafile,
 	metadata: TorrentMetadata,
@@ -64,10 +51,24 @@ export function updateMetafileMetadata(
 		metafile.tags = metadata["qBt-tags"].toString().split(",");
 	}
 	if (metadata.trackers) {
-		metafile.trackers = metadata.trackers.map((tier) =>
-			sanitizeTrackerUrls(tier),
-		);
+		metafile.trackers = metadata.trackers
+			.map((tier) => sanitizeTrackerUrls(tier))
+			.flat();
 	}
+}
+
+export function sanitizeTrackerUrl(url: string): string | null {
+	try {
+		return new URL(url).host;
+	} catch {
+		return null;
+	}
+}
+
+function sanitizeTrackerUrls(urls: Buffer[]): string[] {
+	return urls
+		.map((url) => sanitizeTrackerUrl(url.toString()))
+		.filter(isTruthy);
 }
 
 function sumLength(sum: number, file: { length: number }): number {
@@ -98,7 +99,7 @@ export class Metafile {
 	isSingleFileTorrent: boolean;
 	category?: string;
 	tags?: string[];
-	trackers: string[][];
+	trackers: string[];
 	raw: Torrent;
 
 	constructor(raw: Torrent) {
@@ -161,9 +162,9 @@ export class Metafile {
 		const announceList = raw["announce-list"];
 		this.trackers =
 			Array.isArray(announceList) && announceList.length > 0
-				? announceList.map((tier) => sanitizeTrackerUrls(tier))
+				? announceList.map((tier) => sanitizeTrackerUrls(tier)).flat()
 				: raw.announce
-					? [sanitizeTrackerUrls([raw.announce])]
+					? sanitizeTrackerUrls([raw.announce])
 					: [];
 	}
 

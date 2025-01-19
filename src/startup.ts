@@ -115,12 +115,11 @@ async function checkConfigPaths(): Promise<void> {
 }
 
 export async function doStartupValidation(): Promise<void> {
-	const downloadClient = getClient();
 	await Promise.all<void>([
 		checkConfigPaths(),
 		validateTorznabUrls(),
 		validateUArrLs(),
-		downloadClient?.validateConfig(),
+		getClient()?.validateConfig(),
 	]);
 	logger.verbose({
 		label: Label.CONFIGDUMP,
