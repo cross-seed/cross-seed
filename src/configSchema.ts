@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "fs";
+import { readdirSync } from "fs";
 import ms from "ms";
 import { isAbsolute, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
@@ -11,7 +11,7 @@ import {
 	parseBlocklistEntry,
 } from "./constants.js";
 import { logger } from "./logger.js";
-import { countDirEntriesRec, formatAsList } from "./utils.js";
+import { formatAsList } from "./utils.js";
 
 /**
  * error messages and map returned upon Zod validation failure
@@ -29,8 +29,6 @@ const ZodErrorMessages = {
 	vercel: "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
 	emptyString:
 		"cannot have an empty string. If you want to unset it, use null or undefined.",
-	maxWatchesLow:
-		"max_user_watches too low for proper indexing of dataDirs. It is recommended to set it to fs.inotify.max_user_watches=1048576 in /etc/sysctl.conf (only on the host system if using docker)",
 	delayNegative: "delay is in seconds, you can't travel back in time.",
 	delayUnsupported: `delay must be 30 seconds to 1 hour.${NEWLINE_INDENT}To even out search loads please see the following documentation:${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options#delay)`,
 	rssCadenceUnsupported: "rssCadence must be 10-120 minutes",
@@ -702,19 +700,6 @@ export const VALIDATION_SCHEMA = z
 			!config.dataDirs.every(isAbsolute)
 		) {
 			logger.warn(ZodErrorMessages.relativePaths);
-		}
-		return true;
-	})
-	.refine((config) => {
-		if (!config.dataDirs.length) return true;
-		const path = "/proc/sys/fs/inotify/max_user_watches";
-		if (!existsSync(path)) return true;
-		const count = countDirEntriesRec(config.dataDirs, config.maxDataDepth);
-		const limit = parseInt(readFileSync(path, "utf8"));
-		if (limit < count * 5) {
-			logger.error(
-				`${ZodErrorMessages.maxWatchesLow} - current: ${limit}`,
-			);
 		}
 		return true;
 	});
