@@ -28,7 +28,7 @@ export async function indexDataDirs(options: {
 	startup: boolean;
 }): Promise<void> {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
-	if (!dataDirs?.length) return;
+	if (!dataDirs.length) return;
 
 	if (options.startup) {
 		logger.info("Indexing dataDirs for reverse lookup...");
@@ -239,7 +239,7 @@ export function findPotentialNestedRoots(
 
 export function findSearcheesFromAllDataDirs(): string[] {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
-	return dataDirs!.flatMap((dataDir) =>
+	return dataDirs.flatMap((dataDir) =>
 		readdirSync(dataDir)
 			.map((dirent) => join(dataDir, dirent))
 			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth)),

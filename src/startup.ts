@@ -78,11 +78,9 @@ async function checkConfigPaths(): Promise<void> {
 			pathFailure++;
 		}
 	}
-	if (dataDirs) {
-		for (const dataDir of dataDirs) {
-			if (!(await verifyPath(dataDir, "dataDirs", READ_ONLY))) {
-				pathFailure++;
-			}
+	for (const dataDir of dataDirs) {
+		if (!(await verifyPath(dataDir, "dataDirs", READ_ONLY))) {
+			pathFailure++;
 		}
 	}
 	if (injectDir) {
@@ -94,7 +92,7 @@ async function checkConfigPaths(): Promise<void> {
 			pathFailure++;
 		}
 	}
-	if (linkDirs.length && dataDirs) {
+	if (linkDirs.length) {
 		for (const dataDir of dataDirs) {
 			try {
 				testLinking(dataDir);

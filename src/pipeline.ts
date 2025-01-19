@@ -547,7 +547,7 @@ export async function findAllSearchees(
 		} else if (torrentDir) {
 			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
 		}
-		if (Array.isArray(dataDirs)) {
+		if (dataDirs.length) {
 			const memoizedPaths = new Map<string, string[]>();
 			const memoizedLengths = new Map<string, number>();
 			const searcheeResults = await Promise.all(
@@ -670,7 +670,7 @@ export async function scanRssFeeds() {
 	await indexTorrentsAndDataDirs();
 	if (
 		!torznab.length ||
-		(!useClientTorrents && !torrentDir && !dataDirs?.length)
+		(!useClientTorrents && !torrentDir && !dataDirs.length)
 	) {
 		logger.error({
 			label: Label.RSS,
