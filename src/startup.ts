@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from "fs";
 import { access, constants, stat } from "fs/promises";
+import ms from "ms";
 import { sep } from "path";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
@@ -9,6 +10,7 @@ import { CrossSeedError } from "./errors.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
+import { wait } from "./utils.js";
 
 /**
  * validates existence, permission, and that a path is a directory
@@ -114,13 +116,45 @@ async function checkConfigPaths(): Promise<void> {
 	}
 }
 
+async function retry<T>(
+	cb: () => Promise<T>,
+	retries: number,
+	delayMs: number,
+): Promise<T> {
+	let lastError = new Error("Retry failed");
+	for (let i = 0; i <= retries; i++) {
+		try {
+			return await cb();
+		} catch (e) {
+			const retryMsg =
+				i < retries ? `, retrying in ${delayMs / 1000} seconds` : "";
+			logger.error(
+				`Attempt ${i + 1}/${retries + 1} failed${retryMsg}: ${e.message}`,
+			);
+			logger.debug(e);
+			lastError = e;
+			if (i >= retries) break;
+			await wait(delayMs);
+		}
+	}
+	throw lastError;
+}
+
 export async function doStartupValidation(): Promise<void> {
-	await Promise.all<void>([
-		checkConfigPaths(),
-		validateTorznabUrls(),
-		validateUArrLs(),
-		getClient()?.validateConfig(),
-	]);
+	await checkConfigPaths(); // ensure paths are valid first
+	const validateClientConfig = async () => getClient()?.validateConfig(); // preserve `this` class pointer
+	const errors = (
+		await Promise.allSettled([
+			retry(validateTorznabUrls, 5, ms("1 minute")),
+			retry(validateUArrLs, 5, ms("1 minute")),
+			retry(validateClientConfig, 5, ms("1 minute")),
+		])
+	).filter((p) => p.status === "rejected");
+	if (errors.length) {
+		throw new CrossSeedError(
+			`\tYour configuration is invalid, please see the ${errors.length > 1 ? "errors" : "error"} above for details.`,
+		);
+	}
 	logger.verbose({
 		label: Label.CONFIGDUMP,
 		message: inspect(getRuntimeConfig()),
