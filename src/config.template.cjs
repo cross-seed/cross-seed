@@ -74,10 +74,10 @@ module.exports = {
 	port: 2468,
 
 	/**
-	 * cross-seed will send POST requests to this url with a JSON payload of
-	 * { title, body }. Conforms to the caronc/apprise REST API.
+	 * cross-seed will send POST requests to these urls with a JSON payload of
+	 * { title, body, extra }. Conforms to the caronc/apprise REST API.
 	 */
-	notificationWebhookUrl: undefined,
+	notificationWebhookUrls: [],
 
 	/**
 	 * The url of your rtorrent XMLRPC interface.

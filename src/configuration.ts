@@ -38,6 +38,7 @@ export interface FileConfig {
 	transmissionRpcUrl?: string;
 	delugeRpcUrl?: string;
 	duplicateCategories?: boolean;
+	notificationWebhookUrls?: string[];
 	notificationWebhookUrl?: string;
 	port?: number;
 	host?: string;
