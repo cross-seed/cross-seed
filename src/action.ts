@@ -1,14 +1,5 @@
 import chalk from "chalk";
-import {
-	existsSync,
-	linkSync,
-	lstatSync,
-	mkdirSync,
-	readlinkSync,
-	rmSync,
-	statSync,
-	symlinkSync,
-} from "fs";
+import fs from "fs";
 import { dirname, join, resolve } from "path";
 import { getClient, shouldRecheck } from "./clients/TorrentClient.js";
 import {
@@ -116,12 +107,12 @@ function linkExactTree(
 	for (const newFile of newMeta.files) {
 		const srcFilePath = getAbsoluteFilePath(sourceRoot, newFile.path);
 		const destFilePath = join(destinationDir, newFile.path);
-		if (existsSync(destFilePath)) {
+		if (fs.existsSync(destFilePath)) {
 			alreadyExisted = true;
 			continue;
 		}
-		if (options.ignoreMissing && !existsSync(srcFilePath)) continue;
-		mkdirSync(dirname(destFilePath), { recursive: true });
+		if (options.ignoreMissing && !fs.existsSync(srcFilePath)) continue;
+		fs.mkdirSync(dirname(destFilePath), { recursive: true });
 		if (linkFile(srcFilePath, destFilePath)) {
 			linkedNewFiles = true;
 		}
@@ -160,12 +151,12 @@ function linkFuzzyTree(
 			const destFilePath = join(destinationDir, newFile.path);
 			const index = availableFiles.indexOf(matchedSearcheeFiles[0]);
 			availableFiles.splice(index, 1);
-			if (existsSync(destFilePath)) {
+			if (fs.existsSync(destFilePath)) {
 				alreadyExisted = true;
 				continue;
 			}
-			if (options.ignoreMissing && !existsSync(srcFilePath)) continue;
-			mkdirSync(dirname(destFilePath), { recursive: true });
+			if (options.ignoreMissing && !fs.existsSync(srcFilePath)) continue;
+			fs.mkdirSync(dirname(destFilePath), { recursive: true });
 			if (linkFile(srcFilePath, destFilePath)) {
 				linkedNewFiles = true;
 			}
@@ -198,12 +189,12 @@ function linkVirtualSearchee(
 			const destFilePath = join(destinationDir, newFile.path);
 			const index = availableFiles.indexOf(matchedSearcheeFiles[0]);
 			availableFiles.splice(index, 1);
-			if (existsSync(destFilePath)) {
+			if (fs.existsSync(destFilePath)) {
 				alreadyExisted = true;
 				continue;
 			}
-			if (options.ignoreMissing && !existsSync(srcFilePath)) continue;
-			mkdirSync(dirname(destFilePath), { recursive: true });
+			if (options.ignoreMissing && !fs.existsSync(srcFilePath)) continue;
+			fs.mkdirSync(dirname(destFilePath), { recursive: true });
 			if (linkFile(srcFilePath, destFilePath)) {
 				linkedNewFiles = true;
 			}
@@ -222,11 +213,11 @@ function unlinkMetafile(meta: Metafile, destinationDir: string) {
 		parent = dirname(rootFolder);
 	}
 	const fullPath = join(destinationDir, rootFolder);
-	if (!existsSync(fullPath)) return;
+	if (!fs.existsSync(fullPath)) return;
 	if (!fullPath.startsWith(destinationDir)) return; // assert: fullPath is within destinationDir
-	if (statSync(fullPath).ino === statSync(destinationDir).ino) return; // assert: fullPath is not destinationDir
+	if (fs.statSync(fullPath).ino === fs.statSync(destinationDir).ino) return; // assert: fullPath is not destinationDir
 	logger.verbose(`Unlinking ${fullPath}`);
-	rmSync(fullPath, { recursive: true });
+	fs.rmSync(fullPath, { recursive: true });
 }
 
 export async function linkAllFilesInMetafile(
@@ -289,7 +280,7 @@ export async function linkAllFilesInMetafile(
 				? searchee.files[0].path
 				: searchee.name,
 		);
-		if (!existsSync(sourceRoot)) {
+		if (!fs.existsSync(sourceRoot)) {
 			logger.error({
 				label: searchee.label,
 				message: `Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
@@ -297,7 +288,7 @@ export async function linkAllFilesInMetafile(
 			return resultOfErr("MISSING_DATA");
 		}
 	} else if (searchee.path) {
-		if (!existsSync(searchee.path)) {
+		if (!fs.existsSync(searchee.path)) {
 			logger.error({
 				label: searchee.label,
 				message: `Linking failed, ${searchee.path} not found. Make sure Docker volume mounts are set up properly.`,
@@ -319,14 +310,14 @@ export async function linkAllFilesInMetafile(
 		sourceRoot = searchee.path;
 	} else {
 		for (const file of searchee.files) {
-			if (!existsSync(file.path)) {
+			if (!fs.existsSync(file.path)) {
 				logger.error(
 					`Linking failed, ${file.path} not found. Make sure Docker volume mounts are set up properly.`,
 				);
 				return resultOfErr("MISSING_DATA");
 			}
 			if (options.onlyCompleted) {
-				const f = statSync(file.path);
+				const f = fs.statSync(file.path);
 				if (searchee.mtimeMs! < f.mtimeMs || file.length !== f.size) {
 					return resultOfErr("TORRENT_NOT_COMPLETE");
 				}
@@ -467,13 +458,13 @@ export async function performActions(
 
 export function getLinkDir(path: string): string | null {
 	const { linkDirs, linkType } = getRuntimeConfig();
-	const pathDev = statSync(path).dev;
+	const pathDev = fs.statSync(path).dev;
 	for (const linkDir of linkDirs) {
-		if (statSync(linkDir).dev === pathDev) return linkDir;
+		if (fs.statSync(linkDir).dev === pathDev) return linkDir;
 	}
-	if (linkType === LinkType.HARDLINK) {
+	if (linkType !== LinkType.SYMLINK) {
 		logger.error(
-			`Cannot find any linkDir from linkDirs on the same drive to hardlink ${path}`,
+			`Cannot find any linkDir from linkDirs on the same drive to ${linkType} ${path}`,
 		);
 		return null;
 	}
@@ -504,12 +495,24 @@ function linkFile(oldPath: string, newPath: string): boolean {
 	try {
 		const ogFileResolvedPath = unwrapSymlinks(oldPath);
 
-		if (linkType === LinkType.HARDLINK) {
-			linkSync(ogFileResolvedPath, newPath);
-		} else {
-			// we need to resolve because symlinks are resolved outside
-			// the context of cross-seed's working directory
-			symlinkSync(ogFileResolvedPath, resolve(newPath));
+		switch (linkType) {
+			case LinkType.HARDLINK:
+				fs.linkSync(ogFileResolvedPath, newPath);
+				break;
+			case LinkType.SYMLINK:
+				// we need to resolve because symlinks are resolved outside
+				// the context of cross-seed's working directory
+				fs.symlinkSync(ogFileResolvedPath, resolve(newPath));
+				break;
+			case LinkType.REFLINK:
+				fs.copyFileSync(
+					ogFileResolvedPath,
+					newPath,
+					fs.constants.COPYFILE_FICLONE_FORCE,
+				);
+				break;
+			default:
+				throw new Error(`Unsupported linkType: ${linkType}`);
 		}
 		return true;
 	} catch (e) {
@@ -525,10 +528,10 @@ function linkFile(oldPath: string, newPath: string): boolean {
  */
 function unwrapSymlinks(path: string): string {
 	for (let i = 0; i < 16; i++) {
-		if (!lstatSync(path).isSymbolicLink()) {
+		if (!fs.lstatSync(path).isSymbolicLink()) {
 			return path;
 		}
-		path = resolve(dirname(path), readlinkSync(path));
+		path = resolve(dirname(path), fs.readlinkSync(path));
 	}
 	throw new Error(`too many levels of symbolic links at ${path}`);
 }
@@ -546,7 +549,7 @@ export function testLinking(srcDir: string): void {
 		if (!srcFile) return;
 		const testPath = join(linkDir, "cross-seed.test");
 		linkFile(srcFile, testPath);
-		rmSync(testPath);
+		fs.rmSync(testPath);
 	} catch (e) {
 		logger.error(e);
 		throw new CrossSeedError(
