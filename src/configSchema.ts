@@ -1,4 +1,4 @@
-import { readdirSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
 import ms from "ms";
 import { isAbsolute, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
@@ -11,7 +11,7 @@ import {
 	parseBlocklistEntry,
 } from "./constants.js";
 import { logger } from "./logger.js";
-import { formatAsList } from "./utils.js";
+import { countDirEntriesRec, formatAsList } from "./utils.js";
 
 /**
  * error messages and map returned upon Zod validation failure
@@ -29,6 +29,8 @@ const ZodErrorMessages = {
 	vercel: "format does not follow vercel's `ms` style ( https://github.com/vercel/ms#examples )",
 	emptyString:
 		"cannot have an empty string. If you want to unset it, use null or undefined.",
+	maxWatchesLow:
+		"max_user_watches too low for proper indexing of dataDirs. It is recommended to set it to fs.inotify.max_user_watches=1048576 in /etc/sysctl.conf (only on the host system if using docker)",
 	delayNegative: "delay is in seconds, you can't travel back in time.",
 	delayUnsupported: `delay must be 30 seconds to 1 hour.${NEWLINE_INDENT}To even out search loads please see the following documentation:${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options#delay)`,
 	rssCadenceUnsupported: "rssCadence must be 10-120 minutes",
@@ -304,7 +306,10 @@ export const VALIDATION_SCHEMA = z
 			.lte(3600, ZodErrorMessages.delayUnsupported),
 		torznab: z.array(z.string().url()),
 		useClientTorrents: z.boolean().optional().default(false),
-		dataDirs: z.array(z.string()).nullish(),
+		dataDirs: z
+			.array(z.string())
+			.nullish()
+			.transform((v) => v ?? []),
 		matchMode: z.nativeEnum(MatchMode),
 		skipRecheck: z.boolean().optional().default(true),
 		autoResumeMaxDownload: z
@@ -577,7 +582,7 @@ export const VALIDATION_SCHEMA = z
 		) {
 			return true;
 		}
-		if (!config.dataDirs?.length) {
+		if (!config.dataDirs.length) {
 			logger.error(ZodErrorMessages.blocklistNeedsDataDirs);
 		}
 		return true;
@@ -586,7 +591,7 @@ export const VALIDATION_SCHEMA = z
 		(config) =>
 			config.useClientTorrents ||
 			config.torrentDir ||
-			config.dataDirs?.length ||
+			config.dataDirs.length ||
 			(!config.rssCadence && !config.searchCadence),
 		ZodErrorMessages.needSearchees,
 	)
@@ -624,7 +629,7 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	}, ZodErrorMessages.ensembleNeedsPartial)
 	.refine((config) => {
-		if (!config.dataDirs?.length) return true;
+		if (!config.dataDirs.length) return true;
 		if (!config.seasonFromEpisodes && !config.includeSingleEpisodes) {
 			return true;
 		}
@@ -634,10 +639,9 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	})
 	.refine((config) => {
-		if (!config.linkDirs.length) return true;
 		for (const linkDir of config.linkDirs) {
 			if (isChildPath(linkDir, [config.outputDir])) return false;
-			if (config.dataDirs && isChildPath(linkDir, config.dataDirs)) {
+			if (isChildPath(linkDir, config.dataDirs)) {
 				return false;
 			}
 			if (
@@ -650,7 +654,6 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	}, ZodErrorMessages.linkDirsInOtherDirs)
 	.refine((config) => {
-		if (!config.dataDirs) return true;
 		for (const dataDir of config.dataDirs) {
 			if (isChildPath(dataDir, [config.outputDir])) return false;
 			if (
@@ -659,10 +662,7 @@ export const VALIDATION_SCHEMA = z
 			) {
 				return false;
 			}
-			if (
-				config.linkDirs.length &&
-				isChildPath(dataDir, config.linkDirs)
-			) {
+			if (isChildPath(dataDir, config.linkDirs)) {
 				return false;
 			}
 		}
@@ -671,16 +671,10 @@ export const VALIDATION_SCHEMA = z
 	.refine((config) => {
 		if (!config.torrentDir) return true;
 		if (isChildPath(config.torrentDir, [config.outputDir])) return false;
-		if (
-			config.dataDirs &&
-			isChildPath(config.torrentDir, config.dataDirs)
-		) {
+		if (isChildPath(config.torrentDir, config.dataDirs)) {
 			return false;
 		}
-		if (
-			config.linkDirs.length &&
-			isChildPath(config.torrentDir, config.linkDirs)
-		) {
+		if (isChildPath(config.torrentDir, config.linkDirs)) {
 			return false;
 		}
 		return true;
@@ -692,13 +686,10 @@ export const VALIDATION_SCHEMA = z
 		) {
 			return false;
 		}
-		if (config.dataDirs && isChildPath(config.outputDir, config.dataDirs)) {
+		if (isChildPath(config.outputDir, config.dataDirs)) {
 			return false;
 		}
-		if (
-			config.linkDirs.length &&
-			isChildPath(config.outputDir, config.linkDirs)
-		) {
+		if (isChildPath(config.outputDir, config.linkDirs)) {
 			return false;
 		}
 		return true;
@@ -708,9 +699,22 @@ export const VALIDATION_SCHEMA = z
 			!isAbsolute(config.outputDir) ||
 			!config.linkDirs.every(isAbsolute) ||
 			(config.torrentDir && !isAbsolute(config.torrentDir)) ||
-			(config.dataDirs && !config.dataDirs.every(isAbsolute))
+			!config.dataDirs.every(isAbsolute)
 		) {
 			logger.warn(ZodErrorMessages.relativePaths);
+		}
+		return true;
+	})
+	.refine((config) => {
+		if (!config.dataDirs.length) return true;
+		const path = "/proc/sys/fs/inotify/max_user_watches";
+		if (!existsSync(path)) return true;
+		const count = countDirEntriesRec(config.dataDirs, config.maxDataDepth);
+		const limit = parseInt(readFileSync(path, "utf8"));
+		if (limit < count * 5) {
+			logger.error(
+				`${ZodErrorMessages.maxWatchesLow} - current: ${limit}`,
+			);
 		}
 		return true;
 	});

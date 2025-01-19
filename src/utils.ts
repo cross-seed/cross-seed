@@ -451,6 +451,23 @@ export async function* combineAsyncIterables<T>(
 	return;
 }
 
+export function countDirEntriesRec(
+	dirs: string[],
+	maxDataDepth: number,
+): number {
+	if (maxDataDepth === 0) return 0;
+	let count = 0;
+	for (const dir of dirs) {
+		const newDirs: string[] = [];
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			count++;
+			if (entry.isDirectory()) newDirs.push(path.join(dir, entry.name));
+		}
+		count += countDirEntriesRec(newDirs, maxDataDepth - 1);
+	}
+	return count;
+}
+
 export function findAFileWithExt(dir: string, exts: string[]): string | null {
 	const entries = readdirSync(dir, { withFileTypes: true });
 	for (const entry of entries) {
