@@ -285,7 +285,7 @@ export async function searchForLocalTorrentByCriteria(
 		...searchee,
 		label: Label.WEBHOOK,
 	}));
-	const includeEpisodes = searchees.length === 1;
+	const allowSeasonPackEpisodes = searchees.length === 1;
 	const infoHashesToExclude = await getInfoHashesToExclude();
 	const indexerSearchCount = new Map<number, number>();
 	let totalFound = 0;
@@ -297,7 +297,7 @@ export async function searchForLocalTorrentByCriteria(
 			if (
 				!filterByContent(searchee, {
 					configOverride: options.configOverride,
-					includeEpisodes,
+					allowSeasonPackEpisodes,
 					ignoreCrossSeeds: options.ignoreCrossSeeds,
 				})
 			) {

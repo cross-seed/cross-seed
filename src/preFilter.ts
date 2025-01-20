@@ -85,7 +85,7 @@ export function filterByContent(
 	searchee: SearcheeWithLabel,
 	options?: {
 		configOverride: Partial<RuntimeConfig>;
-		includeEpisodes: boolean;
+		allowSeasonPackEpisodes: boolean;
 		ignoreCrossSeeds: boolean;
 	},
 ): boolean {
@@ -109,7 +109,7 @@ export function filterByContent(
 	}
 
 	if (
-		(!options?.includeEpisodes || !includeSingleEpisodes) &&
+		(!options?.allowSeasonPackEpisodes || !includeSingleEpisodes) &&
 		searchee.path &&
 		searchee.files.length === 1 &&
 		[Label.SEARCH, Label.WEBHOOK].includes(searchee.label) &&
