@@ -40,10 +40,8 @@ import {
 	extractInt,
 	getLogString,
 	humanReadableSize,
-	Mutex,
 	sanitizeInfoHash,
 	wait,
-	withMutex,
 } from "../utils.js";
 
 const X_WWW_FORM_URLENCODED = {
@@ -564,90 +562,82 @@ export default class QBittorrent implements TorrentClient {
 		newSearcheesOnly?: boolean;
 		refresh?: string[];
 	}): Promise<ClientSearcheeResult> {
-		return withMutex(
-			Mutex.QUERY_CLIENT,
-			async () => {
-				const searchees: SearcheeClient[] = [];
-				const newSearchees: SearcheeClient[] = [];
-				const infoHashes = new Set<string>();
-				const torrents = await this.getAllTorrentInfo();
-				if (!torrents.length) {
-					logger.error({
-						label: Label.QBITTORRENT,
-						message: "No torrents found in client",
-					});
-					return { searchees, newSearchees };
+		const searchees: SearcheeClient[] = [];
+		const newSearchees: SearcheeClient[] = [];
+		const infoHashes = new Set<string>();
+		const torrents = await this.getAllTorrentInfo();
+		if (!torrents.length) {
+			logger.error({
+				label: Label.QBITTORRENT,
+				message: "No torrents found in client",
+			});
+			return { searchees, newSearchees };
+		}
+		for (const torrent of torrents) {
+			const infoHash = (
+				torrent.infohash_v1 || torrent.hash
+			).toLowerCase();
+			infoHashes.add(infoHash);
+			const dbTorrent = await memDB("torrent")
+				.where("info_hash", infoHash)
+				.first();
+			const refresh =
+				options?.refresh === undefined
+					? false
+					: options.refresh.length === 0
+						? true
+						: options.refresh.includes(infoHash);
+			if (dbTorrent && !refresh) {
+				if (!options?.newSearcheesOnly) {
+					searchees.push(createSearcheeFromDB(dbTorrent));
 				}
-				for (const torrent of torrents) {
-					const infoHash = (
-						torrent.infohash_v1 || torrent.hash
-					).toLowerCase();
-					infoHashes.add(infoHash);
-					const dbTorrent = await memDB("torrent")
-						.where("info_hash", infoHash)
-						.first();
-					const refresh =
-						options?.refresh === undefined
-							? false
-							: options.refresh.length === 0
-								? true
-								: options.refresh.includes(infoHash);
-					if (dbTorrent && !refresh) {
-						if (!options?.newSearcheesOnly) {
-							searchees.push(createSearcheeFromDB(dbTorrent));
-						}
-						continue;
-					}
-					const files = await this.getFiles(torrent.hash);
-					if (!files) {
-						logger.verbose({
-							label: Label.QBITTORRENT,
-							message: `Failed to get files for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}] (likely transient)`,
-						});
-						continue;
-					}
-					if (!files.length) {
-						logger.verbose({
-							label: Label.QBITTORRENT,
-							message: `No files found for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}]: skipping`,
-						});
-						continue;
-					}
-					const trackers = await this.getTrackers(torrent.hash);
-					if (!trackers) {
-						logger.verbose({
-							label: Label.QBITTORRENT,
-							message: `Failed to get trackers for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}] (likely transient)`,
-						});
-						continue;
-					}
-					const { name } = torrent;
-					const title = parseTitle(name, files) ?? name;
-					const length = torrent.total_size;
-					const savePath = torrent.save_path;
-					const category = torrent.category;
-					const tags = torrent.tags.length
-						? torrent.tags.split(",")
-						: [];
-					const searchee: SearcheeClient = {
-						infoHash,
-						name,
-						title,
-						files,
-						length,
-						savePath,
-						category,
-						tags,
-						trackers,
-					};
-					newSearchees.push(searchee);
-					searchees.push(searchee);
-				}
-				await updateSearcheeClientDB(newSearchees, infoHashes);
-				return { searchees, newSearchees };
-			},
-			{ useQueue: true },
-		);
+				continue;
+			}
+			const files = await this.getFiles(torrent.hash);
+			if (!files) {
+				logger.verbose({
+					label: Label.QBITTORRENT,
+					message: `Failed to get files for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}] (likely transient)`,
+				});
+				continue;
+			}
+			if (!files.length) {
+				logger.verbose({
+					label: Label.QBITTORRENT,
+					message: `No files found for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}]: skipping`,
+				});
+				continue;
+			}
+			const trackers = await this.getTrackers(torrent.hash);
+			if (!trackers) {
+				logger.verbose({
+					label: Label.QBITTORRENT,
+					message: `Failed to get trackers for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}] (likely transient)`,
+				});
+				continue;
+			}
+			const { name } = torrent;
+			const title = parseTitle(name, files) ?? name;
+			const length = torrent.total_size;
+			const savePath = torrent.save_path;
+			const category = torrent.category;
+			const tags = torrent.tags.length ? torrent.tags.split(",") : [];
+			const searchee: SearcheeClient = {
+				infoHash,
+				name,
+				title,
+				files,
+				length,
+				savePath,
+				category,
+				tags,
+				trackers,
+			};
+			newSearchees.push(searchee);
+			searchees.push(searchee);
+		}
+		await updateSearcheeClientDB(newSearchees, infoHashes);
+		return { searchees, newSearchees };
 	}
 
 	/**

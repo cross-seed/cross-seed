@@ -25,10 +25,8 @@ import {
 	extractCredentialsFromUrl,
 	getLogString,
 	humanReadableSize,
-	Mutex,
 	sanitizeInfoHash,
 	wait,
-	withMutex,
 } from "../utils.js";
 import {
 	ClientSearcheeResult,
@@ -627,98 +625,82 @@ export default class Deluge implements TorrentClient {
 		newSearcheesOnly?: boolean;
 		refresh?: string[];
 	}): Promise<ClientSearcheeResult> {
-		return withMutex(
-			Mutex.QUERY_CLIENT,
-			async () => {
-				const searchees: SearcheeClient[] = [];
-				const newSearchees: SearcheeClient[] = [];
-				const infoHashes = new Set<string>();
-				const torrentsRes = await this.call<TorrentStatus>(
-					"web.update_ui",
-					[
-						[
-							"name",
-							"label",
-							"save_path",
-							"total_size",
-							"files",
-							"trackers",
-						],
-						{},
-					],
-				);
-				if (torrentsRes.isErr()) {
-					logger.error({
-						label: Label.DELUGE,
-						message: "Failed to get torrents from client",
-					});
-					logger.debug(torrentsRes.unwrapErr());
-					return { searchees, newSearchees };
+		const searchees: SearcheeClient[] = [];
+		const newSearchees: SearcheeClient[] = [];
+		const infoHashes = new Set<string>();
+		const torrentsRes = await this.call<TorrentStatus>("web.update_ui", [
+			["name", "label", "save_path", "total_size", "files", "trackers"],
+			{},
+		]);
+		if (torrentsRes.isErr()) {
+			logger.error({
+				label: Label.DELUGE,
+				message: "Failed to get torrents from client",
+			});
+			logger.debug(torrentsRes.unwrapErr());
+			return { searchees, newSearchees };
+		}
+		const torrents = torrentsRes.unwrap().torrents;
+		if (!torrents || !Object.keys(torrents).length) {
+			logger.verbose({
+				label: Label.DELUGE,
+				message: "No torrents found in client",
+			});
+			return { searchees, newSearchees };
+		}
+		for (const [hash, torrent] of Object.entries(torrents)) {
+			const infoHash = hash.toLowerCase();
+			infoHashes.add(infoHash);
+			const dbTorrent = await memDB("torrent")
+				.where("info_hash", infoHash)
+				.first();
+			const refresh =
+				options?.refresh === undefined
+					? false
+					: options.refresh.length === 0
+						? true
+						: options.refresh.includes(infoHash);
+			if (dbTorrent && !refresh) {
+				if (!options?.newSearcheesOnly) {
+					searchees.push(createSearcheeFromDB(dbTorrent));
 				}
-				const torrents = torrentsRes.unwrap().torrents;
-				if (!torrents || !Object.keys(torrents).length) {
-					logger.verbose({
-						label: Label.DELUGE,
-						message: "No torrents found in client",
-					});
-					return { searchees, newSearchees };
-				}
-				for (const [hash, torrent] of Object.entries(torrents)) {
-					const infoHash = hash.toLowerCase();
-					infoHashes.add(infoHash);
-					const dbTorrent = await memDB("torrent")
-						.where("info_hash", infoHash)
-						.first();
-					const refresh =
-						options?.refresh === undefined
-							? false
-							: options.refresh.length === 0
-								? true
-								: options.refresh.includes(infoHash);
-					if (dbTorrent && !refresh) {
-						if (!options?.newSearcheesOnly) {
-							searchees.push(createSearcheeFromDB(dbTorrent));
-						}
-						continue;
-					}
-					const files = torrent.files!.map((file) => ({
-						name: basename(file.path),
-						path: file.path,
-						length: file.size,
-					}));
-					if (!files.length) {
-						logger.verbose({
-							label: Label.DELUGE,
-							message: `No files found for ${torrent.name} [${sanitizeInfoHash(infoHash)}]: skipping`,
-						});
-						continue;
-					}
-					const trackers = organizeTrackers(torrent.trackers!);
-					const name = torrent.name!;
-					const title = parseTitle(name, files) ?? name;
-					const length = torrent.total_size!;
-					const savePath = torrent.save_path!;
-					const category = torrent.label ?? "";
-					const tags = [];
-					const searchee: SearcheeClient = {
-						infoHash,
-						name,
-						title,
-						files,
-						length,
-						savePath,
-						category,
-						tags,
-						trackers,
-					};
-					newSearchees.push(searchee);
-					searchees.push(searchee);
-				}
-				await updateSearcheeClientDB(newSearchees, infoHashes);
-				return { searchees, newSearchees };
-			},
-			{ useQueue: true },
-		);
+				continue;
+			}
+			const files = torrent.files!.map((file) => ({
+				name: basename(file.path),
+				path: file.path,
+				length: file.size,
+			}));
+			if (!files.length) {
+				logger.verbose({
+					label: Label.DELUGE,
+					message: `No files found for ${torrent.name} [${sanitizeInfoHash(infoHash)}]: skipping`,
+				});
+				continue;
+			}
+			const trackers = organizeTrackers(torrent.trackers!);
+			const name = torrent.name!;
+			const title = parseTitle(name, files) ?? name;
+			const length = torrent.total_size!;
+			const savePath = torrent.save_path!;
+			const category = torrent.label ?? "";
+			const tags = [];
+			const searchee: SearcheeClient = {
+				infoHash,
+				name,
+				title,
+				files,
+				length,
+				savePath,
+				category,
+				tags,
+				trackers,
+			};
+			newSearchees.push(searchee);
+			searchees.push(searchee);
+		}
+		await updateSearcheeClientDB(newSearchees, infoHashes);
+		return { searchees, newSearchees };
 	}
 
 	/**

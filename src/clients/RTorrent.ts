@@ -27,10 +27,8 @@ import {
 	extractCredentialsFromUrl,
 	humanReadableSize,
 	isTruthy,
-	Mutex,
 	sanitizeInfoHash,
 	wait,
-	withMutex,
 } from "../utils.js";
 import {
 	ClientSearcheeResult,
@@ -512,150 +510,136 @@ export default class RTorrent implements TorrentClient {
 		newSearcheesOnly?: boolean;
 		refresh?: string[];
 	}): Promise<ClientSearcheeResult> {
-		return withMutex(
-			Mutex.QUERY_CLIENT,
-			async () => {
-				const searchees: SearcheeClient[] = [];
-				const newSearchees: SearcheeClient[] = [];
-				const hashes = await this.methodCallP<string[]>(
-					"download_list",
-					[],
-				);
-				type ReturnType = any[][] | Fault[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-				let response: ReturnType;
-				const args = [
-					hashes
-						.map((hash) => [
-							{
-								methodName: "d.name",
-								params: [hash],
-							},
-							{
-								methodName: "d.size_bytes",
-								params: [hash],
-							},
-							{
-								methodName: "d.directory",
-								params: [hash],
-							},
-							{
-								methodName: "d.is_multi_file",
-								params: [hash],
-							},
-							{
-								methodName: "d.custom1",
-								params: [hash],
-							},
-							{
-								methodName: "f.multicall",
-								params: [hash, "", "f.path=", "f.size_bytes="],
-							},
-							{
-								methodName: "t.multicall",
-								params: [hash, "", "t.url=", "t.group="],
-							},
-						])
-						.flat(),
-				];
-				try {
-					response = await this.methodCallP<ReturnType>(
-						"system.multicall",
-						args,
-					);
-				} catch (e) {
-					logger.error({
-						Label: Label.RTORRENT,
-						message: "Failed to get torrent info for all torrents",
-					});
-					logger.debug(e);
-					return { searchees, newSearchees };
-				}
+		const searchees: SearcheeClient[] = [];
+		const newSearchees: SearcheeClient[] = [];
+		const hashes = await this.methodCallP<string[]>("download_list", []);
+		type ReturnType = any[][] | Fault[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+		let response: ReturnType;
+		const args = [
+			hashes
+				.map((hash) => [
+					{
+						methodName: "d.name",
+						params: [hash],
+					},
+					{
+						methodName: "d.size_bytes",
+						params: [hash],
+					},
+					{
+						methodName: "d.directory",
+						params: [hash],
+					},
+					{
+						methodName: "d.is_multi_file",
+						params: [hash],
+					},
+					{
+						methodName: "d.custom1",
+						params: [hash],
+					},
+					{
+						methodName: "f.multicall",
+						params: [hash, "", "f.path=", "f.size_bytes="],
+					},
+					{
+						methodName: "t.multicall",
+						params: [hash, "", "t.url=", "t.group="],
+					},
+				])
+				.flat(),
+		];
+		try {
+			response = await this.methodCallP<ReturnType>(
+				"system.multicall",
+				args,
+			);
+		} catch (e) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: "Failed to get torrent info for all torrents",
+			});
+			logger.debug(e);
+			return { searchees, newSearchees };
+		}
 
-				function isFault(response: ReturnType): response is Fault[] {
-					return "faultString" in response[0];
+		function isFault(response: ReturnType): response is Fault[] {
+			return "faultString" in response[0];
+		}
+		if (isFault(response)) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: "Fault while getting torrent info for all torrents",
+			});
+			logger.debug(inspect(response));
+			return { searchees, newSearchees };
+		}
+		const infoHashes = new Set<string>();
+		for (let i = 0; i < hashes.length; i++) {
+			const infoHash = hashes[i].toLowerCase();
+			infoHashes.add(infoHash);
+			const dbTorrent = await memDB("torrent")
+				.where("info_hash", infoHash)
+				.first();
+			const refresh =
+				options?.refresh === undefined
+					? false
+					: options.refresh.length === 0
+						? true
+						: options.refresh.includes(infoHash);
+			if (dbTorrent && !refresh) {
+				if (!options?.newSearcheesOnly) {
+					searchees.push(createSearcheeFromDB(dbTorrent));
 				}
-				if (isFault(response)) {
-					logger.error({
-						Label: Label.RTORRENT,
-						message:
-							"Fault while getting torrent info for all torrents",
-					});
-					logger.debug(inspect(response));
-					return { searchees, newSearchees };
-				}
-				const infoHashes = new Set<string>();
-				for (let i = 0; i < hashes.length; i++) {
-					const infoHash = hashes[i].toLowerCase();
-					infoHashes.add(infoHash);
-					const dbTorrent = await memDB("torrent")
-						.where("info_hash", infoHash)
-						.first();
-					const refresh =
-						options?.refresh === undefined
-							? false
-							: options.refresh.length === 0
-								? true
-								: options.refresh.includes(infoHash);
-					if (dbTorrent && !refresh) {
-						if (!options?.newSearcheesOnly) {
-							searchees.push(createSearcheeFromDB(dbTorrent));
-						}
-						continue;
-					}
-					const name: string = response[i * 7][0];
-					const length = Number(response[i * 7 + 1][0]);
-					const directory: string = response[i * 7 + 2][0];
-					const isMultiFile = Boolean(Number(response[i * 7 + 3][0]));
-					const labels: string = response[i * 7 + 4][0];
-					const files: File[] = response[i * 7 + 5][0].map((arr) => ({
-						name: basename(arr[0]),
-						path: isMultiFile
-							? join(basename(directory), arr[0])
-							: arr[0],
-						length: Number(arr[1]),
-					}));
-					if (!files.length) {
-						logger.verbose({
-							label: Label.RTORRENT,
-							message: `No files found for ${name} [${sanitizeInfoHash(infoHash)}]: skipping`,
-						});
-						continue;
-					}
-					const trackers = organizeTrackers(
-						response[i * 7 + 6][0].map((arr) => ({
-							url: arr[0],
-							tier: arr[1],
-						})),
-					);
-					const title = parseTitle(name, files) ?? name;
-					const savePath = isMultiFile
-						? dirname(directory)
-						: directory;
-					const category = "";
-					const tags = labels.length
-						? decodeURIComponent(labels)
-								.split(",")
-								.map((tag) => tag.trim())
-						: [];
-					const searchee: SearcheeClient = {
-						infoHash,
-						name,
-						title,
-						files,
-						length,
-						savePath,
-						category,
-						tags,
-						trackers,
-					};
-					newSearchees.push(searchee);
-					searchees.push(searchee);
-				}
-				await updateSearcheeClientDB(newSearchees, infoHashes);
-				return { searchees, newSearchees };
-			},
-			{ useQueue: true },
-		);
+				continue;
+			}
+			const name: string = response[i * 7][0];
+			const length = Number(response[i * 7 + 1][0]);
+			const directory: string = response[i * 7 + 2][0];
+			const isMultiFile = Boolean(Number(response[i * 7 + 3][0]));
+			const labels: string = response[i * 7 + 4][0];
+			const files: File[] = response[i * 7 + 5][0].map((arr) => ({
+				name: basename(arr[0]),
+				path: isMultiFile ? join(basename(directory), arr[0]) : arr[0],
+				length: Number(arr[1]),
+			}));
+			if (!files.length) {
+				logger.verbose({
+					label: Label.RTORRENT,
+					message: `No files found for ${name} [${sanitizeInfoHash(infoHash)}]: skipping`,
+				});
+				continue;
+			}
+			const trackers = organizeTrackers(
+				response[i * 7 + 6][0].map((arr) => ({
+					url: arr[0],
+					tier: arr[1],
+				})),
+			);
+			const title = parseTitle(name, files) ?? name;
+			const savePath = isMultiFile ? dirname(directory) : directory;
+			const category = "";
+			const tags = labels.length
+				? decodeURIComponent(labels)
+						.split(",")
+						.map((tag) => tag.trim())
+				: [];
+			const searchee: SearcheeClient = {
+				infoHash,
+				name,
+				title,
+				files,
+				length,
+				savePath,
+				category,
+				tags,
+				trackers,
+			};
+			newSearchees.push(searchee);
+			searchees.push(searchee);
+		}
+		await updateSearcheeClientDB(newSearchees, infoHashes);
+		return { searchees, newSearchees };
 	}
 
 	async recheckTorrent(infoHash: string): Promise<void> {
