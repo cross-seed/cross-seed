@@ -259,9 +259,11 @@ export const tap = (fn) => (value) => {
 	return value;
 };
 
-export async function filterAsync(arr, predicate) {
+export async function filterAsync<T>(
+	arr: T[],
+	predicate: (e: T) => Promise<boolean>,
+): Promise<T[]> {
 	const results = await Promise.all(arr.map(predicate));
-
 	return arr.filter((_, index) => results[index]);
 }
 

@@ -49,6 +49,13 @@ export function setRuntimeConfig(configObj: RuntimeConfig): void {
 	runtimeConfig = configObj;
 }
 
-export function getRuntimeConfig(): RuntimeConfig {
-	return runtimeConfig;
+export function getRuntimeConfig(
+	configOverride: Partial<RuntimeConfig> = {},
+): RuntimeConfig {
+	return {
+		...runtimeConfig,
+		...Object.fromEntries(
+			Object.entries(configOverride).filter(([, v]) => v !== undefined),
+		),
+	};
 }

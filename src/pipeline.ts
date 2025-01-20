@@ -36,7 +36,7 @@ import {
 } from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
 import { isOk } from "./Result.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
 	createEnsembleSearchees,
 	createSearcheeFromPath,
@@ -100,6 +100,7 @@ async function assessCandidates(
 	candidates: Candidate[],
 	searchee: SearcheeWithLabel,
 	infoHashesToExclude: Set<string>,
+	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<AssessmentWithTracker[]> {
 	const assessments: AssessmentWithTracker[] = [];
 	const guidInfoHashMap = await getGuidInfoHashMap();
@@ -109,6 +110,7 @@ async function assessCandidates(
 			searchee,
 			infoHashesToExclude,
 			guidInfoHashMap,
+			options,
 		);
 		assessments.push({ assessment, tracker: result.tracker });
 	}
@@ -121,6 +123,7 @@ async function findOnOtherSites(
 	indexerSearchCount: Map<number, number>,
 	cachedSearch: CachedSearch,
 	progress: string,
+	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<FoundOnOtherSites> {
 	// make sure searchee is in database
 	await db("searchee")
@@ -133,6 +136,7 @@ async function findOnOtherSites(
 		indexerSearchCount,
 		cachedSearch,
 		progress,
+		options,
 	);
 	const cachedIndexers = cachedSearch.indexerCandidates.length;
 	const searchedIndexers = response.length - cachedIndexers;
@@ -155,6 +159,7 @@ async function findOnOtherSites(
 		results,
 		searchee,
 		infoHashesToExclude,
+		options,
 	);
 
 	const { rateLimited, notRateLimited } = assessments.reduce(
@@ -254,6 +259,10 @@ async function findMatchesBatch(
 
 export async function searchForLocalTorrentByCriteria(
 	criteria: TorrentLocator,
+	options: {
+		configOverride: Partial<RuntimeConfig>;
+		ignoreCrossSeeds: boolean;
+	},
 ): Promise<number | null> {
 	const { delay, maxDataDepth, searchLimit } = getRuntimeConfig();
 
@@ -285,7 +294,13 @@ export async function searchForLocalTorrentByCriteria(
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
 		try {
-			if (!filterByContent(searchee, includeEpisodes)) {
+			if (
+				!filterByContent(searchee, {
+					configOverride: options.configOverride,
+					includeEpisodes,
+					ignoreCrossSeeds: options.ignoreCrossSeeds,
+				})
+			) {
 				filtered++;
 				continue;
 			}
@@ -297,6 +312,7 @@ export async function searchForLocalTorrentByCriteria(
 				indexerSearchCount,
 				cachedSearch,
 				progress,
+				options,
 			);
 			totalFound += matches;
 

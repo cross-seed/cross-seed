@@ -1,7 +1,6 @@
 import chalk from "chalk";
 import { existsSync } from "fs";
 import http, { IncomingMessage, ServerResponse } from "http";
-import { pick } from "lodash-es";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
 import { z } from "zod";
@@ -21,7 +20,7 @@ import {
 } from "./pipeline.js";
 import { indexTorrentsAndDataDirs, TorrentLocator } from "./torrent.js";
 import { formatAsList, sanitizeInfoHash } from "./utils.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 
 const ANNOUNCE_SCHEMA = z
 	.object({
@@ -44,10 +43,28 @@ const WEBHOOK_SCHEMA = z
 	.object({
 		infoHash: z.string().length(40),
 		path: z.string().refine((path) => path && existsSync(path)),
+		ignoreCrossSeeds: z
+			.boolean()
+			.or(z.string().transform((v) => v === "true")),
+		ignoreExcludeRecentSearch: z
+			.boolean()
+			.or(z.string().transform((v) => v === "true")),
+		ignoreExcludeOlder: z
+			.boolean()
+			.or(z.string().transform((v) => v === "true")),
+		ignoreBlockList: z
+			.boolean()
+			.or(z.string().transform((v) => v === "true")),
+		includeSingleEpisodes: z
+			.boolean()
+			.or(z.string().transform((v) => v === "true")),
+		includeNonVideos: z
+			.boolean()
+			.or(z.string().transform((v) => v === "true")),
 	})
 	.strict()
 	.partial()
-	.refine((data) => Object.keys(data).length === 1);
+	.refine((data) => !data.infoHash !== !data.path);
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -133,45 +150,48 @@ async function search(
 		res.end(e.message);
 		return;
 	}
-	let criteria: TorrentLocator = pick(data, ["infoHash", "path"]);
 
 	try {
-		criteria = WEBHOOK_SCHEMA.parse(criteria) as TorrentLocator;
+		data = WEBHOOK_SCHEMA.parse(data) as TorrentLocator;
 	} catch {
-		const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/reference/api): ${inspect(criteria)}`;
+		const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/reference/api): ${inspect(data)}`;
 		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);
 		return;
 	}
-
-	const criteriaStr = criteria.infoHash
-		? inspect(criteria).replace(
-				criteria.infoHash,
-				sanitizeInfoHash(criteria.infoHash),
-			)
-		: inspect(criteria);
-
 	res.writeHead(204);
 	res.end();
+
+	const criteriaStr = data.infoHash
+		? inspect(data).replace(data.infoHash, sanitizeInfoHash(data.infoHash))
+		: inspect(data);
 
 	logger.info({
 		label: Label.WEBHOOK,
 		message: `Received search request: ${criteriaStr}`,
 	});
 
+	const configOverride: Partial<RuntimeConfig> = {
+		includeSingleEpisodes: data.includeSingleEpisodes,
+		includeNonVideos: data.includeNonVideos,
+		excludeRecentSearch: data.ignoreExcludeRecentSearch ? 1 : undefined,
+		excludeOlder: data.ignoreExcludeOlder
+			? Number.MAX_SAFE_INTEGER
+			: undefined,
+		blockList: data.ignoreBlockList ? [] : undefined,
+	};
+
 	try {
 		let numFound: number | null = null;
-		if (criteria) {
-			numFound = await searchForLocalTorrentByCriteria(criteria);
+		if (data) {
+			numFound = await searchForLocalTorrentByCriteria(data, {
+				configOverride,
+				ignoreCrossSeeds: data.ignoreCrossSeeds ?? true,
+			});
 		}
 
-		if (numFound === null) {
-			logger.info({
-				label: Label.WEBHOOK,
-				message: `Did not search for ${criteriaStr} (check verbose logs for preFilter reason)`,
-			});
-		} else {
+		if (numFound !== null) {
 			logger.info({
 				label: Label.WEBHOOK,
 				message: `Found ${numFound} torrents for ${criteriaStr}`,
