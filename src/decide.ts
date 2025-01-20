@@ -29,7 +29,7 @@ import {
 	isSingleEpisode,
 } from "./preFilter.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
 	File,
 	getReleaseGroup,
@@ -60,8 +60,9 @@ function logDecision(
 	decision: Decision,
 	metafile: Metafile | undefined,
 	tracker: string,
+	options?: { configOverride: Partial<RuntimeConfig> },
 ): void {
-	const { blockList, matchMode } = getRuntimeConfig();
+	const { blockList, matchMode } = getRuntimeConfig(options?.configOverride);
 
 	let reason: string;
 	switch (decision) {
@@ -315,8 +316,11 @@ export async function assessCandidate(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
 	infoHashesToExclude: Set<string>,
+	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<ResultAssessment> {
-	const { blockList, includeSingleEpisodes, matchMode } = getRuntimeConfig();
+	const { blockList, includeSingleEpisodes, matchMode } = getRuntimeConfig(
+		options?.configOverride,
+	);
 
 	// When metaOrCandidate is a Metafile, skip straight to the
 	// main matching algorithms as we don't need pre-download filtering.
@@ -506,11 +510,13 @@ async function assessAndSaveResults(
 	infoHashesToExclude: Set<string>,
 	firstSeen: number,
 	guidInfoHashMap: Map<string, string>,
+	options?: { configOverride: Partial<RuntimeConfig> },
 ) {
 	const assessment = await assessCandidate(
 		metaOrCandidate,
 		searchee,
 		infoHashesToExclude,
+		options,
 	);
 
 	if (assessment.metaCached && assessment.metafile) {
@@ -581,6 +587,7 @@ export async function assessCandidateCaching(
 	searchee: SearcheeWithLabel,
 	infoHashesToExclude: Set<string>,
 	guidInfoHashMap: Map<string, string>,
+	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<ResultAssessment> {
 	const { name, guid, link, tracker } = candidate;
 
@@ -629,6 +636,7 @@ export async function assessCandidateCaching(
 			infoHashesToExclude,
 			cacheEntry?.firstSeen ?? Date.now(),
 			guidInfoHashMap,
+			options,
 		);
 	}
 
@@ -638,6 +646,7 @@ export async function assessCandidateCaching(
 		assessment.decision,
 		assessment.metafile,
 		tracker,
+		options,
 	);
 
 	return assessment;

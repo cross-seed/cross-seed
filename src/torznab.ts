@@ -34,7 +34,7 @@ import {
 } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
 	getSearcheeNewestFileAge,
 	Searchee,
@@ -459,6 +459,7 @@ export async function searchTorznab(
 	indexerSearchCount: Map<number, number>,
 	cachedSearch: CachedSearch,
 	progress: string,
+	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<IndexerCandidates[]> {
 	const { torznab } = getRuntimeConfig();
 	if (torznab.length === 0) {
@@ -476,6 +477,7 @@ export async function searchTorznab(
 		cachedSearch,
 		mediaType,
 		progress,
+		options,
 	);
 	const indexerCandidates = await makeRequests(
 		indexersToSearch,
@@ -817,13 +819,14 @@ async function getAndLogIndexers(
 	cachedSearch: CachedSearch,
 	mediaType: MediaType,
 	progress: string,
+	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<{ indexersToSearch: Indexer[]; parsedMedia?: ParsedMedia }> {
 	const {
 		excludeRecentSearch,
 		excludeOlder,
 		seasonFromEpisodes,
 		searchLimit,
-	} = getRuntimeConfig();
+	} = getRuntimeConfig(options?.configOverride);
 	const searcheeLog = getLogString(searchee, chalk.bold.white);
 	const mediaTypeLog = chalk.white(mediaType.toUpperCase());
 
@@ -845,14 +848,12 @@ async function getAndLogIndexers(
 			lastSearched: "timestamp.last_searched",
 		});
 
-	const skipBefore =
-		searchee.label !== Label.WEBHOOK && excludeOlder
-			? nMsAgo(excludeOlder)
-			: Number.NEGATIVE_INFINITY;
-	const skipAfter =
-		searchee.label !== Label.WEBHOOK && excludeRecentSearch
-			? nMsAgo(excludeRecentSearch)
-			: Number.POSITIVE_INFINITY;
+	const skipBefore = excludeOlder
+		? nMsAgo(excludeOlder)
+		: Number.NEGATIVE_INFINITY;
+	const skipAfter = excludeRecentSearch
+		? nMsAgo(excludeRecentSearch)
+		: Number.POSITIVE_INFINITY;
 	const isEnsemble =
 		seasonFromEpisodes && !searchee.infoHash && !searchee.path;
 	const newestFileAge = isEnsemble

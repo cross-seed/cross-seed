@@ -10,11 +10,13 @@ import {
 	BlocklistType,
 	parseBlocklistEntry,
 	VIDEO_EXTENSIONS,
+	TORRENT_TAG,
+	TORRENT_CATEGORY_SUFFIX,
 } from "./constants.js";
 import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
 	getSearcheeNewestFileAge,
 	Searchee,
@@ -39,10 +41,18 @@ function logReason(
 	searchee: Searchee,
 	mediaType: MediaType,
 ): void {
-	logger.verbose({
-		label: Label.PREFILTER,
-		message: `${getLogString(searchee)} | MediaType: ${mediaType.toUpperCase()} - was not selected for searching because ${reason}`,
-	});
+	const message = `${getLogString(searchee)} | MediaType: ${mediaType.toUpperCase()} - ${reason}`;
+	if (searchee.label === Label.WEBHOOK) {
+		logger.info({
+			label: Label.WEBHOOK,
+			message: `Did not search for ${message}`,
+		});
+	} else {
+		logger.verbose({
+			label: Label.PREFILTER,
+			message,
+		});
+	}
 }
 
 export function isSingleEpisode(
@@ -59,16 +69,32 @@ export function isSingleEpisode(
 	// To check arrs use: return parsedMedia?.episodes?.length === 1, uncomment above
 }
 
+function isCrossSeed(searchee: Searchee): boolean {
+	const { linkCategory } = getRuntimeConfig();
+	if (linkCategory?.length && searchee.category === linkCategory) return true; // qBit, Deluge
+	if (searchee.category === TORRENT_TAG) return true; // Deluge
+	if (searchee.category?.endsWith(TORRENT_CATEGORY_SUFFIX)) return true; // qBit, Deluge
+	if (searchee.tags?.includes(TORRENT_TAG)) return true; // qBit, rTorrent, Transmission
+	if (searchee.tags?.some((tag) => tag.endsWith(TORRENT_CATEGORY_SUFFIX))) {
+		return true; // qBit
+	}
+	return false;
+}
+
 export function filterByContent(
 	searchee: SearcheeWithLabel,
-	includeEpisodes?: boolean,
+	options?: {
+		configOverride: Partial<RuntimeConfig>;
+		allowSeasonPackEpisodes: boolean;
+		ignoreCrossSeeds: boolean;
+	},
 ): boolean {
 	const {
 		fuzzySizeThreshold,
 		includeNonVideos,
 		includeSingleEpisodes,
 		blockList,
-	} = getRuntimeConfig();
+	} = getRuntimeConfig(options?.configOverride);
 
 	const mediaType = getMediaType(searchee);
 
@@ -83,7 +109,7 @@ export function filterByContent(
 	}
 
 	if (
-		(!includeEpisodes || !includeSingleEpisodes) &&
+		(!options?.allowSeasonPackEpisodes || !includeSingleEpisodes) &&
 		searchee.path &&
 		searchee.files.length === 1 &&
 		[Label.SEARCH, Label.WEBHOOK].includes(searchee.label) &&
@@ -119,6 +145,11 @@ export function filterByContent(
 			searchee,
 			mediaType,
 		);
+		return false;
+	}
+
+	if (options?.ignoreCrossSeeds && isCrossSeed(searchee)) {
+		logReason("it is a cross seed", searchee, mediaType);
 		return false;
 	}
 
