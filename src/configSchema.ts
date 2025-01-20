@@ -455,7 +455,7 @@ export const VALIDATION_SCHEMA = z
 	)
 	.refine(
 		(config) => !config.useClientTorrents || !config.delugeRpcUrl,
-		"Deluge is not supported for useClientTorrents.",
+		"Deluge does not currently support useClientTorrents, use torrentDir instead.",
 	)
 	.refine(
 		(config) =>
