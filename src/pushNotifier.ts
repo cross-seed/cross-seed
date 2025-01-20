@@ -14,6 +14,7 @@ import { formatAsList } from "./utils.js";
 export let pushNotifier: PushNotifier;
 
 enum Event {
+	TEST = "TEST",
 	RESULTS = "RESULTS",
 }
 
@@ -26,45 +27,46 @@ interface PushNotification {
 }
 
 export class PushNotifier {
-	url?: string;
+	urls: string[];
 
-	constructor(url?: string) {
-		this.url = url;
+	constructor(urls: string[]) {
+		this.urls = urls;
 	}
 
 	async notify({
 		title = PROGRAM_NAME,
 		body,
 		...rest
-	}: PushNotification): Promise<void> {
-		if (this.url) {
-			try {
-				const response = await fetch(this.url, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						"User-Agent": USER_AGENT,
-					},
-					body: JSON.stringify({ title, body, ...rest }),
-				});
+	}: PushNotification): Promise<void[]> {
+		return Promise.all(
+			this.urls.map(async (url) => {
+				try {
+					const response = await fetch(url, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							"User-Agent": USER_AGENT,
+						},
+						body: JSON.stringify({ title, body, ...rest }),
+					});
 
-				if (!response.ok) {
-					logger.error({
-						message: "Failed to send push notification",
-					});
-					logger.debug({
-						message: `Server response: ${response.status} ${response.statusText}`,
-					});
+					if (!response.ok) {
+						const responseText = await response.clone().text();
+						logger.error(
+							`${url} rejected push notification: ${response.status} ${response.statusText}`,
+						);
+						logger.debug(
+							`${url}: ${responseText.slice(0, 100)}${
+								responseText.length > 100 ? "..." : ""
+							}"`,
+						);
+					}
+				} catch (error) {
+					logger.error(`${url} failed to send push notification`);
+					logger.debug(error);
 				}
-			} catch (error) {
-				logger.error({
-					message: "Failed to send push notification",
-				});
-				logger.debug({
-					message: error,
-				});
-			}
-		}
+			}),
+		);
 	}
 }
 
@@ -170,11 +172,11 @@ export function sendResultsNotification(
 }
 
 export function initializePushNotifier(): void {
-	const { notificationWebhookUrl } = getRuntimeConfig();
-	pushNotifier = new PushNotifier(notificationWebhookUrl);
+	const { notificationWebhookUrls } = getRuntimeConfig();
+	pushNotifier = new PushNotifier(notificationWebhookUrls);
 }
 
 export function sendTestNotification(): void {
-	pushNotifier.notify({ body: "Test", extra: { event: "TEST" } });
+	pushNotifier.notify({ body: "Test", extra: { event: Event.TEST } });
 	logger.info("Sent test notification");
 }

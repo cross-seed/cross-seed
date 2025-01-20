@@ -377,6 +377,10 @@ export const VALIDATION_SCHEMA = z
 		transmissionRpcUrl: z.string().url().nullish(),
 		delugeRpcUrl: z.string().url().nullish(),
 		duplicateCategories: z.boolean(),
+		notificationWebhookUrls: z
+			.array(z.string().url())
+			.optional()
+			.default([]),
 		notificationWebhookUrl: z.string().url().nullish(),
 		port: z
 			.number()
@@ -433,13 +437,21 @@ export const VALIDATION_SCHEMA = z
 	})
 	.strict()
 	.refine((config) => {
-		if (config.linkDir && config.linkDirs.length) return false;
-		if (config.linkDir) {
-			logger.warn("linkDir is deprecated, use linkDirs instead.");
-			config.linkDirs = [config.linkDir];
-		}
+		if (!config.linkDir) return true;
+		if (config.linkDirs.length) return false;
+		logger.warn("linkDir is deprecated, use linkDirs instead.");
+		config.linkDirs = [config.linkDir];
 		return true;
 	}, "You cannot have both linkDir and linkDirs, use linkDirs only.")
+	.refine((config) => {
+		if (!config.notificationWebhookUrl) return true;
+		if (config.notificationWebhookUrls.length) return false;
+		logger.warn(
+			"notificationWebhookUrl is deprecated, use notificationWebhookUrls instead.",
+		);
+		config.notificationWebhookUrls = [config.notificationWebhookUrl];
+		return true;
+	}, "You cannot have both notificationWebhookUrl and notificationWebhookUrls, use notificationWebhookUrls only.")
 	.refine(
 		(config) => !config.torrentDir || !config.useClientTorrents,
 		ZodErrorMessages.torrentDirAndUseClientTorrents,

@@ -29,7 +29,7 @@ export interface RuntimeConfig {
 	transmissionRpcUrl?: string;
 	delugeRpcUrl?: string;
 	duplicateCategories: boolean;
-	notificationWebhookUrl?: string;
+	notificationWebhookUrls: string[];
 	torrents: string[];
 	port?: number;
 	searchCadence?: number;

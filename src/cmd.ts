@@ -279,8 +279,14 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			fallback(fileConfig.duplicateCategories, false),
 		)
 		.option(
+			"--notification-webhook-urls <urls...>",
+			"cross-seed will send POST requests to these urls with a JSON payload of { title, body, extra }",
+			// @ts-expect-error commander supports non-string defaults
+			fileConfig.notificationWebhookUrls,
+		)
+		.option(
 			"--notification-webhook-url <url>",
-			"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
+			"cross-seed will send POST requests to this url with a JSON payload of { title, body, extra }",
 			fileConfig.notificationWebhookUrl,
 		)
 		.option(
@@ -368,22 +374,6 @@ program
 			"period of time, you have bigger issues that need to be addressed.",
 		);
 		await clearIndexerFailures();
-		await db.destroy();
-		await memDB.destroy();
-	});
-program
-	.command("test-notification")
-	.description("Send a test notification")
-	.requiredOption(
-		"--notification-webhook-url <url>",
-		"cross-seed will send POST requests to this url with a JSON payload of { title, body }",
-		fileConfig.notificationWebhookUrl,
-	)
-	.action(async (options) => {
-		setRuntimeConfig(options);
-		initializeLogger(options);
-		initializePushNotifier();
-		sendTestNotification();
 		await db.destroy();
 		await memDB.destroy();
 	});
@@ -543,6 +533,24 @@ createCommandWithSharedOptions(
 		await db.migrate.latest();
 		await doStartupValidation();
 		await restoreFromTorrentCache();
+		await db.destroy();
+		await memDB.destroy();
+	} catch (e) {
+		exitOnCrossSeedErrors(e);
+		await db.destroy();
+		await memDB.destroy();
+	}
+});
+
+createCommandWithSharedOptions(
+	"test-notification",
+	"Send a test notification",
+).action(async (options) => {
+	try {
+		await validateAndSetRuntimeConfig(options);
+		await db.migrate.latest();
+		await doStartupValidation();
+		sendTestNotification();
 		await db.destroy();
 		await memDB.destroy();
 	} catch (e) {
