@@ -324,7 +324,10 @@ export const VALIDATION_SCHEMA = z
 			.nullish()
 			.transform((v) => (typeof v === "boolean" ? v : false)),
 		maxDataDepth: z.number().gte(1),
-		torrentDir: z.string().nullable(),
+		torrentDir: z
+			.string()
+			.nullish()
+			.transform((v) => v ?? null),
 		outputDir: z.string().refine((dir) => {
 			if (readdirSync(dir).some((f) => !f.endsWith(".torrent"))) {
 				logger.warn(ZodErrorMessages.invalidOutputDir);
