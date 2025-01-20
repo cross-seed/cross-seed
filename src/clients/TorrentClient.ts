@@ -3,7 +3,7 @@ import ms from "ms";
 import { testLinking } from "../action.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
-import { Metafile } from "../parseTorrent.js";
+import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
 import { filterByContent } from "../preFilter.js";
 import { Result } from "../Result.js";
 import {
@@ -15,8 +15,8 @@ import {
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeWithInfoHash } from "../searchee.js";
-import { formatAsList, wait } from "../utils.js";
+import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
+import { formatAsList, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
@@ -31,11 +31,17 @@ export type TorrentClientType =
 	| Label.TRANSMISSION
 	| Label.DELUGE;
 
+export type Tracker = { url: string; tier: number };
 export interface TorrentMetadataInClient {
 	infoHash: string;
 	category: string;
 	tags: string[];
 	trackers?: string[];
+}
+
+export interface ClientSearcheeResult {
+	searchees: SearcheeClient[];
+	newSearchees: SearcheeClient[];
 }
 
 export interface TorrentClient {
@@ -44,6 +50,16 @@ export interface TorrentClient {
 		infoHash: string,
 	) => Promise<Result<boolean, "NOT_FOUND">>;
 	getAllTorrents: () => Promise<TorrentMetadataInClient[]>;
+	/**
+	 * Get all searchees from the client and update the db
+	 * @param options.newSearcheesOnly only return searchees that are not in the db
+	 * @param options.refresh undefined uses the cache, [] refreshes all searchees, or a list of infoHashes to refresh
+	 * @return an object containing all searchees and new searchees (refreshed searchees are considered new)
+	 */
+	getClientSearchees: (options?: {
+		newSearcheesOnly?: boolean;
+		refresh?: string[];
+	}) => Promise<ClientSearcheeResult>;
 	getDownloadDir: (
 		meta: SearcheeWithInfoHash | Metafile,
 		options: { onlyCompleted: boolean },
@@ -147,6 +163,10 @@ export async function validateClientSavePaths(
 			);
 		}
 	}
+}
+
+export function organizeTrackers(trackers: Tracker[]): string[] {
+	return trackers.map((t) => sanitizeTrackerUrl(t.url)).filter(isTruthy);
 }
 
 export async function waitForTorrentToComplete(

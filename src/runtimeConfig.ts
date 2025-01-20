@@ -4,7 +4,7 @@ export interface RuntimeConfig {
 	delay: number;
 	torznab: string[];
 	useClientTorrents: boolean;
-	dataDirs?: string[];
+	dataDirs: string[];
 	matchMode: MatchMode;
 	skipRecheck: boolean;
 	autoResumeMaxDownload: number;

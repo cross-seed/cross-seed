@@ -17,6 +17,7 @@ import {
 	SONARR_SUBFOLDERS_REGEX,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
+import { memDB } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -30,6 +31,7 @@ import {
 	hasExt,
 	humanReadableDate,
 	humanReadableSize,
+	inBatches,
 	isBadTitle,
 	stripExtension,
 	WithRequired,
@@ -37,9 +39,9 @@ import {
 } from "./utils.js";
 
 export interface File {
-	length: number;
 	name: string;
 	path: string;
+	length: number;
 }
 
 export type SearcheeLabel =
@@ -71,6 +73,7 @@ export interface Searchee {
 	title: string;
 	length: number;
 	mtimeMs?: number;
+	savePath?: string;
 	category?: string;
 	tags?: string[];
 	trackers?: string[];
@@ -79,6 +82,10 @@ export interface Searchee {
 
 export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
 export type SearcheeWithoutInfoHash = WithUndefined<Searchee, "infoHash">;
+export type SearcheeClient = WithRequired<
+	Searchee,
+	"infoHash" | "savePath" | "category" | "tags" | "trackers"
+>;
 export type SearcheeVirtual = WithUndefined<Searchee, "infoHash" | "path">;
 export type SearcheeWithLabel = WithRequired<Searchee, "label">;
 
@@ -89,13 +96,16 @@ export function hasInfoHash(
 }
 
 enum SearcheeSource {
-	TORRENT = "torrentDir",
+	CLIENT = "torrentClient",
+	TORRENT = "torrentFile",
 	DATA = "dataDir",
 	VIRTUAL = "virtual",
 }
 
 export function getSearcheeSource(searchee: Searchee): SearcheeSource {
-	if (searchee.infoHash) {
+	if (searchee.savePath) {
+		return SearcheeSource.CLIENT;
+	} else if (searchee.infoHash) {
 		return SearcheeSource.TORRENT;
 	} else if (searchee.path) {
 		return SearcheeSource.DATA;
@@ -241,6 +251,54 @@ export function parseTitle(
 		}
 	}
 	return !seasonMatch ? name : null;
+}
+
+export async function updateSearcheeClientDB(
+	newSearchees: SearcheeClient[],
+	infoHashes: Set<string>,
+): Promise<void> {
+	const removedInfoHashes: string[] = (
+		await memDB("torrent").select({ infoHash: "info_hash" })
+	)
+		.map((t) => t.infoHash)
+		.filter((infoHash) => !infoHashes.has(infoHash));
+	await inBatches(removedInfoHashes, async (batch) => {
+		await memDB("torrent").whereIn("info_hash", batch).del();
+		await memDB("ensemble").whereIn("info_hash", batch).del();
+	});
+	await inBatches(
+		newSearchees.map((searchee) => ({
+			info_hash: searchee.infoHash,
+			name: searchee.name,
+			title: searchee.title,
+			files: JSON.stringify(searchee.files),
+			length: searchee.length,
+			save_path: searchee.savePath,
+			category: searchee.category,
+			tags: JSON.stringify(searchee.tags),
+			trackers: JSON.stringify(searchee.trackers),
+		})),
+		async (batch) => {
+			await memDB("torrent")
+				.insert(batch)
+				.onConflict("info_hash")
+				.merge();
+		},
+	);
+}
+
+export function createSearcheeFromDB(dbTorrent): SearcheeClient {
+	return {
+		infoHash: dbTorrent.info_hash,
+		name: dbTorrent.name,
+		title: dbTorrent.title,
+		files: JSON.parse(dbTorrent.files),
+		length: dbTorrent.length,
+		savePath: dbTorrent.save_path,
+		category: dbTorrent.category,
+		tags: JSON.parse(dbTorrent.tags),
+		trackers: JSON.parse(dbTorrent.trackers),
+	};
 }
 
 export function createSearcheeFromMetafile(
@@ -539,7 +597,8 @@ function pushEnsembleEpisode(
 	if (searchee.path) {
 		sourceRoot = searchee.path;
 	} else {
-		const savePath = torrentSavePaths.get(searchee.infoHash!);
+		const savePath =
+			searchee.savePath ?? torrentSavePaths.get(searchee.infoHash!);
 		if (!savePath) return;
 		sourceRoot = join(
 			savePath,
@@ -642,7 +701,7 @@ export async function createEnsembleSearchees(
 	allSearchees: SearcheeWithLabel[],
 	options: { useFilters: boolean },
 ): Promise<SearcheeWithLabel[]> {
-	const { seasonFromEpisodes } = getRuntimeConfig();
+	const { seasonFromEpisodes, useClientTorrents } = getRuntimeConfig();
 	if (!seasonFromEpisodes) return [];
 	logEnsemble(`Creating virtual searchees for seasons...`, options);
 
@@ -650,11 +709,14 @@ export async function createEnsembleSearchees(
 		allSearchees,
 		options,
 	);
-	const torrentSavePaths =
-		(await getClient()?.getAllDownloadDirs({
-			metas: allSearchees.filter(hasInfoHash) as SearcheeWithInfoHash[],
-			onlyCompleted: false,
-		})) ?? new Map();
+	const torrentSavePaths = useClientTorrents
+		? new Map()
+		: (await getClient()?.getAllDownloadDirs({
+				metas: allSearchees.filter(
+					hasInfoHash,
+				) as SearcheeWithInfoHash[],
+				onlyCompleted: false,
+			})) ?? new Map();
 
 	const seasonSearchees: SearcheeWithLabel[] = [];
 	for (const [key, episodeSearchees] of keyMap) {

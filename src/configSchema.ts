@@ -304,7 +304,10 @@ export const VALIDATION_SCHEMA = z
 			.lte(3600, ZodErrorMessages.delayUnsupported),
 		torznab: z.array(z.string().url()),
 		useClientTorrents: z.boolean().optional().default(false),
-		dataDirs: z.array(z.string()).nullish(),
+		dataDirs: z
+			.array(z.string())
+			.nullish()
+			.transform((v) => v ?? []),
 		matchMode: z.nativeEnum(MatchMode),
 		skipRecheck: z.boolean().optional().default(true),
 		autoResumeMaxDownload: z
@@ -438,10 +441,6 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	}, "You cannot have both linkDir and linkDirs, use linkDirs only.")
 	.refine(
-		(config) => !config.useClientTorrents,
-		"useClientTorrents has not yet been implemented.",
-	)
-	.refine(
 		(config) => !config.torrentDir || !config.useClientTorrents,
 		ZodErrorMessages.torrentDirAndUseClientTorrents,
 	)
@@ -456,7 +455,7 @@ export const VALIDATION_SCHEMA = z
 	)
 	.refine(
 		(config) => !config.useClientTorrents || !config.delugeRpcUrl,
-		"Deluge is not supported for useClientTorrents.",
+		"Deluge does not currently support useClientTorrents, use torrentDir instead.",
 	)
 	.refine(
 		(config) =>
@@ -581,7 +580,7 @@ export const VALIDATION_SCHEMA = z
 		) {
 			return true;
 		}
-		if (!config.dataDirs?.length) {
+		if (!config.dataDirs.length) {
 			logger.error(ZodErrorMessages.blocklistNeedsDataDirs);
 		}
 		return true;
@@ -590,7 +589,7 @@ export const VALIDATION_SCHEMA = z
 		(config) =>
 			config.useClientTorrents ||
 			config.torrentDir ||
-			config.dataDirs?.length ||
+			config.dataDirs.length ||
 			(!config.rssCadence && !config.searchCadence),
 		ZodErrorMessages.needSearchees,
 	)
@@ -628,7 +627,7 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	}, ZodErrorMessages.ensembleNeedsPartial)
 	.refine((config) => {
-		if (!config.dataDirs?.length) return true;
+		if (!config.dataDirs.length) return true;
 		if (!config.seasonFromEpisodes && !config.includeSingleEpisodes) {
 			return true;
 		}
@@ -638,10 +637,9 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	})
 	.refine((config) => {
-		if (!config.linkDirs.length) return true;
 		for (const linkDir of config.linkDirs) {
 			if (isChildPath(linkDir, [config.outputDir])) return false;
-			if (config.dataDirs && isChildPath(linkDir, config.dataDirs)) {
+			if (isChildPath(linkDir, config.dataDirs)) {
 				return false;
 			}
 			if (
@@ -654,7 +652,6 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	}, ZodErrorMessages.linkDirsInOtherDirs)
 	.refine((config) => {
-		if (!config.dataDirs) return true;
 		for (const dataDir of config.dataDirs) {
 			if (isChildPath(dataDir, [config.outputDir])) return false;
 			if (
@@ -663,10 +660,7 @@ export const VALIDATION_SCHEMA = z
 			) {
 				return false;
 			}
-			if (
-				config.linkDirs.length &&
-				isChildPath(dataDir, config.linkDirs)
-			) {
+			if (isChildPath(dataDir, config.linkDirs)) {
 				return false;
 			}
 		}
@@ -675,16 +669,10 @@ export const VALIDATION_SCHEMA = z
 	.refine((config) => {
 		if (!config.torrentDir) return true;
 		if (isChildPath(config.torrentDir, [config.outputDir])) return false;
-		if (
-			config.dataDirs &&
-			isChildPath(config.torrentDir, config.dataDirs)
-		) {
+		if (isChildPath(config.torrentDir, config.dataDirs)) {
 			return false;
 		}
-		if (
-			config.linkDirs.length &&
-			isChildPath(config.torrentDir, config.linkDirs)
-		) {
+		if (isChildPath(config.torrentDir, config.linkDirs)) {
 			return false;
 		}
 		return true;
@@ -696,13 +684,10 @@ export const VALIDATION_SCHEMA = z
 		) {
 			return false;
 		}
-		if (config.dataDirs && isChildPath(config.outputDir, config.dataDirs)) {
+		if (isChildPath(config.outputDir, config.dataDirs)) {
 			return false;
 		}
-		if (
-			config.linkDirs.length &&
-			isChildPath(config.outputDir, config.linkDirs)
-		) {
+		if (isChildPath(config.outputDir, config.linkDirs)) {
 			return false;
 		}
 		return true;
@@ -712,7 +697,7 @@ export const VALIDATION_SCHEMA = z
 			!isAbsolute(config.outputDir) ||
 			!config.linkDirs.every(isAbsolute) ||
 			(config.torrentDir && !isAbsolute(config.torrentDir)) ||
-			(config.dataDirs && !config.dataDirs.every(isAbsolute))
+			!config.dataDirs.every(isAbsolute)
 		) {
 			logger.warn(ZodErrorMessages.relativePaths);
 		}

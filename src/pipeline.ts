@@ -39,7 +39,6 @@ import { isOk } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createEnsembleSearchees,
-	createSearcheeFromMetafile,
 	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
 	File,
@@ -69,6 +68,7 @@ import {
 	getLogString,
 	humanReadableDate,
 	humanReadableSize,
+	inBatches,
 	isTruthy,
 	Mutex,
 	stripExtension,
@@ -258,11 +258,8 @@ export async function searchForLocalTorrentByCriteria(
 	const { delay, maxDataDepth, searchLimit } = getRuntimeConfig();
 
 	const rawSearchees: Searchee[] = [];
-	if (criteria.infoHash || !criteria.path) {
-		const res = createSearcheeFromMetafile(
-			await getTorrentByCriteria(criteria),
-		);
-		if (res.isOk()) rawSearchees.push(res.unwrap());
+	if (!criteria.path) {
+		rawSearchees.push(await getTorrentByCriteria(criteria));
 	} else {
 		const memoizedPaths = new Map<string, string[]>();
 		const memoizedLengths = new Map<string, number>();
@@ -338,23 +335,19 @@ async function getSearcheesForCandidate(
 	searcheeLabel: SearcheeLabel,
 ): Promise<{ searchees: SearcheeWithLabel[]; method: string } | null> {
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
-	const { keys, metas, dataSearchees } = await getSimilarByName(
+	const { keys, clientSearchees, dataSearchees } = await getSimilarByName(
 		candidate.name,
 	);
 	const method = keys.length ? `[${keys}]` : "Fuse fallback";
-	if (!metas.length && !dataSearchees.length) {
+	if (!clientSearchees.length && !dataSearchees.length) {
 		logger.verbose({
 			label: searcheeLabel,
 			message: `Did not find an existing entry using ${method} for ${candidateLog}`,
 		});
 		return null;
 	}
-	const torrentSearchees = metas
-		.map(createSearcheeFromMetafile)
-		.filter(isOk)
-		.map((r) => r.unwrap());
 	const searchees = filterDupesFromSimilar(
-		[...torrentSearchees, ...dataSearchees]
+		[...clientSearchees, ...dataSearchees]
 			.map((searchee) => ({ ...searchee, label: searcheeLabel }))
 			.filter((searchee) => filterByContent(searchee)),
 	);
@@ -405,9 +398,10 @@ async function getEnsembleForCandidate(
 		acc.push({ length, name, path });
 		return acc;
 	}, []);
-	if (entriesToDelete.length) {
-		await memDB("ensemble").whereIn("path", entriesToDelete).del();
-	}
+	await inBatches(entriesToDelete, async (batch) => {
+		await memDB("data").whereIn("path", batch).del();
+		await memDB("ensemble").whereIn("path", batch).del();
+	});
 	if (files.length === 0) {
 		logger.verbose({
 			label: searcheeLabel,
@@ -530,10 +524,12 @@ export async function checkNewCandidateMatch(
 export async function findAllSearchees(
 	searcheeLabel: SearcheeLabel,
 ): Promise<SearcheeWithLabel[]> {
-	const { torrents, dataDirs, torrentDir } = getRuntimeConfig();
+	const { dataDirs, torrentDir, torrents, useClientTorrents } =
+		getRuntimeConfig();
+	const client = getClient();
 	const rawSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
-		const torrentInfos = (await getClient()?.getAllTorrents()) ?? [];
+		const torrentInfos = (await client?.getAllTorrents()) ?? [];
 		const searcheeResults = await Promise.all(
 			torrents.map((torrent) =>
 				createSearcheeFromTorrentFile(torrent, torrentInfos),
@@ -543,10 +539,15 @@ export async function findAllSearchees(
 			...searcheeResults.filter(isOk).map((r) => r.unwrap()),
 		);
 	} else {
-		if (torrentDir) {
+		if (useClientTorrents) {
+			const refresh = searcheeLabel === Label.SEARCH ? [] : undefined;
+			rawSearchees.push(
+				...(await client!.getClientSearchees({ refresh })).searchees,
+			);
+		} else if (torrentDir) {
 			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
 		}
-		if (Array.isArray(dataDirs)) {
+		if (dataDirs.length) {
 			const memoizedPaths = new Map<string, string[]>();
 			const memoizedLengths = new Map<string, number>();
 			const searcheeResults = await Promise.all(
@@ -664,23 +665,23 @@ export async function main(): Promise<void> {
 }
 
 export async function scanRssFeeds() {
-	const { dataDirs, torrentDir, torznab } = getRuntimeConfig();
+	const { dataDirs, torrentDir, torznab, useClientTorrents } =
+		getRuntimeConfig();
 	await indexTorrentsAndDataDirs();
-	if (!torznab.length || (!torrentDir && !dataDirs?.length)) {
+	if (
+		!torznab.length ||
+		(!useClientTorrents && !torrentDir && !dataDirs.length)
+	) {
 		logger.error({
 			label: Label.RSS,
 			message:
-				"RSS requires torznab and at least one of torrentDir (recommended) or dataDirs to be set",
+				"RSS requires torznab and at least one of useClientTorrents, torrentDir, or dataDirs to be set",
 		});
 		return;
 	}
 	const lastRun: number =
 		(await db("job_log").select("last_run").where({ name: "rss" }).first())
 			?.last_run ?? 0;
-	logger.verbose({
-		label: Label.RSS,
-		message: "Indexing new torrents...",
-	});
 	logger.verbose({
 		label: Label.RSS,
 		message: "Querying RSS feeds...",

@@ -184,9 +184,9 @@ module.exports = {
 
 	/**
 	 * cross-seed will use links of this type to inject data-based matches into
-	 * your client. We recommend reading the following entry:
-	 * https://www.cross-seed.org/docs/tutorials/linking#hardlinks-vs-symlinks
-	 * Options: "symlink", "hardlink".
+	 * your client. We recommend reading the following page:
+	 * https://www.cross-seed.org/docs/tutorials/linking
+	 * Options: "symlink", "hardlink", "reflink".
 	 */
 	linkType: "hardlink",
 

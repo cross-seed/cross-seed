@@ -264,7 +264,7 @@ async function announce(
 	const candidate = data as Candidate;
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	try {
-		if (!useClientTorrents && !torrentDir && !dataDirs?.length) {
+		if (!useClientTorrents && !torrentDir && !dataDirs.length) {
 			throw new Error(
 				`Announce requires at least one of useClientTorrents, torrentDir, or dataDirs to be set`,
 			);

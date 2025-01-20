@@ -1,6 +1,6 @@
 import { readdirSync, type Stats } from "fs";
 import { stat, unlink, writeFile } from "fs/promises";
-import { dirname, join, resolve, sep } from "path";
+import { basename, dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
 import {
@@ -8,12 +8,21 @@ import {
 	InjectionResult,
 	TORRENT_TAG,
 } from "../constants.js";
+import { memDB } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { File, Searchee, SearcheeWithInfoHash } from "../searchee.js";
+import {
+	createSearcheeFromDB,
+	File,
+	parseTitle,
+	Searchee,
+	SearcheeClient,
+	SearcheeWithInfoHash,
+	updateSearcheeClientDB,
+} from "../searchee.js";
 import {
 	extractCredentialsFromUrl,
 	humanReadableSize,
@@ -22,13 +31,15 @@ import {
 	wait,
 } from "../utils.js";
 import {
-	TorrentMetadataInClient,
+	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
+	organizeTrackers,
 	resumeErrSleepTime,
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
+	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 
 const COULD_NOT_FIND_INFO_HASH = "Could not find info-hash.";
@@ -183,39 +194,43 @@ export default class RTorrent implements TorrentClient {
 			| Fault[];
 
 		let response: ReturnType;
+		const args = [
+			[
+				{
+					methodName: "d.name",
+					params: [hash],
+				},
+				{
+					methodName: "d.directory",
+					params: [hash],
+				},
+				{
+					methodName: "d.left_bytes",
+					params: [hash],
+				},
+				{
+					methodName: "d.hashing",
+					params: [hash],
+				},
+				{
+					methodName: "d.complete",
+					params: [hash],
+				},
+				{
+					methodName: "d.is_multi_file",
+					params: [hash],
+				},
+				{
+					methodName: "d.is_active",
+					params: [hash],
+				},
+			],
+		];
 		try {
-			response = await this.methodCallP<ReturnType>("system.multicall", [
-				[
-					{
-						methodName: "d.name",
-						params: [hash],
-					},
-					{
-						methodName: "d.directory",
-						params: [hash],
-					},
-					{
-						methodName: "d.left_bytes",
-						params: [hash],
-					},
-					{
-						methodName: "d.hashing",
-						params: [hash],
-					},
-					{
-						methodName: "d.complete",
-						params: [hash],
-					},
-					{
-						methodName: "d.is_multi_file",
-						params: [hash],
-					},
-					{
-						methodName: "d.is_active",
-						params: [hash],
-					},
-				],
-			]);
+			response = await this.methodCallP<ReturnType>(
+				"system.multicall",
+				args,
+			);
 		} catch (e) {
 			logger.debug(e);
 			return resultOfErr("FAILURE");
@@ -333,31 +348,37 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	async getAllDownloadDirs(options: {
-		metas: SearcheeWithInfoHash[] | Metafile[] | string[];
 		onlyCompleted: boolean;
 	}): Promise<Map<string, string>> {
-		if (options.metas.length === 0) return new Map();
-		const infoHashes: string[] =
-			typeof options.metas[0] === "string"
-				? options.metas
-				: options.metas.map((meta) => meta.infoHash);
+		const infoHashes = await this.methodCallP<string[]>(
+			"download_list",
+			[],
+		);
 		type ReturnType = string[][] | Fault[];
 		let response: ReturnType;
+		const args = [
+			infoHashes
+				.map((hash) => [
+					{
+						methodName: "d.directory",
+						params: [hash],
+					},
+					{
+						methodName: "d.is_multi_file",
+						params: [hash],
+					},
+					{
+						methodName: "d.complete",
+						params: [hash],
+					},
+				])
+				.flat(),
+		];
 		try {
-			response = await this.methodCallP<ReturnType>("system.multicall", [
-				infoHashes
-					.map((hash) => [
-						{
-							methodName: "d.directory",
-							params: [hash],
-						},
-						{
-							methodName: "d.is_multi_file",
-							params: [hash],
-						},
-					])
-					.flat(),
-			]);
+			response = await this.methodCallP<ReturnType>(
+				"system.multicall",
+				args,
+			);
 		} catch (e) {
 			logger.error({
 				Label: Label.RTORRENT,
@@ -382,15 +403,18 @@ export default class RTorrent implements TorrentClient {
 				return new Map();
 			}
 
-			return new Map(
-				infoHashes.map((hash, index) => {
-					const directory = response[index * 2][0];
-					const isMultiFile = Boolean(
-						Number(response[index * 2 + 1][0]),
+			return infoHashes.reduce((infoHashSavePathMap, hash, index) => {
+				const directory = response[index * 3][0];
+				const isMultiFile = Boolean(Number(response[index * 3 + 1][0]));
+				const isComplete = Boolean(Number(response[index * 3 + 2][0]));
+				if (!options.onlyCompleted || isComplete) {
+					infoHashSavePathMap.set(
+						hash,
+						isMultiFile ? dirname(directory) : directory,
 					);
-					return [hash, isMultiFile ? dirname(directory) : directory];
-				}),
-			);
+				}
+				return infoHashSavePathMap;
+			}, new Map<string, string>());
 		} catch (e) {
 			logger.error({
 				Label: Label.RTORRENT,
@@ -424,15 +448,19 @@ export default class RTorrent implements TorrentClient {
 		);
 		type ReturnType = string[][] | Fault[];
 		let response: ReturnType;
+		const args = [
+			infoHashes.map((hash) => {
+				return {
+					methodName: "d.custom1",
+					params: [hash],
+				};
+			}),
+		];
 		try {
-			response = await this.methodCallP<ReturnType>("system.multicall", [
-				infoHashes.map((hash) => {
-					return {
-						methodName: "d.custom1",
-						params: [hash],
-					};
-				}),
-			]);
+			response = await this.methodCallP<ReturnType>(
+				"system.multicall",
+				args,
+			);
 		} catch (e) {
 			logger.error({
 				Label: Label.RTORRENT,
@@ -476,6 +504,142 @@ export default class RTorrent implements TorrentClient {
 			logger.debug(e);
 			return [];
 		}
+	}
+
+	async getClientSearchees(options?: {
+		newSearcheesOnly?: boolean;
+		refresh?: string[];
+	}): Promise<ClientSearcheeResult> {
+		const searchees: SearcheeClient[] = [];
+		const newSearchees: SearcheeClient[] = [];
+		const hashes = await this.methodCallP<string[]>("download_list", []);
+		type ReturnType = any[][] | Fault[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+		let response: ReturnType;
+		const args = [
+			hashes
+				.map((hash) => [
+					{
+						methodName: "d.name",
+						params: [hash],
+					},
+					{
+						methodName: "d.size_bytes",
+						params: [hash],
+					},
+					{
+						methodName: "d.directory",
+						params: [hash],
+					},
+					{
+						methodName: "d.is_multi_file",
+						params: [hash],
+					},
+					{
+						methodName: "d.custom1",
+						params: [hash],
+					},
+					{
+						methodName: "f.multicall",
+						params: [hash, "", "f.path=", "f.size_bytes="],
+					},
+					{
+						methodName: "t.multicall",
+						params: [hash, "", "t.url=", "t.group="],
+					},
+				])
+				.flat(),
+		];
+		try {
+			response = await this.methodCallP<ReturnType>(
+				"system.multicall",
+				args,
+			);
+		} catch (e) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: "Failed to get torrent info for all torrents",
+			});
+			logger.debug(e);
+			return { searchees, newSearchees };
+		}
+
+		function isFault(response: ReturnType): response is Fault[] {
+			return "faultString" in response[0];
+		}
+		if (isFault(response)) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: "Fault while getting torrent info for all torrents",
+			});
+			logger.debug(inspect(response));
+			return { searchees, newSearchees };
+		}
+		const infoHashes = new Set<string>();
+		for (let i = 0; i < hashes.length; i++) {
+			const infoHash = hashes[i].toLowerCase();
+			infoHashes.add(infoHash);
+			const dbTorrent = await memDB("torrent")
+				.where("info_hash", infoHash)
+				.first();
+			const refresh =
+				options?.refresh === undefined
+					? false
+					: options.refresh.length === 0
+						? true
+						: options.refresh.includes(infoHash);
+			if (dbTorrent && !refresh) {
+				if (!options?.newSearcheesOnly) {
+					searchees.push(createSearcheeFromDB(dbTorrent));
+				}
+				continue;
+			}
+			const name: string = response[i * 7][0];
+			const length = Number(response[i * 7 + 1][0]);
+			const directory: string = response[i * 7 + 2][0];
+			const isMultiFile = Boolean(Number(response[i * 7 + 3][0]));
+			const labels: string = response[i * 7 + 4][0];
+			const files: File[] = response[i * 7 + 5][0].map((arr) => ({
+				name: basename(arr[0]),
+				path: isMultiFile ? join(basename(directory), arr[0]) : arr[0],
+				length: Number(arr[1]),
+			}));
+			if (!files.length) {
+				logger.verbose({
+					label: Label.RTORRENT,
+					message: `No files found for ${name} [${sanitizeInfoHash(infoHash)}]: skipping`,
+				});
+				continue;
+			}
+			const trackers = organizeTrackers(
+				response[i * 7 + 6][0].map((arr) => ({
+					url: arr[0],
+					tier: arr[1],
+				})),
+			);
+			const title = parseTitle(name, files) ?? name;
+			const savePath = isMultiFile ? dirname(directory) : directory;
+			const category = "";
+			const tags = labels.length
+				? decodeURIComponent(labels)
+						.split(",")
+						.map((tag) => tag.trim())
+				: [];
+			const searchee: SearcheeClient = {
+				infoHash,
+				name,
+				title,
+				files,
+				length,
+				savePath,
+				category,
+				tags,
+				trackers,
+			};
+			newSearchees.push(searchee);
+			searchees.push(searchee);
+		}
+		await updateSearcheeClientDB(newSearchees, infoHashes);
+		return { searchees, newSearchees };
 	}
 
 	async recheckTorrent(infoHash: string): Promise<void> {

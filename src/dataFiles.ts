@@ -1,4 +1,11 @@
-import { existsSync, FSWatcher, readdirSync, statSync, watch } from "fs";
+import {
+	existsSync,
+	FSWatcher,
+	readdirSync,
+	readFileSync,
+	statSync,
+	watch,
+} from "fs";
 import Fuse from "fuse.js";
 import { basename, dirname, extname, join, resolve, sep } from "path";
 import { IGNORED_FOLDERS_SUBSTRINGS, VIDEO_EXTENSIONS } from "./constants.js";
@@ -28,7 +35,7 @@ export async function indexDataDirs(options: {
 	startup: boolean;
 }): Promise<void> {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
-	if (!dataDirs?.length) return;
+	if (!dataDirs.length) return;
 
 	if (options.startup) {
 		logger.info("Indexing dataDirs for reverse lookup...");
@@ -48,7 +55,17 @@ export async function indexDataDirs(options: {
 				),
 			);
 		}
-		return await indexDataPaths(findSearcheesFromAllDataDirs());
+		const searcheePaths = findSearcheesFromAllDataDirs();
+		const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
+		if (existsSync(maxUserWatchesPath)) {
+			const limit = parseInt(readFileSync(maxUserWatchesPath, "utf8"));
+			if (limit < searcheePaths.length * 10) {
+				logger.error(
+					`max_user_watches too low for proper indexing of dataDirs. It is recommended to set fs.inotify.max_user_watches=1048576 in /etc/sysctl.conf (only on the host system if using docker) - current: ${limit}`,
+				);
+			}
+		}
+		return await indexDataPaths(searcheePaths);
 	}
 
 	await Promise.all(
@@ -239,7 +256,7 @@ export function findPotentialNestedRoots(
 
 export function findSearcheesFromAllDataDirs(): string[] {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
-	return dataDirs!.flatMap((dataDir) =>
+	return dataDirs.flatMap((dataDir) =>
 		readdirSync(dataDir)
 			.map((dirent) => join(dataDir, dirent))
 			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth)),
