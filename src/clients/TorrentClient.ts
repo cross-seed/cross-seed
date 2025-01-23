@@ -109,10 +109,11 @@ export function getClient(): TorrentClient | null {
 
 export async function validateClientSavePaths(
 	searchees: SearcheeWithInfoHash[],
-	infoHashPathMap: Map<string, string>,
+	infoHashPathMapOrig: Map<string, string>,
 ): Promise<void> {
 	const { linkDirs } = getRuntimeConfig();
 	logger.info(`Validating all existing torrent save paths...`);
+	const infoHashPathMap = new Map(infoHashPathMapOrig);
 
 	const entryDir = searchees.find((s) => !infoHashPathMap.has(s.infoHash));
 	if (entryDir) {

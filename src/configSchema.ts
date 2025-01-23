@@ -502,6 +502,14 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.seasonFromEpisodesMin,
 	)
 	.refine((config) => {
+		if (config.action === Action.SAVE && config.linkDirs.length) {
+			logger.error(
+				`You cannot use action 'save' with linkDirs, use 'inject' for cross-seed to perform linking.`,
+			);
+		}
+		return true;
+	})
+	.refine((config) => {
 		if (
 			config.action === Action.INJECT &&
 			config.qbittorrentUrl &&
