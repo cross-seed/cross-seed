@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { Option, program } from "commander";
 import { inspect } from "util";
 import { getApiKey, resetApiKey } from "./auth.js";
+import { updateTorrentCache } from "./cache.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
 import { FileConfig, generateConfig, getFileConfig } from "./configuration.js";
 import {
@@ -357,6 +358,24 @@ program
 		console.log("Clearing cache...");
 		await db("decision").whereNull("info_hash").del();
 		await db("timestamp").del();
+		await db.destroy();
+		await memDB.destroy();
+	});
+
+program
+	.command("update-torrent-cache-urls")
+	.description("Update announce urls in the torrent cache")
+	.usage("<old-announce-url> <new-announce-url>")
+	.argument(
+		"old-announce-url",
+		'A substring of the announce url to replace, e.g. update-torrent-cache-urls "old.example.com" "new.example.com"',
+	)
+	.argument(
+		"new-announce-url",
+		'A substring of the new announce url to replace the old one with, e.g. update-torrent-cache-urls "myoldpasskey" "mynewpasskey"',
+	)
+	.action(async (oldAnnounceUrl, newAnnounceUrl) => {
+		await updateTorrentCache(oldAnnounceUrl, newAnnounceUrl);
 		await db.destroy();
 		await memDB.destroy();
 	});
