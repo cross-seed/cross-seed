@@ -301,15 +301,10 @@ function sourceDoesMatch(searcheeTitle: string, candidateName: string) {
 }
 
 function releaseVersionDoesMatch(searcheeName: string, candidateName: string) {
-	const searcheeVersionType = stripExtension(searcheeName)
-		.match(REPACK_PROPER_REGEX)
-		?.groups?.type?.trim()
-		?.toLowerCase();
-	const candidateVersionType = stripExtension(candidateName)
-		.match(REPACK_PROPER_REGEX)
-		?.groups?.type?.trim()
-		?.toLowerCase();
-	return searcheeVersionType === candidateVersionType;
+	return (
+		REPACK_PROPER_REGEX.test(searcheeName) ===
+		REPACK_PROPER_REGEX.test(candidateName)
+	);
 }
 
 export async function assessCandidate(
