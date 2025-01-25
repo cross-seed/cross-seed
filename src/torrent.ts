@@ -345,6 +345,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 	const { seasonFromEpisodes, torrentDir, useClientTorrents } =
 		getRuntimeConfig();
 	if (!useClientTorrents && !torrentDir) return;
+	const client = getClient();
 	let searchees: SearcheeWithInfoHash[];
 	let infoHashPathMap: Map<string, string> | undefined;
 
@@ -352,26 +353,30 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		if (torrentDir) {
 			logger.info("Indexing torrentDir for reverse lookup...");
 			searchees = await loadTorrentDirLight(torrentDir);
-			infoHashPathMap = await getClient()!.getAllDownloadDirs({
-				metas: searchees,
-				onlyCompleted: false,
-				v1HashOnly: true,
-			});
+			if (client) {
+				infoHashPathMap = await client.getAllDownloadDirs({
+					metas: searchees,
+					onlyCompleted: false,
+					v1HashOnly: true,
+				});
+			}
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
-			searchees = (await getClient()!.getClientSearchees()).searchees;
+			searchees = (await client!.getClientSearchees()).searchees;
 			infoHashPathMap = searchees.reduce((map, searchee) => {
 				map.set(searchee.infoHash, searchee.savePath!);
 				return map;
 			}, new Map<string, string>());
 		}
-		await validateClientSavePaths(searchees, new Map(infoHashPathMap));
+		if (infoHashPathMap) {
+			await validateClientSavePaths(searchees, infoHashPathMap);
+		}
 	} else {
 		if (torrentDir) {
 			searchees = await indexTorrentDir(torrentDir);
 		} else {
 			searchees = (
-				await getClient()!.getClientSearchees({
+				await client!.getClientSearchees({
 					newSearcheesOnly: true,
 				})
 			).newSearchees;
