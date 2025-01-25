@@ -1,6 +1,8 @@
+import bencode from "bencode";
 import {
 	existsSync,
 	readdirSync,
+	readFileSync,
 	statSync,
 	unlinkSync,
 	utimesSync,
@@ -22,7 +24,7 @@ import {
 } from "./constants.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
-import { Metafile } from "./parseTorrent.js";
+import { Metafile, Torrent } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
 import {
 	findBlockedStringInReleaseMaybe,
@@ -499,6 +501,59 @@ export async function cleanupTorrentCache(): Promise<void> {
 			logger.verbose(`Deleting ${filePath}`);
 			await db("decision").where("info_hash", file.split(".")[0]).del();
 			unlinkSync(filePath);
+		}
+	}
+}
+
+export async function updateTorrentCache(
+	oldStr: string,
+	newStr: string,
+): Promise<void> {
+	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
+	const files = readdirSync(torrentCacheDir);
+	console.log(`Found ${files.length} files in cache, processing...`);
+	let count = 0;
+	for (const file of files) {
+		const filePath = path.join(torrentCacheDir, file);
+		try {
+			const torrent: Torrent = bencode.decode(readFileSync(filePath));
+			const announce = torrent.announce?.toString();
+			const announceList = torrent["announce-list"]?.map((tier) =>
+				tier.map((url) => url.toString()),
+			);
+			if (
+				!announce?.includes(oldStr) &&
+				!announceList?.some((t) =>
+					t.some((url) => url.includes(oldStr)),
+				)
+			) {
+				continue;
+			}
+			count++;
+			console.log(`#${count}: ${filePath}`);
+			let updated = false;
+			if (announce) {
+				const newAnnounce = announce.replace(oldStr, newStr);
+				if (announce !== newAnnounce) {
+					updated = true;
+					console.log(`--- ${announce} -> ${newAnnounce}`);
+					torrent.announce = Buffer.from(newAnnounce);
+				}
+			}
+			if (announceList) {
+				torrent["announce-list"] = announceList.map((tier) =>
+					tier.map((url) => {
+						const newAnnounce = url.replace(oldStr, newStr);
+						if (url === newAnnounce) return Buffer.from(url);
+						updated = true;
+						console.log(`--- ${url} -> ${newAnnounce}`);
+						return Buffer.from(newAnnounce);
+					}),
+				);
+			}
+			if (updated) writeFileSync(filePath, bencode.encode(torrent));
+		} catch (e) {
+			console.error(`Error reading ${filePath}: ${e}`);
 		}
 	}
 }
