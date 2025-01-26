@@ -18,9 +18,9 @@ import {
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
-import { wait } from "./utils.js";
+import { Awaitable, wait } from "./utils.js";
 
-async function exitGracefully() {
+export async function exitGracefully() {
 	await db.destroy();
 	await memDB.destroy();
 	process.exit();
@@ -231,22 +231,46 @@ export function parseRuntimeConfigAndLogErrors(
  * starts singletons, then runs the callback, then cleans up
  * @param entrypoint
  */
-export function withCrossSeedRuntime(
-	entrypoint: (options: RuntimeConfig) => Promise<void>,
-) {
-	return async (options: Record<string, unknown>) => {
+
+type CommanderActionCb = (
+	options: Record<string, unknown>,
+) => void | Promise<void>;
+
+/**
+ * Initializes only the database, runs the callback, then cleans up
+ */
+export function withMinimalRuntime<
+	T extends (...args: unknown[]) => Awaitable<string | void>,
+>(
+	entrypoint: T,
+	{ migrate = true } = {},
+): (...args: Parameters<T>) => Promise<void> {
+	return async (...args: Parameters<T>) => {
 		try {
-			await db.migrate.latest();
-			initializeLogger(options);
-			const runtimeConfig = parseRuntimeConfigAndLogErrors(options);
-			setRuntimeConfig(runtimeConfig);
-			initializePushNotifier();
-			await doStartupValidation();
-			await entrypoint(runtimeConfig);
+			if (migrate) await db.migrate.latest();
+			const output = await entrypoint(...args);
+			if (output) console.log(output);
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
 		} finally {
 			await exitGracefully();
 		}
 	};
+}
+
+/**
+ * Initializes the full runtime, runs the callback, then cleans up
+ * @param entrypoint
+ */
+export function withFullRuntime(
+	entrypoint: (runtimeConfig: RuntimeConfig) => Promise<void>,
+): CommanderActionCb {
+	return withMinimalRuntime(async (options) => {
+		initializeLogger(options as Record<string, unknown>);
+		const runtimeConfig = parseRuntimeConfigAndLogErrors(options);
+		setRuntimeConfig(runtimeConfig);
+		initializePushNotifier();
+		await doStartupValidation();
+		await entrypoint(runtimeConfig);
+	});
 }
