@@ -10,7 +10,7 @@ interface TorrentDirent {
 	"path.utf-8"?: Buffer[];
 }
 
-interface Torrent {
+export interface Torrent {
 	info: {
 		"name.utf-8"?: Buffer;
 		name?: Buffer;
