@@ -6,9 +6,17 @@ import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { validateUArrLs } from "./arr.js";
 import { getClient } from "./clients/TorrentClient.js";
-import { CrossSeedError } from "./errors.js";
-import { Label, logger } from "./logger.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
+import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
+import { db, memDB } from "./db.js";
+import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
+import { initializeLogger, Label, logger } from "./logger.js";
+import { initializePushNotifier } from "./pushNotifier.js";
+import {
+	getRuntimeConfig,
+	RuntimeConfig,
+	setRuntimeConfig,
+} from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
 import { wait } from "./utils.js";
 
@@ -158,4 +166,79 @@ export async function doStartupValidation(): Promise<void> {
 		message: inspect(getRuntimeConfig()),
 	});
 	logger.info("Your configuration is valid!");
+}
+
+/**
+ * validates and sets RuntimeConfig
+ * @return (the number of errors Zod encountered in the configuration)
+ */
+export function parseRuntimeConfigAndLogErrors(
+	options: unknown,
+): RuntimeConfig {
+	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
+	logger.info("Validating your configuration...");
+	let parsedOptions: RuntimeConfig;
+	try {
+		parsedOptions = VALIDATION_SCHEMA.parse(options, {
+			errorMap: customizeErrorMessage,
+		}) as RuntimeConfig;
+	} catch (error) {
+		logger.verbose({
+			label: Label.CONFIGDUMP,
+			message: inspect(options),
+		});
+		if ("errors" in error && Array.isArray(error.errors)) {
+			error.errors.forEach(({ path, message }) => {
+				const urlPath = path[0];
+				const optionLine =
+					path.length === 2
+						? `${path[0]} (position #${path[1] + 1})`
+						: path;
+				logger.error(
+					`${
+						path.length > 0
+							? `Option: ${optionLine}`
+							: "Configuration:"
+					}${NEWLINE_INDENT}${message}${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options${
+						urlPath ? `#${urlPath.toLowerCase()}` : ""
+					})\n`,
+				);
+			});
+			if (error.errors.length > 0) {
+				throw new CrossSeedError(
+					`Your configuration is invalid, please see the ${
+						error.errors.length > 1 ? "errors" : "error"
+					} above for details.`,
+				);
+			}
+		}
+		throw error;
+	}
+
+	return parsedOptions;
+}
+
+/**
+ * starts singletons, then runs the callback, then cleans up
+ * @param entrypoint
+ */
+export function withCrossSeedRuntime(
+	entrypoint: (options: RuntimeConfig) => Promise<void>,
+) {
+	return async (options: Record<string, unknown>) => {
+		try {
+			await db.migrate.latest();
+			initializeLogger(options);
+			const runtimeConfig = parseRuntimeConfigAndLogErrors(options);
+			setRuntimeConfig(runtimeConfig);
+			initializePushNotifier();
+			await doStartupValidation();
+			await entrypoint(runtimeConfig);
+		} catch (e) {
+			exitOnCrossSeedErrors(e);
+		} finally {
+			await db.destroy();
+			await memDB.destroy();
+		}
+	};
 }

@@ -32,6 +32,7 @@ export interface RuntimeConfig {
 	notificationWebhookUrls: string[];
 	torrents: string[];
 	port?: number;
+	host?: string;
 	searchCadence?: number;
 	rssCadence?: number;
 	snatchTimeout?: number;
