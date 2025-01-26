@@ -20,6 +20,15 @@ import {
 import { validateTorznabUrls } from "./torznab.js";
 import { wait } from "./utils.js";
 
+async function exitGracefully() {
+	await db.destroy();
+	await memDB.destroy();
+	process.exit();
+}
+
+process.on("SIGINT", exitGracefully);
+process.on("SIGTERM", exitGracefully);
+
 /**
  * validates existence, permission, and that a path is a directory
  * @param path string of path to validate
@@ -237,8 +246,7 @@ export function withCrossSeedRuntime(
 		} catch (e) {
 			exitOnCrossSeedErrors(e);
 		} finally {
-			await db.destroy();
-			await memDB.destroy();
+			await exitGracefully();
 		}
 	};
 }

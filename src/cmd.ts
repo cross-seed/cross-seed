@@ -402,8 +402,8 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	.action(
 		withCrossSeedRuntime(async (options) => {
 			await indexTorrentsAndDataDirs({ startup: true });
-			serve(options.port!, options.host);
-			jobsLoop();
+			// technically this will never resolve, but it's necessary to keep the process running
+			await Promise.all([serve(options.port!, options.host), jobsLoop()]);
 		}),
 	);
 

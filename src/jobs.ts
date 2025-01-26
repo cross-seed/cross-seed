@@ -74,10 +74,10 @@ function logNextRun(
 	});
 }
 
-export function jobsLoop() {
+export async function jobsLoop(): Promise<void> {
 	const jobs = getJobs();
 
-	async function loop(isFirstRun?: true) {
+	async function loop(isFirstRun = false) {
 		const now = Date.now();
 		for (const job of jobs) {
 			const lastRun = (
@@ -109,7 +109,8 @@ export function jobsLoop() {
 		}
 	}
 
-	const interval = setInterval(loop, ms("1 minute"));
-	loop(true);
-	return () => clearInterval(interval);
+	setInterval(loop, ms("1 minute"));
+	await loop(true);
+	// jobs take too long to run to completion so let process.exit take care of stopping
+	return new Promise(() => {});
 }
