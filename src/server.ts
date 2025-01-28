@@ -154,7 +154,7 @@ async function search(
 	try {
 		data = WEBHOOK_SCHEMA.parse(data) as TorrentLocator;
 	} catch {
-		const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/reference/api): ${inspect(data)}`;
+		const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/reference/api#post-apiwebhook): ${inspect(data)}`;
 		logger.error({ label: Label.WEBHOOK, message });
 		res.writeHead(400);
 		res.end(message);

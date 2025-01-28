@@ -91,7 +91,7 @@ module.exports = {
 	 * Only relevant with action: "inject".
 	 *
 	 * If using Automatic Torrent Management, please read:
-	 * https://www.cross-seed.org/docs/v6-migration#qbittorrent
+	 * https://www.cross-seed.org/docs/v6-migration#new-folder-structure-for-links
 	 *
 	 * Supply your username and password inside the url like so:
 	 * "http://username:password@localhost:8080"
@@ -135,21 +135,8 @@ module.exports = {
 	delay: 30,
 
 	/**
-	 * Usually unnecessary: https://www.cross-seed.org/docs/v6-migration#data-based-matching-use-cases
-	 * To search with already downloaded data, you can enter the directories
-	 * to your downloaded torrent data to find matches, rather than relying
-	 * entirely on the .torrent files themselves for matching.
-	 *
-	 * If directories are entered, they must all be in a single option, and they
-	 * need to be surrounded by brackets.
-	 *
-	 * Windows users will need to use double backslash in all paths in this
-	 * config.
-	 *
-	 * example:
-	 *     dataDirs: ["/downloads/movies", "/downloads/packs"],
-	 * or for Windows users
-	 *     dataDirs: ["C:\\My Data\\Downloads\\Movies"],
+	 * Find matches based on the data in these directories:
+	 * https://www.cross-seed.org/docs/tutorials/data-based-matching
 	 */
 	dataDirs: [],
 
@@ -197,7 +184,7 @@ module.exports = {
 	 * own folder with the tracker's name and it's links within it.
 	 *
 	 * If using Automatic Torrent Management in qBittorrent, please read:
-	 * https://www.cross-seed.org/docs/basics/options#flatlinking
+	 * https://www.cross-seed.org/docs/v6-migration#new-folder-structure-for-links
 	 *
 	 * Default: false.
 	 */
@@ -241,7 +228,7 @@ module.exports = {
 	 * and more API hits to your indexers.
 	 * https://www.cross-seed.org/docs/tutorials/data-based-matching#setting-up-data-based-matching
 	 */
-	maxDataDepth: 3,
+	maxDataDepth: 2,
 
 	/**
 	 * Directory containing .torrent files. This is unnecessary with useClientTorrents.
