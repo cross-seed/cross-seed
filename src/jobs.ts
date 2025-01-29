@@ -4,7 +4,7 @@ import { db } from "./db.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
 import { injectSavedTorrents } from "./inject.js";
 import { Label, logger } from "./logger.js";
-import { main, scanRssFeeds } from "./pipeline.js";
+import { bulkSearch, scanRssFeeds } from "./pipeline.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { updateCaps } from "./torznab.js";
 import { cleanupTorrentCache } from "./decide.js";
@@ -44,7 +44,7 @@ function getJobs(): Job[] {
 	const { action, rssCadence, searchCadence, torznab } = getRuntimeConfig();
 	const jobs: Job[] = [];
 	if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
-	if (searchCadence) jobs.push(new Job("search", searchCadence, main));
+	if (searchCadence) jobs.push(new Job("search", searchCadence, bulkSearch));
 	if (torznab.length > 0) {
 		jobs.push(new Job("updateIndexerCaps", ms("1 day"), updateCaps));
 	}
@@ -74,10 +74,10 @@ function logNextRun(
 	});
 }
 
-export function jobsLoop() {
+export async function jobsLoop(): Promise<void> {
 	const jobs = getJobs();
 
-	async function loop(isFirstRun?: true) {
+	async function loop(isFirstRun = false) {
 		const now = Date.now();
 		for (const job of jobs) {
 			const lastRun = (
@@ -109,7 +109,8 @@ export function jobsLoop() {
 		}
 	}
 
-	const interval = setInterval(loop, ms("1 minute"));
-	loop(true);
-	return () => clearInterval(interval);
+	setInterval(loop, ms("1 minute"));
+	await loop(true);
+	// jobs take too long to run to completion so let process.exit take care of stopping
+	return new Promise(() => {});
 }

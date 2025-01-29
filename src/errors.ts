@@ -7,9 +7,14 @@ export class CrossSeedError extends Error {
 	}
 
 	print(): void {
-		logger.error(this.message);
-		if (this.cause) {
-			logger.debug(this.cause);
+		if (logger) {
+			logger.error(this.message);
+
+			if (this.cause) {
+				logger.debug(this.cause);
+			}
+		} else {
+			console.error(this);
 		}
 	}
 }

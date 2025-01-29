@@ -33,6 +33,7 @@ export enum Mutex {
 }
 const mutexes = new Map<Mutex, Promise<unknown>>();
 
+export type Awaitable<T> = T | Promise<T>;
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
 
 export type WithRequired<T, K extends keyof T> = T & { [P in K]-?: T[P] };

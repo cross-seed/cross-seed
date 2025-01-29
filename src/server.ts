@@ -379,13 +379,25 @@ async function handleRequest(
 /**
  * Listens (daemon) on configured port for http API calls
  */
-export function serve(port: number, host: string | undefined): void {
-	if (port) {
+export async function serve(port?: number, host?: string): Promise<void> {
+	if (!port) return;
+	return new Promise((resolve) => {
 		const server = http.createServer(handleRequest);
 		server.listen(port, host);
+		function stop() {
+			server.close(() => {
+				logger.info({
+					label: Label.SERVER,
+					message: "Server stopped",
+				});
+			});
+			resolve();
+		}
+		process.on("SIGINT", stop);
+		process.on("SIGTERM", stop);
 		logger.info({
 			label: Label.SERVER,
 			message: `Server is running on port ${port}, ^C to stop.`,
 		});
-	}
+	});
 }

@@ -481,6 +481,7 @@ export const VALIDATION_SCHEMA = z
 	)
 	.refine(
 		(config) =>
+			process.env.DEV ||
 			!config.searchCadence ||
 			(config.excludeOlder &&
 				config.excludeRecentSearch &&

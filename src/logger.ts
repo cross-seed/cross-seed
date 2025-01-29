@@ -3,7 +3,6 @@ import stripAnsi from "strip-ansi";
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import { appDir, createAppDir } from "./configuration.js";
-import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -32,8 +31,8 @@ export let logger: winston.Logger;
 
 const redactionMsg = "[REDACTED]";
 
-function redactUrlPassword(message, urlStr) {
-	let url;
+function redactUrlPassword(message: string, urlStr: string) {
+	let url: URL;
 	try {
 		url = new URL(urlStr);
 		if (url.password) {
@@ -49,11 +48,13 @@ function redactUrlPassword(message, urlStr) {
 	return message;
 }
 
-function redactMessage(message: string | unknown, options?: RuntimeConfig) {
+function redactMessage(
+	message: string | unknown,
+	options: Record<string, unknown>,
+) {
 	if (typeof message !== "string") {
 		return message;
 	}
-	const runtimeConfig = options ?? getRuntimeConfig();
 	let ret = message;
 
 	ret = ret.replace(/key=[a-zA-Z0-9]+/g, `key=${redactionMsg}`);
@@ -72,8 +73,8 @@ function redactMessage(message: string | unknown, options?: RuntimeConfig) {
 		/\/notification\/crossSeed\/[a-zA-Z-0-9_-]+/g,
 		`/notification/crossSeed/${redactionMsg}`,
 	);
-	for (const [key, urlStr] of Object.entries(runtimeConfig)) {
-		if (key.endsWith("Url") && urlStr) {
+	for (const [key, urlStr] of Object.entries(options)) {
+		if (key.endsWith("Url") && typeof urlStr === "string") {
 			ret = redactUrlPassword(ret, urlStr);
 		}
 	}
@@ -102,7 +103,7 @@ export function logOnce(cacheKey: string, cb: () => void, ttl?: number) {
 	}
 }
 
-export function initializeLogger(options: RuntimeConfig): void {
+export function initializeLogger(options: Record<string, unknown>): void {
 	createAppDir();
 	logger = winston.createLogger({
 		level: "info",
