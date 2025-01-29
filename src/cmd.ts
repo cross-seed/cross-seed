@@ -21,7 +21,6 @@ import { bulkSearch, scanRssFeeds } from "./pipeline.js";
 import { sendTestNotification } from "./pushNotifier.js";
 import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
-import "./signalHandlers.js";
 import { withFullRuntime, withMinimalRuntime } from "./startup.js";
 import {
 	indexTorrentsAndDataDirs,
