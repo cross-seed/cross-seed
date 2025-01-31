@@ -85,34 +85,25 @@ export function hasExt(files: File[], exts: string[]): boolean {
 	return files.some((f) => exts.includes(path.extname(f.name.toLowerCase())));
 }
 
-export function getMediaType(searchee: Searchee): MediaType {
-	function unsupportedMediaType(searchee: Searchee): MediaType {
-		if (hasExt(searchee.files, AUDIO_EXTENSIONS)) {
-			return MediaType.AUDIO;
-		} else if (hasExt(searchee.files, BOOK_EXTENSIONS)) {
-			return MediaType.BOOK;
-		} else {
-			return MediaType.OTHER;
-		}
-	}
-
-	/* eslint-disable no-fallthrough */
-	switch (true) {
-		case EP_REGEX.test(searchee.title):
+export function getMediaType({ title, files }: Searchee): MediaType {
+	switch (true /* eslint-disable no-fallthrough */) {
+		case EP_REGEX.test(title):
 			return MediaType.EPISODE;
-		case SEASON_REGEX.test(searchee.title):
+		case SEASON_REGEX.test(title):
 			return MediaType.SEASON;
-		case hasExt(searchee.files, VIDEO_EXTENSIONS):
-			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
-			if (ANIME_REGEX.test(searchee.title)) return MediaType.ANIME;
+		case hasExt(files, VIDEO_EXTENSIONS):
+			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
+			if (ANIME_REGEX.test(title)) return MediaType.ANIME;
 			return MediaType.VIDEO;
-		case hasExt(searchee.files, VIDEO_DISC_EXTENSIONS):
-			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
+		case hasExt(files, VIDEO_DISC_EXTENSIONS):
+			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
 			return MediaType.VIDEO;
-		case hasExt(searchee.files, [".rar"]):
-			if (MOVIE_REGEX.test(searchee.title)) return MediaType.MOVIE;
-		default:
-			return unsupportedMediaType(searchee);
+		case hasExt(files, [".rar"]):
+			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
+		default: // Minimally supported media types
+			if (hasExt(files, AUDIO_EXTENSIONS)) return MediaType.AUDIO;
+			if (hasExt(files, BOOK_EXTENSIONS)) return MediaType.BOOK;
+			return MediaType.OTHER;
 	}
 }
 
