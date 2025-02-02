@@ -26,6 +26,7 @@ import {
 import { indexerDoesSupportMediaType } from "./torznab.js";
 import {
 	comparing,
+	extractInt,
 	filesWithExt,
 	getLogString,
 	getMediaType,
@@ -158,6 +159,7 @@ export function filterByContent(
 		statSync(searchee.path).isDirectory() &&
 		ARR_DIR_REGEX.test(basename(searchee.path)) &&
 		nonVideoSizeRatio < 0.02 &&
+		![MediaType.EPISODE, MediaType.SEASON].includes(mediaType) &&
 		!(
 			searchee.files.length > 1 &&
 			SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path))
@@ -170,6 +172,16 @@ export function filterByContent(
 		);
 		return false;
 	}
+
+	if (
+		searchee.path &&
+		mediaType === MediaType.SEASON &&
+		extractInt(searchee.title.match(SEASON_REGEX)!.groups!.season) === 0
+	) {
+		logReason("it is a Specials folder", searchee, mediaType);
+		return false;
+	}
+
 	return true;
 }
 
