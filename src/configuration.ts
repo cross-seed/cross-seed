@@ -62,6 +62,13 @@ Make sure that
   - every entry has a comma after it, including inside arrays
 `.trim();
 
+/**
+ * Returns the appDir relevant to the OS/Environment. Due to initialization of
+ * the SQLiteDB during read of db.ts - will need to create appDir in this function if
+ * it does not exist (ENOENT)
+ *
+ * @return a string representing the absolute path to cross-seed config directory
+ */
 export function appDir(): string {
 	const appDir =
 		process.env.CONFIG_DIR ||
@@ -72,6 +79,7 @@ export function appDir(): string {
 		accessSync(appDir, constants.R_OK | constants.W_OK);
 	} catch (e) {
 		if (e.code === "ENOENT") {
+			mkdirSync(appDir, { recursive: true });
 			return appDir;
 		}
 		const dockerMessage =
@@ -85,13 +93,14 @@ export function appDir(): string {
 	return appDir;
 }
 
-export function createAppDir(): void {
-	mkdirSync(path.join(appDir(), "torrent_cache"), { recursive: true });
-	mkdirSync(path.join(appDir(), "logs"), { recursive: true });
+export function createAppDirHierarchy(): void {
+	const appDirPath = appDir();
+	mkdirSync(path.join(appDirPath, "torrent_cache"), { recursive: true });
+	mkdirSync(path.join(appDirPath, "logs"), { recursive: true });
 }
 
 export function generateConfig(): void {
-	createAppDir();
+	createAppDirHierarchy();
 	const dest = path.join(appDir(), "config.js");
 	const templatePath = path.join("./config.template.cjs");
 	if (existsSync(dest)) {

@@ -2,7 +2,7 @@ import { join } from "path";
 import stripAnsi from "strip-ansi";
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
-import { appDir, createAppDir } from "./configuration.js";
+import { appDir, createAppDirHierarchy } from "./configuration.js";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -104,7 +104,7 @@ export function logOnce(cacheKey: string, cb: () => void, ttl?: number) {
 }
 
 export function initializeLogger(options: Record<string, unknown>): void {
-	createAppDir();
+	createAppDirHierarchy();
 	logger = winston.createLogger({
 		level: "info",
 		format: winston.format.combine(
