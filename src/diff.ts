@@ -3,6 +3,9 @@ import { createSearcheeFromMetafile, Searchee } from "./searchee.js";
 import { parseTorrentFromFilename } from "./torrent.js";
 
 function diff(thing1, thing2) {
+	console.log(
+		"Use `cross-seed tree` on each .torrent file to display their full structure",
+	);
 	try {
 		deepStrictEqual(thing1, thing2);
 		console.log(thing1);
@@ -15,28 +18,31 @@ function diff(thing1, thing2) {
 export async function diffCmd(first: string, second: string): Promise<void> {
 	const firstMeta = await parseTorrentFromFilename(first);
 	const secondMeta = await parseTorrentFromFilename(second);
-	const firstSearcheeRes = createSearcheeFromMetafile(firstMeta);
-	if (firstSearcheeRes.isErr()) {
-		console.log(firstSearcheeRes.unwrapErr());
+	const firstRes = createSearcheeFromMetafile(firstMeta);
+	if (firstRes.isErr()) {
+		console.log(firstRes.unwrapErr());
 		return;
 	}
-	const secondSearcheeRes = createSearcheeFromMetafile(secondMeta);
-	if (secondSearcheeRes.isErr()) {
-		console.log(secondSearcheeRes.unwrapErr());
+	const secondRes = createSearcheeFromMetafile(secondMeta);
+	if (secondRes.isErr()) {
+		console.log(secondRes.unwrapErr());
 		return;
 	}
+	const s1 = firstRes.unwrap();
+	const s2 = secondRes.unwrap();
+	const sortBy =
+		s1.files.length === 1
+			? (a, b) => b.length - a.length
+			: s2.files.length === 1
+				? (a, b) => a.length - b.length
+				: (a, b) => a.path.localeCompare(b.path);
 
-	const firstSearchee: Searchee = firstSearcheeRes.unwrap();
-	delete firstSearchee.infoHash;
-	delete firstSearchee.category;
-	delete firstSearchee.tags;
-	delete firstSearchee.trackers;
-
-	const secondSearchee: Searchee = secondSearcheeRes.unwrap();
-	delete secondSearchee.infoHash;
-	delete secondSearchee.category;
-	delete secondSearchee.tags;
-	delete secondSearchee.trackers;
-
-	diff(firstSearchee, secondSearchee);
+	const stripForDiff = (searchee: Searchee) => {
+		for (const key of Object.keys(searchee)) {
+			if (key !== "files") delete searchee[key];
+		}
+		searchee.files.sort(sortBy);
+		return searchee;
+	};
+	return diff(stripForDiff(s1), stripForDiff(s2));
 }

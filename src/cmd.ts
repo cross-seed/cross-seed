@@ -127,7 +127,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"--max-data-depth <depth>",
 			"Max depth to look for searchees in dataDirs",
 			(n) => parseInt(n),
-			fallback(fileConfig.maxDataDepth, 3),
+			fallback(fileConfig.maxDataDepth, 2),
 		)
 		.option(
 			"-i, --torrent-dir <dir>",
@@ -145,13 +145,17 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			fallback(fileConfig.includeNonVideos, false),
 		)
 		.option(
+			"--no-include-non-videos",
+			"Don't include torrents which contain non-videos",
+		)
+		.option(
 			"--include-single-episodes",
 			"Include single episode torrents in the search",
 			fallback(fileConfig.includeSingleEpisodes, false),
 		)
 		.option(
-			"--no-include-non-videos",
-			"Don't include torrents which contain non-videos",
+			"--no-include-single-episodes",
+			"Don't include single episode torrents in the search",
 		)
 		.option(
 			"--season-from-episodes <decimal>",
@@ -178,14 +182,6 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"-r, --exclude-recent-search <cutoff>",
 			"Exclude torrents which have been searched more recently than n minutes ago. Bypasses the -a flag.",
 			fileConfig.excludeRecentSearch,
-		)
-		.option(
-			"--no-exclude-older",
-			"Don't Exclude torrents based on when they were first seen.",
-		)
-		.option(
-			"--no-exclude-recent-search",
-			"Don't Exclude torrents based on when they were last searched.",
 		)
 		.option("-v, --verbose", "Log verbose output", false)
 		.addOption(
@@ -271,30 +267,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"Radarr API URL(s)",
 			// @ts-expect-error commander supports non-string defaults
 			fileConfig.radarr,
-		)
-		.option(
-			"-p, --port <port>",
-			"Listen on a custom port",
-			(n) => parseInt(n),
-			fallback(fileConfig.port, 2468),
-		)
-		.option(
-			"--host <host>",
-			"Bind to a specific IP address",
-			fileConfig.host,
-		)
-		.option("--no-port", "Do not listen on any port")
-		.option(
-			"--search-cadence <cadence>",
-			"Run searches on a schedule. Format: https://github.com/vercel/ms",
-			fileConfig.searchCadence,
-		)
-		.option(
-			"--rss-cadence <cadence>",
-			"Run an rss scan on a schedule. Format: https://github.com/vercel/ms",
-			fileConfig.rssCadence,
-		)
-		.addOption(apiKeyOption);
+		);
 }
 
 program.name(PROGRAM_NAME);
@@ -338,12 +311,17 @@ program
 	.action(
 		withMinimalRuntime(
 			async (torrentPath: string) => {
+				console.log(
+					"Use `cross-seed diff` to compare two .torrent files",
+				);
 				const res = createSearcheeFromMetafile(
 					await parseTorrentFromFilename(torrentPath),
 				);
-				res.isOk()
-					? console.log(res.unwrap())
-					: console.log(res.unwrapErr());
+				if (res.isErr()) return console.log(res.unwrapErr());
+				const searchee = res.unwrap();
+				delete searchee.category;
+				delete searchee.tags;
+				console.log(searchee);
 			},
 			{ migrate: false },
 		),
@@ -378,13 +356,33 @@ program
 	.description("Reset the api key")
 	.action(withMinimalRuntime(resetApiKey));
 
-createCommandWithSharedOptions("daemon", "Start the cross-seed daemon").action(
-	withFullRuntime(async (options) => {
-		await indexTorrentsAndDataDirs({ startup: true });
-		// technically this will never resolve, but it's necessary to keep the process running
-		await Promise.all([serve(options.port!, options.host), jobsLoop()]);
-	}),
-);
+createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
+	.option(
+		"-p, --port <port>",
+		"Listen on a custom port",
+		(n) => parseInt(n),
+		fallback(fileConfig.port, 2468),
+	)
+	.option("--host <host>", "Bind to a specific IP address", fileConfig.host)
+	.option("--no-port", "Do not listen on any port")
+	.option(
+		"--search-cadence <cadence>",
+		"Run searches on a schedule. Format: https://github.com/vercel/ms",
+		fileConfig.searchCadence,
+	)
+	.option(
+		"--rss-cadence <cadence>",
+		"Run an rss scan on a schedule. Format: https://github.com/vercel/ms",
+		fileConfig.rssCadence,
+	)
+	.addOption(apiKeyOption)
+	.action(
+		withFullRuntime(async (options) => {
+			await indexTorrentsAndDataDirs({ startup: true });
+			// technically this will never resolve, but it's necessary to keep the process running
+			await Promise.all([serve(options.port!, options.host), jobsLoop()]);
+		}),
+	);
 
 createCommandWithSharedOptions("rss", "Run an rss scan").action(
 	withFullRuntime(async () => {
@@ -399,6 +397,14 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 			"--torrents <torrents...>",
 			"torrent files separated by spaces",
 		).hideHelp(),
+	)
+	.option(
+		"--no-exclude-older",
+		"Don't Exclude torrents based on when they were first seen.",
+	)
+	.option(
+		"--no-exclude-recent-search",
+		"Don't Exclude torrents based on when they were last searched.",
 	)
 	.action(withFullRuntime(bulkSearch));
 
