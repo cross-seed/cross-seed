@@ -114,6 +114,21 @@ export function getSearcheeSource(searchee: Searchee): SearcheeSource {
 	}
 }
 
+export function getRootFolder({ path }: File): string {
+	let rootFolder = path;
+	let parent = dirname(rootFolder);
+	while (parent !== ".") {
+		rootFolder = parent;
+		parent = dirname(rootFolder);
+	}
+	return rootFolder;
+}
+
+export function getSourceRoot({ files }: Searchee, savePath: string): string {
+	if (files.length === 1) return join(savePath, files[0].path);
+	return join(savePath, getRootFolder(files[0]));
+}
+
 export function getLargestFile(files: File[]): File {
 	return files.reduce((a, b) => (a.length > b.length ? a : b));
 }
@@ -534,7 +549,7 @@ function organizeEnsembleKeys(
 	const existingSeasonMap = new Map<string, SearcheeWithLabel[]>();
 	if (options.useFilters) {
 		for (const searchee of allSearchees) {
-			const stem = stripExtension(searchee.name);
+			const stem = stripExtension(searchee.title);
 			const seasonKey = getSeasonKey(stem);
 			if (!seasonKey) continue;
 			const info = getKeyMetaInfo(stem);
@@ -548,7 +563,7 @@ function organizeEnsembleKeys(
 	const keyMap = new Map<string, Map<number | string, SearcheeWithLabel[]>>();
 	const ensembleTitleMap = new Map<string, string>();
 	for (const searchee of allSearchees) {
-		const stem = stripExtension(searchee.name);
+		const stem = stripExtension(searchee.title);
 		const episodeKey = getEpisodeKey(stem);
 		if (episodeKey) {
 			const info = getKeyMetaInfo(stem);
@@ -600,12 +615,7 @@ function pushEnsembleEpisode(
 		const savePath =
 			searchee.savePath ?? torrentSavePaths.get(searchee.infoHash!);
 		if (!savePath) return;
-		sourceRoot = join(
-			savePath,
-			searchee.files.length === 1
-				? searchee.files[0].path
-				: searchee.name,
-		);
+		sourceRoot = getSourceRoot(searchee, savePath);
 	}
 	if (!existsSync(sourceRoot)) return;
 	const largestFile = getLargestFile(searchee.files);

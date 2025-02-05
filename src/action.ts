@@ -21,7 +21,9 @@ import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromPath,
 	getAbsoluteFilePath,
+	getRootFolder,
 	getSearcheeSource,
+	getSourceRoot,
 	Searchee,
 	SearcheeVirtual,
 	SearcheeWithInfoHash,
@@ -205,14 +207,7 @@ function linkVirtualSearchee(
 }
 
 function unlinkMetafile(meta: Metafile, destinationDir: string) {
-	const file = meta.files[0];
-	let rootFolder = file.path;
-	let parent = dirname(rootFolder);
-	while (parent !== ".") {
-		rootFolder = parent;
-		parent = dirname(rootFolder);
-	}
-	const fullPath = join(destinationDir, rootFolder);
+	const fullPath = join(destinationDir, getRootFolder(meta.files[0]));
 	if (!fs.existsSync(fullPath)) return;
 	if (!fullPath.startsWith(destinationDir)) return; // assert: fullPath is within destinationDir
 	if (fs.statSync(fullPath).ino === fs.statSync(destinationDir).ino) return; // assert: fullPath is not destinationDir
@@ -274,12 +269,7 @@ export async function linkAllFilesInMetafile(
 			}
 			savePath = downloadDirResult.unwrap();
 		}
-		sourceRoot = join(
-			savePath,
-			searchee.files.length === 1
-				? searchee.files[0].path
-				: searchee.name,
-		);
+		sourceRoot = getSourceRoot(searchee, savePath);
 		if (!fs.existsSync(sourceRoot)) {
 			logger.error({
 				label: searchee.label,

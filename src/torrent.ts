@@ -33,6 +33,7 @@ import {
 	getLargestFile,
 	getMovieKey,
 	getSeasonKey,
+	getSourceRoot,
 	SearcheeLabel,
 	SearcheeWithInfoHash,
 	SearcheeWithoutInfoHash,
@@ -323,15 +324,9 @@ async function cacheEnsembleTorrentEntry(
 		return null;
 	}
 
-	// Don't want to statSync(sourceRoot).isFile() now as it might be downloading.
-	// The path will get checked when rss/announce has a potential match.
-	const sourceRoot = join(
-		savePath,
-		searchee.files.length === 1 ? searchee.files[0].path : searchee.name,
-	);
 	return {
 		path: getAbsoluteFilePath(
-			sourceRoot,
+			getSourceRoot(searchee, savePath),
 			largestFile.path,
 			searchee.files.length === 1,
 		),
