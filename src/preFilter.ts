@@ -311,9 +311,12 @@ type TimestampDataSql = {
 	earliest_last_search: number;
 };
 
-export async function filterTimestamps(searchee: Searchee): Promise<boolean> {
+export async function filterTimestamps(
+	searchee: Searchee,
+	options?: { configOverride: Partial<RuntimeConfig> },
+): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch, seasonFromEpisodes } =
-		getRuntimeConfig();
+		getRuntimeConfig(options?.configOverride);
 	const enabledIndexers = await getEnabledIndexers();
 	const mediaType = getMediaType(searchee);
 	const timestampDataSql: TimestampDataSql = (await db("searchee")

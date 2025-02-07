@@ -760,8 +760,14 @@ export async function createEnsembleSearchees(
 	options: { useFilters: boolean },
 ): Promise<SearcheeWithLabel[]> {
 	const { seasonFromEpisodes, useClientTorrents } = getRuntimeConfig();
+	if (!allSearchees.length) return [];
 	if (!seasonFromEpisodes) return [];
-	logEnsemble(`Creating virtual searchees for seasons...`, options);
+	if (options.useFilters) {
+		logger.info({
+			label: allSearchees[0].label,
+			message: `Creating virtual seasons from episode searchees...`,
+		});
+	}
 
 	const { keyMap, ensembleTitleMap } = organizeEnsembleKeys(
 		allSearchees,

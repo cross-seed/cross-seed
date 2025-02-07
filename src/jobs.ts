@@ -5,21 +5,34 @@ import { exitOnCrossSeedErrors } from "./errors.js";
 import { injectSavedTorrents } from "./inject.js";
 import { Label, logger } from "./logger.js";
 import { bulkSearch, scanRssFeeds } from "./pipeline.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import { updateCaps } from "./torznab.js";
 import { cleanupTorrentCache } from "./decide.js";
 
+export enum JobName {
+	RSS = "rss",
+	SEARCH = "search",
+	UPDATE_INDEXER_CAPS = "updateIndexerCaps",
+	INJECT = "inject",
+	CLEANUP = "cleanup",
+}
+
+const jobs: Job[] = [];
+
 class Job {
-	name: string;
+	name: JobName;
 	cadence: number;
 	exec: () => Promise<void>;
 	isActive: boolean;
+	runAheadOfSchedule: boolean;
+	configOverride: Partial<RuntimeConfig> = {};
 
-	constructor(name, cadence, exec) {
+	constructor(name: JobName, cadence: number, exec: () => Promise<void>) {
 		this.name = name;
 		this.cadence = cadence;
 		this.exec = exec;
 		this.isActive = false;
+		this.runAheadOfSchedule = false;
 	}
 
 	async run(): Promise<boolean> {
@@ -30,7 +43,11 @@ class Job {
 					label: Label.SCHEDULER,
 					message: `starting job: ${this.name}`,
 				});
-				await this.exec();
+				if (this.runAheadOfSchedule && this.name === JobName.SEARCH) {
+					await bulkSearch({ configOverride: this.configOverride });
+				} else {
+					await this.exec();
+				}
 			} finally {
 				this.isActive = false;
 			}
@@ -40,18 +57,26 @@ class Job {
 	}
 }
 
-function getJobs(): Job[] {
+function createJobs(): void {
 	const { action, rssCadence, searchCadence, torznab } = getRuntimeConfig();
-	const jobs: Job[] = [];
-	if (rssCadence) jobs.push(new Job("rss", rssCadence, scanRssFeeds));
-	if (searchCadence) jobs.push(new Job("search", searchCadence, bulkSearch));
+	if (rssCadence) {
+		jobs.push(new Job(JobName.RSS, rssCadence, scanRssFeeds));
+	}
+	if (searchCadence) {
+		jobs.push(new Job(JobName.SEARCH, searchCadence, bulkSearch));
+	}
 	if (torznab.length > 0) {
-		jobs.push(new Job("updateIndexerCaps", ms("1 day"), updateCaps));
+		jobs.push(
+			new Job(JobName.UPDATE_INDEXER_CAPS, ms("1 day"), updateCaps),
+		);
 	}
 	if (action === Action.INJECT) {
-		jobs.push(new Job("inject", ms("1 hour"), injectSavedTorrents));
+		jobs.push(new Job(JobName.INJECT, ms("1 hour"), injectSavedTorrents));
 	}
-	jobs.push(new Job("cleanup", ms("1 day"), cleanupTorrentCache));
+	jobs.push(new Job(JobName.CLEANUP, ms("1 day"), cleanupTorrentCache));
+}
+
+export function getJobs(): Job[] {
 	return jobs;
 }
 
@@ -74,33 +99,43 @@ function logNextRun(
 	});
 }
 
+export async function getJobLastRun(
+	name: JobName,
+): Promise<number | undefined> {
+	return (await db("job_log").select("last_run").where({ name }).first())
+		?.last_run;
+}
+
 export async function jobsLoop(): Promise<void> {
-	const jobs = getJobs();
+	createJobs();
 
 	async function loop(isFirstRun = false) {
 		const now = Date.now();
 		for (const job of jobs) {
-			const lastRun = (
-				await db("job_log")
-					.select("last_run")
-					.where({ name: job.name })
-					.first()
-			)?.last_run;
+			const lastRun = await getJobLastRun(job.name);
 
 			// if it's never been run, you are eligible immediately
 			const eligibilityTs = lastRun ? lastRun + job.cadence : now;
 			if (isFirstRun) logNextRun(job.name, job.cadence, lastRun);
 
-			if (now >= eligibilityTs) {
+			if (job.runAheadOfSchedule || now >= eligibilityTs) {
 				job.run()
 					.then(async (didRun) => {
 						if (didRun) {
 							// upon success, update the log
+							const last_run = job.runAheadOfSchedule
+								? now + job.cadence
+								: now;
 							await db("job_log")
-								.insert({ name: job.name, last_run: now })
+								.insert({ name: job.name, last_run })
 								.onConflict("name")
 								.merge();
-							logNextRun(job.name, job.cadence, now);
+							const cadence = job.runAheadOfSchedule
+								? job.cadence * 2
+								: job.cadence;
+							logNextRun(job.name, cadence, now);
+							job.runAheadOfSchedule = false;
+							job.configOverride = {};
 						}
 					})
 					.catch(exitOnCrossSeedErrors)
