@@ -301,7 +301,7 @@ module.exports = {
 	 * 1 - must have all episodes (values below 1 requires matchMode: "partial")
 	 * 0.8 - must have at least 80% of the episodes
 	 */
-	seasonFromEpisodes: 0.8,
+	seasonFromEpisodes: 1,
 
 	/**
 	 * You should NOT modify this unless you have good reason.
