@@ -210,7 +210,7 @@ module.exports = {
 	 * https://www.cross-seed.org/docs/basics/options#matchmode
 	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
 	 */
-	matchMode: "partial",
+	matchMode: "flexible",
 
 	/**
 	 * Skip rechecking on injection if unnecessary. Certain matches, such as partial,
