@@ -359,7 +359,7 @@ async function injectionAlreadyExists({
 	const existsDecision =
 		matchMode === MatchMode.PARTIAL
 			? Decision.MATCH_PARTIAL
-			: matchMode === MatchMode.RISKY
+			: matchMode === MatchMode.FLEXIBLE
 				? Decision.MATCH_SIZE_ONLY
 				: Decision.MATCH;
 	const result = await getClient()!.isTorrentComplete(meta.infoHash);

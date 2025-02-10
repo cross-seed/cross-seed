@@ -107,7 +107,7 @@ function logDecision(
 			reason = "the info hash matches a torrent you already have";
 			break;
 		case Decision.FILE_TREE_MISMATCH:
-			reason = `it has a different file tree${matchMode === MatchMode.SAFE ? " (will match in risky or partial match mode)" : ""}`;
+			reason = `it has a different file tree${matchMode === MatchMode.STRICT ? " (will match in flexible or partial matchMode)" : ""}`;
 			break;
 		case Decision.RELEASE_GROUP_MISMATCH:
 			reason = `it has a different release group: ${getReleaseGroup(
@@ -414,7 +414,7 @@ export async function assessCandidate(
 	}
 
 	const sizeMatch = compareFileTreesIgnoringNames(metafile, searchee);
-	if (sizeMatch && matchMode !== MatchMode.SAFE) {
+	if (sizeMatch && matchMode !== MatchMode.STRICT) {
 		return { decision: Decision.MATCH_SIZE_ONLY, metafile, metaCached };
 	}
 

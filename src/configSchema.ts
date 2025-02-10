@@ -59,12 +59,15 @@ const ZodErrorMessages = {
 	needsClient: "You need to have a client configured for useClientTorrents.",
 	needSearchees:
 		"You need to have torrentDir, useClientTorrents or dataDirs for search/rss/announce matching to work.",
-	matchModeNeedsLinkDirs:
-		"When using action 'inject', you need to set linkDirs (and have your data accessible) for risky and partial matchMode.",
+	matchModeInvalid: `matchMode must be one of: ${formatAsList(
+		Object.values(MatchMode).map((m) => `"${m}"`),
+		{ sort: false, style: "narrow", type: "unit" },
+	)}`,
+	matchModeNeedsLinkDirs: `When using action: "inject", you need to set linkDirs for flexible and partial matchMode (https://www.cross-seed.org/docs/tutorials/linking). If you cannot use linking, use matchMode: "strict"`,
 	ensembleNeedsClient:
 		"seasonFromEpisodes requires a torrent client to connect to when using torrentDir or useClientTorrents.",
 	ensembleNeedsLinkDirs:
-		"When using action 'inject', you need to set linkDirs (and have your data accessible) for seasonFromEpisodes. Set seasonFromEpisodes to null to disable.",
+		"When using action 'inject', you need to set linkDirs for seasonFromEpisodes (https://www.cross-seed.org/docs/tutorials/linking). If you cannot use linking, disable this option by using seasonFromEpisodes: null",
 	ensembleNeedsPartial:
 		"seasonFromEpisodes requires matchMode partial if enabled and value is below 1.",
 	linkDirsInOtherDirs:
@@ -308,7 +311,17 @@ export const VALIDATION_SCHEMA = z
 			.array(z.string())
 			.nullish()
 			.transform((v) => v ?? []),
-		matchMode: z.nativeEnum(MatchMode),
+		matchMode: z.nativeEnum(MatchMode).or(
+			z
+				.string()
+				.refine(
+					(v) => v === "safe" || v === "risky",
+					ZodErrorMessages.matchModeInvalid,
+				)
+				.transform((v) =>
+					v === "safe" ? MatchMode.STRICT : MatchMode.FLEXIBLE,
+				),
+		),
 		skipRecheck: z.boolean().optional().default(true),
 		autoResumeMaxDownload: z
 			.number()
@@ -620,7 +633,7 @@ export const VALIDATION_SCHEMA = z
 	.refine(
 		(config) =>
 			config.linkDirs.length ||
-			config.matchMode === MatchMode.SAFE ||
+			config.matchMode === MatchMode.STRICT ||
 			config.action === Action.SAVE,
 		ZodErrorMessages.matchModeNeedsLinkDirs,
 	)
