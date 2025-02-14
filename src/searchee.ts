@@ -12,6 +12,7 @@ import {
 	MOVIE_REGEX,
 	parseSource,
 	RELEASE_GROUP_REGEX,
+	REPACK_PROPER_REGEX,
 	RES_STRICT_REGEX,
 	SEASON_REGEX,
 	SONARR_SUBFOLDERS_REGEX,
@@ -33,6 +34,7 @@ import {
 	humanReadableSize,
 	inBatches,
 	isBadTitle,
+	isTruthy,
 	stripExtension,
 	WithRequired,
 	WithUndefined,
@@ -211,6 +213,49 @@ export function getFilesFromDataRoot(
 }
 
 /**
+ * Parse things like the resolution to add to parsed titles for better decisions.
+ * @param videoFileNames All relavant video file names (e.g episodes for a season)
+ * @returns Info to add to the title if all files match
+ */
+function parseMetaInfo(videoFileNames: string[]): string {
+	let metaInfo = "";
+	const videoStems = videoFileNames.map((name) => stripExtension(name));
+	const types = videoStems
+		.map((stem) => stem.match(REPACK_PROPER_REGEX)?.groups?.type)
+		.filter(isTruthy);
+	if (types.length) {
+		metaInfo += ` REPACK`;
+	}
+	const res = videoStems
+		.map((stem) =>
+			stem.match(RES_STRICT_REGEX)?.groups?.res?.trim()?.toLowerCase(),
+		)
+		.filter(isTruthy);
+	if (res.length === videoStems.length && res.every((r) => r === res[0])) {
+		metaInfo += ` ${res[0]}`;
+	}
+	const sources = videoStems
+		.map((stem) => parseSource(stem))
+		.filter(isTruthy);
+	if (
+		sources.length === videoStems.length &&
+		sources.every((s) => s === sources[0])
+	) {
+		metaInfo += ` ${sources[0]}`;
+	}
+	const groups = videoStems
+		.map((stem) => getReleaseGroup(stem))
+		.filter(isTruthy);
+	if (
+		groups.length === videoStems.length &&
+		groups.every((g) => g.toLowerCase() === groups[0].toLowerCase())
+	) {
+		metaInfo += `-${groups[0]}`;
+	}
+	return metaInfo;
+}
+
+/**
  * Parse title from SXX or Season XX. Return null if no title found.
  * Also tries to parse titles that are just `Show`, returns `Show` if better not found.
  * @param name Original name of the searchee/metafile
@@ -245,14 +290,16 @@ export function parseTitle(
 					? `E${ep.groups!.episode ? extractInt(ep.groups!.episode) : `${ep.groups!.month}.${ep.groups!.day}`}`
 					: "";
 			if (season.length || episode.length || !seasonMatch) {
-				return `${ep.groups!.title} ${season}${episode}`.trim();
+				const metaInfo = parseMetaInfo(videoFiles.map((f) => f.name));
+				return `${ep.groups!.title} ${season}${episode}${metaInfo}`.trim();
 			}
 		}
 		if (path && seasonMatch) {
 			const title = basename(dirname(path)).match(ARR_DIR_REGEX)?.groups
 				?.title;
 			if (title?.length) {
-				return `${title} S${seasonMatch.groups!.seasonNum}`;
+				const metaInfo = parseMetaInfo(videoFiles.map((f) => f.name));
+				return `${title} S${seasonMatch.groups!.seasonNum}${metaInfo}`;
 			}
 		}
 		const anime = videoFile.name.match(ANIME_REGEX);
@@ -261,7 +308,8 @@ export function parseTitle(
 				? `S${seasonMatch.groups!.seasonNum}`
 				: "";
 			if (season.length || !seasonMatch) {
-				return `${anime.groups!.title} ${season}`.trim();
+				const metaInfo = parseMetaInfo(videoFiles.map((f) => f.name));
+				return `${anime.groups!.title} ${season}${metaInfo}`.trim();
 			}
 		}
 	}
