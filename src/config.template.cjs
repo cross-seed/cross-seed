@@ -66,11 +66,11 @@ module.exports = {
 	radarr: [],
 
 	/**
-	 * Bind to a specific host address. If you are using docker, keep this as undefined
+	 * Bind to a specific host address. Do not change without a good reason.
 	 * Example: "127.0.0.1"
 	 * Default is "0.0.0.0"
 	 */
-	host: undefined,
+	host: "0.0.0.0",
 
 	/**
 	 * The port you wish to listen on for daemon mode.
