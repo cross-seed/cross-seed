@@ -42,8 +42,10 @@ module.exports = {
 	 *
 	 *      sonarr: ["http://sonarr:8989/?apikey=12345",
 	 *               "http://sonarr4k:8989/?apikey=12345"],
+	 *
+	 * For benefits, please read: https://www.cross-seed.org/docs/tutorials/id-searching
 	 */
-	sonarr: undefined,
+	sonarr: [],
 
 	/**
 	 * URL(s) to your Radarr instance(s), included in the same way as torznab
@@ -58,15 +60,17 @@ module.exports = {
 	 *
 	 *       radarr: ["http://radarr:7878/?apikey=12345",
 	 *                "http://radarr4k:7878/?apikey=12345"],
+	 *
+	 * For benefits, please read: https://www.cross-seed.org/docs/tutorials/id-searching
 	 */
-	radarr: undefined,
+	radarr: [],
 
 	/**
-	 * Bind to a specific host address.
+	 * Bind to a specific host address. Do not change without a good reason.
 	 * Example: "127.0.0.1"
 	 * Default is "0.0.0.0"
 	 */
-	host: undefined,
+	host: "0.0.0.0",
 
 	/**
 	 * The port you wish to listen on for daemon mode.
@@ -165,20 +169,20 @@ module.exports = {
 	 * DATADIRS. THIS PATH MUST ALSO BE ACCESSIBLE VIA YOUR TORRENT CLIENT
 	 * USING THE SAME PATH.
 	 *
-	 * https://www.cross-seed.org/docs/basics/options#linkdirs
+	 * Instructions: https://www.cross-seed.org/docs/tutorials/linking
 	 */
 	linkDirs: [],
 
 	/**
-	 * cross-seed will use links of this type to inject data-based matches into
-	 * your client. We recommend reading the following page:
-	 * https://www.cross-seed.org/docs/tutorials/linking
+	 * cross-seed will use links of this type to inject matches into your client.
 	 * Options: "symlink", "hardlink", "reflink".
+	 *
+	 * https://www.cross-seed.org/docs/tutorials/linking#hardlinks-vs-symlinks-vs-reflinks
 	 */
 	linkType: "hardlink",
 
 	/**
-	 * Enabling this will link files using v5's flat folder style.
+	 * Enabling this will link files using v5's flat folder style, not recommended.
 	 *
 	 * Each individual Torznab tracker's cross-seeds, otherwise, will have its
 	 * own folder with the tracker's name and it's links within it.
@@ -191,23 +195,22 @@ module.exports = {
 	flatLinking: false,
 
 	/**
-	 * Determines flexibility of naming during matching, all options will have
-	 * no false positives. Using partial can double the amount of cross seeds found.
-	 * Options: "safe", "risky", "partial".
+	 * Determines flexibility of the matching algorithm, all options are equally safe.
+	 * Using "partial" is recommended as it will match all possible cross seeds.
+	 * Options: "strict", "flexible", "partial".
 	 *
-	 * "safe" will allow only perfect name/size matches using the standard
-	 * matching algorithm.
+	 * "strict" requires all file names to match exactly (required if not linking).
 	 *
-	 * "risky" uses filesize as its only comparison point.
+	 * "flexible" allows for file renames or inconsistencies.
 	 *
-	 * "partial" is like risky but allows matches if they are missing small
+	 * "partial" is like "flexible" but allows matches even if they are missing small
 	 * files like .nfo/.srt.
 	 *
 	 * We recommend reading the following entries:
 	 * https://www.cross-seed.org/docs/basics/options#matchmode
 	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
 	 */
-	matchMode: "safe",
+	matchMode: "flexible",
 
 	/**
 	 * Skip rechecking on injection if unnecessary. Certain matches, such as partial,
@@ -243,7 +246,11 @@ module.exports = {
 	torrentDir: null,
 
 	/**
-	 * Where to save the torrent files that cross-seed finds for you.
+	 * Where to save the .torrent files that cross-seed finds for you.
+	 * This is NOT where the torrent data (.e.g .mkv, .mp4) will be saved.
+	 * This directory will be used for retrying injections.
+	 *
+	 * DO NOT USE THIS DIRECTORY AS A WATCH FOLDER FOR YOUR TORRENT CLIENT!!!
 	 *
 	 * If you are a Windows user you need to put double '\' (e.g. "C:\\output")
 	 */
@@ -290,8 +297,8 @@ module.exports = {
 	 * Match season packs from the individual episodes you already have.
 	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
 	 *
-	 * null - disabled
-	 * 1 - must have all episodes
+	 * null - disabled (required if not linking)
+	 * 1 - must have all episodes (values below 1 requires matchMode: "partial")
 	 * 0.8 - must have at least 80% of the episodes
 	 */
 	seasonFromEpisodes: 1,

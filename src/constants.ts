@@ -200,8 +200,8 @@ export function isStaticDecision(decision: Decision): boolean {
 }
 
 export enum MatchMode {
-	SAFE = "safe",
-	RISKY = "risky",
+	STRICT = "strict",
+	FLEXIBLE = "flexible",
 	PARTIAL = "partial",
 }
 
