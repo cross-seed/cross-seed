@@ -486,6 +486,18 @@ export async function inBatches<T>(
 	}
 }
 
+export async function fromBatches<T, R>(
+	items: T[],
+	cb: (batch: T[]) => Promise<R[]>,
+	options = { batchSize: 100 },
+): Promise<R[]> {
+	const results: R[] = [];
+	for (let i = 0; i < items.length; i += options.batchSize) {
+		results.push(...(await cb(items.slice(i, i + options.batchSize))));
+	}
+	return results;
+}
+
 /**
  * Executes a callback function within a mutex for the given name.
  * @param name The name of the mutex to create/use.

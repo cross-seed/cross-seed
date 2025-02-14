@@ -25,6 +25,7 @@ import {
 } from "../searchee.js";
 import {
 	extractCredentialsFromUrl,
+	fromBatches,
 	humanReadableSize,
 	isTruthy,
 	sanitizeInfoHash,
@@ -115,6 +116,7 @@ async function saveWithLibTorrentResume(
 export default class RTorrent implements TorrentClient {
 	client: Client;
 	readonly type = Label.RTORRENT;
+	readonly batchSize = 1000;
 
 	constructor() {
 		const { rtorrentRpcUrl } = getRuntimeConfig();
@@ -350,63 +352,80 @@ export default class RTorrent implements TorrentClient {
 	async getAllDownloadDirs(options: {
 		onlyCompleted: boolean;
 	}): Promise<Map<string, string>> {
-		const infoHashes = await this.methodCallP<string[]>(
-			"download_list",
-			[],
-		);
+		const hashes = await this.methodCallP<string[]>("download_list", []);
 		type ReturnType = string[][] | Fault[];
-		let response: ReturnType;
-		const args = [
-			infoHashes
-				.map((hash) => [
-					{
-						methodName: "d.directory",
-						params: [hash],
-					},
-					{
-						methodName: "d.is_multi_file",
-						params: [hash],
-					},
-					{
-						methodName: "d.complete",
-						params: [hash],
-					},
-				])
-				.flat(),
-		];
-		try {
-			response = await this.methodCallP<ReturnType>(
-				"system.multicall",
-				args,
-			);
-		} catch (e) {
-			logger.error({
-				Label: Label.RTORRENT,
-				message: "Failed to get download directories for all torrents",
-			});
-			logger.debug(e);
-			return new Map();
-		}
-
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
-
+		let numMethods = 0;
+		const results = await fromBatches(
+			hashes,
+			async (batch) => {
+				const args = [
+					batch
+						.map((hash) => {
+							const arg = [
+								{
+									methodName: "d.directory",
+									params: [hash],
+								},
+								{
+									methodName: "d.is_multi_file",
+									params: [hash],
+								},
+								{
+									methodName: "d.complete",
+									params: [hash],
+								},
+							];
+							numMethods = arg.length;
+							return arg;
+						})
+						.flat(),
+				];
+				try {
+					const res = await this.methodCallP<ReturnType>(
+						"system.multicall",
+						args,
+					);
+					if (isFault(res)) {
+						logger.error({
+							Label: Label.RTORRENT,
+							message:
+								"Fault while getting download directories for all torrents",
+						});
+						logger.debug(inspect(res));
+						return [];
+					}
+					return res;
+				} catch (e) {
+					logger.error({
+						Label: Label.RTORRENT,
+						message:
+							"Failed to get download directories for all torrents",
+					});
+					logger.debug(e);
+					return [];
+				}
+			},
+			{ batchSize: this.batchSize },
+		);
+		if (!results.length || results.length !== hashes.length * numMethods) {
+			logger.error({
+				Label: Label.RTORRENT,
+				message: `Unexpected number of results: ${results.length} for ${hashes.length} hashes`,
+			});
+			return new Map();
+		}
 		try {
-			if (isFault(response)) {
-				logger.error({
-					Label: Label.RTORRENT,
-					message:
-						"Fault while getting download directories for all torrents",
-				});
-				logger.debug(inspect(response));
-				return new Map();
-			}
-
-			return infoHashes.reduce((infoHashSavePathMap, hash, index) => {
-				const directory = response[index * 3][0];
-				const isMultiFile = Boolean(Number(response[index * 3 + 1][0]));
-				const isComplete = Boolean(Number(response[index * 3 + 2][0]));
+			return hashes.reduce((infoHashSavePathMap, hash, index) => {
+				const directory = results[index * numMethods][0];
+				const isMultiFile = Boolean(
+					Number(results[index * numMethods + 1][0]),
+				);
+				const isComplete = Boolean(
+					Number(results[index * numMethods + 2][0]),
+				);
 				if (!options.onlyCompleted || isComplete) {
 					infoHashSavePathMap.set(
 						hash,
@@ -442,56 +461,65 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
-		const infoHashes = await this.methodCallP<string[]>(
-			"download_list",
-			[],
-		);
+		const hashes = await this.methodCallP<string[]>("download_list", []);
 		type ReturnType = string[][] | Fault[];
-		let response: ReturnType;
-		const args = [
-			infoHashes.map((hash) => {
-				return {
-					methodName: "d.custom1",
-					params: [hash],
-				};
-			}),
-		];
-		try {
-			response = await this.methodCallP<ReturnType>(
-				"system.multicall",
-				args,
-			);
-		} catch (e) {
-			logger.error({
-				Label: Label.RTORRENT,
-				message: "Failed to get torrent info for all torrents",
-			});
-			logger.debug(e);
-			return [];
-		}
-
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
-		if (isFault(response)) {
+		const results = await fromBatches(
+			hashes,
+			async (batch) => {
+				const args = [
+					batch.map((hash) => {
+						return {
+							methodName: "d.custom1",
+							params: [hash],
+						};
+					}),
+				];
+				try {
+					const res = await this.methodCallP<ReturnType>(
+						"system.multicall",
+						args,
+					);
+					if (isFault(res)) {
+						logger.error({
+							Label: Label.RTORRENT,
+							message:
+								"Fault while getting torrent info for all torrents",
+						});
+						logger.debug(inspect(res));
+						return [];
+					}
+					return res;
+				} catch (e) {
+					logger.error({
+						Label: Label.RTORRENT,
+						message: "Failed to get torrent info for all torrents",
+					});
+					logger.debug(e);
+					return [];
+				}
+			},
+			{ batchSize: this.batchSize },
+		);
+		if (results.length !== hashes.length) {
 			logger.error({
 				Label: Label.RTORRENT,
-				message: "Fault while getting torrent info for all torrents",
+				message: `Unexpected number of results: ${results.length} for ${hashes.length} hashes`,
 			});
-			logger.debug(inspect(response));
 			return [];
 		}
-
 		try {
 			// response: [ [tag1], [tag2], ... ], assuming infoHash order is preserved
-			return infoHashes.map((hash, index) => ({
+			return hashes.map((hash, index) => ({
 				infoHash: hash.toLowerCase(),
 				category: "",
 				tags:
-					(response[index] as string[]).length !== 1
-						? response[index]
-						: response[index][0].length
-							? decodeURIComponent(response[index][0])
+					(results[index] as string[]).length !== 1
+						? results[index]
+						: results[index][0].length
+							? decodeURIComponent(results[index][0])
 									.split(",")
 									.map((tag) => tag.trim())
 							: [],
@@ -514,64 +542,86 @@ export default class RTorrent implements TorrentClient {
 		const newSearchees: SearcheeClient[] = [];
 		const hashes = await this.methodCallP<string[]>("download_list", []);
 		type ReturnType = any[][] | Fault[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-		let response: ReturnType;
-		const args = [
-			hashes
-				.map((hash) => [
-					{
-						methodName: "d.name",
-						params: [hash],
-					},
-					{
-						methodName: "d.size_bytes",
-						params: [hash],
-					},
-					{
-						methodName: "d.directory",
-						params: [hash],
-					},
-					{
-						methodName: "d.is_multi_file",
-						params: [hash],
-					},
-					{
-						methodName: "d.custom1",
-						params: [hash],
-					},
-					{
-						methodName: "f.multicall",
-						params: [hash, "", "f.path=", "f.size_bytes="],
-					},
-					{
-						methodName: "t.multicall",
-						params: [hash, "", "t.url=", "t.group="],
-					},
-				])
-				.flat(),
-		];
-		try {
-			response = await this.methodCallP<ReturnType>(
-				"system.multicall",
-				args,
-			);
-		} catch (e) {
-			logger.error({
-				Label: Label.RTORRENT,
-				message: "Failed to get torrent info for all torrents",
-			});
-			logger.debug(e);
-			return { searchees, newSearchees };
-		}
-
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
-		if (isFault(response)) {
+		let numMethods = 0;
+		const results = await fromBatches(
+			hashes,
+			async (batch) => {
+				const args = [
+					batch
+						.map((hash) => {
+							const arg = [
+								{
+									methodName: "d.name",
+									params: [hash],
+								},
+								{
+									methodName: "d.size_bytes",
+									params: [hash],
+								},
+								{
+									methodName: "d.directory",
+									params: [hash],
+								},
+								{
+									methodName: "d.is_multi_file",
+									params: [hash],
+								},
+								{
+									methodName: "d.custom1",
+									params: [hash],
+								},
+								{
+									methodName: "f.multicall",
+									params: [
+										hash,
+										"",
+										"f.path=",
+										"f.size_bytes=",
+									],
+								},
+								{
+									methodName: "t.multicall",
+									params: [hash, "", "t.url=", "t.group="],
+								},
+							];
+							numMethods = arg.length;
+							return arg;
+						})
+						.flat(),
+				];
+				try {
+					const res = await this.methodCallP<ReturnType>(
+						"system.multicall",
+						args,
+					);
+					if (isFault(res)) {
+						logger.error({
+							Label: Label.RTORRENT,
+							message: "Fault while getting client torrents",
+						});
+						logger.debug(inspect(res));
+						return [];
+					}
+					return res;
+				} catch (e) {
+					logger.error({
+						Label: Label.RTORRENT,
+						message: "Failed to get client torrents",
+					});
+					logger.debug(e);
+					return [];
+				}
+			},
+			{ batchSize: this.batchSize },
+		);
+		if (!results.length || results.length !== hashes.length * numMethods) {
 			logger.error({
 				Label: Label.RTORRENT,
-				message: "Fault while getting torrent info for all torrents",
+				message: `Unexpected number of results: ${results.length} for ${hashes.length} hashes`,
 			});
-			logger.debug(inspect(response));
 			return { searchees, newSearchees };
 		}
 		const infoHashes = new Set<string>();
@@ -593,12 +643,12 @@ export default class RTorrent implements TorrentClient {
 				}
 				continue;
 			}
-			const name: string = response[i * 7][0];
-			const length = Number(response[i * 7 + 1][0]);
-			const directory: string = response[i * 7 + 2][0];
-			const isMultiFile = Boolean(Number(response[i * 7 + 3][0]));
-			const labels: string = response[i * 7 + 4][0];
-			const files: File[] = response[i * 7 + 5][0].map((arr) => ({
+			const name: string = results[i * numMethods][0];
+			const length = Number(results[i * numMethods + 1][0]);
+			const directory: string = results[i * numMethods + 2][0];
+			const isMultiFile = Boolean(Number(results[i * numMethods + 3][0]));
+			const labels: string = results[i * numMethods + 4][0];
+			const files: File[] = results[i * numMethods + 5][0].map((arr) => ({
 				name: basename(arr[0]),
 				path: isMultiFile ? join(basename(directory), arr[0]) : arr[0],
 				length: Number(arr[1]),
@@ -611,7 +661,7 @@ export default class RTorrent implements TorrentClient {
 				continue;
 			}
 			const trackers = organizeTrackers(
-				response[i * 7 + 6][0].map((arr) => ({
+				results[i * numMethods + 6][0].map((arr) => ({
 					url: arr[0],
 					tier: arr[1],
 				})),
