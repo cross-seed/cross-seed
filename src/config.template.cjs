@@ -200,7 +200,7 @@ module.exports = {
 	 * files like .nfo/.srt.
 	 *
 	 * We recommend reading the following entries:
-	 * https://www.cross-seed.org/docs/basics/options#matchmode
+	 * https://www.cross-seed.org/docs/tutorials/partial-matching
 	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
 	 */
 	matchMode: "flexible",
@@ -220,7 +220,7 @@ module.exports = {
 
 	/**
 	 * Determines how deep into the specified dataDirs to go to generate new
-	 * searchees. This only applies to dataDirs.
+	 * searchees.
 	 *
 	 * PLEASE READ THE FOLLOWING DOCUMENTATION BEFORE CHANGING THIS VALUE:
 	 * https://www.cross-seed.org/docs/tutorials/data-based-matching#setting-up-data-based-matching
@@ -244,6 +244,8 @@ module.exports = {
 	 * DO NOT USE THIS DIRECTORY AS A WATCH FOLDER FOR YOUR TORRENT CLIENT!!!
 	 *
 	 * If you are a Windows user you need to put double '\' (e.g. "C:\\output")
+	 *
+	 * https://www.cross-seed.org/docs/v6-migration#failed-injection-saved-retry
 	 */
 	outputDir: ".",
 
@@ -334,6 +336,8 @@ module.exports = {
 	/**
 	 * Which action to take upon a match being found.
 	 * Options: "save", "inject".
+	 *
+	 * https://www.cross-seed.org/docs/tutorials/injection
 	 */
 	action: "inject",
 
@@ -357,6 +361,9 @@ module.exports = {
 	 * Examples:
 	 * "10 minutes"
 	 * "1 hour"
+	 *
+	 * To cross seed new releases as soon as they are uploaded, use announce:
+	 * https://www.cross-seed.org/docs/tutorials/announce
 	 */
 	rssCadence: "30 minutes",
 
@@ -367,7 +374,9 @@ module.exports = {
 	 * "2 weeks"
 	 * "3 days"
 	 *
-	 * This value must be at least 3x less than your excludeRecentSearch
+	 * This value must be at least 3x less than your excludeRecentSearch.
+	 * To trigger a search on download completion, use webhook:
+	 * https://www.cross-seed.org/docs/tutorials/triggering-searches
 	 */
 	searchCadence: "1 day",
 
