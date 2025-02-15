@@ -1,4 +1,4 @@
-import { readdirSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import ms from "ms";
 import { isAbsolute, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
@@ -342,6 +342,7 @@ export const VALIDATION_SCHEMA = z
 			.nullish()
 			.transform((v) => v ?? null),
 		outputDir: z.string().refine((dir) => {
+			if (!existsSync(dir)) return true;
 			if (readdirSync(dir).some((f) => !f.endsWith(".torrent"))) {
 				logger.warn(ZodErrorMessages.invalidOutputDir);
 			}
