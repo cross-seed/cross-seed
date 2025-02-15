@@ -135,6 +135,7 @@ export default class QBittorrent implements TorrentClient {
 			response = await fetch(`${href}/auth/login`, {
 				method: "POST",
 				body: new URLSearchParams({ username, password }),
+				signal: AbortSignal.timeout(ms("10 seconds")),
 			});
 		} catch (e) {
 			throw new CrossSeedError(`qBittorrent login failed: ${e.message}`);
