@@ -139,7 +139,10 @@ module.exports = {
 	delay: 30,
 
 	/**
-	 * Find matches based on the data in these directories:
+	 * Find matches based on the data in these directories, this may not be
+	 * necessary for your setup.
+	 *
+	 * PLEASE READ THE FOLLOWING DOCUMENTATION BEFORE SETTING THIS UP:
 	 * https://www.cross-seed.org/docs/tutorials/data-based-matching
 	 */
 	dataDirs: [],
@@ -156,20 +159,10 @@ module.exports = {
 
 	/**
 	 * cross-seed will create links to matched files in the specified directories.
-	 * If using hardlinks, you will need as many linkDirs as drives/partion/volumes
-	 * as your dataDirs and torrent client download directories.
+	 * This is necessary for the best cross seeding experience.
 	 *
-	 * Ideally, you should only have a single linkDir and use drive pooling.
-	 * Using multiple linkDirs should be reserved for setups with cache/temp drives
-	 * or where drive pooling is impossible.
-	 *
-	 * If you are a Windows user you need to put double '\' (e.g. "C:\\links")
-	 *
-	 * IF YOU ARE USING HARDLINKS, THIS MUST BE UNDER THE SAME VOLUMES AS YOUR
-	 * DATADIRS. THIS PATH MUST ALSO BE ACCESSIBLE VIA YOUR TORRENT CLIENT
-	 * USING THE SAME PATH.
-	 *
-	 * Instructions: https://www.cross-seed.org/docs/tutorials/linking
+	 * PLEASE READ THE FOLLOWING DOCUMENTATION BEFORE SETTING THIS UP:
+	 * https://www.cross-seed.org/docs/tutorials/linking
 	 */
 	linkDirs: [],
 
@@ -227,21 +220,19 @@ module.exports = {
 
 	/**
 	 * Determines how deep into the specified dataDirs to go to generate new
-	 * searchees. Setting this to higher values will result in more searchees
-	 * and more API hits to your indexers.
+	 * searchees. This only applies to dataDirs.
+	 *
+	 * PLEASE READ THE FOLLOWING DOCUMENTATION BEFORE CHANGING THIS VALUE:
 	 * https://www.cross-seed.org/docs/tutorials/data-based-matching#setting-up-data-based-matching
 	 */
 	maxDataDepth: 2,
 
 	/**
-	 * Directory containing .torrent files. This is unnecessary with useClientTorrents.
-	 * For qBittorrent, this is BT_Backup.
-	 * For rtorrent, this is your session directory as configured in your
-	 * .rtorrent.rc file.
-	 * For Deluge, this is ~/.config/deluge/state.
-	 * For Transmission, this would be ~/.config/transmission/torrents.
+	 * Directory containing your client's internal .torrent files.
+	 * This is unnecessary with useClientTorrents.
 	 *
-	 * If you are a Windows user you need to put double '\' (e.g. "C:\\torrents")
+	 * PLEASE READ THE FOLLOWING DOCUMENTATION BEFORE SETTING THIS UP:
+	 * https://www.cross-seed.org/docs/basics/options#torrentdir
 	 */
 	torrentDir: null,
 

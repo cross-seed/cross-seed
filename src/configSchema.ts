@@ -336,7 +336,17 @@ export const VALIDATION_SCHEMA = z
 			.boolean()
 			.nullish()
 			.transform((v) => (typeof v === "boolean" ? v : false)),
-		maxDataDepth: z.number().gte(1),
+		maxDataDepth: z
+			.number()
+			.gte(1)
+			.refine((maxDataDepth) => {
+				if (maxDataDepth > 3) {
+					logger.error(
+						`Your maxDataDepth is most likely incorrect, please read: https://www.cross-seed.org/docs/tutorials/data-based-matching#setting-up-data-based-matching`,
+					);
+				}
+				return true;
+			}),
 		torrentDir: z
 			.string()
 			.nullish()
