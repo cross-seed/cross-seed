@@ -1,4 +1,5 @@
 import { readdirSync } from "fs";
+import ms from "ms";
 import { basename } from "path";
 import {
 	DecisionAnyMatch,
@@ -90,6 +91,7 @@ export default class Transmission implements TorrentClient {
 		method: Method,
 		args: unknown = {},
 		retries = 1,
+		timeout = 0,
 	): Promise<T> {
 		const { transmissionRpcUrl } = getRuntimeConfig();
 
@@ -111,10 +113,12 @@ export default class Transmission implements TorrentClient {
 			headers.set("Authorization", `Basic ${credentials}`);
 		}
 
+		const signal = timeout ? AbortSignal.timeout(timeout) : undefined;
 		const response = await fetch(href, {
 			method: "POST",
 			body: JSON.stringify({ method, arguments: args }),
 			headers,
+			signal,
 		});
 		if (response.status === 409) {
 			this.xTransmissionSessionId = response.headers.get(
@@ -158,7 +162,7 @@ export default class Transmission implements TorrentClient {
 	async validateConfig(): Promise<void> {
 		const { torrentDir } = getRuntimeConfig();
 		try {
-			await this.request("session-get");
+			await this.request("session-get", {}, 1, ms("10 seconds"));
 		} catch (e) {
 			const { transmissionRpcUrl } = getRuntimeConfig();
 			throw new CrossSeedError(
