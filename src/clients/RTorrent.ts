@@ -338,6 +338,9 @@ export default class RTorrent implements TorrentClient {
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
+		if (!(await this.checkForInfoHashInClient(meta.infoHash))) {
+			return resultOfErr("NOT_FOUND");
+		}
 		const result = await this.checkOriginalTorrent(
 			meta.infoHash,
 			options.onlyCompleted,
@@ -401,8 +404,7 @@ export default class RTorrent implements TorrentClient {
 				} catch (e) {
 					logger.error({
 						Label: Label.RTORRENT,
-						message:
-							"Failed to get download directories for all torrents",
+						message: `Failed to get download directories for all torrents: ${e.message}`,
 					});
 					logger.debug(e);
 					return [];
@@ -495,7 +497,7 @@ export default class RTorrent implements TorrentClient {
 				} catch (e) {
 					logger.error({
 						Label: Label.RTORRENT,
-						message: "Failed to get torrent info for all torrents",
+						message: `Failed to get torrent info for all torrents: ${e.message}`,
 					});
 					logger.debug(e);
 					return [];
@@ -609,7 +611,7 @@ export default class RTorrent implements TorrentClient {
 				} catch (e) {
 					logger.error({
 						Label: Label.RTORRENT,
-						message: "Failed to get client torrents",
+						message: `Failed to get client torrents: ${e.message}`,
 					});
 					logger.debug(e);
 					return [];
