@@ -116,7 +116,7 @@ async function saveWithLibTorrentResume(
 export default class RTorrent implements TorrentClient {
 	client: Client;
 	readonly type = Label.RTORRENT;
-	readonly batchSize = 1000;
+	readonly batchSize = 500;
 
 	constructor() {
 		const { rtorrentRpcUrl } = getRuntimeConfig();
