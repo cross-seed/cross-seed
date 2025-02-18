@@ -72,6 +72,7 @@ export enum SnatchError {
 }
 
 export interface EnsembleEntry {
+	client_host: string | null;
 	path: string;
 	info_hash: string | null;
 	ensemble: string;
@@ -90,7 +91,7 @@ export async function parseTorrentWithMetadata(
 ): Promise<Metafile> {
 	const meta = await parseTorrentFromFilename(filename);
 	const client = getClient();
-	if (client?.type === Label.QBITTORRENT) {
+	if (client?.clientType === Label.QBITTORRENT) {
 		const fastResumePath = filename.replace(
 			extname(filename),
 			".fastresume",
@@ -325,6 +326,7 @@ async function cacheEnsembleTorrentEntry(
 	}
 
 	return {
+		client_host: searchee.clientHost ?? null,
 		path: getAbsoluteFilePath(
 			getSourceRoot(searchee, savePath),
 			largestFile.path,
@@ -364,7 +366,11 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 			}, new Map<string, string>());
 		}
 		if (infoHashPathMap) {
-			await validateClientSavePaths(searchees, infoHashPathMap);
+			await validateClientSavePaths(
+				searchees,
+				infoHashPathMap,
+				client!.label,
+			);
 		}
 	} else {
 		if (torrentDir) {
@@ -387,7 +393,10 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		)
 	).filter(isTruthy);
 	await inBatches(ensembleRows, async (batch) => {
-		await memDB("ensemble").insert(batch).onConflict("path").merge();
+		await memDB("ensemble")
+			.insert(batch)
+			.onConflict(["client_host", "path"])
+			.merge();
 	});
 }
 
@@ -488,7 +497,7 @@ export async function loadTorrentDirLight(
 	const searchees: SearcheeWithInfoHash[] = [];
 	const client = getClient();
 	const torrentInfos =
-		client && client.type !== Label.QBITTORRENT
+		client && client.clientType !== Label.QBITTORRENT
 			? await client.getAllTorrents()
 			: [];
 	for (const torrentFilePath of torrentFilePaths) {
@@ -590,7 +599,7 @@ export async function getSimilarByName(name: string): Promise<{
 		if (filteredTorrentEntries.length) {
 			const client = getClient();
 			const torrentInfos =
-				client && client.type !== Label.QBITTORRENT
+				client && client.clientType !== Label.QBITTORRENT
 					? await client.getAllTorrents()
 					: [];
 			clientSearchees.push(
@@ -670,7 +679,7 @@ async function getTorrentByFuzzyName(
 	}
 	const client = getClient();
 	const torrentInfos =
-		client && client.type !== Label.QBITTORRENT
+		client && client.clientType !== Label.QBITTORRENT
 			? await client.getAllTorrents()
 			: [];
 	const res = await createSearcheeFromTorrentFile(
@@ -699,7 +708,7 @@ export async function getTorrentByCriteria(
 
 	const client = getClient();
 	const torrentInfos =
-		client && client.type !== Label.QBITTORRENT
+		client && client.clientType !== Label.QBITTORRENT
 			? await client.getAllTorrents()
 			: [];
 	return (

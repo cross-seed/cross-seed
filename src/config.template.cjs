@@ -84,41 +84,19 @@ module.exports = {
 	notificationWebhookUrls: [],
 
 	/**
-	 * The url of your rtorrent XMLRPC interface.
-	 * Only relevant with action: "inject".
-	 * Could be something like "http://username:password@localhost:1234/RPC2
-	 */
-	rtorrentRpcUrl: undefined,
-
-	/**
-	 * The url of your qBittorrent webui.
-	 * Only relevant with action: "inject".
+	 * The urls of your torrent clients' web interfaces.
 	 *
+	 * qBittorrent: "qbittorrent:http://username:password@localhost:8080"
 	 * If using Automatic Torrent Management, please read:
 	 * https://www.cross-seed.org/docs/v6-migration#new-folder-structure-for-links
 	 *
-	 * Supply your username and password inside the url like so:
-	 * "http://username:password@localhost:8080"
+	 * rTorrent: "rtorrent:http://username:password@localhost:1234/RPC2"
+	 *
+	 * Transmission: "transmission:http://username:password@localhost:9091/transmission/rpc"
+	 *
+	 * Deluge: "deluge:http://:password@localhost:8112/json"
 	 */
-	qbittorrentUrl: undefined,
-
-	/**
-	 * The url of your Transmission RPC interface.
-	 * Usually ends with "/transmission/rpc".
-	 * Only relevant with action: "inject".
-	 * Supply your username and password inside the url like so:
-	 * "http://username:password@localhost:9091/transmission/rpc"
-	 */
-	transmissionRpcUrl: undefined,
-
-	/**
-	 * The url of your Deluge JSON-RPC interface.
-	 * Usually ends with "/json".
-	 * Only relevant with action: "inject".
-	 * Supply your WebUI password as well like so:
-	 * "http://:password@localhost:8112/json"
-	 */
-	delugeRpcUrl: undefined,
+	torrentClients: [],
 
 	/**
 	 * END OF POTENTIALLY SENSITIVE CONFIGURATION OPTIONS

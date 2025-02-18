@@ -239,43 +239,6 @@ export function findBlockedStringInReleaseMaybe(
 }
 
 /**
- * Filters duplicates from searchees that should be for different candidates,
- * e.g. all searchees created by cross-seed.
- * @param searchees - An array of searchees to filter duplicates from.
- * @returns An array of searchees with duplicates removed, preferring infoHash.
- */
-export function filterDupesByName<T extends Searchee>(searchees: T[]): T[] {
-	const duplicateMap = searchees.reduce((acc, cur) => {
-		const entry = acc.get(cur.title);
-		if (entry === undefined) {
-			acc.set(cur.title, cur);
-			return acc;
-		}
-		if (cur.files.length > entry.files.length) {
-			acc.set(cur.title, cur);
-			return acc;
-		}
-		if (cur.files.length < entry.files.length) {
-			return acc;
-		}
-		if (cur.infoHash && !entry.infoHash) {
-			acc.set(cur.title, cur);
-		}
-		return acc;
-	}, new Map());
-
-	const filtered = Array.from(duplicateMap.values());
-	const numDupes = searchees.length - filtered.length;
-	if (numDupes > 0) {
-		logger.verbose({
-			label: Label.PREFILTER,
-			message: `${numDupes} duplicates not selected for searching`,
-		});
-	}
-	return filtered;
-}
-
-/**
  * Filters duplicates from searchees that are for the same candidates,
  * e.g. searchees for the same media but different resolutions.
  * @param searchees - An array of searchees for a specific media.
@@ -290,6 +253,7 @@ export function filterDupesFromSimilar<T extends Searchee>(
 			if (searchee.title !== s.title) return false;
 			if (searchee.length !== s.length) return false;
 			if (searchee.files.length !== s.files.length) return false;
+			if (searchee.clientHost !== s.clientHost) return false;
 			const potentialFiles = s.files.map((f) => f.length);
 			return searchee.files.every((file) => {
 				const index = potentialFiles.indexOf(file.length);
