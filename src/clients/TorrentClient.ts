@@ -126,8 +126,29 @@ export function instantiateDownloadClients() {
 	}
 }
 
-export function getClient(): TorrentClient | null {
-	return activeClients.length ? activeClients[0] : null;
+export function getClients(): TorrentClient[] {
+	return activeClients;
+}
+
+export function getClient(searchee: Searchee): TorrentClient | undefined {
+	const clients = getClients();
+	if (clients.length === 1) return clients[0];
+	return clients.find((c) => c.clientHost === searchee.clientHost);
+}
+
+/**
+ * Use byClientPriority if Searchee is available for a complete check
+ */
+export function byClientHostPriority(clientHost: string | undefined): number {
+	const clients = getClients();
+	return (
+		clients.find((c) => c.clientHost === clientHost)?.clientPriority ??
+		clients.length
+	);
+}
+
+export function byClientPriority(searchee: Searchee): number {
+	return byClientHostPriority(getClient(searchee)?.clientHost);
 }
 
 export async function validateClientSavePaths(
@@ -201,11 +222,12 @@ export function organizeTrackers(trackers: Tracker[]): string[] {
 }
 
 export async function waitForTorrentToComplete(
+	client: TorrentClient,
 	infoHash: string,
 	options = { retries: 6 },
 ): Promise<boolean> {
 	for (let i = 0; i <= options.retries; i++) {
-		if ((await getClient()!.isTorrentComplete(infoHash)).orElse(false)) {
+		if ((await client.isTorrentComplete(infoHash)).orElse(false)) {
 			return true;
 		}
 		if (i < options.retries) {

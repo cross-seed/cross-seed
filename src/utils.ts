@@ -30,6 +30,7 @@ import { File, Searchee } from "./searchee.js";
 export enum Mutex {
 	INDEX_TORRENTS_AND_DATA_DIRS = "INDEX_TORRENTS_AND_DATA_DIRS",
 	CREATE_ALL_SEARCHEES = "CREATE_ALL_SEARCHEES",
+	CLIENT_INJECTION = "CLIENT_INJECTION",
 }
 const mutexes = new Map<Mutex, Promise<unknown>>();
 
