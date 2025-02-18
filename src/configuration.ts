@@ -1,13 +1,17 @@
 import chalk from "chalk";
-import { accessSync, constants, copyFileSync, existsSync, mkdirSync } from "fs";
+import {
+	accessSync,
+	constants,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	writeFileSync,
+} from "fs";
 import { createRequire } from "module";
 import path from "path";
-import { pathToFileURL } from "url";
-import { Action, MatchMode } from "./constants.js";
+import { Action, MatchMode, PROGRAM_NAME } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
-
-const require = createRequire(import.meta.url);
-const packageDotJson = require("../package.json");
+import { isSea, getAsset } from "node:sea";
 
 export interface FileConfig {
 	action?: Action;
@@ -73,8 +77,8 @@ export function appDir(): string {
 	const appDir =
 		process.env.CONFIG_DIR ||
 		(process.platform === "win32"
-			? path.resolve(process.env.LOCALAPPDATA!, packageDotJson.name)
-			: path.resolve(process.env.HOME!, `.${packageDotJson.name}`));
+			? path.resolve(process.env.LOCALAPPDATA!, PROGRAM_NAME)
+			: path.resolve(process.env.HOME!, `.${PROGRAM_NAME}`));
 	try {
 		accessSync(appDir, constants.R_OK | constants.W_OK);
 	} catch (e) {
@@ -102,26 +106,36 @@ export function createAppDirHierarchy(): void {
 export function generateConfig(): void {
 	createAppDirHierarchy();
 	const dest = path.join(appDir(), "config.js");
-	const templatePath = path.join("./config.template.cjs");
+	const templatePath = "config.template.cjs";
 	if (existsSync(dest)) {
 		console.log("Configuration file already exists.");
 		return;
 	}
-	copyFileSync(new URL(templatePath, import.meta.url), dest);
+
+	if (isSea()) {
+		writeFileSync(dest, getAsset(templatePath, "utf8"));
+	} else {
+		copyFileSync(new URL(templatePath, import.meta.url), dest);
+	}
+
 	console.log("Configuration file created at", chalk.yellow.bold(dest));
 }
 
-export async function getFileConfig(): Promise<FileConfig> {
+export function getFileConfig(): FileConfig {
 	if (process.env.DOCKER_ENV === "true") {
 		generateConfig();
 	}
 
-	const configPath = path.join(appDir(), "config.js");
-
+	// cwd is not special, it's just a stand in.
+	// We only pass an absolute path to require so it doesn't matter.
+	const require = createRequire(process.cwd());
 	try {
-		return (await import(pathToFileURL(configPath).toString())).default;
+		return require(path.join(appDir(), "config.js"));
 	} catch (e) {
-		if (e.code === "ERR_MODULE_NOT_FOUND") {
+		if (
+			e.code === "ERR_MODULE_NOT_FOUND" ||
+			e.code === "MODULE_NOT_FOUND"
+		) {
 			return {};
 		} else if (e instanceof SyntaxError) {
 			const location = e.stack!.split("\n").slice(0, 3).join("\n");
