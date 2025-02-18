@@ -12,14 +12,15 @@ import {
 	InjectionResult,
 	SaveResult,
 } from "./constants.js";
+import { getJobLastRun, getJobs, JobName } from "./jobs.js";
 import { Label, logger } from "./logger.js";
 import {
 	Candidate,
 	checkNewCandidateMatch,
 	searchForLocalTorrentByCriteria,
 } from "./pipeline.js";
-import { indexTorrentsAndDataDirs, TorrentLocator } from "./torrent.js";
-import { formatAsList, sanitizeInfoHash } from "./utils.js";
+import { indexTorrentsAndDataDirs } from "./torrent.js";
+import { formatAsList, humanReadableDate, sanitizeInfoHash } from "./utils.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 
 const ANNOUNCE_SCHEMA = z
@@ -65,6 +66,20 @@ const WEBHOOK_SCHEMA = z
 	.strict()
 	.partial()
 	.refine((data) => !data.infoHash !== !data.path);
+
+const JOB_SCHEMA = z
+	.object({
+		name: z.string(),
+		ignoreExcludeRecentSearch: z
+			.boolean()
+			.or(z.string().transform((v) => v === "true")),
+		ignoreExcludeOlder: z
+			.boolean()
+			.or(z.string().transform((v) => v === "true")),
+	})
+	.strict()
+	.partial()
+	.refine((data) => Object.values(JobName).includes(data.name as JobName));
 
 function getData(req: IncomingMessage): Promise<string> {
 	return new Promise((resolve) => {
@@ -152,7 +167,7 @@ async function search(
 	}
 
 	try {
-		data = WEBHOOK_SCHEMA.parse(data) as TorrentLocator;
+		data = WEBHOOK_SCHEMA.parse(data);
 	} catch {
 		const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/reference/api#post-apiwebhook): ${inspect(data)}`;
 		logger.error({ label: Label.WEBHOOK, message });
@@ -315,6 +330,81 @@ async function announce(
 }
 
 /**
+ * Run a job ahead of schedule if elligible
+ */
+async function runJob(
+	req: IncomingMessage,
+	res: ServerResponse,
+): Promise<void> {
+	const dataStr = await getData(req);
+	let data;
+	try {
+		data = parseData(dataStr);
+	} catch (e) {
+		logger.error({
+			label: Label.SERVER,
+			message: e.message,
+		});
+		res.writeHead(400);
+		res.end(e.message);
+		return;
+	}
+
+	try {
+		data = JOB_SCHEMA.parse(data);
+	} catch {
+		const message = `Job name must be one of ${formatAsList(Object.values(JobName), { sort: true, style: "narrow", type: "unit" })} - received: ${inspect(data)}`;
+		logger.error({ label: Label.SERVER, message });
+		res.writeHead(400);
+		res.end(message);
+		return;
+	}
+
+	logger.info({
+		label: Label.SERVER,
+		message: `Received job request: ${inspect(data)}`,
+	});
+
+	const job = getJobs().find((j) => j.name === data.name);
+	if (!job) {
+		const message = `${data.name}: unable to run, disabled in config`;
+		logger.error({ label: Label.SCHEDULER, message });
+		res.writeHead(404);
+		res.end(message);
+		return;
+	}
+
+	if (job.isActive) {
+		const message = `${job.name}: already running`;
+		logger.error({ label: Label.SCHEDULER, message });
+		res.writeHead(409);
+		res.end(message);
+		return;
+	}
+
+	const lastRun = (await getJobLastRun(job.name)) ?? 0;
+	if (Date.now() < lastRun) {
+		const message = `${job.name}: not elligible to run ahead of schedule, next scheduled run is at ${humanReadableDate(lastRun + job.cadence)} (triggering an early run is allowed after ${humanReadableDate(lastRun)})`;
+		logger.error({ label: Label.SCHEDULER, message });
+		res.writeHead(409);
+		res.end(message);
+		return;
+	}
+
+	job.runAheadOfSchedule = true;
+	job.configOverride = {
+		excludeRecentSearch: data.ignoreExcludeRecentSearch ? 1 : undefined,
+		excludeOlder: data.ignoreExcludeOlder
+			? Number.MAX_SAFE_INTEGER
+			: undefined,
+	};
+	const message = `${job.name}: running ahead of schedule`;
+	logger.info({ label: Label.SCHEDULER, message });
+	res.writeHead(200);
+	res.end(message);
+}
+
+/**
  * current: sends "200 OK"
  * future: respond with current state and job status details via API
  * uses: potential usage of this in dashbrr
@@ -359,6 +449,10 @@ async function handleRequest(
 			if (!checkMethod("POST", endpoint)) return;
 			if (!(await authorize(req, res))) return;
 			return search(req, res);
+		case "/api/job":
+			if (!checkMethod("POST", endpoint)) return;
+			if (!(await authorize(req, res))) return;
+			return runJob(req, res);
 		case "/api/ping":
 			if (!checkMethod("GET", endpoint)) return;
 			return ping(req, res);

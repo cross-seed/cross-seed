@@ -28,6 +28,7 @@ import {
 	updateIndexerStatus,
 	updateSearchTimestamps,
 } from "./indexers.js";
+import { getJobLastRun, JobName } from "./jobs.js";
 import { Label, logger } from "./logger.js";
 import {
 	filterByContent,
@@ -203,8 +204,9 @@ async function findOnOtherSites(
 async function findMatchesBatch(
 	searchees: SearcheeWithLabel[],
 	infoHashesToExclude: Set<string>,
+	options?: { configOverride: Partial<RuntimeConfig> },
 ) {
-	const { delay, searchLimit } = getRuntimeConfig();
+	const { delay, searchLimit } = getRuntimeConfig(options?.configOverride);
 
 	const indexerSearchCount = new Map<number, number>();
 	let totalFound = 0;
@@ -225,6 +227,7 @@ async function findMatchesBatch(
 				indexerSearchCount,
 				cachedSearch,
 				progress,
+				options,
 			);
 			totalFound += matches;
 
@@ -586,15 +589,23 @@ export async function findAllSearchees(
 	}));
 }
 
-async function findSearchableTorrents(): Promise<{
+async function findSearchableTorrents(options?: {
+	configOverride: Partial<RuntimeConfig>;
+}): Promise<{
 	searchees: SearcheeWithLabel[];
 	infoHashesToExclude: Set<string>;
 }> {
-	const { searchLimit } = getRuntimeConfig();
+	const { excludeOlder, excludeRecentSearch, searchLimit } = getRuntimeConfig(
+		options?.configOverride,
+	);
 
 	const { realSearchees, ensembleSearchees } = await withMutex(
 		Mutex.CREATE_ALL_SEARCHEES,
 		async () => {
+			logger.info({
+				label: Label.SEARCH,
+				message: "Gathering searchees...",
+			});
 			const realSearchees = await findAllSearchees(Label.SEARCH);
 			const ensembleSearchees = await createEnsembleSearchees(
 				realSearchees,
@@ -606,6 +617,16 @@ async function findSearchableTorrents(): Promise<{
 		},
 		{ useQueue: true },
 	);
+	const ignoring = [
+		(!excludeOlder || excludeOlder === Number.MAX_SAFE_INTEGER) &&
+			"excludeOlder",
+		(!excludeRecentSearch || excludeRecentSearch === 1) &&
+			"excludeRecentSearch",
+	].filter(isTruthy);
+	logger.info({
+		label: Label.SEARCH,
+		message: `Filtering searchees based on config${ignoring.length ? ` (ignoring ${formatAsList(ignoring, { sort: true })})` : ""}...`,
+	});
 	const infoHashesToExclude = new Set(
 		realSearchees.map((t) => t.infoHash).filter(isTruthy),
 	);
@@ -627,7 +648,9 @@ async function findSearchableTorrents(): Promise<{
 		// If one searchee needs to be searched, use the candidates for all
 		const filteredSearchees = filterDupesFromSimilar(groupedSearchees);
 		const results = await Promise.all(
-			filteredSearchees.map(filterTimestamps),
+			filteredSearchees.map((searchee) =>
+				filterTimestamps(searchee, options),
+			),
 		);
 		if (!results.some(isTruthy)) {
 			grouping.delete(key);
@@ -658,15 +681,17 @@ async function findSearchableTorrents(): Promise<{
 	return { searchees: finalSearchees, infoHashesToExclude };
 }
 
-export async function bulkSearch(): Promise<void> {
-	const { outputDir } = getRuntimeConfig();
-	const { searchees, infoHashesToExclude } = await findSearchableTorrents();
+export async function bulkSearch(options?: {
+	configOverride: Partial<RuntimeConfig>;
+}): Promise<void> {
+	const { searchees, infoHashesToExclude } =
+		await findSearchableTorrents(options);
 
-	if (!fs.existsSync(outputDir)) {
-		fs.mkdirSync(outputDir, { recursive: true });
-	}
-
-	const totalFound = await findMatchesBatch(searchees, infoHashesToExclude);
+	const totalFound = await findMatchesBatch(
+		searchees,
+		infoHashesToExclude,
+		options,
+	);
 
 	logger.info({
 		label: Label.SEARCH,
@@ -695,13 +720,11 @@ export async function scanRssFeeds() {
 		});
 		return;
 	}
-	const lastRun: number =
-		(await db("job_log").select("last_run").where({ name: "rss" }).first())
-			?.last_run ?? 0;
 	logger.verbose({
 		label: Label.RSS,
 		message: "Querying RSS feeds...",
 	});
+	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
 	const candidates = queryRssFeeds(lastRun);
 	let i = 0;
 	for await (const candidate of candidates) {

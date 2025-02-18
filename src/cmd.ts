@@ -406,7 +406,7 @@ createCommandWithSharedOptions("search", "Search for cross-seeds")
 		"--no-exclude-recent-search",
 		"Don't Exclude torrents based on when they were last searched.",
 	)
-	.action(withFullRuntime(bulkSearch));
+	.action(withFullRuntime(() => bulkSearch()));
 
 createCommandWithSharedOptions(
 	"inject",

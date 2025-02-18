@@ -84,6 +84,10 @@ async function checkConfigPaths(): Promise<void> {
 		pathFailure++;
 	}
 
+	if (!existsSync(outputDir)) {
+		logger.info(`Creating outputDir: ${outputDir}`);
+		mkdirSync(outputDir, { recursive: true });
+	}
 	if (!(await verifyPath(outputDir, "outputDir", READ_AND_WRITE))) {
 		pathFailure++;
 	}
