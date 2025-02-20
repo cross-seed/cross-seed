@@ -389,7 +389,7 @@ export async function* rssPager(
 		} catch (e) {
 			logger.error({
 				label: Label.TORZNAB,
-				message: `Paging indexer ${indexer.url} stopped at page ${i + 1}: request failed`,
+				message: `Paging indexer ${indexer.url} stopped at page ${i + 1}: request failed - ${e.message}`,
 			});
 			logger.debug(e);
 			break;
@@ -606,7 +606,7 @@ async function fetchCaps(indexer: {
 		);
 	} catch (e) {
 		const error = new Error(
-			`Indexer ${indexer.url} failed to respond, check verbose logs`,
+			`Indexer ${indexer.url} failed to respond, check verbose logs: ${e.message}`,
 		);
 		logger.error(error.message);
 		logger.debug(e);

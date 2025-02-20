@@ -320,7 +320,7 @@ export default class RTorrent implements TorrentClient {
 		} catch (e) {
 			logger.debug(e);
 			throw new CrossSeedError(
-				`Failed to reach rTorrent at ${rtorrentRpcUrl}`,
+				`Failed to reach rTorrent at ${rtorrentRpcUrl}: ${e.message}`,
 			);
 		}
 
@@ -439,7 +439,7 @@ export default class RTorrent implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				Label: Label.RTORRENT,
-				message: "Error parsing response for all torrents",
+				message: `Error parsing response for all torrents: ${e.message}`,
 			});
 			logger.debug(e);
 			return new Map();
@@ -529,7 +529,7 @@ export default class RTorrent implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				Label: Label.RTORRENT,
-				message: "Error parsing response for all torrents",
+				message: `Error parsing response for all torrents: ${e.message}`,
 			});
 			logger.debug(e);
 			return [];
@@ -814,7 +814,7 @@ export default class RTorrent implements TorrentClient {
 			} catch (e) {
 				logger.verbose({
 					label: Label.RTORRENT,
-					message: `Failed to inject torrent ${meta.name} on attempt ${i + 1}/${retries}`,
+					message: `Failed to inject torrent ${meta.name} on attempt ${i + 1}/${retries}: ${e.message}`,
 				});
 				logger.debug(e);
 				await wait(1000 * Math.pow(2, i));

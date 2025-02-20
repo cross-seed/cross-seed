@@ -381,7 +381,7 @@ export default class Deluge implements TorrentClient {
 			logger.debug(e);
 			logger.warn({
 				label: Label.DELUGE,
-				message: `Failed to label ${getLogString(newTorrent)} as ${label}`,
+				message: `Failed to label ${getLogString(newTorrent)} as ${label}: ${e.message}`,
 			});
 		}
 	}
@@ -761,7 +761,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				label: Label.DELUGE,
-				message: `Failed to fetch torrent data: ${infoHash}`,
+				message: `Failed to fetch torrent data: ${infoHash}: ${e.message}`,
 			});
 			logger.debug(e);
 			throw new Error("web.update_ui: failed to fetch data from client", {
