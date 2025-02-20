@@ -152,7 +152,7 @@ export async function validateClientSavePaths(
 	for (const savePath of uniqueSavePaths) {
 		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
 			throw new CrossSeedError(
-				`Cannot use linkDir with cross platform cross-seed and torrent client, please run cross-seed in docker or natively to match your torrent client (https://www.cross-seed.org/docs/basics/managing-the-daemon): ${savePath}`,
+				`Cannot use linkDirs with cross platform cross-seed and torrent client, please run cross-seed in docker or natively to match your torrent client (https://www.cross-seed.org/docs/basics/managing-the-daemon): ${savePath}`,
 			);
 		}
 		try {
@@ -160,7 +160,7 @@ export async function validateClientSavePaths(
 		} catch (e) {
 			logger.error(e);
 			throw new CrossSeedError(
-				"Failed to link from torrent client save paths to a linkDir. If you have a temp/cache drive, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to it.",
+				"Failed to link from torrent client save paths to a linkDir. If you have a temp/cache drive, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to it (https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking)",
 			);
 		}
 	}
@@ -174,11 +174,12 @@ export async function waitForTorrentToComplete(
 	infoHash: string,
 	options = { retries: 6 },
 ): Promise<boolean> {
-	for (let i = 0; i <= options.retries; i++) {
+	const retries = Math.max(options.retries, 0);
+	for (let i = 0; i <= retries; i++) {
 		if ((await getClient()!.isTorrentComplete(infoHash)).orElse(false)) {
 			return true;
 		}
-		if (i < options.retries) {
+		if (i < retries) {
 			await wait(ms("1 second") * 2 ** i);
 		}
 	}

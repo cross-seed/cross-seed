@@ -61,9 +61,11 @@ export class PushNotifier {
 							}"`,
 						);
 					}
-				} catch (error) {
-					logger.error(`${url} failed to send push notification`);
-					logger.debug(error);
+				} catch (e) {
+					logger.error(
+						`${url} failed to send push notification: ${e.message}`,
+					);
+					logger.debug(e);
 				}
 			}),
 		);
