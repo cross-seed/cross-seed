@@ -369,7 +369,7 @@ export const VALIDATION_SCHEMA = z
 				}
 				return true;
 			}),
-		injectDir: z.string().optional(),
+		injectDir: z.string().nullish(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
 		fuzzySizeThreshold: z
