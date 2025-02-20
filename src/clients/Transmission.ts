@@ -140,7 +140,7 @@ export default class Transmission implements TorrentClient {
 			return this.request(method, args, retries - 1);
 		}
 		try {
-			const responseBody = (await response.json()) as Response<T>;
+			const responseBody = (await response.clone().json()) as Response<T>;
 			if (
 				responseBody.result === "success" ||
 				responseBody.result === "duplicate torrent" // slight hack but best solution for now
@@ -159,12 +159,12 @@ export default class Transmission implements TorrentClient {
 				});
 				logger.debug({
 					label: this.label,
-					message: response,
+					message: response.clone().text(),
 				});
 			} else {
 				logger.error({
 					label: this.label,
-					message: `Transmission responded with an error`,
+					message: `Transmission responded with an error: ${e.message}`,
 				});
 				logger.debug(e);
 			}
@@ -178,7 +178,7 @@ export default class Transmission implements TorrentClient {
 			await this.request("session-get", {}, 1, ms("10 seconds"));
 		} catch (e) {
 			throw new CrossSeedError(
-				`Failed to reach Transmission at ${this.clientHost}`,
+				`Failed to reach Transmission at ${this.clientHost}: ${e.message}`,
 			);
 		}
 		logger.info({
@@ -313,7 +313,7 @@ export default class Transmission implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				label: this.label,
-				message: "Failed to get torrents from client",
+				message: `Failed to get torrents from client: ${e.message}`,
 			});
 			logger.debug(e);
 			return { searchees, newSearchees };

@@ -109,7 +109,7 @@ async function deleteTorrentFileIfSafe(torrentFilePath: string): Promise<void> {
 		if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
 			logger.error({
 				label: Label.INJECT,
-				message: `Failed to delete ${filePathLog}`,
+				message: `Failed to delete ${filePathLog}: ${e.message}`,
 			});
 			logger.debug(e);
 		}
@@ -496,7 +496,7 @@ async function loadMetafile(
 	} catch (e) {
 		logger.error({
 			label: Label.INJECT,
-			message: `${progress} Failed to parse ${filePathLog}`,
+			message: `${progress} Failed to parse ${filePathLog}: ${e.message}`,
 		});
 		logger.debug(e);
 		return resultOfErr("FAILED_TO_PARSE");

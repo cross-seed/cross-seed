@@ -256,7 +256,7 @@ async function findMatchesBatch(
 			const searcheeLog = getLogString(searchee, chalk.bold.white);
 			logger.error({
 				label: searchee.label,
-				message: `${progress}Error searching for ${searcheeLog}`,
+				message: `${progress}Error searching for ${searcheeLog}: ${e.message}`,
 			});
 			logger.debug(e);
 		}
@@ -359,7 +359,7 @@ export async function searchForLocalTorrentByCriteria(
 			const searcheeLog = getLogString(searchee, chalk.bold.white);
 			logger.error({
 				label: searchee.label,
-				message: `${progress}Error searching for ${searcheeLog}`,
+				message: `${progress}Error searching for ${searcheeLog}: ${e.message}`,
 			});
 			logger.debug(e);
 		}

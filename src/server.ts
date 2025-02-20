@@ -312,10 +312,12 @@ async function announce(
 		}
 
 		const { status, state } = determineResponse(result);
-		logger.info({
-			label: Label.ANNOUNCE,
-			message: `${state} ${candidateLog} (status: ${status})`,
-		});
+		if (result.actionResult !== InjectionResult.SUCCESS) {
+			logger.info({
+				label: Label.ANNOUNCE,
+				message: `${state} ${candidateLog} (status: ${status})`,
+			});
+		}
 		res.writeHead(status);
 		res.end();
 	} catch (e) {
