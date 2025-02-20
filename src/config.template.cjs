@@ -244,11 +244,10 @@ module.exports = {
 	 *
 	 * DO NOT USE THIS DIRECTORY AS A WATCH FOLDER FOR YOUR TORRENT CLIENT!!!
 	 *
-	 * You do not need to change this from "/config/cross-seeds". This has
-	 * special treatment for outputDir and will map to your cross-seed config
-	 * directory: https://www.cross-seed.org/docs/basics/options#outputdir
+	 * You do not need to change this from null. It will map to your cross-seed
+	 * config directory: https://www.cross-seed.org/docs/basics/options#outputdir
 	 */
-	outputDir: "/config/cross-seeds",
+	outputDir: null,
 
 	/**
 	 * Whether to include single episode torrents in search/webhook/rss.

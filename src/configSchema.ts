@@ -354,12 +354,11 @@ export const VALIDATION_SCHEMA = z
 			.transform((v) => v ?? null),
 		outputDir: z
 			.string()
+			.nullish()
 			.transform((dir) => {
-				if (dir === "/config/cross-seeds") {
-					return join(appDir(), "cross-seeds");
-				}
+				if (!dir) return join(appDir(), "cross-seeds");
 				logger.warn(
-					`Use outputDir: "/config/cross-seeds" to prevent any issues from occurring (https://www.cross-seed.org/docs/basics/options#outputdir)`,
+					`Set outputDir to null to prevent any issues from occurring (https://www.cross-seed.org/docs/basics/options#outputdir)`,
 				);
 				return dir;
 			})
