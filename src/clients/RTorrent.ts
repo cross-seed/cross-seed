@@ -1,5 +1,5 @@
 import { readdirSync, type Stats } from "fs";
-import { stat, unlink, writeFile } from "fs/promises";
+import { stat } from "fs/promises";
 import { basename, dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
@@ -99,18 +99,6 @@ async function createLibTorrentResumeTree(
 		bitfield: Math.ceil(meta.length / meta.pieceLength),
 		files: fileResumes.filter(isTruthy),
 	};
-}
-
-async function saveWithLibTorrentResume(
-	meta: Metafile,
-	savePath: string,
-	basePath: string,
-): Promise<void> {
-	const rawWithLibtorrentResume = {
-		...meta.raw,
-		libtorrent_resume: await createLibTorrentResumeTree(meta, basePath),
-	};
-	await writeFile(savePath, new Metafile(rawWithLibtorrentResume).encode());
 }
 
 export default class RTorrent implements TorrentClient {
@@ -760,8 +748,6 @@ export default class RTorrent implements TorrentClient {
 		decision: DecisionAnyMatch,
 		path?: string,
 	): Promise<InjectionResult> {
-		const { outputDir } = getRuntimeConfig();
-
 		if (await this.checkForInfoHashInClient(meta.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
@@ -779,15 +765,13 @@ export default class RTorrent implements TorrentClient {
 		}
 		const { directoryBase, basePath } = result.unwrap();
 
-		const torrentFilePath = resolve(
-			outputDir,
-			`${meta.name}.tmp.${Date.now()}.torrent`,
-		);
-
-		await saveWithLibTorrentResume(meta, torrentFilePath, basePath);
+		const rawWithLibtorrentResume = {
+			...meta.raw,
+			libtorrent_resume: await createLibTorrentResumeTree(meta, basePath),
+		};
 
 		const toRecheck = shouldRecheck(searchee, decision);
-		const loadType = toRecheck ? "load.normal" : "load.start";
+		const loadType = toRecheck ? "load.raw" : "load.raw_start";
 
 		const retries = 5;
 		for (let i = 0; i < retries; i++) {
@@ -796,7 +780,7 @@ export default class RTorrent implements TorrentClient {
 					loadType,
 					[
 						"",
-						torrentFilePath,
+						new Metafile(rawWithLibtorrentResume).encode(),
 						`d.directory_base.set="${directoryBase}"`,
 						`d.custom1.set="${TORRENT_TAG}"`,
 						`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
@@ -823,12 +807,10 @@ export default class RTorrent implements TorrentClient {
 
 		for (let i = 0; i < 5; i++) {
 			if (await this.checkForInfoHashInClient(meta.infoHash)) {
-				setTimeout(() => unlink(torrentFilePath), 1000);
 				return InjectionResult.SUCCESS;
 			}
 			await wait(100 * Math.pow(2, i));
 		}
-		setTimeout(() => unlink(torrentFilePath), 1000);
 		return InjectionResult.FAILURE;
 	}
 }
