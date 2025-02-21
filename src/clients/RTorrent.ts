@@ -115,14 +115,15 @@ async function saveWithLibTorrentResume(
 
 export default class RTorrent implements TorrentClient {
 	client: Client;
-	readonly type = Label.RTORRENT;
+	readonly clientHost: string;
+	readonly clientPriority: number;
+	readonly clientType = Label.RTORRENT;
+	readonly label: string;
 	readonly batchSize = 500;
 
-	constructor() {
-		const { rtorrentRpcUrl } = getRuntimeConfig();
-
+	constructor(url: string, priority: number) {
 		const { href, username, password } = extractCredentialsFromUrl(
-			rtorrentRpcUrl!,
+			url,
 		).unwrapOrThrow(
 			new CrossSeedError("rTorrent url must be percent-encoded"),
 		);
@@ -140,16 +141,15 @@ export default class RTorrent implements TorrentClient {
 				? { user: username, pass: password }
 				: undefined,
 		});
+		this.clientHost = new URL(url).host;
+		this.clientPriority = priority;
+		this.label = `${this.clientType}@${this.clientHost}`;
 	}
 
 	private async methodCallP<R>(method: string, args): Promise<R> {
-		logger.verbose({
-			label: Label.RTORRENT,
-			message: `Calling method ${method} with params ${inspect(args, {
-				depth: null,
-				compact: true,
-			})}`,
-		});
+		const msg = `Calling method ${method} with params ${inspect(args, { depth: null, compact: true })}`;
+		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
+		logger.verbose({ label: this.label, message });
 		return new Promise((resolve, reject) => {
 			this.client.methodCall(method, args, (err, data) => {
 				if (err) return reject(err);
@@ -314,15 +314,19 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	async validateConfig(): Promise<void> {
-		const { rtorrentRpcUrl, torrentDir } = getRuntimeConfig();
+		const { torrentDir } = getRuntimeConfig();
 		try {
 			await this.methodCallP<string[]>("download_list", []);
 		} catch (e) {
 			logger.debug(e);
 			throw new CrossSeedError(
-				`Failed to reach rTorrent at ${rtorrentRpcUrl}`,
+				`Failed to reach rTorrent at ${this.clientHost}`,
 			);
 		}
+		logger.info({
+			label: this.label,
+			message: `Logged in successfully`,
+		});
 
 		if (!torrentDir) return;
 		if (!readdirSync(torrentDir).some((f) => f.endsWith("_resume"))) {
@@ -393,7 +397,7 @@ export default class RTorrent implements TorrentClient {
 					);
 					if (isFault(res)) {
 						logger.error({
-							Label: Label.RTORRENT,
+							Label: this.label,
 							message:
 								"Fault while getting download directories for all torrents",
 						});
@@ -403,7 +407,7 @@ export default class RTorrent implements TorrentClient {
 					return res;
 				} catch (e) {
 					logger.error({
-						Label: Label.RTORRENT,
+						Label: this.label,
 						message: `Failed to get download directories for all torrents: ${e.message}`,
 					});
 					logger.debug(e);
@@ -414,7 +418,7 @@ export default class RTorrent implements TorrentClient {
 		);
 		if (!results.length || results.length !== hashes.length * numMethods) {
 			logger.error({
-				Label: Label.RTORRENT,
+				Label: this.label,
 				message: `Unexpected number of results: ${results.length} for ${hashes.length} hashes`,
 			});
 			return new Map();
@@ -438,7 +442,7 @@ export default class RTorrent implements TorrentClient {
 			}, new Map<string, string>());
 		} catch (e) {
 			logger.error({
-				Label: Label.RTORRENT,
+				Label: this.label,
 				message: "Error parsing response for all torrents",
 			});
 			logger.debug(e);
@@ -486,7 +490,7 @@ export default class RTorrent implements TorrentClient {
 					);
 					if (isFault(res)) {
 						logger.error({
-							Label: Label.RTORRENT,
+							Label: this.label,
 							message:
 								"Fault while getting torrent info for all torrents",
 						});
@@ -496,7 +500,7 @@ export default class RTorrent implements TorrentClient {
 					return res;
 				} catch (e) {
 					logger.error({
-						Label: Label.RTORRENT,
+						Label: this.label,
 						message: `Failed to get torrent info for all torrents: ${e.message}`,
 					});
 					logger.debug(e);
@@ -507,7 +511,7 @@ export default class RTorrent implements TorrentClient {
 		);
 		if (results.length !== hashes.length) {
 			logger.error({
-				Label: Label.RTORRENT,
+				Label: this.label,
 				message: `Unexpected number of results: ${results.length} for ${hashes.length} hashes`,
 			});
 			return [];
@@ -528,7 +532,7 @@ export default class RTorrent implements TorrentClient {
 			})) as TorrentMetadataInClient[];
 		} catch (e) {
 			logger.error({
-				Label: Label.RTORRENT,
+				Label: this.label,
 				message: "Error parsing response for all torrents",
 			});
 			logger.debug(e);
@@ -601,7 +605,7 @@ export default class RTorrent implements TorrentClient {
 					);
 					if (isFault(res)) {
 						logger.error({
-							Label: Label.RTORRENT,
+							Label: this.label,
 							message: "Fault while getting client torrents",
 						});
 						logger.debug(inspect(res));
@@ -610,7 +614,7 @@ export default class RTorrent implements TorrentClient {
 					return res;
 				} catch (e) {
 					logger.error({
-						Label: Label.RTORRENT,
+						Label: this.label,
 						message: `Failed to get client torrents: ${e.message}`,
 					});
 					logger.debug(e);
@@ -621,7 +625,7 @@ export default class RTorrent implements TorrentClient {
 		);
 		if (!results.length || results.length !== hashes.length * numMethods) {
 			logger.error({
-				Label: Label.RTORRENT,
+				Label: this.label,
 				message: `Unexpected number of results: ${results.length} for ${hashes.length} hashes`,
 			});
 			return { searchees, newSearchees };
@@ -632,6 +636,7 @@ export default class RTorrent implements TorrentClient {
 			infoHashes.add(infoHash);
 			const dbTorrent = await memDB("torrent")
 				.where("info_hash", infoHash)
+				.where("client_host", this.clientHost)
 				.first();
 			const refresh =
 				options?.refresh === undefined
@@ -657,7 +662,7 @@ export default class RTorrent implements TorrentClient {
 			}));
 			if (!files.length) {
 				logger.verbose({
-					label: Label.RTORRENT,
+					label: this.label,
 					message: `No files found for ${name} [${sanitizeInfoHash(infoHash)}]: skipping`,
 				});
 				continue;
@@ -682,6 +687,7 @@ export default class RTorrent implements TorrentClient {
 				title,
 				files,
 				length,
+				clientHost: this.clientHost,
 				savePath,
 				category,
 				tags,
@@ -690,7 +696,7 @@ export default class RTorrent implements TorrentClient {
 			newSearchees.push(searchee);
 			searchees.push(searchee);
 		}
-		await updateSearcheeClientDB(newSearchees, infoHashes);
+		await updateSearcheeClientDB(this.clientHost, newSearchees, infoHashes);
 		return { searchees, newSearchees };
 	}
 
@@ -730,26 +736,26 @@ export default class RTorrent implements TorrentClient {
 			const torrentLog = `${torrentInfo.name} [${sanitizeInfoHash(infoHash)}]`;
 			if (torrentInfo.isActive) {
 				logger.warn({
-					label: Label.RTORRENT,
+					label: this.label,
 					message: `Will not resume torrent ${torrentLog}: active`,
 				});
 				return;
 			}
 			if (torrentInfo.bytesLeft > maxRemainingBytes) {
 				logger.warn({
-					label: Label.RTORRENT,
+					label: this.label,
 					message: `Will not resume torrent ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 				});
 				return;
 			}
 			logger.info({
-				label: Label.RTORRENT,
+				label: this.label,
 				message: `Resuming torrent ${torrentLog}`,
 			});
 			await this.methodCallP<void>("d.resume", [infoHash]);
 		}
 		logger.warn({
-			label: Label.RTORRENT,
+			label: this.label,
 			message: `Will not resume torrent ${infoHash}: timeout`,
 		});
 	}
@@ -813,7 +819,7 @@ export default class RTorrent implements TorrentClient {
 				break;
 			} catch (e) {
 				logger.verbose({
-					label: Label.RTORRENT,
+					label: this.label,
 					message: `Failed to inject torrent ${meta.name} on attempt ${i + 1}/${retries}`,
 				});
 				logger.debug(e);

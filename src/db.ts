@@ -23,7 +23,9 @@ export const memDB = Knex.knex({
 	useNullAsDefault: true,
 });
 await memDB.schema.createTable("torrent", (table) => {
-	table.string("info_hash").primary();
+	table.string("client_host");
+	table.string("info_hash").index();
+	table.primary(["client_host", "info_hash"]);
 	table.string("name");
 	table.string("title");
 	table.json("files");
@@ -38,8 +40,10 @@ await memDB.schema.createTable("data", (table) => {
 	table.string("title");
 });
 await memDB.schema.createTable("ensemble", (table) => {
-	table.string("path").primary();
-	table.string("info_hash").unique();
+	table.string("client_host");
+	table.string("path").index();
+	table.primary(["client_host", "path"]);
+	table.string("info_hash").index();
 	table.string("ensemble");
 	table.string("element");
 });

@@ -150,7 +150,10 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 		await memDB("data").insert(batch).onConflict("path").merge();
 	});
 	await inBatches(ensembleRows, async (batch) => {
-		await memDB("ensemble").insert(batch).onConflict("path").merge();
+		await memDB("ensemble")
+			.insert(batch)
+			.onConflict(["client_host", "path"])
+			.merge();
 	});
 }
 
@@ -163,6 +166,7 @@ async function indexEnsembleDataEntry(
 	if (!ensemblePieces) return null;
 	const { key, element, largestFile } = ensemblePieces;
 	return {
+		client_host: null,
 		path: join(dirname(path), largestFile.path),
 		info_hash: null,
 		ensemble: key,
