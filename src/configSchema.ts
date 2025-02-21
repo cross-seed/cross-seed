@@ -56,6 +56,8 @@ const ZodErrorMessages = {
 		].map((l) => `${l}:`),
 		{ sort: false, style: "narrow", type: "unit" },
 	)}`,
+	multipleClients:
+		"You need to use useClientTorrents when using multiple clients (dataDirs and --torrents arg is not allowed).",
 	duplicateClients: "Duplicate torrent client URLs are not allowed.",
 	injectNeedsClients:
 		"You need to specify torrentClients when using 'inject'",
@@ -565,8 +567,12 @@ export const VALIDATION_SCHEMA = z
 		"Deluge does not currently support useClientTorrents, use torrentDir instead.",
 	)
 	.refine(
-		(config) => config.torrentClients.length <= 1,
-		"Multiple torrent clients are not currently supported.",
+		(config) =>
+			config.torrentClients.length <= 1 ||
+			(config.useClientTorrents &&
+				!config.torrents?.length &&
+				!config.dataDirs.length),
+		ZodErrorMessages.multipleClients,
 	)
 	.refine(
 		(config) =>

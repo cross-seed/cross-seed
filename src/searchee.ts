@@ -2,7 +2,11 @@ import { stat } from "fs/promises";
 import { existsSync, readdirSync, statSync } from "fs";
 import { basename, dirname, join, relative } from "path";
 import ms from "ms";
-import { getClient, TorrentMetadataInClient } from "./clients/TorrentClient.js";
+import {
+	byClientHostPriority,
+	getClients,
+	TorrentMetadataInClient,
+} from "./clients/TorrentClient.js";
 import {
 	ANIME_GROUP_REGEX,
 	ANIME_REGEX,
@@ -25,6 +29,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { parseTorrentWithMetadata } from "./torrent.js";
 import {
+	comparing,
 	createKeyTitle,
 	extractInt,
 	filesWithExt,
@@ -664,6 +669,7 @@ function organizeEnsembleKeys(
 function pushEnsembleEpisode(
 	searchee: SearcheeWithLabel,
 	episodeFiles: File[],
+	hosts: Map<string, number>,
 	torrentSavePaths: Map<string, string>,
 ): void {
 	let sourceRoot: string;
@@ -696,6 +702,8 @@ function pushEnsembleEpisode(
 		episodeFiles.splice(episodeFiles.indexOf(duplicateFile), 1);
 	}
 	episodeFiles.push(absoluteFile);
+	const clientHost = searchee.clientHost;
+	if (clientHost) hosts.set(clientHost, (hosts.get(clientHost) ?? 0) + 1);
 }
 
 function createVirtualSeasonSearchee(
@@ -731,10 +739,16 @@ function createVirtualSeasonSearchee(
 		label: episodeSearchees.values().next().value[0].label,
 	};
 	let newestFileAge = 0;
+	const hosts = new Map<string, number>();
 	for (const [, searchees] of episodeSearchees) {
 		const episodeFiles: File[] = [];
 		for (const searchee of searchees) {
-			pushEnsembleEpisode(searchee, episodeFiles, torrentSavePaths);
+			pushEnsembleEpisode(
+				searchee,
+				episodeFiles,
+				hosts,
+				torrentSavePaths,
+			);
 		}
 		if (episodeFiles.length === 0) continue;
 		const total = episodeFiles.reduce((a, b) => a + b.length, 0);
@@ -744,6 +758,12 @@ function createVirtualSeasonSearchee(
 		newestFileAge = Math.max(newestFileAge, ...fileAges);
 	}
 	seasonSearchee.mtimeMs = newestFileAge;
+	seasonSearchee.clientHost = [...hosts].sort(
+		comparing(
+			(host) => -host[1],
+			(host) => byClientHostPriority(host[0]),
+		),
+	)[0]?.[0];
 	if (seasonSearchee.files.length < minEpisodes) {
 		logEnsemble(
 			`Skipping virtual searchee for ${ensembleTitle} episodes as only ${seasonSearchee.files.length} episode files were found (min: ${minEpisodes})`,
@@ -785,7 +805,7 @@ export async function createEnsembleSearchees(
 	);
 	const torrentSavePaths = useClientTorrents
 		? new Map()
-		: (await getClient()?.getAllDownloadDirs({
+		: (await getClients()[0]?.getAllDownloadDirs({
 				metas: allSearchees.filter(
 					hasInfoHash,
 				) as SearcheeWithInfoHash[],
