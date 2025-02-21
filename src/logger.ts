@@ -2,6 +2,7 @@ import { join } from "path";
 import stripAnsi from "strip-ansi";
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
+import { parseClientEntry } from "./clients/TorrentClient.js";
 import { appDir, createAppDirHierarchy } from "./configuration.js";
 
 export enum Label {
@@ -73,9 +74,17 @@ function redactMessage(
 		/\/notification\/crossSeed\/[a-zA-Z-0-9_-]+/g,
 		`/notification/crossSeed/${redactionMsg}`,
 	);
-	for (const [key, urlStr] of Object.entries(options)) {
-		if (key.endsWith("Url") && typeof urlStr === "string") {
-			ret = redactUrlPassword(ret, urlStr);
+	for (const [key, value] of Object.entries(options)) {
+		if (key.endsWith("Url") && typeof value === "string") {
+			ret = redactUrlPassword(ret, value);
+		}
+		if (key === "torrentClients" && Array.isArray(value)) {
+			for (const clientEntry of value) {
+				ret = redactUrlPassword(
+					ret,
+					parseClientEntry(clientEntry)!.url,
+				);
+			}
 		}
 	}
 	return ret;
