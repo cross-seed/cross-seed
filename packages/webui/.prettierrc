@@ -1,0 +1,8 @@
+{
+    "trailingComma": "all",
+    "tabWidth": 2,
+    "maxLineLength": 80,
+    "singleQuote": true,
+    "tailwindFunctions": ["clsx", "cva", "cn"],
+    "plugins": ["prettier-plugin-tailwindcss"]
+}
