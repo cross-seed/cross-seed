@@ -1,0 +1,36 @@
+@import "tailwindcss";
+/*---break---*/
+@plugin "tailwindcss-animate";
+/*---break---*/
+@custom-variant dark (&:where(.dark, .dark *));
+
+
+@theme {
+  --color-accent: oklch(61.3% 0.155 147deg);
+  --color-accent-50: oklch(97.9% 0.0132 153deg);
+  --color-accent-100: oklch(95.5% 0.0332 151deg); /*#e1f7e5;*/
+  --color-accent-200: oklch(90.9% 0.06 151deg); /*#c5edcd; */
+  --color-accent-300: oklch(83.9% 0.106 150deg); /* #97dea6 */
+  --color-accent-400: oklch(74.6% 0.148 148deg); /* #62c676 */
+  --color-accent-500: oklch(65.8% 0.161 147deg); /* #3cab53 */
+  --color-accent-600: oklch(61.3% 0.155 147deg); /* #329c48 */
+  --color-accent-700: oklch(48.2% 0.116 147deg); /* #266f35 */
+  --color-accent-800: oklch(41.3% 0.0892 148deg); /* #23582e */
+  --color-accent-900: oklch(36.5% 0.074 149deg); /* #1e4928 */
+  --color-accent-950: oklch(24.5% 0.0502 150deg); /* #0c2713 */
+}
+
+/*---break---*/
+
+:root {
+  --radius: 0.6rem;
+}
+
+/*---break---*/
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
