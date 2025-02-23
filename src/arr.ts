@@ -129,11 +129,13 @@ async function makeArrApiCall<ResponseType>(
 	}
 
 	let response: Response;
+	let clonedResponse: Response;
 	try {
 		response = await fetch(url, {
 			signal: AbortSignal.timeout(ms("30 seconds")),
 			headers: { "X-Api-Key": apikey },
 		});
+		clonedResponse = response.clone();
 	} catch (networkError) {
 		if (
 			networkError.name === "AbortError" ||
@@ -153,10 +155,10 @@ async function makeArrApiCall<ResponseType>(
 		);
 	}
 	try {
-		const responseBody = await response.clone().json();
+		const responseBody = await response.json();
 		return resultOf(responseBody as ResponseType);
 	} catch (e) {
-		const responseText = await response.text();
+		const responseText = await clonedResponse.text();
 		return resultOfErr(
 			new Error(
 				`Arr response was non-JSON. ${getBodySampleMessage(responseText)}`,

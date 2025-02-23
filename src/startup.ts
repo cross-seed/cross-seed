@@ -137,16 +137,17 @@ async function checkConfigPaths(): Promise<void> {
 
 async function retry<T>(
 	cb: () => Promise<T>,
-	retries: number,
+	numRetries: number,
 	delayMs: number,
 ): Promise<T> {
+	const retries = Math.max(numRetries, 0);
 	let lastError = new Error("Retry failed");
 	for (let i = 0; i <= retries; i++) {
 		try {
 			return await cb();
 		} catch (e) {
 			const retryMsg =
-				i < retries ? `, retrying in ${delayMs / 1000} seconds` : "";
+				i < retries ? `, retrying in ${delayMs / 1000}s` : "";
 			logger.error(
 				`Attempt ${i + 1}/${retries + 1} failed${retryMsg}: ${e.message}`,
 			);

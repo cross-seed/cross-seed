@@ -248,7 +248,7 @@ export function findPotentialNestedRoots(
 			return [root];
 		}
 	} catch (e) {
-		logger.verbose(`Failed to process path: ${root}`);
+		logger.verbose(`Failed to process path ${root}: ${e.message}`);
 		logger.debug(e);
 		return [];
 	}
