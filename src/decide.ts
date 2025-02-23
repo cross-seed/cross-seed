@@ -465,7 +465,7 @@ async function getCachedTorrentFile(
 	} catch (e) {
 		logger.error({
 			label: Label.DECIDE,
-			message: `Failed to parse cached torrent ${sanitizeInfoHash(infoHash)}${options.deleteOnFail ? " - deleting" : ""}`,
+			message: `Failed to parse cached torrent ${sanitizeInfoHash(infoHash)}${options.deleteOnFail ? " - deleting" : ""}: ${e.message}`,
 		});
 		logger.debug(e);
 		if (options.deleteOnFail) {

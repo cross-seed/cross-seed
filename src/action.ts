@@ -30,7 +30,12 @@ import {
 	SearcheeWithLabel,
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
-import { findAFileWithExt, getLogString, getMediaType } from "./utils.js";
+import {
+	findAFileWithExt,
+	formatAsList,
+	getLogString,
+	getMediaType,
+} from "./utils.js";
 
 interface LinkResult {
 	contentPath: string;
@@ -114,7 +119,10 @@ function linkExactTree(
 			continue;
 		}
 		if (options.ignoreMissing && !fs.existsSync(srcFilePath)) continue;
-		fs.mkdirSync(dirname(destFilePath), { recursive: true });
+		const destFileParentPath = dirname(destFilePath);
+		if (!fs.existsSync(destFileParentPath)) {
+			fs.mkdirSync(destFileParentPath, { recursive: true });
+		}
 		if (linkFile(srcFilePath, destFilePath)) {
 			linkedNewFiles = true;
 		}
@@ -158,7 +166,10 @@ function linkFuzzyTree(
 				continue;
 			}
 			if (options.ignoreMissing && !fs.existsSync(srcFilePath)) continue;
-			fs.mkdirSync(dirname(destFilePath), { recursive: true });
+			const destFileParentPath = dirname(destFilePath);
+			if (!fs.existsSync(destFileParentPath)) {
+				fs.mkdirSync(destFileParentPath, { recursive: true });
+			}
 			if (linkFile(srcFilePath, destFilePath)) {
 				linkedNewFiles = true;
 			}
@@ -196,7 +207,10 @@ function linkVirtualSearchee(
 				continue;
 			}
 			if (options.ignoreMissing && !fs.existsSync(srcFilePath)) continue;
-			fs.mkdirSync(dirname(destFilePath), { recursive: true });
+			const destFileParentPath = dirname(destFilePath);
+			if (!fs.existsSync(destFileParentPath)) {
+				fs.mkdirSync(destFileParentPath, { recursive: true });
+			}
 			if (linkFile(srcFilePath, destFilePath)) {
 				linkedNewFiles = true;
 			}
@@ -441,7 +455,6 @@ export async function performActions(
 			tracker,
 		);
 		results.push(actionResult);
-		if (actionResult === InjectionResult.TORRENT_NOT_COMPLETE) break;
 	}
 	return results;
 }
@@ -472,7 +485,7 @@ export function getLinkDirVirtual(searchee: SearcheeVirtual): string | null {
 	for (let i = 1; i < searchee.files.length; i++) {
 		if (getLinkDir(searchee.files[i].path) !== linkDir) {
 			logger.error(
-				`Cannot hardlink files to multiple linkDirs for seasonFromEpisodes aggregation, source episodes are spread across multiple drives.`,
+				`Cannot link files to multiple linkDirs for seasonFromEpisodes aggregation, source episodes are spread across multiple drives.`,
 			);
 			return null;
 		}
@@ -531,7 +544,7 @@ function unwrapSymlinks(path: string): string {
  * @param srcDir The directory to link from
  */
 export function testLinking(srcDir: string): void {
-	const { linkType } = getRuntimeConfig();
+	const { linkDirs, linkType } = getRuntimeConfig();
 	try {
 		const linkDir = getLinkDir(srcDir);
 		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
@@ -543,7 +556,10 @@ export function testLinking(srcDir: string): void {
 	} catch (e) {
 		logger.error(e);
 		throw new CrossSeedError(
-			`Failed to create a test ${linkType} in any linkDirs from ${srcDir}. Ensure that ${linkType} is supported between these paths (hardlink requires same drive, partition, and volume).`,
+			`Failed to create a test ${linkType} from ${srcDir} in any linkDirs: [${formatAsList(
+				linkDirs.map((d) => `"${d}"`),
+				{ sort: false, style: "short", type: "unit" },
+			)}]. Ensure that ${linkType} is supported between these paths (hardlink/reflink requires same drive, partition, and volume).`,
 		);
 	}
 }

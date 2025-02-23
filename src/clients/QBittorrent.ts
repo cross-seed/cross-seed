@@ -508,9 +508,10 @@ export default class QBittorrent implements TorrentClient {
 	 */
 	async getTorrentInfo(
 		hash: string | undefined,
-		retries = 0,
+		numRetries = 0,
 	): Promise<TorrentInfo | undefined> {
 		if (!hash) return undefined;
+		const retries = Math.max(numRetries, 0);
 		for (let i = 0; i <= retries; i++) {
 			const responseText = await this.request(
 				"/torrents/info",
