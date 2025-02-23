@@ -31,6 +31,20 @@ interface DataEntry {
 const watchers: Map<string, FSWatcher> = new Map();
 const modifiedPaths: Map<string, Set<string>> = new Map();
 
+function createWatcher(dataDir: string): FSWatcher {
+	return watch(dataDir, { recursive: true, persistent: false }, (_, f) => {
+		if (!f) return;
+		const fullPath = resolve(join(dataDir, f));
+		if (fullPath === resolve(dataDir)) return;
+		modifiedPaths.get(dataDir)!.add(fullPath);
+	}).on("error", (e) => {
+		logger.error(`Restarting watcher for dataDir ${dataDir}: ${e.message}`);
+		logger.debug(e);
+		watchers.get(dataDir)!.close();
+		watchers.set(dataDir, createWatcher(dataDir));
+	});
+}
+
 export async function indexDataDirs(options: {
 	startup: boolean;
 }): Promise<void> {
@@ -41,19 +55,7 @@ export async function indexDataDirs(options: {
 		logger.info("Indexing dataDirs for reverse lookup...");
 		for (const dataDir of dataDirs) {
 			modifiedPaths.set(dataDir, new Set());
-			watchers.set(
-				dataDir,
-				watch(
-					dataDir,
-					{ recursive: true, persistent: false },
-					(_, f) => {
-						if (!f) return;
-						const fullPath = resolve(join(dataDir, f));
-						if (fullPath === resolve(dataDir)) return;
-						modifiedPaths.get(dataDir)!.add(fullPath);
-					},
-				),
-			);
+			watchers.set(dataDir, createWatcher(dataDir));
 		}
 		const searcheePaths = findSearcheesFromAllDataDirs();
 		const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
