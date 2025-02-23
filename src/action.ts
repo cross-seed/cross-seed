@@ -37,6 +37,8 @@ import {
 	getMediaType,
 } from "./utils.js";
 
+const linkTestName = "cross-seed.test";
+
 interface LinkResult {
 	contentPath: string;
 	alreadyExisted: boolean;
@@ -459,21 +461,47 @@ export async function performActions(
 	return results;
 }
 
-export function getLinkDir(path: string): string | null {
+export function getLinkDir(pathStr: string): string | null {
 	const { linkDirs, linkType } = getRuntimeConfig();
-	const pathDev = fs.statSync(path).dev;
-	for (const linkDir of linkDirs) {
-		if (fs.statSync(linkDir).dev === pathDev) return linkDir;
+	const pathStat = fs.statSync(pathStr);
+	const pathDev = pathStat.dev; // Windows always returns 0
+	if (pathDev) {
+		for (const linkDir of linkDirs) {
+			if (fs.statSync(linkDir).dev === pathDev) return linkDir;
+		}
+	}
+	const srcFile = pathStat.isFile()
+		? pathStr
+		: pathStat.isDirectory()
+			? findAFileWithExt(pathStr, ALL_EXTENSIONS)
+			: null;
+	if (srcFile) {
+		for (const linkDir of linkDirs) {
+			try {
+				const testPath = join(linkDir, linkTestName);
+				linkFile(
+					srcFile,
+					testPath,
+					linkType === LinkType.REFLINK
+						? linkType
+						: LinkType.HARDLINK,
+				);
+				fs.rmSync(testPath);
+				return linkDir;
+			} catch {
+				continue;
+			}
+		}
 	}
 	if (linkType !== LinkType.SYMLINK) {
 		logger.error(
-			`Cannot find any linkDir from linkDirs on the same drive to ${linkType} ${path}`,
+			`Cannot find any linkDir from linkDirs on the same drive to ${linkType} ${pathStr}`,
 		);
 		return null;
 	}
 	if (linkDirs.length > 1) {
 		logger.warn(
-			`Cannot find any linkDir from linkDirs on the same drive, using first linkDir for symlink: ${path}`,
+			`Cannot find any linkDir from linkDirs on the same drive, using first linkDir for symlink: ${pathStr}`,
 		);
 	}
 	return linkDirs[0];
@@ -493,8 +521,12 @@ export function getLinkDirVirtual(searchee: SearcheeVirtual): string | null {
 	return linkDir;
 }
 
-function linkFile(oldPath: string, newPath: string): boolean {
-	const { linkType } = getRuntimeConfig();
+function linkFile(
+	oldPath: string,
+	newPath: string,
+	linkType?: LinkType,
+): boolean {
+	if (!linkType) linkType = getRuntimeConfig().linkType;
 	try {
 		const ogFileResolvedPath = unwrapSymlinks(oldPath);
 
@@ -546,11 +578,11 @@ function unwrapSymlinks(path: string): string {
 export function testLinking(srcDir: string): void {
 	const { linkDirs, linkType } = getRuntimeConfig();
 	try {
-		const linkDir = getLinkDir(srcDir);
-		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
 		const srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
 		if (!srcFile) return;
-		const testPath = join(linkDir, "cross-seed.test");
+		const linkDir = getLinkDir(srcDir);
+		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
+		const testPath = join(linkDir, linkTestName);
 		linkFile(srcFile, testPath);
 		fs.rmSync(testPath);
 	} catch (e) {

@@ -23,6 +23,7 @@ import {
 	VIDEO_EXTENSIONS,
 	YEARS_REGEX,
 } from "./constants.js";
+import { logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, Searchee } from "./searchee.js";
@@ -462,16 +463,19 @@ export function countDirEntriesRec(
 }
 
 export function findAFileWithExt(dir: string, exts: string[]): string | null {
-	const entries = readdirSync(dir, { withFileTypes: true });
-	for (const entry of entries) {
-		const fullPath = path.join(dir, entry.name);
-		if (entry.isFile() && exts.includes(path.extname(fullPath))) {
-			return fullPath;
+	try {
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			const fullPath = path.join(dir, entry.name);
+			if (entry.isFile() && exts.includes(path.extname(fullPath))) {
+				return fullPath;
+			}
+			if (entry.isDirectory()) {
+				const file = findAFileWithExt(fullPath, exts);
+				if (file) return file;
+			}
 		}
-		if (entry.isDirectory()) {
-			const file = findAFileWithExt(fullPath, exts);
-			if (file) return file;
-		}
+	} catch (e) {
+		logger.debug(e);
 	}
 	return null;
 }
