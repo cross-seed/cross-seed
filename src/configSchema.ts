@@ -1,7 +1,8 @@
 import { existsSync, readdirSync } from "fs";
 import ms from "ms";
-import { isAbsolute, relative, resolve } from "path";
+import { isAbsolute, join, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
+import { appDir } from "./configuration.js";
 import {
 	Action,
 	BlocklistType,
@@ -351,14 +352,24 @@ export const VALIDATION_SCHEMA = z
 			.string()
 			.nullish()
 			.transform((v) => v ?? null),
-		outputDir: z.string().refine((dir) => {
-			if (!existsSync(dir)) return true;
-			if (readdirSync(dir).some((f) => !f.endsWith(".torrent"))) {
-				logger.warn(ZodErrorMessages.invalidOutputDir);
-			}
-			return true;
-		}),
-		injectDir: z.string().optional(),
+		outputDir: z
+			.string()
+			.nullish()
+			.transform((dir) => {
+				if (!dir) return join(appDir(), "cross-seeds");
+				logger.warn(
+					`Set outputDir to null to prevent any issues from occurring (https://www.cross-seed.org/docs/basics/options#outputdir)`,
+				);
+				return dir;
+			})
+			.refine((dir) => {
+				if (!existsSync(dir)) return true;
+				if (readdirSync(dir).some((f) => !f.endsWith(".torrent"))) {
+					logger.warn(ZodErrorMessages.invalidOutputDir);
+				}
+				return true;
+			}),
+		injectDir: z.string().nullish(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
 		fuzzySizeThreshold: z

@@ -239,15 +239,15 @@ module.exports = {
 	/**
 	 * Where to save the .torrent files that cross-seed finds for you.
 	 * This is NOT where the torrent data (.e.g .mkv, .mp4) will be saved.
-	 * This directory will be used for retrying injections.
+	 * This directory will be used for retrying injections:
+	 * https://www.cross-seed.org/docs/v6-migration#failed-injection-saved-retry
 	 *
 	 * DO NOT USE THIS DIRECTORY AS A WATCH FOLDER FOR YOUR TORRENT CLIENT!!!
 	 *
-	 * If you are a Windows user you need to put double '\' (e.g. "C:\\output")
-	 *
-	 * https://www.cross-seed.org/docs/v6-migration#failed-injection-saved-retry
+	 * You do not need to change this from null. It will map to your cross-seed
+	 * config directory: https://www.cross-seed.org/docs/basics/options#outputdir
 	 */
-	outputDir: ".",
+	outputDir: null,
 
 	/**
 	 * Whether to include single episode torrents in search/webhook/rss.
