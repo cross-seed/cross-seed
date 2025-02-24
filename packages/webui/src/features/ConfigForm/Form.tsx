@@ -34,16 +34,16 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
   const form = useForm<Config>({
     defaultValues: {
       delay: 30,
-      torznab: [''],
+      torznab: [],
       useClientTorrents: false,
       dataDirs: [],
-      matchMode: 'safe' as MatchMode,
+      matchMode: MatchMode.STRICT,
       skipRecheck: true,
       autoResumeMaxDownload: 52428800,
       linkCategory: null,
       linkDir: null,
-      linkDirs: [''],
-      linkType: 'hardlink' as LinkType,
+      linkDirs: [],
+      linkType: LinkType.HARDLINK,
       flatLinking: false,
       maxDataDepth: 2,
       torrentDir: null,
@@ -55,13 +55,13 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
       seasonFromEpisodes: null,
       excludeOlder: null,
       excludeRecentSearch: null,
-      action: 'inject' as Action,
+      action: Action.INJECT,
       qbittorrentUrl: null,
       rtorrentRpcUrl: null,
       transmissionRpcUrl: null,
       delugeRpcUrl: null,
       duplicateCategories: false,
-      notificationWebhookUrls: [''],
+      notificationWebhookUrls: [],
       notificationWebhookUrl: null,
       port: null,
       host: null,
@@ -71,11 +71,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
       searchTimeout: null,
       searchLimit: null,
       verbose: false,
-      torrents: [''],
-      blockList: [''],
+      torrents: [],
+      blockList: [],
       apiKey: null,
-      radarr: [''],
-      sonarr: [''],
+      radarr: [],
+      sonarr: [],
     },
     onSubmit: async ({ value }) => {
       console.log('submitting form', value);
@@ -124,13 +124,10 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                   <div className="form-field__switch flex flex-col items-start gap-5">
                     <Label htmlFor={field.name} className="mr-3">
                       Flat linking
-                      {isFieldRequired(field.name) && (
-                        <span className="pl-1 text-red-500">*</span>
-                      )}
                     </Label>
                     <Switch
                       id={field.name}
-                      className="data-[state='checked']:bg-accent focus-visible:ring-accent"
+                      className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                       checked={field.state.value ?? false}
                       onCheckedChange={field.handleChange}
                     />
@@ -153,15 +150,13 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       defaultValue={field.state.value}
                       onValueChange={(e) => field.handleChange(e as LinkType)}
                     >
-                      <SelectTrigger className="focus:ring-accent">
+                      <SelectTrigger className="focus-visible:ring-accent-300/40 border-slate-300 bg-white shadow-none">
                         <SelectValue placeholder="Select a link type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="hardlink">
                           hardlink
-                          <span className="pl-1 text-slate-400">
-                            (recommended)
-                          </span>
+                          <span className="text-slate-400">(recommended)</span>
                         </SelectItem>
                         <SelectItem value="symlink">symlink</SelectItem>
                       </SelectContent>
@@ -209,7 +204,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="url"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
@@ -259,7 +254,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
@@ -282,7 +277,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="number"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
@@ -307,7 +302,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
@@ -337,7 +332,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="url"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       placeholder="http://username:password@localhost:1234/RPC2"
@@ -361,7 +356,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="url"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       placeholder="http://username:password@localhost:8080"
@@ -385,7 +380,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="url"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       placeholder="http://username:password@localhost:9091/transmission/rpc"
@@ -409,7 +404,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="url"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       placeholder="http://:password@localhost:8112/json"
@@ -437,15 +432,13 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       defaultValue={field.state.value}
                       onValueChange={(e) => field.handleChange(e as Action)}
                     >
-                      <SelectTrigger className="focus:ring-accent">
+                      <SelectTrigger className="focus-visible:ring-accent-300/40 border-slate-300 bg-white shadow-none">
                         <SelectValue placeholder="Select an action" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="inject">
                           Inject
-                          <span className="pl-1 text-slate-400">
-                            (recommended)
-                          </span>
+                          <span className="text-slate-400">(recommended)</span>
                         </SelectItem>
                         <SelectItem value="save">Save</SelectItem>
                       </SelectContent>
@@ -466,7 +459,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
@@ -489,7 +482,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
@@ -512,7 +505,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value}
@@ -523,20 +516,17 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                 )}
               </form.Field>
             </div>
-            <div className="form-field-switches col-span-2">
+            <div className="form-field-switches col-span-2 gap-x-12">
               <form.Field name="skipRecheck">
                 {(field) => {
                   return (
                     <div className="form-field__switch flex items-center">
                       <Label htmlFor={field.name} className="mr-3">
                         Skip Recheck
-                        {isFieldRequired(field.name) && (
-                          <span className="pl-1 text-red-500">*</span>
-                        )}
                       </Label>
                       <Switch
                         id={field.name}
-                        className="data-[state='checked']:bg-accent focus-visible:ring-accent"
+                        className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                         checked={field.state.value}
                         onCheckedChange={field.handleChange}
                       />
@@ -550,13 +540,10 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     <div className="form-field__switch flex items-center">
                       <Label htmlFor={field.name} className="mr-3">
                         Use Client Torrents
-                        {isFieldRequired(field.name) && (
-                          <span className="pl-1 text-red-500">*</span>
-                        )}
                       </Label>
                       <Switch
                         id={field.name}
-                        className="data-[state='checked']:bg-accent focus-visible:ring-accent"
+                        className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                         checked={field.state.value}
                         onCheckedChange={field.handleChange}
                       />
@@ -569,11 +556,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                   return (
                     <div className="form-field__switch flex items-center">
                       <Label htmlFor={field.name} className="mr-3">
-                        duplicateCategories
+                        Duplicate Categories
                       </Label>
                       <Switch
                         id={field.name}
-                        className="data-[state='checked']:bg-accent focus-visible:ring-accent"
+                        className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                         checked={field.state.value}
                         onCheckedChange={field.handleChange}
                       />
@@ -597,7 +584,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="number"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       placeholder="30"
@@ -626,13 +613,13 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       defaultValue={field.state.value}
                       onValueChange={(e) => field.handleChange(e as MatchMode)}
                     >
-                      <SelectTrigger className="focus:ring-accent">
+                      <SelectTrigger className="focus-visible:ring-accent-300/40 border-slate-300 bg-white shadow-none">
                         <SelectValue placeholder="Select a link type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="strict">
                           Strict
-                          {/* <span className="pl-1 text-slate-400">
+                          {/* <span className="text-slate-400">
                             (recommended)
                           </span> */}
                         </SelectItem>
@@ -657,7 +644,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       placeholder="15 minutes"
@@ -681,7 +668,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       placeholder="1 day"
@@ -705,7 +692,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
@@ -728,7 +715,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
@@ -751,7 +738,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="number"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
@@ -776,7 +763,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       placeholder="2 weeks"
@@ -797,7 +784,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Input
                       type="text"
-                      className="form-input focus-visible:ring-accent"
+                      className="form-input"
                       name={field.name}
                       id={field.name}
                       placeholder="3 days"
@@ -817,11 +804,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                 return (
                   <div className="form-field__switch flex items-center">
                     <Label htmlFor={field.name} className="mr-3">
-                      includeNonVideos
+                      Include Non-Videos
                     </Label>
                     <Switch
                       id={field.name}
-                      className="data-[state='checked']:bg-accent focus-visible:ring-accent"
+                      className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                       checked={field.state.value}
                       onCheckedChange={field.handleChange}
                     />
@@ -834,11 +821,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                 return (
                   <div className="form-field__switch flex items-center">
                     <Label htmlFor={field.name} className="mr-3">
-                      includeSingleEpisodes
+                      Include Single Episodes
                     </Label>
                     <Switch
                       id={field.name}
-                      className="data-[state='checked']:bg-accent focus-visible:ring-accent"
+                      className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                       checked={field.state.value}
                       onCheckedChange={field.handleChange}
                     />
@@ -872,13 +859,14 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           {([canSubmit, isSubmitting, errors]) => (
             // console.log('form state', { canSubmit, errors, isValid });
             // return (
-            <div className="sticky right-0 bottom-0 left-0 -mx-4 border-t border-solid border-slate-200 bg-white p-6 dark:bg-slate-900">
+            <div className="sticky right-0 bottom-0 left-0 -mx-4 border-t border-solid border-slate-200 bg-slate-50 p-6 dark:bg-slate-900">
               <Button
                 type="submit"
-                className="bg-accent dark:bg-accent-800 dark:text-accent-50 w-full rounded-md px-4 py-4 text-white disabled:bg-slate-300 disabled:opacity-60"
+                className="!bg-accent hover:!bg-accent-500 dark:bg-accent-800 w-full rounded-md px-4 py-6 text-white transition-colors duration-150 disabled:bg-slate-300 disabled:opacity-60"
                 disabled={!canSubmit}
               >
-                {isSubmitting ? 'Saving...' : 'Save'}
+                {isSubmitting ? 'Saving...' : 'Save'} "
+                {canSubmit && 'can submit'}"
               </Button>
               {JSON.stringify(errors)}
             </div>
