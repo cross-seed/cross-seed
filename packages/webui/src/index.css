@@ -18,6 +18,7 @@
   --color-accent-800: oklch(41.3% 0.0892 148deg); /* #23582e */
   --color-accent-900: oklch(36.5% 0.074 149deg); /* #1e4928 */
   --color-accent-950: oklch(24.5% 0.0502 150deg); /* #0c2713 */
+  --shadow-glow: 0 0 1px 3px;
 }
 
 /*---break---*/
