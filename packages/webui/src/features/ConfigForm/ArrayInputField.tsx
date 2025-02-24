@@ -34,7 +34,7 @@ export const ArrayInputField: FC<ArrayInputFieldProps> = ({
         <div key={index} className="flex items-center gap-2">
           <Input
             type={inputType}
-            className="form-input focus-visible:ring-accent"
+            className="form-input"
             id={field.name}
             name={field.name}
             value={value}
@@ -51,7 +51,7 @@ export const ArrayInputField: FC<ArrayInputFieldProps> = ({
               );
               field.handleChange(newValues);
             }}
-            className="rounded bg-slate-100 px-4 py-1 text-slate-400 hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white"
+            className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
           >
             <FontAwesomeIcon icon={faTrash} />
           </Button>
@@ -60,7 +60,7 @@ export const ArrayInputField: FC<ArrayInputFieldProps> = ({
       <div className="flex items-center gap-2">
         <Input
           type={inputType}
-          className="form-input focus-visible:ring-accent"
+          className="form-input"
           id={field.name}
           name={field.name}
           value={fieldValue}
@@ -68,13 +68,13 @@ export const ArrayInputField: FC<ArrayInputFieldProps> = ({
         />
         {/* Add new URL button */}
         <Button
-          variant="outline"
           disabled={!fieldValue}
+          variant="secondary"
           onClick={() => {
             field.handleChange([...field.state.value, fieldValue]);
             setFieldValue('');
           }}
-          className="h-auto rounded px-2 py-2"
+          className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
           title={`Add ${field.name}`}
         >
           {buttonLabel ?? 'Add'}
