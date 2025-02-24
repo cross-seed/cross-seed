@@ -7,7 +7,7 @@ export function Root() {
     <div className="min-h-screen bg-slate-50 px-4 pt-5 dark:bg-slate-900">
       <Header />
       <Outlet />
-      <TanStackRouterDevtools />
+      <TanStackRouterDevtools position="top-left" />
     </div>
   );
 }
