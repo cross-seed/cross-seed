@@ -27,13 +27,11 @@ import {
 	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
 	File,
-	getAbsoluteFilePath,
 	getAnimeKeys,
 	getEpisodeKey,
 	getLargestFile,
 	getMovieKey,
 	getSeasonKey,
-	getSourceRoot,
 	SearcheeLabel,
 	SearcheeWithInfoHash,
 	SearcheeWithoutInfoHash,
@@ -317,7 +315,7 @@ async function cacheEnsembleTorrentEntry(
 		);
 		if (downloadDirResult.isErr()) {
 			logger.error(
-				`Failed to get download dir for ${getLogString(searchee)}`,
+				`Failed to get download dir for ${getLogString(searchee)}: ${downloadDirResult.unwrapErr()}`,
 			);
 			return null;
 		}
@@ -330,11 +328,7 @@ async function cacheEnsembleTorrentEntry(
 
 	return {
 		client_host: searchee.clientHost ?? null,
-		path: getAbsoluteFilePath(
-			getSourceRoot(searchee, savePath),
-			largestFile.path,
-			searchee.files.length === 1,
-		),
+		path: join(savePath, largestFile.path),
 		info_hash: searchee.infoHash,
 		ensemble: key,
 		element,

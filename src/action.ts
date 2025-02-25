@@ -25,10 +25,9 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromPath,
-	getAbsoluteFilePath,
+	getRoot,
 	getRootFolder,
 	getSearcheeSource,
-	getSourceRoot,
 	Searchee,
 	SearcheeVirtual,
 	SearcheeWithInfoHash,
@@ -47,7 +46,7 @@ import {
 const linkTestName = "cross-seed.test";
 
 interface LinkResult {
-	contentPath: string;
+	destinationDir: string;
 	alreadyExisted: boolean;
 	linkedNewFiles: boolean;
 }
@@ -115,13 +114,13 @@ function logActionResult(
 function linkExactTree(
 	newMeta: Metafile,
 	destinationDir: string,
-	sourceRoot: string,
+	savePath: string,
 	options: { ignoreMissing: boolean },
 ): LinkResult {
 	let alreadyExisted = false;
 	let linkedNewFiles = false;
 	for (const newFile of newMeta.files) {
-		const srcFilePath = getAbsoluteFilePath(sourceRoot, newFile.path);
+		const srcFilePath = join(savePath, newFile.path);
 		const destFilePath = join(destinationDir, newFile.path);
 		if (fs.existsSync(destFilePath)) {
 			alreadyExisted = true;
@@ -136,8 +135,7 @@ function linkExactTree(
 			linkedNewFiles = true;
 		}
 	}
-	const contentPath = join(destinationDir, newMeta.name);
-	return { contentPath, alreadyExisted, linkedNewFiles };
+	return { destinationDir, alreadyExisted, linkedNewFiles };
 }
 
 /**
@@ -147,7 +145,7 @@ function linkFuzzyTree(
 	searchee: Searchee,
 	newMeta: Metafile,
 	destinationDir: string,
-	sourceRoot: string,
+	savePath: string,
 	options: { ignoreMissing: boolean },
 ): LinkResult {
 	let alreadyExisted = false;
@@ -163,10 +161,7 @@ function linkFuzzyTree(
 			);
 		}
 		if (matchedSearcheeFiles.length) {
-			const srcFilePath = getAbsoluteFilePath(
-				sourceRoot,
-				matchedSearcheeFiles[0].path,
-			);
+			const srcFilePath = join(savePath, matchedSearcheeFiles[0].path);
 			const destFilePath = join(destinationDir, newFile.path);
 			const index = availableFiles.indexOf(matchedSearcheeFiles[0]);
 			availableFiles.splice(index, 1);
@@ -184,8 +179,7 @@ function linkFuzzyTree(
 			}
 		}
 	}
-	const contentPath = join(destinationDir, newMeta.name);
-	return { contentPath, alreadyExisted, linkedNewFiles };
+	return { destinationDir, alreadyExisted, linkedNewFiles };
 }
 
 function linkVirtualSearchee(
@@ -225,17 +219,20 @@ function linkVirtualSearchee(
 			}
 		}
 	}
-	const contentPath = join(destinationDir, newMeta.name);
-	return { contentPath, alreadyExisted, linkedNewFiles };
+	return { destinationDir, alreadyExisted, linkedNewFiles };
 }
 
 function unlinkMetafile(meta: Metafile, destinationDir: string) {
-	const fullPath = join(destinationDir, getRootFolder(meta.files[0]));
-	if (!fs.existsSync(fullPath)) return;
-	if (!fullPath.startsWith(destinationDir)) return; // assert: fullPath is within destinationDir
-	if (fs.statSync(fullPath).ino === fs.statSync(destinationDir).ino) return; // assert: fullPath is not destinationDir
-	logger.verbose(`Unlinking ${fullPath}`);
-	fs.rmSync(fullPath, { recursive: true });
+	const destinationDirIno = fs.statSync(destinationDir).ino;
+	const roots = meta.files.map((file) => join(destinationDir, getRoot(file)));
+	for (const root of roots) {
+		if (!fs.existsSync(root)) continue;
+		if (!root.startsWith(destinationDir)) continue; // assert: root is within destinationDir
+		if (resolve(root) === resolve(destinationDir)) continue; // assert: root is not destinationDir
+		if (fs.statSync(root).ino === destinationDirIno) continue; // assert: root is not destinationDir
+		logger.verbose(`Unlinking ${root}`);
+		fs.rmSync(root, { recursive: true });
+	}
 }
 
 export async function linkAllFilesInMetafile(
@@ -248,7 +245,7 @@ export async function linkAllFilesInMetafile(
 ): Promise<
 	Result<
 		LinkResult,
-		| "MISSING_DATA"
+		| "INVALID_DATA"
 		| "TORRENT_NOT_FOUND"
 		| "TORRENT_NOT_COMPLETE"
 		| "UNKNOWN_ERROR"
@@ -256,9 +253,8 @@ export async function linkAllFilesInMetafile(
 > {
 	const { flatLinking } = getRuntimeConfig();
 
-	let sourceRoot: string | undefined;
+	let savePath: string | undefined;
 	if (searchee.infoHash) {
-		let savePath: string;
 		if (searchee.savePath) {
 			const refreshedSearchee = (
 				await client.getClientSearchees({
@@ -292,21 +288,27 @@ export async function linkAllFilesInMetafile(
 			}
 			savePath = downloadDirResult.unwrap();
 		}
-		sourceRoot = getSourceRoot(searchee, savePath);
-		if (!fs.existsSync(sourceRoot)) {
+		const rootFolder = getRootFolder(searchee.files[0]);
+		const sourceRootOrSavePath =
+			searchee.files.length === 1
+				? join(savePath, searchee.files[0].path)
+				: rootFolder
+					? join(savePath, rootFolder)
+					: savePath;
+		if (!fs.existsSync(sourceRootOrSavePath)) {
 			logger.error({
 				label: searchee.label,
-				message: `Linking failed, ${sourceRoot} not found. Make sure Docker volume mounts are set up properly.`,
+				message: `Linking failed, ${sourceRootOrSavePath} not found.`,
 			});
-			return resultOfErr("MISSING_DATA");
+			return resultOfErr("INVALID_DATA");
 		}
 	} else if (searchee.path) {
 		if (!fs.existsSync(searchee.path)) {
 			logger.error({
 				label: searchee.label,
-				message: `Linking failed, ${searchee.path} not found. Make sure Docker volume mounts are set up properly.`,
+				message: `Linking failed, ${searchee.path} not found.`,
 			});
-			return resultOfErr("MISSING_DATA");
+			return resultOfErr("INVALID_DATA");
 		}
 		const result = await createSearcheeFromPath(searchee.path);
 		if (result.isErr()) {
@@ -320,14 +322,12 @@ export async function linkAllFilesInMetafile(
 		) {
 			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}
-		sourceRoot = searchee.path;
+		savePath = dirname(searchee.path);
 	} else {
 		for (const file of searchee.files) {
 			if (!fs.existsSync(file.path)) {
-				logger.error(
-					`Linking failed, ${file.path} not found. Make sure Docker volume mounts are set up properly.`,
-				);
-				return resultOfErr("MISSING_DATA");
+				logger.error(`Linking failed, ${file.path} not found.`);
+				return resultOfErr("INVALID_DATA");
 			}
 			if (options.onlyCompleted) {
 				const f = fs.statSync(file.path);
@@ -345,14 +345,17 @@ export async function linkAllFilesInMetafile(
 	if (clientSavePathRes.isOk()) {
 		destinationDir = clientSavePathRes.unwrap();
 	} else {
-		const linkDir = sourceRoot
-			? getLinkDir(sourceRoot)
+		if (clientSavePathRes.unwrapErr() === "INVALID_DATA") {
+			return resultOfErr("INVALID_DATA");
+		}
+		const linkDir = savePath
+			? getLinkDir(savePath)
 			: getLinkDirVirtual(searchee as SearcheeVirtual);
-		if (!linkDir) return resultOfErr("MISSING_DATA");
+		if (!linkDir) return resultOfErr("INVALID_DATA");
 		destinationDir = flatLinking ? linkDir : join(linkDir, tracker);
 	}
 
-	if (!sourceRoot) {
+	if (!savePath) {
 		return resultOf(
 			linkVirtualSearchee(searchee, newMeta, destinationDir, {
 				ignoreMissing: !options.onlyCompleted,
@@ -360,13 +363,13 @@ export async function linkAllFilesInMetafile(
 		);
 	} else if (decision === Decision.MATCH) {
 		return resultOf(
-			linkExactTree(newMeta, destinationDir, sourceRoot, {
+			linkExactTree(newMeta, destinationDir, savePath, {
 				ignoreMissing: !options.onlyCompleted,
 			}),
 		);
 	} else {
 		return resultOf(
-			linkFuzzyTree(searchee, newMeta, destinationDir, sourceRoot, {
+			linkFuzzyTree(searchee, newMeta, destinationDir, savePath, {
 				ignoreMissing: !options.onlyCompleted,
 			}),
 		);
@@ -464,7 +467,7 @@ export async function performActionWithoutMutex(
 		);
 		if (linkedFilesRootResult.isOk()) {
 			const linkResult = linkedFilesRootResult.unwrap();
-			destinationDir = dirname(linkResult.contentPath);
+			destinationDir = linkResult.destinationDir;
 			unlinkOk = !linkResult.alreadyExisted;
 			linkedNewFiles = linkResult.linkedNewFiles;
 		} else {
