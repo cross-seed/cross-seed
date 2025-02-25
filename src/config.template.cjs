@@ -244,7 +244,7 @@ module.exports = {
 	 *
 	 * DO NOT USE THIS DIRECTORY AS A WATCH FOLDER FOR YOUR TORRENT CLIENT!!!
 	 *
-	 * You do not need to change this from null. It will map to your cross-seed
+	 * You do not need to change this from null. It will map into your cross-seed
 	 * config directory: https://www.cross-seed.org/docs/basics/options#outputdir
 	 */
 	outputDir: null,
