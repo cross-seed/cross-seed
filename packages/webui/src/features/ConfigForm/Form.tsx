@@ -81,7 +81,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
       console.log('submitting form', value);
     },
     validators: {
-      onChange: baseValidationSchema,
+      onSubmit: baseValidationSchema,
     },
   });
 
@@ -108,7 +108,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           <fieldset className="form-fieldset w-full gap-6 rounded-md">
             <legend>Directories and Paths</legend>
             <div className="">
-              <form.Field name="dataDirs">
+              <form.Field
+                name="dataDirs"
+                validators={{
+                  onBlur: baseValidationSchema.shape.dataDirs,
+                }}
+              >
                 {(field) => (
                   <ArrayInputField
                     field={field}
@@ -118,7 +123,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                 )}
               </form.Field>
             </div>
-            <form.Field name="flatLinking">
+            <form.Field
+              name="flatLinking"
+              validators={{
+                onChange: baseValidationSchema.shape.flatLinking,
+              }}
+            >
               {(field) => {
                 return (
                   <div className="form-field__switch flex flex-col items-start gap-5">
@@ -136,7 +146,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               }}
             </form.Field>
             <div className="">
-              <form.Field name="linkType">
+              <form.Field
+                name="linkType"
+                validators={{
+                  onChange: baseValidationSchema.shape.linkType,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -167,7 +182,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="linkDirs">
+              <form.Field
+                name="linkDirs"
+                validators={{
+                  onChange: baseValidationSchema.shape.torznab,
+                }}
+              >
                 {(field) => (
                   <ArrayInputField
                     field={field}
@@ -181,19 +201,32 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           <fieldset className="form-fieldset w-full gap-6 rounded-md">
             <legend>Connecting to Other Apps</legend>
             <div className="">
-              <form.Field name="torznab">
+              <form.Field
+                name="torznab"
+                validators={{
+                  onChange: baseValidationSchema.shape.torznab,
+                }}
+              >
                 {(field) => (
-                  <ArrayInputField
-                    field={field}
-                    label="Torznab URL(s)"
-                    inputType="url"
-                    required={isFieldRequired(field.name)}
-                  />
+                  <>
+                    <ArrayInputField
+                      field={field}
+                      label="Torznab URL(s)"
+                      inputType="url"
+                      required={isFieldRequired(field.name)}
+                    />
+                    {/* <FieldInfo field={field} /> */}
+                  </>
                 )}
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="notificationWebhookUrl">
+              <form.Field
+                name="notificationWebhookUrl"
+                validators={{
+                  onBlur: baseValidationSchema.shape.notificationWebhookUrl,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -208,6 +241,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -216,7 +254,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="sonarr">
+              <form.Field
+                name="sonarr"
+                validators={{
+                  onChange: baseValidationSchema.shape.torznab,
+                }}
+              >
                 {(field) => (
                   <ArrayInputField
                     field={field}
@@ -228,7 +271,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div>
-              <form.Field name="radarr">
+              <form.Field
+                name="radarr"
+                validators={{
+                  onChange: baseValidationSchema.shape.torznab,
+                }}
+              >
                 {(field) => (
                   <ArrayInputField
                     field={field}
@@ -243,7 +291,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           <fieldset className="form-fieldset w-full gap-6 rounded-md">
             <legend>Connect to Cross Seed</legend>
             <div>
-              <form.Field name="host">
+              <form.Field
+                name="host"
+                validators={{
+                  onBlur: baseValidationSchema.shape.host,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -258,6 +311,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -266,7 +324,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="port">
+              <form.Field
+                name="port"
+                validators={{
+                  onBlur: baseValidationSchema.shape.port,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -281,6 +344,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) =>
                         field.handleChange(Number(e.target.value))
                       }
@@ -291,7 +359,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="apiKey">
+              <form.Field
+                name="apiKey"
+                validators={{
+                  onBlur: baseValidationSchema.shape.apiKey,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -306,6 +379,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -321,7 +399,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               details here.
             </p>
             <div>
-              <form.Field name="rtorrentRpcUrl">
+              <form.Field
+                name="rtorrentRpcUrl"
+                validators={{
+                  onBlur: baseValidationSchema.shape.rtorrentRpcUrl,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -337,6 +420,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       id={field.name}
                       placeholder="http://username:password@localhost:1234/RPC2"
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -345,7 +433,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div>
-              <form.Field name="qbittorrentUrl">
+              <form.Field
+                name="qbittorrentUrl"
+                validators={{
+                  onBlur: baseValidationSchema.shape.qbittorrentUrl,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -361,6 +454,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       id={field.name}
                       placeholder="http://username:password@localhost:8080"
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -369,7 +467,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div>
-              <form.Field name="transmissionRpcUrl">
+              <form.Field
+                name="transmissionRpcUrl"
+                validators={{
+                  onBlur: baseValidationSchema.shape.transmissionRpcUrl,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -385,6 +488,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       id={field.name}
                       placeholder="http://username:password@localhost:9091/transmission/rpc"
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -393,7 +501,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div>
-              <form.Field name="delugeRpcUrl">
+              <form.Field
+                name="delugeRpcUrl"
+                validators={{
+                  onBlur: baseValidationSchema.shape.delugeRpcUrl,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -409,6 +522,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       id={field.name}
                       placeholder="http://:password@localhost:8112/json"
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -448,7 +566,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="linkCategory">
+              <form.Field
+                name="linkCategory"
+                validators={{
+                  onBlur: baseValidationSchema.shape.linkCategory,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -463,6 +586,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -471,7 +599,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="torrentDir">
+              <form.Field
+                name="torrentDir"
+                validators={{
+                  onBlur: baseValidationSchema.shape.torrentDir,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -486,6 +619,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -494,7 +632,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="outputDir">
+              <form.Field
+                name="outputDir"
+                validators={{
+                  onBlur: baseValidationSchema.shape.outputDir,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -509,6 +652,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -572,8 +720,16 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           </fieldset>
           <fieldset className="form-fieldset w-full gap-6 rounded-md">
             <legend>Searching and RSS</legend>
+
+            {/* TODO: Error states or validations don't seem to work for these fields */}
+
             <div className="">
-              <form.Field name="delay">
+              <form.Field
+                name="delay"
+                validators={{
+                  onBlur: baseValidationSchema.shape.delay,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -589,6 +745,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       id={field.name}
                       placeholder="30"
                       value={field.state.value}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) =>
                         field.handleChange(Number(e.target.value))
                       }
@@ -633,7 +794,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="rssCadence">
+              <form.Field
+                name="rssCadence"
+                validators={{
+                  onBlur: baseValidationSchema.shape.rssCadence,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -649,6 +815,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       id={field.name}
                       placeholder="15 minutes"
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -657,7 +828,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="searchCadence">
+              <form.Field
+                name="searchCadence"
+                validators={{
+                  onBlur: baseValidationSchema.shape.searchCadence,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -673,6 +849,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       id={field.name}
                       placeholder="1 day"
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -681,7 +862,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="snatchTimeout">
+              <form.Field
+                name="snatchTimeout"
+                validators={{
+                  onBlur: baseValidationSchema.shape.snatchTimeout,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -696,6 +882,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -704,7 +895,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="searchTimeout">
+              <form.Field
+                name="searchTimeout"
+                validators={{
+                  onBlur: baseValidationSchema.shape.searchTimeout,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -719,6 +915,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -727,7 +928,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="searchLimit">
+              <form.Field
+                name="searchLimit"
+                validators={{
+                  onBlur: baseValidationSchema.shape.searchLimit,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -742,6 +948,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       name={field.name}
                       id={field.name}
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) =>
                         field.handleChange(Number(e.target.value))
                       }
@@ -752,7 +963,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="excludeOlder">
+              <form.Field
+                name="excludeOlder"
+                validators={{
+                  onBlur: baseValidationSchema.shape.excludeOlder,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -768,6 +984,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       id={field.name}
                       placeholder="2 weeks"
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -776,7 +997,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </form.Field>
             </div>
             <div className="">
-              <form.Field name="excludeRecentSearch">
+              <form.Field
+                name="excludeRecentSearch"
+                validators={{
+                  onBlur: baseValidationSchema.shape.excludeRecentSearch,
+                }}
+              >
                 {(field) => (
                   <div className="space-y-3">
                     <Label htmlFor={field.name} className="block w-full">
@@ -789,6 +1015,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       id={field.name}
                       placeholder="3 days"
                       value={field.state.value ?? ''}
+                      aria-invalid={
+                        field.state.meta.isTouched &&
+                        field.state.meta.errors?.length > 0
+                      }
+                      onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                     />
                     <FieldInfo field={field} />
@@ -834,7 +1065,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               }}
             </form.Field>
             <div className="">
-              <form.Field name="blockList">
+              <form.Field
+                name="blockList"
+                validators={{
+                  onChange: baseValidationSchema.shape.blockList,
+                }}
+              >
                 {(field) => (
                   <ArrayInputField
                     field={field}
@@ -857,8 +1093,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           ]}
         >
           {([canSubmit, isSubmitting, errors]) => (
-            // console.log('form state', { canSubmit, errors, isValid });
-            // return (
             <div className="sticky right-0 bottom-0 left-0 -mx-4 border-t border-solid border-slate-200 bg-slate-50 p-6 dark:bg-slate-900">
               <Button
                 type="submit"
@@ -870,17 +1104,9 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               </Button>
               {JSON.stringify(errors)}
             </div>
-            // );
           )}
         </form.Subscribe>
       </form>
     </div>
   );
 };
-
-/**
- * List of enhancements/todos
- *
- * TODO: add hover card to explain fields
- * TODO: collapse/accordion the "edit config" section so it's not visible immediately
- */
