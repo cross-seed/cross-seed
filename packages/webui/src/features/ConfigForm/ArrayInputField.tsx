@@ -31,30 +31,38 @@ export const ArrayInputField: FC<ArrayInputFieldProps> = ({
         {required && <span className="pl-1 text-red-500">*</span>}
       </Label>
       {field.state.value.map((value: string, index: number) => (
-        <div key={index} className="flex items-center gap-2">
-          <Input
-            type={inputType}
-            className="form-input"
-            id={field.name}
-            name={field.name}
-            value={value}
-            onChange={(e) => {
-              const newValues = [...field.state.value];
-              newValues[index] = e.target.value;
-              field.setValue(newValues);
-            }}
-          />
-          <Button
-            onClick={() => {
-              const newValues = field.state.value.filter(
-                (_: unknown, i: number) => i !== index,
-              );
-              field.handleChange(newValues);
-            }}
-            className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
-          >
-            <FontAwesomeIcon icon={faTrash} />
-          </Button>
+        <div key={index} className="gap-y- mb-3 flex flex-col">
+          <div className="flex items-center gap-2">
+            <Input
+              type={inputType}
+              className="form-input"
+              id={field.name}
+              name={field.name}
+              value={value}
+              onBlur={field.handleBlur}
+              aria-invalid={
+                field.state.meta.isTouched &&
+                field.state.meta.errors?.length > 0
+              }
+              onChange={(e) => {
+                const newValues = [...field.state.value];
+                newValues[index] = e.target.value;
+                field.setValue(newValues);
+              }}
+            />
+            <Button
+              onClick={() => {
+                const newValues = field.state.value.filter(
+                  (_: unknown, i: number) => i !== index,
+                );
+                field.handleChange(newValues);
+              }}
+              className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </Button>
+          </div>
+          <FieldInfo field={field} />
         </div>
       ))}
       <div className="flex items-center gap-2">
@@ -64,6 +72,7 @@ export const ArrayInputField: FC<ArrayInputFieldProps> = ({
           id={field.name}
           name={field.name}
           value={fieldValue}
+          onBlur={field.handleBlur}
           onChange={(e) => setFieldValue(e.target.value)}
         />
         {/* Add new URL button */}
@@ -80,7 +89,6 @@ export const ArrayInputField: FC<ArrayInputFieldProps> = ({
           {buttonLabel ?? 'Add'}
         </Button>
       </div>
-      <FieldInfo field={field} />
     </div>
   );
 };
