@@ -52,6 +52,11 @@
         box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-accent-300) 40%, transparent);
     }
 
+    &[aria-invalid='true'] {
+        border-color: theme('colors.red.500');
+        box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-red-500) 40%, transparent);
+    }
+
     .dark & {
         border-color: theme('colors.slate.600');
     }
