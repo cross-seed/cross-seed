@@ -117,6 +117,8 @@ export default class QBittorrent implements TorrentClient {
 	url: { username: string; password: string; href: string };
 	version: string;
 	versionMajor: number;
+	versionMinor: number;
+	versionPatch: number;
 	readonly type = Label.QBITTORRENT;
 
 	constructor() {
@@ -166,6 +168,19 @@ export default class QBittorrent implements TorrentClient {
 		}
 		this.version = version;
 		this.versionMajor = extractInt(this.version);
+		this.versionMinor = extractInt(this.version.split(".")[1]);
+		this.versionPatch = extractInt(this.version.split(".")[2]);
+		if (
+			this.versionMajor < 4 ||
+			(this.versionMajor === 4 && this.versionMinor < 3) ||
+			(this.versionMajor === 4 &&
+				this.versionMinor === 3 &&
+				this.versionPatch < 1)
+		) {
+			throw new CrossSeedError(
+				`qBittorrent minimum supported version is v4.3.1, current version is ${this.version}`,
+			);
+		}
 		logger.info({
 			label: Label.QBITTORRENT,
 			message: `Logged in to qBittorrent ${this.version}`,
@@ -181,7 +196,7 @@ export default class QBittorrent implements TorrentClient {
 		const { resume_data_storage_type } = await this.getPreferences();
 		if (resume_data_storage_type === "SQLite") {
 			throw new CrossSeedError(
-				"torrentDir is not compatible with SQLite mode in qBittorrent, use: https://www.cross-seed.org/docs/basics/options#useclienttorrents",
+				"torrentDir is not compatible with SQLite mode in qBittorrent, use https://www.cross-seed.org/docs/basics/options#useclienttorrents",
 			);
 		}
 		if (!readdirSync(torrentDir).some((f) => f.endsWith(".fastresume"))) {
@@ -484,11 +499,9 @@ export default class QBittorrent implements TorrentClient {
 				meta &&
 				this.isNoSubfolderContentLayout(meta, torrent)
 			) {
-				logger.error({
-					label: Label.QBITTORRENT,
-					message: `NoSubfolder content layout is not supported with torrentDir, use https://www.cross-seed.org/docs/basics/options#useclienttorrents: ${torrent.name} [${sanitizeInfoHash(torrent.hash)}]`,
-				});
-				continue;
+				throw new CrossSeedError(
+					`NoSubfolder content layout is not supported with torrentDir, use https://www.cross-seed.org/docs/basics/options#useclienttorrents: ${torrent.name} [${sanitizeInfoHash(torrent.hash)}]`,
+				);
 			}
 			if (options.onlyCompleted && !this.isTorrentInfoComplete(torrent)) {
 				continue;
