@@ -15,7 +15,6 @@ export interface FileConfig {
 	delay?: number;
 	includeSingleEpisodes?: boolean;
 	outputDir?: string;
-	rtorrentRpcUrl?: string;
 	includeNonVideos?: boolean;
 	seasonFromEpisodes?: number;
 	fuzzySizeThreshold?: number;
@@ -34,7 +33,9 @@ export interface FileConfig {
 	linkCategory?: string;
 	torrentDir?: string;
 	torznab?: string[];
+	torrentClients?: string[];
 	qbittorrentUrl?: string;
+	rtorrentRpcUrl?: string;
 	transmissionRpcUrl?: string;
 	delugeRpcUrl?: string;
 	duplicateCategories?: boolean;

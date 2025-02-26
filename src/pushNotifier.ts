@@ -83,6 +83,7 @@ export function sendResultsNotification(
 	const searcheeTrackers = searchee.trackers ?? null;
 	const searcheeLength = searchee.length;
 	const searcheeInfoHash = searchee.infoHash ?? null;
+	const searcheeClientHost = searchee.clientHost ?? null;
 	const searcheePath = searchee.path ?? null;
 	const searcheeSource = getSearcheeSource(searchee);
 
@@ -129,6 +130,7 @@ export function sendResultsNotification(
 					tags: searcheeTags,
 					trackers: searcheeTrackers,
 					length: searcheeLength,
+					clientHost: searcheeClientHost,
 					infoHash: searcheeInfoHash,
 					path: searcheePath,
 					source: searcheeSource,
@@ -164,6 +166,7 @@ export function sendResultsNotification(
 					tags: searcheeTags,
 					trackers: searcheeTrackers,
 					length: searcheeLength,
+					clientHost: searcheeClientHost,
 					infoHash: searcheeInfoHash,
 					path: searcheePath,
 					source: searcheeSource,
