@@ -160,7 +160,7 @@ export async function validateClientSavePaths(
 		} catch (e) {
 			logger.error(e);
 			throw new CrossSeedError(
-				"Failed to link from torrent client save paths to a linkDir. If you have a temp/cache drive, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to it (https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking)",
+				`Failed to link from torrent client save paths to a linkDir. If you have multiple drives, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to the drives (https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking)`,
 			);
 		}
 	}

@@ -1,5 +1,6 @@
 // If you find yourself always using the same command-line flag, you can set it
-// here as a default.
+// here as a default. For a complete guide on configuration, please visit:
+// https://www.cross-seed.org
 
 module.exports = {
 	/**
@@ -26,42 +27,25 @@ module.exports = {
 	 * For Prowlarr, click on the indexer name and copy the Torznab Url, then
 	 * append "?apikey=YOUR_PROWLARR_API_KEY". Wrap each URL in quotation marks
 	 * and separate them with commas, and surround the entire set in brackets.
+	 * https://www.cross-seed.org/docs/basics/getting-started#3-edit-the-config-file
 	 */
 	torznab: [],
 
 	/**
-	 * URL(s) to your Sonarr instance(s), included in the same way as torznab
-	 * URLs but for your Sonarr: note that api is not at the end. see below.
+	 * URL(s) to your Sonarr instance(s). For benefits and usage, please read:
+	 * https://www.cross-seed.org/docs/tutorials/id-searching
 	 *
 	 * You should order these in most likely to match -> the least likely order.
 	 * They are searched sequentially as they are listed.
-	 *
-	 * This apikey parameter comes from Sonarr
-	 *
-	 * Example: sonarr: ["http://sonarr:8989/?apikey=12345"],
-	 *
-	 *      sonarr: ["http://sonarr:8989/?apikey=12345",
-	 *               "http://sonarr4k:8989/?apikey=12345"],
-	 *
-	 * For benefits, please read: https://www.cross-seed.org/docs/tutorials/id-searching
 	 */
 	sonarr: [],
 
 	/**
-	 * URL(s) to your Radarr instance(s), included in the same way as torznab
-	 * URLs but for your Radarr: note that api is not at the end. see below.
+	 * URL(s) to your Radarr instance(s). For benefits and usage, please read:
+	 * https://www.cross-seed.org/docs/tutorials/id-searching
 	 *
 	 * You should order these in most likely to match -> the least likely order.
 	 * They are searched sequentially as they are listed.
-	 *
-	 * This apikey parameter comes from Radarr
-	 *
-	 * Example: radarr: ["http://radarr:7878/?apikey=12345"],
-	 *
-	 *       radarr: ["http://radarr:7878/?apikey=12345",
-	 *                "http://radarr4k:7878/?apikey=12345"],
-	 *
-	 * For benefits, please read: https://www.cross-seed.org/docs/tutorials/id-searching
 	 */
 	radarr: [],
 
@@ -237,12 +221,13 @@ module.exports = {
 	torrentDir: null,
 
 	/**
-	 * Where to save the .torrent files that cross-seed finds for you.
-	 * This is NOT where the torrent data (.e.g .mkv, .mp4) will be saved.
-	 * This directory will be used for retrying injections:
+	 * With action: "inject", cross-seed will use this directory to retry
+	 * injectections. This directory will be empty nearly all the time.
 	 * https://www.cross-seed.org/docs/v6-migration#failed-injection-saved-retry
+	 * If you are using action: "save", this will be the directory where the
+	 * .torrent files are saved.
 	 *
-	 * DO NOT USE THIS DIRECTORY AS A WATCH FOLDER FOR YOUR TORRENT CLIENT!!!
+	 * DO NOT USE THIS DIRECTORY AS A WATCH FOLDER FOR YOUR TORRENT CLIENT
 	 *
 	 * You do not need to change this from null. It will map into your cross-seed
 	 * config directory: https://www.cross-seed.org/docs/basics/options#outputdir
@@ -258,7 +243,7 @@ module.exports = {
 	includeSingleEpisodes: false,
 
 	/**
-	 * Include torrents/data comprised of non-video files.
+	 * Include torrents/data that are mainly comprised of non-video files.
 	 *
 	 * If this option is set to false, any folders or torrents whose
 	 * totalNonVideoFilesSize / totalSize > fuzzySizeThreshold
@@ -268,21 +253,6 @@ module.exports = {
 	 * false will still allow the torrent to be considered for cross-seeding
 	 * while disallowing torrents that are music, games, books, etc.
 	 * For full disc based folders (not .ISO) you may wish to set this as true.
-	 *
-	 * To search for all video media except individual episodes, use:
-	 *
-	 *    includeSingleEpisodes: false
-	 *    includeNonVideos: false
-	 *
-	 * To search for all video media including individual episodes, use:
-	 *
-	 *    includeSingleEpisodes: true
-	 *    includeNonVideos: false
-	 *
-	 * To search for absolutely ALL types of content, including non-video,
-	 * configure your episode settings based on the above examples and use:
-	 *
-	 *     includeNonVideos: true
 	 */
 	includeNonVideos: false,
 
@@ -313,8 +283,8 @@ module.exports = {
 	/**
 	 * Exclude torrents or data first seen by cross-seed more than this long ago.
 	 * Examples:
-	 * "5 days"
-	 * "2 weeks"
+	 * "2 weeks" - if you want to search multiple times quickly
+	 * "450 days" - if you rather spread out the searches over a long period
 	 *
 	 * This value must be in the range of 2-5 times your excludeRecentSearch
 	 */
@@ -322,12 +292,11 @@ module.exports = {
 
 	/**
 	 * Exclude torrents or data which has been searched more recently than this
-	 * long ago.
+	 * long ago. Previously failed searches ignore this value per tracker.
 	 *
-	 * Doesn't exclude previously failed searches.
 	 * Examples:
-	 * "2 days"
-	 * "5 days"
+	 * "3 days" - if you want to search multiple times quickly
+	 * "90 days" - if you rather spread out the searches over a long period
 	 *
 	 * This value must be 2-5x less than excludeOlder.
 	 */
@@ -356,10 +325,11 @@ module.exports = {
 	duplicateCategories: false,
 
 	/**
-	 * Run rss scans on a schedule.
-	 * Set to undefined or null to disable. Minimum of 10 minutes.
+	 * Run rss scans on a schedule. Set to undefined or null to disable.
+	 * Minimum of 10 minutes.
+	 *
 	 * Examples:
-	 * "10 minutes"
+	 * "30 minutes"
 	 * "1 hour"
 	 *
 	 * To cross seed new releases as soon as they are uploaded, use announce:
@@ -368,11 +338,11 @@ module.exports = {
 	rssCadence: "30 minutes",
 
 	/**
-	 * Run searches on a schedule.
-	 * Set to undefined or null to disable. Minimum of 1 day.
+	 * Run searches on a schedule. Set to undefined or null to disable.
+	 * Minimum of 1 day.
+	 *
 	 * Examples:
-	 * "2 weeks"
-	 * "3 days"
+	 * "1 day" - there is not much value in setting this above "1 day"
 	 *
 	 * This value must be at least 3x less than your excludeRecentSearch.
 	 * To trigger a search on download completion, use webhook:
@@ -383,6 +353,7 @@ module.exports = {
 	/**
 	 * Fail snatch requests that haven't responded after this long.
 	 * Set to null for an infinite timeout.
+	 *
 	 * Examples:
 	 * "30 seconds"
 	 * null
@@ -392,8 +363,9 @@ module.exports = {
 	/**
 	 * Fail search requests that haven't responded after this long.
 	 * Set to null for an infinite timeout.
+	 *
 	 * Examples:
-	 * "30 seconds"
+	 * "2 minutes"
 	 * null
 	 */
 	searchTimeout: "2 minutes",
