@@ -1,5 +1,5 @@
 # Build Stage
-FROM node:20-alpine AS build-stage
+FROM node:22-alpine AS build-stage
 WORKDIR /usr/src/cross-seed
 COPY package*.json ./
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
@@ -11,7 +11,7 @@ RUN npm run build && \
     rm -rf src tsconfig.json
 
 # Production Stage
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /usr/src/cross-seed
 COPY --from=build-stage /usr/src/cross-seed ./
 RUN apk add --no-cache catatonit curl tzdata && \
