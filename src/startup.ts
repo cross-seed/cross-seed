@@ -5,7 +5,10 @@ import { sep } from "path";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { validateUArrLs } from "./arr.js";
-import { getClient } from "./clients/TorrentClient.js";
+import {
+	getClient,
+	instantiateDownloadClients,
+} from "./clients/TorrentClient.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db, memDB } from "./db.js";
@@ -162,6 +165,7 @@ async function retry<T>(
 
 export async function doStartupValidation(): Promise<void> {
 	await checkConfigPaths(); // ensure paths are valid first
+	instantiateDownloadClients();
 	const validateClientConfig = async () => getClient()?.validateConfig(); // preserve `this` class pointer
 	const errors = (
 		await Promise.allSettled([

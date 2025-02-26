@@ -76,6 +76,7 @@ export interface Searchee {
 	title: string;
 	length: number;
 	mtimeMs?: number;
+	clientHost?: string;
 	savePath?: string;
 	category?: string;
 	tags?: string[];
@@ -87,7 +88,7 @@ export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
 export type SearcheeWithoutInfoHash = WithUndefined<Searchee, "infoHash">;
 export type SearcheeClient = WithRequired<
 	Searchee,
-	"infoHash" | "savePath" | "category" | "tags" | "trackers"
+	"infoHash" | "clientHost" | "savePath" | "category" | "tags" | "trackers"
 >;
 export type SearcheeVirtual = WithUndefined<Searchee, "infoHash" | "path">;
 export type SearcheeWithLabel = WithRequired<Searchee, "label">;
@@ -307,6 +308,7 @@ export function parseTitle(
 }
 
 export async function updateSearcheeClientDB(
+	clientHost: string,
 	newSearchees: SearcheeClient[],
 	infoHashes: Set<string>,
 ): Promise<void> {
@@ -316,8 +318,14 @@ export async function updateSearcheeClientDB(
 		.map((t) => t.infoHash)
 		.filter((infoHash) => !infoHashes.has(infoHash));
 	await inBatches(removedInfoHashes, async (batch) => {
-		await memDB("torrent").whereIn("info_hash", batch).del();
-		await memDB("ensemble").whereIn("info_hash", batch).del();
+		await memDB("torrent")
+			.whereIn("info_hash", batch)
+			.where("client_host", clientHost)
+			.del();
+		await memDB("ensemble")
+			.whereIn("info_hash", batch)
+			.where("client_host", clientHost)
+			.del();
 	});
 	await inBatches(
 		newSearchees.map((searchee) => ({
@@ -326,6 +334,7 @@ export async function updateSearcheeClientDB(
 			title: searchee.title,
 			files: JSON.stringify(searchee.files),
 			length: searchee.length,
+			client_host: searchee.clientHost,
 			save_path: searchee.savePath,
 			category: searchee.category,
 			tags: JSON.stringify(searchee.tags),
@@ -334,7 +343,7 @@ export async function updateSearcheeClientDB(
 		async (batch) => {
 			await memDB("torrent")
 				.insert(batch)
-				.onConflict("info_hash")
+				.onConflict(["client_host", "info_hash"])
 				.merge();
 		},
 	);
@@ -347,6 +356,7 @@ export function createSearcheeFromDB(dbTorrent): SearcheeClient {
 		title: dbTorrent.title,
 		files: JSON.parse(dbTorrent.files),
 		length: dbTorrent.length,
+		clientHost: dbTorrent.client_host,
 		savePath: dbTorrent.save_path,
 		category: dbTorrent.category,
 		tags: JSON.parse(dbTorrent.tags),

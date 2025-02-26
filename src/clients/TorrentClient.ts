@@ -23,9 +23,9 @@ import RTorrent from "./RTorrent.js";
 import Transmission from "./Transmission.js";
 import { hasExt } from "../utils.js";
 
-let activeClient: TorrentClient | null = null;
+const activeClients: TorrentClient[] = [];
 
-export type TorrentClientType =
+type TorrentClientType =
 	| Label.QBITTORRENT
 	| Label.RTORRENT
 	| Label.TRANSMISSION
@@ -45,7 +45,10 @@ export interface ClientSearcheeResult {
 }
 
 export interface TorrentClient {
-	type: TorrentClientType;
+	clientHost: string;
+	clientPriority: number;
+	clientType: TorrentClientType;
+	label: string;
 	isTorrentComplete: (
 		infoHash: string,
 	) => Promise<Result<boolean, "NOT_FOUND">>;
@@ -92,49 +95,75 @@ export interface TorrentClient {
 	validateConfig: () => Promise<void>;
 }
 
-function instantiateDownloadClient() {
-	const { rtorrentRpcUrl, qbittorrentUrl, transmissionRpcUrl, delugeRpcUrl } =
-		getRuntimeConfig();
-	if (rtorrentRpcUrl) {
-		activeClient = new RTorrent();
-	} else if (qbittorrentUrl) {
-		activeClient = new QBittorrent();
-	} else if (transmissionRpcUrl) {
-		activeClient = new Transmission();
-	} else if (delugeRpcUrl) {
-		activeClient = new Deluge();
+const PARSE_CLIENT_REGEX = /^(?<clientType>.+?):(?<url>.*)$/;
+export function parseClientEntry(
+	clientEntry: string,
+): { clientType: TorrentClientType; url: string } | null {
+	const match = clientEntry.match(PARSE_CLIENT_REGEX);
+	if (!match?.groups) return null;
+	return {
+		clientType: match.groups.clientType as TorrentClientType,
+		url: match.groups.url,
+	};
+}
+
+export function instantiateDownloadClients() {
+	const { torrentClients } = getRuntimeConfig();
+	for (const [priority, clientEntryRaw] of torrentClients.entries()) {
+		const clientEntry = parseClientEntry(clientEntryRaw)!;
+		switch (clientEntry.clientType) {
+			case Label.QBITTORRENT:
+				activeClients.push(new QBittorrent(clientEntry.url, priority));
+				break;
+			case Label.RTORRENT:
+				activeClients.push(new RTorrent(clientEntry.url, priority));
+				break;
+			case Label.TRANSMISSION:
+				activeClients.push(new Transmission(clientEntry.url, priority));
+				break;
+			case Label.DELUGE:
+				activeClients.push(new Deluge(clientEntry.url, priority));
+				break;
+			default:
+				throw new Error(
+					`Invalid client type: ${clientEntry.clientType}`,
+				);
+		}
 	}
 }
 
 export function getClient(): TorrentClient | null {
-	if (!activeClient) {
-		instantiateDownloadClient();
-	}
-	return activeClient;
+	return activeClients.length ? activeClients[0] : null;
 }
 
 export async function validateClientSavePaths(
 	searchees: SearcheeWithInfoHash[],
 	infoHashPathMapOrig: Map<string, string>,
+	label: string,
 ): Promise<void> {
 	const { linkDirs } = getRuntimeConfig();
-	logger.info(`Validating all existing torrent save paths...`);
+	logger.info({
+		label,
+		message: `Validating all existing torrent save paths...`,
+	});
 	const infoHashPathMap = new Map(infoHashPathMapOrig);
 
 	const entryDir = searchees.find((s) => !infoHashPathMap.has(s.infoHash));
 	if (entryDir) {
-		logger.warn(
-			`Not all torrents from torrentDir are in the torrent client (missing ${entryDir.name} [${entryDir.infoHash}]): https://www.cross-seed.org/docs/basics/options#torrentdir`,
-		);
+		logger.warn({
+			label,
+			message: `Not all torrents from torrentDir are in the torrent client (missing ${entryDir.name} [${entryDir.infoHash}]): https://www.cross-seed.org/docs/basics/options#torrentdir`,
+		});
 	}
 	const searcheeInfoHashes = new Set(searchees.map((s) => s.infoHash));
 	const entryClient = Array.from(infoHashPathMap.keys()).find(
 		(infoHash) => !searcheeInfoHashes.has(infoHash),
 	);
 	if (entryClient) {
-		logger.warn(
-			`Could not ensure all torrents from the torrent client are in torrentDir (missing ${entryClient} with savePath ${infoHashPathMap.get(entryClient)}): https://www.cross-seed.org/docs/basics/options#torrentdir`,
-		);
+		logger.warn({
+			label,
+			message: `Could not ensure all torrents from the torrent client are in torrentDir (missing ${entryClient} with savePath ${infoHashPathMap.get(entryClient)}): https://www.cross-seed.org/docs/basics/options#torrentdir`,
+		});
 	}
 	if (!linkDirs.length) return;
 
@@ -151,14 +180,15 @@ export async function validateClientSavePaths(
 	const ignoredSavePaths = Array.from(removedSavePaths).filter(
 		(savePath) => !uniqueSavePaths.has(savePath),
 	);
-	logger.verbose(
-		`Excluded save paths from linking test due to filters: ${formatAsList(ignoredSavePaths, { sort: true, type: "unit" })}`,
-	);
+	logger.verbose({
+		label,
+		message: `Excluded save paths from linking test due to filters: ${formatAsList(ignoredSavePaths, { sort: true, type: "unit" })}`,
+	});
 
 	for (const savePath of uniqueSavePaths) {
 		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
 			throw new CrossSeedError(
-				`Cannot use linkDirs with cross platform cross-seed and torrent client, please run cross-seed in docker or natively to match your torrent client (https://www.cross-seed.org/docs/basics/managing-the-daemon): ${savePath}`,
+				`Cannot use linkDirs with cross platform cross-seed and ${label}, please run cross-seed in docker or natively to match your torrent client (https://www.cross-seed.org/docs/basics/managing-the-daemon): ${savePath}`,
 			);
 		}
 		try {
@@ -166,7 +196,7 @@ export async function validateClientSavePaths(
 		} catch (e) {
 			logger.error(e);
 			throw new CrossSeedError(
-				`Failed to link from torrent client save paths to a linkDir. If you have multiple drives, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to the drives (https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking)`,
+				`Failed to link from ${label} save paths to a linkDir. If you have multiple drives, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to the drives (https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking)`,
 			);
 		}
 	}

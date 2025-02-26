@@ -24,10 +24,7 @@ export interface RuntimeConfig {
 	excludeOlder?: number;
 	excludeRecentSearch?: number;
 	action: Action;
-	rtorrentRpcUrl?: string;
-	qbittorrentUrl?: string;
-	transmissionRpcUrl?: string;
-	delugeRpcUrl?: string;
+	torrentClients: string[];
 	duplicateCategories: boolean;
 	notificationWebhookUrls: string[];
 	torrents: string[];
