@@ -445,6 +445,24 @@ export async function* combineAsyncIterables<T>(
 	return;
 }
 
+export function getPathParts(
+	pathStr: string,
+	dirnameFunc = path.dirname,
+): string[] {
+	const parts: string[] = [];
+	let parent = pathStr;
+	while (parent !== ".") {
+		parts.unshift(path.basename(parent));
+		const newParent = dirnameFunc(parent);
+		if (newParent === parent) {
+			parts.shift();
+			break;
+		}
+		parent = newParent;
+	}
+	return parts;
+}
+
 export function countDirEntriesRec(
 	dirs: string[],
 	maxDataDepth: number,

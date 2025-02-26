@@ -116,33 +116,24 @@ export function getSearcheeSource(searchee: Searchee): SearcheeSource {
 	}
 }
 
-export function getRootFolder({ path }: File): string {
-	let rootFolder = path;
-	let parent = dirname(rootFolder);
+export function getRoot({ path }: File, dirnameFunc = dirname): string {
+	let root = path;
+	let parent = dirnameFunc(root);
 	while (parent !== ".") {
-		rootFolder = parent;
-		parent = dirname(rootFolder);
+		root = parent;
+		parent = dirnameFunc(root);
 	}
-	return rootFolder;
+	return root;
 }
 
-export function getSourceRoot({ files }: Searchee, savePath: string): string {
-	if (files.length === 1) return join(savePath, files[0].path);
-	return join(savePath, getRootFolder(files[0]));
+export function getRootFolder(file: File): string | null {
+	const root = getRoot(file);
+	if (root === file.path) return null;
+	return root;
 }
 
 export function getLargestFile(files: File[]): File {
 	return files.reduce((a, b) => (a.length > b.length ? a : b));
-}
-
-export function getAbsoluteFilePath(
-	sourceRoot: string,
-	filePath: string,
-	sourceRootIsFileHint?: boolean,
-): string {
-	return sourceRootIsFileHint ?? statSync(sourceRoot).isFile()
-		? sourceRoot
-		: join(dirname(sourceRoot), filePath);
 }
 
 export async function getNewestFileAge(
@@ -165,9 +156,7 @@ export async function getSearcheeNewestFileAge(
 	const pathStat = statSync(path);
 	if (pathStat.isFile()) return pathStat.mtimeMs;
 	return getNewestFileAge(
-		searchee.files.map((file) =>
-			getAbsoluteFilePath(path, file.path, false),
-		),
+		searchee.files.map((file) => join(dirname(path), file.path)),
 	);
 }
 
@@ -656,22 +645,16 @@ function pushEnsembleEpisode(
 	episodeFiles: File[],
 	torrentSavePaths: Map<string, string>,
 ): void {
-	let sourceRoot: string;
-	if (searchee.path) {
-		sourceRoot = searchee.path;
-	} else {
-		const savePath =
-			searchee.savePath ?? torrentSavePaths.get(searchee.infoHash!);
-		if (!savePath) return;
-		sourceRoot = getSourceRoot(searchee, savePath);
-	}
-	if (!existsSync(sourceRoot)) return;
+	const savePath = searchee.path
+		? dirname(searchee.path)
+		: searchee.savePath ?? torrentSavePaths.get(searchee.infoHash!);
+	if (!savePath) return;
 	const largestFile = getLargestFile(searchee.files);
 	if (largestFile.length / searchee.length < 0.5) return;
 	const absoluteFile: File = {
 		length: largestFile.length,
 		name: largestFile.name,
-		path: getAbsoluteFilePath(sourceRoot, largestFile.path),
+		path: join(savePath, largestFile.path),
 	};
 	if (!existsSync(absoluteFile.path)) return;
 

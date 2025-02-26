@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { stat, unlink } from "fs/promises";
 import ms from "ms";
 import { copyFileSync, existsSync } from "fs";
-import path, { basename, dirname } from "path";
+import path, { basename } from "path";
 import { linkAllFilesInMetafile, performAction } from "./action.js";
 import {
 	getClient,
@@ -273,7 +273,7 @@ async function injectFromStalledTorrent({
 		}
 		if (!inClient) {
 			if (linkedFilesRootResult.isOk()) {
-				const destinationDir = dirname(linkResult!.contentPath);
+				const destinationDir = linkResult!.destinationDir;
 				const result = await getClient()!.inject(
 					meta,
 					searchee,
