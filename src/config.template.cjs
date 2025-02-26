@@ -62,47 +62,28 @@ module.exports = {
 	port: 2468,
 
 	/**
-	 * cross-seed will send POST requests to these urls with a JSON payload of
-	 * { title, body, extra }. Conforms to the caronc/apprise REST API.
+	 * cross-seed will send caronc/apprise POST requests to these urls
+	 * with a JSON payload of:
+	 * https://www.cross-seed.org/docs/basics/options#notificationwebhookurls
 	 */
 	notificationWebhookUrls: [],
 
 	/**
-	 * The url of your rtorrent XMLRPC interface.
-	 * Only relevant with action: "inject".
-	 * Could be something like "http://username:password@localhost:1234/RPC2
-	 */
-	rtorrentRpcUrl: undefined,
-
-	/**
-	 * The url of your qBittorrent webui.
-	 * Only relevant with action: "inject".
+	 * The urls of your torrent clients' web interfaces prefixed by their type.
+	 * You may need to urlencode your username and password if they contain special characters:
+	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#can-i-use-special-characters-in-my-urls
 	 *
+	 * torrentClients: ["qbittorrent:http://username:password@localhost:8080"]
 	 * If using Automatic Torrent Management, please read:
 	 * https://www.cross-seed.org/docs/v6-migration#new-folder-structure-for-links
 	 *
-	 * Supply your username and password inside the url like so:
-	 * "http://username:password@localhost:8080"
+	 * torrentClients: ["rtorrent:http://username:password@localhost:1234/RPC2"]
+	 *
+	 * torrentClients: ["transmission:http://username:password@localhost:9091/transmission/rpc"]
+	 *
+	 * torrentClients: ["deluge:http://:password@localhost:8112/json"]
 	 */
-	qbittorrentUrl: undefined,
-
-	/**
-	 * The url of your Transmission RPC interface.
-	 * Usually ends with "/transmission/rpc".
-	 * Only relevant with action: "inject".
-	 * Supply your username and password inside the url like so:
-	 * "http://username:password@localhost:9091/transmission/rpc"
-	 */
-	transmissionRpcUrl: undefined,
-
-	/**
-	 * The url of your Deluge JSON-RPC interface.
-	 * Usually ends with "/json".
-	 * Only relevant with action: "inject".
-	 * Supply your WebUI password as well like so:
-	 * "http://:password@localhost:8112/json"
-	 */
-	delugeRpcUrl: undefined,
+	torrentClients: [],
 
 	/**
 	 * END OF POTENTIALLY SENSITIVE CONFIGURATION OPTIONS

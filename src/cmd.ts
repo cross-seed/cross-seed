@@ -193,23 +193,29 @@ function createCommandWithSharedOptions(name: string, description: string) {
 				.choices(Object.values(Action)),
 		)
 		.option(
+			"--torrent-clients <clients...>",
+			"The the client prefix and urls of your torrent clients.",
+			// @ts-expect-error commander supports non-string defaults
+			fallback(fileConfig.torrentClients, []),
+		)
+		.option(
 			"--rtorrent-rpc-url <url>",
-			"The url of your rtorrent XMLRPC interface. Requires '-A inject'. See the docs for more information.",
+			"The url of your rtorrent XMLRPC interface.",
 			fileConfig.rtorrentRpcUrl,
 		)
 		.option(
 			"--qbittorrent-url <url>",
-			"The url of your qBittorrent webui. Requires '-A inject'. See the docs for more information.",
+			"The url of your qBittorrent webui.",
 			fileConfig.qbittorrentUrl,
 		)
 		.option(
 			"--transmission-rpc-url <url>",
-			"The url of your Transmission RPC interface. Requires '-A inject'. See the docs for more information.",
+			"The url of your Transmission RPC interface.",
 			fileConfig.transmissionRpcUrl,
 		)
 		.option(
 			"--deluge-rpc-url <url>",
-			"The url of your Deluge JSON-RPC interface. Requires '-A inject'. See the docs for more information.",
+			"The url of your Deluge JSON-RPC interface.",
 			fileConfig.delugeRpcUrl,
 		)
 		.option(
@@ -277,10 +283,6 @@ program.version(PROGRAM_VERSION, "-V, --version", "output the current version");
 program
 	.command("gen-config")
 	.description("Generate a config file")
-	.option(
-		"-d, --docker",
-		"Generate the docker config instead of the normal one",
-	)
 	.action(withMinimalRuntime(generateConfig));
 
 program

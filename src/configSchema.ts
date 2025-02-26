@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from "fs";
 import ms from "ms";
 import { isAbsolute, join, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
+import { parseClientEntry } from "./clients/TorrentClient.js";
 import { appDir } from "./configuration.js";
 import {
 	Action,
@@ -11,7 +12,7 @@ import {
 	NEWLINE_INDENT,
 	parseBlocklistEntry,
 } from "./constants.js";
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { formatAsList } from "./utils.js";
 
 /**
@@ -47,8 +48,18 @@ const ZodErrorMessages = {
 		"fuzzySizeThreshold cannot be greater than 0.1 when using searchCadence or rssCadence.",
 	seasonFromEpisodesMin:
 		"seasonFromEpisodes cannot be less than 0.5 when using searchCadence or rssCadence",
-	injectUrl:
-		"You need to specify rtorrentRpcUrl, transmissionRpcUrl, qbittorrentUrl, or delugeRpcUrl when using 'inject'",
+	clientType: `torrentClients type prefix must be one of ${formatAsList(
+		[
+			Label.QBITTORRENT,
+			Label.RTORRENT,
+			Label.TRANSMISSION,
+			Label.DELUGE,
+		].map((l) => `${l}:`),
+		{ sort: false, style: "narrow", type: "unit" },
+	)}`,
+	duplicateClients: "Duplicate torrent client URLs are not allowed.",
+	injectNeedsClients:
+		"You need to specify torrentClients when using 'inject'",
 	qBitAutoTMM:
 		"If using Automatic Torrent Management in qBittorrent, please read: https://www.cross-seed.org/docs/v6-migration#new-folder-structure-for-links",
 	includeSingleEpisodes:
@@ -141,15 +152,40 @@ function transformDurationString(durationStr: string, ctx: RefinementCtx) {
 }
 
 /**
+ * helper function for verifying torrent client types
+ * @param torrentClients the torrent clients to validate
+ * @param ctx ZodError map
+ * @return torrentClients (string array)
+ */
+function transformTorrentClients(torrentClients: string[], ctx: RefinementCtx) {
+	if (!Array.isArray(torrentClients)) return [];
+	for (const clientEntryRaw of torrentClients) {
+		const clientEntry = parseClientEntry(clientEntryRaw);
+		if (!clientEntry) {
+			addZodIssue(clientEntryRaw, ZodErrorMessages.clientType, ctx);
+			continue;
+		}
+		switch (clientEntry.clientType) {
+			case Label.QBITTORRENT:
+			case Label.RTORRENT:
+			case Label.TRANSMISSION:
+			case Label.DELUGE:
+				break;
+			default:
+				addZodIssue(clientEntryRaw, ZodErrorMessages.clientType, ctx);
+		}
+	}
+	return torrentClients;
+}
+
+/**
  * helper function for verifying blocklist types
  * @param blockList the blocklist to validate
  * @param ctx ZodError map
  * @return blocklist (string array)
  */
 function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
-	if (!Array.isArray(blockList)) {
-		return [];
-	}
+	if (!Array.isArray(blockList)) return [];
 	const sizeTest = (value: string, existing: number) => {
 		if (!existing) {
 			const match = value.match(/^\d+$/);
@@ -410,6 +446,10 @@ export const VALIDATION_SCHEMA = z
 			),
 
 		action: z.nativeEnum(Action),
+		torrentClients: z
+			.array(z.string())
+			.optional()
+			.transform(transformTorrentClients),
 		qbittorrentUrl: z.string().url().nullish(),
 		rtorrentRpcUrl: z.string().url().nullish(),
 		transmissionRpcUrl: z.string().url().nullish(),
@@ -475,6 +515,37 @@ export const VALIDATION_SCHEMA = z
 	})
 	.strict()
 	.refine((config) => {
+		if (
+			config.qbittorrentUrl ||
+			config.rtorrentRpcUrl ||
+			config.transmissionRpcUrl ||
+			config.delugeRpcUrl
+		) {
+			if (config.torrentClients.length) return false;
+			logger.warn(
+				"qbittorrentUrl, rtorrentRpcUrl, transmissionRpcUrl, and delugeRpcUrl are deprecated, use torrentClients instead.",
+			);
+			if (config.qbittorrentUrl) {
+				config.torrentClients = [
+					`${Label.QBITTORRENT}:${config.qbittorrentUrl}`,
+				];
+			} else if (config.rtorrentRpcUrl) {
+				config.torrentClients = [
+					`${Label.RTORRENT}:${config.rtorrentRpcUrl}`,
+				];
+			} else if (config.transmissionRpcUrl) {
+				config.torrentClients = [
+					`${Label.TRANSMISSION}:${config.transmissionRpcUrl}`,
+				];
+			} else if (config.delugeRpcUrl) {
+				config.torrentClients = [
+					`${Label.DELUGE}:${config.delugeRpcUrl}`,
+				];
+			}
+		}
+		return true;
+	}, "Cannot use qbittorrentUrl, rtorrentRpcUrl, transmissionRpcUrl, or delugeRpcUrl with torrentClients. Only use torrentClients.")
+	.refine((config) => {
 		if (!config.linkDir) return true;
 		if (config.linkDirs.length) return false;
 		logger.warn("linkDir is deprecated, use linkDirs instead.");
@@ -495,17 +566,27 @@ export const VALIDATION_SCHEMA = z
 		ZodErrorMessages.torrentDirAndUseClientTorrents,
 	)
 	.refine(
-		(config) =>
-			!config.useClientTorrents ||
-			config.qbittorrentUrl ||
-			config.delugeRpcUrl ||
-			config.transmissionRpcUrl ||
-			config.rtorrentRpcUrl,
+		(config) => !config.useClientTorrents || config.torrentClients.length,
 		ZodErrorMessages.needsClient,
 	)
 	.refine(
-		(config) => !config.useClientTorrents || !config.delugeRpcUrl,
+		(config) =>
+			!config.useClientTorrents ||
+			!config.torrentClients.some((c) => c.startsWith(Label.DELUGE)),
 		"Deluge does not currently support useClientTorrents, use torrentDir instead.",
+	)
+	.refine(
+		(config) => config.torrentClients.length <= 1,
+		"Multiple torrent clients are not currently supported.",
+	)
+	.refine(
+		(config) =>
+			new Set(
+				config.torrentClients.map(
+					(entry) => new URL(parseClientEntry(entry)!.url).host,
+				),
+			).size === config.torrentClients.length,
+		ZodErrorMessages.duplicateClients,
 	)
 	.refine(
 		(config) =>
@@ -548,7 +629,9 @@ export const VALIDATION_SCHEMA = z
 	.refine((config) => {
 		if (
 			config.action === Action.INJECT &&
-			config.qbittorrentUrl &&
+			config.torrentClients.some((c) =>
+				c.startsWith(Label.QBITTORRENT),
+			) &&
 			!config.flatLinking &&
 			config.linkDirs.length
 		) {
@@ -568,18 +651,12 @@ export const VALIDATION_SCHEMA = z
 	)
 	.refine(
 		(config) =>
-			!(
-				config.action === Action.INJECT &&
-				!config.rtorrentRpcUrl &&
-				!config.qbittorrentUrl &&
-				!config.transmissionRpcUrl &&
-				!config.delugeRpcUrl
-			),
-		ZodErrorMessages.injectUrl,
+			config.torrentClients.length || config.action !== Action.INJECT,
+		ZodErrorMessages.injectNeedsClients,
 	)
 	.refine((config) => {
 		if (
-			config.delugeRpcUrl &&
+			config.torrentClients.some((c) => c.startsWith(Label.DELUGE)) &&
 			config.blockList.some((b) => b.startsWith(`${BlocklistType.TAG}:`))
 		) {
 			logger.error(
@@ -593,7 +670,10 @@ export const VALIDATION_SCHEMA = z
 			});
 		}
 		if (
-			(config.transmissionRpcUrl || config.rtorrentRpcUrl) &&
+			config.torrentClients.some(
+				(c) =>
+					c.startsWith(Label.RTORRENT) || c.startsWith(Label.DELUGE),
+			) &&
 			config.blockList.some((b) =>
 				b.startsWith(`${BlocklistType.CATEGORY}:`),
 			)
@@ -617,13 +697,8 @@ export const VALIDATION_SCHEMA = z
 			return true;
 		}
 		if (
-			!(
-				(config.useClientTorrents || config.torrentDir) &&
-				(config.qbittorrentUrl ||
-					config.delugeRpcUrl ||
-					config.transmissionRpcUrl ||
-					config.rtorrentRpcUrl)
-			)
+			!config.torrentClients.length ||
+			!(config.useClientTorrents || config.torrentDir)
 		) {
 			logger.error(ZodErrorMessages.blocklistNeedsClient);
 		}
@@ -662,11 +737,8 @@ export const VALIDATION_SCHEMA = z
 	.refine(
 		(config) =>
 			!config.seasonFromEpisodes ||
-			(!config.torrentDir && !config.useClientTorrents) ||
-			config.qbittorrentUrl ||
-			config.delugeRpcUrl ||
-			config.transmissionRpcUrl ||
-			config.rtorrentRpcUrl,
+			!config.torrentDir ||
+			config.torrentClients.length,
 		ZodErrorMessages.ensembleNeedsClient,
 	)
 	.refine((config) => {
