@@ -47,7 +47,6 @@ import {
 	getMinSizeRatio,
 	sanitizeInfoHash,
 	stripExtension,
-	wait,
 } from "./utils.js";
 
 export interface ResultAssessment {
@@ -357,24 +356,17 @@ export async function assessCandidate(
 
 	let metafile: Metafile;
 	if (isCandidate) {
-		let res = await snatch(metaOrCandidate, searchee.label);
+		const res = await snatch(metaOrCandidate, searchee.label, {
+			retries: 4,
+			delayMs: ms("60 seconds"),
+		});
 		if (res.isErr()) {
-			const e = res.unwrapErr();
-			if (
-				[Label.ANNOUNCE, Label.RSS].includes(searchee.label) &&
-				![SnatchError.RATE_LIMITED, SnatchError.MAGNET_LINK].includes(e)
-			) {
-				await wait(ms("30 seconds"));
-				res = await snatch(metaOrCandidate, searchee.label);
-			}
-			if (res.isErr()) {
-				const err = res.unwrapErr();
-				return err === SnatchError.MAGNET_LINK
-					? { decision: Decision.MAGNET_LINK }
-					: err === SnatchError.RATE_LIMITED
-						? { decision: Decision.RATE_LIMITED }
-						: { decision: Decision.DOWNLOAD_FAILED };
-			}
+			const err = res.unwrapErr();
+			return err === SnatchError.MAGNET_LINK
+				? { decision: Decision.MAGNET_LINK }
+				: err === SnatchError.RATE_LIMITED
+					? { decision: Decision.RATE_LIMITED }
+					: { decision: Decision.DOWNLOAD_FAILED };
 		}
 		metafile = res.unwrap();
 		metaCached = cacheTorrentFile(metafile);

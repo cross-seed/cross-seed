@@ -75,6 +75,7 @@ import {
 	stripExtension,
 	wait,
 	withMutex,
+	WithRequired,
 } from "./utils.js";
 
 export interface Candidate {
@@ -87,6 +88,8 @@ export interface Candidate {
 	indexerId?: number;
 }
 
+export type CandidateWithIndexerId = WithRequired<Candidate, "indexerId">;
+
 export interface AssessmentWithTracker {
 	assessment: ResultAssessment;
 	tracker: string;
@@ -98,24 +101,35 @@ interface FoundOnOtherSites {
 }
 
 async function assessCandidates(
-	candidates: Candidate[],
+	candidates: CandidateWithIndexerId[],
 	searchee: SearcheeWithLabel,
 	infoHashesToExclude: Set<string>,
 	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<AssessmentWithTracker[]> {
-	const assessments: AssessmentWithTracker[] = [];
 	const guidInfoHashMap = await getGuidInfoHashMap();
-	for (const result of candidates) {
-		const assessment = await assessCandidateCaching(
-			result,
-			searchee,
-			infoHashesToExclude,
-			guidInfoHashMap,
-			options,
-		);
-		assessments.push({ assessment, tracker: result.tracker });
-	}
-	return assessments;
+	const candidatesByIndexer = candidates.reduce((acc, cur) => {
+		if (!acc.has(cur.indexerId)) acc.set(cur.indexerId, []);
+		acc.get(cur.indexerId)!.push(cur);
+		return acc;
+	}, new Map<number, CandidateWithIndexerId[]>());
+	return Promise.all(
+		Array.from(candidatesByIndexer.values()).map(async (candidates) => {
+			const assessments: AssessmentWithTracker[] = [];
+			for (const candidate of candidates) {
+				assessments.push({
+					assessment: await assessCandidateCaching(
+						candidate,
+						searchee,
+						infoHashesToExclude,
+						guidInfoHashMap,
+						options,
+					),
+					tracker: candidate.tracker,
+				});
+			}
+			return assessments;
+		}),
+	).then((assessments) => assessments.flat());
 }
 
 async function findOnOtherSites(
@@ -143,7 +157,7 @@ async function findOnOtherSites(
 	const searchedIndexers = response.length - cachedIndexers;
 	cachedSearch.indexerCandidates = response;
 
-	const results: Candidate[] = response.flatMap((e) =>
+	const candidates: CandidateWithIndexerId[] = response.flatMap((e) =>
 		e.candidates.map((candidate) => ({
 			...candidate,
 			indexerId: e.indexerId,
@@ -153,11 +167,11 @@ async function findOnOtherSites(
 	if (response.length) {
 		logger.verbose({
 			label: Label.DECIDE,
-			message: `Assessing ${results.length} candidates for ${searchee.title} from ${searchedIndexers}|${cachedIndexers} indexers by search|cache`,
+			message: `Assessing ${candidates.length} candidates for ${searchee.title} from ${searchedIndexers}|${cachedIndexers} indexers by search|cache`,
 		});
 	}
 	const assessments = await assessCandidates(
-		results,
+		candidates,
 		searchee,
 		infoHashesToExclude,
 		options,
@@ -165,10 +179,10 @@ async function findOnOtherSites(
 
 	const { rateLimited, notRateLimited } = assessments.reduce(
 		(acc, cur, idx) => {
-			const candidate = results[idx];
+			const candidate = candidates[idx];
 			if (cur.assessment.decision === Decision.RATE_LIMITED) {
-				acc.rateLimited.add(candidate.indexerId!);
-				acc.notRateLimited.delete(candidate.indexerId!);
+				acc.rateLimited.add(candidate.indexerId);
+				acc.notRateLimited.delete(candidate.indexerId);
 			}
 			return acc;
 		},
@@ -725,15 +739,21 @@ export async function scanRssFeeds() {
 		message: "Querying RSS feeds...",
 	});
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
-	const candidates = queryRssFeeds(lastRun);
-	let i = 0;
-	for await (const candidate of candidates) {
-		await checkNewCandidateMatch(candidate, Label.RSS);
-		i++;
-	}
+	const numCandidates = (
+		await Promise.all(
+			(await queryRssFeeds(lastRun)).map(async (candidates) => {
+				let i = 0;
+				for await (const candidate of candidates) {
+					await checkNewCandidateMatch(candidate, Label.RSS);
+					i++;
+				}
+				return i;
+			}),
+		)
+	).reduce((acc, cur) => acc + cur, 0);
 
 	logger.info({
 		label: Label.RSS,
-		message: `RSS scan complete - checked ${i} new candidates since ${humanReadableDate(lastRun)}`,
+		message: `RSS scan complete - checked ${numCandidates} new candidates since ${humanReadableDate(lastRun)}`,
 	});
 }

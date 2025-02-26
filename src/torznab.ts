@@ -43,7 +43,6 @@ import {
 } from "./searchee.js";
 import {
 	cleanTitle,
-	combineAsyncIterables,
 	comparing,
 	extractInt,
 	formatAsList,
@@ -444,14 +443,12 @@ export async function* rssPager(
 	}
 }
 
-export async function* queryRssFeeds(
+export async function queryRssFeeds(
 	lastRun: number,
-): AsyncGenerator<Candidate> {
+): Promise<AsyncGenerator<Candidate>[]> {
 	const timeSinceLastRun = Date.now() - lastRun;
 	const indexers = await getEnabledIndexers();
-	yield* combineAsyncIterables(
-		indexers.map((indexer) => rssPager(indexer, timeSinceLastRun)),
-	);
+	return indexers.map((indexer) => rssPager(indexer, timeSinceLastRun));
 }
 
 export async function searchTorznab(

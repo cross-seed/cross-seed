@@ -44,6 +44,7 @@ import {
 	isTruthy,
 	Mutex,
 	stripExtension,
+	wait,
 	withMutex,
 } from "./utils.js";
 import {
@@ -138,13 +139,14 @@ function isMagnetRedirectError(error: Error): boolean {
 	);
 }
 
-export async function snatch(
+async function snatchOnce(
 	candidate: Candidate,
-	label: SearcheeLabel,
-): Promise<Result<Metafile, SnatchError>> {
+): Promise<
+	| Metafile
+	| { snatchError: SnatchError; retryAfterMs?: number; extra?: string }
+> {
 	const { snatchTimeout } = getRuntimeConfig();
 	const url = candidate.link;
-	const tracker = candidate.tracker;
 
 	let response: Response;
 	try {
@@ -157,75 +159,102 @@ export async function snatch(
 		});
 	} catch (e) {
 		if (e.name === "AbortError" || e.name === "TimeoutError") {
-			logger.error({
-				label,
-				message: `Snatch timed out from ${tracker} for ${candidate.name}`,
-			});
 			logger.debug(`${candidate.name}: ${url}`);
-			return resultOfErr(SnatchError.ABORTED);
+			return {
+				snatchError: SnatchError.ABORTED,
+				extra: `snatch timed out`,
+			};
 		} else if (isMagnetRedirectError(e)) {
-			logger.verbose({
-				label,
-				message: `Unsupported: magnet link detected from ${tracker} for ${candidate.name}`,
-			});
 			logger.debug(`${candidate.name}: ${url}`);
-			return resultOfErr(SnatchError.MAGNET_LINK);
+			return { snatchError: SnatchError.MAGNET_LINK };
 		}
-		logger.error({
-			label,
-			message: `Failed to access ${tracker} for ${candidate.name}`,
-		});
 		logger.debug(`${candidate.name}: ${url}`);
 		logger.debug(e);
-		return resultOfErr(SnatchError.UNKNOWN_ERROR);
+		return {
+			snatchError: SnatchError.UNKNOWN_ERROR,
+			extra: `failed to access`,
+		};
 	}
 
+	const retryAfterSeconds = Number(response.headers.get("Retry-After"));
+	const retryAfterMs = !Number.isNaN(retryAfterSeconds)
+		? retryAfterSeconds * 1000
+		: undefined;
 	if (response.status === 429) {
-		return resultOfErr(SnatchError.RATE_LIMITED);
+		return { snatchError: SnatchError.RATE_LIMITED, retryAfterMs };
 	} else if (!response.ok) {
-		logger.error({
-			label,
-			message: `Error downloading torrent from ${tracker} for ${candidate.name}: ${response.status} ${response.statusText}`,
-		});
 		const responseText = await response.clone().text();
 		logger.debug(
 			`${candidate.name}: ${url} - Response: "${responseText.slice(0, 100)}${
 				responseText.length > 100 ? "..." : ""
 			}"`,
 		);
-		return resultOfErr(SnatchError.UNKNOWN_ERROR);
+		return {
+			snatchError: SnatchError.UNKNOWN_ERROR,
+			retryAfterMs,
+			extra: `error downloading torrent - ${response.status} ${response.statusText}`,
+		};
 	} else if (response.headers.get("Content-Type") === "application/rss+xml") {
 		const responseText = await response.clone().text();
-		logger.error({
-			label,
-			message: `Invalid torrent contents from ${tracker} for ${candidate.name}`,
-		});
 		logger.debug(
 			`${candidate.name}: ${url} - Contents: "${responseText.slice(0, 100)}${
 				responseText.length > 100 ? "..." : ""
 			}"`,
 		);
-		return resultOfErr(SnatchError.INVALID_CONTENTS);
+		return { snatchError: SnatchError.INVALID_CONTENTS, retryAfterMs };
 	}
 	try {
-		return resultOf(
-			Metafile.decode(
-				Buffer.from(new Uint8Array(await response.arrayBuffer())),
-			),
+		return Metafile.decode(
+			Buffer.from(new Uint8Array(await response.arrayBuffer())),
 		);
 	} catch (e) {
-		logger.error({
-			label,
-			message: `Invalid torrent contents from ${tracker} for ${candidate.name}`,
-		});
 		const contentType = response.headers.get("Content-Type");
 		const contentLength = response.headers.get("Content-Length");
 		logger.debug(
 			`${candidate.name}: ${url} - Content-Type: ${contentType} - Content-Length: ${contentLength}`,
 		);
 		logger.debug(e);
-		return resultOfErr(SnatchError.INVALID_CONTENTS);
+		return { snatchError: SnatchError.INVALID_CONTENTS, retryAfterMs };
 	}
+}
+
+export async function snatch(
+	candidate: Candidate,
+	label: SearcheeLabel,
+	options: { retries: number; delayMs: number },
+): Promise<Result<Metafile, SnatchError>> {
+	const retries = Math.max(options.retries, 0);
+	const retryAfterEndTime = Date.now() + retries * options.delayMs;
+
+	let snatchError: SnatchError;
+	for (let i = 0; i <= retries; i++) {
+		const snatchResult = await snatchOnce(candidate);
+		if (snatchResult instanceof Metafile) return resultOf(snatchResult);
+		snatchError = snatchResult.snatchError;
+		if (
+			snatchError === SnatchError.RATE_LIMITED ||
+			snatchError === SnatchError.MAGNET_LINK
+		) {
+			return resultOfErr(snatchError);
+		}
+		const { extra, retryAfterMs } = snatchResult;
+		const progress = `${i + 1}/${retries + 1}`;
+		if (retryAfterMs && Date.now() + retryAfterMs >= retryAfterEndTime) {
+			logger.warn({
+				label,
+				message: `Snatching ${candidate.name} from ${candidate.tracker} stopped at attempt ${progress}, Retry-After of ${retryAfterMs / 1000}s exceeds timeout: ${snatchError}${extra ? ` - ${extra}` : ""}`,
+			});
+			return resultOfErr(snatchError);
+		}
+		const delayMs = Math.max(options.delayMs, retryAfterMs ?? 0);
+		logger.error({
+			label,
+			message: `Snatch attempt ${progress} from ${candidate.tracker} for ${candidate.name} failed${i < retries ? `, retrying in ${delayMs / 1000}s` : ""}: ${snatchError}${extra ? ` - ${extra}` : ""}`,
+		});
+		if (i >= retries) break;
+		await wait(delayMs);
+	}
+	return resultOfErr(snatchError!);
 }
 
 export async function saveTorrentFile(
@@ -456,13 +485,13 @@ export async function indexTorrentsAndDataDirs(
 					break;
 				} catch (e) {
 					const msg = `Indexing failed (${maxRetries - attempt}): ${e.message}`;
+					logger.debug(e);
 					if (attempt < maxRetries) {
 						logger.verbose(msg);
 					} else {
 						logger.error(msg);
 						if (options.startup) throw e;
 					}
-					logger.debug(e);
 				}
 			}
 		},
