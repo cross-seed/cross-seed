@@ -222,7 +222,7 @@ module.exports = {
 
 	/**
 	 * With action: "inject", cross-seed will use this directory to retry
-	 * injectections. This directory will be empty nearly all the time.
+	 * injections. This directory will be empty nearly all the time.
 	 * https://www.cross-seed.org/docs/v6-migration#failed-injection-saved-retry
 	 * If you are using action: "save", this will be the directory where the
 	 * .torrent files are saved.
