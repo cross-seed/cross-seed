@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useForm } from '@tanstack/react-form';
 import { z } from 'zod';
@@ -91,6 +91,18 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
     return !schemaField.isOptional() && !schemaField.isNullable();
   };
 
+  /**
+   * Focus on the newly added field in array fields
+   */
+  const [lastFieldAdded, setLastFieldAdded] = useState<string | null>(null);
+  useEffect(() => {
+    if (lastFieldAdded) {
+      const el = document.getElementById(lastFieldAdded);
+      el?.focus();
+      setLastFieldAdded(null);
+    }
+  }, [lastFieldAdded]);
+
   return (
     <div className={cn('mb-5', className)}>
       <h2 className="mb-6 text-2xl font-semibold dark:text-slate-100">
@@ -145,6 +157,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                     <div className="flex items-center gap-2">
                                       <Input
                                         type="text"
+                                        id={`${field.name}-${index}`}
                                         className="form-input"
                                         value={subfield.state.value ?? ''}
                                         aria-invalid={
@@ -183,7 +196,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       <Button
                         variant="secondary"
                         type="button"
-                        onClick={() => field.pushValue('')}
+                        onClick={() => {
+                          field.pushValue('');
+                          setLastFieldAdded(
+                            `${field.name}-${field.state.value.length - 1}`,
+                          );
+                        }}
                         className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
@@ -289,6 +307,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                       <Input
                                         type="text"
                                         className="form-input"
+                                        id={`${field.name}-${index}`}
                                         value={subfield.state.value ?? ''}
                                         aria-invalid={
                                           !!(
@@ -326,7 +345,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       <Button
                         variant="secondary"
                         type="button"
-                        onClick={() => field.pushValue('')}
+                        onClick={() => {
+                          field.pushValue('');
+                          setLastFieldAdded(
+                            `${field.name}-${field.state.value.length - 1}`,
+                          );
+                        }}
                         className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
@@ -377,6 +401,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                       <Input
                                         type="text"
                                         className="form-input"
+                                        id={`${field.name}-${index}`}
                                         value={subfield.state.value ?? ''}
                                         aria-invalid={
                                           !!(
@@ -414,7 +439,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       <Button
                         variant="secondary"
                         type="button"
-                        onClick={() => field.pushValue('')}
+                        onClick={() => {
+                          field.pushValue('');
+                          setLastFieldAdded(
+                            `${field.name}-${field.state.value.length - 1}`,
+                          );
+                        }}
                         className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
@@ -495,6 +525,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                       <Input
                                         type="text"
                                         className="form-input"
+                                        id={`${field.name}-${index}`}
                                         value={subfield.state.value ?? ''}
                                         aria-invalid={
                                           !!(
@@ -532,7 +563,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       <Button
                         variant="secondary"
                         type="button"
-                        onClick={() => field.pushValue('')}
+                        onClick={() => {
+                          field.pushValue('');
+                          setLastFieldAdded(
+                            `${field.name}-${field.state.value.length - 1}`,
+                          );
+                        }}
                         className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
@@ -580,6 +616,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                       <Input
                                         type="text"
                                         className="form-input"
+                                        id={`${field.name}-${index}`}
                                         value={subfield.state.value ?? ''}
                                         aria-invalid={
                                           !!(
@@ -617,7 +654,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       <Button
                         variant="secondary"
                         type="button"
-                        onClick={() => field.pushValue('')}
+                        onClick={() => {
+                          field.pushValue('');
+                          setLastFieldAdded(
+                            `${field.name}-${field.state.value.length - 1}`,
+                          );
+                        }}
                         className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
@@ -1443,6 +1485,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                         <Input
                                           type="text"
                                           className="form-input"
+                                          id={`${field.name}-${index}`}
                                           value={subfield.state.value ?? ''}
                                           aria-invalid={
                                             !!(
@@ -1483,7 +1526,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       <Button
                         variant="secondary"
                         type="button"
-                        onClick={() => field.pushValue('')}
+                        onClick={() => {
+                          field.pushValue('');
+                          setLastFieldAdded(
+                            `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`,
+                          );
+                        }}
                         className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
