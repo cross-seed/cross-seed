@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { FieldInfo } from './FieldInfo';
-import { ArrayInputField } from './ArrayInputField';
 import {
   Select,
   SelectContent,
@@ -23,6 +22,8 @@ import {
 } from '@/features/ConfigForm/types/Form.types';
 import { baseValidationSchema } from './types/Form.types';
 import { Button } from '@/components/ui/button';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTrash } from '@fortawesome/free-solid-svg-icons';
 
 type FormProps = {
   className?: string;
@@ -34,15 +35,15 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
   const form = useForm<Config>({
     defaultValues: {
       delay: 30,
-      torznab: [],
+      torznab: [''],
       useClientTorrents: false,
-      dataDirs: [],
+      dataDirs: [''],
       matchMode: MatchMode.STRICT,
       skipRecheck: true,
       autoResumeMaxDownload: 52428800,
       linkCategory: null,
       linkDir: null,
-      linkDirs: [],
+      linkDirs: [''],
       linkType: LinkType.HARDLINK,
       flatLinking: false,
       maxDataDepth: 2,
@@ -61,7 +62,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
       transmissionRpcUrl: null,
       delugeRpcUrl: null,
       duplicateCategories: false,
-      notificationWebhookUrls: [],
+      notificationWebhookUrls: [''],
       notificationWebhookUrl: null,
       port: null,
       host: null,
@@ -71,11 +72,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
       searchTimeout: null,
       searchLimit: null,
       verbose: false,
-      torrents: [],
-      blockList: [],
+      torrents: [''],
+      blockList: [''],
       apiKey: null,
-      radarr: [],
-      sonarr: [],
+      radarr: [''],
+      sonarr: [''],
     },
     onSubmit: async ({ value }) => {
       console.log('submitting form', value);
@@ -102,6 +103,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           e.stopPropagation();
           form.handleSubmit();
         }}
+        noValidate
       >
         {/* form fields */}
         <div className="flex flex-wrap gap-6 dark:text-slate-100">
@@ -110,17 +112,86 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
             <div className="">
               <form.Field
                 name="dataDirs"
+                mode="array"
                 validators={{
                   onBlur: baseValidationSchema.shape.dataDirs,
+                  onChange: baseValidationSchema.shape.dataDirs,
                 }}
               >
-                {(field) => (
-                  <ArrayInputField
-                    field={field}
-                    label="Data directories"
-                    required={isFieldRequired(field.name)}
-                  />
-                )}
+                {(field) => {
+                  return (
+                    <div className="space-y-3">
+                      <Label htmlFor={field.name} className="block w-full">
+                        Data Directories
+                        {isFieldRequired(field.name) && (
+                          <span className="pl-1 text-red-500">*</span>
+                        )}
+                      </Label>
+                      {field.state.value.map((_: string, index: number) => {
+                        return (
+                          <div
+                            key={index}
+                            className="gap-y- mb-3 flex flex-col"
+                          >
+                            <form.Field
+                              name={`dataDirs[${index}]`}
+                              validators={{
+                                onBlur: z.string(),
+                              }}
+                            >
+                              {(subfield) => {
+                                return (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        className="form-input"
+                                        value={subfield.state.value ?? ''}
+                                        aria-invalid={
+                                          !!(
+                                            subfield.state.meta.isTouched &&
+                                            (
+                                              subfield.state.meta.errorMap
+                                                .onBlur as string
+                                            )?.length > 0
+                                          )
+                                        }
+                                        onBlur={subfield.handleBlur}
+                                        onChange={(e) =>
+                                          subfield.handleChange(e.target.value)
+                                        }
+                                      />
+                                      {field.state.value.length > 1 && (
+                                        <Button
+                                          onClick={() =>
+                                            field.removeValue(index)
+                                          }
+                                          className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
+                                        >
+                                          <FontAwesomeIcon icon={faTrash} />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <FieldInfo field={subfield} />
+                                  </>
+                                );
+                              }}
+                            </form.Field>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => field.pushValue('')}
+                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
+                        title={`Add ${field.name}`}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  );
+                }}
               </form.Field>
             </div>
             <form.Field
@@ -184,17 +255,86 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
             <div className="">
               <form.Field
                 name="linkDirs"
+                mode="array"
                 validators={{
-                  onChange: baseValidationSchema.shape.torznab,
+                  onBlur: baseValidationSchema.shape.linkDirs,
+                  onChange: baseValidationSchema.shape.linkDirs,
                 }}
               >
-                {(field) => (
-                  <ArrayInputField
-                    field={field}
-                    label="Link directories"
-                    required={isFieldRequired(field.name)}
-                  />
-                )}
+                {(field) => {
+                  return (
+                    <div className="space-y-3">
+                      <Label htmlFor={field.name} className="block w-full">
+                        Link Directories
+                        {isFieldRequired(field.name) && (
+                          <span className="pl-1 text-red-500">*</span>
+                        )}
+                      </Label>
+                      {field.state.value.map((_: string, index: number) => {
+                        return (
+                          <div
+                            key={index}
+                            className="gap-y- mb-3 flex flex-col"
+                          >
+                            <form.Field
+                              name={`linkDirs[${index}]`}
+                              validators={{
+                                onBlur: z.string(),
+                              }}
+                            >
+                              {(subfield) => {
+                                return (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        className="form-input"
+                                        value={subfield.state.value ?? ''}
+                                        aria-invalid={
+                                          !!(
+                                            subfield.state.meta.isTouched &&
+                                            (
+                                              subfield.state.meta.errorMap
+                                                .onBlur as string
+                                            )?.length > 0
+                                          )
+                                        }
+                                        onBlur={subfield.handleBlur}
+                                        onChange={(e) =>
+                                          subfield.handleChange(e.target.value)
+                                        }
+                                      />
+                                      {field.state.value.length > 1 && (
+                                        <Button
+                                          onClick={() =>
+                                            field.removeValue(index)
+                                          }
+                                          className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
+                                        >
+                                          <FontAwesomeIcon icon={faTrash} />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <FieldInfo field={subfield} />
+                                  </>
+                                );
+                              }}
+                            </form.Field>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => field.pushValue('')}
+                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
+                        title={`Add ${field.name}`}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  );
+                }}
               </form.Field>
             </div>
           </fieldset>
@@ -203,21 +343,86 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
             <div className="">
               <form.Field
                 name="torznab"
+                mode="array"
                 validators={{
+                  onBlur: baseValidationSchema.shape.torznab,
                   onChange: baseValidationSchema.shape.torznab,
                 }}
               >
-                {(field) => (
-                  <>
-                    <ArrayInputField
-                      field={field}
-                      label="Torznab URL(s)"
-                      inputType="url"
-                      required={isFieldRequired(field.name)}
-                    />
-                    {/* <FieldInfo field={field} /> */}
-                  </>
-                )}
+                {(field) => {
+                  return (
+                    <div className="space-y-3">
+                      <Label htmlFor={field.name} className="block w-full">
+                        Torznab URL(s)
+                        {isFieldRequired(field.name) && (
+                          <span className="pl-1 text-red-500">*</span>
+                        )}
+                      </Label>
+                      {field.state.value.map((_: string, index: number) => {
+                        return (
+                          <div
+                            key={index}
+                            className="gap-y- mb-3 flex flex-col"
+                          >
+                            <form.Field
+                              name={`torznab[${index}]`}
+                              validators={{
+                                onBlur: z.string().min(3).url(),
+                              }}
+                            >
+                              {(subfield) => {
+                                return (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        className="form-input"
+                                        value={subfield.state.value ?? ''}
+                                        aria-invalid={
+                                          !!(
+                                            subfield.state.meta.isTouched &&
+                                            (
+                                              subfield.state.meta.errorMap
+                                                .onBlur as string
+                                            )?.length > 0
+                                          )
+                                        }
+                                        onBlur={subfield.handleBlur}
+                                        onChange={(e) =>
+                                          subfield.handleChange(e.target.value)
+                                        }
+                                      />
+                                      {field.state.value.length > 1 && (
+                                        <Button
+                                          onClick={() =>
+                                            field.removeValue(index)
+                                          }
+                                          className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
+                                        >
+                                          <FontAwesomeIcon icon={faTrash} />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <FieldInfo field={subfield} />
+                                  </>
+                                );
+                              }}
+                            </form.Field>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => field.pushValue('')}
+                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
+                        title={`Add ${field.name}`}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  );
+                }}
               </form.Field>
             </div>
             <div className="">
@@ -256,35 +461,171 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
             <div className="">
               <form.Field
                 name="sonarr"
+                mode="array"
                 validators={{
-                  onChange: baseValidationSchema.shape.torznab,
+                  onBlur: baseValidationSchema.shape.sonarr,
+                  onChange: baseValidationSchema.shape.sonarr,
                 }}
               >
-                {(field) => (
-                  <ArrayInputField
-                    field={field}
-                    label="Sonarr"
-                    inputType="url"
-                    required={isFieldRequired(field.name)}
-                  />
-                )}
+                {(field) => {
+                  return (
+                    <div className="space-y-3">
+                      <Label htmlFor={field.name} className="block w-full">
+                        Sonarr URL(s)
+                        {isFieldRequired(field.name) && (
+                          <span className="pl-1 text-red-500">*</span>
+                        )}
+                      </Label>
+                      {field.state.value.map((_: string, index: number) => {
+                        return (
+                          <div
+                            key={index}
+                            className="gap-y- mb-3 flex flex-col"
+                          >
+                            <form.Field
+                              name={`sonarr[${index}]`}
+                              validators={{
+                                onBlur: z.string().url(),
+                              }}
+                            >
+                              {(subfield) => {
+                                return (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        className="form-input"
+                                        value={subfield.state.value ?? ''}
+                                        aria-invalid={
+                                          !!(
+                                            subfield.state.meta.isTouched &&
+                                            (
+                                              subfield.state.meta.errorMap
+                                                .onBlur as string
+                                            )?.length > 0
+                                          )
+                                        }
+                                        onBlur={subfield.handleBlur}
+                                        onChange={(e) =>
+                                          subfield.handleChange(e.target.value)
+                                        }
+                                      />
+                                      {field.state.value.length > 1 && (
+                                        <Button
+                                          onClick={() =>
+                                            field.removeValue(index)
+                                          }
+                                          className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
+                                        >
+                                          <FontAwesomeIcon icon={faTrash} />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <FieldInfo field={subfield} />
+                                  </>
+                                );
+                              }}
+                            </form.Field>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => field.pushValue('')}
+                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
+                        title={`Add ${field.name}`}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  );
+                }}
               </form.Field>
             </div>
             <div>
               <form.Field
                 name="radarr"
+                mode="array"
                 validators={{
-                  onChange: baseValidationSchema.shape.torznab,
+                  onBlur: baseValidationSchema.shape.radarr,
+                  onChange: baseValidationSchema.shape.radarr,
                 }}
               >
-                {(field) => (
-                  <ArrayInputField
-                    field={field}
-                    label="Radarr"
-                    inputType="url"
-                    required={isFieldRequired(field.name)}
-                  />
-                )}
+                {(field) => {
+                  return (
+                    <div className="space-y-3">
+                      <Label htmlFor={field.name} className="block w-full">
+                        Radarr URL(s)
+                        {isFieldRequired(field.name) && (
+                          <span className="pl-1 text-red-500">*</span>
+                        )}
+                      </Label>
+                      {field.state.value.map((_: string, index: number) => {
+                        return (
+                          <div
+                            key={index}
+                            className="gap-y- mb-3 flex flex-col"
+                          >
+                            <form.Field
+                              name={`radarr[${index}]`}
+                              validators={{
+                                onBlur: z.string().url(),
+                              }}
+                            >
+                              {(subfield) => {
+                                return (
+                                  <>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        className="form-input"
+                                        value={subfield.state.value ?? ''}
+                                        aria-invalid={
+                                          !!(
+                                            subfield.state.meta.isTouched &&
+                                            (
+                                              subfield.state.meta.errorMap
+                                                .onBlur as string
+                                            )?.length > 0
+                                          )
+                                        }
+                                        onBlur={subfield.handleBlur}
+                                        onChange={(e) =>
+                                          subfield.handleChange(e.target.value)
+                                        }
+                                      />
+                                      {field.state.value.length > 1 && (
+                                        <Button
+                                          onClick={() =>
+                                            field.removeValue(index)
+                                          }
+                                          className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
+                                        >
+                                          <FontAwesomeIcon icon={faTrash} />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <FieldInfo field={subfield} />
+                                  </>
+                                );
+                              }}
+                            </form.Field>
+                          </div>
+                        );
+                      })}
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => field.pushValue('')}
+                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
+                        title={`Add ${field.name}`}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  );
+                }}
               </form.Field>
             </div>
           </fieldset>
@@ -1067,18 +1408,90 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
             <div className="">
               <form.Field
                 name="blockList"
+                mode="array"
                 validators={{
+                  onBlur: baseValidationSchema.shape.blockList,
                   onChange: baseValidationSchema.shape.blockList,
                 }}
               >
-                {(field) => (
-                  <ArrayInputField
-                    field={field}
-                    label="Block"
-                    buttonLabel="Block"
-                    required={isFieldRequired(field.name)}
-                  />
-                )}
+                {(field) => {
+                  return (
+                    <div className="space-y-3">
+                      <Label htmlFor={field.name} className="block w-full">
+                        Block List
+                        {isFieldRequired(field.name) && (
+                          <span className="pl-1 text-red-500">*</span>
+                        )}
+                      </Label>
+                      {field.state.value &&
+                        field.state.value.map((_: string, index: number) => {
+                          return (
+                            <div
+                              key={index}
+                              className="gap-y- mb-3 flex flex-col"
+                            >
+                              <form.Field
+                                name={`blockList[${index}]`}
+                                validators={{
+                                  onBlur: z.string(),
+                                }}
+                              >
+                                {(subfield) => {
+                                  return (
+                                    <>
+                                      <div className="flex items-center gap-2">
+                                        <Input
+                                          type="text"
+                                          className="form-input"
+                                          value={subfield.state.value ?? ''}
+                                          aria-invalid={
+                                            !!(
+                                              subfield.state.meta.isTouched &&
+                                              (
+                                                subfield.state.meta.errorMap
+                                                  .onBlur as string
+                                              )?.length > 0
+                                            )
+                                          }
+                                          onBlur={subfield.handleBlur}
+                                          onChange={(e) =>
+                                            subfield.handleChange(
+                                              e.target.value,
+                                            )
+                                          }
+                                        />
+                                        {field.state.value &&
+                                          field.state.value.length > 1 && (
+                                            <Button
+                                              onClick={() =>
+                                                field.removeValue(index)
+                                              }
+                                              className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
+                                            >
+                                              <FontAwesomeIcon icon={faTrash} />
+                                            </Button>
+                                          )}
+                                      </div>
+                                      <FieldInfo field={subfield} />
+                                    </>
+                                  );
+                                }}
+                              </form.Field>
+                            </div>
+                          );
+                        })}
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => field.pushValue('')}
+                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
+                        title={`Add ${field.name}`}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  );
+                }}
               </form.Field>
             </div>
           </fieldset>
