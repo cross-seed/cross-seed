@@ -45,3 +45,5 @@ test.db
 .tool-versions
 coverage/
 .vscode/
+bundle.js
+sea/

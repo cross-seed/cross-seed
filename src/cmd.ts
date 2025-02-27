@@ -30,7 +30,7 @@ import { fallback } from "./utils.js";
 
 let fileConfig: FileConfig;
 try {
-	fileConfig = await getFileConfig();
+	fileConfig = getFileConfig();
 } catch (e) {
 	if (e instanceof CrossSeedError) {
 		console.error(e.message);
@@ -432,4 +432,4 @@ createCommandWithSharedOptions(
 
 program.showHelpAfterError("(add --help for additional information)");
 
-await program.parseAsync();
+program.parseAsync().catch(console.error);
