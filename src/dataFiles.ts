@@ -140,12 +140,12 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 		if (!title) continue;
 		dataRows.push({ title, path });
 		if (seasonFromEpisodes) {
-			const ensembleEntry = await indexEnsembleDataEntry(
+			const ensembleEntries = await indexEnsembleDataEntry(
 				title,
 				path,
 				files,
 			);
-			if (ensembleEntry) ensembleRows.push(ensembleEntry);
+			if (ensembleEntries) ensembleRows.push(...ensembleEntries);
 		}
 	}
 	await inBatches(dataRows, async (batch) => {
@@ -160,16 +160,15 @@ async function indexEnsembleDataEntry(
 	title: string,
 	path: string,
 	files: File[],
-): Promise<EnsembleEntry | null> {
+): Promise<EnsembleEntry[] | null> {
 	const ensemblePieces = await createEnsemblePieces(title, files);
-	if (!ensemblePieces) return null;
-	const { key, element, largestFile } = ensemblePieces;
-	return {
-		path: join(dirname(path), largestFile.path),
+	if (!ensemblePieces || !ensemblePieces.length) return null;
+	return ensemblePieces.map((ensemblePiece) => ({
+		path: join(dirname(path), ensemblePiece.largestFile.path),
 		info_hash: null,
-		ensemble: key,
-		element,
-	};
+		ensemble: ensemblePiece.key,
+		element: ensemblePiece.element,
+	}));
 }
 
 export async function getDataByFuzzyName(
