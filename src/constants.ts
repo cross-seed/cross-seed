@@ -41,6 +41,7 @@ export const BAD_GROUP_PARSE_REGEX =
 	/^(?<badmatch>(?:dl|DDP?|aac|eac3|atmos|dts|ma|hd|[heav.c]{3.5}|[xh.]{1,2}[2456]|[0-9]+[ip]?|dxva|full|blu|ray|s(?:eason)?\W\d+|\W){3,})$/i;
 export const JSON_VALUES_REGEX = /".+?"\s*:\s*"(?<value>.+?)"\s*(?:,|})/g;
 export const ABS_WIN_PATH_REGEX = /^[a-z]:|^\\/i;
+export const AKA_REGEX = /(?:[_.\s-]+|\b)a[_.\s-]?k[_.\s-]?a(?:[_.\s-]+|\b)/i;
 
 // Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {

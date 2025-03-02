@@ -26,7 +26,7 @@ import {
 import { logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { File, Searchee } from "./searchee.js";
+import { File, getAllTitles, Searchee } from "./searchee.js";
 
 export enum Mutex {
 	INDEX_TORRENTS_AND_DATA_DIRS = "INDEX_TORRENTS_AND_DATA_DIRS",
@@ -119,25 +119,29 @@ export function areMediaTitlesSimilar(a: string, b: string): boolean {
 		b.match(SEASON_REGEX) ??
 		b.match(MOVIE_REGEX) ??
 		b.match(ANIME_REGEX);
-	const titlesA: string[] = (
+	const titlesA: string[] = getAllTitles(
 		matchA
 			? [matchA.groups?.title, matchA.groups?.altTitle].filter(isTruthy)
-			: [a]
+			: [a],
 	)
 		.map((title) => createKeyTitle(stripMetaFromName(title)))
 		.filter(isTruthy);
-	const titlesB: string[] = (
+	const titlesB: string[] = getAllTitles(
 		matchB
 			? [matchB.groups?.title, matchB.groups?.altTitle].filter(isTruthy)
-			: [b]
+			: [b],
 	)
 		.map((title) => createKeyTitle(stripMetaFromName(title)))
 		.filter(isTruthy);
 	const maxDistanceA = Math.floor(
-		Math.max(...titlesA.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
+		titlesA.reduce((sum, title) => sum + title.length, 0) /
+			titlesA.length /
+			LEVENSHTEIN_DIVISOR,
 	);
 	const maxDistanceB = Math.floor(
-		Math.max(...titlesB.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
+		titlesB.reduce((sum, title) => sum + title.length, 0) /
+			titlesB.length /
+			LEVENSHTEIN_DIVISOR,
 	);
 	const maxDistance = Math.max(maxDistanceA, maxDistanceB);
 	return titlesA.some((titleA) =>
