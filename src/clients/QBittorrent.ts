@@ -119,16 +119,18 @@ export default class QBittorrent implements TorrentClient {
 	versionMajor: number;
 	versionMinor: number;
 	versionPatch: number;
-	readonly type = Label.QBITTORRENT;
+	readonly clientHost: string;
+	readonly clientPriority: number;
+	readonly clientType = Label.QBITTORRENT;
+	readonly label: string;
 
-	constructor() {
-		const { qbittorrentUrl } = getRuntimeConfig();
-		this.url = extractCredentialsFromUrl(
-			qbittorrentUrl!,
-			"/api/v2",
-		).unwrapOrThrow(
+	constructor(url: string, priority: number) {
+		this.url = extractCredentialsFromUrl(url, "/api/v2").unwrapOrThrow(
 			new CrossSeedError("qBittorrent url must be percent-encoded"),
 		);
+		this.clientHost = new URL(url).host;
+		this.clientPriority = priority;
+		this.label = `${this.clientType}@${this.clientHost}`;
 	}
 
 	async login(): Promise<void> {
@@ -182,8 +184,8 @@ export default class QBittorrent implements TorrentClient {
 			);
 		}
 		logger.info({
-			label: Label.QBITTORRENT,
-			message: `Logged in to qBittorrent ${this.version}`,
+			label: this.label,
+			message: `Logged in to ${this.version} successfully`,
 		});
 	}
 
@@ -221,7 +223,7 @@ export default class QBittorrent implements TorrentClient {
 							match.replace(hash, sanitizeInfoHash(hash)),
 					);
 		logger.verbose({
-			label: Label.QBITTORRENT,
+			label: this.label,
 			message: `Making request (${retries}) to ${path} with body ${bodyStr}`,
 		});
 
@@ -234,7 +236,7 @@ export default class QBittorrent implements TorrentClient {
 			});
 			if (response.status === 403 && retries > 0) {
 				logger.verbose({
-					label: Label.QBITTORRENT,
+					label: this.label,
 					message:
 						"Received 403 from API. Logging in again and retrying",
 				});
@@ -244,13 +246,13 @@ export default class QBittorrent implements TorrentClient {
 		} catch (e) {
 			if (retries > 0) {
 				logger.verbose({
-					label: Label.QBITTORRENT,
+					label: this.label,
 					message: `Request failed, ${retries} retries remaining: ${e.message}`,
 				});
 				return this.request(path, body, headers, retries - 1);
 			}
 			logger.verbose({
-				label: Label.QBITTORRENT,
+				label: this.label,
 				message: `Request failed after ${retries} retries: ${e.message}`,
 			});
 		}
@@ -621,7 +623,7 @@ export default class QBittorrent implements TorrentClient {
 		const torrents = await this.getAllTorrentInfo();
 		if (!torrents.length) {
 			logger.error({
-				label: Label.QBITTORRENT,
+				label: this.label,
 				message: "No torrents found in client",
 			});
 			return { searchees, newSearchees };
@@ -633,6 +635,7 @@ export default class QBittorrent implements TorrentClient {
 			infoHashes.add(infoHash);
 			const dbTorrent = await memDB("torrent")
 				.where("info_hash", infoHash)
+				.where("client_host", this.clientHost)
 				.first();
 			const refresh =
 				options?.refresh === undefined
@@ -649,14 +652,14 @@ export default class QBittorrent implements TorrentClient {
 			const files = await this.getFiles(torrent.hash);
 			if (!files) {
 				logger.verbose({
-					label: Label.QBITTORRENT,
+					label: this.label,
 					message: `Failed to get files for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}] (likely transient)`,
 				});
 				continue;
 			}
 			if (!files.length) {
 				logger.verbose({
-					label: Label.QBITTORRENT,
+					label: this.label,
 					message: `No files found for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}]: skipping`,
 				});
 				continue;
@@ -664,7 +667,7 @@ export default class QBittorrent implements TorrentClient {
 			const trackers = await this.getTrackers(torrent.hash);
 			if (!trackers) {
 				logger.verbose({
-					label: Label.QBITTORRENT,
+					label: this.label,
 					message: `Failed to get trackers for ${torrent.name} [${sanitizeInfoHash(torrent.hash)}] (likely transient)`,
 				});
 				continue;
@@ -681,6 +684,7 @@ export default class QBittorrent implements TorrentClient {
 				title,
 				files,
 				length,
+				clientHost: this.clientHost,
 				savePath,
 				category,
 				tags,
@@ -689,7 +693,7 @@ export default class QBittorrent implements TorrentClient {
 			newSearchees.push(searchee);
 			searchees.push(searchee);
 		}
-		await updateSearcheeClientDB(newSearchees, infoHashes);
+		await updateSearcheeClientDB(this.clientHost, newSearchees, infoHashes);
 		return { searchees, newSearchees };
 	}
 
@@ -808,20 +812,20 @@ export default class QBittorrent implements TorrentClient {
 				)
 			) {
 				logger.warn({
-					label: Label.QBITTORRENT,
+					label: this.label,
 					message: `Will not resume ${torrentLog}: state is ${torrentInfo.state}`,
 				});
 				return;
 			}
 			if (torrentInfo.amount_left > maxRemainingBytes) {
 				logger.warn({
-					label: Label.QBITTORRENT,
+					label: this.label,
 					message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 				});
 				return;
 			}
 			logger.info({
-				label: Label.QBITTORRENT,
+				label: this.label,
 				message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, { binary: true })} remaining`,
 			});
 			await this.request(
@@ -832,7 +836,7 @@ export default class QBittorrent implements TorrentClient {
 			return;
 		}
 		logger.warn({
-			label: Label.QBITTORRENT,
+			label: this.label,
 			message: `Will not resume torrent ${infoHash}: timeout`,
 		});
 	}
@@ -857,7 +861,7 @@ export default class QBittorrent implements TorrentClient {
 					);
 				} else if (searchee.infoHash) {
 					logger.warn({
-						label: Label.QBITTORRENT,
+						label: this.label,
 						message: `Searchee torrent may have been deleted, tagging may not meet expectations: ${getLogString(searchee)}`,
 					});
 				}
@@ -921,7 +925,7 @@ export default class QBittorrent implements TorrentClient {
 				await this.addTorrent(formData);
 			} catch (e) {
 				logger.error({
-					label: Label.QBITTORRENT,
+					label: this.label,
 					message: `Failed to add torrent (polling client to confirm): ${e.message}`,
 				});
 				logger.debug(e);
@@ -941,7 +945,7 @@ export default class QBittorrent implements TorrentClient {
 			return InjectionResult.SUCCESS;
 		} catch (e) {
 			logger.error({
-				label: Label.QBITTORRENT,
+				label: this.label,
 				message: `Injection failed for ${getLogString(newTorrent)}: ${e.message}`,
 			});
 			logger.debug(e);

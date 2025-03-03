@@ -39,6 +39,7 @@ import {
 	TorrentClient,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
+import { inspect } from "util";
 
 interface TorrentInfo {
 	name?: string;
@@ -80,12 +81,23 @@ type DelugeJSON<ResultType> = {
 };
 
 export default class Deluge implements TorrentClient {
-	readonly type = Label.DELUGE;
+	readonly url: string;
+	readonly clientHost: string;
+	readonly clientPriority: number;
+	readonly clientType = Label.DELUGE;
+	readonly label: string;
 	private delugeCookie: string | null = null;
 	private delugeLabel = TORRENT_TAG;
 	private delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
 	private isLabelEnabled: boolean;
 	private delugeRequestId: number = 0;
+
+	constructor(url: string, priority: number) {
+		this.url = url;
+		this.clientHost = new URL(url).host;
+		this.clientPriority = priority;
+		this.label = `${this.clientType}@${this.clientHost}`;
+	}
 
 	/**
 	 * validates the login and host for deluge webui
@@ -94,6 +106,10 @@ export default class Deluge implements TorrentClient {
 		const { torrentDir } = getRuntimeConfig();
 		await this.authenticate();
 		this.isLabelEnabled = await this.labelEnabled();
+		logger.info({
+			label: this.label,
+			message: `Logged in successfully`,
+		});
 
 		if (!torrentDir) return;
 		if (!readdirSync(torrentDir).some((f) => f.endsWith(".state"))) {
@@ -107,9 +123,8 @@ export default class Deluge implements TorrentClient {
 	 * connects and authenticates to the webui
 	 */
 	private async authenticate(): Promise<void> {
-		const { delugeRpcUrl } = getRuntimeConfig();
 		const { href, password } = extractCredentialsFromUrl(
-			delugeRpcUrl!,
+			this.url,
 		).unwrapOrThrow(
 			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
 		);
@@ -170,8 +185,10 @@ export default class Deluge implements TorrentClient {
 		params: unknown[],
 		retries = 1,
 	): Promise<Result<ResultType, ErrorType>> {
-		const { delugeRpcUrl } = getRuntimeConfig();
-		const { href } = extractCredentialsFromUrl(delugeRpcUrl!).unwrapOrThrow(
+		const msg = `Calling method ${method} with params ${inspect(params, { depth: null, compact: true })}`;
+		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
+		logger.verbose({ label: this.label, message });
+		const { href } = extractCredentialsFromUrl(this.url).unwrapOrThrow(
 			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
 		);
 		const headers = new Headers({ "Content-Type": "application/json" });
@@ -285,14 +302,14 @@ export default class Deluge implements TorrentClient {
 				torrentLog = `${torrentInfo.name} [${sanitizeInfoHash(infoHash)}]`;
 				if (torrentInfo.state !== "Paused") {
 					logger.warn({
-						label: Label.DELUGE,
+						label: this.label,
 						message: `Will not resume ${torrentLog}: state is ${torrentInfo.state}`,
 					});
 					return;
 				}
 				if (torrentInfo.total_remaining! > maxRemainingBytes) {
 					logger.warn({
-						label: Label.DELUGE,
+						label: this.label,
 						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 					});
 					return;
@@ -302,14 +319,14 @@ export default class Deluge implements TorrentClient {
 				continue;
 			}
 			logger.info({
-				label: Label.DELUGE,
+				label: this.label,
 				message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining`,
 			});
 			await this.call<string>("core.resume_torrent", [[infoHash]]);
 			return;
 		}
 		logger.warn({
-			label: Label.DELUGE,
+			label: this.label,
 			message: `Will not resume torrent ${infoHash}: timeout`,
 		});
 	}
@@ -380,7 +397,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.debug(e);
 			logger.warn({
-				label: Label.DELUGE,
+				label: this.label,
 				message: `Failed to label ${getLogString(newTorrent)} as ${label}: ${e.message}`,
 			});
 		}
@@ -410,7 +427,7 @@ export default class Deluge implements TorrentClient {
 			}
 			if (!path && (!searchee.infoHash || !torrentInfo!)) {
 				logger.debug({
-					label: Label.DELUGE,
+					label: this.label,
 					message: `Injection failure: ${getLogString(searchee)} was missing critical data.`,
 				});
 				return InjectionResult.FAILURE;
@@ -437,13 +454,13 @@ export default class Deluge implements TorrentClient {
 					return InjectionResult.ALREADY_EXISTS;
 				} else if (addResponseError) {
 					logger.debug({
-						label: Label.DELUGE,
+						label: this.label,
 						message: `Injection failed: ${addResponseError.message}`,
 					});
 					return InjectionResult.FAILURE;
 				} else {
 					logger.debug({
-						label: Label.DELUGE,
+						label: this.label,
 						message: `Unknown injection failure: ${getLogString(newTorrent)}`,
 					});
 					return InjectionResult.FAILURE;
@@ -467,7 +484,7 @@ export default class Deluge implements TorrentClient {
 			}
 		} catch (error) {
 			logger.error({
-				label: Label.DELUGE,
+				label: this.label,
 				message: `Injection failed: ${error}`,
 			});
 			logger.debug(error);
@@ -585,7 +602,9 @@ export default class Deluge implements TorrentClient {
 		infoHash: string,
 	): Promise<Result<boolean, "NOT_FOUND">> {
 		try {
-			const torrentInfo = await this.getTorrentInfo(infoHash);
+			const torrentInfo = await this.getTorrentInfo(infoHash, {
+				useVerbose: true,
+			});
 			return torrentInfo.complete ? resultOf(true) : resultOf(false);
 		} catch (e) {
 			return resultOfErr("NOT_FOUND");
@@ -634,7 +653,7 @@ export default class Deluge implements TorrentClient {
 		]);
 		if (torrentsRes.isErr()) {
 			logger.error({
-				label: Label.DELUGE,
+				label: this.label,
 				message: "Failed to get torrents from client",
 			});
 			logger.debug(torrentsRes.unwrapErr());
@@ -643,7 +662,7 @@ export default class Deluge implements TorrentClient {
 		const torrents = torrentsRes.unwrap().torrents;
 		if (!torrents || !Object.keys(torrents).length) {
 			logger.verbose({
-				label: Label.DELUGE,
+				label: this.label,
 				message: "No torrents found in client",
 			});
 			return { searchees, newSearchees };
@@ -653,6 +672,7 @@ export default class Deluge implements TorrentClient {
 			infoHashes.add(infoHash);
 			const dbTorrent = await memDB("torrent")
 				.where("info_hash", infoHash)
+				.where("client_host", this.clientHost)
 				.first();
 			const refresh =
 				options?.refresh === undefined
@@ -673,7 +693,7 @@ export default class Deluge implements TorrentClient {
 			}));
 			if (!files.length) {
 				logger.verbose({
-					label: Label.DELUGE,
+					label: this.label,
 					message: `No files found for ${torrent.name} [${sanitizeInfoHash(infoHash)}]: skipping`,
 				});
 				continue;
@@ -691,6 +711,7 @@ export default class Deluge implements TorrentClient {
 				title,
 				files,
 				length,
+				clientHost: this.clientHost,
 				savePath,
 				category,
 				tags,
@@ -699,7 +720,7 @@ export default class Deluge implements TorrentClient {
 			newSearchees.push(searchee);
 			searchees.push(searchee);
 		}
-		await updateSearcheeClientDB(newSearchees, infoHashes);
+		await updateSearcheeClientDB(this.clientHost, newSearchees, infoHashes);
 		return { searchees, newSearchees };
 	}
 
@@ -707,8 +728,12 @@ export default class Deluge implements TorrentClient {
 	 * returns information needed to complete/validate injection
 	 * @return Promise of TorrentInfo type
 	 * @param infoHash infohash to query for in the client
+	 * @param options.useVerbose use verbose instead of error logging
 	 */
-	private async getTorrentInfo(infoHash: string): Promise<TorrentInfo> {
+	private async getTorrentInfo(
+		infoHash: string,
+		options?: { useVerbose: boolean },
+	): Promise<TorrentInfo> {
 		let torrent: TorrentInfo;
 		try {
 			const params = [
@@ -759,9 +784,10 @@ export default class Deluge implements TorrentClient {
 				total_remaining: torrent.total_remaining,
 			};
 		} catch (e) {
-			logger.error({
-				label: Label.DELUGE,
-				message: `Failed to fetch torrent data: ${infoHash}: ${e.message}`,
+			const log = options?.useVerbose ? logger.verbose : logger.error;
+			log({
+				label: this.label,
+				message: `Failed to fetch torrent data for ${infoHash}: ${e.message}`,
 			});
 			logger.debug(e);
 			throw new Error("web.update_ui: failed to fetch data from client", {

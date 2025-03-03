@@ -275,13 +275,13 @@ export function getLogString(
 ) {
 	if (searchee.title === searchee.name) {
 		return searchee.infoHash
-			? `${color(searchee.title)} ${chalk.dim(`[${sanitizeInfoHash(searchee.infoHash)}]`)}`
+			? `${color(searchee.title)} ${chalk.dim(`[${sanitizeInfoHash(searchee.infoHash)}${searchee.clientHost ? `@${searchee.clientHost}` : ""}]`)}`
 			: searchee.path
 				? color(searchee.path)
 				: color(searchee.title);
 	}
 	return searchee.infoHash
-		? `${color(searchee.title)} ${chalk.dim(`[${searchee.name} [${sanitizeInfoHash(searchee.infoHash)}]]`)}`
+		? `${color(searchee.title)} ${chalk.dim(`[${searchee.name} [${sanitizeInfoHash(searchee.infoHash)}${searchee.clientHost ? `@${searchee.clientHost}` : ""}]]`)}`
 		: searchee.path
 			? `${color(searchee.title)} ${chalk.dim(`[${searchee.path}]`)}`
 			: `${color(searchee.title)} ${chalk.dim(`[${searchee.name}]`)}`;

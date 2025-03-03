@@ -37,6 +37,7 @@ import {
 	sanitizeInfoHash,
 	wait,
 } from "../utils.js";
+import { inspect } from "util";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
 type Method =
@@ -85,7 +86,18 @@ function doesAlreadyExist(
 
 export default class Transmission implements TorrentClient {
 	xTransmissionSessionId: string;
-	readonly type = Label.TRANSMISSION;
+	readonly url: string;
+	readonly clientHost: string;
+	readonly clientPriority: number;
+	readonly clientType = Label.TRANSMISSION;
+	readonly label: string;
+
+	constructor(url: string, priority: number) {
+		this.url = url;
+		this.clientHost = new URL(url).host;
+		this.clientPriority = priority;
+		this.label = `${this.clientType}@${this.clientHost}`;
+	}
 
 	private async request<T>(
 		method: Method,
@@ -93,10 +105,11 @@ export default class Transmission implements TorrentClient {
 		retries = 1,
 		timeout = 0,
 	): Promise<T> {
-		const { transmissionRpcUrl } = getRuntimeConfig();
-
+		const msg = `Calling method ${method} with params ${inspect(args, { depth: null, compact: true })}`;
+		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
+		logger.verbose({ label: this.label, message });
 		const { username, password, href } = extractCredentialsFromUrl(
-			transmissionRpcUrl!,
+			this.url,
 		).unwrapOrThrow(
 			new CrossSeedError("Transmission rpc url must be percent-encoded"),
 		);
@@ -141,16 +154,16 @@ export default class Transmission implements TorrentClient {
 		} catch (e) {
 			if (e instanceof SyntaxError) {
 				logger.error({
-					label: Label.TRANSMISSION,
+					label: this.label,
 					message: `Transmission returned non-JSON response`,
 				});
 				logger.debug({
-					label: Label.TRANSMISSION,
+					label: this.label,
 					message: response.clone().text(),
 				});
 			} else {
 				logger.error({
-					label: Label.TRANSMISSION,
+					label: this.label,
 					message: `Transmission responded with an error: ${e.message}`,
 				});
 				logger.debug(e);
@@ -164,11 +177,14 @@ export default class Transmission implements TorrentClient {
 		try {
 			await this.request("session-get", {}, 1, ms("10 seconds"));
 		} catch (e) {
-			const { transmissionRpcUrl } = getRuntimeConfig();
 			throw new CrossSeedError(
-				`Failed to reach Transmission at ${transmissionRpcUrl}: ${e.message}`,
+				`Failed to reach Transmission at ${this.clientHost}: ${e.message}`,
 			);
 		}
+		logger.info({
+			label: this.label,
+			message: `Logged in successfully`,
+		});
 
 		if (!torrentDir) return;
 		if (!readdirSync(torrentDir).some((f) => f.endsWith(".torrent"))) {
@@ -296,7 +312,7 @@ export default class Transmission implements TorrentClient {
 			).torrents;
 		} catch (e) {
 			logger.error({
-				label: Label.TRANSMISSION,
+				label: this.label,
 				message: `Failed to get torrents from client: ${e.message}`,
 			});
 			logger.debug(e);
@@ -304,7 +320,7 @@ export default class Transmission implements TorrentClient {
 		}
 		if (!torrents.length) {
 			logger.error({
-				label: Label.TRANSMISSION,
+				label: this.label,
 				message: "No torrents found in client",
 			});
 			return { searchees, newSearchees };
@@ -314,6 +330,7 @@ export default class Transmission implements TorrentClient {
 			infoHashes.add(infoHash);
 			const dbTorrent = await memDB("torrent")
 				.where("info_hash", infoHash)
+				.where("client_host", this.clientHost)
 				.first();
 			const refresh =
 				options?.refresh === undefined
@@ -334,7 +351,7 @@ export default class Transmission implements TorrentClient {
 			}));
 			if (!files.length) {
 				logger.verbose({
-					label: Label.TRANSMISSION,
+					label: this.label,
 					message: `No files found for ${torrent.name} [${sanitizeInfoHash(infoHash)}]: skipping`,
 				});
 				continue;
@@ -357,6 +374,7 @@ export default class Transmission implements TorrentClient {
 				title,
 				files,
 				length,
+				clientHost: this.clientHost,
 				savePath,
 				category,
 				tags,
@@ -365,7 +383,7 @@ export default class Transmission implements TorrentClient {
 			newSearchees.push(searchee);
 			searchees.push(searchee);
 		}
-		await updateSearcheeClientDB(newSearchees, infoHashes);
+		await updateSearcheeClientDB(this.clientHost, newSearchees, infoHashes);
 		return { searchees, newSearchees };
 	}
 
@@ -412,20 +430,20 @@ export default class Transmission implements TorrentClient {
 			const torrentLog = `${name} [${sanitizeInfoHash(infoHash)}]`;
 			if (status !== 0) {
 				logger.warn({
-					label: Label.TRANSMISSION,
+					label: this.label,
 					message: `Will not resume ${torrentLog}: status is ${status}`,
 				});
 				return;
 			}
 			if (leftUntilDone > maxRemainingBytes) {
 				logger.warn({
-					label: Label.TRANSMISSION,
+					label: this.label,
 					message: `Will not resume ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 				});
 				return;
 			}
 			logger.info({
-				label: Label.TRANSMISSION,
+				label: this.label,
 				message: `Resuming ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining`,
 			});
 			await this.request<void>("torrent-start", {
@@ -434,7 +452,7 @@ export default class Transmission implements TorrentClient {
 			return;
 		}
 		logger.warn({
-			label: Label.TRANSMISSION,
+			label: this.label,
 			message: `Will not resume torrent ${infoHash}: timeout`,
 		});
 	}
