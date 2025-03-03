@@ -4,6 +4,7 @@ import { basename, dirname, join, relative } from "path";
 import ms from "ms";
 import { getClient, TorrentMetadataInClient } from "./clients/TorrentClient.js";
 import {
+	AKA_REGEX,
 	ANIME_GROUP_REGEX,
 	ANIME_REGEX,
 	ARR_DIR_REGEX,
@@ -432,6 +433,121 @@ export async function createSearcheeFromPath(
 	return resultOfErr(new Error(msg));
 }
 
+export function getAllTitles(titles: string[]): string[] {
+	const allTitles = titles.slice();
+	for (const title of titles) {
+		if (AKA_REGEX.test(title) && title.trim().toLowerCase() !== "aka") {
+			allTitles.push(...title.split(AKA_REGEX));
+		}
+	}
+	return allTitles;
+}
+
+export function getMovieKeys(stem: string): {
+	ensembleTitles: string[];
+	keyTitles: string[];
+	year: number;
+} | null {
+	const match = stem.match(MOVIE_REGEX);
+	if (!match) return null;
+	const titles = getAllTitles([match.groups!.title]);
+	const year = extractInt(match.groups!.year);
+	const keyTitles: string[] = [];
+	const ensembleTitles: string[] = [];
+	for (const title of titles) {
+		const keyTitle = createKeyTitle(title);
+		if (!keyTitle) continue;
+		keyTitles.push(keyTitle);
+		ensembleTitles.push(`${title}.${year}`);
+	}
+	if (!keyTitles.length) return null;
+	return { ensembleTitles, keyTitles, year };
+}
+
+export function getSeasonKeys(stem: string): {
+	ensembleTitles: string[];
+	keyTitles: string[];
+	season: string;
+} | null {
+	const match = stem.match(SEASON_REGEX);
+	if (!match) return null;
+	const titles = getAllTitles([match.groups!.title]);
+	const season = `S${extractInt(match.groups!.season)}`;
+	const keyTitles: string[] = [];
+	const ensembleTitles: string[] = [];
+	for (const title of titles) {
+		const keyTitle = createKeyTitle(title);
+		if (!keyTitle) continue;
+		keyTitles.push(keyTitle);
+		ensembleTitles.push(`${title}.${season}`);
+	}
+	if (!keyTitles.length) return null;
+	return { ensembleTitles, keyTitles, season };
+}
+
+export function getEpisodeKeys(stem: string): {
+	ensembleTitles: string[];
+	keyTitles: string[];
+	season: string | undefined;
+	episode: number | string;
+} | null {
+	const match = stem.match(EP_REGEX);
+	if (!match) return null;
+	const titles = getAllTitles([match.groups!.title]);
+	const season = match!.groups!.season
+		? `S${extractInt(match!.groups!.season)}`
+		: match!.groups!.year
+			? `S${match!.groups!.year}`
+			: undefined;
+	const keyTitles: string[] = [];
+	const ensembleTitles: string[] = [];
+	for (const title of titles) {
+		const keyTitle = createKeyTitle(title);
+		if (!keyTitle) continue;
+		keyTitles.push(keyTitle);
+		ensembleTitles.push(`${title}${season ? `.${season}` : ""}`);
+	}
+	if (!keyTitles.length) return null;
+	const episode = match!.groups!.episode
+		? extractInt(match!.groups!.episode)
+		: `${match!.groups!.month}.${match!.groups!.day}`;
+	return { ensembleTitles, keyTitles, season, episode };
+}
+
+export function getAnimeKeys(stem: string): {
+	ensembleTitles: string[];
+	keyTitles: string[];
+	release: number;
+} | null {
+	const match = stem.match(ANIME_REGEX);
+	if (!match) return null;
+	const titles = getAllTitles([match.groups!.title, match.groups!.altTitle]);
+	const keyTitles: string[] = [];
+	const ensembleTitles: string[] = [];
+	for (const title of titles) {
+		if (!title) continue;
+		if (isBadTitle(title)) continue;
+		const keyTitle = createKeyTitle(title);
+		if (!keyTitle) continue;
+		keyTitles.push(keyTitle);
+		ensembleTitles.push(title);
+	}
+	if (!keyTitles.length) return null;
+	const release = extractInt(match!.groups!.release);
+	return { ensembleTitles, keyTitles, release };
+}
+
+export function getReleaseGroup(stem: string): string | null {
+	const predictedGroupMatch = stem.match(RELEASE_GROUP_REGEX);
+	if (!predictedGroupMatch) {
+		return null;
+	}
+	const parsedGroupMatchString = predictedGroupMatch!.groups!.group.trim();
+	return BAD_GROUP_PARSE_REGEX.test(parsedGroupMatchString)
+		? null
+		: parsedGroupMatchString;
+}
+
 export function getKeyMetaInfo(stem: string): string {
 	const resM = stem.match(RES_STRICT_REGEX)?.groups?.res;
 	const res = resM ? `.${resM}` : "";
@@ -446,91 +562,6 @@ export function getKeyMetaInfo(stem: string): string {
 		return `${res}${source}-${groupAnimeM}`.toLowerCase();
 	}
 	return `${res}${source}`.toLowerCase();
-}
-
-export function getMovieKey(stem: string): {
-	ensembleTitle: string;
-	keyTitle: string;
-	year: number;
-} | null {
-	const match = stem.match(MOVIE_REGEX);
-	if (!match) return null;
-	const keyTitle = createKeyTitle(match.groups!.title);
-	if (!keyTitle) return null;
-	const year = extractInt(match.groups!.year);
-	const ensembleTitle = `${match.groups!.title}.${year}`;
-	return { ensembleTitle, keyTitle, year };
-}
-
-export function getSeasonKey(stem: string): {
-	ensembleTitle: string;
-	keyTitle: string;
-	season: string;
-} | null {
-	const match = stem.match(SEASON_REGEX);
-	if (!match) return null;
-	const keyTitle = createKeyTitle(match.groups!.title);
-	if (!keyTitle) return null;
-	const season = `S${extractInt(match.groups!.season)}`;
-	const ensembleTitle = `${match.groups!.title}.${season}`;
-	return { ensembleTitle, keyTitle, season };
-}
-
-export function getEpisodeKey(stem: string): {
-	ensembleTitle: string;
-	keyTitle: string;
-	season: string | undefined;
-	episode: number | string;
-} | null {
-	const match = stem.match(EP_REGEX);
-	if (!match) return null;
-	const keyTitle = createKeyTitle(match.groups!.title);
-	if (!keyTitle) return null;
-	const season = match!.groups!.season
-		? `S${extractInt(match!.groups!.season)}`
-		: match!.groups!.year
-			? `S${match!.groups!.year}`
-			: undefined;
-	const ensembleTitle = `${match!.groups!.title}${season ? `.${season}` : ""}`;
-	const episode = match!.groups!.episode
-		? extractInt(match!.groups!.episode)
-		: `${match!.groups!.month}.${match!.groups!.day}`;
-	return { ensembleTitle, keyTitle, season, episode };
-}
-
-export function getAnimeKeys(stem: string): {
-	ensembleTitles: string[];
-	keyTitles: string[];
-	release: number;
-} | null {
-	const match = stem.match(ANIME_REGEX);
-	if (!match) return null;
-	const firstTitle = match!.groups!.title;
-	const altTitle = match!.groups!.altTitle;
-	const keyTitles: string[] = [];
-	const ensembleTitles: string[] = [];
-	for (const title of [firstTitle, altTitle]) {
-		if (!title) continue;
-		if (isBadTitle(title)) continue;
-		const keyTitle = createKeyTitle(title);
-		if (!keyTitle) continue;
-		keyTitles.push(keyTitle);
-		ensembleTitles.push(title);
-	}
-	if (keyTitles.length === 0) return null;
-	const release = extractInt(match!.groups!.release);
-	return { ensembleTitles, keyTitles, release };
-}
-
-export function getReleaseGroup(stem: string): string | null {
-	const predictedGroupMatch = stem.match(RELEASE_GROUP_REGEX);
-	if (!predictedGroupMatch) {
-		return null;
-	}
-	const parsedGroupMatchString = predictedGroupMatch!.groups!.group.trim();
-	return BAD_GROUP_PARSE_REGEX.test(parsedGroupMatchString)
-		? null
-		: parsedGroupMatchString;
 }
 
 const logEnsemble = (
@@ -587,30 +618,37 @@ function organizeEnsembleKeys(
 	if (options.useFilters) {
 		for (const searchee of allSearchees) {
 			const stem = stripExtension(searchee.title);
-			const seasonKey = getSeasonKey(stem);
-			if (!seasonKey) continue;
+			const seasonKeys = getSeasonKeys(stem);
+			if (!seasonKeys) continue;
 			const info = getKeyMetaInfo(stem);
-			const key = `${seasonKey.keyTitle}.${seasonKey.season}${info}`;
-			if (!existingSeasonMap.has(key)) {
-				existingSeasonMap.set(key, []);
+			const keys = seasonKeys.keyTitles.map(
+				(k) => `${k}.${seasonKeys.season}${info}`,
+			);
+			for (const key of keys) {
+				if (!existingSeasonMap.has(key)) existingSeasonMap.set(key, []);
+				existingSeasonMap.get(key)!.push(searchee);
 			}
-			existingSeasonMap.get(key)!.push(searchee);
 		}
 	}
 	const keyMap = new Map<string, Map<number | string, SearcheeWithLabel[]>>();
 	const ensembleTitleMap = new Map<string, string>();
 	for (const searchee of allSearchees) {
 		const stem = stripExtension(searchee.title);
-		const episodeKey = getEpisodeKey(stem);
-		if (episodeKey) {
+		const episodeKeys = getEpisodeKeys(stem);
+		if (episodeKeys) {
 			const info = getKeyMetaInfo(stem);
-			const key = `${episodeKey.keyTitle}${episodeKey.season ? `.${episodeKey.season}` : ""}${info}`;
-			const ensembleTitle = `${episodeKey.ensembleTitle}${info}`;
+			const keys = episodeKeys.keyTitles.map(
+				(k) =>
+					`${k}${episodeKeys.season ? `.${episodeKeys.season}` : ""}${info}`,
+			);
+			const ensembleTitles = episodeKeys.ensembleTitles.map(
+				(t) => `${t}${info}`,
+			);
 			parseEnsembleKeys(
 				searchee,
-				[key],
-				[ensembleTitle],
-				episodeKey.episode,
+				keys,
+				ensembleTitles,
+				episodeKeys.episode,
 				existingSeasonMap,
 				keyMap,
 				ensembleTitleMap,

@@ -28,10 +28,10 @@ import {
 	createSearcheeFromTorrentFile,
 	File,
 	getAnimeKeys,
-	getEpisodeKey,
+	getEpisodeKeys,
 	getLargestFile,
-	getMovieKey,
-	getSeasonKey,
+	getMovieKeys,
+	getSeasonKeys,
 	SearcheeLabel,
 	SearcheeWithInfoHash,
 	SearcheeWithoutInfoHash,
@@ -304,30 +304,33 @@ export async function findAllTorrentFilesInDir(
 export async function createEnsemblePieces(
 	title: string,
 	files: File[],
-): Promise<{
-	key: string;
-	element: string | number;
-	largestFile: File;
-} | null> {
-	const episodeKey = getEpisodeKey(stripExtension(title));
-	if (!episodeKey) return null;
-	const { keyTitle, season, episode } = episodeKey;
-	const key = `${keyTitle}${season ? `.${season}` : ""}`;
-	const element = episode;
+): Promise<
+	| {
+			key: string;
+			element: string | number;
+			largestFile: File;
+	  }[]
+	| null
+> {
+	const episodeKeys = getEpisodeKeys(stripExtension(title));
+	if (!episodeKeys) return null;
+	const element = episodeKeys.episode;
 	const largestFile = getLargestFile(files);
-	return { key, element, largestFile };
+	return episodeKeys.keyTitles.map((keyTitle) => {
+		const key = `${keyTitle}${episodeKeys.season ? `.${episodeKeys.season}` : ""}`;
+		return { key, element, largestFile };
+	});
 }
 
 async function cacheEnsembleTorrentEntry(
 	searchee: SearcheeWithInfoHash,
 	torrentSavePaths?: Map<string, string>,
-): Promise<EnsembleEntry | null> {
+): Promise<EnsembleEntry[] | null> {
 	const ensemblePieces = await createEnsemblePieces(
 		searchee.title,
 		searchee.files,
 	);
-	if (!ensemblePieces) return null;
-	const { key, element, largestFile } = ensemblePieces;
+	if (!ensemblePieces || !ensemblePieces.length) return null;
 
 	let savePath: string | undefined;
 	if (searchee.savePath) {
@@ -351,12 +354,12 @@ async function cacheEnsembleTorrentEntry(
 		return null;
 	}
 
-	return {
-		path: join(savePath, largestFile.path),
+	return ensemblePieces.map((ensemblePiece) => ({
+		path: join(savePath, ensemblePiece.largestFile.path),
 		info_hash: searchee.infoHash,
-		ensemble: key,
-		element,
-	};
+		ensemble: ensemblePiece.key,
+		element: ensemblePiece.element,
+	}));
 }
 
 async function indexTorrents(options: { startup: boolean }): Promise<void> {
@@ -408,7 +411,9 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 				cacheEnsembleTorrentEntry(searchee, infoHashPathMap),
 			),
 		)
-	).filter(isTruthy);
+	)
+		.flat()
+		.filter(isTruthy);
 	await inBatches(ensembleRows, async (batch) => {
 		await memDB("ensemble").insert(batch).onConflict("path").merge();
 	});
@@ -532,21 +537,21 @@ function getKeysFromName(name: string): {
 	useFallback: boolean;
 } {
 	const stem = stripExtension(name);
-	const episodeKey = getEpisodeKey(stem);
-	if (episodeKey) {
-		const keyTitles = [episodeKey.keyTitle];
-		const element = `${episodeKey.season ? `${episodeKey.season}.` : ""}${episodeKey.episode}`;
+	const episodeKeys = getEpisodeKeys(stem);
+	if (episodeKeys) {
+		const keyTitles = episodeKeys.keyTitles;
+		const element = `${episodeKeys.season ? `${episodeKeys.season}.` : ""}${episodeKeys.episode}`;
 		return { keyTitles, element, useFallback: false };
 	}
-	const seasonKey = getSeasonKey(stem);
-	if (seasonKey) {
-		const keyTitles = [seasonKey.keyTitle];
-		const element = seasonKey.season;
+	const seasonKeys = getSeasonKeys(stem);
+	if (seasonKeys) {
+		const keyTitles = seasonKeys.keyTitles;
+		const element = seasonKeys.season;
 		return { keyTitles, element, useFallback: false };
 	}
-	const movieKey = getMovieKey(stem);
-	if (movieKey) {
-		const keyTitles = [movieKey.keyTitle];
+	const movieKeys = getMovieKeys(stem);
+	if (movieKeys) {
+		const keyTitles = movieKeys.keyTitles;
 		return { keyTitles, useFallback: false };
 	}
 	const animeKeys = getAnimeKeys(stem);
@@ -573,7 +578,8 @@ export async function getSimilarByName(name: string): Promise<{
 		return { keys: [], clientSearchees, dataSearchees };
 	}
 	const candidateMaxDistance = Math.floor(
-		Math.max(...keyTitles.map((keyTitle) => keyTitle.length)) /
+		keyTitles.reduce((sum, title) => sum + title.length, 0) /
+			keyTitles.length /
 			LEVENSHTEIN_DIVISOR,
 	);
 
@@ -587,9 +593,12 @@ export async function getSimilarByName(name: string): Promise<{
 			const maxDistance = Math.max(
 				candidateMaxDistance,
 				Math.floor(
-					Math.max(
-						...entry.keyTitles.map((keyTitle) => keyTitle.length),
-					) / LEVENSHTEIN_DIVISOR,
+					entry.keyTitles.reduce(
+						(sum, title) => sum + title.length,
+						0,
+					) /
+						entry.keyTitles.length /
+						LEVENSHTEIN_DIVISOR,
 				),
 			);
 			return entry.keyTitles.some((dbKeyTitle) => {

@@ -44,7 +44,7 @@ import {
 	createSearcheeFromTorrentFile,
 	File,
 	getNewestFileAge,
-	getSeasonKey,
+	getSeasonKeys,
 	Searchee,
 	SearcheeLabel,
 	SearcheeWithLabel,
@@ -400,18 +400,18 @@ async function getEnsembleForCandidate(
 ): Promise<{ searchees: SearcheeWithLabel[]; method: string } | null> {
 	const { seasonFromEpisodes } = getRuntimeConfig();
 	if (!seasonFromEpisodes) return null;
-	const seasonKey = getSeasonKey(stripExtension(candidate.name));
-	if (!seasonKey) return null;
+	const seasonKeys = getSeasonKeys(stripExtension(candidate.name));
+	if (!seasonKeys) return null;
 	const method = "ensemble";
 
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
-	const { ensembleTitle, keyTitle, season } = seasonKey;
-	const key = `${keyTitle}.${season}`;
-	const ensemble = await memDB("ensemble").where({ ensemble: key });
+	const { ensembleTitles, keyTitles, season } = seasonKeys;
+	const keys = keyTitles.map((keyTitle) => `${keyTitle}.${season}`);
+	const ensemble = await memDB("ensemble").whereIn("ensemble", keys);
 	if (ensemble.length === 0) {
 		logger.verbose({
 			label: searcheeLabel,
-			message: `Did not find an ${method} ${ensembleTitle} for ${candidateLog}`,
+			message: `Did not find an ${method} [${ensembleTitles}] for ${candidateLog}`,
 		});
 		return null;
 	}
@@ -438,7 +438,7 @@ async function getEnsembleForCandidate(
 	if (files.length === 0) {
 		logger.verbose({
 			label: searcheeLabel,
-			message: `Did not find any files for ${method} ${ensembleTitle} for ${candidateLog}: sources may be incomplete or missing`,
+			message: `Did not find any files for ${method} [${ensembleTitles}] for ${candidateLog}: sources may be incomplete or missing`,
 		});
 		return null;
 	}
@@ -456,19 +456,18 @@ async function getEnsembleForCandidate(
 			return acc + lengths.reduce((a, b) => a + b) / lengths.length;
 		}, 0),
 	);
-	const searchees: SearcheeWithLabel[] = [
-		{
-			name: ensembleTitle,
-			title: ensembleTitle,
-			files: files,
-			length: totalLength,
-			mtimeMs: await getNewestFileAge(files.map((f) => f.path)),
-			label: searcheeLabel,
-		},
-	];
+	const mtimeMs = await getNewestFileAge(files.map((f) => f.path));
+	const searchees: SearcheeWithLabel[] = ensembleTitles.map((title) => ({
+		name: title,
+		title,
+		files,
+		length: totalLength,
+		mtimeMs,
+		label: searcheeLabel,
+	}));
 	logger.verbose({
 		label: searcheeLabel,
-		message: `Using ${method} ${ensembleTitle} for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
+		message: `Using ${method} [${ensembleTitles}] for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
 	});
 	return { searchees, method };
 }
