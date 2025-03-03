@@ -38,6 +38,7 @@ import {
 import {
 	extractCredentialsFromUrl,
 	extractInt,
+	getPathParts,
 	getLogString,
 	humanReadableSize,
 	sanitizeInfoHash,
@@ -116,6 +117,8 @@ export default class QBittorrent implements TorrentClient {
 	url: { username: string; password: string; href: string };
 	version: string;
 	versionMajor: number;
+	versionMinor: number;
+	versionPatch: number;
 	readonly type = Label.QBITTORRENT;
 
 	constructor() {
@@ -165,6 +168,19 @@ export default class QBittorrent implements TorrentClient {
 		}
 		this.version = version;
 		this.versionMajor = extractInt(this.version);
+		this.versionMinor = extractInt(this.version.split(".")[1]);
+		this.versionPatch = extractInt(this.version.split(".")[2]);
+		if (
+			this.versionMajor < 4 ||
+			(this.versionMajor === 4 && this.versionMinor < 3) ||
+			(this.versionMajor === 4 &&
+				this.versionMinor === 3 &&
+				this.versionPatch < 1)
+		) {
+			throw new CrossSeedError(
+				`qBittorrent minimum supported version is v4.3.1, current version is ${this.version}`,
+			);
+		}
 		logger.info({
 			label: Label.QBITTORRENT,
 			message: `Logged in to qBittorrent ${this.version}`,
@@ -180,7 +196,7 @@ export default class QBittorrent implements TorrentClient {
 		const { resume_data_storage_type } = await this.getPreferences();
 		if (resume_data_storage_type === "SQLite") {
 			throw new CrossSeedError(
-				"torrentDir is not compatible with SQLite mode in qBittorrent, use: https://www.cross-seed.org/docs/basics/options#useclienttorrents",
+				"torrentDir is not compatible with SQLite mode in qBittorrent, use https://www.cross-seed.org/docs/basics/options#useclienttorrents",
 			);
 		}
 		if (!readdirSync(torrentDir).some((f) => f.endsWith(".fastresume"))) {
@@ -255,6 +271,14 @@ export default class QBittorrent implements TorrentClient {
 		return JSON.parse(responseText);
 	}
 
+	/**
+	 * Always returns "Original" for API searchees due to isSubfolderContentLayout.
+	 * This is not an issue since it's either a MATCH or we are linking.
+	 * @param searchee the Searchee the match was sourced from
+	 * @param searcheeInfo the torrent info from the searchee
+	 * @param path the destinationDir for the new torrent
+	 * @returns the layout to use for the new torrent
+	 */
 	private getLayoutForNewTorrent(
 		searchee: Searchee,
 		searcheeInfo: TorrentInfo | undefined,
@@ -406,12 +430,29 @@ export default class QBittorrent implements TorrentClient {
 		meta: SearcheeWithInfoHash | Metafile,
 		options: { onlyCompleted: boolean },
 	): Promise<
-		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
+		Result<
+			string,
+			| "NOT_FOUND"
+			| "TORRENT_NOT_COMPLETE"
+			| "INVALID_DATA"
+			| "UNKNOWN_ERROR"
+		>
 	> {
+		const { torrentDir } = getRuntimeConfig();
 		try {
 			const torrentInfo = await this.getTorrentInfo(meta.infoHash);
 			if (!torrentInfo) {
 				return resultOfErr("NOT_FOUND");
+			}
+			if (
+				torrentDir &&
+				this.isNoSubfolderContentLayout(meta, torrentInfo)
+			) {
+				logger.error({
+					label: Label.QBITTORRENT,
+					message: `NoSubfolder content layout is not supported with torrentDir, use https://www.cross-seed.org/docs/basics/options#useclienttorrents: ${torrentInfo.name} [${sanitizeInfoHash(torrentInfo.hash)}]`,
+				});
+				return resultOfErr("INVALID_DATA");
 			}
 			if (
 				options.onlyCompleted &&
@@ -438,6 +479,7 @@ export default class QBittorrent implements TorrentClient {
 		onlyCompleted: boolean;
 		v1HashOnly?: boolean;
 	}): Promise<Map<string, string>> {
+		const { torrentDir } = getRuntimeConfig();
 		const torrents = await this.getAllTorrentInfo();
 		const torrentSavePaths = new Map<string, string>();
 		const infoHashMetaMap = options.metas.reduce((acc, meta) => {
@@ -445,9 +487,6 @@ export default class QBittorrent implements TorrentClient {
 			return acc;
 		}, new Map<string, SearcheeWithInfoHash | Metafile>());
 		for (const torrent of torrents) {
-			if (options.onlyCompleted && !this.isTorrentInfoComplete(torrent)) {
-				continue;
-			}
 			const meta =
 				infoHashMetaMap.get(torrent.hash) ||
 				(torrent.infohash_v2 &&
@@ -455,6 +494,18 @@ export default class QBittorrent implements TorrentClient {
 				(torrent.infohash_v1 &&
 					infoHashMetaMap.get(torrent.infohash_v1)) ||
 				undefined;
+			if (
+				torrentDir &&
+				meta &&
+				this.isNoSubfolderContentLayout(meta, torrent)
+			) {
+				throw new CrossSeedError(
+					`NoSubfolder content layout is not supported with torrentDir, use https://www.cross-seed.org/docs/basics/options#useclienttorrents: ${torrent.name} [${sanitizeInfoHash(torrent.hash)}]`,
+				);
+			}
+			if (options.onlyCompleted && !this.isTorrentInfoComplete(torrent)) {
+				continue;
+			}
 			const savePath = meta
 				? this.getCorrectSavePath(meta, torrent)
 				: torrent.save_path;
@@ -668,21 +719,62 @@ export default class QBittorrent implements TorrentClient {
 		].includes(torrentInfo.state);
 	}
 
+	/**
+	 * This can only return true if the searchee is from a torrent file, not API.
+	 * Since we get the file structure from the API, it's already accounted for.
+	 * This does NOT check if the torrent was added with "Don't Create Subfolder".
+	 * @param data the Searchee or Metafile
+	 * @param dataInfo the TorrentInfo
+	 * @returns whether the torrent was added with "Create Subfolder"
+	 */
 	isSubfolderContentLayout(
 		data: Searchee | Metafile,
 		dataInfo: TorrentInfo,
 	): boolean {
+		const { useClientTorrents } = getRuntimeConfig();
+		if (useClientTorrents) return false;
 		if (data.files.length > 1) return false;
-		if (path.dirname(data.files[0].path) !== ".") return false;
 		let dirname = path.posix.dirname;
 		let resolve = path.posix.resolve;
 		if (ABS_WIN_PATH_REGEX.test(dataInfo.content_path)) {
 			dirname = path.win32.dirname;
 			resolve = path.win32.resolve;
 		}
+		if (dirname(data.files[0].path) !== ".") return false;
 		return (
 			resolve(dirname(dataInfo.content_path)) !==
 			resolve(dataInfo.save_path)
+		);
+	}
+
+	/**
+	 * This can only return true if the searchee is from a torrent file, not API.
+	 * Since we get the file structure from the API, it's already accounted for.
+	 * This does NOT check if the torrent was added with "Create Subfolder".
+	 * @param data the Searchee or Metafile
+	 * @param dataInfo the TorrentInfo
+	 * @returns whether the torrent was added with "Don't Create Subfolder"
+	 */
+	isNoSubfolderContentLayout(
+		data: Searchee | Metafile,
+		dataInfo: TorrentInfo,
+	): boolean {
+		const { useClientTorrents } = getRuntimeConfig();
+		if (useClientTorrents) return false;
+		if (data.files.length > 1) {
+			return dataInfo.content_path === dataInfo.save_path;
+		}
+		let dirname = path.posix.dirname;
+		let relative = path.posix.relative;
+		if (ABS_WIN_PATH_REGEX.test(dataInfo.content_path)) {
+			dirname = path.win32.dirname;
+			relative = path.win32.relative;
+		}
+		if (dirname(data.files[0].path) === ".") return false;
+		const clientPath = relative(dataInfo.save_path, dataInfo.content_path);
+		return (
+			getPathParts(clientPath, dirname).length <
+			getPathParts(data.files[0].path, dirname).length
 		);
 	}
 
