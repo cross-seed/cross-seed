@@ -13,14 +13,8 @@ function App() {
     trpc.createClient({
       links: [
         httpBatchLink({
-          url: 'http://192.168.1.234:4000/api',
-          fetch(url, options) {
-            // console.log('making request to: ', url, options);
-            return fetch(url, {
-              ...options,
-              // credentials: 'include',
-            });
-          },
+          // base url of the backend/server API
+          url: 'http://localhost:3000/api',
         }),
       ],
     }),
