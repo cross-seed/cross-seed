@@ -26,7 +26,7 @@ app.options('*', (req, res) => {
 app.use(
   cors({
     origin: `${URL_CLIENT}`,
-    // credentials: true,
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['content-type', 'Authorization', 'trpc-batch'],
   }),
@@ -36,6 +36,7 @@ app.use(
   '/api',
   createExpressMiddleware({
     router: appRouter,
+    createContext: () => ({}),
   }),
 );
 
