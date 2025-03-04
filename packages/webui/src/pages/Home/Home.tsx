@@ -1,6 +1,7 @@
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { trpc } from '../../lib/trpc';
 import { cn } from '../../lib/utils';
+import { formatDistanceToNow } from 'date-fns';
 
 export function HealthCheck() {
   const Healthcheck = trpc.healthcheck.useQuery();
@@ -33,10 +34,9 @@ export function HealthCheck() {
           Status:{' '}
           <span
             className={cn('font-medium', {
-              'text-green-500': Healthcheck.data?.status === 'ok',
-              'text-red-500': Healthcheck.data?.status === 'error',
-              'text-yellow-500': Healthcheck.data?.status === 'warning',
-              'text-slate-500': Healthcheck.data?.status === 'unknown',
+              'text-green-500': Healthcheck.data?.status.toLowerCase() === 'ok',
+              'text-red-500':
+                Healthcheck.data?.status.toLowerCase() === 'error',
             })}
           >
             {Healthcheck.data?.status ?? 'unknown'}
@@ -44,7 +44,9 @@ export function HealthCheck() {
         </p>
         <p>
           Last check:{' '}
-          <span className="">{Healthcheck.data?.timestamp ?? 'unknown'}</span>
+          <span className="">
+            {formatDistanceToNow(Healthcheck.data?.timestamp) ?? 'unknown'}
+          </span>
         </p>
       </section>
       <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
