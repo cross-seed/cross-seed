@@ -15,69 +15,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import {
-  Action,
-  LinkType,
-  MatchMode,
-} from '@/features/ConfigForm/types/Form.types';
-import { baseValidationSchema } from './types/Form.types';
+import { Action, LinkType, MatchMode } from '../../../../shared/constants';
+import { baseValidationSchema, Config } from '@/types/config';
 import { Button } from '@/components/ui/button';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { trpc } from '@/lib/trpc';
+import { defaultConfig } from '../../../../shared/constants';
 
 type FormProps = {
   className?: string;
 };
 
-type Config = z.infer<typeof baseValidationSchema>;
-
 export const ConfigForm: FC<FormProps> = ({ className }) => {
-  const form = useForm<Config>({
-    defaultValues: {
-      delay: 30,
-      torznab: [''],
-      useClientTorrents: false,
-      dataDirs: [''],
-      matchMode: MatchMode.STRICT,
-      skipRecheck: true,
-      autoResumeMaxDownload: 52428800,
-      linkCategory: null,
-      linkDir: null,
-      linkDirs: [''],
-      linkType: LinkType.HARDLINK,
-      flatLinking: false,
-      maxDataDepth: 2,
-      torrentDir: null,
-      outputDir: '',
-      injectDir: '',
-      includeSingleEpisodes: false,
-      includeNonVideos: false,
-      fuzzySizeThreshold: 1,
-      seasonFromEpisodes: null,
-      excludeOlder: null,
-      excludeRecentSearch: null,
-      action: Action.INJECT,
-      qbittorrentUrl: null,
-      rtorrentRpcUrl: null,
-      transmissionRpcUrl: null,
-      delugeRpcUrl: null,
-      duplicateCategories: false,
-      notificationWebhookUrls: [''],
-      notificationWebhookUrl: null,
-      port: null,
-      host: null,
-      rssCadence: null,
-      searchCadence: null,
-      snatchTimeout: null,
-      searchTimeout: null,
-      searchLimit: null,
-      verbose: false,
-      torrents: [''],
-      blockList: [''],
-      apiKey: null,
-      radarr: [''],
-      sonarr: [''],
-    },
+  const {
     onSubmit: async ({ value }) => {
       console.log('submitting form', value);
     },
