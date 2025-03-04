@@ -36,6 +36,7 @@ import {
 	getMediaType,
 } from "./utils.js";
 
+const srcTestName = "test.cross-seed";
 const linkTestName = "cross-seed.test";
 
 interface LinkResult {
@@ -467,11 +468,23 @@ export function getLinkDir(pathStr: string): string | null {
 			if (fs.statSync(linkDir).dev === pathDev) return linkDir;
 		}
 	}
-	const srcFile = pathStat.isFile()
+	let srcFile = pathStat.isFile()
 		? pathStr
 		: pathStat.isDirectory()
 			? findAFileWithExt(pathStr, ALL_EXTENSIONS)
 			: null;
+	let tempFile: string | undefined;
+	if (!srcFile) {
+		tempFile = pathStat.isDirectory()
+			? join(pathStr, srcTestName)
+			: join(dirname(pathStr), srcTestName);
+		try {
+			fs.writeFileSync(tempFile, "");
+			srcFile = tempFile;
+		} catch (e) {
+			logger.debug(e);
+		}
+	}
 	if (srcFile) {
 		for (const linkDir of linkDirs) {
 			try {
@@ -484,12 +497,14 @@ export function getLinkDir(pathStr: string): string | null {
 						: LinkType.HARDLINK,
 				);
 				fs.rmSync(testPath);
+				if (tempFile && fs.existsSync(tempFile)) fs.rmSync(tempFile);
 				return linkDir;
 			} catch {
 				continue;
 			}
 		}
 	}
+	if (tempFile && fs.existsSync(tempFile)) fs.rmSync(tempFile);
 	if (linkType !== LinkType.SYMLINK) {
 		logger.error(
 			`Cannot find any linkDir from linkDirs on the same drive to ${linkType} ${pathStr}`,
@@ -574,9 +589,14 @@ function unwrapSymlinks(path: string): string {
  */
 export function testLinking(srcDir: string): void {
 	const { linkDirs, linkType } = getRuntimeConfig();
+	let tempFile: string | undefined;
 	try {
-		const srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
-		if (!srcFile) return;
+		let srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
+		if (!srcFile) {
+			tempFile = join(srcDir, srcTestName);
+			fs.writeFileSync(tempFile, "");
+			srcFile = tempFile;
+		}
 		const linkDir = getLinkDir(srcDir);
 		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
 		const testPath = join(linkDir, linkTestName);
@@ -590,5 +610,7 @@ export function testLinking(srcDir: string): void {
 				{ sort: false, style: "short", type: "unit" },
 			)}]. Ensure that ${linkType} is supported between these paths (hardlink/reflink requires same drive, partition, and volume).`,
 		);
+	} finally {
+		if (tempFile && fs.existsSync(tempFile)) fs.rmSync(tempFile);
 	}
 }
