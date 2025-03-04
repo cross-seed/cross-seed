@@ -37,8 +37,6 @@ const ValidationEntry = ({
   content: any;
   className?: string;
 }) => {
-  console.log(content[title] ?? content);
-
   const titleMap = {
     paths: 'Paths',
     torznab: 'Torznab',

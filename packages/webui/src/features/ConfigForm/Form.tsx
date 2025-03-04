@@ -22,6 +22,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
 import { trpc } from '@/lib/trpc';
 import { defaultConfig } from '../../../../shared/constants';
+import { formatConfigDataForForm } from './lib/formatConfigData';
 
 type FormProps = {
   className?: string;
@@ -29,6 +30,21 @@ type FormProps = {
 
 export const ConfigForm: FC<FormProps> = ({ className }) => {
   const {
+    data: configData,
+    isLoading,
+    isError,
+  } = trpc.config.get.useQuery(undefined, {
+    select: (data) => ({
+      ...formatConfigDataForForm(data.config),
+    }),
+  });
+
+  useEffect(() => {
+    console.log('configData', configData);
+  }, [configData]);
+
+  const form = useForm({
+    defaultValues: configData ?? defaultConfig,
     onSubmit: async ({ value }) => {
       console.log('submitting form', value);
     },
@@ -53,6 +69,15 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
       setLastFieldAdded(null);
     }
   }, [lastFieldAdded]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (isError) {
+    console.error('Error fetching config file:', isError);
+    // return <div>Error: {JSON.stringify(isError)}</div>;
+  }
 
   return (
     <div className={cn('mb-5', className)}>
@@ -202,18 +227,21 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Select
                       name={field.name}
-                      defaultValue={field.state.value}
+                      defaultValue={field.state.value as LinkType}
                       onValueChange={(e) => field.handleChange(e as LinkType)}
                     >
                       <SelectTrigger className="focus-visible:ring-accent-300/40 border-slate-300 bg-white shadow-none">
                         <SelectValue placeholder="Select a link type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="hardlink">
-                          hardlink
-                          <span className="text-slate-400">(recommended)</span>
-                        </SelectItem>
-                        <SelectItem value="symlink">symlink</SelectItem>
+                        {Object.keys(LinkType).map((key) => (
+                          <SelectItem
+                            key={key.toLowerCase()}
+                            value={key.toLowerCase()}
+                          >
+                            {key.toLowerCase()}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FieldInfo field={field} />
@@ -881,18 +909,21 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Select
                       name={field.name}
-                      defaultValue={field.state.value}
+                      defaultValue={field.state.value as Action}
                       onValueChange={(e) => field.handleChange(e as Action)}
                     >
                       <SelectTrigger className="focus-visible:ring-accent-300/40 border-slate-300 bg-white shadow-none">
                         <SelectValue placeholder="Select an action" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="inject">
-                          Inject
-                          <span className="text-slate-400">(recommended)</span>
-                        </SelectItem>
-                        <SelectItem value="save">Save</SelectItem>
+                        {Object.keys(Action).map((key) => (
+                          <SelectItem
+                            key={key.toLowerCase()}
+                            value={key.toLowerCase()}
+                          >
+                            {key.toLowerCase()}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1105,21 +1136,21 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Select
                       name={field.name}
-                      defaultValue={field.state.value}
+                      defaultValue={field.state.value as MatchMode}
                       onValueChange={(e) => field.handleChange(e as MatchMode)}
                     >
                       <SelectTrigger className="focus-visible:ring-accent-300/40 border-slate-300 bg-white shadow-none">
                         <SelectValue placeholder="Select a link type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="strict">
-                          Strict
-                          {/* <span className="text-slate-400">
-                            (recommended)
-                          </span> */}
-                        </SelectItem>
-                        <SelectItem value="flexible">Risky</SelectItem>
-                        <SelectItem value="partial">Partial</SelectItem>
+                        {Object.keys(MatchMode).map((key) => (
+                          <SelectItem
+                            key={key.toLowerCase()}
+                            value={key.toLowerCase()}
+                          >
+                            {key.toLowerCase()}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FieldInfo field={field} />
@@ -1417,7 +1448,10 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                         )}
                       </Label>
                       {field.state.value &&
-                        field.state.value.map((_: string, index: number) => {
+                        (field.state.value.length
+                          ? field.state.value
+                          : ['']
+                        ).map((_: string, index: number) => {
                           return (
                             <div
                               key={index}
