@@ -31,6 +31,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cva": "^1.0.0-beta.3",
+    "date-fns": "^4.1.0",
     "init": "^0.1.2",
     "lucide-react": "^0.475.0",
     "prettier": "^3.5.1",
