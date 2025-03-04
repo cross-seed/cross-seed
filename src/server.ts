@@ -431,7 +431,77 @@ async function status(
  */
 async function ping(req: IncomingMessage, res: ServerResponse): Promise<void> {
 	res.writeHead(200);
-	res.end("OK");
+	res.end(JSON.stringify({ status: "OK", timestamp: new Date() }));
+}
+
+/**
+ * Depending on request method, either:
+ * - get: reads config file and returns as JSON
+ * - post: writes config file from JSON
+ */
+async function manageConfig(
+	req: IncomingMessage,
+	res: ServerResponse,
+): Promise<void> {
+	if (req.method === "GET") {
+		try {
+			const runtimeConfig = getRuntimeConfig();
+			console.log("manageConfig.get", runtimeConfig);
+			const apikey = await getApiKey();
+			res.writeHead(200);
+			res.end(
+				JSON.stringify({
+					config: runtimeConfig,
+					apikey,
+				}),
+			);
+		} catch (error) {
+			logger.error({
+				label: Label.SERVER,
+				message: error.message,
+			});
+			res.writeHead(500);
+			res.end(error.message);
+		}
+		return;
+	}
+
+	if (req.method === "POST") {
+		try {
+			console.log("manageConfig.save", req);
+			// const config = JSON.parse(req);
+			// await writeFileSync(configPath, config);
+			// res.writeHead(200);
+			// res.end("OK");
+			return;
+		} catch (e) {
+			logger.error({
+				label: Label.SERVER,
+				message: e.message,
+			});
+			res.writeHead(500);
+			res.end(e.message);
+			return;
+		}
+		// const data = await getData(req);
+		// const config = JSON.parse(data);
+		// await writeFileSync(configPath, config);
+		// res.writeHead(200);
+		// res.end("OK");
+		// return;
+	}
+}
+
+function setCorsHeaders(res: ServerResponse): void {
+	res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+	res.setHeader(
+		"Access-Control-Allow-Methods",
+		"GET, POST, PUT, DELETE, OPTIONS",
+	);
+	res.setHeader(
+		"Access-Control-Allow-Headers",
+		"Content-Type, Authorization, trpc-batch",
+	);
 }
 
 /**
@@ -441,8 +511,10 @@ async function handleRequest(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	setCorsHeaders(res);
+
 	const checkMethod = (method: string, endpoint: string) => {
-		if (req.method === method) return true;
+		if (req.method === "OPTIONS" || req.method === method) return true;
 		res.writeHead(405);
 		res.end(`Method ${req.method} not allowed for ${endpoint}`);
 		return false;
@@ -469,6 +541,11 @@ async function handleRequest(
 			if (!checkMethod("GET", endpoint)) return;
 			if (!(await authorize(req, res))) return;
 			return status(req, res);
+		// Endpoints for the web UI
+		case "/api/config":
+			// if (!checkMethod("GET", endpoint)) return;
+			// if (!(await authorize(req, res))) return;
+			return manageConfig(req, res);
 		default: {
 			const message = `Unknown endpoint: ${endpoint}`;
 			logger.error({ label: Label.SERVER, message });
