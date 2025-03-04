@@ -14,7 +14,7 @@ export enum MatchMode {
 export enum LinkType {
 	SYMLINK = "symlink",
 	HARDLINK = "hardlink",
-	REFLINK = "reflink",
+	// REFLINK = "reflink",
 }
 
 export enum BlocklistType {
@@ -99,4 +99,53 @@ export const ZodErrorMessages = {
 		"You cannot have your outputDir inside of your torrentDir/dataDirs/linkDirs. Please adjust your paths to correct this.",
 	relativePaths:
 		"Absolute paths for torrentDir, linkDirs, dataDirs, and outputDir are recommended.",
+};
+
+/**
+ * Default config values
+ */
+export const defaultConfig = {
+	delay: 30,
+	torznab: [""],
+	useClientTorrents: false,
+	dataDirs: [""],
+	matchMode: MatchMode.STRICT,
+	skipRecheck: true,
+	autoResumeMaxDownload: 52428800,
+	linkCategory: null,
+	linkDir: null,
+	linkDirs: [""],
+	linkType: LinkType.HARDLINK,
+	flatLinking: false,
+	maxDataDepth: 2,
+	torrentDir: null,
+	outputDir: "",
+	injectDir: "",
+	includeSingleEpisodes: false,
+	includeNonVideos: false,
+	fuzzySizeThreshold: 1,
+	seasonFromEpisodes: null,
+	excludeOlder: null,
+	excludeRecentSearch: null,
+	action: Action.INJECT,
+	qbittorrentUrl: null,
+	rtorrentRpcUrl: null,
+	transmissionRpcUrl: null,
+	delugeRpcUrl: null,
+	duplicateCategories: false,
+	notificationWebhookUrls: [""],
+	notificationWebhookUrl: null,
+	port: null,
+	host: null,
+	rssCadence: null,
+	searchCadence: null,
+	snatchTimeout: null,
+	searchTimeout: null,
+	searchLimit: null,
+	verbose: false,
+	torrents: [""],
+	blockList: [""],
+	apiKey: null,
+	radarr: [""],
+	sonarr: [""],
 };
