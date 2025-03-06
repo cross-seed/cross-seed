@@ -6,7 +6,7 @@ import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { validateUArrLs } from "./arr.js";
 import {
-	getClient,
+	getClients,
 	instantiateDownloadClients,
 } from "./clients/TorrentClient.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
@@ -166,7 +166,8 @@ async function retry<T>(
 export async function doStartupValidation(): Promise<void> {
 	await checkConfigPaths(); // ensure paths are valid first
 	instantiateDownloadClients();
-	const validateClientConfig = async () => getClient()?.validateConfig(); // preserve `this` class pointer
+	const validateClientConfig = async () =>
+		Promise.all(getClients().map((client) => client.validateConfig()));
 	const errors = (
 		await Promise.allSettled([
 			retry(validateTorznabUrls, 5, ms("1 minute")),
