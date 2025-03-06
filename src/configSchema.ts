@@ -416,7 +416,15 @@ export const VALIDATION_SCHEMA = z
 			.number()
 			.positive()
 			.lte(1, ZodErrorMessages.numberMustBeRatio)
-			.nullish(),
+			.nullish()
+			.or(
+				z
+					.boolean()
+					.refine((value) => value !== true, {
+						message: "Expected string, received boolean (true)",
+					})
+					.transform(() => null),
+			),
 		excludeOlder: z
 			.string()
 			.min(1, ZodErrorMessages.emptyString)
