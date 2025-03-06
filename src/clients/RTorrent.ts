@@ -510,7 +510,6 @@ export default class RTorrent implements TorrentClient {
 			// response: [ [tag1], [tag2], ... ], assuming infoHash order is preserved
 			return hashes.map((hash, index) => ({
 				infoHash: hash.toLowerCase(),
-				category: "",
 				tags:
 					(results[index] as string[]).length !== 1
 						? results[index]
@@ -665,7 +664,6 @@ export default class RTorrent implements TorrentClient {
 			);
 			const title = parseTitle(name, files) ?? name;
 			const savePath = isMultiFile ? dirname(directory) : directory;
-			const category = "";
 			const tags = labels.length
 				? decodeURIComponent(labels)
 						.split(",")
@@ -679,7 +677,6 @@ export default class RTorrent implements TorrentClient {
 				length,
 				clientHost: this.clientHost,
 				savePath,
-				category,
 				tags,
 				trackers,
 			};

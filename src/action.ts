@@ -1,7 +1,12 @@
 import chalk from "chalk";
 import fs from "fs";
 import { dirname, join, resolve } from "path";
-import { getClient, shouldRecheck } from "./clients/TorrentClient.js";
+import {
+	getClient,
+	getClients,
+	shouldRecheck,
+	TorrentClient,
+} from "./clients/TorrentClient.js";
 import {
 	Action,
 	ActionResult,
@@ -34,6 +39,8 @@ import {
 	formatAsList,
 	getLogString,
 	getMediaType,
+	Mutex,
+	withMutex,
 } from "./utils.js";
 
 const srcTestName = "test.cross-seed";
@@ -230,6 +237,7 @@ function unlinkMetafile(meta: Metafile, destinationDir: string) {
 }
 
 export async function linkAllFilesInMetafile(
+	client: TorrentClient,
 	searchee: Searchee,
 	newMeta: Metafile,
 	tracker: string,
@@ -245,7 +253,6 @@ export async function linkAllFilesInMetafile(
 	>
 > {
 	const { flatLinking } = getRuntimeConfig();
-	const client = getClient()!;
 
 	let savePath: string | undefined;
 	if (searchee.infoHash) {
@@ -375,21 +382,84 @@ export async function performAction(
 	decision: DecisionAnyMatch,
 	searchee: SearcheeWithLabel,
 	tracker: string,
-): Promise<{ actionResult: ActionResult; linkedNewFiles: boolean }> {
+): Promise<{
+	client?: TorrentClient;
+	actionResult: ActionResult;
+	linkedNewFiles: boolean;
+	existsInOtherClients: boolean;
+}> {
+	return withMutex(
+		Mutex.CLIENT_INJECTION,
+		async () => {
+			return performActionWithoutMutex(
+				newMeta,
+				decision,
+				searchee,
+				tracker,
+			);
+		},
+		{ useQueue: true },
+	);
+}
+
+export async function performActionWithoutMutex(
+	newMeta: Metafile,
+	decision: DecisionAnyMatch,
+	searchee: SearcheeWithLabel,
+	tracker: string,
+): Promise<{
+	client?: TorrentClient;
+	actionResult: ActionResult;
+	linkedNewFiles: boolean;
+	existsInOtherClients: boolean;
+}> {
 	const { action, linkDirs } = getRuntimeConfig();
-
-	if (action === Action.SAVE) {
-		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
-		logActionResult(SaveResult.SAVED, newMeta, searchee, tracker, decision);
-		return { actionResult: SaveResult.SAVED, linkedNewFiles: false };
-	}
-
 	let destinationDir: string | undefined;
 	let unlinkOk = false;
 	let linkedNewFiles = false;
+	let existsInOtherClients = false;
+	const warnOrVerbose =
+		searchee.label !== Label.INJECT ? logger.warn : logger.verbose;
+
+	if (action === Action.SAVE) {
+		logActionResult(SaveResult.SAVED, newMeta, searchee, tracker, decision);
+		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+		return {
+			actionResult: SaveResult.SAVED,
+			linkedNewFiles,
+			existsInOtherClients,
+		};
+	}
+
+	const client = getClient(searchee);
+	if (!client) {
+		logger.error({
+			label: searchee.label,
+			message: `Failed to find a torrent client for ${getLogString(searchee)}`,
+		});
+		const actionResult = InjectionResult.FAILURE;
+		logActionResult(actionResult, newMeta, searchee, tracker, decision);
+		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+		return { actionResult, linkedNewFiles, existsInOtherClients };
+	}
+	for (const otherClient of getClients()) {
+		if (otherClient.clientHost === client.clientHost) continue;
+		if ((await otherClient.isTorrentComplete(newMeta.infoHash)).isErr()) {
+			continue;
+		}
+		existsInOtherClients = true;
+		warnOrVerbose({
+			label: searchee.label,
+			message: `Failed to inject ${getLogString(newMeta)} into ${client.clientHost}: already exists in ${otherClient.clientHost}`,
+		});
+		const actionResult = InjectionResult.ALREADY_EXISTS;
+		logActionResult(actionResult, newMeta, searchee, tracker, decision);
+		return { actionResult, linkedNewFiles, existsInOtherClients };
+	}
 
 	if (linkDirs.length) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
+			client,
 			searchee,
 			newMeta,
 			tracker,
@@ -415,12 +485,17 @@ export async function performAction(
 			}
 			logActionResult(actionResult, newMeta, searchee, tracker, decision);
 			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
-			return { actionResult, linkedNewFiles };
+			return {
+				client,
+				actionResult,
+				linkedNewFiles,
+				existsInOtherClients,
+			};
 		}
 	} else if (searchee.path) {
 		destinationDir = dirname(searchee.path);
 	}
-	const actionResult = await getClient()!.inject(
+	const actionResult = await client.inject(
 		newMeta,
 		searchee,
 		decision,
@@ -439,7 +514,7 @@ export async function performAction(
 			unlinkMetafile(newMeta, destinationDir);
 		}
 	}
-	return { actionResult, linkedNewFiles };
+	return { client, actionResult, linkedNewFiles, existsInOtherClients };
 }
 
 export async function performActions(
