@@ -32,6 +32,8 @@ jobs:
         environment: Docker Hub
         runs-on: ubuntu-latest
         steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
             - name: Docker meta
               id: meta
               uses: docker/metadata-action@v5
@@ -64,6 +66,21 @@ jobs:
               with:
                   username: ${{ secrets.DOCKERHUB_USERNAME }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
+            - name: Get npm version
+              id: get_version
+              run: |
+                VERSION=$(node -p "require('./package.json').version")
+                echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+            - name: Get Git revision
+              id: get_revision
+              run: |
+                REVISION=$(git rev-parse HEAD)
+                echo "REVISION=$REVISION" >> $GITHUB_OUTPUT
+            - name: Get creation time
+              id: get_created
+              run: |
+                CREATED=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+                echo "CREATED=$CREATED" >> $GITHUB_OUTPUT
             - name: Build and push
               uses: docker/build-push-action@v5
               with:
@@ -71,3 +88,7 @@ jobs:
                   platforms: linux/amd64,linux/arm64
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
+                  build-args: |
+                      VERSION=${{ steps.get_version.outputs.VERSION }}
+                      REVISION=${{ steps.get_revision.outputs.REVISION }}
+                      CREATED=${{ steps.get_created.outputs.CREATED }}
