@@ -358,7 +358,10 @@ export async function assessCandidate(
 	if (isCandidate) {
 		const res = await snatch(metaOrCandidate, searchee.label, {
 			retries: 4,
-			delayMs: ms("60 seconds"),
+			delayMs:
+				searchee.label === Label.ANNOUNCE
+					? ms("5 minutes")
+					: ms("1 minute"),
 		});
 		if (res.isErr()) {
 			const err = res.unwrapErr();
