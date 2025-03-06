@@ -579,6 +579,7 @@ export const VALIDATION_SCHEMA = z
 	)
 	.refine(
 		(config) =>
+			process.env.DEV ||
 			!config.useClientTorrents ||
 			!config.torrentClients.some((c) => c.startsWith(Label.DELUGE)),
 		"Deluge does not currently support useClientTorrents, use torrentDir instead.",
