@@ -630,7 +630,6 @@ export default class Deluge implements TorrentClient {
 		return Object.entries(torrents).map(([hash, torrent]) => ({
 			infoHash: hash,
 			category: torrent.label ?? "",
-			tags: [],
 		}));
 	}
 
@@ -704,7 +703,6 @@ export default class Deluge implements TorrentClient {
 			const length = torrent.total_size!;
 			const savePath = torrent.save_path!;
 			const category = torrent.label ?? "";
-			const tags = [];
 			const searchee: SearcheeClient = {
 				infoHash,
 				name,
@@ -714,7 +712,6 @@ export default class Deluge implements TorrentClient {
 				clientHost: this.clientHost,
 				savePath,
 				category,
-				tags,
 				trackers,
 			};
 			newSearchees.push(searchee);
