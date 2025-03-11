@@ -107,7 +107,7 @@ export default class RTorrent implements TorrentClient {
 	readonly clientPriority: number;
 	readonly clientType = Label.RTORRENT;
 	readonly label: string;
-	readonly batchSize = 500;
+	readonly batchSize = 300;
 
 	constructor(url: string, priority: number) {
 		const { href, username, password } = extractCredentialsFromUrl(
