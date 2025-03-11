@@ -677,7 +677,7 @@ export default class QBittorrent implements TorrentClient {
 			const length = torrent.total_size;
 			const savePath = torrent.save_path;
 			const category = torrent.category;
-			const tags = torrent.tags.length ? torrent.tags.split(",") : [];
+			const tags = torrent.tags.length ? torrent.tags.split(", ") : [];
 			const searchee: SearcheeClient = {
 				infoHash,
 				name,
