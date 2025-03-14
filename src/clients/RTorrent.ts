@@ -222,7 +222,7 @@ export default class RTorrent implements TorrentClient {
 				args,
 			);
 		} catch (e) {
-			logger.debug(e);
+			logger.debug({ label: this.label, message: e });
 			return resultOfErr("FAILURE");
 		}
 
@@ -262,7 +262,7 @@ export default class RTorrent implements TorrentClient {
 				isActive: Boolean(Number(isActive)),
 			});
 		} catch (e) {
-			logger.error(e);
+			logger.error({ label: this.label, message: e });
 			logger.debug("Failure caused by server response below:");
 			logger.debug(inspect(response));
 			return resultOfErr("FAILURE");
@@ -306,7 +306,7 @@ export default class RTorrent implements TorrentClient {
 		try {
 			await this.methodCallP<string[]>("download_list", []);
 		} catch (e) {
-			logger.debug(e);
+			logger.debug({ label: this.label, message: e });
 			throw new CrossSeedError(
 				`Failed to reach rTorrent at ${this.clientHost}: ${e.message}`,
 			);
@@ -385,7 +385,7 @@ export default class RTorrent implements TorrentClient {
 					);
 					if (isFault(res)) {
 						logger.error({
-							Label: this.label,
+							label: this.label,
 							message:
 								"Fault while getting download directories for all torrents",
 						});
@@ -395,7 +395,7 @@ export default class RTorrent implements TorrentClient {
 					return res;
 				} catch (e) {
 					logger.error({
-						Label: this.label,
+						label: this.label,
 						message: `Failed to get download directories for all torrents: ${e.message}`,
 					});
 					logger.debug(e);
@@ -406,7 +406,7 @@ export default class RTorrent implements TorrentClient {
 		);
 		if (!results.length || results.length !== hashes.length * numMethods) {
 			logger.error({
-				Label: this.label,
+				label: this.label,
 				message: `Unexpected number of results: ${results.length} for ${hashes.length} hashes`,
 			});
 			return new Map();
@@ -430,7 +430,7 @@ export default class RTorrent implements TorrentClient {
 			}, new Map<string, string>());
 		} catch (e) {
 			logger.error({
-				Label: this.label,
+				label: this.label,
 				message: `Error parsing response for all torrents: ${e.message}`,
 			});
 			logger.debug(e);
@@ -478,7 +478,7 @@ export default class RTorrent implements TorrentClient {
 					);
 					if (isFault(res)) {
 						logger.error({
-							Label: this.label,
+							label: this.label,
 							message:
 								"Fault while getting torrent info for all torrents",
 						});
@@ -488,7 +488,7 @@ export default class RTorrent implements TorrentClient {
 					return res;
 				} catch (e) {
 					logger.error({
-						Label: this.label,
+						label: this.label,
 						message: `Failed to get torrent info for all torrents: ${e.message}`,
 					});
 					logger.debug(e);
@@ -499,7 +499,7 @@ export default class RTorrent implements TorrentClient {
 		);
 		if (results.length !== hashes.length) {
 			logger.error({
-				Label: this.label,
+				label: this.label,
 				message: `Unexpected number of results: ${results.length} for ${hashes.length} hashes`,
 			});
 			return [];
@@ -520,7 +520,7 @@ export default class RTorrent implements TorrentClient {
 			})) as TorrentMetadataInClient[];
 		} catch (e) {
 			logger.error({
-				Label: this.label,
+				label: this.label,
 				message: `Error parsing response for all torrents: ${e.message}`,
 			});
 			logger.debug(e);
@@ -593,7 +593,7 @@ export default class RTorrent implements TorrentClient {
 					);
 					if (isFault(res)) {
 						logger.error({
-							Label: this.label,
+							label: this.label,
 							message: "Fault while getting client torrents",
 						});
 						logger.debug(inspect(res));
@@ -602,7 +602,7 @@ export default class RTorrent implements TorrentClient {
 					return res;
 				} catch (e) {
 					logger.error({
-						Label: this.label,
+						label: this.label,
 						message: `Failed to get client torrents: ${e.message}`,
 					});
 					logger.debug(e);
@@ -613,7 +613,7 @@ export default class RTorrent implements TorrentClient {
 		);
 		if (!results.length || results.length !== hashes.length * numMethods) {
 			logger.error({
-				Label: this.label,
+				label: this.label,
 				message: `Unexpected number of results: ${results.length} for ${hashes.length} hashes`,
 			});
 			return { searchees, newSearchees };

@@ -152,9 +152,11 @@ export default class Deluge implements TorrentClient {
 			0,
 		);
 		if (isConnectedResponse.isOk() && !isConnectedResponse.unwrap()) {
-			logger.warn(
-				"Deluge WebUI disconnected from daemon...attempting to reconnect.",
-			);
+			logger.warn({
+				label: this.label,
+				message:
+					"Deluge WebUI disconnected from daemon...attempting to reconnect.",
+			});
 			const webuiHostList = (
 				await this.call<WebHostList>("web.get_hosts", [], 0)
 			).unwrapOrThrow(new Error("failed to get host-list for reconnect"));
@@ -164,7 +166,10 @@ export default class Deluge implements TorrentClient {
 				0,
 			);
 			if (connectResponse.isOk() && connectResponse.unwrap()) {
-				logger.info("Deluge WebUI connected to the daemon.");
+				logger.info({
+					label: this.label,
+					message: "Deluge WebUI connected to the daemon.",
+				});
 			} else {
 				throw new CrossSeedError(
 					"Unable to connect WebUI to Deluge daemon. Connect to the WebUI to resolve this.",
@@ -395,11 +400,11 @@ export default class Deluge implements TorrentClient {
 				throw new Error(setResult.unwrapErr().message);
 			}
 		} catch (e) {
-			logger.debug(e);
 			logger.warn({
 				label: this.label,
 				message: `Failed to label ${getLogString(newTorrent)} as ${label}: ${e.message}`,
 			});
+			logger.debug(e);
 		}
 	}
 
