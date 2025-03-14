@@ -386,7 +386,7 @@ export default class QBittorrent implements TorrentClient {
 				length: file.size,
 			}));
 		} catch (e) {
-			logger.debug(e);
+			logger.debug({ label: this.label, message: e });
 			return null;
 		}
 	}
@@ -401,7 +401,7 @@ export default class QBittorrent implements TorrentClient {
 		try {
 			return organizeTrackers(JSON.parse(responseText));
 		} catch (e) {
-			logger.debug(e);
+			logger.debug({ label: this.label, message: e });
 			return null;
 		}
 	}
@@ -451,7 +451,7 @@ export default class QBittorrent implements TorrentClient {
 				this.isNoSubfolderContentLayout(meta, torrentInfo)
 			) {
 				logger.error({
-					label: Label.QBITTORRENT,
+					label: this.label,
 					message: `NoSubfolder content layout is not supported with torrentDir, use https://www.cross-seed.org/docs/basics/options#useclienttorrents: ${torrentInfo.name} [${sanitizeInfoHash(torrentInfo.hash)}]`,
 				});
 				return resultOfErr("INVALID_DATA");
@@ -464,7 +464,7 @@ export default class QBittorrent implements TorrentClient {
 			}
 			return resultOf(this.getCorrectSavePath(meta, torrentInfo));
 		} catch (e) {
-			logger.debug(e);
+			logger.debug({ label: this.label, message: e });
 			if (e.message.includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
 			}
