@@ -188,6 +188,13 @@ module.exports = {
 	autoResumeMaxDownload: 52428800,
 
 	/**
+	 *  Whether or not to ignore certain known-irrelevant files such as nfo,
+	 *  sample, txt, subs, proofs, and bonus/commentary files in the auto resume
+	 *  check. This functionality will only work if after exclusion the size is within
+	 *  fuzzySizeThreshold for remaining files size difference.
+	 */
+	ignoreNonRelevantFilesToResume: false,
+	/**
 	 * Determines how deep into the specified dataDirs to go to generate new
 	 * searchees.
 	 *
