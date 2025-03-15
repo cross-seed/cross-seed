@@ -460,20 +460,23 @@ export default class Transmission implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee,
 		decision: DecisionAnyMatch,
-		path?: string,
+		options: { onlyCompleted: boolean; destinationDir?: string },
 	): Promise<InjectionResult> {
-		let downloadDir: string;
-		if (path) {
-			downloadDir = path;
+		let destinationDir: string;
+		if (options.destinationDir) {
+			destinationDir = options.destinationDir;
 		} else {
 			const result = await this.getDownloadDir(
 				searchee as SearcheeWithInfoHash,
-				{ onlyCompleted: true },
+				{ onlyCompleted: options.onlyCompleted },
 			);
-			if (result.isErr()) {
-				return InjectionResult.FAILURE;
+			if (result.isOk()) {
+				destinationDir = result.unwrap();
 			} else {
-				downloadDir = result.unwrap();
+				if (result.unwrapErr() === "TORRENT_NOT_COMPLETE") {
+					return InjectionResult.TORRENT_NOT_COMPLETE;
+				}
+				return InjectionResult.FAILURE;
 			}
 		}
 
@@ -483,7 +486,7 @@ export default class Transmission implements TorrentClient {
 			addResponse = await this.request<TorrentAddResponse>(
 				"torrent-add",
 				{
-					"download-dir": downloadDir,
+					"download-dir": destinationDir,
 					metainfo: newTorrent.encode().toString("base64"),
 					paused: shouldRecheck(searchee, decision),
 					labels: [TORRENT_TAG],
