@@ -125,12 +125,14 @@ export default class QBittorrent implements TorrentClient {
 	readonly label: string;
 
 	constructor(url: string, priority: number) {
-		this.url = extractCredentialsFromUrl(url, "/api/v2").unwrapOrThrow(
-			new CrossSeedError("qBittorrent url must be percent-encoded"),
-		);
 		this.clientHost = new URL(url).host;
 		this.clientPriority = priority;
 		this.label = `${this.clientType}@${this.clientHost}`;
+		this.url = extractCredentialsFromUrl(url, "/api/v2").unwrapOrThrow(
+			new CrossSeedError(
+				`[${this.label}] qBittorrent url must be percent-encoded`,
+			),
+		);
 	}
 
 	async login(): Promise<void> {
@@ -191,19 +193,24 @@ export default class QBittorrent implements TorrentClient {
 
 	async validateConfig(): Promise<void> {
 		const { torrentDir } = getRuntimeConfig();
-		await this.login();
+		try {
+			await this.login();
+		} catch (e) {
+			e.message = `[${this.label}] ${e.message}`;
+			throw e;
+		}
 		await this.createTag();
 
 		if (!torrentDir) return;
 		const { resume_data_storage_type } = await this.getPreferences();
 		if (resume_data_storage_type === "SQLite") {
 			throw new CrossSeedError(
-				"torrentDir is not compatible with SQLite mode in qBittorrent, use https://www.cross-seed.org/docs/basics/options#useclienttorrents",
+				`[${this.label}] torrentDir is not compatible with SQLite mode in qBittorrent, use https://www.cross-seed.org/docs/basics/options#useclienttorrents`,
 			);
 		}
 		if (!readdirSync(torrentDir).some((f) => f.endsWith(".fastresume"))) {
 			throw new CrossSeedError(
-				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
+				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
 			);
 		}
 	}
@@ -267,7 +274,7 @@ export default class QBittorrent implements TorrentClient {
 		);
 		if (!responseText) {
 			throw new CrossSeedError(
-				`qBittorrent failed to retrieve preferences`,
+				`[${this.label}] qBittorrent failed to retrieve preferences`,
 			);
 		}
 		return JSON.parse(responseText);
@@ -502,7 +509,7 @@ export default class QBittorrent implements TorrentClient {
 				this.isNoSubfolderContentLayout(meta, torrent)
 			) {
 				throw new CrossSeedError(
-					`NoSubfolder content layout is not supported with torrentDir, use https://www.cross-seed.org/docs/basics/options#useclienttorrents: ${torrent.name} [${sanitizeInfoHash(torrent.hash)}]`,
+					`[${this.label}] NoSubfolder content layout is not supported with torrentDir, use https://www.cross-seed.org/docs/basics/options#useclienttorrents: ${torrent.name} [${sanitizeInfoHash(torrent.hash)}]`,
 				);
 			}
 			if (options.onlyCompleted && !this.isTorrentInfoComplete(torrent)) {

@@ -110,10 +110,15 @@ export default class RTorrent implements TorrentClient {
 	readonly batchSize = 500;
 
 	constructor(url: string, priority: number) {
+		this.clientHost = new URL(url).host;
+		this.clientPriority = priority;
+		this.label = `${this.clientType}@${this.clientHost}`;
 		const { href, username, password } = extractCredentialsFromUrl(
 			url,
 		).unwrapOrThrow(
-			new CrossSeedError("rTorrent url must be percent-encoded"),
+			new CrossSeedError(
+				`[${this.label}] rTorrent url must be percent-encoded`,
+			),
 		);
 
 		const clientCreator =
@@ -129,9 +134,6 @@ export default class RTorrent implements TorrentClient {
 				? { user: username, pass: password }
 				: undefined,
 		});
-		this.clientHost = new URL(url).host;
-		this.clientPriority = priority;
-		this.label = `${this.clientType}@${this.clientHost}`;
 	}
 
 	private async methodCallP<R>(method: string, args): Promise<R> {
@@ -308,7 +310,7 @@ export default class RTorrent implements TorrentClient {
 		} catch (e) {
 			logger.debug({ label: this.label, message: e });
 			throw new CrossSeedError(
-				`Failed to reach rTorrent at ${this.clientHost}: ${e.message}`,
+				`[${this.label}] Failed to reach rTorrent at ${this.clientHost}: ${e.message}`,
 			);
 		}
 		logger.info({
@@ -319,7 +321,7 @@ export default class RTorrent implements TorrentClient {
 		if (!torrentDir) return;
 		if (!readdirSync(torrentDir).some((f) => f.endsWith("_resume"))) {
 			throw new CrossSeedError(
-				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
+				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
 			);
 		}
 	}

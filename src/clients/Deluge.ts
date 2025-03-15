@@ -114,7 +114,7 @@ export default class Deluge implements TorrentClient {
 		if (!torrentDir) return;
 		if (!readdirSync(torrentDir).some((f) => f.endsWith(".state"))) {
 			throw new CrossSeedError(
-				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
+				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
 			);
 		}
 	}
@@ -126,21 +126,27 @@ export default class Deluge implements TorrentClient {
 		const { href, password } = extractCredentialsFromUrl(
 			this.url,
 		).unwrapOrThrow(
-			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
+			new CrossSeedError(
+				`[${this.label}] delugeRpcUrl must be percent-encoded`,
+			),
 		);
 		if (!password) {
 			throw new CrossSeedError(
-				"You need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)",
+				`[${this.label}] You need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)`,
 			);
 		}
 		try {
 			const authResponse = (
 				await this.call<boolean>("auth.login", [password], 0)
-			).unwrapOrThrow(new Error("failed to connect for authentication"));
+			).unwrapOrThrow(
+				new Error(
+					`[${this.label}] failed to connect for authentication`,
+				),
+			);
 
 			if (!authResponse) {
 				throw new CrossSeedError(
-					`Reached Deluge, but failed to authenticate: ${href}`,
+					`[${this.label}] Reached Deluge, but failed to authenticate: ${href}`,
 				);
 			}
 		} catch (networkError) {
@@ -159,7 +165,11 @@ export default class Deluge implements TorrentClient {
 			});
 			const webuiHostList = (
 				await this.call<WebHostList>("web.get_hosts", [], 0)
-			).unwrapOrThrow(new Error("failed to get host-list for reconnect"));
+			).unwrapOrThrow(
+				new Error(
+					`[${this.label}] failed to get host-list for reconnect`,
+				),
+			);
 			const connectResponse = await this.call<undefined>(
 				"web.connect",
 				[webuiHostList[0][0]],
@@ -172,7 +182,7 @@ export default class Deluge implements TorrentClient {
 				});
 			} else {
 				throw new CrossSeedError(
-					"Unable to connect WebUI to Deluge daemon. Connect to the WebUI to resolve this.",
+					`[${this.label}] Unable to connect WebUI to Deluge daemon. Connect to the WebUI to resolve this.`,
 				);
 			}
 		}
@@ -194,7 +204,9 @@ export default class Deluge implements TorrentClient {
 		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
 		logger.verbose({ label: this.label, message });
 		const { href } = extractCredentialsFromUrl(this.url).unwrapOrThrow(
-			new CrossSeedError("delugeRpcUrl must be percent-encoded"),
+			new CrossSeedError(
+				`[${this.label}] delugeRpcUrl must be percent-encoded`,
+			),
 		);
 		const headers = new Headers({ "Content-Type": "application/json" });
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
@@ -218,18 +230,21 @@ export default class Deluge implements TorrentClient {
 				networkError.name === "TimeoutError"
 			) {
 				throw new Error(
-					`Deluge method ${method} timed out after 10 seconds`,
+					`[${this.label}] Deluge method ${method} timed out after 10 seconds`,
 				);
 			}
-			throw new Error(`Failed to connect to Deluge at ${href}`, {
-				cause: networkError,
-			});
+			throw new Error(
+				`[${this.label}] Failed to connect to Deluge at ${href}`,
+				{
+					cause: networkError,
+				},
+			);
 		}
 		try {
 			json = (await response.json()) as DelugeJSON<ResultType>;
 		} catch (jsonParseError) {
 			throw new Error(
-				`Deluge method ${method} response was non-JSON ${jsonParseError}`,
+				`[${this.label}] Deluge method ${method} response was non-JSON ${jsonParseError}`,
 			);
 		}
 		if (json.error?.code === DelugeErrorCode.NO_AUTH && retries > 0) {
@@ -239,7 +254,7 @@ export default class Deluge implements TorrentClient {
 				return this.call<ResultType>(method, params, 0);
 			} else {
 				throw new Error(
-					"Connection lost with Deluge. Re-authentication failed.",
+					`[${this.label}] Connection lost with Deluge. Re-authentication failed.`,
 				);
 			}
 		}
@@ -795,9 +810,12 @@ export default class Deluge implements TorrentClient {
 				message: `Failed to fetch torrent data for ${infoHash}: ${e.message}`,
 			});
 			logger.debug(e);
-			throw new Error("web.update_ui: failed to fetch data from client", {
-				cause: e,
-			});
+			throw new Error(
+				`[${this.label}] web.update_ui: failed to fetch data from client`,
+				{
+					cause: e,
+				},
+			);
 		}
 	}
 }

@@ -111,7 +111,9 @@ export default class Transmission implements TorrentClient {
 		const { username, password, href } = extractCredentialsFromUrl(
 			this.url,
 		).unwrapOrThrow(
-			new CrossSeedError("Transmission rpc url must be percent-encoded"),
+			new CrossSeedError(
+				`[${this.label}] Transmission rpc url must be percent-encoded`,
+			),
 		);
 
 		const headers = new Headers();
@@ -178,7 +180,7 @@ export default class Transmission implements TorrentClient {
 			await this.request("session-get", {}, 1, ms("10 seconds"));
 		} catch (e) {
 			throw new CrossSeedError(
-				`Failed to reach Transmission at ${this.clientHost}: ${e.message}`,
+				`[${this.label}] Failed to reach Transmission at ${this.clientHost}: ${e.message}`,
 			);
 		}
 		logger.info({
@@ -189,7 +191,7 @@ export default class Transmission implements TorrentClient {
 		if (!torrentDir) return;
 		if (!readdirSync(torrentDir).some((f) => f.endsWith(".torrent"))) {
 			throw new CrossSeedError(
-				"Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir",
+				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
 			);
 		}
 	}
