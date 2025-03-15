@@ -30,7 +30,8 @@ export enum Label {
 
 export let logger: winston.Logger;
 
-const redactionMsg = "[REDACTED]";
+const REDACTED_MSG = "[REDACTED]";
+const ERROR_PREFIX_REGEX = /^\s*error:\s*/i;
 
 function redactUrlPassword(message: string, urlStr: string) {
 	let url: URL;
@@ -39,9 +40,9 @@ function redactUrlPassword(message: string, urlStr: string) {
 		if (url.password) {
 			const urlDecodedPassword = decodeURIComponent(url.password);
 			const urlEncodedPassword = encodeURIComponent(url.password);
-			message = message.split(url.password).join(redactionMsg);
-			message = message.split(urlDecodedPassword).join(redactionMsg);
-			message = message.split(urlEncodedPassword).join(redactionMsg);
+			message = message.split(url.password).join(REDACTED_MSG);
+			message = message.split(urlDecodedPassword).join(REDACTED_MSG);
+			message = message.split(urlEncodedPassword).join(REDACTED_MSG);
 		}
 	} catch (e) {
 		// do nothing
@@ -58,21 +59,21 @@ function redactMessage(
 	}
 	let ret = message;
 
-	ret = ret.replace(/key=[a-zA-Z0-9]+/g, `key=${redactionMsg}`);
-	ret = ret.replace(/pass=[a-zA-Z0-9]+/g, `pass=${redactionMsg}`);
+	ret = ret.replace(/key=[a-zA-Z0-9]+/g, `key=${REDACTED_MSG}`);
+	ret = ret.replace(/pass=[a-zA-Z0-9]+/g, `pass=${REDACTED_MSG}`);
 	ret = ret.replace(
 		/(?:(?:auto|download)[./]\d+[./])([a-zA-Z0-9]+)/g,
-		(match, key) => match.replace(key, redactionMsg),
+		(match, key) => match.replace(key, REDACTED_MSG),
 	);
 	ret = ret.replace(
 		/(?:\d+[./](?:auto|download)[./])([a-zA-Z0-9]+)/g,
-		(match, key) => match.replace(key, redactionMsg),
+		(match, key) => match.replace(key, REDACTED_MSG),
 	);
-	ret = ret.replace(/apiKey: '.+'/g, `apiKey: ${redactionMsg}`);
+	ret = ret.replace(/apiKey: '.+'/g, `apiKey: ${REDACTED_MSG}`);
 
 	ret = ret.replace(
 		/\/notification\/crossSeed\/[a-zA-Z-0-9_-]+/g,
-		`/notification/crossSeed/${redactionMsg}`,
+		`/notification/crossSeed/${REDACTED_MSG}`,
 	);
 	for (const [key, value] of Object.entries(options)) {
 		if (key.endsWith("Url") && typeof value === "string") {
@@ -124,7 +125,12 @@ export function initializeLogger(options: Record<string, unknown>): void {
 			winston.format.splat(),
 			winston.format.printf(
 				({ level, message, label, timestamp, stack, cause }) => {
-					const msg = `${message}${stack ? `\n${stack}` : ""}${cause ? `\n${cause}` : ""}`;
+					const msg = !stack
+						? `${message}${cause ? `\n${cause}` : ""}`
+						: `${stack}${cause ? `\n${cause}` : ""}`.replace(
+								ERROR_PREFIX_REGEX,
+								"",
+							);
 					return `${timestamp} ${level}: ${
 						label ? `[${label}] ` : ""
 					}${stripAnsiChars(redactMessage(msg, options))}`;
@@ -170,7 +176,12 @@ export function initializeLogger(options: Record<string, unknown>): void {
 							stack,
 							cause,
 						}) => {
-							const msg = `${message}${stack ? `\n${stack}` : ""}${cause ? `\n${cause}` : ""}`;
+							const msg = !stack
+								? `${message}${cause ? `\n${cause}` : ""}`
+								: `${stack}${cause ? `\n${cause}` : ""}`.replace(
+										ERROR_PREFIX_REGEX,
+										"",
+									);
 							return `${timestamp} ${level}: ${
 								label ? `[${label}] ` : ""
 							}${redactMessage(msg, options)}`;
