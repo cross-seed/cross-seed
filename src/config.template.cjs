@@ -178,10 +178,10 @@ module.exports = {
 
 	/**
 	 * The maximum size in bytes remaining for a torrent to be resumed.
-	 * Must be in the range of 0 to 52428800 (50 MiB).
+	 * Must be in the range of 0 to 104857600 (100 MiB).
 	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
 	 */
-	autoResumeMaxDownload: 52428800,
+	autoResumeMaxDownload: 104857600,
 
 	/**
 	 * Determines how deep into the specified dataDirs to go to generate new
