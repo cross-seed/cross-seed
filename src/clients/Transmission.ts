@@ -483,18 +483,21 @@ export default class Transmission implements TorrentClient {
 		let addResponse: TorrentAddResponse;
 
 		try {
+			const toRecheck = shouldRecheck(searchee, decision);
 			addResponse = await this.request<TorrentAddResponse>(
 				"torrent-add",
 				{
 					"download-dir": downloadDir,
 					metainfo: newTorrent.encode().toString("base64"),
-					paused: shouldRecheck(searchee, decision),
+					paused: toRecheck,
 					labels: [TORRENT_TAG],
 				},
 			);
-			this.resumeInjection(newTorrent.infoHash, decision, {
-				checkOnce: false,
-			});
+			if (toRecheck) {
+				this.resumeInjection(newTorrent.infoHash, decision, {
+					checkOnce: false,
+				});
+			}
 		} catch (e) {
 			return InjectionResult.FAILURE;
 		}
