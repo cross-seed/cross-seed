@@ -456,12 +456,12 @@ export default class Deluge implements TorrentClient {
 			const torrentFileName = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
 			const encodedTorrentData = newTorrent.encode().toString("base64");
 			const torrentPath = path ? path : torrentInfo!.save_path!;
+			const toRecheck = shouldRecheck(searchee, decision);
 			const params = this.formatData(
 				torrentFileName,
 				encodedTorrentData,
 				torrentPath,
-				searchee,
-				decision,
+				toRecheck,
 			);
 
 			const addResponse = await this.call<string>(
@@ -492,7 +492,7 @@ export default class Deluge implements TorrentClient {
 					this.calculateLabel(searchee, torrentInfo!),
 				);
 
-				if (shouldRecheck(searchee, decision)) {
+				if (toRecheck) {
 					// when paused, libtorrent doesnt start rechecking
 					// leaves torrent ready to download - ~99%
 					await wait(1000);
@@ -524,17 +524,14 @@ export default class Deluge implements TorrentClient {
 	 * @param filename filename for the injecting torrent file
 	 * @param filedump string with encoded torrent file
 	 * @param path path to the torrent data
-	 * @param searchee searchee of the original torrent matched
-	 * @param decision decision by which the newTorrent was matched
+	 * @param toRecheck boolean to recheck the torrent
 	 */
 	private formatData(
 		filename: string,
 		filedump: string,
 		path: string,
-		searchee: Searchee,
-		decision: DecisionAnyMatch,
+		toRecheck: boolean,
 	): InjectData {
-		const toRecheck = shouldRecheck(searchee, decision);
 		return [
 			filename,
 			filedump,
