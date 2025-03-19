@@ -428,24 +428,27 @@ export default class Deluge implements TorrentClient {
 	 * @param newTorrent injected candidate torrent
 	 * @param searchee originating torrent (searchee)
 	 * @param decision decision by which the newTorrent was matched
-	 * @param path location of the linked files (optional)
+	 * @param options.onlyCompleted boolean to only inject completed torrents
+	 * @param options.destinationDir location of the linked files (optional)
 	 * @return InjectionResult of the newTorrent's injection
 	 */
 	async inject(
 		newTorrent: Metafile,
 		searchee: Searchee,
 		decision: DecisionAnyMatch,
-		path?: string,
+		options: { onlyCompleted: boolean; destinationDir?: string },
 	): Promise<InjectionResult> {
 		try {
 			let torrentInfo: TorrentInfo;
-			if (searchee.infoHash) {
+			if (options.onlyCompleted && searchee.infoHash) {
 				torrentInfo = await this.getTorrentInfo(searchee.infoHash);
-				if (!torrentInfo.complete) {
+				if (!torrentInfo.complete)
 					return InjectionResult.TORRENT_NOT_COMPLETE;
-				}
 			}
-			if (!path && (!searchee.infoHash || !torrentInfo!)) {
+			if (
+				!options.destinationDir &&
+				(!searchee.infoHash || !torrentInfo!)
+			) {
 				logger.debug({
 					label: this.label,
 					message: `Injection failure: ${getLogString(searchee)} was missing critical data.`,
@@ -455,12 +458,14 @@ export default class Deluge implements TorrentClient {
 
 			const torrentFileName = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
 			const encodedTorrentData = newTorrent.encode().toString("base64");
-			const torrentPath = path ? path : torrentInfo!.save_path!;
+			const destinationDir = options.destinationDir
+				? options.destinationDir
+				: torrentInfo!.save_path!;
 			const toRecheck = shouldRecheck(searchee, decision);
 			const params = this.formatData(
 				torrentFileName,
 				encodedTorrentData,
-				torrentPath,
+				destinationDir,
 				toRecheck,
 			);
 
@@ -523,13 +528,13 @@ export default class Deluge implements TorrentClient {
 	 * formats the json for rpc calls to inject
 	 * @param filename filename for the injecting torrent file
 	 * @param filedump string with encoded torrent file
-	 * @param path path to the torrent data
+	 * @param destinationDir path to the torrent data
 	 * @param toRecheck boolean to recheck the torrent
 	 */
 	private formatData(
 		filename: string,
 		filedump: string,
-		path: string,
+		destinationDir: string,
 		toRecheck: boolean,
 	): InjectData {
 		return [
@@ -538,7 +543,7 @@ export default class Deluge implements TorrentClient {
 			{
 				add_paused: toRecheck,
 				seed_mode: !toRecheck,
-				download_location: path,
+				download_location: destinationDir,
 			},
 		];
 	}
