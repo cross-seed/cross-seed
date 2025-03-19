@@ -279,6 +279,23 @@ export default class Transmission implements TorrentClient {
 		return resultOf(percentDone === 1);
 	}
 
+	async isTorrentChecking(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		const queryResponse = await this.request<TorrentGetResponseArgs>(
+			"torrent-get",
+			{
+				fields: ["status"],
+				ids: [infoHash],
+			},
+		);
+		if (queryResponse.torrents.length === 0) {
+			return resultOfErr("NOT_FOUND");
+		}
+		const [{ status }] = queryResponse.torrents;
+		return resultOf([1, 2].includes(status));
+	}
+
 	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
 		const res = await this.request<TorrentGetResponseArgs>("torrent-get", {
 			fields: ["hashString", "labels"],

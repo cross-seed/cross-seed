@@ -52,6 +52,9 @@ export interface TorrentClient {
 	isTorrentComplete: (
 		infoHash: string,
 	) => Promise<Result<boolean, "NOT_FOUND">>;
+	isTorrentChecking: (
+		infoHash: string,
+	) => Promise<Result<boolean, "NOT_FOUND">>;
 	getAllTorrents: () => Promise<TorrentMetadataInClient[]>;
 	/**
 	 * Get all searchees from the client and update the db

@@ -362,8 +362,12 @@ async function injectionAlreadyExists({
 			: matchMode === MatchMode.FLEXIBLE
 				? Decision.MATCH_SIZE_ONLY
 				: Decision.MATCH;
-	const result = await getClient()!.isTorrentComplete(meta.infoHash);
-	let isComplete = result.orElse(false);
+	const isChecking = (
+		await getClient()!.isTorrentChecking(meta.infoHash)
+	).orElse(false);
+	let isComplete = (
+		await getClient()!.isTorrentComplete(meta.infoHash)
+	).orElse(false);
 	const anyFullMatch = matches.some(
 		(m) =>
 			m.decision === Decision.MATCH ||
@@ -378,12 +382,20 @@ async function injectionAlreadyExists({
 		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
 			checkOnce: false,
 		});
+	} else if (isChecking) {
+		logger.info({
+			label: Label.INJECT,
+			message: `${progress} ${filePathLog} is being checked by client - ${chalk.green(injectionResult)}`,
+		});
+		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+			checkOnce: false,
+		});
 	} else if (anyFullMatch && !isComplete) {
 		const finalCheckTime =
 			(await stat(torrentFilePath)).mtimeMs + ms("1 day");
 		logger.info({
 			label: Label.INJECT,
-			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.green(injectionResult)}`,
+			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
 		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
