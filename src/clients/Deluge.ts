@@ -629,6 +629,24 @@ export default class Deluge implements TorrentClient {
 	}
 
 	/**
+	 * checks if a torrent is checking in deluge
+	 * @param infoHash the infoHash of the torrent to check
+	 * @return Result containing either a boolean or reason it was not provided
+	 */
+	async isTorrentChecking(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		try {
+			const torrentInfo = await this.getTorrentInfo(infoHash, {
+				useVerbose: true,
+			});
+			return resultOf(torrentInfo.state === "Checking");
+		} catch (e) {
+			return resultOfErr("NOT_FOUND");
+		}
+	}
+
+	/**
 	 * @return All torrents in the client
 	 */
 	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {

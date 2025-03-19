@@ -165,7 +165,7 @@ export default class RTorrent implements TorrentClient {
 				name: string;
 				directoryBase: string;
 				bytesLeft: number;
-				hashing: number;
+				hashing: 0 | 1 | 2 | 3;
 				isMultiFile: boolean;
 				isActive: boolean;
 			},
@@ -177,8 +177,8 @@ export default class RTorrent implements TorrentClient {
 			| [
 					[string],
 					[string],
-					[number],
-					[number],
+					[string],
+					["0" | "1" | "2" | "3"],
 					["0" | "1"],
 					["0" | "1"],
 					["0" | "1"],
@@ -245,11 +245,11 @@ export default class RTorrent implements TorrentClient {
 			const [
 				[name],
 				[directoryBase],
-				[bytesLeft],
-				[hashing],
+				[bytesLeftStr],
+				[hashingStr],
 				[isCompleteStr],
 				[isMultiFileStr],
-				[isActive],
+				[isActiveStr],
 			] = response;
 			const isComplete = Boolean(Number(isCompleteStr));
 			if (onlyCompleted && !isComplete) {
@@ -258,10 +258,10 @@ export default class RTorrent implements TorrentClient {
 			return resultOf({
 				name,
 				directoryBase,
-				bytesLeft,
-				hashing,
+				bytesLeft: Number(bytesLeftStr),
+				hashing: Number(hashingStr) as 0 | 1 | 2 | 3,
 				isMultiFile: Boolean(Number(isMultiFileStr)),
-				isActive: Boolean(Number(isActive)),
+				isActive: Boolean(Number(isActiveStr)),
 			});
 		} catch (e) {
 			logger.error({ label: this.label, message: e });
@@ -450,7 +450,23 @@ export default class RTorrent implements TorrentClient {
 			if (response.length === 0) {
 				return resultOfErr("NOT_FOUND");
 			}
-			return resultOf(response[0] === "1");
+			return resultOf(Boolean(Number(response[0])));
+		} catch (e) {
+			return resultOfErr("NOT_FOUND");
+		}
+	}
+
+	async isTorrentChecking(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		try {
+			const response = await this.methodCallP<string[]>("d.hashing", [
+				infoHash,
+			]);
+			if (response.length === 0) {
+				return resultOfErr("NOT_FOUND");
+			}
+			return resultOf(Boolean(Number(response[0])));
 		} catch (e) {
 			return resultOfErr("NOT_FOUND");
 		}
@@ -660,7 +676,7 @@ export default class RTorrent implements TorrentClient {
 			const trackers = organizeTrackers(
 				results[i * numMethods + 6][0].map((arr) => ({
 					url: arr[0],
-					tier: arr[1],
+					tier: Number(arr[1]),
 				})),
 			);
 			const title = parseTitle(name, files) ?? name;

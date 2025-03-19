@@ -712,10 +712,22 @@ export default class QBittorrent implements TorrentClient {
 		infoHash: string,
 	): Promise<Result<boolean, "NOT_FOUND">> {
 		const torrentInfo = await this.getTorrentInfo(infoHash);
-		if (!torrentInfo) {
-			return resultOfErr("NOT_FOUND");
-		}
+		if (!torrentInfo) return resultOfErr("NOT_FOUND");
 		return resultOf(this.isTorrentInfoComplete(torrentInfo));
+	}
+
+	/**
+	 * @param infoHash the infohash of the torrent
+	 * @returns whether the torrent is checking
+	 */
+	async isTorrentChecking(
+		infoHash: string,
+	): Promise<Result<boolean, "NOT_FOUND">> {
+		const torrentInfo = await this.getTorrentInfo(infoHash);
+		if (!torrentInfo) return resultOfErr("NOT_FOUND");
+		return resultOf(
+			["checkingDL", "checkingUP"].includes(torrentInfo.state),
+		);
 	}
 
 	isTorrentInfoComplete(torrentInfo: TorrentInfo): boolean {
