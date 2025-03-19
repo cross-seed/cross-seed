@@ -4,7 +4,11 @@ import { zip } from "lodash-es";
 import ms from "ms";
 import { basename } from "path";
 import { performAction, performActions } from "./action.js";
-import { getClient } from "./clients/TorrentClient.js";
+import {
+	byClientHostPriority,
+	byClientPriority,
+	getClients,
+} from "./clients/TorrentClient.js";
 import {
 	ActionResult,
 	Decision,
@@ -285,7 +289,7 @@ export async function searchForLocalTorrentByCriteria(
 
 	const rawSearchees: Searchee[] = [];
 	if (!criteria.path) {
-		rawSearchees.push(await getTorrentByCriteria(criteria));
+		rawSearchees.push(...(await getTorrentByCriteria(criteria)));
 	} else {
 		const memoizedPaths = new Map<string, string[]>();
 		const memoizedLengths = new Map<string, number>();
@@ -298,11 +302,26 @@ export async function searchForLocalTorrentByCriteria(
 			...searcheeResults.filter(isOk).map((r) => r.unwrap()),
 		);
 	}
-	const searchees: SearcheeWithLabel[] = rawSearchees.map((searchee) => ({
-		...searchee,
-		label: Label.WEBHOOK,
-	}));
-	const allowSeasonPackEpisodes = searchees.length === 1;
+	const searchees: SearcheeWithLabel[] = rawSearchees
+		.sort(
+			comparing(
+				(searchee) => byClientPriority(searchee),
+				(searchee) => -searchee.files.length, // Assume searchees are complete
+				(searchee) => !searchee.infoHash,
+			),
+		)
+		.map((searchee) => ({
+			...searchee,
+			label: Label.WEBHOOK,
+		}));
+	const allowSeasonPackEpisodes = Array.from(
+		searchees
+			.reduce((acc, cur) => {
+				acc.set(cur.clientHost, (acc.get(cur.clientHost) ?? 0) + 1);
+				return acc;
+			}, new Map<string | undefined, number>())
+			.values(),
+	).some((v) => v === 1);
 	const infoHashesToExclude = await getInfoHashesToExclude();
 	const indexerSearchCount = new Map<number, number>();
 	let totalFound = 0;
@@ -416,22 +435,25 @@ async function getEnsembleForCandidate(
 		return null;
 	}
 	const duplicateFiles = new Set<string>();
-	const entriesToDelete: string[] = [];
+	const entriesToDelete = new Set<string>();
+	const hosts = new Map<string, number>();
 	const files = ensemble.reduce<File[]>((acc, entry) => {
 		const path = entry.path;
 		if (!fs.existsSync(path)) {
-			entriesToDelete.push(path);
+			entriesToDelete.add(path);
 			return acc;
 		}
 		const length = fs.statSync(path).size;
 		const name = basename(path);
-		const test = `${entry.element}-${length}`;
-		if (duplicateFiles.has(test)) return acc; // cross seeded file
-		duplicateFiles.add(test);
+		const clientHost: string | null = entry.client_host;
+		const uniqueKey = `${clientHost}-${entry.element}-${length}`;
+		if (duplicateFiles.has(uniqueKey)) return acc; // cross seeded file
+		duplicateFiles.add(uniqueKey);
+		if (clientHost) hosts.set(clientHost, (hosts.get(clientHost) ?? 0) + 1);
 		acc.push({ length, name, path });
 		return acc;
 	}, []);
-	await inBatches(entriesToDelete, async (batch) => {
+	await inBatches(Array.from(entriesToDelete), async (batch) => {
 		await memDB("data").whereIn("path", batch).del();
 		await memDB("ensemble").whereIn("path", batch).del();
 	});
@@ -463,6 +485,12 @@ async function getEnsembleForCandidate(
 		files,
 		length: totalLength,
 		mtimeMs,
+		clientHost: [...hosts].sort(
+			comparing(
+				(host) => -host[1],
+				(host) => byClientHostPriority(host[0]),
+			),
+		)[0]?.[0],
 		label: searcheeLabel,
 	}));
 	logger.verbose({
@@ -504,6 +532,7 @@ export async function checkNewCandidateMatch(
 	let actionResult: ActionResult | null = null;
 	searchees.sort(
 		comparing(
+			(searchee) => byClientPriority(searchee),
 			(searchee) => !searchee.infoHash, // Prefer packs over ensemble
 			(searchee) => -searchee.files.length,
 		),
@@ -558,10 +587,12 @@ export async function findAllSearchees(
 ): Promise<SearcheeWithLabel[]> {
 	const { dataDirs, torrentDir, torrents, useClientTorrents } =
 		getRuntimeConfig();
-	const client = getClient();
+	const clients = getClients();
 	const rawSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
-		const torrentInfos = (await client?.getAllTorrents()) ?? [];
+		const torrentInfos = (
+			await Promise.all(clients.map((client) => client.getAllTorrents()))
+		).flat();
 		const searcheeResults = await Promise.all(
 			torrents.map((torrent) =>
 				createSearcheeFromTorrentFile(torrent, torrentInfos),
@@ -574,7 +605,15 @@ export async function findAllSearchees(
 		if (useClientTorrents) {
 			const refresh = searcheeLabel === Label.SEARCH ? [] : undefined;
 			rawSearchees.push(
-				...(await client!.getClientSearchees({ refresh })).searchees,
+				...(
+					await Promise.all(
+						clients.map((client) =>
+							client.getClientSearchees({ refresh }),
+						),
+					)
+				)
+					.map((r) => r.searchees)
+					.flat(),
 			);
 		} else if (torrentDir) {
 			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
@@ -671,6 +710,7 @@ async function findSearchableTorrents(options?: {
 		}
 		filteredSearchees.sort(
 			comparing(
+				(searchee) => byClientPriority(searchee),
 				(searchee) => -searchee.files.length, // Assume searchees are complete
 				(searchee) => !searchee.infoHash,
 			),
