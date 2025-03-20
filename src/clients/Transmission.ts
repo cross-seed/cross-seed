@@ -1,6 +1,7 @@
 import { readdirSync } from "fs";
 import ms from "ms";
 import { basename } from "path";
+import { inspect } from "util";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
@@ -21,6 +22,13 @@ import {
 	updateSearcheeClientDB,
 } from "../searchee.js";
 import {
+	extractCredentialsFromUrl,
+	humanReadableSize,
+	sanitizeInfoHash,
+	wait,
+} from "../utils.js";
+import {
+	calculateSizeForAutoResume,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -29,15 +37,9 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
+	TorrentExclusionInfo,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
-import {
-	extractCredentialsFromUrl,
-	humanReadableSize,
-	sanitizeInfoHash,
-	wait,
-} from "../utils.js";
-import { inspect } from "util";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
 type Method =
@@ -61,7 +63,7 @@ interface TorrentGetResponseArgs {
 		totalSize: number;
 		labels: string[];
 		downloadDir: string;
-		files: { name: string; length: number }[];
+		files: { name: string; length: number; bytesCompleted: number }[];
 		trackers: { announce: string; tier: number }[];
 		leftUntilDone: number;
 		percentDone: number;
@@ -418,9 +420,12 @@ export default class Transmission implements TorrentClient {
 	async resumeInjection(
 		infoHash: string,
 		decision: DecisionAnyMatch,
-		options: { checkOnce: boolean },
+		options: { checkOnce: boolean; meta: Metafile },
 	): Promise<void> {
 		let sleepTime = resumeSleepTime;
+		const { ignoreNonRelevantFilesToResume, fuzzySizeThreshold } =
+			getRuntimeConfig();
+		let exclusionInfo: TorrentExclusionInfo;
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
@@ -433,7 +438,7 @@ export default class Transmission implements TorrentClient {
 			const queryResponse = await this.request<TorrentGetResponseArgs>(
 				"torrent-get",
 				{
-					fields: ["leftUntilDone", "name", "status"],
+					fields: ["leftUntilDone", "name", "status", "files"],
 					ids: [infoHash],
 				},
 			);
@@ -452,6 +457,33 @@ export default class Transmission implements TorrentClient {
 					message: `Will not resume ${torrentLog}: status is ${status}`,
 				});
 				return;
+			}
+			if (ignoreNonRelevantFilesToResume) {
+				exclusionInfo = calculateSizeForAutoResume(options.meta.files);
+				if (
+					!exclusionInfo.excludedFileCount &&
+					leftUntilDone > maxRemainingBytes
+				) {
+					logger.warn({
+						label: this.label,
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}  (no files excluded)`,
+					});
+					return;
+				} else if (
+					exclusionInfo.excludedFileCount &&
+					(options.meta.length - leftUntilDone) *
+						(1 - fuzzySizeThreshold) >=
+						exclusionInfo.relevantSize
+				) {
+					logger.info({
+						label: this.label,
+						message: `Resuming ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining and ${exclusionInfo.excludedFileCount} files excluded (relevant size: ${humanReadableSize(exclusionInfo.relevantSize, { binary: true })}`,
+					});
+					await this.request<void>("torrent-start", {
+						ids: [infoHash],
+					});
+					return;
+				}
 			}
 			if (leftUntilDone > maxRemainingBytes) {
 				logger.warn({
@@ -515,6 +547,7 @@ export default class Transmission implements TorrentClient {
 			if (toRecheck) {
 				this.resumeInjection(newTorrent.infoHash, decision, {
 					checkOnce: false,
+					meta: newTorrent,
 				});
 			}
 		} catch (e) {
