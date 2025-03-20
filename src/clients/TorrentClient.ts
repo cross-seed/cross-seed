@@ -1,27 +1,33 @@
-import path from "path";
 import ms from "ms";
+import path from "path";
 import { testLinking } from "../action.js";
-import { CrossSeedError } from "../errors.js";
-import { Label, logger } from "../logger.js";
-import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
-import { filterByContent } from "../preFilter.js";
-import { Result } from "../Result.js";
 import {
 	ABS_WIN_PATH_REGEX,
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
 	MatchMode,
+	RESUME_EXCLUDED_FILETYPES,
+	RESUME_EXCLUDED_KEYWORDS,
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
+import { CrossSeedError } from "../errors.js";
+import { Label, logger } from "../logger.js";
+import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
+import { filterByContent } from "../preFilter.js";
+import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
-import { formatAsList, isTruthy, wait } from "../utils.js";
+import {
+	File,
+	Searchee,
+	SearcheeClient,
+	SearcheeWithInfoHash,
+} from "../searchee.js";
+import { formatAsList, hasExt, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
 import Transmission from "./Transmission.js";
-import { hasExt } from "../utils.js";
 
 const activeClients: TorrentClient[] = [];
 
@@ -32,6 +38,7 @@ type TorrentClientType =
 	| Label.DELUGE;
 
 export type Tracker = { url: string; tier: number };
+
 export interface TorrentMetadataInClient {
 	infoHash: string;
 	category?: string;
@@ -42,6 +49,11 @@ export interface TorrentMetadataInClient {
 export interface ClientSearcheeResult {
 	searchees: SearcheeClient[];
 	newSearchees: SearcheeClient[];
+}
+
+export interface TorrentExclusionInfo {
+	relevantSize: number;
+	excludedFileCount: number;
 }
 
 export interface TorrentClient {
@@ -194,7 +206,13 @@ export async function validateClientSavePaths(
 	);
 	logger.verbose({
 		label,
-		message: `Excluded save paths from linking test due to filters: ${formatAsList(ignoredSavePaths, { sort: true, type: "unit" })}`,
+		message: `Excluded save paths from linking test due to filters: ${formatAsList(
+			ignoredSavePaths,
+			{
+				sort: true,
+				type: "unit",
+			},
+		)}`,
 	});
 
 	for (const savePath of uniqueSavePaths) {
@@ -253,8 +271,58 @@ export function getMaxRemainingBytes(decision: DecisionAnyMatch) {
 	if (matchMode !== MatchMode.PARTIAL) return 0;
 	return autoResumeMaxDownload;
 }
+
 export const resumeSleepTime = ms("15 seconds");
 export const resumeErrSleepTime = ms("5 minutes");
+
 export function getResumeStopTime() {
 	return Date.now() + ms("1 hour");
+}
+
+/**
+ * Calculates the total size of files that don't match exclusion criteria
+ * and counts how many files were excluded.
+ *
+ * @param files - Array of File objects to process
+ * @returns Object containing the total size of relevant files and count of excluded files
+ */
+export function calculateSizeForAutoResume(
+	files: File[],
+): TorrentExclusionInfo {
+	if (!files || files.length === 0) {
+		return { relevantSize: 0, excludedFileCount: 0 };
+	}
+
+	// Use reduce to calculate both values in a single pass
+	return files.reduce(
+		(acc, file) => {
+			// Check if the file path OR name contains any of the excluded keywords
+			const containsExcludedKeyword = RESUME_EXCLUDED_KEYWORDS.some(
+				(keyword) =>
+					file.path.toLowerCase().includes(keyword.toLowerCase()) ||
+					file.name.toLowerCase().includes(keyword.toLowerCase()),
+			);
+
+			// Check if the file name has an excluded extension
+			const hasExcludedFileType = RESUME_EXCLUDED_FILETYPES.some(
+				(fileType) =>
+					file.name.toLowerCase().endsWith(fileType.toLowerCase()),
+			);
+
+			// Check if file should be excluded
+			const shouldExclude =
+				containsExcludedKeyword || hasExcludedFileType;
+
+			// Update the accumulator based on whether the file is excluded
+			return {
+				relevantSize: shouldExclude
+					? acc.relevantSize
+					: acc.relevantSize + file.length,
+				excludedFileCount: shouldExclude
+					? acc.excludedFileCount + 1
+					: acc.excludedFileCount,
+			};
+		},
+		{ relevantSize: 0, excludedFileCount: 0 },
+	);
 }

@@ -251,3 +251,15 @@ export const IGNORED_FOLDERS_SUBSTRINGS = [
 	"certificate",
 	"video_ts",
 ];
+export const RESUME_EXCLUDED_KEYWORDS: string[] = [
+	"sample",
+	"trailer",
+	"extras",
+	"bonus",
+];
+export const RESUME_EXCLUDED_FILETYPES: string[] = [
+	".nfo",
+	".srt",
+	".txt",
+	".ass",
+];
