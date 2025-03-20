@@ -1,6 +1,7 @@
 import { readdirSync } from "fs";
-import { basename } from "path";
 import ms from "ms";
+import { basename } from "path";
+import { inspect } from "util";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
@@ -29,6 +30,7 @@ import {
 	wait,
 } from "../utils.js";
 import {
+	calculateSizeForAutoResume,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -37,9 +39,9 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
+	TorrentExclusionInfo,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
-import { inspect } from "util";
 
 interface TorrentInfo {
 	name?: string;
@@ -297,14 +299,19 @@ export default class Deluge implements TorrentClient {
 	/**
 	 * checks the status of an infohash in the client and resumes if/when criteria is met
 	 * @param infoHash string containing the infohash to resume
+	 * @param decision decision by which the newTorrent was matched
+	 * @param options options object for extra flags
 	 * @param options.checkOnce boolean to only check for resuming once
+	 * @param options.meta metafile object containing the torrent data
 	 */
 	async resumeInjection(
 		infoHash: string,
 		decision: DecisionAnyMatch,
-		options: { checkOnce: boolean },
+		options: { checkOnce: boolean; meta: Metafile },
 	): Promise<void> {
 		let sleepTime = resumeSleepTime;
+		const { fuzzySizeThreshold, ignoreNonRelevantFilesToResume } =
+			getRuntimeConfig();
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
@@ -315,6 +322,7 @@ export default class Deluge implements TorrentClient {
 			}
 			await wait(sleepTime);
 			let torrentInfo: TorrentInfo;
+			let exclusionInfo: TorrentExclusionInfo;
 			let torrentLog: string;
 			try {
 				torrentInfo = await this.getTorrentInfo(infoHash);
@@ -328,6 +336,36 @@ export default class Deluge implements TorrentClient {
 						message: `Will not resume ${torrentLog}: state is ${torrentInfo.state}`,
 					});
 					return;
+				}
+				if (ignoreNonRelevantFilesToResume) {
+					exclusionInfo = calculateSizeForAutoResume(
+						options.meta.files,
+					);
+					if (
+						!exclusionInfo.excludedFileCount &&
+						torrentInfo.total_remaining! > maxRemainingBytes
+					) {
+						logger.warn({
+							label: this.label,
+							message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}  (no files excluded)`,
+						});
+						return;
+					} else if (
+						exclusionInfo.excludedFileCount &&
+						(torrentInfo.total_size! -
+							torrentInfo.total_remaining!) *
+							(1 - fuzzySizeThreshold) >=
+							exclusionInfo.relevantSize
+					) {
+						logger.info({
+							label: this.label,
+							message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining and ${exclusionInfo.excludedFileCount} files excluded (relevant size: ${humanReadableSize(exclusionInfo.relevantSize, { binary: true })}`,
+						});
+						await this.call<string>("core.resume_torrent", [
+							[infoHash],
+						]);
+						return;
+					}
 				}
 				if (torrentInfo.total_remaining! > maxRemainingBytes) {
 					logger.warn({
@@ -506,6 +544,7 @@ export default class Deluge implements TorrentClient {
 					await this.recheckTorrent(newTorrent.infoHash);
 					this.resumeInjection(newTorrent.infoHash, decision, {
 						checkOnce: false,
+						meta: newTorrent,
 					});
 				}
 			}
@@ -553,6 +592,7 @@ export default class Deluge implements TorrentClient {
 	/**
 	 * returns directory of an infohash in deluge as a string
 	 * @param meta SearcheeWithInfoHash or Metafile for torrent to lookup in client
+	 * @param options options object for extra flags
 	 * @param options.onlyCompleted boolean to only return a completed torrent
 	 * @return Result containing either a string with path or reason it was not provided
 	 */
@@ -767,7 +807,9 @@ export default class Deluge implements TorrentClient {
 	 * returns information needed to complete/validate injection
 	 * @return Promise of TorrentInfo type
 	 * @param infoHash infohash to query for in the client
+	 * @param options options object for extra flags
 	 * @param options.useVerbose use verbose instead of error logging
+	 * @return Promise of TorrentInfo type
 	 */
 	private async getTorrentInfo(
 		infoHash: string,
