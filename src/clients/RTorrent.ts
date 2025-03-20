@@ -32,6 +32,7 @@ import {
 	wait,
 } from "../utils.js";
 import {
+	calculateSizeForAutoResume,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -40,6 +41,7 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
+	TorrentExclusionInfo,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 
@@ -351,9 +353,11 @@ export default class RTorrent implements TorrentClient {
 	}): Promise<Map<string, string>> {
 		const hashes = await this.methodCallP<string[]>("download_list", []);
 		type ReturnType = string[][] | Fault[];
+
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
+
 		let numMethods = 0;
 		const results = await fromBatches(
 			hashes,
@@ -475,9 +479,11 @@ export default class RTorrent implements TorrentClient {
 	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
 		const hashes = await this.methodCallP<string[]>("download_list", []);
 		type ReturnType = string[][] | Fault[];
+
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
+
 		const results = await fromBatches(
 			hashes,
 			async (batch) => {
@@ -557,6 +563,7 @@ export default class RTorrent implements TorrentClient {
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
+
 		let numMethods = 0;
 		const results = await fromBatches(
 			hashes,
@@ -715,9 +722,12 @@ export default class RTorrent implements TorrentClient {
 	async resumeInjection(
 		infoHash: string,
 		decision: DecisionAnyMatch,
-		options: { checkOnce: boolean },
+		options: { checkOnce: boolean; meta: Metafile },
 	): Promise<void> {
 		let sleepTime = resumeSleepTime;
+		const { ignoreNonRelevantFilesToResume, fuzzySizeThreshold } =
+			getRuntimeConfig();
+		let exclusionInfo: TorrentExclusionInfo;
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
@@ -746,6 +756,31 @@ export default class RTorrent implements TorrentClient {
 					message: `Will not resume torrent ${torrentLog}: active`,
 				});
 				return;
+			}
+			if (ignoreNonRelevantFilesToResume) {
+				exclusionInfo = calculateSizeForAutoResume(options.meta.files);
+				if (
+					!exclusionInfo.excludedFileCount &&
+					torrentInfo.bytesLeft! > maxRemainingBytes
+				) {
+					logger.warn({
+						label: this.label,
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}  (no files excluded)`,
+					});
+					return;
+				} else if (
+					exclusionInfo.excludedFileCount &&
+					(options.meta.length! - torrentInfo.bytesLeft!) *
+						(1 - fuzzySizeThreshold) >=
+						exclusionInfo.relevantSize
+				) {
+					logger.info({
+						label: this.label,
+						message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft!, { binary: true })} remaining and ${exclusionInfo.excludedFileCount} files excluded (relevant size: ${humanReadableSize(exclusionInfo.relevantSize, { binary: true })}`,
+					});
+					await this.methodCallP<void>("d.resume", [infoHash]);
+					return;
+				}
 			}
 			if (torrentInfo.bytesLeft > maxRemainingBytes) {
 				logger.warn({
@@ -816,6 +851,7 @@ export default class RTorrent implements TorrentClient {
 				if (toRecheck) {
 					this.resumeInjection(meta.infoHash, decision, {
 						checkOnce: false,
+						meta: meta,
 					});
 				}
 				break;
