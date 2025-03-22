@@ -32,6 +32,7 @@ import {
 	wait,
 } from "../utils.js";
 import {
+	calculateSizeForAutoResume,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -351,9 +352,11 @@ export default class RTorrent implements TorrentClient {
 	}): Promise<Map<string, string>> {
 		const hashes = await this.methodCallP<string[]>("download_list", []);
 		type ReturnType = string[][] | Fault[];
+
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
+
 		let numMethods = 0;
 		const results = await fromBatches(
 			hashes,
@@ -475,9 +478,11 @@ export default class RTorrent implements TorrentClient {
 	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
 		const hashes = await this.methodCallP<string[]>("download_list", []);
 		type ReturnType = string[][] | Fault[];
+
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
+
 		const results = await fromBatches(
 			hashes,
 			async (batch) => {
@@ -557,6 +562,7 @@ export default class RTorrent implements TorrentClient {
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
 		}
+
 		let numMethods = 0;
 		const results = await fromBatches(
 			hashes,
@@ -713,10 +719,11 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	async resumeInjection(
-		infoHash: string,
+		meta: Metafile,
 		decision: DecisionAnyMatch,
 		options: { checkOnce: boolean },
 	): Promise<void> {
+		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
@@ -747,12 +754,22 @@ export default class RTorrent implements TorrentClient {
 				});
 				return;
 			}
-			if (torrentInfo.bytesLeft > maxRemainingBytes) {
-				logger.warn({
-					label: this.label,
-					message: `Will not resume torrent ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
-				});
-				return;
+			if (torrentInfo.bytesLeft! > maxRemainingBytes) {
+				if (
+					!calculateSizeForAutoResume(
+						meta.files,
+						meta.length!,
+						torrentInfo.bytesLeft!,
+						torrentLog,
+						this.label,
+					)
+				) {
+					logger.warn({
+						label: this.label,
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
+					});
+					return;
+				}
 			}
 			logger.info({
 				label: this.label,
@@ -814,7 +831,7 @@ export default class RTorrent implements TorrentClient {
 					].filter((e) => e !== null),
 				);
 				if (toRecheck) {
-					this.resumeInjection(meta.infoHash, decision, {
+					this.resumeInjection(meta, decision, {
 						checkOnce: false,
 					});
 				}

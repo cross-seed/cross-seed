@@ -1,27 +1,33 @@
-import path from "path";
 import ms from "ms";
+import path from "path";
 import { testLinking } from "../action.js";
-import { CrossSeedError } from "../errors.js";
-import { Label, logger } from "../logger.js";
-import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
-import { filterByContent } from "../preFilter.js";
-import { Result } from "../Result.js";
 import {
 	ABS_WIN_PATH_REGEX,
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
 	MatchMode,
+	RESUME_EXCLUDED_FILETYPES,
+	RESUME_EXCLUDED_KEYWORDS,
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
+import { CrossSeedError } from "../errors.js";
+import { Label, logger } from "../logger.js";
+import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
+import { filterByContent } from "../preFilter.js";
+import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
-import { formatAsList, isTruthy, wait } from "../utils.js";
+import {
+	File,
+	Searchee,
+	SearcheeClient,
+	SearcheeWithInfoHash,
+} from "../searchee.js";
+import { formatAsList, hasExt, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
 import Transmission from "./Transmission.js";
-import { hasExt } from "../utils.js";
 
 const activeClients: TorrentClient[] = [];
 
@@ -32,6 +38,7 @@ type TorrentClientType =
 	| Label.DELUGE;
 
 export type Tracker = { url: string; tier: number };
+
 export interface TorrentMetadataInClient {
 	infoHash: string;
 	category: string;
@@ -84,7 +91,7 @@ export interface TorrentClient {
 		v1HashOnly?: boolean;
 	}) => Promise<Map<string, string>>;
 	resumeInjection: (
-		infoHash: string,
+		meta: Metafile,
 		decision: DecisionAnyMatch,
 		options: { checkOnce: boolean },
 	) => Promise<void>;
@@ -99,6 +106,7 @@ export interface TorrentClient {
 }
 
 const PARSE_CLIENT_REGEX = /^(?<clientType>.+?):(?<url>.*)$/;
+
 export function parseClientEntry(
 	clientEntry: string,
 ): { clientType: TorrentClientType; url: string } | null {
@@ -185,7 +193,13 @@ export async function validateClientSavePaths(
 	);
 	logger.verbose({
 		label,
-		message: `Excluded save paths from linking test due to filters: ${formatAsList(ignoredSavePaths, { sort: true, type: "unit" })}`,
+		message: `Excluded save paths from linking test due to filters: ${formatAsList(
+			ignoredSavePaths,
+			{
+				sort: true,
+				type: "unit",
+			},
+		)}`,
 	});
 
 	for (const savePath of uniqueSavePaths) {
@@ -243,8 +257,69 @@ export function getMaxRemainingBytes(decision: DecisionAnyMatch) {
 	if (matchMode !== MatchMode.PARTIAL) return 0;
 	return autoResumeMaxDownload;
 }
+
 export const resumeSleepTime = ms("15 seconds");
 export const resumeErrSleepTime = ms("5 minutes");
+
 export function getResumeStopTime() {
 	return Date.now() + ms("1 hour");
+}
+
+/**
+ * Calculates the total size of files that don't match exclusion criteria
+ * and counts how many files were excluded.
+ *
+ * @param files - Array of File objects to process
+ * @param totalSize total torrent size
+ * @param remainingSize remaining size of the torrent
+ * @param torrentLog name of the torrent
+ * @param label label of torrent action
+ * @returns Object containing the total size of relevant files and count of excluded files
+ */
+export function calculateSizeForAutoResume(
+	files: File[],
+	totalSize: number,
+	remainingSize: number,
+	torrentLog: string,
+	label: string,
+): boolean {
+	const { fuzzySizeThreshold, ignoreNonRelevantFilesToResume } =
+		getRuntimeConfig();
+	if (!ignoreNonRelevantFilesToResume) return false;
+	if (remainingSize > 209715200) return false; // 200 MiB limit
+
+	const { excludedFileCount, relevantSize } = files.reduce(
+		(acc, file) => {
+			const shouldExclude =
+				RESUME_EXCLUDED_KEYWORDS.some((keyword) =>
+					[file.path, file.name].some((text) =>
+						text.toLowerCase().includes(keyword.toLowerCase()),
+					),
+				) ||
+				RESUME_EXCLUDED_FILETYPES.some((fileType) =>
+					file.name.toLowerCase().endsWith(fileType.toLowerCase()),
+				);
+			if (shouldExclude) {
+				logger.verbose({
+					label,
+					message: `${torrentLog}: excluding file ${file.path} from auto resume check`,
+				});
+				return {
+					relevantSize: acc.relevantSize,
+					excludedFileCount: acc.excludedFileCount + 1,
+				};
+			}
+			return {
+				relevantSize: acc.relevantSize + file.length,
+				excludedFileCount: acc.excludedFileCount,
+			};
+		},
+		{ relevantSize: 0, excludedFileCount: 0 },
+	);
+
+	if (!excludedFileCount) return false;
+	if ((totalSize - remainingSize) * (1 - fuzzySizeThreshold) < relevantSize) {
+		return false;
+	}
+	return true;
 }

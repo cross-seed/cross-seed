@@ -25,6 +25,16 @@ import {
 	updateSearcheeClientDB,
 } from "../searchee.js";
 import {
+	extractCredentialsFromUrl,
+	extractInt,
+	getLogString,
+	getPathParts,
+	humanReadableSize,
+	sanitizeInfoHash,
+	wait,
+} from "../utils.js";
+import {
+	calculateSizeForAutoResume,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -35,15 +45,6 @@ import {
 	TorrentClient,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
-import {
-	extractCredentialsFromUrl,
-	extractInt,
-	getPathParts,
-	getLogString,
-	humanReadableSize,
-	sanitizeInfoHash,
-	wait,
-} from "../utils.js";
 
 const X_WWW_FORM_URLENCODED = {
 	"Content-Type": "application/x-www-form-urlencoded",
@@ -802,10 +803,11 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async resumeInjection(
-		infoHash: string,
+		meta: Metafile,
 		decision: DecisionAnyMatch,
 		options: { checkOnce: boolean },
 	): Promise<void> {
+		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
@@ -836,12 +838,22 @@ export default class QBittorrent implements TorrentClient {
 				});
 				return;
 			}
-			if (torrentInfo.amount_left > maxRemainingBytes) {
-				logger.warn({
-					label: this.label,
-					message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
-				});
-				return;
+			if (torrentInfo.amount_left! > maxRemainingBytes) {
+				if (
+					!calculateSizeForAutoResume(
+						meta.files,
+						torrentInfo.total_size!,
+						torrentInfo.amount_left!,
+						torrentLog,
+						this.label,
+					)
+				) {
+					logger.warn({
+						label: this.label,
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
+					});
+					return;
+				}
 			}
 			logger.info({
 				label: this.label,
@@ -956,7 +968,7 @@ export default class QBittorrent implements TorrentClient {
 			}
 			if (toRecheck) {
 				await this.recheckTorrent(newInfo.hash);
-				this.resumeInjection(newInfo.hash, decision, {
+				this.resumeInjection(newTorrent, decision, {
 					checkOnce: false,
 				});
 			}

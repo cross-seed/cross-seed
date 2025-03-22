@@ -309,7 +309,7 @@ async function injectFromStalledTorrent({
 				message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 			});
 			await getClient()!.recheckTorrent(meta.infoHash);
-			getClient()!.resumeInjection(meta.infoHash, stalledDecision, {
+			getClient()!.resumeInjection(meta, stalledDecision, {
 				checkOnce: false,
 			});
 		} else {
@@ -379,7 +379,7 @@ async function injectionAlreadyExists({
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
-		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+		getClient()!.resumeInjection(meta, existsDecision, {
 			checkOnce: false,
 		});
 	} else if (isChecking) {
@@ -387,7 +387,7 @@ async function injectionAlreadyExists({
 			label: Label.INJECT,
 			message: `${progress} ${filePathLog} is being checked by client - ${chalk.green(injectionResult)}`,
 		});
-		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+		getClient()!.resumeInjection(meta, existsDecision, {
 			checkOnce: false,
 		});
 	} else if (anyFullMatch && !isComplete) {
@@ -398,7 +398,7 @@ async function injectionAlreadyExists({
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
 		});
 		await getClient()!.recheckTorrent(meta.infoHash);
-		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+		getClient()!.resumeInjection(meta, existsDecision, {
 			checkOnce: false,
 		});
 		if (Date.now() >= finalCheckTime) {
@@ -415,7 +415,7 @@ async function injectionAlreadyExists({
 				label: Label.INJECT,
 				message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)} (incomplete)`,
 			});
-			getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+			getClient()!.resumeInjection(meta, existsDecision, {
 				checkOnce: true,
 			});
 		}
