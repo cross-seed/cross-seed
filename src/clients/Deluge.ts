@@ -39,7 +39,6 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
-	TorrentExclusionInfo,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 
@@ -298,20 +297,19 @@ export default class Deluge implements TorrentClient {
 
 	/**
 	 * checks the status of an infohash in the client and resumes if/when criteria is met
-	 * @param infoHash string containing the infohash to resume
+	 * @param meta MetaFile containing torrent being resumed
 	 * @param decision decision by which the newTorrent was matched
 	 * @param options options object for extra flags
 	 * @param options.checkOnce boolean to only check for resuming once
 	 * @param options.meta metafile object containing the torrent data
 	 */
 	async resumeInjection(
-		infoHash: string,
+		meta: Metafile,
 		decision: DecisionAnyMatch,
-		options: { checkOnce: boolean; meta: Metafile },
+		options: { checkOnce: boolean },
 	): Promise<void> {
+		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
-		const { fuzzySizeThreshold, ignoreNonRelevantFilesToResume } =
-			getRuntimeConfig();
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
@@ -322,7 +320,6 @@ export default class Deluge implements TorrentClient {
 			}
 			await wait(sleepTime);
 			let torrentInfo: TorrentInfo;
-			let exclusionInfo: TorrentExclusionInfo;
 			let torrentLog: string;
 			try {
 				torrentInfo = await this.getTorrentInfo(infoHash);
@@ -337,42 +334,22 @@ export default class Deluge implements TorrentClient {
 					});
 					return;
 				}
-				if (ignoreNonRelevantFilesToResume) {
-					exclusionInfo = calculateSizeForAutoResume(
-						options.meta.files,
-					);
+				if (torrentInfo.total_remaining! > maxRemainingBytes) {
 					if (
-						!exclusionInfo.excludedFileCount &&
-						torrentInfo.total_remaining! > maxRemainingBytes
+						!calculateSizeForAutoResume(
+							meta.files,
+							torrentInfo.total_size!,
+							torrentInfo.total_remaining!,
+							torrentLog,
+							this.label,
+						)
 					) {
 						logger.warn({
 							label: this.label,
-							message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}  (no files excluded)`,
+							message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 						});
-						return;
-					} else if (
-						exclusionInfo.excludedFileCount &&
-						(torrentInfo.total_size! -
-							torrentInfo.total_remaining!) *
-							(1 - fuzzySizeThreshold) >=
-							exclusionInfo.relevantSize
-					) {
-						logger.info({
-							label: this.label,
-							message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining and ${exclusionInfo.excludedFileCount} files excluded (relevant size: ${humanReadableSize(exclusionInfo.relevantSize, { binary: true })}`,
-						});
-						await this.call<string>("core.resume_torrent", [
-							[infoHash],
-						]);
 						return;
 					}
-				}
-				if (torrentInfo.total_remaining! > maxRemainingBytes) {
-					logger.warn({
-						label: this.label,
-						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
-					});
-					return;
 				}
 			} catch (e) {
 				sleepTime = resumeErrSleepTime; // Dropping connections or restart
@@ -542,9 +519,8 @@ export default class Deluge implements TorrentClient {
 					// leaves torrent ready to download - ~99%
 					await wait(1000);
 					await this.recheckTorrent(newTorrent.infoHash);
-					this.resumeInjection(newTorrent.infoHash, decision, {
+					this.resumeInjection(newTorrent, decision, {
 						checkOnce: false,
-						meta: newTorrent,
 					});
 				}
 			}

@@ -41,7 +41,6 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
-	TorrentExclusionInfo,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 
@@ -721,14 +720,12 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	async resumeInjection(
-		infoHash: string,
+		meta: Metafile,
 		decision: DecisionAnyMatch,
-		options: { checkOnce: boolean; meta: Metafile },
+		options: { checkOnce: boolean },
 	): Promise<void> {
+		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
-		const { ignoreNonRelevantFilesToResume, fuzzySizeThreshold } =
-			getRuntimeConfig();
-		let exclusionInfo: TorrentExclusionInfo;
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
@@ -757,37 +754,22 @@ export default class RTorrent implements TorrentClient {
 				});
 				return;
 			}
-			if (ignoreNonRelevantFilesToResume) {
-				exclusionInfo = calculateSizeForAutoResume(options.meta.files);
+			if (torrentInfo.bytesLeft! > maxRemainingBytes) {
 				if (
-					!exclusionInfo.excludedFileCount &&
-					torrentInfo.bytesLeft! > maxRemainingBytes
+					!calculateSizeForAutoResume(
+						meta.files,
+						meta.length!,
+						torrentInfo.bytesLeft!,
+						torrentLog,
+						this.label,
+					)
 				) {
 					logger.warn({
 						label: this.label,
-						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}  (no files excluded)`,
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 					});
-					return;
-				} else if (
-					exclusionInfo.excludedFileCount &&
-					(options.meta.length! - torrentInfo.bytesLeft!) *
-						(1 - fuzzySizeThreshold) >=
-						exclusionInfo.relevantSize
-				) {
-					logger.info({
-						label: this.label,
-						message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft!, { binary: true })} remaining and ${exclusionInfo.excludedFileCount} files excluded (relevant size: ${humanReadableSize(exclusionInfo.relevantSize, { binary: true })}`,
-					});
-					await this.methodCallP<void>("d.resume", [infoHash]);
 					return;
 				}
-			}
-			if (torrentInfo.bytesLeft > maxRemainingBytes) {
-				logger.warn({
-					label: this.label,
-					message: `Will not resume torrent ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
-				});
-				return;
 			}
 			logger.info({
 				label: this.label,
@@ -849,9 +831,8 @@ export default class RTorrent implements TorrentClient {
 					].filter((e) => e !== null),
 				);
 				if (toRecheck) {
-					this.resumeInjection(meta.infoHash, decision, {
+					this.resumeInjection(meta, decision, {
 						checkOnce: false,
-						meta: meta,
 					});
 				}
 				break;

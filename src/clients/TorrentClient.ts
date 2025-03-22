@@ -51,11 +51,6 @@ export interface ClientSearcheeResult {
 	newSearchees: SearcheeClient[];
 }
 
-export interface TorrentExclusionInfo {
-	relevantSize: number;
-	excludedFileCount: number;
-}
-
 export interface TorrentClient {
 	clientHost: string;
 	clientPriority: number;
@@ -97,7 +92,7 @@ export interface TorrentClient {
 		v1HashOnly?: boolean;
 	}) => Promise<Map<string, string>>;
 	resumeInjection: (
-		infoHash: string,
+		meta: Metafile,
 		decision: DecisionAnyMatch,
 		options: { checkOnce: boolean },
 	) => Promise<void>;
@@ -284,45 +279,56 @@ export function getResumeStopTime() {
  * and counts how many files were excluded.
  *
  * @param files - Array of File objects to process
+ * @param totalSize total torrent size
+ * @param remainingSize remaining size of the torrent
+ * @param torrentLog name of the torrent
+ * @param label label of torrent action
  * @returns Object containing the total size of relevant files and count of excluded files
  */
 export function calculateSizeForAutoResume(
 	files: File[],
-): TorrentExclusionInfo {
-	if (!files || files.length === 0) {
-		return { relevantSize: 0, excludedFileCount: 0 };
-	}
+	totalSize: number,
+	remainingSize: number,
+	torrentLog: string,
+	label: string,
+): boolean {
+	const { fuzzySizeThreshold, ignoreNonRelevantFilesToResume } =
+		getRuntimeConfig();
+	if (!ignoreNonRelevantFilesToResume) return false;
+	if (remainingSize > 209715200) return false; // 200 MiB limit
 
-	// Use reduce to calculate both values in a single pass
-	return files.reduce(
+	const { excludedFileCount, relevantSize } = files.reduce(
 		(acc, file) => {
-			// Check if the file path OR name contains any of the excluded keywords
-			const containsExcludedKeyword = RESUME_EXCLUDED_KEYWORDS.some(
-				(keyword) =>
-					file.path.toLowerCase().includes(keyword.toLowerCase()) ||
-					file.name.toLowerCase().includes(keyword.toLowerCase()),
-			);
-
-			// Check if the file name has an excluded extension
-			const hasExcludedFileType = RESUME_EXCLUDED_FILETYPES.some(
-				(fileType) =>
-					file.name.toLowerCase().endsWith(fileType.toLowerCase()),
-			);
-
-			// Check if file should be excluded
 			const shouldExclude =
-				containsExcludedKeyword || hasExcludedFileType;
-
-			// Update the accumulator based on whether the file is excluded
+				RESUME_EXCLUDED_KEYWORDS.some((keyword) =>
+					[file.path, file.name].some((text) =>
+						text.toLowerCase().includes(keyword.toLowerCase()),
+					),
+				) ||
+				RESUME_EXCLUDED_FILETYPES.some((fileType) =>
+					file.name.toLowerCase().endsWith(fileType.toLowerCase()),
+				);
+			if (shouldExclude) {
+				logger.verbose({
+					label,
+					message: `${torrentLog}: excluding file ${file.path} from auto resume check`,
+				});
+				return {
+					relevantSize: acc.relevantSize,
+					excludedFileCount: acc.excludedFileCount + 1,
+				};
+			}
 			return {
-				relevantSize: shouldExclude
-					? acc.relevantSize
-					: acc.relevantSize + file.length,
-				excludedFileCount: shouldExclude
-					? acc.excludedFileCount + 1
-					: acc.excludedFileCount,
+				relevantSize: acc.relevantSize + file.length,
+				excludedFileCount: acc.excludedFileCount,
 			};
 		},
 		{ relevantSize: 0, excludedFileCount: 0 },
 	);
+
+	if (!excludedFileCount) return false;
+	if ((totalSize - remainingSize) * (1 - fuzzySizeThreshold) < relevantSize) {
+		return false;
+	}
+	return true;
 }
