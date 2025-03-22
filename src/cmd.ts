@@ -63,6 +63,15 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			"Don't use torrents from your client for matching",
 		)
 		.option(
+			"--ignore-non-relevant-files-to-resume",
+			"Ignore certain known irrelevant files when calculating resume size",
+			fallback(fileConfig.ignoreNonRelevantFilesToResume, false),
+		)
+		.option(
+			"--no-ignore-non-relevant-files-to-resume",
+			"Don't ignore certain known irrelevant files when calculating resume size",
+		)
+		.option(
 			"--data-dirs <dirs...>",
 			"Directories to use if searching by data instead of torrents (separated by spaces)",
 			// @ts-expect-error commander supports non-string defaults

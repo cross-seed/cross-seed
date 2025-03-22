@@ -43,7 +43,6 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
-	TorrentExclusionInfo,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 
@@ -806,14 +805,12 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async resumeInjection(
-		infoHash: string,
+		meta: Metafile,
 		decision: DecisionAnyMatch,
-		options: { checkOnce: boolean; meta: Metafile },
+		options: { checkOnce: boolean },
 	): Promise<void> {
+		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
-		const { ignoreNonRelevantFilesToResume, fuzzySizeThreshold } =
-			getRuntimeConfig();
-		let exclusionInfo: TorrentExclusionInfo;
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
@@ -843,43 +840,22 @@ export default class QBittorrent implements TorrentClient {
 				});
 				return;
 			}
-			if (ignoreNonRelevantFilesToResume) {
-				exclusionInfo = calculateSizeForAutoResume(
-					(await this.getFiles(infoHash))!,
-				);
+			if (torrentInfo.amount_left! > maxRemainingBytes) {
 				if (
-					!exclusionInfo.excludedFileCount &&
-					torrentInfo.amount_left! > maxRemainingBytes
+					!calculateSizeForAutoResume(
+						meta.files,
+						torrentInfo.total_size!,
+						torrentInfo.amount_left!,
+						torrentLog,
+						this.label,
+					)
 				) {
 					logger.warn({
 						label: this.label,
-						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}  (no files excluded)`,
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 					});
-					return;
-				} else if (
-					exclusionInfo.excludedFileCount &&
-					(torrentInfo.total_size! - torrentInfo.amount_left!) *
-						(1 - fuzzySizeThreshold) >=
-						exclusionInfo.relevantSize
-				) {
-					logger.info({
-						label: this.label,
-						message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left!, { binary: true })} remaining and ${exclusionInfo.excludedFileCount} files excluded (relevant size: ${humanReadableSize(exclusionInfo.relevantSize, { binary: true })}`,
-					});
-					await this.request(
-						`/torrents/${this.versionMajor >= 5 ? "start" : "resume"}`,
-						`hashes=${infoHash}`,
-						X_WWW_FORM_URLENCODED,
-					);
 					return;
 				}
-			}
-			if (torrentInfo.amount_left > maxRemainingBytes) {
-				logger.warn({
-					label: this.label,
-					message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
-				});
-				return;
 			}
 			logger.info({
 				label: this.label,
@@ -1003,9 +979,8 @@ export default class QBittorrent implements TorrentClient {
 			}
 			if (toRecheck) {
 				await this.recheckTorrent(newInfo.hash);
-				this.resumeInjection(newInfo.hash, decision, {
+				this.resumeInjection(newTorrent, decision, {
 					checkOnce: false,
-					meta: newTorrent,
 				});
 			}
 

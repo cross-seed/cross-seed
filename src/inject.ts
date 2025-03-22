@@ -312,7 +312,7 @@ async function injectFromStalledTorrent({
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 		});
 		await client!.recheckTorrent(meta.infoHash);
-		client!.resumeInjection(meta.infoHash, stalledDecision, {
+		client!.resumeInjection(meta, stalledDecision, {
 			checkOnce: false,
 		});
 	} else {
@@ -378,7 +378,7 @@ async function injectionAlreadyExists({
 			label: Label.INJECT,
 			message: `${progress} ${filePathLog} is being checked by client - ${chalk.green(injectionResult)}`,
 		});
-		client!.resumeInjection(meta.infoHash, decision, {
+		client!.resumeInjection(meta, decision, {
 			checkOnce: false,
 		});
 	} else if (!isComplete && decision !== Decision.MATCH_PARTIAL) {
@@ -389,7 +389,7 @@ async function injectionAlreadyExists({
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
 		});
 		await client!.recheckTorrent(meta.infoHash);
-		client!.resumeInjection(meta.infoHash, decision, {
+		client!.resumeInjection(meta, decision, {
 			checkOnce: false,
 		});
 		if (Date.now() >= finalCheckTime) {
@@ -406,7 +406,7 @@ async function injectionAlreadyExists({
 				label: Label.INJECT,
 				message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)} (incomplete)`,
 			});
-			client!.resumeInjection(meta.infoHash, decision, {
+			client!.resumeInjection(meta, decision, {
 				checkOnce: true,
 			});
 		}
