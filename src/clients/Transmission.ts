@@ -37,7 +37,6 @@ import {
 	resumeSleepTime,
 	shouldRecheck,
 	TorrentClient,
-	TorrentExclusionInfo,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 
@@ -419,14 +418,12 @@ export default class Transmission implements TorrentClient {
 	}
 
 	async resumeInjection(
-		infoHash: string,
+		meta: Metafile,
 		decision: DecisionAnyMatch,
-		options: { checkOnce: boolean; meta: Metafile },
+		options: { checkOnce: boolean },
 	): Promise<void> {
+		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
-		const { ignoreNonRelevantFilesToResume, fuzzySizeThreshold } =
-			getRuntimeConfig();
-		let exclusionInfo: TorrentExclusionInfo;
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
@@ -439,7 +436,7 @@ export default class Transmission implements TorrentClient {
 			const queryResponse = await this.request<TorrentGetResponseArgs>(
 				"torrent-get",
 				{
-					fields: ["leftUntilDone", "name", "status", "files"],
+					fields: ["leftUntilDone", "name", "status"],
 					ids: [infoHash],
 				},
 			);
@@ -459,39 +456,22 @@ export default class Transmission implements TorrentClient {
 				});
 				return;
 			}
-			if (ignoreNonRelevantFilesToResume) {
-				exclusionInfo = calculateSizeForAutoResume(options.meta.files);
+			if (leftUntilDone > maxRemainingBytes) {
 				if (
-					!exclusionInfo.excludedFileCount &&
-					leftUntilDone > maxRemainingBytes
+					!calculateSizeForAutoResume(
+						meta.files,
+						meta.length,
+						leftUntilDone,
+						torrentLog,
+						this.label,
+					)
 				) {
 					logger.warn({
 						label: this.label,
-						message: `Will not resume ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}  (no files excluded)`,
-					});
-					return;
-				} else if (
-					exclusionInfo.excludedFileCount &&
-					(options.meta.length - leftUntilDone) *
-						(1 - fuzzySizeThreshold) >=
-						exclusionInfo.relevantSize
-				) {
-					logger.info({
-						label: this.label,
-						message: `Resuming ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining and ${exclusionInfo.excludedFileCount} files excluded (relevant size: ${humanReadableSize(exclusionInfo.relevantSize, { binary: true })}`,
-					});
-					await this.request<void>("torrent-start", {
-						ids: [infoHash],
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 					});
 					return;
 				}
-			}
-			if (leftUntilDone > maxRemainingBytes) {
-				logger.warn({
-					label: this.label,
-					message: `Will not resume ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
-				});
-				return;
 			}
 			logger.info({
 				label: this.label,
@@ -543,9 +523,8 @@ export default class Transmission implements TorrentClient {
 				},
 			);
 			if (toRecheck) {
-				this.resumeInjection(newTorrent.infoHash, decision, {
+				this.resumeInjection(newTorrent, decision, {
 					checkOnce: false,
-					meta: newTorrent,
 				});
 			}
 		} catch (e) {
