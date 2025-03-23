@@ -30,7 +30,7 @@ import {
 	wait,
 } from "../utils.js";
 import {
-	calculateSizeForAutoResume,
+	shouldResumeFromNonRelevantFiles,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -336,9 +336,8 @@ export default class Deluge implements TorrentClient {
 				}
 				if (torrentInfo.total_remaining! > maxRemainingBytes) {
 					if (
-						!calculateSizeForAutoResume(
-							meta.files,
-							torrentInfo.total_size!,
+						!shouldResumeFromNonRelevantFiles(
+							meta,
 							torrentInfo.total_remaining!,
 							torrentLog,
 							this.label,
