@@ -34,7 +34,7 @@ import {
 	wait,
 } from "../utils.js";
 import {
-	calculateSizeForAutoResume,
+	shouldResumeFromNonRelevantFiles,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -842,9 +842,8 @@ export default class QBittorrent implements TorrentClient {
 			}
 			if (torrentInfo.amount_left! > maxRemainingBytes) {
 				if (
-					!calculateSizeForAutoResume(
-						meta.files,
-						torrentInfo.total_size!,
+					!shouldResumeFromNonRelevantFiles(
+						meta,
 						torrentInfo.amount_left!,
 						torrentLog,
 						this.label,

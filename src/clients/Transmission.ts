@@ -28,7 +28,7 @@ import {
 	wait,
 } from "../utils.js";
 import {
-	calculateSizeForAutoResume,
+	shouldResumeFromNonRelevantFiles,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -457,9 +457,8 @@ export default class Transmission implements TorrentClient {
 			}
 			if (leftUntilDone > maxRemainingBytes) {
 				if (
-					!calculateSizeForAutoResume(
-						meta.files,
-						meta.length,
+					!shouldResumeFromNonRelevantFiles(
+						meta,
 						leftUntilDone,
 						torrentLog,
 						this.label,
