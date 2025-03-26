@@ -840,18 +840,17 @@ export default class QBittorrent implements TorrentClient {
 				});
 				return;
 			}
-			if (torrentInfo.amount_left! > maxRemainingBytes) {
+			if (torrentInfo.amount_left > maxRemainingBytes) {
 				if (
 					!shouldResumeFromNonRelevantFiles(
 						meta,
-						torrentInfo.amount_left!,
-						torrentLog,
-						this.label,
+						torrentInfo.amount_left,
+						{ torrentLog, label: this.label },
 					)
 				) {
 					logger.warn({
 						label: this.label,
-						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 					});
 					return;
 				}

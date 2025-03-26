@@ -754,18 +754,17 @@ export default class RTorrent implements TorrentClient {
 				});
 				return;
 			}
-			if (torrentInfo.bytesLeft! > maxRemainingBytes) {
+			if (torrentInfo.bytesLeft > maxRemainingBytes) {
 				if (
 					!shouldResumeFromNonRelevantFiles(
 						meta,
-						torrentInfo.bytesLeft!,
-						torrentLog,
-						this.label,
+						torrentInfo.bytesLeft,
+						{ torrentLog, label: this.label },
 					)
 				) {
 					logger.warn({
 						label: this.label,
-						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
+						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.bytesLeft, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
 					});
 					return;
 				}

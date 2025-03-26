@@ -11,6 +11,7 @@ import {
 	RESUME_EXCLUDED_KEYWORDS,
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
+import { getPartialSizeRatio } from "../decide.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
@@ -270,20 +271,18 @@ export function getResumeStopTime() {
 }
 
 /**
- * Calculates the total size of files that don't match exclusion criteria
- * and counts how many files were excluded.
+ * Checks if the torrent should be resumed based on excluded files
  *
  * @param meta metafile object containing torrent information
  * @param remainingSize remaining size of the torrent
- * @param torrentLog name of the torrent
- * @param label label of torrent action
+ * @param options.torrentLog torrent log string
+ * @param options.label torrent client label
  * @returns boolean determining if the torrent should be resumed
  */
 export function shouldResumeFromNonRelevantFiles(
 	meta: Metafile,
 	remainingSize: number,
-	torrentLog: string,
-	label: string,
+	options?: { torrentLog: string; label: string },
 ): boolean {
 	const { ignoreNonRelevantFilesToResume } = getRuntimeConfig();
 	if (!ignoreNonRelevantFilesToResume) return false;
@@ -301,10 +300,12 @@ export function shouldResumeFromNonRelevantFiles(
 					file.name.toLowerCase().endsWith(fileType),
 				);
 			if (shouldExclude) {
-				logger.verbose({
-					label,
-					message: `${torrentLog}: excluding file ${file.path} from auto resume check`,
-				});
+				if (options) {
+					logger.verbose({
+						label: options.label,
+						message: `${options.torrentLog}: excluding file ${file.path} from auto resume check`,
+					});
+				}
 				return {
 					relevantSize: acc.relevantSize,
 					excludedFileCount: acc.excludedFileCount + 1,
@@ -319,8 +320,15 @@ export function shouldResumeFromNonRelevantFiles(
 	);
 
 	if (relevantSize === meta.length) return false;
-	if (meta.length - remainingSize + meta.pieceLength < relevantSize) {
-		return false;
-	}
-	return true;
+	return meta.length - remainingSize + meta.pieceLength >= relevantSize;
+}
+
+export function estimatePausedStatus(
+	meta: Metafile,
+	searchee: Searchee,
+): boolean {
+	const { autoResumeMaxDownload } = getRuntimeConfig();
+	const remaining = (1 - getPartialSizeRatio(meta, searchee)) * meta.length;
+	if (remaining <= autoResumeMaxDownload) return false;
+	return !shouldResumeFromNonRelevantFiles(meta, remaining);
 }

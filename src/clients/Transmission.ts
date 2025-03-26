@@ -457,12 +457,10 @@ export default class Transmission implements TorrentClient {
 			}
 			if (leftUntilDone > maxRemainingBytes) {
 				if (
-					!shouldResumeFromNonRelevantFiles(
-						meta,
-						leftUntilDone,
+					!shouldResumeFromNonRelevantFiles(meta, leftUntilDone, {
 						torrentLog,
-						this.label,
-					)
+						label: this.label,
+					})
 				) {
 					logger.warn({
 						label: this.label,
