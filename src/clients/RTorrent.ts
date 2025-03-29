@@ -800,7 +800,7 @@ export default class RTorrent implements TorrentClient {
 		};
 
 		//const toRecheck = shouldRecheck(searchee, decision);
-		const loadType = "load.raw_start";
+		const loadType = "load.raw";
 
 		const retries = 5;
 		for (let i = 0; i < retries; i++) {
@@ -817,9 +817,9 @@ export default class RTorrent implements TorrentClient {
 					].filter((e) => e !== null),
 				);
 				// if (toRecheck) {
-				// 	this.resumeInjection(meta.infoHash, decision, {
-				// 		checkOnce: false,
-				// 	});
+				this.resumeInjection(meta.infoHash, decision, {
+					checkOnce: false,
+				});
 				// }
 				break;
 			} catch (e) {
