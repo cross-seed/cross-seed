@@ -32,7 +32,7 @@ import {
 	wait,
 } from "../utils.js";
 import {
-	calculateSizeForAutoResume,
+	shouldResumeFromNonRelevantFiles,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -754,9 +754,8 @@ export default class RTorrent implements TorrentClient {
 			}
 			if (torrentInfo.bytesLeft! > maxRemainingBytes) {
 				if (
-					!calculateSizeForAutoResume(
-						meta.files,
-						meta.length!,
+					!shouldResumeFromNonRelevantFiles(
+						meta,
 						torrentInfo.bytesLeft!,
 						torrentLog,
 						this.label,

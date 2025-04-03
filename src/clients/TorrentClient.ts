@@ -17,12 +17,7 @@ import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
 import { filterByContent } from "../preFilter.js";
 import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import {
-	File,
-	Searchee,
-	SearcheeClient,
-	SearcheeWithInfoHash,
-} from "../searchee.js";
+import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
 import { formatAsList, hasExt, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
@@ -278,35 +273,32 @@ export function getResumeStopTime() {
  * Calculates the total size of files that don't match exclusion criteria
  * and counts how many files were excluded.
  *
- * @param files - Array of File objects to process
- * @param totalSize total torrent size
+ * @param meta metafile object containing torrent information
  * @param remainingSize remaining size of the torrent
  * @param torrentLog name of the torrent
  * @param label label of torrent action
- * @returns Object containing the total size of relevant files and count of excluded files
+ * @returns boolean determining if the torrent should be resumed
  */
-export function calculateSizeForAutoResume(
-	files: File[],
-	totalSize: number,
+export function shouldResumeFromNonRelevantFiles(
+	meta: Metafile,
 	remainingSize: number,
 	torrentLog: string,
 	label: string,
 ): boolean {
-	const { fuzzySizeThreshold, ignoreNonRelevantFilesToResume } =
-		getRuntimeConfig();
+	const { ignoreNonRelevantFilesToResume } = getRuntimeConfig();
 	if (!ignoreNonRelevantFilesToResume) return false;
 	if (remainingSize > 209715200) return false; // 200 MiB limit
 
-	const { excludedFileCount, relevantSize } = files.reduce(
+	const { relevantSize } = meta.files.reduce(
 		(acc, file) => {
 			const shouldExclude =
 				RESUME_EXCLUDED_KEYWORDS.some((keyword) =>
 					[file.path, file.name].some((text) =>
-						text.toLowerCase().includes(keyword.toLowerCase()),
+						text.toLowerCase().includes(keyword),
 					),
 				) ||
 				RESUME_EXCLUDED_FILETYPES.some((fileType) =>
-					file.name.toLowerCase().endsWith(fileType.toLowerCase()),
+					file.name.toLowerCase().endsWith(fileType),
 				);
 			if (shouldExclude) {
 				logger.verbose({
@@ -326,8 +318,8 @@ export function calculateSizeForAutoResume(
 		{ relevantSize: 0, excludedFileCount: 0 },
 	);
 
-	if (!excludedFileCount) return false;
-	if ((totalSize - remainingSize) * (1 - fuzzySizeThreshold) < relevantSize) {
+	if (relevantSize === meta.length) return false;
+	if (meta.length - remainingSize + meta.pieceLength < relevantSize) {
 		return false;
 	}
 	return true;
