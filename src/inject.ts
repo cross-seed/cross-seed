@@ -15,7 +15,6 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	isAnyMatchedDecision,
-	MatchMode,
 	MediaType,
 	SaveResult,
 	TORRENT_CACHE_FOLDER,
@@ -358,69 +357,55 @@ async function injectionAlreadyExists({
 	meta,
 	filePathLog,
 }: InjectionAftermath) {
-	const { matchMode } = getRuntimeConfig();
-	const existsDecision =
-		matchMode === MatchMode.PARTIAL
-			? Decision.MATCH_PARTIAL
-			: matchMode === MatchMode.FLEXIBLE
-				? Decision.MATCH_SIZE_ONLY
-				: Decision.MATCH;
 	const isChecking = (await client!.isTorrentChecking(meta.infoHash)).orElse(
 		false,
 	);
 	let isComplete = (await client!.isTorrentComplete(meta.infoHash)).orElse(
 		false,
 	);
-	const anyFullMatch = clientMatches.some(
-		(m) =>
-			m.decision === Decision.MATCH ||
-			m.decision === Decision.MATCH_SIZE_ONLY,
-	);
-	if (linkedNewFiles) {
-		logger.info({
-			label: Label.INJECT,
-			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
-		});
-		await client!.recheckTorrent(meta.infoHash);
-		client!.resumeInjection(meta, existsDecision, {
-			checkOnce: false,
-		});
-	} else if (isChecking) {
-		logger.info({
-			label: Label.INJECT,
-			message: `${progress} ${filePathLog} is being checked by client - ${chalk.green(injectionResult)}`,
-		});
-		client!.resumeInjection(meta, existsDecision, {
-			checkOnce: false,
-		});
-	} else if (anyFullMatch && !isComplete) {
-		const finalCheckTime =
-			(await stat(torrentFilePath)).mtimeMs + ms("1 day");
-		logger.info({
-			label: Label.INJECT,
-			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
-		});
-		await client!.recheckTorrent(meta.infoHash);
-		client!.resumeInjection(meta, existsDecision, {
-			checkOnce: false,
-		});
-		if (Date.now() >= finalCheckTime) {
-			isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
-		}
-	} else {
-		if (isComplete) {
+	const decision =
+		clientMatches.find((m) => m.decision === Decision.MATCH)?.decision ??
+		clientMatches.find((m) => m.decision === Decision.MATCH_SIZE_ONLY)
+			?.decision ??
+		Decision.MATCH_PARTIAL;
+	if (!linkedNewFiles) {
+		if (isChecking) {
 			logger.info({
 				label: Label.INJECT,
-				message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)}`,
+				message: `${progress} ${filePathLog} is being checked by client - ${chalk.green(injectionResult)}`,
 			});
-		} else {
-			logger.warn({
+			client!.resumeInjection(meta, decision, {
+				checkOnce: false,
+			});
+		} else if (!isComplete && decision !== Decision.MATCH_PARTIAL) {
+			const finalCheckTime =
+				(await stat(torrentFilePath)).mtimeMs + ms("1 day");
+			logger.info({
 				label: Label.INJECT,
-				message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)} (incomplete)`,
+				message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
 			});
-			client!.resumeInjection(meta, existsDecision, {
-				checkOnce: true,
+			await client!.recheckTorrent(meta.infoHash);
+			client!.resumeInjection(meta, decision, {
+				checkOnce: false,
 			});
+			if (Date.now() >= finalCheckTime) {
+				isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
+			}
+		} else {
+			if (isComplete) {
+				logger.info({
+					label: Label.INJECT,
+					message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)}`,
+				});
+			} else {
+				logger.warn({
+					label: Label.INJECT,
+					message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)} (incomplete)`,
+				});
+				client!.resumeInjection(meta, decision, {
+					checkOnce: true,
+				});
+			}
 		}
 	}
 	summary.ALREADY_EXISTS++;
