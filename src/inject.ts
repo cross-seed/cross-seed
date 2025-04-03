@@ -3,9 +3,11 @@ import { stat, unlink } from "fs/promises";
 import ms from "ms";
 import { copyFileSync, existsSync } from "fs";
 import path, { basename } from "path";
-import { linkAllFilesInMetafile, performAction } from "./action.js";
+import { linkAllFilesInMetafile, performActionWithoutMutex } from "./action.js";
 import {
+	byClientPriority,
 	getClient,
+	TorrentClient,
 	waitForTorrentToComplete,
 } from "./clients/TorrentClient.js";
 import { appDir } from "./configuration.js";
@@ -67,6 +69,8 @@ type InjectSummary = {
 type InjectionAftermath = {
 	summary: InjectSummary;
 	torrentFilePath: string;
+	client?: TorrentClient;
+	clientMatches: AllMatches;
 	meta: Metafile;
 	matchedDecision?: DecisionAnyMatch;
 	tracker: string;
@@ -74,7 +78,6 @@ type InjectionAftermath = {
 	injectionResult: InjectionResult;
 	matchedSearchee?: SearcheeWithLabel;
 	filePathLog: string;
-	matches: AllMatches;
 	linkedNewFiles: boolean;
 };
 
@@ -115,9 +118,10 @@ async function deleteTorrentFileIfSafe(torrentFilePath: string): Promise<void> {
 
 async function deleteTorrentFileIfComplete(
 	torrentFilePath: string,
+	client: TorrentClient,
 	infoHash: string,
 ): Promise<void> {
-	if (await waitForTorrentToComplete(infoHash)) {
+	if (await waitForTorrentToComplete(client, infoHash)) {
 		await deleteTorrentFileIfSafe(torrentFilePath);
 	} else {
 		logger.warn({
@@ -164,12 +168,14 @@ async function whichSearcheesMatchTorrent(
 	}
 
 	/**
+	 * sort by client priority first for consistency, then
 	 * full matches, then size only matches, then partial matches
 	 * torrent, then data, then virtual
 	 * prefer more files for partials
 	 */
 	matches.sort(
 		comparing(
+			(match) => byClientPriority(match.searchee),
 			(match) =>
 				// indexOf returns -1 for not found
 				-[Decision.MATCH_SIZE_ONLY, Decision.MATCH].indexOf(
@@ -188,17 +194,35 @@ async function injectInitialAction(
 	matches: AllMatches,
 	tracker: string,
 ): Promise<{
+	client?: TorrentClient;
+	clientMatches: AllMatches;
 	injectionResult: InjectionResult;
 	matchedSearchee?: SearcheeWithLabel;
 	matchedDecision?: DecisionAnyMatch;
 	linkedNewFiles: boolean;
 }> {
+	let client: TorrentClient | undefined;
+	const clientMatches: AllMatches = [];
 	let injectionResult = InjectionResult.FAILURE;
 	let matchedSearchee: SearcheeWithLabel | undefined;
 	let matchedDecision: DecisionAnyMatch | undefined;
 	let linkedNewFiles = false;
 	for (const { searchee, decision } of matches) {
-		const res = await performAction(meta, decision, searchee, tracker);
+		const otherClientHost = getClient(searchee)?.clientHost;
+		if (client && client.clientHost !== otherClientHost) {
+			logger.verbose({
+				label: Label.INJECT,
+				message: `Skipping ${getLogString(searchee, chalk.bold.white)} injection into ${otherClientHost} - existing match is using ${client.clientHost}`,
+			});
+			continue;
+		}
+		const res = await performActionWithoutMutex(
+			meta,
+			decision,
+			searchee,
+			tracker,
+		);
+		if (res.existsInOtherClients) continue;
 		const result = res.actionResult;
 		if (res.linkedNewFiles) {
 			linkedNewFiles = true;
@@ -211,22 +235,30 @@ async function injectInitialAction(
 			continue;
 		}
 		if (result === InjectionResult.ALREADY_EXISTS) {
+			client = res.client;
+			clientMatches.push({ searchee, decision });
 			injectionResult = result;
 			continue;
 		}
 		if (result === InjectionResult.TORRENT_NOT_COMPLETE) {
 			if (injectionResult !== InjectionResult.ALREADY_EXISTS) {
+				client = res.client;
+				clientMatches.push({ searchee, decision });
 				injectionResult = result;
 				matchedSearchee = searchee;
 				matchedDecision = decision;
 			}
 			continue;
 		}
+		client = res.client;
+		clientMatches.push({ searchee, decision });
 		injectionResult = InjectionResult.SUCCESS;
 		matchedSearchee = searchee;
 		matchedDecision = decision;
 	}
 	return {
+		client,
+		clientMatches,
 		injectionResult,
 		matchedSearchee,
 		matchedDecision,
@@ -249,18 +281,20 @@ function injectionFailed({
 
 async function injectFromStalledTorrent({
 	meta,
-	matches,
+	client,
+	clientMatches,
 	tracker,
 	injectionResult,
 	progress,
 	filePathLog,
 }: InjectionAftermath): Promise<boolean> {
 	let linkedNewFiles = false;
-	let inClient = (await getClient()!.isTorrentComplete(meta.infoHash)).isOk();
+	let inClient = (await client!.isTorrentComplete(meta.infoHash)).isOk();
 	let injected = false;
 	const stalledDecision = Decision.MATCH_PARTIAL; // Should always be considered partial
-	for (const { searchee, decision } of matches) {
+	for (const { searchee, decision } of clientMatches) {
 		const linkedFilesRootResult = await linkAllFilesInMetafile(
+			client!,
 			searchee,
 			meta,
 			tracker,
@@ -274,7 +308,7 @@ async function injectFromStalledTorrent({
 		if (!inClient) {
 			if (linkedFilesRootResult.isOk()) {
 				const destinationDir = linkResult!.destinationDir;
-				const result = await getClient()!.inject(
+				const result = await client!.inject(
 					meta,
 					searchee,
 					stalledDecision,
@@ -308,8 +342,8 @@ async function injectFromStalledTorrent({
 				label: Label.INJECT,
 				message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 			});
-			await getClient()!.recheckTorrent(meta.infoHash);
-			getClient()!.resumeInjection(meta.infoHash, stalledDecision, {
+			await client!.recheckTorrent(meta.infoHash);
+			client!.resumeInjection(meta.infoHash, stalledDecision, {
 				checkOnce: false,
 			});
 		} else {
@@ -348,11 +382,12 @@ async function injectionTorrentNotComplete(
 async function injectionAlreadyExists({
 	progress,
 	torrentFilePath,
+	client,
+	clientMatches,
 	injectionResult,
 	summary,
 	linkedNewFiles,
 	meta,
-	matches,
 	filePathLog,
 }: InjectionAftermath) {
 	const { matchMode } = getRuntimeConfig();
@@ -362,13 +397,13 @@ async function injectionAlreadyExists({
 			: matchMode === MatchMode.FLEXIBLE
 				? Decision.MATCH_SIZE_ONLY
 				: Decision.MATCH;
-	const isChecking = (
-		await getClient()!.isTorrentChecking(meta.infoHash)
-	).orElse(false);
-	let isComplete = (
-		await getClient()!.isTorrentComplete(meta.infoHash)
-	).orElse(false);
-	const anyFullMatch = matches.some(
+	const isChecking = (await client!.isTorrentChecking(meta.infoHash)).orElse(
+		false,
+	);
+	let isComplete = (await client!.isTorrentComplete(meta.infoHash)).orElse(
+		false,
+	);
+	const anyFullMatch = clientMatches.some(
 		(m) =>
 			m.decision === Decision.MATCH ||
 			m.decision === Decision.MATCH_SIZE_ONLY,
@@ -378,8 +413,8 @@ async function injectionAlreadyExists({
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 		});
-		await getClient()!.recheckTorrent(meta.infoHash);
-		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+		await client!.recheckTorrent(meta.infoHash);
+		client!.resumeInjection(meta.infoHash, existsDecision, {
 			checkOnce: false,
 		});
 	} else if (isChecking) {
@@ -387,7 +422,7 @@ async function injectionAlreadyExists({
 			label: Label.INJECT,
 			message: `${progress} ${filePathLog} is being checked by client - ${chalk.green(injectionResult)}`,
 		});
-		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+		client!.resumeInjection(meta.infoHash, existsDecision, {
 			checkOnce: false,
 		});
 	} else if (anyFullMatch && !isComplete) {
@@ -397,8 +432,8 @@ async function injectionAlreadyExists({
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
 		});
-		await getClient()!.recheckTorrent(meta.infoHash);
-		getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+		await client!.recheckTorrent(meta.infoHash);
+		client!.resumeInjection(meta.infoHash, existsDecision, {
 			checkOnce: false,
 		});
 		if (Date.now() >= finalCheckTime) {
@@ -415,7 +450,7 @@ async function injectionAlreadyExists({
 				label: Label.INJECT,
 				message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)} (incomplete)`,
 			});
-			getClient()!.resumeInjection(meta.infoHash, existsDecision, {
+			client!.resumeInjection(meta.infoHash, existsDecision, {
 				checkOnce: true,
 			});
 		}
@@ -425,13 +460,14 @@ async function injectionAlreadyExists({
 	if (isComplete) {
 		await deleteTorrentFileIfSafe(torrentFilePath);
 	} else {
-		deleteTorrentFileIfComplete(torrentFilePath, meta.infoHash);
+		deleteTorrentFileIfComplete(torrentFilePath, client!, meta.infoHash);
 	}
 }
 
 async function injectionSuccess({
 	progress,
 	torrentFilePath,
+	client,
 	injectionResult,
 	summary,
 	matchedSearchee,
@@ -457,7 +493,7 @@ async function injectionSuccess({
 	} else {
 		summary.FULL_MATCHES++;
 	}
-	deleteTorrentFileIfComplete(torrentFilePath, meta.infoHash);
+	deleteTorrentFileIfComplete(torrentFilePath, client!, meta.infoHash);
 }
 
 async function loadMetafile(
@@ -527,6 +563,8 @@ async function injectSavedTorrent(
 	}
 
 	const {
+		client,
+		clientMatches,
 		injectionResult,
 		matchedSearchee,
 		matchedDecision,
@@ -536,11 +574,12 @@ async function injectSavedTorrent(
 	const injectionAftermath: InjectionAftermath = {
 		progress,
 		torrentFilePath,
+		client,
 		injectionResult,
 		summary,
 		meta,
 		tracker,
-		matches,
+		clientMatches,
 		matchedSearchee,
 		matchedDecision,
 		linkedNewFiles,
@@ -666,7 +705,18 @@ export async function injectSavedTorrents(): Promise<void> {
 	const searchees = [...realSearchees, ...ensembleSearchees];
 	for (const [i, torrentFilePath] of torrentFilePaths.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${torrentFilePaths.length})`);
-		await injectSavedTorrent(progress, torrentFilePath, summary, searchees);
+		await withMutex(
+			Mutex.CLIENT_INJECTION,
+			async () => {
+				return injectSavedTorrent(
+					progress,
+					torrentFilePath,
+					summary,
+					searchees,
+				);
+			},
+			{ useQueue: true },
+		);
 	}
 	logInjectSummary(summary, flatLinking, injectDir);
 }

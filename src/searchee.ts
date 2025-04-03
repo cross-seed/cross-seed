@@ -2,7 +2,11 @@ import { stat } from "fs/promises";
 import { existsSync, readdirSync, statSync } from "fs";
 import { basename, dirname, join, relative } from "path";
 import ms from "ms";
-import { getClient, TorrentMetadataInClient } from "./clients/TorrentClient.js";
+import {
+	byClientHostPriority,
+	getClients,
+	TorrentMetadataInClient,
+} from "./clients/TorrentClient.js";
 import {
 	AKA_REGEX,
 	ANIME_GROUP_REGEX,
@@ -26,6 +30,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { parseTorrentWithMetadata } from "./torrent.js";
 import {
+	comparing,
 	createKeyTitle,
 	extractInt,
 	filesWithExt,
@@ -88,7 +93,7 @@ export type SearcheeWithInfoHash = WithRequired<Searchee, "infoHash">;
 export type SearcheeWithoutInfoHash = WithUndefined<Searchee, "infoHash">;
 export type SearcheeClient = WithRequired<
 	Searchee,
-	"infoHash" | "clientHost" | "savePath" | "category" | "tags" | "trackers"
+	"infoHash" | "clientHost" | "savePath" | "trackers"
 >;
 export type SearcheeVirtual = WithUndefined<Searchee, "infoHash" | "path">;
 export type SearcheeWithLabel = WithRequired<Searchee, "label">;
@@ -336,8 +341,8 @@ export async function updateSearcheeClientDB(
 			length: searchee.length,
 			client_host: searchee.clientHost,
 			save_path: searchee.savePath,
-			category: searchee.category,
-			tags: JSON.stringify(searchee.tags),
+			category: searchee.category ?? null,
+			tags: searchee.tags ? JSON.stringify(searchee.tags) : null,
 			trackers: JSON.stringify(searchee.trackers),
 		})),
 		async (batch) => {
@@ -358,8 +363,8 @@ export function createSearcheeFromDB(dbTorrent): SearcheeClient {
 		length: dbTorrent.length,
 		clientHost: dbTorrent.client_host,
 		savePath: dbTorrent.save_path,
-		category: dbTorrent.category,
-		tags: JSON.parse(dbTorrent.tags),
+		category: dbTorrent.category ?? undefined,
+		tags: dbTorrent.tags ? JSON.parse(dbTorrent.tags) : undefined,
 		trackers: JSON.parse(dbTorrent.trackers),
 	};
 }
@@ -691,6 +696,7 @@ function organizeEnsembleKeys(
 function pushEnsembleEpisode(
 	searchee: SearcheeWithLabel,
 	episodeFiles: File[],
+	hosts: Map<string, number>,
 	torrentSavePaths: Map<string, string>,
 ): void {
 	const savePath = searchee.path
@@ -717,6 +723,8 @@ function pushEnsembleEpisode(
 		episodeFiles.splice(episodeFiles.indexOf(duplicateFile), 1);
 	}
 	episodeFiles.push(absoluteFile);
+	const clientHost = searchee.clientHost;
+	if (clientHost) hosts.set(clientHost, (hosts.get(clientHost) ?? 0) + 1);
 }
 
 function createVirtualSeasonSearchee(
@@ -752,10 +760,16 @@ function createVirtualSeasonSearchee(
 		label: episodeSearchees.values().next().value[0].label,
 	};
 	let newestFileAge = 0;
+	const hosts = new Map<string, number>();
 	for (const [, searchees] of episodeSearchees) {
 		const episodeFiles: File[] = [];
 		for (const searchee of searchees) {
-			pushEnsembleEpisode(searchee, episodeFiles, torrentSavePaths);
+			pushEnsembleEpisode(
+				searchee,
+				episodeFiles,
+				hosts,
+				torrentSavePaths,
+			);
 		}
 		if (episodeFiles.length === 0) continue;
 		const total = episodeFiles.reduce((a, b) => a + b.length, 0);
@@ -765,6 +779,12 @@ function createVirtualSeasonSearchee(
 		newestFileAge = Math.max(newestFileAge, ...fileAges);
 	}
 	seasonSearchee.mtimeMs = newestFileAge;
+	seasonSearchee.clientHost = [...hosts].sort(
+		comparing(
+			(host) => -host[1],
+			(host) => byClientHostPriority(host[0]),
+		),
+	)[0]?.[0];
 	if (seasonSearchee.files.length < minEpisodes) {
 		logEnsemble(
 			`Skipping virtual searchee for ${ensembleTitle} episodes as only ${seasonSearchee.files.length} episode files were found (min: ${minEpisodes})`,
@@ -806,7 +826,7 @@ export async function createEnsembleSearchees(
 	);
 	const torrentSavePaths = useClientTorrents
 		? new Map()
-		: (await getClient()?.getAllDownloadDirs({
+		: (await getClients()[0]?.getAllDownloadDirs({
 				metas: allSearchees.filter(
 					hasInfoHash,
 				) as SearcheeWithInfoHash[],
