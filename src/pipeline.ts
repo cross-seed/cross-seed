@@ -4,11 +4,7 @@ import { zip } from "lodash-es";
 import ms from "ms";
 import { basename } from "path";
 import { performAction, performActions } from "./action.js";
-import {
-	byClientHostPriority,
-	byClientPriority,
-	getClients,
-} from "./clients/TorrentClient.js";
+import { byClientHostPriority, getClients } from "./clients/TorrentClient.js";
 import {
 	ActionResult,
 	Decision,
@@ -305,7 +301,7 @@ export async function searchForLocalTorrentByCriteria(
 	const searchees: SearcheeWithLabel[] = rawSearchees
 		.sort(
 			comparing(
-				(searchee) => byClientPriority(searchee),
+				(searchee) => byClientHostPriority(searchee.clientHost),
 				(searchee) => -searchee.files.length, // Assume searchees are complete
 				(searchee) => !searchee.infoHash,
 			),
@@ -536,7 +532,7 @@ export async function checkNewCandidateMatch(
 	let actionResult: ActionResult | null = null;
 	searchees.sort(
 		comparing(
-			(searchee) => byClientPriority(searchee),
+			(searchee) => byClientHostPriority(searchee.clientHost),
 			(searchee) => !searchee.infoHash, // Prefer packs over ensemble
 			(searchee) => -searchee.files.length,
 		),
@@ -714,7 +710,7 @@ async function findSearchableTorrents(options?: {
 		}
 		filteredSearchees.sort(
 			comparing(
-				(searchee) => byClientPriority(searchee),
+				(searchee) => byClientHostPriority(searchee.clientHost),
 				(searchee) => -searchee.files.length, // Assume searchees are complete
 				(searchee) => !searchee.infoHash,
 			),
