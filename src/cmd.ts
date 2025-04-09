@@ -19,7 +19,6 @@ import { injectSavedTorrents, restoreFromTorrentCache } from "./inject.js";
 import { jobsLoop } from "./jobs.js";
 import { bulkSearch, scanRssFeeds } from "./pipeline.js";
 import { sendTestNotification } from "./pushNotifier.js";
-import { createSearcheeFromMetafile } from "./searchee.js";
 import { serve } from "./server.js";
 import { withFullRuntime, withMinimalRuntime } from "./startup.js";
 import {
@@ -316,14 +315,10 @@ program
 				console.log(
 					"Use `cross-seed diff` to compare two .torrent files",
 				);
-				const res = createSearcheeFromMetafile(
-					await parseTorrentFromFilename(torrentPath),
-				);
-				if (res.isErr()) return console.log(res.unwrapErr());
-				const searchee = res.unwrap();
-				delete searchee.category;
-				delete searchee.tags;
-				console.log(searchee);
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				const { category, isSingleFileTorrent, raw, tags, ...meta } =
+					await parseTorrentFromFilename(torrentPath);
+				console.log(meta);
 			},
 			{ migrate: false },
 		),
