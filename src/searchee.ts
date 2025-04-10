@@ -558,9 +558,20 @@ export function getReleaseGroup(stem: string): string | null {
 		return null;
 	}
 	const parsedGroupMatchString = predictedGroupMatch!.groups!.group.trim();
-	return BAD_GROUP_PARSE_REGEX.test(parsedGroupMatchString)
-		? null
-		: parsedGroupMatchString;
+	if (BAD_GROUP_PARSE_REGEX.test(parsedGroupMatchString)) return null;
+	const match =
+		stem.match(EP_REGEX) ??
+		stem.match(SEASON_REGEX) ??
+		stem.match(MOVIE_REGEX) ??
+		stem.match(ANIME_REGEX);
+	const titles = getAllTitles(
+		[match?.groups?.title, match?.groups?.altTitle].filter(isTruthy),
+	);
+	for (const title of titles) {
+		const group = title.match(RELEASE_GROUP_REGEX)?.groups!.group.trim();
+		if (group && parsedGroupMatchString.includes(group)) return null;
+	}
+	return parsedGroupMatchString;
 }
 
 export function getKeyMetaInfo(stem: string): string {
