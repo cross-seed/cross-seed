@@ -338,9 +338,9 @@ export function indexerDoesSupportMediaType(
 	switch (mediaType) {
 		case MediaType.EPISODE:
 		case MediaType.SEASON:
-			return caps.tv;
+			return caps.tv || caps.anime || caps.xxx;
 		case MediaType.MOVIE:
-			return caps.movie;
+			return caps.movie || caps.anime || caps.xxx;
 		case MediaType.ANIME:
 		case MediaType.VIDEO:
 			return caps.movie || caps.tv || caps.anime || caps.xxx;
