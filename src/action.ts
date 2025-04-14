@@ -535,7 +535,18 @@ export async function performActionWithoutMutex(
 		if (shouldRecheck(searchee, decision) || !searchee.infoHash) {
 			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 		}
-	} else if (actionResult !== InjectionResult.ALREADY_EXISTS) {
+	} else if (actionResult === InjectionResult.ALREADY_EXISTS) {
+		if (linkedNewFiles) {
+			logger.info({
+				label: client.label,
+				message: `Rechecking ${getLogString(newMeta)} as new files were linked from ${getLogString(searchee)}`,
+			});
+			await client.recheckTorrent(newMeta.infoHash);
+			client.resumeInjection(newMeta.infoHash, decision, {
+				checkOnce: false,
+			});
+		}
+	} else {
 		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 		if (unlinkOk && destinationDir) {
 			unlinkMetafile(newMeta, destinationDir);

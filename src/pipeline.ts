@@ -525,11 +525,6 @@ export async function checkNewCandidateMatch(
 		label: searcheeLabel,
 		message: `Unique entries [${searchees.map((m) => m.title)}] using ${formatAsList(methods, { sort: true })} for ${chalk.bold.white(candidate.name)} from ${candidate.tracker}`,
 	});
-	const infoHashesToExclude = await getInfoHashesToExclude();
-
-	let decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null =
-		null;
-	let actionResult: ActionResult | null = null;
 	searchees.sort(
 		comparing(
 			(searchee) => byClientHostPriority(searchee.clientHost),
@@ -537,7 +532,14 @@ export async function checkNewCandidateMatch(
 			(searchee) => -searchee.files.length,
 		),
 	);
+	const infoHashesToExclude = await getInfoHashesToExclude();
 	const guidInfoHashMap = await getGuidInfoHashMap();
+
+	let decision: DecisionAnyMatch | Decision.INFO_HASH_ALREADY_EXISTS | null =
+		null;
+	let actionResult: ActionResult | null = null;
+	let matchedSearchee: SearcheeWithLabel | null = null;
+	let matchedAssessment: ResultAssessment | null = null;
 	for (const searchee of searchees) {
 		await db("searchee")
 			.insert({ name: searchee.title })
@@ -550,34 +552,58 @@ export async function checkNewCandidateMatch(
 			infoHashesToExclude,
 			guidInfoHashMap,
 		);
-
-		if (
-			assessment.decision === Decision.INFO_HASH_ALREADY_EXISTS &&
-			!decision
-		) {
+		if (assessment.decision === Decision.INFO_HASH_ALREADY_EXISTS) {
 			decision = assessment.decision;
 			break; // In client before rss/announce
 		}
-		if (!isAnyMatchedDecision(assessment.decision)) {
-			continue; // Will report 200 if SAME_INFO_HASH and INFO_HASH_ALREADY_EXISTS
-		}
+		if (!isAnyMatchedDecision(assessment.decision)) continue;
 
-		decision = assessment.decision;
-		({ actionResult } = await performAction(
+		const actionReturn = await performAction(
 			assessment.metafile!,
 			assessment.decision,
 			searchee,
 			candidate.tracker,
-		));
-		sendResultsNotification(searchee, [
-			[assessment, candidate.tracker, actionResult],
-		]);
-		if (
-			actionResult === InjectionResult.SUCCESS ||
-			actionResult === SaveResult.SAVED
-		) {
+		);
+		if (actionReturn.actionResult === SaveResult.SAVED) {
+			decision = assessment.decision;
+			actionResult = actionReturn.actionResult;
+			matchedSearchee = searchee;
+			matchedAssessment = assessment;
 			break;
 		}
+		if (
+			assessment.decision !== Decision.MATCH_PARTIAL &&
+			(actionReturn.actionResult === InjectionResult.SUCCESS ||
+				actionReturn.actionResult === InjectionResult.ALREADY_EXISTS)
+		) {
+			decision = assessment.decision;
+			actionResult = InjectionResult.SUCCESS;
+			matchedSearchee = searchee;
+			matchedAssessment = assessment;
+			break;
+		}
+		if (actionResult === InjectionResult.SUCCESS) continue;
+		if (
+			actionResult &&
+			actionReturn.actionResult === InjectionResult.FAILURE
+		) {
+			continue;
+		}
+		if (
+			actionResult === InjectionResult.ALREADY_EXISTS &&
+			actionReturn.actionResult === InjectionResult.TORRENT_NOT_COMPLETE
+		) {
+			continue;
+		}
+		decision = assessment.decision;
+		actionResult = actionReturn.actionResult;
+		matchedSearchee = searchee;
+		matchedAssessment = assessment;
+	}
+	if (matchedSearchee) {
+		sendResultsNotification(matchedSearchee, [
+			[matchedAssessment!, candidate.tracker, actionResult!],
+		]);
 	}
 	return { decision, actionResult };
 }
