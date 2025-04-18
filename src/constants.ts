@@ -257,8 +257,9 @@ export const RESUME_EXCLUDED_KEYWORDS: string[] = [
 	"extras",
 	"bonus",
 ];
-export const RESUME_EXCLUDED_FILETYPES: string[] = [
+export const RESUME_EXCLUDED_EXTS: string[] = [
 	".nfo",
+	".srr",
 	".srt",
 	".txt",
 	".ass",
