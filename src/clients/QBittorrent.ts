@@ -850,7 +850,7 @@ export default class QBittorrent implements TorrentClient {
 				) {
 					logger.warn({
 						label: this.label,
-						message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.amount_left, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
+						message: `autoResumeMaxDownload will not resume ${torrentLog}: remainingSize ${humanReadableSize(torrentInfo.amount_left, { binary: true })} > ${humanReadableSize(maxRemainingBytes, { binary: true })} limit`,
 					});
 					return;
 				}

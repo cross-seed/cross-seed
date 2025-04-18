@@ -7,7 +7,7 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	MatchMode,
-	RESUME_EXCLUDED_FILETYPES,
+	RESUME_EXCLUDED_EXTS,
 	RESUME_EXCLUDED_KEYWORDS,
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
@@ -19,7 +19,13 @@ import { filterByContent } from "../preFilter.js";
 import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
-import { formatAsList, hasExt, isTruthy, wait } from "../utils.js";
+import {
+	formatAsList,
+	hasExt,
+	humanReadableSize,
+	isTruthy,
+	wait,
+} from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
@@ -286,41 +292,51 @@ export function shouldResumeFromNonRelevantFiles(
 ): boolean {
 	const { ignoreNonRelevantFilesToResume } = getRuntimeConfig();
 	if (!ignoreNonRelevantFilesToResume) return false;
-	if (remainingSize > 209715200) return false; // 200 MiB limit
+	if (remainingSize > 209715200) {
+		if (options) {
+			logger.warn({
+				label: options.label,
+				message: `ignoreNonRelevantFilesToResume will not resume ${options.torrentLog}: 200 MiB limit`,
+			});
+		}
+		return false;
+	}
 
-	const { relevantSize } = meta.files.reduce(
-		(acc, file) => {
-			const shouldExclude =
-				RESUME_EXCLUDED_KEYWORDS.some((keyword) =>
-					[file.path, file.name].some((text) =>
-						text.toLowerCase().includes(keyword),
-					),
-				) ||
-				RESUME_EXCLUDED_FILETYPES.some((fileType) =>
-					file.name.toLowerCase().endsWith(fileType),
-				);
-			if (shouldExclude) {
-				if (options) {
-					logger.verbose({
-						label: options.label,
-						message: `${options.torrentLog}: excluding file ${file.path} from auto resume check`,
-					});
-				}
-				return {
-					relevantSize: acc.relevantSize,
-					excludedFileCount: acc.excludedFileCount + 1,
-				};
-			}
-			return {
-				relevantSize: acc.relevantSize + file.length,
-				excludedFileCount: acc.excludedFileCount,
-			};
-		},
-		{ relevantSize: 0, excludedFileCount: 0 },
-	);
+	const irrelevantSize = meta.files.reduce((acc, { path, length }) => {
+		const shouldExclude =
+			RESUME_EXCLUDED_KEYWORDS.some((keyword) =>
+				path.toLowerCase().includes(keyword),
+			) ||
+			RESUME_EXCLUDED_EXTS.some((ext) =>
+				path.toLowerCase().endsWith(ext),
+			);
+		if (!shouldExclude) return acc;
+		if (options) {
+			logger.verbose({
+				label: options.label,
+				message: `${options.torrentLog}: excluding file ${path} from auto resume check`,
+			});
+		}
+		return acc + length;
+	}, 0);
 
-	if (relevantSize === meta.length) return false;
-	return meta.length - remainingSize + meta.pieceLength >= relevantSize;
+	if (irrelevantSize === 0) {
+		if (options) {
+			logger.warn({
+				label: options.label,
+				message: `ignoreNonRelevantFilesToResume will not resume ${options.torrentLog}: all files are relevant`,
+			});
+		}
+		return false;
+	}
+	if (remainingSize <= irrelevantSize + meta.pieceLength * 2) return true;
+	if (options) {
+		logger.warn({
+			label: options.label,
+			message: `ignoreNonRelevantFilesToResume will not resume ${options.torrentLog}: remainingSize ${humanReadableSize(remainingSize, { binary: true })} > ${humanReadableSize(irrelevantSize, { binary: true })} irrelevantSize`,
+		});
+	}
+	return false;
 }
 
 export function estimatePausedStatus(

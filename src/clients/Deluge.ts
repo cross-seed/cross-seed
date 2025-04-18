@@ -344,7 +344,7 @@ export default class Deluge implements TorrentClient {
 					) {
 						logger.warn({
 							label: this.label,
-							message: `Will not resume ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
+							message: `autoResumeMaxDownload will not resume ${torrentLog}: remainingSize ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} > ${humanReadableSize(maxRemainingBytes, { binary: true })} limit`,
 						});
 						return;
 					}
