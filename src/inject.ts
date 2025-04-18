@@ -3,10 +3,9 @@ import { stat, unlink } from "fs/promises";
 import ms from "ms";
 import { copyFileSync, existsSync } from "fs";
 import path, { basename } from "path";
-import { linkAllFilesInMetafile, performActionWithoutMutex } from "./action.js";
+import { performActionWithoutMutex } from "./action.js";
 import {
-	byClientPriority,
-	getClient,
+	byClientHostPriority,
 	TorrentClient,
 	waitForTorrentToComplete,
 } from "./clients/TorrentClient.js";
@@ -175,7 +174,7 @@ async function whichSearcheesMatchTorrent(
 	 */
 	matches.sort(
 		comparing(
-			(match) => byClientPriority(match.searchee),
+			(match) => byClientHostPriority(match.searchee.clientHost),
 			(match) =>
 				// indexOf returns -1 for not found
 				-[Decision.MATCH_SIZE_ONLY, Decision.MATCH].indexOf(
@@ -208,46 +207,32 @@ async function injectInitialAction(
 	let matchedDecision: DecisionAnyMatch | undefined;
 	let linkedNewFiles = false;
 	for (const { searchee, decision } of matches) {
-		const otherClientHost = getClient(searchee)?.clientHost;
-		if (client && client.clientHost !== otherClientHost) {
-			logger.verbose({
-				label: Label.INJECT,
-				message: `Skipping ${getLogString(searchee, chalk.bold.white)} injection into ${otherClientHost} - existing match is using ${client.clientHost}`,
-			});
-			continue;
-		}
 		const res = await performActionWithoutMutex(
 			meta,
 			decision,
 			searchee,
 			tracker,
+			client,
 		);
-		if (res.existsInOtherClients) continue;
-		const result = res.actionResult;
-		if (res.linkedNewFiles) {
-			linkedNewFiles = true;
-		}
-		if (
-			injectionResult === InjectionResult.SUCCESS ||
-			result === InjectionResult.FAILURE ||
-			result === SaveResult.SAVED
-		) {
+		const actionResult = res.actionResult;
+		if (actionResult === InjectionResult.FAILURE) {
+			if (res.linkedNewFiles) break; // Since we couldn't unlink, process with the next job
 			continue;
 		}
-		if (result === InjectionResult.ALREADY_EXISTS) {
+		if (actionResult === SaveResult.SAVED || !res.client) continue;
+		if (res.linkedNewFiles) linkedNewFiles = true;
+		if (injectionResult === InjectionResult.SUCCESS) continue;
+		if (actionResult === InjectionResult.ALREADY_EXISTS) {
 			client = res.client;
 			clientMatches.push({ searchee, decision });
-			injectionResult = result;
+			injectionResult = actionResult;
 			continue;
 		}
-		if (result === InjectionResult.TORRENT_NOT_COMPLETE) {
-			if (injectionResult !== InjectionResult.ALREADY_EXISTS) {
-				client = res.client;
-				clientMatches.push({ searchee, decision });
-				injectionResult = result;
-				matchedSearchee = searchee;
-				matchedDecision = decision;
-			}
+		if (actionResult === InjectionResult.TORRENT_NOT_COMPLETE) {
+			if (injectionResult === InjectionResult.ALREADY_EXISTS) continue;
+			client = res.client;
+			clientMatches.push({ searchee, decision });
+			injectionResult = actionResult;
 			continue;
 		}
 		client = res.client;
@@ -287,73 +272,56 @@ async function injectFromStalledTorrent({
 	injectionResult,
 	progress,
 	filePathLog,
-}: InjectionAftermath): Promise<boolean> {
+}: InjectionAftermath): Promise<void> {
 	let linkedNewFiles = false;
-	let inClient = (await client!.isTorrentComplete(meta.infoHash)).isOk();
-	let injected = false;
 	const stalledDecision = Decision.MATCH_PARTIAL; // Should always be considered partial
-	for (const { searchee, decision } of clientMatches) {
-		const linkedFilesRootResult = await linkAllFilesInMetafile(
-			client!,
-			searchee,
+	for (const { searchee } of clientMatches) {
+		const searcheeLog = getLogString(searchee, chalk.bold.white);
+		const res = await performActionWithoutMutex(
 			meta,
+			stalledDecision,
+			searchee,
 			tracker,
-			decision,
+			client,
 			{ onlyCompleted: false },
 		);
-		const linkResult = linkedFilesRootResult.orElse(null);
-		if (linkResult && linkResult.linkedNewFiles) {
-			linkedNewFiles = true;
+		if (
+			res.actionResult === SaveResult.SAVED ||
+			res.actionResult === InjectionResult.TORRENT_NOT_COMPLETE
+		) {
+			continue; // Not possible
 		}
-		if (!inClient) {
-			if (linkedFilesRootResult.isOk()) {
-				const destinationDir = linkResult!.destinationDir;
-				const result = await client!.inject(
-					meta,
-					searchee,
-					stalledDecision,
-					destinationDir,
-				);
-				// result is only SUCCESS or FAILURE here but still log original injectionResult
-				if (result === InjectionResult.SUCCESS) {
-					logger.warn({
-						label: Label.INJECT,
-						message: `${progress} Injected ${filePathLog} using stalled source, you will need to resume or remove from client - ${chalk.green(injectionResult)}`,
-					});
-					inClient = true;
-					injected = true;
-				} else {
-					logger.error({
-						label: Label.INJECT,
-						message: `${progress} Failed to inject ${filePathLog} using stalled source - ${chalk.yellow(injectionResult)}`,
-					});
-				}
-			} else {
-				logger.error({
-					label: Label.INJECT,
-					message: `${progress} Failed to link files for ${filePathLog}, ${linkedFilesRootResult.unwrapErr()} - ${chalk.yellow(injectionResult)}`,
-				});
-			}
-		}
-	}
-	if (inClient && !injected) {
-		if (linkedNewFiles) {
-			logger.info({
+		linkedNewFiles = res.linkedNewFiles;
+		if (res.actionResult === InjectionResult.FAILURE) {
+			logger.error({
 				label: Label.INJECT,
-				message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
+				message: `${progress} Failed to inject ${filePathLog} using stalled source ${searcheeLog} - ${chalk.yellow(injectionResult)}`,
 			});
-			await client!.recheckTorrent(meta.infoHash);
-			client!.resumeInjection(meta.infoHash, stalledDecision, {
-				checkOnce: false,
-			});
-		} else {
-			logger.warn({
-				label: Label.INJECT,
-				message: `${progress} No new files linked for ${filePathLog}, resume or remove from client - ${chalk.yellow(injectionResult)}`,
-			});
+			continue;
 		}
+		if (res.actionResult === InjectionResult.ALREADY_EXISTS) continue;
+		logger.warn({
+			label: Label.INJECT,
+			message: `${progress} Injected ${filePathLog} using stalled source ${searcheeLog}, you will need to resume or remove from client - ${chalk.green(injectionResult)}`,
+		});
 	}
-	return injected;
+
+	if ((await client!.isTorrentComplete(meta.infoHash)).isErr()) return;
+	if (linkedNewFiles) {
+		logger.info({
+			label: Label.INJECT,
+			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
+		});
+		await client!.recheckTorrent(meta.infoHash);
+		client!.resumeInjection(meta.infoHash, stalledDecision, {
+			checkOnce: false,
+		});
+	} else {
+		logger.warn({
+			label: Label.INJECT,
+			message: `${progress} No new files linked for ${filePathLog}, resume or remove from client - ${chalk.yellow(injectionResult)}`,
+		});
+	}
 }
 
 async function injectionTorrentNotComplete(

@@ -92,7 +92,7 @@ export interface TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee,
 		decision: DecisionAnyMatch,
-		path?: string,
+		options: { onlyCompleted: boolean; destinationDir?: string },
 	) => Promise<InjectionResult>;
 	recheckTorrent: (infoHash: string) => Promise<void>;
 	validateConfig: () => Promise<void>;
@@ -139,25 +139,12 @@ export function getClients(): TorrentClient[] {
 	return activeClients;
 }
 
-export function getClient(searchee: Searchee): TorrentClient | undefined {
-	const clients = getClients();
-	if (clients.length === 1) return clients[0];
-	return clients.find((c) => c.clientHost === searchee.clientHost);
-}
-
-/**
- * Use byClientPriority if Searchee is available for a complete check
- */
 export function byClientHostPriority(clientHost: string | undefined): number {
 	const clients = getClients();
 	return (
 		clients.find((c) => c.clientHost === clientHost)?.clientPriority ??
 		clients.length
 	);
-}
-
-export function byClientPriority(searchee: Searchee): number {
-	return byClientHostPriority(getClient(searchee)?.clientHost);
 }
 
 export async function validateClientSavePaths(

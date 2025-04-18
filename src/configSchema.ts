@@ -57,8 +57,10 @@ const ZodErrorMessages = {
 		].map((l) => `${l}:`),
 		{ sort: false, style: "narrow", type: "unit" },
 	)}`,
-	multipleClients:
-		"You need to use useClientTorrents when using multiple clients (dataDirs and --torrents arg is not allowed).",
+	multipleClientsTorrentFile:
+		"torrentDir and --torrents arg does not support multiple clients, use useClientTorrents instead.",
+	multipleClientsNoLinking:
+		"dataDirs is not supported with multiple clients if not linking. To configure linking, please read: https://www.cross-seed.org/docs/tutorials/linking",
 	duplicateClients: "Duplicate torrent client URLs are not allowed.",
 	injectNeedsClients:
 		"You need to specify torrentClients when using 'inject'",
@@ -589,10 +591,15 @@ export const VALIDATION_SCHEMA = z
 	.refine(
 		(config) =>
 			config.torrentClients.length <= 1 ||
-			(config.useClientTorrents &&
-				!config.torrents?.length &&
-				!config.dataDirs.length),
-		ZodErrorMessages.multipleClients,
+			(!config.torrentDir && !config.torrents?.length),
+		ZodErrorMessages.multipleClientsTorrentFile,
+	)
+	.refine(
+		(config) =>
+			config.torrentClients.length <= 1 ||
+			config.linkDirs.length ||
+			!config.dataDirs.length,
+		ZodErrorMessages.multipleClientsNoLinking,
 	)
 	.refine(
 		(config) =>

@@ -285,15 +285,15 @@ export default class QBittorrent implements TorrentClient {
 	 * This is not an issue since it's either a MATCH or we are linking.
 	 * @param searchee the Searchee the match was sourced from
 	 * @param searcheeInfo the torrent info from the searchee
-	 * @param path the destinationDir for the new torrent
+	 * @param destinationDir the destinationDir for the new torrent
 	 * @returns the layout to use for the new torrent
 	 */
 	private getLayoutForNewTorrent(
 		searchee: Searchee,
 		searcheeInfo: TorrentInfo | undefined,
-		path: string | undefined,
+		destinationDir: string | undefined,
 	): string {
-		return path
+		return destinationDir
 			? "Original"
 			: this.isSubfolderContentLayout(searchee, searcheeInfo!)
 				? "Subfolder"
@@ -332,12 +332,12 @@ export default class QBittorrent implements TorrentClient {
 
 	private getTagsForNewTorrent(
 		searcheeInfo: TorrentInfo | undefined,
-		path: string | undefined,
+		destinationDir: string | undefined,
 	): string {
 		const { duplicateCategories, linkCategory } = getRuntimeConfig();
 
-		if (!duplicateCategories || !searcheeInfo || !path) {
-			return TORRENT_TAG; // Require path to duplicate category using tags
+		if (!duplicateCategories || !searcheeInfo || !destinationDir) {
+			return TORRENT_TAG; // Require destinationDir to duplicate category using tags
 		}
 		const searcheeCategory = searcheeInfo.category;
 		if (!searcheeCategory.length || searcheeCategory === linkCategory) {
@@ -864,7 +864,7 @@ export default class QBittorrent implements TorrentClient {
 		newTorrent: Metafile,
 		searchee: Searchee,
 		decision: DecisionAnyMatch,
-		path?: string,
+		options: { onlyCompleted: boolean; destinationDir?: string },
 	): Promise<InjectionResult> {
 		const { linkCategory } = getRuntimeConfig();
 		try {
@@ -873,7 +873,7 @@ export default class QBittorrent implements TorrentClient {
 			}
 			const searcheeInfo = await this.getTorrentInfo(searchee.infoHash);
 			if (!searcheeInfo) {
-				if (!path) {
+				if (!options.destinationDir) {
 					// This is never possible, being made explicit here
 					throw new Error(
 						`Searchee torrent may have been deleted: ${getLogString(searchee)}`,
@@ -886,20 +886,25 @@ export default class QBittorrent implements TorrentClient {
 				}
 			}
 
-			const { savePath, isComplete, autoTMM, category } = path
-				? {
-						savePath: path,
-						isComplete: true,
-						autoTMM: false,
-						category: linkCategory,
-					}
-				: {
-						savePath: searcheeInfo!.save_path,
-						isComplete: this.isTorrentInfoComplete(searcheeInfo!),
-						autoTMM: searcheeInfo!.auto_tmm,
-						category: searcheeInfo!.category,
-					};
-			if (!isComplete) return InjectionResult.TORRENT_NOT_COMPLETE;
+			const { savePath, isComplete, autoTMM, category } =
+				options.destinationDir
+					? {
+							savePath: options.destinationDir,
+							isComplete: true,
+							autoTMM: false,
+							category: linkCategory,
+						}
+					: {
+							savePath: searcheeInfo!.save_path,
+							isComplete: this.isTorrentInfoComplete(
+								searcheeInfo!,
+							),
+							autoTMM: searcheeInfo!.auto_tmm,
+							category: searcheeInfo!.category,
+						};
+			if (options.onlyCompleted && !isComplete) {
+				return InjectionResult.TORRENT_NOT_COMPLETE;
+			}
 			const filename = `${newTorrent.getFileSystemSafeName()}.${TORRENT_TAG}.torrent`;
 			const buffer = new Blob([newTorrent.encode()], {
 				type: "application/x-bittorrent",
@@ -926,11 +931,15 @@ export default class QBittorrent implements TorrentClient {
 			}
 			formData.append(
 				"tags",
-				this.getTagsForNewTorrent(searcheeInfo, path),
+				this.getTagsForNewTorrent(searcheeInfo, options.destinationDir),
 			);
 			formData.append(
 				"contentLayout",
-				this.getLayoutForNewTorrent(searchee, searcheeInfo, path),
+				this.getLayoutForNewTorrent(
+					searchee,
+					searcheeInfo,
+					options.destinationDir,
+				),
 			);
 			formData.append("skip_checking", (!toRecheck).toString());
 			formData.append(
