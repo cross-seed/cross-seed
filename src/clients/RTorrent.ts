@@ -158,7 +158,7 @@ export default class RTorrent implements TorrentClient {
 
 	private async checkOriginalTorrent(
 		infoHash: string,
-		onlyCompleted: boolean,
+		options: { onlyCompleted: boolean },
 	): Promise<
 		Result<
 			{
@@ -252,7 +252,7 @@ export default class RTorrent implements TorrentClient {
 				[isActiveStr],
 			] = response;
 			const isComplete = Boolean(Number(isCompleteStr));
-			if (onlyCompleted && !isComplete) {
+			if (options.onlyCompleted && !isComplete) {
 				return resultOfErr("TORRENT_NOT_COMPLETE");
 			}
 			return resultOf({
@@ -274,23 +274,28 @@ export default class RTorrent implements TorrentClient {
 	private async getDownloadLocation(
 		meta: Metafile,
 		searchee: Searchee,
-		path?: string,
+		options: { onlyCompleted: boolean; destinationDir?: string },
 	): Promise<
 		Result<
 			DownloadLocation,
 			"NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "FAILURE"
 		>
 	> {
-		if (path) {
+		if (options.destinationDir) {
 			// resolve to absolute because we send the path to rTorrent
-			const basePath = resolve(path, meta.name);
-			const directoryBase = meta.isSingleFileTorrent ? path : basePath;
-			return resultOf({ downloadDir: path, basePath, directoryBase });
+			const basePath = resolve(options.destinationDir, meta.name);
+			const directoryBase = meta.isSingleFileTorrent
+				? options.destinationDir
+				: basePath;
+			return resultOf({
+				downloadDir: options.destinationDir,
+				basePath,
+				directoryBase,
+			});
 		} else {
-			const result = await this.checkOriginalTorrent(
-				searchee.infoHash!,
-				true,
-			);
+			const result = await this.checkOriginalTorrent(searchee.infoHash!, {
+				onlyCompleted: options.onlyCompleted,
+			});
 			return result.mapOk(({ directoryBase }) => ({
 				directoryBase,
 				downloadDir: meta.isSingleFileTorrent
@@ -335,10 +340,7 @@ export default class RTorrent implements TorrentClient {
 		if (!(await this.checkForInfoHashInClient(meta.infoHash))) {
 			return resultOfErr("NOT_FOUND");
 		}
-		const result = await this.checkOriginalTorrent(
-			meta.infoHash,
-			options.onlyCompleted,
-		);
+		const result = await this.checkOriginalTorrent(meta.infoHash, options);
 		return result
 			.mapOk(({ directoryBase, isMultiFile }) => {
 				return isMultiFile ? dirname(directoryBase) : directoryBase;
@@ -724,10 +726,9 @@ export default class RTorrent implements TorrentClient {
 				stop = true;
 			}
 			await wait(sleepTime);
-			const torrentInfoRes = await this.checkOriginalTorrent(
-				infoHash,
-				false,
-			);
+			const torrentInfoRes = await this.checkOriginalTorrent(infoHash, {
+				onlyCompleted: false,
+			});
 			if (torrentInfoRes.isErr()) {
 				sleepTime = resumeErrSleepTime; // Dropping connections or restart
 				continue;
@@ -767,13 +768,13 @@ export default class RTorrent implements TorrentClient {
 		meta: Metafile,
 		searchee: Searchee,
 		decision: DecisionAnyMatch,
-		path?: string,
+		options: { onlyCompleted: boolean; destinationDir?: string },
 	): Promise<InjectionResult> {
 		if (await this.checkForInfoHashInClient(meta.infoHash)) {
 			return InjectionResult.ALREADY_EXISTS;
 		}
 
-		const result = await this.getDownloadLocation(meta, searchee, path);
+		const result = await this.getDownloadLocation(meta, searchee, options);
 		if (result.isErr()) {
 			switch (result.unwrapErr()) {
 				case "NOT_FOUND":
