@@ -143,7 +143,6 @@ function unlinkMetafile(meta: Metafile, destinationDir: string) {
 }
 
 async function getSavePath(
-	client: TorrentClient | undefined,
 	searchee: Searchee,
 	options: { onlyCompleted: boolean },
 ): Promise<
@@ -188,10 +187,15 @@ async function getSavePath(
 		}
 		return resultOf(undefined);
 	}
+	const clients = getClients();
+	const client =
+		clients.length === 1
+			? clients[0]
+			: clients.find((c) => c.clientHost === searchee.clientHost)!;
 	let savePath: string;
 	if (searchee.savePath) {
 		const refreshedSearchee = (
-			await client!.getClientSearchees({
+			await client.getClientSearchees({
 				newSearcheesOnly: true,
 				refresh: [searchee.infoHash],
 			})
@@ -201,13 +205,13 @@ async function getSavePath(
 			searchee[key] = value;
 		}
 		if (
-			!(await client!.isTorrentComplete(searchee.infoHash)).orElse(false)
+			!(await client.isTorrentComplete(searchee.infoHash)).orElse(false)
 		) {
 			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}
 		savePath = searchee.savePath;
 	} else {
-		const downloadDirResult = await client!.getDownloadDir(
+		const downloadDirResult = await client.getDownloadDir(
 			searchee as SearcheeWithInfoHash,
 			{ onlyCompleted: options.onlyCompleted },
 		);
@@ -413,7 +417,8 @@ export async function performActionWithoutMutex(
 		return { actionResult: SaveResult.SAVED };
 	}
 
-	let savePath: string | undefined;
+	const savePathRes = await getSavePath(searchee, options);
+	const savePath = savePathRes.orElse(undefined);
 	let destinationDir: string | undefined;
 	let unlinkOk = false;
 	let linkedNewFiles = false;
@@ -427,8 +432,8 @@ export async function performActionWithoutMutex(
 			: clients.find(
 					(c) => c.clientHost === searchee.clientHost && !c.readonly,
 				);
+	const readonlySource = !client && !!searchee.clientHost;
 	if (linkDirs.length) {
-		const savePathRes = await getSavePath(client, searchee, options);
 		if (savePathRes.isErr()) {
 			const result = savePathRes.unwrapErr();
 			if (result === "TORRENT_NOT_COMPLETE") {
@@ -452,7 +457,6 @@ export async function performActionWithoutMutex(
 			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 			return { actionResult, linkedNewFiles };
 		}
-		savePath = savePathRes.unwrap();
 		const res = await getClientAndDestinationDir(
 			client,
 			searchee,
@@ -524,12 +528,29 @@ export async function performActionWithoutMutex(
 		linkedNewFiles = linkResult.linkedNewFiles;
 	} else if (searchee.path) {
 		destinationDir = dirname(searchee.path);
+	} else if (readonlySource) {
+		if (!savePath) {
+			logger.error({
+				label: searchee.label,
+				message: `Failed to find a save path for ${getLogString(searchee)}`,
+			});
+			const actionResult = InjectionResult.FAILURE;
+			logActionResult(actionResult, newMeta, searchee, tracker, decision);
+			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+			return { actionResult, linkedNewFiles };
+		}
+		destinationDir = savePath;
 	}
 
-	const actionResult = await client.inject(newMeta, searchee, decision, {
-		onlyCompleted: options.onlyCompleted,
-		destinationDir,
-	});
+	const actionResult = await client.inject(
+		newMeta,
+		readonlySource ? { ...searchee, infoHash: undefined } : searchee, // treat as data-based
+		decision,
+		{
+			onlyCompleted: options.onlyCompleted,
+			destinationDir,
+		},
+	);
 
 	logActionResult(actionResult, newMeta, searchee, tracker, decision);
 	if (actionResult === InjectionResult.SUCCESS) {
