@@ -122,11 +122,13 @@ export default class QBittorrent implements TorrentClient {
 	readonly clientHost: string;
 	readonly clientPriority: number;
 	readonly clientType = Label.QBITTORRENT;
+	readonly readonly: boolean;
 	readonly label: string;
 
-	constructor(url: string, priority: number) {
+	constructor(url: string, priority: number, readonly: boolean) {
 		this.clientHost = new URL(url).host;
 		this.clientPriority = priority;
+		this.readonly = readonly;
 		this.label = `${this.clientType}@${this.clientHost}`;
 		this.url = extractCredentialsFromUrl(url, "/api/v2").unwrapOrThrow(
 			new CrossSeedError(
@@ -187,7 +189,7 @@ export default class QBittorrent implements TorrentClient {
 		}
 		logger.info({
 			label: this.label,
-			message: `Logged in to ${this.version} successfully`,
+			message: `Logged in to ${this.version} successfully${this.readonly ? " (readonly)" : ""}`,
 		});
 	}
 

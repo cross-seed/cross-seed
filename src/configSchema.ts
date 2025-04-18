@@ -56,7 +56,8 @@ const ZodErrorMessages = {
 			Label.DELUGE,
 		].map((l) => `${l}:`),
 		{ sort: false, style: "narrow", type: "unit" },
-	)}`,
+	)} and optionally followed by readonly: (e.g torrentClients: ["qbittorrent:http://username:password@localhost:8080", "rtorrent:readonly:http://username:password@localhost:1234/RPC2"])`,
+	clientTypeReadOnly: `You must have at least one non-readonly torrent client when using action: "inject"`,
 	multipleClientsTorrentFile:
 		"torrentDir and --torrents arg does not support multiple clients, use useClientTorrents instead.",
 	multipleClientsNoLinking:
@@ -587,6 +588,12 @@ export const VALIDATION_SCHEMA = z
 			!config.useClientTorrents ||
 			!config.torrentClients.some((c) => c.startsWith(Label.DELUGE)),
 		"Deluge does not currently support useClientTorrents, use torrentDir instead.",
+	)
+	.refine(
+		(config) =>
+			config.action !== Action.INJECT ||
+			config.torrentClients.some((c) => !c.includes(":readonly:")),
+		ZodErrorMessages.clientTypeReadOnly,
 	)
 	.refine(
 		(config) =>

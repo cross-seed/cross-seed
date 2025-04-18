@@ -106,12 +106,14 @@ export default class RTorrent implements TorrentClient {
 	readonly clientHost: string;
 	readonly clientPriority: number;
 	readonly clientType = Label.RTORRENT;
+	readonly readonly: boolean;
 	readonly label: string;
 	readonly batchSize = 500;
 
-	constructor(url: string, priority: number) {
+	constructor(url: string, priority: number, readonly: boolean) {
 		this.clientHost = new URL(url).host;
 		this.clientPriority = priority;
+		this.readonly = readonly;
 		this.label = `${this.clientType}@${this.clientHost}`;
 		const { href, username, password } = extractCredentialsFromUrl(
 			url,
@@ -320,7 +322,7 @@ export default class RTorrent implements TorrentClient {
 		}
 		logger.info({
 			label: this.label,
-			message: `Logged in successfully`,
+			message: `Logged in successfully${this.readonly ? " (readonly)" : ""}`,
 		});
 
 		if (!torrentDir) return;

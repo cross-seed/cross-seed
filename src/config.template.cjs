@@ -82,6 +82,10 @@ module.exports = {
 	 * torrentClients: ["transmission:http://username:password@localhost:9091/transmission/rpc"]
 	 *
 	 * torrentClients: ["deluge:http://:password@localhost:8112/json"]
+	 *
+	 * You can optionally add readonly: after the prefix to use a client as a
+	 * source for finding cross seeds, but not for injecting.
+	 * e.g. "qbittorrent:readonly:http://username:password@localhost:8080"
 	 */
 	torrentClients: [],
 

@@ -263,7 +263,7 @@ async function getClientAndDestinationDir(
 			return null;
 		}
 		let error: Error | undefined;
-		for (const testClient of getClients()) {
+		for (const testClient of getClients().filter((c) => !c.readonly)) {
 			const torrentSavePaths = new Set(
 				(
 					await testClient.getAllDownloadDirs({
@@ -424,7 +424,9 @@ export async function performActionWithoutMutex(
 	let client =
 		clients.length === 1
 			? clients[0]
-			: clients.find((c) => c.clientHost === searchee.clientHost);
+			: clients.find(
+					(c) => c.clientHost === searchee.clientHost && !c.readonly,
+				);
 	if (linkDirs.length) {
 		const savePathRes = await getSavePath(client, searchee, options);
 		if (savePathRes.isErr()) {

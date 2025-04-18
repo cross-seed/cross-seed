@@ -193,7 +193,7 @@ function createCommandWithSharedOptions(name: string, description: string) {
 		)
 		.option(
 			"--torrent-clients <clients...>",
-			"The the client prefix and urls of your torrent clients.",
+			"The the client prefix, readonly status, and urls of your torrent clients.",
 			// @ts-expect-error commander supports non-string defaults
 			fallback(fileConfig.torrentClients, []),
 		)
