@@ -6,7 +6,7 @@ import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
 import {
-	getClient,
+	getClients,
 	TorrentMetadataInClient,
 	validateClientSavePaths,
 } from "./clients/TorrentClient.js";
@@ -89,8 +89,8 @@ export async function parseTorrentWithMetadata(
 	torrentInfos: TorrentMetadataInClient[],
 ): Promise<Metafile> {
 	const meta = await parseTorrentFromFilename(filename);
-	const client = getClient();
-	if (client?.clientType === Label.QBITTORRENT) {
+	const clients = getClients();
+	if (clients[0]?.clientType === Label.QBITTORRENT) {
 		const fastResumePath = filename.replace(
 			extname(filename),
 			".fastresume",
@@ -117,7 +117,7 @@ export async function parseTorrentWithMetadata(
 		if (!meta.trackers.length && torrentInfo.trackers) {
 			meta.trackers = torrentInfo.trackers;
 		}
-	} else if (client) {
+	} else if (clients.length) {
 		logger.verbose(
 			`No torrent info found for ${meta.infoHash} from ${filename}`,
 		);
@@ -339,9 +339,12 @@ async function cacheEnsembleTorrentEntry(
 	} else if (torrentSavePaths) {
 		savePath = torrentSavePaths.get(searchee.infoHash);
 	} else {
-		const downloadDirResult = await getClient()!.getDownloadDir(searchee, {
-			onlyCompleted: false,
-		});
+		const downloadDirResult = await getClients()[0].getDownloadDir(
+			searchee,
+			{
+				onlyCompleted: false,
+			},
+		);
 		if (downloadDirResult.isErr()) {
 			logger.error(
 				`Failed to get download dir for ${getLogString(searchee)}: ${downloadDirResult.unwrapErr()}`,
@@ -368,7 +371,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 	const { seasonFromEpisodes, torrentDir, useClientTorrents } =
 		getRuntimeConfig();
 	if (!useClientTorrents && !torrentDir) return;
-	const client = getClient();
+	const clients = getClients();
 	let searchees: SearcheeWithInfoHash[];
 	let infoHashPathMap: Map<string, string> | undefined;
 
@@ -376,37 +379,52 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		if (torrentDir) {
 			logger.info("Indexing torrentDir for reverse lookup...");
 			searchees = await loadTorrentDirLight(torrentDir);
-			if (client) {
-				infoHashPathMap = await client.getAllDownloadDirs({
+			if (clients.length) {
+				infoHashPathMap = await clients[0].getAllDownloadDirs({
 					metas: searchees,
 					onlyCompleted: false,
 					v1HashOnly: true,
 				});
+				await validateClientSavePaths(
+					searchees,
+					infoHashPathMap,
+					clients[0].label,
+				);
 			}
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
-			searchees = (await client!.getClientSearchees()).searchees;
-			infoHashPathMap = searchees.reduce((map, searchee) => {
-				map.set(searchee.infoHash, searchee.savePath!);
-				return map;
-			}, new Map<string, string>());
-		}
-		if (infoHashPathMap) {
-			await validateClientSavePaths(
-				searchees,
-				infoHashPathMap,
-				client!.label,
-			);
+			searchees = (
+				await Promise.all(
+					clients.map(async (client) => {
+						const { searchees } = await client.getClientSearchees();
+						validateClientSavePaths(
+							searchees,
+							searchees.reduce((map, searchee) => {
+								map.set(searchee.infoHash, searchee.savePath);
+								return map;
+							}, new Map<string, string>()),
+							client.label,
+						);
+						return searchees;
+					}),
+				)
+			).flat();
 		}
 	} else {
 		if (torrentDir) {
 			searchees = await indexTorrentDir(torrentDir);
 		} else {
 			searchees = (
-				await client!.getClientSearchees({
-					newSearcheesOnly: true,
-				})
-			).newSearchees;
+				await Promise.all(
+					clients.map((client) =>
+						client.getClientSearchees({
+							newSearcheesOnly: true,
+						}),
+					),
+				)
+			)
+				.map((r) => r.newSearchees)
+				.flat();
 		}
 	}
 	if (!seasonFromEpisodes) return;
@@ -523,7 +541,7 @@ export async function loadTorrentDirLight(
 	const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
 
 	const searchees: SearcheeWithInfoHash[] = [];
-	const client = getClient();
+	const client = getClients()[0];
 	const torrentInfos =
 		client && client.clientType !== Label.QBITTORRENT
 			? await client.getAllTorrents()
@@ -629,7 +647,7 @@ export async function getSimilarByName(name: string): Promise<{
 			await db("torrent").select("name", "file_path"),
 		)) as { name: string; file_path: string }[];
 		if (filteredTorrentEntries.length) {
-			const client = getClient();
+			const client = getClients()[0];
 			const torrentInfos =
 				client && client.clientType !== Label.QBITTORRENT
 					? await client.getAllTorrents()
@@ -709,7 +727,7 @@ async function getTorrentByFuzzyName(
 	if (useClientTorrents) {
 		return [createSearcheeFromDB(potentialMatches[0].item)];
 	}
-	const client = getClient();
+	const client = getClients()[0];
 	const torrentInfos =
 		client && client.clientType !== Label.QBITTORRENT
 			? await client.getAllTorrents()
@@ -724,28 +742,35 @@ async function getTorrentByFuzzyName(
 
 export async function getTorrentByCriteria(
 	criteria: TorrentLocator,
-): Promise<SearcheeWithInfoHash> {
+): Promise<SearcheeWithInfoHash[]> {
 	const { useClientTorrents } = getRuntimeConfig();
 	const database = useClientTorrents ? memDB : db;
-	const dbTorrent = await database("torrent")
-		.where((b) => b.where({ info_hash: criteria.infoHash }))
-		.first();
-	if (!dbTorrent) {
+	const dbTorrents = await database("torrent").where((b) =>
+		b.where({ info_hash: criteria.infoHash }),
+	);
+	if (!dbTorrents.length) {
 		const message = `Torrent client does not have any torrent with criteria ${inspect(
 			criteria,
 		)}`;
 		throw new Error(message);
 	}
-	if (useClientTorrents) return createSearcheeFromDB(dbTorrent);
+	if (useClientTorrents) return dbTorrents.map(createSearcheeFromDB);
 
-	const client = getClient();
+	const client = getClients()[0];
 	const torrentInfos =
 		client && client.clientType !== Label.QBITTORRENT
 			? await client.getAllTorrents()
 			: [];
-	return (
-		await createSearcheeFromTorrentFile(dbTorrent.file_path, torrentInfos)
-	).unwrapOrThrow(
-		new Error(`Failed to create searchee from ${dbTorrent.file_path}`),
-	);
+	return [
+		(
+			await createSearcheeFromTorrentFile(
+				dbTorrents[0].file_path,
+				torrentInfos,
+			)
+		).unwrapOrThrow(
+			new Error(
+				`Failed to create searchee from ${dbTorrents[0].file_path}`,
+			),
+		),
+	];
 }

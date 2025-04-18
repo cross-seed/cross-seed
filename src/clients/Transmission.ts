@@ -302,7 +302,6 @@ export default class Transmission implements TorrentClient {
 		});
 		return res.torrents.map((torrent) => ({
 			infoHash: torrent.hashString,
-			category: "",
 			tags: torrent.labels,
 		}));
 	}
@@ -385,7 +384,6 @@ export default class Transmission implements TorrentClient {
 			const title = parseTitle(name, files) ?? name;
 			const length = torrent.totalSize;
 			const savePath = torrent.downloadDir;
-			const category = "";
 			const tags = torrent.labels;
 			const searchee: SearcheeClient = {
 				infoHash,
@@ -395,7 +393,6 @@ export default class Transmission implements TorrentClient {
 				length,
 				clientHost: this.clientHost,
 				savePath,
-				category,
 				tags,
 				trackers,
 			};
