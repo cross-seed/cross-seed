@@ -48,6 +48,7 @@ export interface TorrentClient {
 	clientHost: string;
 	clientPriority: number;
 	clientType: TorrentClientType;
+	readonly: boolean;
 	label: string;
 	isTorrentComplete: (
 		infoHash: string,
@@ -98,14 +99,16 @@ export interface TorrentClient {
 	validateConfig: () => Promise<void>;
 }
 
-const PARSE_CLIENT_REGEX = /^(?<clientType>.+?):(?<url>.*)$/;
+const PARSE_CLIENT_REGEX =
+	/^(?<clientType>.+?):(?:(?<readonly>readonly):)?(?<url>.*)$/;
 export function parseClientEntry(
 	clientEntry: string,
-): { clientType: TorrentClientType; url: string } | null {
+): { clientType: TorrentClientType; readonly: boolean; url: string } | null {
 	const match = clientEntry.match(PARSE_CLIENT_REGEX);
 	if (!match?.groups) return null;
 	return {
 		clientType: match.groups.clientType as TorrentClientType,
+		readonly: isTruthy(match.groups.readonly),
 		url: match.groups.url,
 	};
 }
@@ -113,24 +116,22 @@ export function parseClientEntry(
 export function instantiateDownloadClients() {
 	const { torrentClients } = getRuntimeConfig();
 	for (const [priority, clientEntryRaw] of torrentClients.entries()) {
-		const clientEntry = parseClientEntry(clientEntryRaw)!;
-		switch (clientEntry.clientType) {
+		const { clientType, readonly, url } = parseClientEntry(clientEntryRaw)!;
+		switch (clientType) {
 			case Label.QBITTORRENT:
-				activeClients.push(new QBittorrent(clientEntry.url, priority));
+				activeClients.push(new QBittorrent(url, priority, readonly));
 				break;
 			case Label.RTORRENT:
-				activeClients.push(new RTorrent(clientEntry.url, priority));
+				activeClients.push(new RTorrent(url, priority, readonly));
 				break;
 			case Label.TRANSMISSION:
-				activeClients.push(new Transmission(clientEntry.url, priority));
+				activeClients.push(new Transmission(url, priority, readonly));
 				break;
 			case Label.DELUGE:
-				activeClients.push(new Deluge(clientEntry.url, priority));
+				activeClients.push(new Deluge(url, priority, readonly));
 				break;
 			default:
-				throw new Error(
-					`Invalid client type: ${clientEntry.clientType}`,
-				);
+				throw new Error(`Invalid client type: ${clientType}`);
 		}
 	}
 }

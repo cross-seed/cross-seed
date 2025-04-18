@@ -85,6 +85,7 @@ export default class Deluge implements TorrentClient {
 	readonly clientHost: string;
 	readonly clientPriority: number;
 	readonly clientType = Label.DELUGE;
+	readonly readonly: boolean;
 	readonly label: string;
 	private delugeCookie: string | null = null;
 	private delugeLabel = TORRENT_TAG;
@@ -92,10 +93,11 @@ export default class Deluge implements TorrentClient {
 	private isLabelEnabled: boolean;
 	private delugeRequestId: number = 0;
 
-	constructor(url: string, priority: number) {
+	constructor(url: string, priority: number, readonly: boolean) {
 		this.url = url;
 		this.clientHost = new URL(url).host;
 		this.clientPriority = priority;
+		this.readonly = readonly;
 		this.label = `${this.clientType}@${this.clientHost}`;
 	}
 
@@ -108,7 +110,7 @@ export default class Deluge implements TorrentClient {
 		this.isLabelEnabled = await this.labelEnabled();
 		logger.info({
 			label: this.label,
-			message: `Logged in successfully`,
+			message: `Logged in successfully${this.readonly ? " (readonly)" : ""}`,
 		});
 
 		if (!torrentDir) return;
