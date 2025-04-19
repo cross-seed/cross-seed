@@ -1,6 +1,7 @@
 import { readdirSync } from "fs";
 import ms from "ms";
 import { basename } from "path";
+import { inspect } from "util";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
@@ -21,6 +22,13 @@ import {
 	updateSearcheeClientDB,
 } from "../searchee.js";
 import {
+	extractCredentialsFromUrl,
+	humanReadableSize,
+	sanitizeInfoHash,
+	wait,
+} from "../utils.js";
+import {
+	shouldResumeFromNonRelevantFiles,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -31,13 +39,6 @@ import {
 	TorrentClient,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
-import {
-	extractCredentialsFromUrl,
-	humanReadableSize,
-	sanitizeInfoHash,
-	wait,
-} from "../utils.js";
-import { inspect } from "util";
 
 const XTransmissionSessionId = "X-Transmission-Session-Id";
 type Method =
@@ -61,7 +62,7 @@ interface TorrentGetResponseArgs {
 		totalSize: number;
 		labels: string[];
 		downloadDir: string;
-		files: { name: string; length: number }[];
+		files: { name: string; length: number; bytesCompleted: number }[];
 		trackers: { announce: string; tier: number }[];
 		leftUntilDone: number;
 		percentDone: number;
@@ -416,10 +417,11 @@ export default class Transmission implements TorrentClient {
 	}
 
 	async resumeInjection(
-		infoHash: string,
+		meta: Metafile,
 		decision: DecisionAnyMatch,
 		options: { checkOnce: boolean },
 	): Promise<void> {
+		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
 		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
@@ -454,11 +456,18 @@ export default class Transmission implements TorrentClient {
 				return;
 			}
 			if (leftUntilDone > maxRemainingBytes) {
-				logger.warn({
-					label: this.label,
-					message: `Will not resume ${torrentLog}: ${humanReadableSize(leftUntilDone, { binary: true })} remaining > ${humanReadableSize(maxRemainingBytes, { binary: true })}`,
-				});
-				return;
+				if (
+					!shouldResumeFromNonRelevantFiles(meta, leftUntilDone, {
+						torrentLog,
+						label: this.label,
+					})
+				) {
+					logger.warn({
+						label: this.label,
+						message: `autoResumeMaxDownload will not resume ${torrentLog}: remainingSize ${humanReadableSize(leftUntilDone, { binary: true })} > ${humanReadableSize(maxRemainingBytes, { binary: true })} limit`,
+					});
+					return;
+				}
 			}
 			logger.info({
 				label: this.label,
@@ -513,7 +522,7 @@ export default class Transmission implements TorrentClient {
 				},
 			);
 			if (toRecheck) {
-				this.resumeInjection(newTorrent.infoHash, decision, {
+				this.resumeInjection(newTorrent, decision, {
 					checkOnce: false,
 				});
 			}

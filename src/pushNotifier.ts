@@ -1,3 +1,4 @@
+import { estimatePausedStatus } from "./clients/TorrentClient.js";
 import {
 	ActionResult,
 	InjectionResult,
@@ -5,7 +6,7 @@ import {
 	SaveResult,
 	USER_AGENT,
 } from "./constants.js";
-import { getPartialSizeRatio, ResultAssessment } from "./decide.js";
+import { ResultAssessment } from "./decide.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { getSearcheeSource, SearcheeWithLabel } from "./searchee.js";
@@ -76,7 +77,6 @@ export function sendResultsNotification(
 	searchee: SearcheeWithLabel,
 	results: [ResultAssessment, TrackerName, ActionResult][],
 ) {
-	const { autoResumeMaxDownload } = getRuntimeConfig();
 	const source = searchee.label;
 	const searcheeCategory = searchee.category ?? null;
 	const searcheeTags = searchee.tags ?? null;
@@ -100,11 +100,8 @@ export function sendResultsNotification(
 		);
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
 		const trackersListStr = formatAsList(trackers, { sort: true });
-		const paused = notableSuccesses.some(
-			([{ metafile }]) =>
-				(1 - getPartialSizeRatio(metafile!, searchee)) *
-					metafile!.length >
-				autoResumeMaxDownload,
+		const paused = notableSuccesses.some(([{ metafile }]) =>
+			estimatePausedStatus(metafile!, searchee),
 		);
 		const injected = notableSuccesses.some(
 			([, , actionResult]) => actionResult === InjectionResult.SUCCESS,

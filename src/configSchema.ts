@@ -370,6 +370,10 @@ export const VALIDATION_SCHEMA = z
 			.int()
 			.gte(0, ZodErrorMessages.autoResumeMaxDownloadUnsupported)
 			.lte(52428800, ZodErrorMessages.autoResumeMaxDownloadUnsupported),
+		ignoreNonRelevantFilesToResume: z
+			.boolean()
+			.nullish()
+			.transform((v) => (typeof v === "boolean" ? v : false)),
 		linkCategory: z.string().nullish(),
 		linkDir: z.string().nullish(),
 		linkDirs: z.array(z.string()).optional().default([]),
