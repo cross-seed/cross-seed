@@ -733,9 +733,24 @@ export function testLinking(srcDir: string): void {
 	try {
 		let srcFile = findAFileWithExt(srcDir, ALL_EXTENSIONS);
 		if (!srcFile) {
+			try {
+				fs.accessSync(srcDir, fs.constants.W_OK);
+			} catch (e) {
+				logger.error(e);
+				logger.error(
+					`Failed to access ${srcDir}, cross-seed is unable to verify linking for this path.`,
+				);
+				return;
+			}
 			tempFile = join(srcDir, srcTestName);
 			try {
 				fs.writeFileSync(tempFile, "");
+				if (!fs.existsSync(tempFile)) {
+					logger.error(
+						`Failed to verify test file in ${tempFile}, cross-seed is unable to verify linking for this path.`,
+					);
+					return;
+				}
 				srcFile = tempFile;
 			} catch (e) {
 				logger.error(e);
