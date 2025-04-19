@@ -151,6 +151,8 @@ async function search(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
+	const injectJob = getJobs().find((job) => job.name === JobName.INJECT);
+	if (injectJob) injectJob.runAheadOfSchedule = true; // run on completion
 	await indexTorrentsAndDataDirs();
 	const dataStr = await getData(req);
 	let data;
@@ -394,6 +396,7 @@ async function runJob(
 	}
 
 	job.runAheadOfSchedule = true;
+	job.delayNextRun = true;
 	job.configOverride = {
 		excludeRecentSearch: data.ignoreExcludeRecentSearch ? 1 : undefined,
 		excludeOlder: data.ignoreExcludeOlder
