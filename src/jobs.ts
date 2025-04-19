@@ -25,7 +25,8 @@ class Job {
 	exec: () => Promise<void>;
 	isActive: boolean;
 	runAheadOfSchedule: boolean;
-	configOverride: Partial<RuntimeConfig> = {};
+	delayNextRun: boolean;
+	configOverride: Partial<RuntimeConfig>;
 
 	constructor(name: JobName, cadence: number, exec: () => Promise<void>) {
 		this.name = name;
@@ -33,27 +34,29 @@ class Job {
 		this.exec = exec;
 		this.isActive = false;
 		this.runAheadOfSchedule = false;
+		this.delayNextRun = false;
+		this.configOverride = {};
 	}
 
 	async run(): Promise<boolean> {
-		if (!this.isActive) {
-			this.isActive = true;
-			try {
-				logger.info({
-					label: Label.SCHEDULER,
-					message: `starting job: ${this.name}`,
-				});
-				if (this.runAheadOfSchedule && this.name === JobName.SEARCH) {
-					await bulkSearch({ configOverride: this.configOverride });
-				} else {
-					await this.exec();
-				}
-			} finally {
-				this.isActive = false;
+		if (this.isActive) return false;
+		this.isActive = true;
+		try {
+			logger.info({
+				label: Label.SCHEDULER,
+				message: `starting job: ${this.name}`,
+			});
+			if (this.runAheadOfSchedule && this.name === JobName.SEARCH) {
+				await bulkSearch({ configOverride: this.configOverride });
+			} else {
+				await this.exec();
 			}
-			return true;
+		} finally {
+			this.isActive = false;
+			this.runAheadOfSchedule = false;
+			this.configOverride = {};
 		}
-		return false;
+		return true;
 	}
 }
 
@@ -121,22 +124,16 @@ export async function jobsLoop(): Promise<void> {
 			if (job.runAheadOfSchedule || now >= eligibilityTs) {
 				job.run()
 					.then(async (didRun) => {
-						if (didRun) {
-							// upon success, update the log
-							const last_run = job.runAheadOfSchedule
-								? now + job.cadence
-								: now;
-							await db("job_log")
-								.insert({ name: job.name, last_run })
-								.onConflict("name")
-								.merge();
-							const cadence = job.runAheadOfSchedule
-								? job.cadence * 2
-								: job.cadence;
-							logNextRun(job.name, cadence, now);
-							job.runAheadOfSchedule = false;
-							job.configOverride = {};
-						}
+						if (!didRun) return; // upon success, update the log
+						const toDelay = job.delayNextRun;
+						job.delayNextRun = false;
+						const last_run = toDelay ? now + job.cadence : now;
+						await db("job_log")
+							.insert({ name: job.name, last_run })
+							.onConflict("name")
+							.merge();
+						const cadence = toDelay ? job.cadence * 2 : job.cadence;
+						logNextRun(job.name, cadence, now);
 					})
 					.catch(exitOnCrossSeedErrors)
 					.catch((e) => void logger.error(e));
