@@ -42,8 +42,11 @@ import {
 	withMutex,
 } from "./utils.js";
 
-const srcTestName = "test.cross-seed";
-const linkTestName = "cross-seed.test";
+const testLinkingSrcName = "a.cross-seed";
+const testLinkingDestName = "b.cross-seed";
+const linkDirSrcName = "c.cross-seed";
+const linkDirDestName = "d.cross-seed";
+const clientDestName = "e.cross-seed";
 
 type ActionReturn =
 	| {
@@ -282,7 +285,7 @@ async function getClientAndDestinationDir(
 						client = testClient;
 						break;
 					}
-					const testPath = join(torrentSavePath, linkTestName);
+					const testPath = join(torrentSavePath, clientDestName);
 					linkFile(
 						srcPath,
 						testPath,
@@ -616,8 +619,8 @@ export function getLinkDir(pathStr: string): string | null {
 	let tempFile: string | undefined;
 	if (!srcFile) {
 		tempFile = pathStat.isDirectory()
-			? join(pathStr, srcTestName)
-			: join(dirname(pathStr), srcTestName);
+			? join(pathStr, linkDirSrcName)
+			: join(dirname(pathStr), linkDirSrcName);
 		try {
 			fs.writeFileSync(tempFile, "");
 			srcFile = tempFile;
@@ -628,7 +631,7 @@ export function getLinkDir(pathStr: string): string | null {
 	if (srcFile) {
 		for (const linkDir of linkDirs) {
 			try {
-				const testPath = join(linkDir, linkTestName);
+				const testPath = join(linkDir, linkDirDestName);
 				linkFile(
 					srcFile,
 					testPath,
@@ -742,12 +745,12 @@ export function testLinking(srcDir: string): void {
 				);
 				return;
 			}
-			tempFile = join(srcDir, srcTestName);
+			tempFile = join(srcDir, testLinkingSrcName);
 			try {
 				fs.writeFileSync(tempFile, "");
 				if (!fs.existsSync(tempFile)) {
 					logger.error(
-						`Failed to verify test file in ${tempFile}, cross-seed is unable to verify linking for this path.`,
+						`Failed to verify test file at ${tempFile}, cross-seed is unable to verify linking for this path.`,
 					);
 					return;
 				}
@@ -762,7 +765,7 @@ export function testLinking(srcDir: string): void {
 		}
 		const linkDir = getLinkDir(srcDir);
 		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
-		const testPath = join(linkDir, linkTestName);
+		const testPath = join(linkDir, testLinkingDestName);
 		linkFile(srcFile, testPath);
 		fs.rmSync(testPath);
 	} catch (e) {
