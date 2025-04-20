@@ -23,7 +23,7 @@ import {
 	SONARR_SUBFOLDERS_REGEX,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
-import { memDB } from "./db.js";
+import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -318,16 +318,16 @@ export async function updateSearcheeClientDB(
 	infoHashes: Set<string>,
 ): Promise<void> {
 	const removedInfoHashes: string[] = (
-		await memDB("torrent").select({ infoHash: "info_hash" })
+		await db("client_searchee").select({ infoHash: "info_hash" })
 	)
 		.map((t) => t.infoHash)
 		.filter((infoHash) => !infoHashes.has(infoHash));
 	await inBatches(removedInfoHashes, async (batch) => {
-		await memDB("torrent")
+		await db("client_searchee")
 			.whereIn("info_hash", batch)
 			.where("client_host", clientHost)
 			.del();
-		await memDB("ensemble")
+		await db("ensemble")
 			.whereIn("info_hash", batch)
 			.where("client_host", clientHost)
 			.del();
@@ -346,7 +346,7 @@ export async function updateSearcheeClientDB(
 			trackers: JSON.stringify(searchee.trackers),
 		})),
 		async (batch) => {
-			await memDB("torrent")
+			await db("client_searchee")
 				.insert(batch)
 				.onConflict(["client_host", "info_hash"])
 				.merge();

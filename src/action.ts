@@ -204,9 +204,7 @@ async function getSavePath(
 			})
 		).newSearchees.find((s) => s.infoHash === searchee.infoHash);
 		if (!refreshedSearchee) return resultOfErr("TORRENT_NOT_FOUND");
-		for (const [key, value] of Object.entries(refreshedSearchee)) {
-			searchee[key] = value;
-		}
+		Object.assign(searchee, refreshedSearchee);
 		if (
 			!(await client.isTorrentComplete(searchee.infoHash)).orElse(false)
 		) {

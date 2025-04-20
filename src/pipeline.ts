@@ -17,7 +17,7 @@ import {
 	findPotentialNestedRoots,
 	findSearcheesFromAllDataDirs,
 } from "./dataFiles.js";
-import { db, memDB } from "./db.js";
+import { db } from "./db.js";
 import {
 	assessCandidateCaching,
 	getGuidInfoHashMap,
@@ -422,7 +422,7 @@ async function getEnsembleForCandidate(
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	const { ensembleTitles, keyTitles, season } = seasonKeys;
 	const keys = keyTitles.map((keyTitle) => `${keyTitle}.${season}`);
-	const ensemble = await memDB("ensemble").whereIn("ensemble", keys);
+	const ensemble = await db("ensemble").whereIn("ensemble", keys);
 	if (ensemble.length === 0) {
 		logger.verbose({
 			label: searcheeLabel,
@@ -456,8 +456,8 @@ async function getEnsembleForCandidate(
 		[],
 	);
 	await inBatches(Array.from(entriesToDelete), async (batch) => {
-		await memDB("data").whereIn("path", batch).del();
-		await memDB("ensemble").whereIn("path", batch).del();
+		await db("data").whereIn("path", batch).del();
+		await db("ensemble").whereIn("path", batch).del();
 	});
 	if (filesWithElement.length === 0) {
 		logger.verbose({
@@ -629,13 +629,10 @@ export async function findAllSearchees(
 		);
 	} else {
 		if (useClientTorrents) {
-			const refresh = searcheeLabel === Label.SEARCH ? [] : undefined;
 			rawSearchees.push(
 				...(
 					await Promise.all(
-						clients.map((client) =>
-							client.getClientSearchees({ refresh }),
-						),
+						clients.map((client) => client.getClientSearchees()),
 					)
 				)
 					.map((r) => r.searchees)

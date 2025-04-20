@@ -481,20 +481,6 @@ function cacheTorrentFile(meta: Metafile): boolean {
 	return true;
 }
 
-export async function cleanupTorrentCache(): Promise<void> {
-	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
-	const files = readdirSync(torrentCacheDir);
-	const now = Date.now();
-	for (const file of files) {
-		const filePath = path.join(torrentCacheDir, file);
-		if (now - statSync(filePath).atimeMs > ms("1 year")) {
-			logger.verbose(`Deleting ${filePath}`);
-			await db("decision").where("info_hash", file.split(".")[0]).del();
-			unlinkSync(filePath);
-		}
-	}
-}
-
 export async function updateTorrentCache(
 	oldStr: string,
 	newStr: string,

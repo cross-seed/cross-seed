@@ -1,13 +1,12 @@
 import ms from "ms";
 import { Action } from "./constants.js";
-import { db } from "./db.js";
+import { cleanupDB, db } from "./db.js";
 import { exitOnCrossSeedErrors } from "./errors.js";
 import { injectSavedTorrents } from "./inject.js";
 import { Label, logger } from "./logger.js";
 import { bulkSearch, scanRssFeeds } from "./pipeline.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import { updateCaps } from "./torznab.js";
-import { cleanupTorrentCache } from "./decide.js";
 
 export enum JobName {
 	RSS = "rss",
@@ -76,7 +75,7 @@ function createJobs(): void {
 	if (action === Action.INJECT) {
 		jobs.push(new Job(JobName.INJECT, ms("1 hour"), injectSavedTorrents));
 	}
-	jobs.push(new Job(JobName.CLEANUP, ms("1 day"), cleanupTorrentCache));
+	jobs.push(new Job(JobName.CLEANUP, ms("1 day"), cleanupDB));
 }
 
 export function getJobs(): Job[] {

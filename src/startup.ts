@@ -11,7 +11,7 @@ import {
 } from "./clients/TorrentClient.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
-import { db, memDB } from "./db.js";
+import { db } from "./db.js";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { initializePushNotifier } from "./pushNotifier.js";
@@ -25,7 +25,6 @@ import { Awaitable, wait } from "./utils.js";
 
 export async function exitGracefully() {
 	await db.destroy();
-	await memDB.destroy();
 	process.exit();
 }
 

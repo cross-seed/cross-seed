@@ -6,7 +6,7 @@ import {
 	InjectionResult,
 	TORRENT_TAG,
 } from "../constants.js";
-import { memDB } from "../db.js";
+import { db } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -348,7 +348,7 @@ export default class Transmission implements TorrentClient {
 		for (const torrent of torrents) {
 			const infoHash = torrent.hashString.toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await memDB("torrent")
+			const dbTorrent = await db("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();

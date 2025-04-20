@@ -343,6 +343,21 @@ program
 	);
 
 program
+	.command("clear-client-cache")
+	.description(
+		"Clear cross-seed's cache of your client's torrents. Only necessary if you have recently changed clients or modified the torrents in client and don't want to wait on the cleanup job.",
+	)
+	.action(
+		withMinimalRuntime(async () => {
+			console.log("Clearing client cache...");
+			await db("torrent").del();
+			await db("client_searchee").del();
+			await db("data").del();
+			await db("ensemble").del();
+		}),
+	);
+
+program
 	.command("api-key")
 	.description("Show the api key")
 	.addOption(apiKeyOption)
