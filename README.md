@@ -17,12 +17,25 @@ files to a folder you specify. After that, I recommend using
 [AutoTorrent2](https://github.com/JohnDoee/autotorrent2) to do the last-mile
 delivery into your client.
 
+## Web UI (Beta)
+
+Cross-seed now includes a web-based user interface that makes it easier to:
+
+-   Monitor cross-seed's activity
+-   Trigger searches
+-   Manage configuration
+-   Access documentation
+
+To access the Web UI, start cross-seed in daemon mode and visit
+http://localhost:PORT in your browser, where PORT is the value of the `port`
+setting in your configuration.
+
 ## 🚨🚨🚨 Breaking changes in cross-seed v6 🚨🚨🚨
 
 Head on over to the
-[v6 migration guide](https://www.cross-seed.org/docs/v6-migration)
-to see the steps required for migration.
- 
+[v6 migration guide](https://www.cross-seed.org/docs/v6-migration) to see the
+steps required for migration.
+
 ## Requirements
 
 -   [Node >= 20](https://nodejs.org/en/download)

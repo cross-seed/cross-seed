@@ -8,6 +8,9 @@ import fastify, {
 	FastifyRequest,
 	FastifyReply,
 } from "fastify";
+import fastifyStatic from "@fastify/static";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { checkApiKey } from "./auth.js";
 import {
 	ActionResult,
@@ -173,6 +176,10 @@ function determineResponse(result: {
 	return { status, state };
 }
 
+// Get the directory of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 // Create Fastify app
 const createServer = (): FastifyInstance => {
 	const app = fastify({
@@ -220,6 +227,13 @@ const createServer = (): FastifyInstance => {
 			}
 		},
 	);
+
+	// Serve static files from the client/dist directory
+	app.register(fastifyStatic, {
+		root: join(dirname(__dirname), "client", "dist"),
+		prefix: "/",
+		decorateReply: true,
+	});
 
 	/**
 	 * Trigger a search for a torrent
@@ -461,9 +475,16 @@ const createServer = (): FastifyInstance => {
 
 	// Handle 404s
 	app.setNotFoundHandler((request, reply) => {
-		const message = `Unknown endpoint: ${request.url}`;
-		logger.error({ label: Label.SERVER, message });
-		reply.code(404).send(message);
+		// If the request path starts with /api, it's an API request that wasn't found
+		if (request.url.startsWith("/api")) {
+			const message = `Unknown endpoint: ${request.url}`;
+			logger.error({ label: Label.SERVER, message });
+			reply.code(404).send(message);
+			return;
+		}
+
+		// For all other requests, serve the SPA index.html to support client-side routing
+		reply.sendFile("index.html");
 	});
 
 	// Handle method not allowed
