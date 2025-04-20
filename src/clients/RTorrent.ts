@@ -643,7 +643,7 @@ export default class RTorrent implements TorrentClient {
 		for (let i = 0; i < hashes.length; i++) {
 			const infoHash = hashes[i].toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await db("client_searchees")
+			const dbTorrent = await db("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();

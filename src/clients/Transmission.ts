@@ -348,7 +348,7 @@ export default class Transmission implements TorrentClient {
 		for (const torrent of torrents) {
 			const infoHash = torrent.hashString.toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await db("client_searchees")
+			const dbTorrent = await db("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();

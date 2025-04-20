@@ -642,7 +642,7 @@ export default class QBittorrent implements TorrentClient {
 				torrent.infohash_v1 || torrent.hash
 			).toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await db("client_searchees")
+			const dbTorrent = await db("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();

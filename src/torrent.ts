@@ -506,7 +506,7 @@ export async function indexTorrentsAndDataDirs(
 		const { dataDirs, seasonFromEpisodes, torrentDir, useClientTorrents } =
 			getRuntimeConfig();
 		if (!useClientTorrents) {
-			const hashes = await db("client_searchees").select("info_hash");
+			const hashes = await db("client_searchee").select("info_hash");
 			await inBatches(hashes, async (batch) => {
 				await db("ensemble")
 					.whereIn(
@@ -515,7 +515,7 @@ export async function indexTorrentsAndDataDirs(
 					)
 					.del();
 			});
-			await db("client_searchees").del();
+			await db("client_searchee").del();
 		}
 		if (!torrentDir) {
 			const hashes = await db("torrent").select("info_hash");
@@ -572,7 +572,7 @@ export async function indexTorrentsAndDataDirs(
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {
 	const { useClientTorrents } = getRuntimeConfig();
-	const database = useClientTorrents ? db("client_searchees") : db("torrent");
+	const database = useClientTorrents ? db("client_searchee") : db("torrent");
 	return new Set(
 		(await database.select({ infoHash: "info_hash" })).map(
 			(e) => e.infoHash,
@@ -683,7 +683,7 @@ export async function getSimilarByName(name: string): Promise<{
 
 	if (useClientTorrents) {
 		clientSearchees.push(
-			...(await filterEntries(await db("client_searchees"))).map(
+			...(await filterEntries(await db("client_searchee"))).map(
 				createSearcheeFromDB,
 			),
 		);
@@ -759,7 +759,7 @@ async function getTorrentByFuzzyName(
 	const { useClientTorrents } = getRuntimeConfig();
 
 	const database = useClientTorrents
-		? await db("client_searchees")
+		? await db("client_searchee")
 		: await db("torrent");
 
 	// @ts-expect-error fuse types are confused
@@ -789,7 +789,7 @@ export async function getTorrentByCriteria(
 	criteria: TorrentLocator,
 ): Promise<SearcheeWithInfoHash[]> {
 	const { useClientTorrents } = getRuntimeConfig();
-	const database = useClientTorrents ? db("client_searchees") : db("torrent");
+	const database = useClientTorrents ? db("client_searchee") : db("torrent");
 	const dbTorrents = await database.where((b) =>
 		b.where({ info_hash: criteria.infoHash }),
 	);

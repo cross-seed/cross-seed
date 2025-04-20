@@ -351,7 +351,7 @@ program
 		withMinimalRuntime(async () => {
 			console.log("Clearing client cache...");
 			await db("torrent").del();
-			await db("client_searchees").del();
+			await db("client_searchee").del();
 			await db("data").del();
 			await db("ensemble").del();
 		}),

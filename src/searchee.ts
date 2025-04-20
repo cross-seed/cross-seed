@@ -318,12 +318,12 @@ export async function updateSearcheeClientDB(
 	infoHashes: Set<string>,
 ): Promise<void> {
 	const removedInfoHashes: string[] = (
-		await db("client_searchees").select({ infoHash: "info_hash" })
+		await db("client_searchee").select({ infoHash: "info_hash" })
 	)
 		.map((t) => t.infoHash)
 		.filter((infoHash) => !infoHashes.has(infoHash));
 	await inBatches(removedInfoHashes, async (batch) => {
-		await db("client_searchees")
+		await db("client_searchee")
 			.whereIn("info_hash", batch)
 			.where("client_host", clientHost)
 			.del();
@@ -346,7 +346,7 @@ export async function updateSearcheeClientDB(
 			trackers: JSON.stringify(searchee.trackers),
 		})),
 		async (batch) => {
-			await db("client_searchees")
+			await db("client_searchee")
 				.insert(batch)
 				.onConflict(["client_host", "info_hash"])
 				.merge();

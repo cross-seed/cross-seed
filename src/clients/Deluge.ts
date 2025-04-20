@@ -711,7 +711,7 @@ export default class Deluge implements TorrentClient {
 		for (const [hash, torrent] of Object.entries(torrents)) {
 			const infoHash = hash.toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await db("client_searchees")
+			const dbTorrent = await db("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
