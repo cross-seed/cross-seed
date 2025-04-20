@@ -9,7 +9,7 @@ import {
 import Fuse from "fuse.js";
 import { basename, dirname, extname, join, resolve, sep } from "path";
 import { IGNORED_FOLDERS_SUBSTRINGS, VIDEO_EXTENSIONS } from "./constants.js";
-import { memDB } from "./db.js";
+import { db } from "./db.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
@@ -111,8 +111,8 @@ export async function indexDataDirs(options: {
 				return false;
 			});
 			await inBatches(deletedPaths, async (batch) => {
-				await memDB("data").whereIn("path", batch).del();
-				await memDB("ensemble").whereIn("path", batch).del();
+				await db("data").whereIn("path", batch).del();
+				await db("ensemble").whereIn("path", batch).del();
 			});
 			return indexDataPaths(paths);
 		}),
@@ -149,10 +149,10 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 		}
 	}
 	await inBatches(dataRows, async (batch) => {
-		await memDB("data").insert(batch).onConflict("path").merge();
+		await db("data").insert(batch).onConflict("path").merge();
 	});
 	await inBatches(ensembleRows, async (batch) => {
-		await memDB("ensemble")
+		await db("ensemble")
 			.insert(batch)
 			.onConflict(["client_host", "path"])
 			.merge();
@@ -178,8 +178,7 @@ async function indexEnsembleDataEntry(
 export async function getDataByFuzzyName(
 	name: string,
 ): Promise<SearcheeWithoutInfoHash[]> {
-	const allDataEntries: { title: string; path: string }[] =
-		await memDB("data");
+	const allDataEntries: { title: string; path: string }[] = await db("data");
 	const fullMatch = createKeyTitle(name);
 
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
@@ -209,8 +208,8 @@ export async function getDataByFuzzyName(
 			return false;
 		});
 	await inBatches(entriesToDelete, async (batch) => {
-		await memDB("data").whereIn("path", batch).del();
-		await memDB("ensemble").whereIn("path", batch).del();
+		await db("data").whereIn("path", batch).del();
+		await db("ensemble").whereIn("path", batch).del();
 	});
 	if (potentialMatches.length === 0) return [];
 	return [await createSearcheeFromPath(potentialMatches[0].item.path)]

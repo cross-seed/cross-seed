@@ -7,7 +7,7 @@ import {
 	TORRENT_CATEGORY_SUFFIX,
 	TORRENT_TAG,
 } from "../constants.js";
-import { memDB } from "../db.js";
+import { db } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile } from "../parseTorrent.js";
@@ -711,7 +711,7 @@ export default class Deluge implements TorrentClient {
 		for (const [hash, torrent] of Object.entries(torrents)) {
 			const infoHash = hash.toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await memDB("torrent")
+			const dbTorrent = await db("client_searchees")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();

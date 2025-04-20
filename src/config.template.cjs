@@ -86,6 +86,7 @@ module.exports = {
 	 * You can optionally add readonly: after the prefix to use a client as a
 	 * source for finding cross seeds but not for injecting.
 	 * e.g. "qbittorrent:readonly:http://username:password@localhost:8080"
+	 * https://www.cross-seed.org/docs/basics/options#torrentclients
 	 */
 	torrentClients: [],
 

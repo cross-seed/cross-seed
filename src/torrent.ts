@@ -16,7 +16,7 @@ import {
 	SAVED_TORRENTS_INFO_REGEX,
 	USER_AGENT,
 } from "./constants.js";
-import { db, memDB } from "./db.js";
+import { db } from "./db.js";
 import { Label, logger, logOnce } from "./logger.js";
 import { Metafile, updateMetafileMetadata } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
@@ -323,7 +323,7 @@ export async function createEnsemblePieces(
 	});
 }
 
-async function cacheEnsembleTorrentEntry(
+export async function cacheEnsembleTorrentEntry(
 	searchee: SearcheeWithInfoHash,
 	torrentSavePaths?: Map<string, string>,
 ): Promise<EnsembleEntry[] | null> {
@@ -439,7 +439,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		.flat()
 		.filter(isTruthy);
 	await inBatches(ensembleRows, async (batch) => {
-		await memDB("ensemble")
+		await db("ensemble")
 			.insert(batch)
 			.onConflict(["client_host", "path"])
 			.merge();
@@ -449,47 +449,51 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 	const dirContents = new Set(await findAllTorrentFilesInDir(dir));
 
-	// Index new torrents in the torrentDir
-	let firstNewTorrent = true;
 	const newSearchees: SearcheeWithInfoHash[] = [];
 	for (const filepath of dirContents) {
 		const doesAlreadyExist = await db("torrent")
 			.select("id")
 			.where({ file_path: filepath })
 			.first();
+		if (doesAlreadyExist) continue;
 
-		if (!doesAlreadyExist) {
-			if (firstNewTorrent) firstNewTorrent = false;
-			let meta: Metafile;
-			try {
-				meta = await parseTorrentFromFilename(filepath);
-			} catch (e) {
-				logOnce(`Failed to parse ${filepath}`, () => {
-					logger.error(`Failed to parse ${filepath}`);
-					logger.debug(e);
-				});
-				continue;
-			}
-			await db("torrent")
-				.insert({
-					file_path: filepath,
-					info_hash: meta.infoHash,
-					name: meta.name,
-				})
-				.onConflict("file_path")
-				.ignore();
-			const res = await createSearcheeFromTorrentFile(filepath, []);
-			if (res.isOk()) newSearchees.push(res.unwrap());
+		let meta: Metafile;
+		try {
+			meta = await parseTorrentFromFilename(filepath);
+		} catch (e) {
+			logOnce(`Failed to parse ${filepath}`, () => {
+				logger.error(`Failed to parse ${filepath}`);
+				logger.debug(e);
+			});
+			continue;
 		}
+		await db("torrent")
+			.insert({
+				file_path: filepath,
+				info_hash: meta.infoHash,
+				name: meta.name,
+			})
+			.onConflict("file_path")
+			.ignore();
+		const res = await createSearcheeFromTorrentFile(filepath, []);
+		if (res.isOk()) newSearchees.push(res.unwrap());
 	}
 
-	const dbFiles = await db("torrent").select({ filePath: "file_path" });
-	const dbFilePaths: string[] = dbFiles.map((row) => row.filePath);
-	const filesToDelete = dbFilePaths.filter(
-		(filePath) => !dirContents.has(filePath),
-	);
-	await inBatches(filesToDelete, async (batch) => {
-		await db("torrent").whereIn("file_path", batch).del();
+	const rows = await db("torrent").select("file_path", "info_hash");
+	const toDelete = rows.filter((row) => !dirContents.has(row.file_path));
+	await inBatches(toDelete, async (batch) => {
+		await db("torrent")
+			.whereIn(
+				"file_path",
+				batch.map((row) => row.file_path),
+			)
+			.del();
+		await db("ensemble")
+			.whereIn(
+				"info_hash",
+				batch.map((row) => row.info_hash),
+			)
+			.del();
 	});
 
 	return newSearchees;
@@ -498,6 +502,47 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 export async function indexTorrentsAndDataDirs(
 	options = { startup: false },
 ): Promise<void> {
+	if (options.startup) {
+		const { dataDirs, seasonFromEpisodes, torrentDir, useClientTorrents } =
+			getRuntimeConfig();
+		if (!useClientTorrents) {
+			const hashes = await db("client_searchees").select("info_hash");
+			await inBatches(hashes, async (batch) => {
+				await db("ensemble")
+					.whereIn(
+						"info_hash",
+						batch.map((row) => row.info_hash),
+					)
+					.del();
+			});
+			await db("client_searchees").del();
+		}
+		if (!torrentDir) {
+			const hashes = await db("torrent").select("info_hash");
+			await inBatches(hashes, async (batch) => {
+				await db("ensemble")
+					.whereIn(
+						"info_hash",
+						batch.map((row) => row.info_hash),
+					)
+					.del();
+			});
+			await db("torrent").del();
+		}
+		if (!dataDirs.length) {
+			const paths = await db("data").select("path");
+			await inBatches(paths, async (batch) => {
+				await db("ensemble")
+					.whereIn(
+						"path",
+						batch.map((row) => row.path),
+					)
+					.del();
+			});
+			await db("data").del();
+		}
+		if (!seasonFromEpisodes) await db("ensemble").del();
+	}
 	return withMutex(
 		Mutex.INDEX_TORRENTS_AND_DATA_DIRS,
 		async () => {
@@ -527,9 +572,9 @@ export async function indexTorrentsAndDataDirs(
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {
 	const { useClientTorrents } = getRuntimeConfig();
-	const database = useClientTorrents ? memDB : db;
+	const database = useClientTorrents ? db("client_searchees") : db("torrent");
 	return new Set(
-		(await database("torrent").select({ infoHash: "info_hash" })).map(
+		(await database.select({ infoHash: "info_hash" })).map(
 			(e) => e.infoHash,
 		),
 	);
@@ -638,7 +683,7 @@ export async function getSimilarByName(name: string): Promise<{
 
 	if (useClientTorrents) {
 		clientSearchees.push(
-			...(await filterEntries(await memDB("torrent"))).map(
+			...(await filterEntries(await db("client_searchees"))).map(
 				createSearcheeFromDB,
 			),
 		);
@@ -671,7 +716,7 @@ export async function getSimilarByName(name: string): Promise<{
 
 	const entriesToDelete: string[] = [];
 	const filteredDataEntries = (
-		(await filterEntries(await memDB("data"))) as {
+		(await filterEntries(await db("data"))) as {
 			title: string;
 			path: string;
 		}[]
@@ -686,8 +731,8 @@ export async function getSimilarByName(name: string): Promise<{
 		return true;
 	});
 	await inBatches(entriesToDelete, async (batch) => {
-		await memDB("data").whereIn("path", batch).del();
-		await memDB("ensemble").whereIn("path", batch).del();
+		await db("data").whereIn("path", batch).del();
+		await db("ensemble").whereIn("path", batch).del();
 	});
 	if (filteredDataEntries.length) {
 		dataSearchees.push(
@@ -714,7 +759,7 @@ async function getTorrentByFuzzyName(
 	const { useClientTorrents } = getRuntimeConfig();
 
 	const database = useClientTorrents
-		? await memDB("torrent")
+		? await db("client_searchees")
 		: await db("torrent");
 
 	// @ts-expect-error fuse types are confused
@@ -744,8 +789,8 @@ export async function getTorrentByCriteria(
 	criteria: TorrentLocator,
 ): Promise<SearcheeWithInfoHash[]> {
 	const { useClientTorrents } = getRuntimeConfig();
-	const database = useClientTorrents ? memDB : db;
-	const dbTorrents = await database("torrent").where((b) =>
+	const database = useClientTorrents ? db("client_searchees") : db("torrent");
+	const dbTorrents = await database.where((b) =>
 		b.where({ info_hash: criteria.infoHash }),
 	);
 	if (!dbTorrents.length) {
