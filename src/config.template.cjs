@@ -189,6 +189,15 @@ module.exports = {
 	autoResumeMaxDownload: 52428800,
 
 	/**
+	 * If set to `true` and the amount remaining is above autoResumeMaxDownload,
+	 * resume if accumulated size of the missing files is less than the
+	 * accumulated size of the known-irrelevant files such as nfo, sample, txt,
+	 * subs, proofs, and bonus/commentary files present in the torrent.
+	 * https://www.cross-seed.org/docs/basics/faq-troubleshooting#my-partial-matches-from-related-searches-are-missing-the-same-data-how-can-i-only-download-it-once
+	 */
+	ignoreNonRelevantFilesToResume: false,
+
+	/**
 	 * Determines how deep into the specified dataDirs to go to generate new
 	 * searchees.
 	 *

@@ -8,6 +8,7 @@ export interface RuntimeConfig {
 	matchMode: MatchMode;
 	skipRecheck: boolean;
 	autoResumeMaxDownload: number;
+	ignoreNonRelevantFilesToResume: boolean;
 	linkDirs: string[];
 	linkType: LinkType;
 	flatLinking: boolean;

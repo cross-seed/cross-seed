@@ -566,7 +566,7 @@ export async function performActionWithoutMutex(
 				message: `Rechecking ${getLogString(newMeta)} as new files were linked from ${getLogString(searchee)}`,
 			});
 			await client.recheckTorrent(newMeta.infoHash);
-			client.resumeInjection(newMeta.infoHash, decision, {
+			client.resumeInjection(newMeta, decision, {
 				checkOnce: false,
 			});
 		}
