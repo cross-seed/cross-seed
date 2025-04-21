@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button } from './components/ui/button'
+import { Button } from '@/components/ui/button'
 
 function App() {
   const [count, setCount] = useState(0)
@@ -39,7 +39,7 @@ function App() {
             Count is: {count}
           </Button>
           <p className="mt-4 text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-            This demo button uses our shadcn/ui Button component.
+            This demo button uses the shadcn/ui Button component.
           </p>
         </div>
       </main>
