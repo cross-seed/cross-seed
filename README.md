@@ -43,5 +43,5 @@ The docs are updated when a new release is made, `pre-release` is not a release 
 ## Docker Release Tags
 
  - `:nightly` - for open PRs, implementation could change after review
- - `:master` - for pre-release testing
+ - `:master` - for pre-release - _tagged GitHub releases_ - testing
  - `:latest` - for tagged releases
