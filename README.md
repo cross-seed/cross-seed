@@ -31,3 +31,17 @@ If you are migrating version to the latest available, please read
 Feel free to
 [start a discussion](https://github.com/cross-seed/cross-seed/discussions/new),
 or reach out on [Discord](https://discord.gg/jpbUFzS5Wb).
+
+## Branches and Releases
+
+The docs are updated when a new release is made, `pre-release` is not a release by definition.
+
+## Github Branches
+- Tagged Pre-Release releases are betas and align to the `master` release branch
+- `master` Github Development Branch is equivalent to nightly/bleeding edge.
+
+## Docker Release Tags
+
+ - `:nightly` - for open PRs, implementation could change after review
+ - `:master` - for pre-release testing
+ - `:latest` - for tagged releases
