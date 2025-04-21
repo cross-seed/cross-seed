@@ -230,7 +230,7 @@ const createServer = (): FastifyInstance => {
 
 	// Serve static files from the client/dist directory
 	app.register(fastifyStatic, {
-		root: join(dirname(__dirname), "client", "dist"),
+		root: join(dirname(__dirname), "client", "build"),
 		prefix: "/",
 		decorateReply: true,
 	});
