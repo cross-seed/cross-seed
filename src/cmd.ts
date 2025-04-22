@@ -433,11 +433,19 @@ createCommandWithSharedOptions(
 	"inject",
 	"Inject saved cross-seeds into your client (without filtering, see docs)",
 )
-	.addOption(
-		new Option(
-			"--inject-dir <dir>",
-			"Directory of torrent files to try to inject",
-		).default(fileConfig.outputDir),
+	.option(
+		"--inject-dir <dir>",
+		"Directory of torrent files to try to inject",
+		fallback(fileConfig.injectDir, fileConfig.outputDir),
+	)
+	.option(
+		"--ignore-titles",
+		"Searchee and candidate titles do not need to pass the fuzzy matching check (useful if `cross-seed inject` erroneously rejects by title)",
+		fallback(fileConfig.ignoreTitles, false),
+	)
+	.option(
+		"--no-ignore-titles",
+		"Searchee and candidate titles need to pass the fuzzy matching check (default)",
 	)
 	.action(withFullRuntime(injectSavedTorrents));
 

@@ -109,10 +109,6 @@ async function checkConfigPaths(): Promise<void> {
 		}
 	}
 	if (injectDir) {
-		logger.warn({
-			label: Label.INJECT,
-			message: `Manually injecting torrents performs minimal filtering which slightly increases chances of false positives, see the docs for more info`,
-		});
 		if (!(await verifyPath(injectDir, "injectDir", READ_AND_WRITE))) {
 			pathFailure++;
 		}

@@ -17,6 +17,7 @@ export interface RuntimeConfig {
 	torrentDir?: string;
 	outputDir: string;
 	injectDir?: string;
+	ignoreTitles?: boolean;
 	includeSingleEpisodes: boolean;
 	verbose: boolean;
 	includeNonVideos: boolean;
