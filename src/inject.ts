@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { stat, unlink } from "fs/promises";
 import ms from "ms";
-import { copyFileSync, existsSync } from "fs";
+import { copyFileSync } from "fs";
 import path, { basename } from "path";
 import { performActionWithoutMutex } from "./action.js";
 import {
@@ -36,6 +36,7 @@ import {
 import {
 	areMediaTitlesSimilar,
 	comparing,
+	exists,
 	formatAsList,
 	getLogString,
 	humanReadableDate,
@@ -719,7 +720,7 @@ export async function restoreFromTorrentCache(): Promise<void> {
 			outputDir,
 			`[${MediaType.OTHER}][${UNKNOWN_TRACKER}]${basename(torrentFilePath)}`,
 		);
-		if (existsSync(dest)) {
+		if (await exists(dest)) {
 			existed++;
 			continue;
 		}

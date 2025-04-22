@@ -1,6 +1,6 @@
 import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
-import fs, { existsSync, statSync } from "fs";
+import fs, { statSync } from "fs";
 import { readdir, readFile, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
@@ -37,10 +37,13 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import {
+	exists,
+	filterAsync,
 	getLogString,
 	inBatches,
 	isTruthy,
 	Mutex,
+	notExists,
 	stripExtension,
 	wait,
 	withMutex,
@@ -95,7 +98,7 @@ export async function parseTorrentWithMetadata(
 			extname(filename),
 			".fastresume",
 		);
-		if (fs.existsSync(fastResumePath)) {
+		if (await exists(fastResumePath)) {
 			updateMetafileMetadata(
 				meta,
 				bencode.decode(await readFile(fastResumePath)),
@@ -270,7 +273,7 @@ export async function saveTorrentFile(
 			meta.getFileSystemSafeName(),
 		)}[${meta.infoHash}].torrent`,
 	);
-	if (fs.existsSync(filePath)) {
+	if (await exists(filePath)) {
 		fs.utimesSync(filePath, new Date(), fs.statSync(filePath).mtime);
 		return;
 	}
@@ -717,21 +720,25 @@ export async function getSimilarByName(name: string): Promise<{
 	}
 
 	const entriesToDelete: string[] = [];
-	const filteredDataEntries = (
+	const filteredDataEntries = await filterAsync(
 		(await filterEntries(await db("data"))) as {
 			title: string;
 			path: string;
-		}[]
-	).filter(({ path }) => {
-		if (
-			!existsSync(path) ||
-			shouldIgnorePathHeuristically(path, statSync(path).isDirectory())
-		) {
-			entriesToDelete.push(path);
-			return false;
-		}
-		return true;
-	});
+		}[],
+		async ({ path }) => {
+			if (
+				(await notExists(path)) ||
+				shouldIgnorePathHeuristically(
+					path,
+					statSync(path).isDirectory(),
+				)
+			) {
+				entriesToDelete.push(path);
+				return false;
+			}
+			return true;
+		},
+	);
 	await inBatches(entriesToDelete, async (batch) => {
 		await db("data").whereIn("path", batch).del();
 		await db("ensemble").whereIn("path", batch).del();

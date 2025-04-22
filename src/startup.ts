@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "fs";
+import { mkdirSync } from "fs";
 import { access, constants, stat } from "fs/promises";
 import ms from "ms";
 import { sep } from "path";
@@ -21,7 +21,7 @@ import {
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
-import { Awaitable, wait } from "./utils.js";
+import { Awaitable, notExists, wait } from "./utils.js";
 
 export async function exitGracefully() {
 	await db.destroy();
@@ -86,7 +86,7 @@ async function checkConfigPaths(): Promise<void> {
 		pathFailure++;
 	}
 
-	if (!existsSync(outputDir)) {
+	if (await notExists(outputDir)) {
 		logger.info(`Creating outputDir: ${outputDir}`);
 		mkdirSync(outputDir, { recursive: true });
 	}
@@ -95,7 +95,7 @@ async function checkConfigPaths(): Promise<void> {
 	}
 
 	for (const linkDir of linkDirs) {
-		if (!existsSync(linkDir)) {
+		if (await notExists(linkDir)) {
 			logger.info(`Creating linkDir: ${linkDir}`);
 			mkdirSync(linkDir, { recursive: true });
 		}
@@ -116,7 +116,7 @@ async function checkConfigPaths(): Promise<void> {
 	if (linkDirs.length) {
 		for (const dataDir of dataDirs) {
 			try {
-				testLinking(
+				await testLinking(
 					dataDir,
 					"dataDirSrc.cross-seed",
 					"dataDirDest.cross-seed",

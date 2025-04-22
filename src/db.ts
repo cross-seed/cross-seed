@@ -1,5 +1,5 @@
 import Sqlite from "better-sqlite3";
-import { existsSync, readdirSync, statSync, unlinkSync } from "fs";
+import { readdirSync, statSync, unlinkSync } from "fs";
 import knex from "knex";
 import ms from "ms";
 import { join } from "path";
@@ -10,7 +10,7 @@ import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { migrations } from "./migrations/migrations.js";
 import { cacheEnsembleTorrentEntry } from "./torrent.js";
-import { inBatches, isTruthy } from "./utils.js";
+import { filterAsync, inBatches, isTruthy, notExists } from "./utils.js";
 
 const filename = join(appDir(), "cross-seed.db");
 const rawSqliteHandle = new Sqlite(filename);
@@ -60,9 +60,10 @@ export async function cleanupDB(): Promise<void> {
 		})(),
 		(async () => {
 			if (!dataDirs.length) return;
-			const deletedPaths = (await db("data").select("path"))
-				.map((e) => e.path)
-				.filter((p) => !existsSync(p));
+			const deletedPaths = await filterAsync(
+				(await db("data").select("path")).map((e) => e.path),
+				(p) => notExists(p),
+			);
 			await inBatches(deletedPaths, async (batch) => {
 				await db("data").whereIn("path", batch).del();
 				await db("ensemble").whereIn("path", batch).del();
@@ -70,9 +71,10 @@ export async function cleanupDB(): Promise<void> {
 		})(),
 		(async () => {
 			if (!seasonFromEpisodes) return;
-			const deletedPaths = (await db("ensemble").select("path"))
-				.map((e) => e.path)
-				.filter((p) => !existsSync(p));
+			const deletedPaths = await filterAsync(
+				(await db("ensemble").select("path")).map((e) => e.path),
+				(p) => notExists(p),
+			);
 			await inBatches(deletedPaths, async (batch) => {
 				await db("data").whereIn("path", batch).del();
 				await db("ensemble").whereIn("path", batch).del();

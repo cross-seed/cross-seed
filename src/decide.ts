@@ -1,6 +1,5 @@
 import bencode from "bencode";
 import {
-	existsSync,
 	readdirSync,
 	readFileSync,
 	statSync,
@@ -45,6 +44,7 @@ import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
 import {
 	extractInt,
 	getLogString,
+	notExists,
 	sanitizeInfoHash,
 	stripExtension,
 } from "./utils.js";
@@ -372,7 +372,7 @@ export async function assessCandidate(
 					: { decision: Decision.DOWNLOAD_FAILED };
 		}
 		metafile = res.unwrap();
-		metaCached = cacheTorrentFile(metafile);
+		metaCached = await cacheTorrentFile(metafile);
 		metaOrCandidate.size = metafile.length; // Trackers can be wrong
 	} else {
 		metafile = metaOrCandidate;
@@ -435,13 +435,13 @@ export async function assessCandidate(
 	return { decision: Decision.FILE_TREE_MISMATCH, metafile, metaCached };
 }
 
-function existsInTorrentCache(infoHash: string): boolean {
+async function existsInTorrentCache(infoHash: string): Promise<boolean> {
 	const torrentPath = path.join(
 		appDir(),
 		TORRENT_CACHE_FOLDER,
 		`${infoHash}.cached.torrent`,
 	);
-	if (!existsSync(torrentPath)) return false;
+	if (await notExists(torrentPath)) return false;
 	utimesSync(torrentPath, new Date(), statSync(torrentPath).mtime);
 	return true;
 }
@@ -470,8 +470,8 @@ async function getCachedTorrentFile(
 	}
 }
 
-function cacheTorrentFile(meta: Metafile): boolean {
-	if (existsInTorrentCache(meta.infoHash)) return false;
+async function cacheTorrentFile(meta: Metafile): Promise<boolean> {
+	if (await existsInTorrentCache(meta.infoHash)) return false;
 	const torrentPath = path.join(
 		appDir(),
 		TORRENT_CACHE_FOLDER,
@@ -635,7 +635,7 @@ export async function assessCandidateCaching(
 		.first();
 	const metaInfoHash = await guidLookup(guid, link, guidInfoHashMap);
 	const metaOrCandidate = metaInfoHash
-		? existsInTorrentCache(metaInfoHash)
+		? (await existsInTorrentCache(metaInfoHash))
 			? (await getCachedTorrentFile(metaInfoHash)).orElse(candidate)
 			: candidate
 		: candidate;

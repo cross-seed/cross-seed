@@ -35,10 +35,14 @@ import {
 } from "./searchee.js";
 import { saveTorrentFile } from "./torrent.js";
 import {
+	exists,
+	filterAsync,
 	findAFileWithExt,
+	findAsync,
 	formatAsList,
 	getLogString,
 	Mutex,
+	notExists,
 	withMutex,
 } from "./utils.js";
 
@@ -67,13 +71,13 @@ interface LinkResult {
 	linkedNewFiles: boolean;
 }
 
-function linkAllFilesInMetafile(
+async function linkAllFilesInMetafile(
 	searchee: Searchee,
 	newMeta: Metafile,
 	decision: DecisionAnyMatch,
 	destinationDir: string,
 	options: { savePath?: string; ignoreMissing: boolean },
-): Result<LinkResult, Error> {
+): Promise<Result<LinkResult, Error>> {
 	const availableFiles = searchee.files.slice();
 	const paths =
 		decision === Decision.MATCH && options.savePath
@@ -106,18 +110,21 @@ function linkAllFilesInMetafile(
 	let alreadyExisted = false;
 	let linkedNewFiles = false;
 	try {
-		const validPaths = paths.filter(([srcFilePath, destFilePath]) => {
-			if (fs.existsSync(destFilePath)) {
-				alreadyExisted = true;
-				return false;
-			}
-			if (fs.existsSync(srcFilePath)) return true;
-			if (options.ignoreMissing) return false;
-			throw new Error(`Linking failed, ${srcFilePath} not found.`);
-		});
+		const validPaths = await filterAsync(
+			paths,
+			async ([srcFilePath, destFilePath]) => {
+				if (await exists(destFilePath)) {
+					alreadyExisted = true;
+					return false;
+				}
+				if (await exists(srcFilePath)) return true;
+				if (options.ignoreMissing) return false;
+				throw new Error(`Linking failed, ${srcFilePath} not found.`);
+			},
+		);
 		for (const [srcFilePath, destFilePath] of validPaths) {
 			const destFileParentPath = dirname(destFilePath);
-			if (!fs.existsSync(destFileParentPath)) {
+			if (await notExists(destFileParentPath)) {
 				fs.mkdirSync(destFileParentPath, { recursive: true });
 			}
 			if (linkFile(srcFilePath, destFilePath)) {
@@ -130,11 +137,11 @@ function linkAllFilesInMetafile(
 	return resultOf({ alreadyExisted, linkedNewFiles });
 }
 
-function unlinkMetafile(meta: Metafile, destinationDir: string) {
+async function unlinkMetafile(meta: Metafile, destinationDir: string) {
 	const destinationDirIno = fs.statSync(destinationDir).ino;
 	const roots = meta.files.map((file) => join(destinationDir, getRoot(file)));
 	for (const root of roots) {
-		if (!fs.existsSync(root)) continue;
+		if (await notExists(root)) continue;
 		if (!root.startsWith(destinationDir)) continue; // assert: root is within destinationDir
 		if (resolve(root) === resolve(destinationDir)) continue; // assert: root is not destinationDir
 		if (fs.statSync(root).ino === destinationDirIno) continue; // assert: root is not destinationDir
@@ -153,7 +160,7 @@ async function getSavePath(
 	>
 > {
 	if (searchee.path) {
-		if (!fs.existsSync(searchee.path)) {
+		if (await notExists(searchee.path)) {
 			logger.error({
 				label: searchee.label,
 				message: `Linking failed, ${searchee.path} not found.`,
@@ -175,7 +182,7 @@ async function getSavePath(
 		return resultOf(dirname(searchee.path));
 	} else if (!searchee.infoHash) {
 		for (const file of searchee.files) {
-			if (!fs.existsSync(file.path)) {
+			if (await notExists(file.path)) {
 				logger.error(`Linking failed, ${file.path} not found.`);
 				return resultOfErr("INVALID_DATA");
 			}
@@ -230,7 +237,7 @@ async function getSavePath(
 			: rootFolder
 				? join(savePath, rootFolder)
 				: savePath;
-	if (!fs.existsSync(sourceRootOrSavePath)) {
+	if (await notExists(sourceRootOrSavePath)) {
 		logger.error({
 			label: searchee.label,
 			message: `Linking failed, ${sourceRootOrSavePath} not found.`,
@@ -253,12 +260,16 @@ async function getClientAndDestinationDir(
 		let srcDev: number;
 		try {
 			srcPath = !savePath
-				? searchee.files.find((f) => fs.existsSync(f.path))!.path
+				? (await findAsync(
+						searchee.files,
+						async (f) => await exists(f.path),
+					))!.path
 				: join(
 						savePath,
-						searchee.files.find((f) =>
-							fs.existsSync(join(savePath, f.path)),
-						)!.path,
+						(await findAsync(
+							searchee.files,
+							async (f) => await exists(join(savePath, f.path)),
+						))!.path,
 					);
 			srcDev = fs.statSync(srcPath).dev;
 		} catch (e) {
@@ -315,8 +326,8 @@ async function getClientAndDestinationDir(
 			return null;
 		}
 		const linkDir = savePath
-			? getLinkDir(savePath)
-			: getLinkDirVirtual(searchee as SearcheeVirtual);
+			? await getLinkDir(savePath)
+			: await getLinkDirVirtual(searchee as SearcheeVirtual);
 		if (!linkDir) return null;
 		destinationDir = flatLinking ? linkDir : join(linkDir, tracker);
 	}
@@ -505,7 +516,7 @@ export async function performActionWithoutMutex(
 	}
 
 	if (linkDirs.length) {
-		const res = linkAllFilesInMetafile(
+		const res = await linkAllFilesInMetafile(
 			searchee,
 			newMeta,
 			decision,
@@ -571,7 +582,7 @@ export async function performActionWithoutMutex(
 	} else {
 		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 		if (unlinkOk && destinationDir) {
-			unlinkMetafile(newMeta, destinationDir);
+			await unlinkMetafile(newMeta, destinationDir);
 			linkedNewFiles = false;
 		}
 	}
@@ -598,7 +609,7 @@ export async function performActions(
 	return results;
 }
 
-export function getLinkDir(pathStr: string): string | null {
+async function getLinkDir(pathStr: string): Promise<string | null> {
 	const { linkDirs, linkType } = getRuntimeConfig();
 	const pathStat = fs.statSync(pathStr);
 	const pathDev = pathStat.dev; // Windows always returns 0
@@ -636,14 +647,14 @@ export function getLinkDir(pathStr: string): string | null {
 						: LinkType.HARDLINK,
 				);
 				fs.rmSync(testPath);
-				if (tempFile && fs.existsSync(tempFile)) fs.rmSync(tempFile);
+				if (tempFile && (await exists(tempFile))) fs.rmSync(tempFile);
 				return linkDir;
 			} catch {
 				continue;
 			}
 		}
 	}
-	if (tempFile && fs.existsSync(tempFile)) fs.rmSync(tempFile);
+	if (tempFile && (await exists(tempFile))) fs.rmSync(tempFile);
 	if (linkType !== LinkType.SYMLINK) {
 		logger.error(
 			`Cannot find any linkDir from linkDirs on the same drive to ${linkType} ${pathStr}`,
@@ -658,11 +669,13 @@ export function getLinkDir(pathStr: string): string | null {
 	return linkDirs[0];
 }
 
-export function getLinkDirVirtual(searchee: SearcheeVirtual): string | null {
-	const linkDir = getLinkDir(searchee.files[0].path);
+async function getLinkDirVirtual(
+	searchee: SearcheeVirtual,
+): Promise<string | null> {
+	const linkDir = await getLinkDir(searchee.files[0].path);
 	if (!linkDir) return null;
 	for (let i = 1; i < searchee.files.length; i++) {
-		if (getLinkDir(searchee.files[i].path) !== linkDir) {
+		if ((await getLinkDir(searchee.files[i].path)) !== linkDir) {
 			logger.error(
 				`Cannot link files to multiple linkDirs for seasonFromEpisodes aggregation, source episodes are spread across multiple drives.`,
 			);
@@ -728,11 +741,11 @@ function unwrapSymlinks(path: string): string {
  * @param testSrcName A unique name.cross-seed to create in srcDir if necessary
  * @param testDestName A unique name.cross-seed to create in the linkDir
  */
-export function testLinking(
+export async function testLinking(
 	srcDir: string,
 	testSrcName: string,
 	testDestName: string,
-): void {
+): Promise<void> {
 	const { linkDirs, linkType } = getRuntimeConfig();
 	let tempFile: string | undefined;
 	try {
@@ -750,7 +763,7 @@ export function testLinking(
 			tempFile = join(srcDir, testSrcName);
 			try {
 				fs.writeFileSync(tempFile, "");
-				if (!fs.existsSync(tempFile)) {
+				if (await notExists(tempFile)) {
 					logger.error(
 						`Failed to verify test file at ${tempFile}, cross-seed is unable to verify linking for this path.`,
 					);
@@ -765,7 +778,7 @@ export function testLinking(
 				return;
 			}
 		}
-		const linkDir = getLinkDir(srcDir);
+		const linkDir = await getLinkDir(srcDir);
 		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
 		const testPath = join(linkDir, testDestName);
 		linkFile(srcFile, testPath);
@@ -779,6 +792,6 @@ export function testLinking(
 			)}]. Ensure that ${linkType} is supported between these paths (hardlink/reflink requires same drive, partition, and volume).`,
 		);
 	} finally {
-		if (tempFile && fs.existsSync(tempFile)) fs.rmSync(tempFile);
+		if (tempFile && (await exists(tempFile))) fs.rmSync(tempFile);
 	}
 }

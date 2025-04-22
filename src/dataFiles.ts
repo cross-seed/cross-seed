@@ -1,11 +1,4 @@
-import {
-	existsSync,
-	FSWatcher,
-	readdirSync,
-	readFileSync,
-	statSync,
-	watch,
-} from "fs";
+import { FSWatcher, readdirSync, readFileSync, statSync, watch } from "fs";
 import Fuse from "fuse.js";
 import { basename, dirname, extname, join, resolve, sep } from "path";
 import { IGNORED_FOLDERS_SUBSTRINGS, VIDEO_EXTENSIONS } from "./constants.js";
@@ -20,7 +13,13 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import { createEnsemblePieces, EnsembleEntry } from "./torrent.js";
-import { createKeyTitle, inBatches, isTruthy } from "./utils.js";
+import {
+	createKeyTitle,
+	exists,
+	filterAsync,
+	inBatches,
+	isTruthy,
+} from "./utils.js";
 import { isOk } from "./Result.js";
 
 interface DataEntry {
@@ -59,7 +58,7 @@ export async function indexDataDirs(options: {
 		}
 		const searcheePaths = findSearcheesFromAllDataDirs();
 		const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
-		if (existsSync(maxUserWatchesPath)) {
+		if (await exists(maxUserWatchesPath)) {
 			const limit = parseInt(readFileSync(maxUserWatchesPath, "utf8"));
 			if (limit < searcheePaths.length * 10) {
 				logger.error(
@@ -90,26 +89,29 @@ export async function indexDataDirs(options: {
 					a.split(sep).filter(isTruthy).length,
 			);
 			const deletedPaths: string[] = [];
-			const paths = Array.from(
-				eventPaths.reduce<Set<string>>((acc, path) => {
-					const affectedPaths: string[] = [path];
-					let parentPath = dirname(path);
-					while (resolve(parentPath) !== resolve(dataDir)) {
-						affectedPaths.push(parentPath);
-						parentPath = dirname(parentPath);
-					}
-					for (const affectedPath of affectedPaths.slice(
-						-maxDataDepth,
-					)) {
-						acc.add(affectedPath);
-					}
-					return acc;
-				}, new Set()),
-			).filter((path) => {
-				if (existsSync(path)) return true;
-				deletedPaths.push(path);
-				return false;
-			});
+			const paths = await filterAsync(
+				Array.from(
+					eventPaths.reduce<Set<string>>((acc, path) => {
+						const affectedPaths: string[] = [path];
+						let parentPath = dirname(path);
+						while (resolve(parentPath) !== resolve(dataDir)) {
+							affectedPaths.push(parentPath);
+							parentPath = dirname(parentPath);
+						}
+						for (const affectedPath of affectedPaths.slice(
+							-maxDataDepth,
+						)) {
+							acc.add(affectedPath);
+						}
+						return acc;
+					}, new Set()),
+				),
+				async (path) => {
+					if (await exists(path)) return true;
+					deletedPaths.push(path);
+					return false;
+				},
+			);
 			await inBatches(deletedPaths, async (batch) => {
 				await db("data").whereIn("path", batch).del();
 				await db("ensemble").whereIn("path", batch).del();
@@ -178,11 +180,11 @@ async function indexEnsembleDataEntry(
 export async function getDataByFuzzyName(
 	name: string,
 ): Promise<SearcheeWithoutInfoHash[]> {
-	const allDataEntries: { title: string; path: string }[] = await db("data");
+	const allDataEntries: DataEntry[] = await db("data");
 	const fullMatch = createKeyTitle(name);
 
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
-	let filteredNames: typeof allDataEntries = [];
+	let filteredNames: DataEntry[] = [];
 	if (fullMatch) {
 		filteredNames = allDataEntries.filter((dbData) => {
 			const dbMatch = createKeyTitle(dbData.title);
@@ -194,19 +196,21 @@ export async function getDataByFuzzyName(
 	filteredNames = filteredNames.length > 0 ? filteredNames : allDataEntries;
 
 	const entriesToDelete: string[] = [];
-	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(filteredNames, {
-		keys: ["title"],
-		distance: 6,
-		threshold: 0.25,
-	})
-		.search(name)
-		.filter((match) => {
+
+	const potentialMatches = await filterAsync(
+		// @ts-expect-error fuse types are confused
+		new Fuse(filteredNames, {
+			keys: ["title"],
+			distance: 6,
+			threshold: 0.25,
+		}).search(name) as { item: DataEntry }[],
+		async (match) => {
 			const path = match.item.path;
-			if (existsSync(path)) return true;
+			if (await exists(path)) return true;
 			entriesToDelete.push(path);
 			return false;
-		});
+		},
+	);
 	await inBatches(entriesToDelete, async (batch) => {
 		await db("data").whereIn("path", batch).del();
 		await db("ensemble").whereIn("path", batch).del();

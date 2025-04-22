@@ -72,6 +72,8 @@ import {
 	inBatches,
 	isTruthy,
 	Mutex,
+	notExists,
+	reduceAsync,
 	stripExtension,
 	wait,
 	withMutex,
@@ -433,17 +435,21 @@ async function getEnsembleForCandidate(
 	const duplicateFiles = new Set<string>();
 	const entriesToDelete = new Set<string>();
 	const hosts = new Map<string, number>();
-	const filesWithElement = ensemble.reduce<(File & { element: string })[]>(
-		(acc, entry) => {
+	const filesWithElement = await reduceAsync<
+		{ client_host: string | null; path: string; element: string },
+		(File & { element: string })[]
+	>(
+		ensemble,
+		async (acc, entry) => {
 			const path = entry.path;
-			if (!fs.existsSync(path)) {
+			if (await notExists(path)) {
 				entriesToDelete.add(path);
 				return acc;
 			}
 			const length = fs.statSync(path).size;
 			const name = basename(path);
 			const element = entry.element;
-			const clientHost: string | null = entry.client_host;
+			const clientHost = entry.client_host;
 			const uniqueKey = `${clientHost}-${element}-${length}`;
 			if (duplicateFiles.has(uniqueKey)) return acc; // cross seeded file
 			duplicateFiles.add(uniqueKey);

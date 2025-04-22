@@ -222,7 +222,7 @@ export async function validateClientSavePaths(
 			);
 		}
 		try {
-			testLinking(
+			await testLinking(
 				savePath,
 				`torrentClient${clientPriority}Src.cross-seed`,
 				`torrentClient${clientPriority}Dest.cross-seed`,

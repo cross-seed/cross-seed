@@ -1,5 +1,5 @@
 import { stat } from "fs/promises";
-import { existsSync, readdirSync, statSync } from "fs";
+import { readdirSync, statSync } from "fs";
 import { basename, dirname, join, relative } from "path";
 import ms from "ms";
 import {
@@ -45,6 +45,7 @@ import {
 	inBatches,
 	isBadTitle,
 	isTruthy,
+	notExists,
 	stripExtension,
 	WithRequired,
 	WithUndefined,
@@ -744,12 +745,12 @@ function organizeEnsembleKeys(
 	return { keyMap, ensembleTitleMap };
 }
 
-function pushEnsembleEpisode(
+async function pushEnsembleEpisode(
 	searchee: SearcheeWithLabel,
 	episodeFiles: File[],
 	hosts: Map<string, number>,
 	torrentSavePaths: Map<string, string>,
-): void {
+): Promise<void> {
 	const savePath = searchee.path
 		? dirname(searchee.path)
 		: searchee.savePath ?? torrentSavePaths.get(searchee.infoHash!);
@@ -761,7 +762,7 @@ function pushEnsembleEpisode(
 		name: largestFile.name,
 		path: join(savePath, largestFile.path),
 	};
-	if (!existsSync(absoluteFile.path)) return;
+	if (await notExists(absoluteFile.path)) return;
 
 	// Use the oldest file for episode if dupe (cross seeds)
 	const duplicateFile = episodeFiles.find(
@@ -778,13 +779,13 @@ function pushEnsembleEpisode(
 	if (clientHost) hosts.set(clientHost, (hosts.get(clientHost) ?? 0) + 1);
 }
 
-function createVirtualSeasonSearchee(
+async function createVirtualSeasonSearchee(
 	key: string,
 	episodeSearchees: Map<string | number, SearcheeWithLabel[]>,
 	ensembleTitleMap: Map<string, string>,
 	torrentSavePaths: Map<string, string>,
 	options: { useFilters: boolean },
-): SearcheeWithLabel | null {
+): Promise<SearcheeWithLabel | null> {
 	const seasonFromEpisodes = getRuntimeConfig().seasonFromEpisodes!;
 	const minEpisodes = 3;
 	if (options.useFilters && episodeSearchees.size < minEpisodes) {
@@ -815,7 +816,7 @@ function createVirtualSeasonSearchee(
 	for (const [, searchees] of episodeSearchees) {
 		const episodeFiles: File[] = [];
 		for (const searchee of searchees) {
-			pushEnsembleEpisode(
+			await pushEnsembleEpisode(
 				searchee,
 				episodeFiles,
 				hosts,
@@ -886,7 +887,7 @@ export async function createEnsembleSearchees(
 
 	const seasonSearchees: SearcheeWithLabel[] = [];
 	for (const [key, episodeSearchees] of keyMap) {
-		const seasonSearchee = createVirtualSeasonSearchee(
+		const seasonSearchee = await createVirtualSeasonSearchee(
 			key,
 			episodeSearchees,
 			ensembleTitleMap,
