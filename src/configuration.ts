@@ -15,6 +15,8 @@ export interface FileConfig {
 	delay?: number;
 	includeSingleEpisodes?: boolean;
 	outputDir?: string;
+	injectDir?: string;
+	ignoreTitles?: boolean;
 	includeNonVideos?: boolean;
 	seasonFromEpisodes?: number;
 	fuzzySizeThreshold?: number;

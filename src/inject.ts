@@ -132,7 +132,8 @@ async function deleteTorrentFileIfComplete(
 async function whichSearcheesMatchTorrent(
 	meta: Metafile,
 	searchees: SearcheeWithLabel[],
-): Promise<{ matches: AllMatches; foundBlocked: boolean }> {
+	ignoreTitles: boolean,
+): Promise<{ matches: AllMatches; foundBlocked: boolean; fuzzyFail: boolean }> {
 	const isSimilar = (searchee: SearcheeWithLabel, meta: Metafile) =>
 		areMediaTitlesSimilar(searchee.title, meta.title) ||
 		areMediaTitlesSimilar(searchee.title, meta.name) ||
@@ -144,6 +145,7 @@ async function whichSearcheesMatchTorrent(
 			),
 		);
 	let foundBlocked = false;
+	let fuzzyFail = false;
 	const matches: AllMatches = [];
 	for (const searchee of searchees) {
 		const { decision } = await assessCandidate(meta, searchee, new Set());
@@ -155,11 +157,19 @@ async function whichSearcheesMatchTorrent(
 		}
 
 		if (!isSimilar(searchee, meta)) {
-			logger.warn({
-				label: Label.INJECT,
-				message: `Skipping likely false positive for ${getLogString(meta, chalk.bold.white)} from ${getLogString(searchee, chalk.bold.white)}`,
-			});
-			continue;
+			if (ignoreTitles) {
+				logger.warn({
+					label: Label.INJECT,
+					message: `Ignoring title mismatch for ${getLogString(meta, chalk.bold.white)} with ${getLogString(searchee, chalk.bold.white)}`,
+				});
+			} else {
+				logger.warn({
+					label: Label.INJECT,
+					message: `Skipping match for ${getLogString(meta, chalk.bold.white)} with ${getLogString(searchee, chalk.bold.white)} due to title mismatch (use "${chalk.bold.white("cross-seed inject --ignore-titles")}" if this is an erroneous rejection)`,
+				});
+				fuzzyFail = true;
+				continue;
+			}
 		}
 
 		matches.push({ searchee, decision });
@@ -184,7 +194,7 @@ async function whichSearcheesMatchTorrent(
 			(match) => -match.searchee.files.length,
 		),
 	);
-	return { matches, foundBlocked };
+	return { matches, foundBlocked, fuzzyFail };
 }
 
 async function injectInitialAction(
@@ -483,6 +493,7 @@ async function injectSavedTorrent(
 	torrentFilePath: string,
 	summary: InjectSummary,
 	searchees: SearcheeWithLabel[],
+	ignoreTitles: boolean,
 ) {
 	const metafileResult = await loadMetafile(
 		torrentFilePath,
@@ -495,10 +506,8 @@ async function injectSavedTorrent(
 	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 	const metaLog = getLogString(meta, chalk.bold.white);
 
-	const { matches, foundBlocked } = await whichSearcheesMatchTorrent(
-		meta,
-		searchees,
-	);
+	const { matches, foundBlocked, fuzzyFail } =
+		await whichSearcheesMatchTorrent(meta, searchees, ignoreTitles);
 
 	if (!matches.length && foundBlocked) {
 		logger.warn({
@@ -506,7 +515,7 @@ async function injectSavedTorrent(
 			message: `${progress} ${metaLog} ${chalk.yellow("possibly blocklisted")}: ${filePathLog}`,
 		});
 		summary.BLOCKED++;
-		await deleteTorrentFileIfSafe(torrentFilePath);
+		if (!fuzzyFail) await deleteTorrentFileIfSafe(torrentFilePath);
 		return;
 	} else if (!matches.length) {
 		logger.error({
@@ -514,7 +523,7 @@ async function injectSavedTorrent(
 			message: `${progress} ${metaLog} ${chalk.red("has no matches")}: ${filePathLog}`,
 		});
 		summary.UNMATCHED++;
-		await deleteTorrentFileIfSafe(torrentFilePath);
+		if (!fuzzyFail) await deleteTorrentFileIfSafe(torrentFilePath);
 		return;
 	}
 
@@ -627,9 +636,23 @@ function createSummary(total: number): InjectSummary {
 }
 
 export async function injectSavedTorrents(): Promise<void> {
-	const { flatLinking, injectDir, outputDir } = getRuntimeConfig();
+	const { flatLinking, ignoreTitles, injectDir, outputDir } =
+		getRuntimeConfig();
 	const targetDir = injectDir ?? outputDir;
 	const targetDirLog = chalk.bold.magenta(targetDir);
+
+	if (injectDir) {
+		logger.warn({
+			label: Label.INJECT,
+			message: `Manually injecting torrents performs minimal filtering which slightly increases chances of false positives, see the docs for more info`,
+		});
+	}
+	if (ignoreTitles) {
+		logger.warn({
+			label: Label.INJECT,
+			message: `Ignoring torrent titles when looking for matches, this may result in false positives`,
+		});
+	}
 
 	const torrentFilePaths = await findAllTorrentFilesInDir(targetDir);
 	if (torrentFilePaths.length === 0) {
@@ -669,6 +692,7 @@ export async function injectSavedTorrents(): Promise<void> {
 					torrentFilePath,
 					summary,
 					searchees,
+					ignoreTitles ?? false,
 				);
 			},
 			{ useQueue: true },
