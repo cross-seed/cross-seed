@@ -21,6 +21,7 @@ import {
 	flatMapAsync,
 	inBatches,
 	isTruthy,
+	mapAsync,
 } from "./utils.js";
 import { isOk } from "./Result.js";
 
@@ -71,56 +72,52 @@ export async function indexDataDirs(options: {
 		return await indexDataPaths(searcheePaths);
 	}
 
-	await Promise.all(
-		dataDirs.map(async (dataDir) => {
-			const modified = modifiedPaths.get(dataDir)!;
-			const eventPaths: string[] = [];
-			while (modified.size) {
-				const path: string | undefined = modified.values().next().value;
-				if (!path) continue;
-				if (!modified.delete(path)) continue;
-				eventPaths.push(path);
-			}
-			if (!eventPaths.length) return;
-			logger.verbose(
-				`Indexing dataDir ${dataDir} due to recent changes...`,
-			);
-			eventPaths.sort(
-				(a, b) =>
-					b.split(sep).filter(isTruthy).length -
-					a.split(sep).filter(isTruthy).length,
-			);
-			const deletedPaths: string[] = [];
-			const paths = await filterAsync(
-				Array.from(
-					eventPaths.reduce<Set<string>>((acc, path) => {
-						const affectedPaths: string[] = [path];
-						let parentPath = dirname(path);
-						while (resolve(parentPath) !== resolve(dataDir)) {
-							affectedPaths.push(parentPath);
-							parentPath = dirname(parentPath);
-						}
-						for (const affectedPath of affectedPaths.slice(
-							-maxDataDepth,
-						)) {
-							acc.add(affectedPath);
-						}
-						return acc;
-					}, new Set()),
-				),
-				async (path) => {
-					if (await exists(path)) return true;
-					deletedPaths.push(path);
-					return false;
-				},
-			);
-			await inBatches(deletedPaths, async (batch) => {
-				await db("data").whereIn("path", batch).del();
-				await db("ensemble").whereIn("path", batch).del();
-			});
-			return indexDataPaths(paths);
-		}),
-	);
+	await mapAsync(dataDirs, async (dataDir) => {
+		const modified = modifiedPaths.get(dataDir)!;
+		const eventPaths: string[] = [];
+		while (modified.size) {
+			const path: string | undefined = modified.values().next().value;
+			if (!path) continue;
+			if (!modified.delete(path)) continue;
+			eventPaths.push(path);
+		}
+		if (!eventPaths.length) return;
+		logger.verbose(`Indexing dataDir ${dataDir} due to recent changes...`);
+		eventPaths.sort(
+			(a, b) =>
+				b.split(sep).filter(isTruthy).length -
+				a.split(sep).filter(isTruthy).length,
+		);
+		const deletedPaths: string[] = [];
+		const paths = await filterAsync(
+			Array.from(
+				eventPaths.reduce<Set<string>>((acc, path) => {
+					const affectedPaths: string[] = [path];
+					let parentPath = dirname(path);
+					while (resolve(parentPath) !== resolve(dataDir)) {
+						affectedPaths.push(parentPath);
+						parentPath = dirname(parentPath);
+					}
+					for (const affectedPath of affectedPaths.slice(
+						-maxDataDepth,
+					)) {
+						acc.add(affectedPath);
+					}
+					return acc;
+				}, new Set()),
+			),
+			async (path) => {
+				if (await exists(path)) return true;
+				deletedPaths.push(path);
+				return false;
+			},
+		);
+		await inBatches(deletedPaths, async (batch) => {
+			await db("data").whereIn("path", batch).del();
+			await db("ensemble").whereIn("path", batch).del();
+		});
+		return indexDataPaths(paths);
+	});
 }
 
 /**

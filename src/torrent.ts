@@ -38,9 +38,11 @@ import {
 import {
 	exists,
 	filterAsync,
+	flatMapAsync,
 	getLogString,
 	inBatches,
 	isTruthy,
+	mapAsync,
 	Mutex,
 	notExists,
 	stripExtension,
@@ -396,23 +398,19 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 			}
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
-			searchees = (
-				await Promise.all(
-					clients.map(async (client) => {
-						const { searchees } = await client.getClientSearchees();
-						validateClientSavePaths(
-							searchees,
-							searchees.reduce((map, searchee) => {
-								map.set(searchee.infoHash, searchee.savePath);
-								return map;
-							}, new Map<string, string>()),
-							client.label,
-							client.clientPriority,
-						);
-						return searchees;
-					}),
-				)
-			).flat();
+			searchees = await flatMapAsync(clients, async (client) => {
+				const { searchees } = await client.getClientSearchees();
+				validateClientSavePaths(
+					searchees,
+					searchees.reduce((map, searchee) => {
+						map.set(searchee.infoHash, searchee.savePath);
+						return map;
+					}, new Map<string, string>()),
+					client.label,
+					client.clientPriority,
+				);
+				return searchees;
+			});
 		}
 	} else {
 		if (torrentDir) {
@@ -703,17 +701,15 @@ export async function getSimilarByName(name: string): Promise<{
 					: [];
 			clientSearchees.push(
 				...(
-					await Promise.all(
-						filteredTorrentEntries.map(async (dbTorrent) => {
-							return (
-								await createSearcheeFromTorrentFile(
-									dbTorrent.file_path,
-									torrentInfos,
-								)
-							).orElse(null);
-						}),
+					await mapAsync(filteredTorrentEntries, (dbTorrent) =>
+						createSearcheeFromTorrentFile(
+							dbTorrent.file_path,
+							torrentInfos,
+						),
 					)
-				).filter(isTruthy),
+				)
+					.filter(isOk)
+					.map((r) => r.unwrap()),
 			);
 		}
 	}
@@ -745,10 +741,8 @@ export async function getSimilarByName(name: string): Promise<{
 	if (filteredDataEntries.length) {
 		dataSearchees.push(
 			...(
-				await Promise.all(
-					filteredDataEntries.map(async (dbData) => {
-						return createSearcheeFromPath(dbData.path);
-					}),
+				await mapAsync(filteredDataEntries, (dbData) =>
+					createSearcheeFromPath(dbData.path),
 				)
 			)
 				.filter(isOk)

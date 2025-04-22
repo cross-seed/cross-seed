@@ -66,12 +66,14 @@ import {
 import {
 	comparing,
 	filterAsync,
+	flatMapAsync,
 	formatAsList,
 	getLogString,
 	humanReadableDate,
 	humanReadableSize,
 	inBatches,
 	isTruthy,
+	mapAsync,
 	Mutex,
 	notExists,
 	reduceAsync,
@@ -115,24 +117,20 @@ async function assessCandidates(
 		acc.get(cur.indexerId)!.push(cur);
 		return acc;
 	}, new Map<number, CandidateWithIndexerId[]>());
-	return Promise.all(
-		Array.from(candidatesByIndexer.values()).map(async (candidates) => {
-			const assessments: AssessmentWithTracker[] = [];
-			for (const candidate of candidates) {
-				assessments.push({
-					assessment: await assessCandidateCaching(
-						candidate,
-						searchee,
-						infoHashesToExclude,
-						guidInfoHashMap,
-						options,
-					),
-					tracker: candidate.tracker,
-				});
-			}
-			return assessments;
-		}),
-	).then((assessments) => assessments.flat());
+	return flatMapAsync(
+		Array.from(candidatesByIndexer.values()),
+		(candidates) =>
+			mapAsync(candidates, async (candidate) => ({
+				assessment: await assessCandidateCaching(
+					candidate,
+					searchee,
+					infoHashesToExclude,
+					guidInfoHashMap,
+					options,
+				),
+				tracker: candidate.tracker,
+			})),
+	);
 }
 
 async function findOnOtherSites(
@@ -818,16 +816,14 @@ export async function scanRssFeeds() {
 	});
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
 	const numCandidates = (
-		await Promise.all(
-			(await queryRssFeeds(lastRun)).map(async (candidates) => {
-				let i = 0;
-				for await (const candidate of candidates) {
-					await checkNewCandidateMatch(candidate, Label.RSS);
-					i++;
-				}
-				return i;
-			}),
-		)
+		await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
+			let i = 0;
+			for await (const candidate of candidates) {
+				await checkNewCandidateMatch(candidate, Label.RSS);
+				i++;
+			}
+			return i;
+		})
 	).reduce((acc, cur) => acc + cur, 0);
 
 	logger.info({
