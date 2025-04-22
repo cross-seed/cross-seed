@@ -936,7 +936,7 @@ export default class QBittorrent implements TorrentClient {
 				return InjectionResult.TORRENT_NOT_COMPLETE;
 			}
 			const filename = `${newTorrent.getFileSystemSafeName()}.${TORRENT_TAG}.torrent`;
-			const buffer = new Blob([newTorrent.encode()], {
+			const buffer = new Blob([new Uint8Array(newTorrent.encode())], {
 				type: "application/x-bittorrent",
 			});
 			const toRecheck = shouldRecheck(searchee, decision);

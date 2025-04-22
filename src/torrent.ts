@@ -266,7 +266,6 @@ export async function saveTorrentFile(
 	meta: Metafile,
 ): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
-	const buf = meta.encode();
 	// Be sure to update parseInfoFromSavedTorrent if changing the format
 	const filePath = join(
 		outputDir,
@@ -278,7 +277,7 @@ export async function saveTorrentFile(
 		await utimes(filePath, new Date(), (await stat(filePath)).mtime);
 		return;
 	}
-	await writeFile(filePath, buf, { mode: 0o644 });
+	await writeFile(filePath, new Uint8Array(meta.encode()));
 }
 
 export function parseMetadataFromFilename(

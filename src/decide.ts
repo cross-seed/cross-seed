@@ -475,7 +475,7 @@ async function cacheTorrentFile(meta: Metafile): Promise<boolean> {
 		TORRENT_CACHE_FOLDER,
 		`${meta.infoHash}.cached.torrent`,
 	);
-	await writeFile(torrentPath, meta.encode());
+	await writeFile(torrentPath, new Uint8Array(meta.encode()));
 	return true;
 }
 
@@ -525,7 +525,12 @@ export async function updateTorrentCache(
 					}),
 				);
 			}
-			if (updated) await writeFile(filePath, bencode.encode(torrent));
+			if (updated) {
+				await writeFile(
+					filePath,
+					new Uint8Array(bencode.encode(torrent)),
+				);
+			}
 		} catch (e) {
 			console.error(`Error reading ${filePath}: ${e}`);
 		}
