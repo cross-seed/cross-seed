@@ -1,5 +1,5 @@
 import Sqlite from "better-sqlite3";
-import { readdirSync, statSync, unlinkSync } from "fs";
+import { readdir, stat, unlink } from "fs/promises";
 import knex from "knex";
 import ms from "ms";
 import { join } from "path";
@@ -82,16 +82,16 @@ export async function cleanupDB(): Promise<void> {
 		})(),
 		(async () => {
 			const torrentCacheDir = join(appDir(), TORRENT_CACHE_FOLDER);
-			const files = readdirSync(torrentCacheDir);
+			const files = await readdir(torrentCacheDir);
 			const now = Date.now();
 			for (const file of files) {
 				const filePath = join(torrentCacheDir, file);
-				if (now - statSync(filePath).atimeMs > ms("1 year")) {
+				if (now - (await stat(filePath)).atimeMs > ms("1 year")) {
 					logger.verbose(`Deleting ${filePath}`);
 					await db("decision")
 						.where("info_hash", file.split(".")[0])
 						.del();
-					unlinkSync(filePath);
+					await unlink(filePath);
 				}
 			}
 		})(),

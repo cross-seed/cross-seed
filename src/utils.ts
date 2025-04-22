@@ -1,6 +1,6 @@
 import chalk, { ChalkInstance } from "chalk";
 import { distance } from "fastest-levenshtein";
-import fs from "fs";
+import { access, readdir } from "fs/promises";
 import path from "path";
 import {
 	ALL_EXTENSIONS,
@@ -40,7 +40,7 @@ export function isTruthy<T>(value: T): value is Truthy<T> {
 
 export async function exists(path: string): Promise<boolean> {
 	try {
-		await fs.promises.access(path);
+		await access(path);
 		return true;
 	} catch {
 		return false;
@@ -49,26 +49,26 @@ export async function exists(path: string): Promise<boolean> {
 
 export async function notExists(path: string): Promise<boolean> {
 	try {
-		await fs.promises.access(path);
+		await access(path);
 		return false;
 	} catch {
 		return true;
 	}
 }
 
-export function countDirEntriesRec(
+export async function countDirEntriesRec(
 	dirs: string[],
 	maxDataDepth: number,
-): number {
+): Promise<number> {
 	if (maxDataDepth === 0) return 0;
 	let count = 0;
 	for (const dir of dirs) {
 		const newDirs: string[] = [];
-		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		for (const entry of await readdir(dir, { withFileTypes: true })) {
 			count++;
 			if (entry.isDirectory()) newDirs.push(path.join(dir, entry.name));
 		}
-		count += countDirEntriesRec(newDirs, maxDataDepth - 1);
+		count += await countDirEntriesRec(newDirs, maxDataDepth - 1);
 	}
 	return count;
 }
@@ -92,15 +92,18 @@ export function filesWithExt(files: File[], exts: string[]): File[] {
 	);
 }
 
-export function findAFileWithExt(dir: string, exts: string[]): string | null {
+export async function findAFileWithExt(
+	dir: string,
+	exts: string[],
+): Promise<string | null> {
 	try {
-		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		for (const entry of await readdir(dir, { withFileTypes: true })) {
 			const fullPath = path.join(dir, entry.name);
 			if (entry.isFile() && exts.includes(path.extname(fullPath))) {
 				return fullPath;
 			}
 			if (entry.isDirectory()) {
-				const file = findAFileWithExt(fullPath, exts);
+				const file = await findAFileWithExt(fullPath, exts);
 				if (file) return file;
 			}
 		}

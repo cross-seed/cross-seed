@@ -1,5 +1,4 @@
-import { stat } from "fs/promises";
-import { readdirSync, statSync } from "fs";
+import { readdir, stat } from "fs/promises";
 import { basename, dirname, join, relative } from "path";
 import ms from "ms";
 import {
@@ -38,6 +37,7 @@ import {
 	createKeyTitle,
 	extractInt,
 	filesWithExt,
+	flatMapAsync,
 	getLogString,
 	hasExt,
 	humanReadableDate,
@@ -46,6 +46,7 @@ import {
 	isBadTitle,
 	isTruthy,
 	notExists,
+	mapAsync,
 	stripExtension,
 	WithRequired,
 	WithUndefined,
@@ -201,48 +202,55 @@ export async function getSearcheeNewestFileAge(
 	if (!path) {
 		return getNewestFileAge(searchee.files.map((file) => file.path));
 	}
-	const pathStat = statSync(path);
+	const pathStat = await stat(path);
 	if (pathStat.isFile()) return pathStat.mtimeMs;
 	return getNewestFileAge(
 		searchee.files.map((file) => join(dirname(path), file.path)),
 	);
 }
 
-function getFileNamesFromRootRec(
+async function getFileNamesFromRootRec(
 	root: string,
 	memoizedPaths: Map<string, string[]>,
 	isDirHint?: boolean,
-): string[] {
+): Promise<string[]> {
 	if (memoizedPaths.has(root)) return memoizedPaths.get(root)!;
 	const isDir =
-		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
+		isDirHint !== undefined ? isDirHint : (await stat(root)).isDirectory();
 	const paths = !isDir
 		? [root]
-		: readdirSync(root, { withFileTypes: true }).flatMap((dirent) =>
-				getFileNamesFromRootRec(
-					join(root, dirent.name),
-					memoizedPaths,
-					dirent.isDirectory(),
-				),
+		: await flatMapAsync(
+				await readdir(root, { withFileTypes: true }),
+				(dirent) =>
+					getFileNamesFromRootRec(
+						join(root, dirent.name),
+						memoizedPaths,
+						dirent.isDirectory(),
+					),
 			);
 	memoizedPaths.set(root, paths);
 	return paths;
 }
 
-export function getFilesFromDataRoot(
+export async function getFilesFromDataRoot(
 	rootPath: string,
 	memoizedPaths: Map<string, string[]>,
 	memoizedLengths: Map<string, number>,
-): File[] {
+): Promise<File[]> {
 	const parentDir = dirname(rootPath);
 	try {
-		return getFileNamesFromRootRec(rootPath, memoizedPaths).map((file) => ({
-			path: relative(parentDir, file),
-			name: basename(file),
-			length:
-				memoizedLengths.get(file) ??
-				memoizedLengths.set(file, statSync(file).size).get(file)!,
-		}));
+		return mapAsync(
+			await getFileNamesFromRootRec(rootPath, memoizedPaths),
+			async (file) => ({
+				path: relative(parentDir, file),
+				name: basename(file),
+				length:
+					memoizedLengths.get(file) ??
+					memoizedLengths
+						.set(file, (await stat(file)).size)
+						.get(file)!,
+			}),
+		);
 	} catch (e) {
 		logger.debug(e);
 		return [];
@@ -453,7 +461,11 @@ export async function createSearcheeFromPath(
 	memoizedPaths = new Map<string, string[]>(),
 	memoizedLengths = new Map<string, number>(),
 ): Promise<Result<SearcheeWithoutInfoHash, Error>> {
-	const files = getFilesFromDataRoot(root, memoizedPaths, memoizedLengths);
+	const files = await getFilesFromDataRoot(
+		root,
+		memoizedPaths,
+		memoizedLengths,
+	);
 	if (files.length === 0) {
 		const msg = `Failed to retrieve files in ${root}`;
 		logger.verbose({
@@ -769,8 +781,8 @@ async function pushEnsembleEpisode(
 		(file) => file.length === absoluteFile.length,
 	);
 	if (duplicateFile) {
-		const dupeFileAge = statSync(duplicateFile.path).mtimeMs;
-		const newFileAge = statSync(absoluteFile.path).mtimeMs;
+		const dupeFileAge = (await stat(duplicateFile.path)).mtimeMs;
+		const newFileAge = (await stat(absoluteFile.path)).mtimeMs;
 		if (dupeFileAge <= newFileAge) return;
 		episodeFiles.splice(episodeFiles.indexOf(duplicateFile), 1);
 	}
@@ -827,7 +839,10 @@ async function createVirtualSeasonSearchee(
 		const total = episodeFiles.reduce((a, b) => a + b.length, 0);
 		seasonSearchee.length += Math.round(total / episodeFiles.length);
 		seasonSearchee.files.push(...episodeFiles);
-		const fileAges = episodeFiles.map((f) => statSync(f.path).mtimeMs);
+		const fileAges = await mapAsync(
+			episodeFiles,
+			async (f) => (await stat(f.path)).mtimeMs,
+		);
 		newestFileAge = Math.max(newestFileAge, ...fileAges);
 	}
 	seasonSearchee.mtimeMs = newestFileAge;

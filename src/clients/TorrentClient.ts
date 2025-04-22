@@ -193,7 +193,7 @@ export async function validateClientSavePaths(
 
 	const removedSavePaths = new Set<string>();
 	for (const searchee of searchees) {
-		if (!filterByContent({ ...searchee, label: Label.SEARCH })) {
+		if (!(await filterByContent({ ...searchee, label: Label.SEARCH }))) {
 			if (infoHashPathMap.has(searchee.infoHash)) {
 				removedSavePaths.add(infoHashPathMap.get(searchee.infoHash)!);
 				infoHashPathMap.delete(searchee.infoHash);

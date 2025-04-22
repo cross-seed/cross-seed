@@ -1,7 +1,6 @@
 import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
-import fs, { statSync } from "fs";
-import { readdir, readFile, writeFile } from "fs/promises";
+import { readdir, readFile, stat, utimes, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
@@ -274,7 +273,7 @@ export async function saveTorrentFile(
 		)}[${meta.infoHash}].torrent`,
 	);
 	if (await exists(filePath)) {
-		fs.utimesSync(filePath, new Date(), fs.statSync(filePath).mtime);
+		await utimes(filePath, new Date(), (await stat(filePath)).mtime);
 		return;
 	}
 	await writeFile(filePath, buf, { mode: 0o644 });
@@ -730,7 +729,7 @@ export async function getSimilarByName(name: string): Promise<{
 				(await notExists(path)) ||
 				shouldIgnorePathHeuristically(
 					path,
-					statSync(path).isDirectory(),
+					(await stat(path)).isDirectory(),
 				)
 			) {
 				entriesToDelete.push(path);

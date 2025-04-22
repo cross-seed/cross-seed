@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import fs from "fs";
+import { stat } from "fs/promises";
 import { zip } from "lodash-es";
 import ms from "ms";
 import { basename } from "path";
@@ -65,6 +65,7 @@ import {
 } from "./torznab.js";
 import {
 	comparing,
+	filterAsync,
 	formatAsList,
 	getLogString,
 	humanReadableDate,
@@ -292,8 +293,13 @@ export async function searchForLocalTorrentByCriteria(
 		const memoizedPaths = new Map<string, string[]>();
 		const memoizedLengths = new Map<string, number>();
 		const searcheeResults = await Promise.all(
-			findPotentialNestedRoots(criteria.path, maxDataDepth).map((path) =>
-				createSearcheeFromPath(path, memoizedPaths, memoizedLengths),
+			(await findPotentialNestedRoots(criteria.path, maxDataDepth)).map(
+				(path) =>
+					createSearcheeFromPath(
+						path,
+						memoizedPaths,
+						memoizedLengths,
+					),
 			),
 		);
 		rawSearchees.push(
@@ -329,11 +335,11 @@ export async function searchForLocalTorrentByCriteria(
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
 		try {
 			if (
-				!filterByContent(searchee, {
+				!(await filterByContent(searchee, {
 					configOverride: options.configOverride,
 					allowSeasonPackEpisodes,
 					ignoreCrossSeeds: options.ignoreCrossSeeds,
-				})
+				}))
 			) {
 				filtered++;
 				continue;
@@ -397,9 +403,13 @@ async function getSearcheesForCandidate(
 		return null;
 	}
 	const searchees = filterDupesFromSimilar(
-		[...clientSearchees, ...dataSearchees]
-			.map((searchee) => ({ ...searchee, label: searcheeLabel }))
-			.filter((searchee) => filterByContent(searchee)),
+		await filterAsync(
+			[...clientSearchees, ...dataSearchees].map((searchee) => ({
+				...searchee,
+				label: searcheeLabel,
+			})),
+			filterByContent,
+		),
 	);
 	if (!searchees.length) {
 		logger.verbose({
@@ -446,7 +456,7 @@ async function getEnsembleForCandidate(
 				entriesToDelete.add(path);
 				return acc;
 			}
-			const length = fs.statSync(path).size;
+			const length = (await stat(path)).size;
 			const name = basename(path);
 			const element = entry.element;
 			const clientHost = entry.client_host;
@@ -651,7 +661,7 @@ export async function findAllSearchees(
 			const memoizedPaths = new Map<string, string[]>();
 			const memoizedLengths = new Map<string, number>();
 			const searcheeResults = await Promise.all(
-				findSearcheesFromAllDataDirs().map((path) =>
+				(await findSearcheesFromAllDataDirs()).map((path) =>
 					createSearcheeFromPath(
 						path,
 						memoizedPaths,
@@ -716,7 +726,7 @@ async function findSearchableTorrents(options?: {
 	const grouping = new Map<string, SearcheeWithLabel[]>();
 	const validSearchees = [
 		...ensembleSearchees,
-		...realSearchees.filter((searchee) => filterByContent(searchee)),
+		...(await filterAsync(realSearchees, filterByContent)),
 	];
 	for (const searchee of validSearchees) {
 		const key = await getSearchString(searchee);

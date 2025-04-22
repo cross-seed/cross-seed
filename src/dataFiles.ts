@@ -1,4 +1,5 @@
-import { FSWatcher, readdirSync, readFileSync, statSync, watch } from "fs";
+import { FSWatcher, watch } from "fs";
+import { readdir, readFile, stat } from "fs/promises";
 import Fuse from "fuse.js";
 import { basename, dirname, extname, join, resolve, sep } from "path";
 import { IGNORED_FOLDERS_SUBSTRINGS, VIDEO_EXTENSIONS } from "./constants.js";
@@ -17,6 +18,7 @@ import {
 	createKeyTitle,
 	exists,
 	filterAsync,
+	flatMapAsync,
 	inBatches,
 	isTruthy,
 } from "./utils.js";
@@ -56,10 +58,10 @@ export async function indexDataDirs(options: {
 			modifiedPaths.set(dataDir, new Set());
 			watchers.set(dataDir, createWatcher(dataDir));
 		}
-		const searcheePaths = findSearcheesFromAllDataDirs();
+		const searcheePaths = await findSearcheesFromAllDataDirs();
 		const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
 		if (await exists(maxUserWatchesPath)) {
-			const limit = parseInt(readFileSync(maxUserWatchesPath, "utf8"));
+			const limit = parseInt(await readFile(maxUserWatchesPath, "utf8"));
 			if (limit < searcheePaths.length * 10) {
 				logger.error(
 					`max_user_watches too low for proper indexing of dataDirs. It is recommended to set fs.inotify.max_user_watches=1048576 in /etc/sysctl.conf (only on the host system if using docker) - current: ${limit}`,
@@ -132,7 +134,7 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 	const dataRows: DataEntry[] = [];
 	const ensembleRows: EnsembleEntry[] = [];
 	for (const path of paths) {
-		const files = getFilesFromDataRoot(
+		const files = await getFilesFromDataRoot(
 			path,
 			memoizedPaths,
 			memoizedLengths,
@@ -232,24 +234,28 @@ export function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
 	}
 }
 
-export function findPotentialNestedRoots(
+export async function findPotentialNestedRoots(
 	root: string,
 	depth: number,
 	isDirHint?: boolean,
-): string[] {
+): Promise<string[]> {
 	try {
 		const isDir =
-			isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
+			isDirHint !== undefined
+				? isDirHint
+				: (await stat(root)).isDirectory();
 		if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir)) {
 			return [];
 		} else if (depth > 0 && isDir) {
-			const directChildren = readdirSync(root, { withFileTypes: true });
-			const allDescendants = directChildren.flatMap((dirent) =>
-				findPotentialNestedRoots(
-					join(root, dirent.name),
-					depth - 1,
-					dirent.isDirectory(),
-				),
+			const directChildren = await readdir(root, { withFileTypes: true });
+			const allDescendants = await flatMapAsync(
+				directChildren,
+				(dirent) =>
+					findPotentialNestedRoots(
+						join(root, dirent.name),
+						depth - 1,
+						dirent.isDirectory(),
+					),
 			);
 			return [...allDescendants, root]; // deepest paths first for memoization
 		} else {
@@ -262,11 +268,12 @@ export function findPotentialNestedRoots(
 	}
 }
 
-export function findSearcheesFromAllDataDirs(): string[] {
+export async function findSearcheesFromAllDataDirs(): Promise<string[]> {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
-	return dataDirs.flatMap((dataDir) =>
-		readdirSync(dataDir)
-			.map((dirent) => join(dataDir, dirent))
-			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth)),
+	return flatMapAsync(dataDirs, async (dataDir) =>
+		flatMapAsync(
+			(await readdir(dataDir)).map((dirent) => join(dataDir, dirent)),
+			(path) => findPotentialNestedRoots(path, maxDataDepth),
+		),
 	);
 }

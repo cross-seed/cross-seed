@@ -1,4 +1,4 @@
-import { readdirSync } from "fs";
+import { readdir } from "fs/promises";
 import ms from "ms";
 import path from "path";
 import { BodyInit } from "undici-types";
@@ -212,7 +212,9 @@ export default class QBittorrent implements TorrentClient {
 				`[${this.label}] torrentDir is not compatible with SQLite mode in qBittorrent, use https://www.cross-seed.org/docs/basics/options#useclienttorrents`,
 			);
 		}
-		if (!readdirSync(torrentDir).some((f) => f.endsWith(".fastresume"))) {
+		if (
+			!(await readdir(torrentDir)).some((f) => f.endsWith(".fastresume"))
+		) {
 			throw new CrossSeedError(
 				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
 			);

@@ -1,5 +1,4 @@
-import { mkdirSync } from "fs";
-import { access, constants, stat } from "fs/promises";
+import { access, constants, mkdir, stat } from "fs/promises";
 import ms from "ms";
 import { sep } from "path";
 import { inspect } from "util";
@@ -88,7 +87,7 @@ async function checkConfigPaths(): Promise<void> {
 
 	if (await notExists(outputDir)) {
 		logger.info(`Creating outputDir: ${outputDir}`);
-		mkdirSync(outputDir, { recursive: true });
+		await mkdir(outputDir, { recursive: true });
 	}
 	if (!(await verifyPath(outputDir, "outputDir", READ_AND_WRITE))) {
 		pathFailure++;
@@ -97,7 +96,7 @@ async function checkConfigPaths(): Promise<void> {
 	for (const linkDir of linkDirs) {
 		if (await notExists(linkDir)) {
 			logger.info(`Creating linkDir: ${linkDir}`);
-			mkdirSync(linkDir, { recursive: true });
+			await mkdir(linkDir, { recursive: true });
 		}
 		if (!(await verifyPath(linkDir, "linkDir", READ_AND_WRITE))) {
 			pathFailure++;
@@ -165,7 +164,7 @@ async function retry<T>(
 export async function doStartupValidation(): Promise<void> {
 	await checkConfigPaths(); // ensure paths are valid first
 	instantiateDownloadClients();
-	const validateClientConfig = async () =>
+	const validateClientConfig = () =>
 		Promise.all(getClients().map((client) => client.validateConfig()));
 	const errors = (
 		await Promise.allSettled([

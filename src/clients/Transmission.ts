@@ -1,4 +1,4 @@
-import { readdirSync } from "fs";
+import { readdir } from "fs/promises";
 import ms from "ms";
 import { basename } from "path";
 import { inspect } from "util";
@@ -193,7 +193,7 @@ export default class Transmission implements TorrentClient {
 		});
 
 		if (!torrentDir) return;
-		if (!readdirSync(torrentDir).some((f) => f.endsWith(".torrent"))) {
+		if (!(await readdir(torrentDir)).some((f) => f.endsWith(".torrent"))) {
 			throw new CrossSeedError(
 				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
 			);

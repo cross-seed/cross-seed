@@ -1,12 +1,12 @@
 import bencode from "bencode";
 import {
-	readdirSync,
-	readFileSync,
-	statSync,
-	unlinkSync,
-	utimesSync,
-	writeFileSync,
-} from "fs";
+	readdir,
+	readFile,
+	stat,
+	unlink,
+	utimes,
+	writeFile,
+} from "fs/promises";
 import ms from "ms";
 import path from "path";
 import { appDir } from "./configuration.js";
@@ -442,7 +442,7 @@ async function existsInTorrentCache(infoHash: string): Promise<boolean> {
 		`${infoHash}.cached.torrent`,
 	);
 	if (await notExists(torrentPath)) return false;
-	utimesSync(torrentPath, new Date(), statSync(torrentPath).mtime);
+	await utimes(torrentPath, new Date(), (await stat(torrentPath)).mtime);
 	return true;
 }
 
@@ -463,9 +463,7 @@ async function getCachedTorrentFile(
 			message: `Failed to parse cached torrent ${sanitizeInfoHash(infoHash)}${options.deleteOnFail ? " - deleting" : ""}: ${e.message}`,
 		});
 		logger.debug(e);
-		if (options.deleteOnFail) {
-			unlinkSync(torrentPath);
-		}
+		if (options.deleteOnFail) await unlink(torrentPath);
 		return resultOfErr(e);
 	}
 }
@@ -477,7 +475,7 @@ async function cacheTorrentFile(meta: Metafile): Promise<boolean> {
 		TORRENT_CACHE_FOLDER,
 		`${meta.infoHash}.cached.torrent`,
 	);
-	writeFileSync(torrentPath, meta.encode());
+	await writeFile(torrentPath, meta.encode());
 	return true;
 }
 
@@ -486,13 +484,13 @@ export async function updateTorrentCache(
 	newStr: string,
 ): Promise<void> {
 	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
-	const files = readdirSync(torrentCacheDir);
+	const files = await readdir(torrentCacheDir);
 	console.log(`Found ${files.length} files in cache, processing...`);
 	let count = 0;
 	for (const file of files) {
 		const filePath = path.join(torrentCacheDir, file);
 		try {
-			const torrent: Torrent = bencode.decode(readFileSync(filePath));
+			const torrent: Torrent = bencode.decode(await readFile(filePath));
 			const announce = torrent.announce?.toString();
 			const announceList = torrent["announce-list"]?.map((tier) =>
 				tier.map((url) => url.toString()),
@@ -527,7 +525,7 @@ export async function updateTorrentCache(
 					}),
 				);
 			}
-			if (updated) writeFileSync(filePath, bencode.encode(torrent));
+			if (updated) await writeFile(filePath, bencode.encode(torrent));
 		} catch (e) {
 			console.error(`Error reading ${filePath}: ${e}`);
 		}

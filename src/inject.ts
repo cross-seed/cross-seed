@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { stat, unlink } from "fs/promises";
 import ms from "ms";
-import { copyFileSync } from "fs";
+import { copyFile } from "fs/promises";
 import path, { basename } from "path";
 import { performActionWithoutMutex } from "./action.js";
 import {
@@ -724,7 +724,7 @@ export async function restoreFromTorrentCache(): Promise<void> {
 			existed++;
 			continue;
 		}
-		copyFileSync(torrentFilePath, dest);
+		await copyFile(torrentFilePath, dest);
 		if ((i + 1) % 100 === 0) {
 			console.log(
 				`${chalk.blue(`(${i + 1}/${torrentFilePaths.length})`)} ${chalk.bold.magenta(dest)}`,

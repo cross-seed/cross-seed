@@ -1,4 +1,4 @@
-import { statSync } from "fs";
+import { stat } from "fs/promises";
 import ms from "ms";
 import { basename, dirname } from "path";
 import {
@@ -82,14 +82,14 @@ function isCrossSeed(searchee: Searchee): boolean {
 	return false;
 }
 
-export function filterByContent(
+export async function filterByContent(
 	searchee: SearcheeWithLabel,
 	options?: {
 		configOverride: Partial<RuntimeConfig>;
 		allowSeasonPackEpisodes: boolean;
 		ignoreCrossSeeds: boolean;
 	},
-): boolean {
+): Promise<boolean> {
 	const {
 		fuzzySizeThreshold,
 		includeNonVideos,
@@ -156,7 +156,7 @@ export function filterByContent(
 
 	if (
 		searchee.path &&
-		statSync(searchee.path).isDirectory() &&
+		(await stat(searchee.path)).isDirectory() &&
 		ARR_DIR_REGEX.test(basename(searchee.path)) &&
 		nonVideoSizeRatio < 0.02 &&
 		![MediaType.EPISODE, MediaType.SEASON].includes(mediaType) &&

@@ -1,5 +1,5 @@
-import { readdirSync, type Stats } from "fs";
-import { stat } from "fs/promises";
+import { type Stats } from "fs";
+import { readdir, stat } from "fs/promises";
 import { basename, dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
@@ -328,7 +328,7 @@ export default class RTorrent implements TorrentClient {
 		});
 
 		if (!torrentDir) return;
-		if (!readdirSync(torrentDir).some((f) => f.endsWith("_resume"))) {
+		if (!(await readdir(torrentDir)).some((f) => f.endsWith("_resume"))) {
 			throw new CrossSeedError(
 				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
 			);
