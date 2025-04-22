@@ -12,7 +12,7 @@ import {
 	InjectionResult,
 	SaveResult,
 } from "./constants.js";
-import { getJobLastRun, getJobs, JobName } from "./jobs.js";
+import { checkJobs, getJobLastRun, getJobs, JobName } from "./jobs.js";
 import { Label, logger } from "./logger.js";
 import {
 	Candidate,
@@ -152,7 +152,10 @@ async function search(
 	res: ServerResponse,
 ): Promise<void> {
 	const injectJob = getJobs().find((job) => job.name === JobName.INJECT);
-	if (injectJob) injectJob.runAheadOfSchedule = true; // run on completion
+	if (injectJob) {
+		injectJob.runAheadOfSchedule = true;
+		checkJobs({ isFirstRun: false, useQueue: true });
+	}
 	await indexTorrentsAndDataDirs();
 	const dataStr = await getData(req);
 	let data;
@@ -396,17 +399,18 @@ async function runJob(
 	}
 
 	job.runAheadOfSchedule = true;
-	job.delayNextRun = true;
+	if (job.name === JobName.SEARCH || job.name === JobName.RSS) {
+		job.delayNextRun = true;
+	}
 	job.configOverride = {
 		excludeRecentSearch: data.ignoreExcludeRecentSearch ? 1 : undefined,
 		excludeOlder: data.ignoreExcludeOlder
 			? Number.MAX_SAFE_INTEGER
 			: undefined,
 	};
-	const message = `${job.name}: running ahead of schedule`;
-	logger.info({ label: Label.SCHEDULER, message });
+	checkJobs({ isFirstRun: false, useQueue: true });
 	res.writeHead(200);
-	res.end(message);
+	res.end(`${job.name}: running ahead of schedule`);
 }
 
 /**

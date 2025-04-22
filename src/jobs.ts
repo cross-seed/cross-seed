@@ -7,6 +7,7 @@ import { Label, logger } from "./logger.js";
 import { bulkSearch, scanRssFeeds } from "./pipeline.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import { updateCaps } from "./torznab.js";
+import { Mutex, withMutex } from "./utils.js";
 
 export enum JobName {
 	RSS = "rss",
@@ -108,40 +109,52 @@ export async function getJobLastRun(
 		?.last_run;
 }
 
+export async function checkJobs(
+	options = { isFirstRun: false, useQueue: false },
+): Promise<void> {
+	return withMutex(
+		Mutex.CHECK_JOBS,
+		async () => {
+			const now = Date.now();
+			for (const job of jobs) {
+				const lastRun = await getJobLastRun(job.name);
+
+				// if it's never been run, you are eligible immediately
+				const eligibilityTs = lastRun ? lastRun + job.cadence : now;
+				if (options.isFirstRun) {
+					logNextRun(job.name, job.cadence, lastRun);
+				}
+
+				if (job.runAheadOfSchedule || now >= eligibilityTs) {
+					job.run()
+						.then(async (didRun) => {
+							if (!didRun) return; // upon success, update the log
+							const toDelay = job.delayNextRun;
+							job.delayNextRun = false;
+							const last_run = toDelay ? now + job.cadence : now;
+							await db("job_log")
+								.insert({ name: job.name, last_run })
+								.onConflict("name")
+								.merge();
+							const cadence = toDelay
+								? job.cadence * 2
+								: job.cadence;
+							logNextRun(job.name, cadence, now);
+						})
+						.catch(exitOnCrossSeedErrors)
+						.catch((e) => void logger.error(e));
+				}
+			}
+		},
+		{ useQueue: options.useQueue },
+	);
+}
+
 export async function jobsLoop(): Promise<void> {
 	createJobs();
 
-	async function loop(isFirstRun = false) {
-		const now = Date.now();
-		for (const job of jobs) {
-			const lastRun = await getJobLastRun(job.name);
-
-			// if it's never been run, you are eligible immediately
-			const eligibilityTs = lastRun ? lastRun + job.cadence : now;
-			if (isFirstRun) logNextRun(job.name, job.cadence, lastRun);
-
-			if (job.runAheadOfSchedule || now >= eligibilityTs) {
-				job.run()
-					.then(async (didRun) => {
-						if (!didRun) return; // upon success, update the log
-						const toDelay = job.delayNextRun;
-						job.delayNextRun = false;
-						const last_run = toDelay ? now + job.cadence : now;
-						await db("job_log")
-							.insert({ name: job.name, last_run })
-							.onConflict("name")
-							.merge();
-						const cadence = toDelay ? job.cadence * 2 : job.cadence;
-						logNextRun(job.name, cadence, now);
-					})
-					.catch(exitOnCrossSeedErrors)
-					.catch((e) => void logger.error(e));
-			}
-		}
-	}
-
-	setInterval(loop, ms("1 minute"));
-	await loop(true);
+	setInterval(checkJobs, ms("1 minute"));
+	await checkJobs({ isFirstRun: true, useQueue: false });
 	// jobs take too long to run to completion so let process.exit take care of stopping
 	return new Promise(() => {});
 }

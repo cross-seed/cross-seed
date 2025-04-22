@@ -30,6 +30,7 @@ import { File, getAllTitles, Searchee } from "./searchee.js";
 
 export enum Mutex {
 	INDEX_TORRENTS_AND_DATA_DIRS = "INDEX_TORRENTS_AND_DATA_DIRS",
+	CHECK_JOBS = "CHECK_JOBS",
 	CREATE_ALL_SEARCHEES = "CREATE_ALL_SEARCHEES",
 	CLIENT_INJECTION = "CLIENT_INJECTION",
 }
