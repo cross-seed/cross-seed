@@ -29,6 +29,7 @@ import {
 } from "../utils.js";
 import {
 	shouldResumeFromNonRelevantFiles,
+	clientSearcheeModified,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -353,13 +354,25 @@ export default class Transmission implements TorrentClient {
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
+			const { name } = torrent;
+			const savePath = torrent.downloadDir;
+			const tags = torrent.labels;
+			const modified = clientSearcheeModified(
+				this.label,
+				dbTorrent,
+				name,
+				savePath,
+				{
+					tags,
+				},
+			);
 			const refresh =
 				options?.refresh === undefined
 					? false
 					: options.refresh.length === 0
 						? true
 						: options.refresh.includes(infoHash);
-			if (dbTorrent && !refresh) {
+			if (!modified && !refresh) {
 				if (!options?.newSearcheesOnly) {
 					searchees.push(createSearcheeFromDB(dbTorrent));
 				}
@@ -383,11 +396,8 @@ export default class Transmission implements TorrentClient {
 					tier: tracker.tier,
 				})),
 			);
-			const { name } = torrent;
 			const title = parseTitle(name, files) ?? name;
 			const length = torrent.totalSize;
-			const savePath = torrent.downloadDir;
-			const tags = torrent.labels;
 			const searchee: SearcheeClient = {
 				infoHash,
 				name,

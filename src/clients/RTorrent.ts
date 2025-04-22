@@ -33,6 +33,7 @@ import {
 } from "../utils.js";
 import {
 	shouldResumeFromNonRelevantFiles,
+	clientSearcheeModified,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -653,23 +654,38 @@ export default class RTorrent implements TorrentClient {
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
+			const name: string = results[i * numMethods][0];
+			const directory: string = results[i * numMethods + 2][0];
+			const isMultiFile = Boolean(Number(results[i * numMethods + 3][0]));
+			const labels: string = results[i * numMethods + 4][0];
+			const savePath = isMultiFile ? dirname(directory) : directory;
+			const tags = labels.length
+				? decodeURIComponent(labels)
+						.split(",")
+						.map((tag) => tag.trim())
+				: [];
+			const modified = clientSearcheeModified(
+				this.label,
+				dbTorrent,
+				name,
+				savePath,
+				{
+					tags,
+				},
+			);
 			const refresh =
 				options?.refresh === undefined
 					? false
 					: options.refresh.length === 0
 						? true
 						: options.refresh.includes(infoHash);
-			if (dbTorrent && !refresh) {
+			if (!modified && !refresh) {
 				if (!options?.newSearcheesOnly) {
 					searchees.push(createSearcheeFromDB(dbTorrent));
 				}
 				continue;
 			}
-			const name: string = results[i * numMethods][0];
 			const length = Number(results[i * numMethods + 1][0]);
-			const directory: string = results[i * numMethods + 2][0];
-			const isMultiFile = Boolean(Number(results[i * numMethods + 3][0]));
-			const labels: string = results[i * numMethods + 4][0];
 			const files: File[] = results[i * numMethods + 5][0].map((arr) => ({
 				name: basename(arr[0]),
 				path: isMultiFile ? join(basename(directory), arr[0]) : arr[0],
@@ -689,12 +705,6 @@ export default class RTorrent implements TorrentClient {
 				})),
 			);
 			const title = parseTitle(name, files) ?? name;
-			const savePath = isMultiFile ? dirname(directory) : directory;
-			const tags = labels.length
-				? decodeURIComponent(labels)
-						.split(",")
-						.map((tag) => tag.trim())
-				: [];
 			const searchee: SearcheeClient = {
 				infoHash,
 				name,

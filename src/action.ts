@@ -42,11 +42,9 @@ import {
 	withMutex,
 } from "./utils.js";
 
-const testLinkingSrcName = "a.cross-seed";
-const testLinkingDestName = "b.cross-seed";
-const linkDirSrcName = "c.cross-seed";
-const linkDirDestName = "d.cross-seed";
-const clientDestName = "e.cross-seed";
+const linkDirSrcName = "linkDirSrc.cross-seed";
+const linkDirDestName = "linkDirDest.cross-seed";
+const clientDestName = "torrentClientDest.cross-seed";
 
 type ActionReturn =
 	| {
@@ -727,8 +725,14 @@ function unwrapSymlinks(path: string): string {
 /**
  * Tests if srcDir supports linkType.
  * @param srcDir The directory to link from
+ * @param testSrcName A unique name.cross-seed to create in srcDir if necessary
+ * @param testDestName A unique name.cross-seed to create in the linkDir
  */
-export function testLinking(srcDir: string): void {
+export function testLinking(
+	srcDir: string,
+	testSrcName: string,
+	testDestName: string,
+): void {
 	const { linkDirs, linkType } = getRuntimeConfig();
 	let tempFile: string | undefined;
 	try {
@@ -743,7 +747,7 @@ export function testLinking(srcDir: string): void {
 				);
 				return;
 			}
-			tempFile = join(srcDir, testLinkingSrcName);
+			tempFile = join(srcDir, testSrcName);
 			try {
 				fs.writeFileSync(tempFile, "");
 				if (!fs.existsSync(tempFile)) {
@@ -763,7 +767,7 @@ export function testLinking(srcDir: string): void {
 		}
 		const linkDir = getLinkDir(srcDir);
 		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
-		const testPath = join(linkDir, testLinkingDestName);
+		const testPath = join(linkDir, testDestName);
 		linkFile(srcFile, testPath);
 		fs.rmSync(testPath);
 	} catch (e) {
