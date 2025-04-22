@@ -18,6 +18,7 @@ import { getEnabledIndexers } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
+	getMediaType,
 	getSearcheeNewestFileAge,
 	Searchee,
 	SearcheeWithLabel,
@@ -29,7 +30,6 @@ import {
 	extractInt,
 	filesWithExt,
 	getLogString,
-	getMediaType,
 	hasExt,
 	humanReadableDate,
 	nMsAgo,

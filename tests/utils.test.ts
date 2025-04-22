@@ -3,12 +3,8 @@ import { fileFactory } from "./factories/file";
 import { searcheeFactory } from "./factories/searchee";
 
 import { MediaType, SEASON_REGEX } from "../src/constants";
-import {
-	extractInt,
-	getMediaType,
-	humanReadableSize,
-	sanitizeUrl,
-} from "../src/utils";
+import { getMediaType } from "../src/searchee";
+import { extractInt, humanReadableSize, sanitizeUrl } from "../src/utils";
 
 describe("humanReadableSize", () => {
 	it("returns a human-readable size", () => {

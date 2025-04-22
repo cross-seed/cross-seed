@@ -36,6 +36,7 @@ import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
+	getMediaType,
 	getSearcheeNewestFileAge,
 	Searchee,
 	SearcheeWithLabel,
@@ -49,7 +50,6 @@ import {
 	getAnimeQueries,
 	getApikey,
 	getLogString,
-	getMediaType,
 	humanReadableDate,
 	isTruthy,
 	nMsAgo,

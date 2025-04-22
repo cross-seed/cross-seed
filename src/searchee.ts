@@ -12,8 +12,11 @@ import {
 	ANIME_GROUP_REGEX,
 	ANIME_REGEX,
 	ARR_DIR_REGEX,
+	AUDIO_EXTENSIONS,
 	BAD_GROUP_PARSE_REGEX,
+	BOOK_EXTENSIONS,
 	EP_REGEX,
+	MediaType,
 	MOVIE_REGEX,
 	parseSource,
 	RELEASE_GROUP_REGEX,
@@ -21,6 +24,7 @@ import {
 	RES_STRICT_REGEX,
 	SEASON_REGEX,
 	SONARR_SUBFOLDERS_REGEX,
+	VIDEO_DISC_EXTENSIONS,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -121,6 +125,42 @@ export function getSearcheeSource(searchee: Searchee): SearcheeSource {
 	} else {
 		return SearcheeSource.VIRTUAL;
 	}
+}
+
+export function getMediaType({ title, files }: Searchee): MediaType {
+	switch (true /* eslint-disable no-fallthrough */) {
+		case EP_REGEX.test(title):
+			return MediaType.EPISODE;
+		case SEASON_REGEX.test(title):
+			return MediaType.SEASON;
+		case hasExt(files, VIDEO_EXTENSIONS):
+			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
+			if (ANIME_REGEX.test(title)) return MediaType.ANIME;
+			return MediaType.VIDEO;
+		case hasExt(files, VIDEO_DISC_EXTENSIONS):
+			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
+			return MediaType.VIDEO;
+		case hasExt(files, [".rar"]):
+			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
+		default: // Minimally supported media types
+			if (hasExt(files, AUDIO_EXTENSIONS)) return MediaType.AUDIO;
+			if (hasExt(files, BOOK_EXTENSIONS)) return MediaType.BOOK;
+			return MediaType.OTHER;
+	}
+}
+
+export function getFuzzySizeFactor(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? 1 - seasonFromEpisodes
+		: fuzzySizeThreshold;
+}
+
+export function getMinSizeRatio(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? seasonFromEpisodes
+		: 1 - fuzzySizeThreshold;
 }
 
 export function getRoot({ path }: File, dirnameFunc = dirname): string {

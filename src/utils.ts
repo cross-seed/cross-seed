@@ -1,16 +1,13 @@
 import chalk, { ChalkInstance } from "chalk";
 import { distance } from "fastest-levenshtein";
-import { readdirSync } from "fs";
+import fs from "fs";
 import path from "path";
 import {
 	ALL_EXTENSIONS,
 	ANIME_REGEX,
-	AUDIO_EXTENSIONS,
-	BOOK_EXTENSIONS,
 	EP_REGEX,
 	JSON_VALUES_REGEX,
 	LEVENSHTEIN_DIVISOR,
-	MediaType,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
 	RELEASE_GROUP_REGEX,
@@ -19,22 +16,13 @@ import {
 	SCENE_TITLE_REGEX,
 	SEASON_REGEX,
 	sourceRegexRemove,
-	VIDEO_DISC_EXTENSIONS,
-	VIDEO_EXTENSIONS,
 	YEARS_REGEX,
 } from "./constants.js";
 import { logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
 import { File, getAllTitles, Searchee } from "./searchee.js";
 
-export enum Mutex {
-	INDEX_TORRENTS_AND_DATA_DIRS = "INDEX_TORRENTS_AND_DATA_DIRS",
-	CHECK_JOBS = "CHECK_JOBS",
-	CREATE_ALL_SEARCHEES = "CREATE_ALL_SEARCHEES",
-	CLIENT_INJECTION = "CLIENT_INJECTION",
-}
-const mutexes = new Map<Mutex, Promise<unknown>>();
+// ================================== TYPES ==================================
 
 export type Awaitable<T> = T | Promise<T>;
 type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
@@ -48,6 +36,49 @@ export function isTruthy<T>(value: T): value is Truthy<T> {
 	return Boolean(value);
 }
 
+// ==================================== OS ====================================
+
+export async function exists(path: string): Promise<boolean> {
+	try {
+		await fs.promises.access(path);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+export async function notExists(path: string): Promise<boolean> {
+	try {
+		await fs.promises.access(path);
+		return false;
+	} catch {
+		return true;
+	}
+}
+
+export function countDirEntriesRec(
+	dirs: string[],
+	maxDataDepth: number,
+): number {
+	if (maxDataDepth === 0) return 0;
+	let count = 0;
+	for (const dir of dirs) {
+		const newDirs: string[] = [];
+		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+			count++;
+			if (entry.isDirectory()) newDirs.push(path.join(dir, entry.name));
+		}
+		count += countDirEntriesRec(newDirs, maxDataDepth - 1);
+	}
+	return count;
+}
+
+// ================================ EXTENSIONS ================================
+
+export function hasExt(files: File[], exts: string[]): boolean {
+	return files.some((f) => exts.includes(path.extname(f.name.toLowerCase())));
+}
+
 export function stripExtension(filename: string): string {
 	for (const ext of ALL_EXTENSIONS) {
 		if (filename.endsWith(ext)) return path.basename(filename, ext);
@@ -55,12 +86,53 @@ export function stripExtension(filename: string): string {
 	return filename;
 }
 
+export function filesWithExt(files: File[], exts: string[]): File[] {
+	return files.filter((f) =>
+		exts.includes(path.extname(f.name.toLowerCase())),
+	);
+}
+
+export function findAFileWithExt(dir: string, exts: string[]): string | null {
+	try {
+		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+			const fullPath = path.join(dir, entry.name);
+			if (entry.isFile() && exts.includes(path.extname(fullPath))) {
+				return fullPath;
+			}
+			if (entry.isDirectory()) {
+				const file = findAFileWithExt(fullPath, exts);
+				if (file) return file;
+			}
+		}
+	} catch (e) {
+		logger.debug(e);
+	}
+	return null;
+}
+
+// =================================== TIME ===================================
+
 export function nMsAgo(n: number): number {
 	return Date.now() - n;
 }
 
 export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
+}
+
+export async function time<R>(cb: () => R, times: number[]) {
+	const before = performance.now();
+	try {
+		return await cb();
+	} finally {
+		times.push(performance.now() - before);
+	}
+}
+
+// ================================= LOGGING =================================
+
+export function humanReadableDate(timestamp: number): string {
+	return new Date(timestamp).toLocaleString("sv");
 }
 
 export function humanReadableSize(
@@ -78,37 +150,49 @@ export function humanReadableSize(
 	return `${parseFloat(coefficient.toFixed(2))} ${sizes[exponent]}`;
 }
 
-export function filesWithExt(files: File[], exts: string[]): File[] {
-	return files.filter((f) =>
-		exts.includes(path.extname(f.name.toLowerCase())),
-	);
-}
-
-export function hasExt(files: File[], exts: string[]): boolean {
-	return files.some((f) => exts.includes(path.extname(f.name.toLowerCase())));
-}
-
-export function getMediaType({ title, files }: Searchee): MediaType {
-	switch (true /* eslint-disable no-fallthrough */) {
-		case EP_REGEX.test(title):
-			return MediaType.EPISODE;
-		case SEASON_REGEX.test(title):
-			return MediaType.SEASON;
-		case hasExt(files, VIDEO_EXTENSIONS):
-			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
-			if (ANIME_REGEX.test(title)) return MediaType.ANIME;
-			return MediaType.VIDEO;
-		case hasExt(files, VIDEO_DISC_EXTENSIONS):
-			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
-			return MediaType.VIDEO;
-		case hasExt(files, [".rar"]):
-			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
-		default: // Minimally supported media types
-			if (hasExt(files, AUDIO_EXTENSIONS)) return MediaType.AUDIO;
-			if (hasExt(files, BOOK_EXTENSIONS)) return MediaType.BOOK;
-			return MediaType.OTHER;
+export function getLogString(
+	searchee: Searchee,
+	color: ChalkInstance = chalk.reset,
+) {
+	if (searchee.title === searchee.name) {
+		return searchee.infoHash || searchee.clientHost
+			? `${color(searchee.title)} ${chalk.dim(`[${searchee.infoHash ? sanitizeInfoHash(searchee.infoHash) : ""}${searchee.clientHost ? `@${searchee.clientHost}` : ""}]`)}`
+			: searchee.path
+				? color(searchee.path)
+				: color(searchee.title);
 	}
+	return searchee.infoHash || searchee.clientHost
+		? `${color(searchee.title)} ${chalk.dim(`[${searchee.name} [${searchee.infoHash ? sanitizeInfoHash(searchee.infoHash) : ""}${searchee.clientHost ? `@${searchee.clientHost}` : ""}]]`)}`
+		: searchee.path
+			? `${color(searchee.title)} ${chalk.dim(`[${searchee.path}]`)}`
+			: `${color(searchee.title)} ${chalk.dim(`[${searchee.name}]`)}`;
 }
+
+export function formatAsList(
+	strings: string[],
+	options: {
+		sort: boolean;
+		style?: Intl.ListFormatStyle;
+		type?: Intl.ListFormatType;
+	},
+) {
+	if (options.sort) strings.sort((a, b) => a.localeCompare(b));
+	return new Intl.ListFormat("en", {
+		style: options.style ?? "long",
+		type: options.type ?? "conjunction",
+	}).format(strings);
+}
+
+/**
+ * This cannot be done at the log level because of too many false positives.
+ * The caller will need to extract the infoHash from their specific syntax.
+ * @param infoHash The infoHash to sanitize
+ */
+export function sanitizeInfoHash(infoHash: string): string {
+	return `${infoHash.slice(0, 8)}...`;
+}
+
+// ================================== TITLES ==================================
 
 export function areMediaTitlesSimilar(a: string, b: string): boolean {
 	const matchA =
@@ -154,35 +238,6 @@ export function areMediaTitlesSimilar(a: string, b: string): boolean {
 				titleB.includes(titleA),
 		),
 	);
-}
-
-export async function time<R>(cb: () => R, times: number[]) {
-	const before = performance.now();
-	try {
-		return await cb();
-	} finally {
-		times.push(performance.now() - before);
-	}
-}
-
-export function sanitizeUrl(url: string | URL): string {
-	if (typeof url === "string") {
-		url = new URL(url);
-	}
-	return url.origin + url.pathname;
-}
-
-/**
- * This cannot be done at the log level because of too many false positives.
- * The caller will need to extract the infoHash from their specific syntax.
- * @param infoHash The infoHash to sanitize
- */
-export function sanitizeInfoHash(infoHash: string): string {
-	return `${infoHash.slice(0, 8)}...`;
-}
-
-export function getApikey(url: string) {
-	return new URL(url).searchParams.get("apikey");
 }
 
 export function cleanseSeparators(str: string): string {
@@ -253,62 +308,17 @@ export function stripMetaFromName(name: string): string {
 	);
 }
 
-export const tap = (fn) => (value) => {
-	fn(value);
-	return value;
-};
+// =================================== URLS ===================================
 
-export async function filterAsync<T>(
-	arr: T[],
-	predicate: (e: T) => Promise<boolean>,
-): Promise<T[]> {
-	const results = await Promise.all(arr.map(predicate));
-	return arr.filter((_, index) => results[index]);
-}
-
-export function humanReadableDate(timestamp: number): string {
-	// swedish conventions roughly follow the iso format!
-	return new Date(timestamp).toLocaleString("sv");
-}
-
-export function getLogString(
-	searchee: Searchee,
-	color: ChalkInstance = chalk.reset,
-) {
-	if (searchee.title === searchee.name) {
-		return searchee.infoHash || searchee.clientHost
-			? `${color(searchee.title)} ${chalk.dim(`[${searchee.infoHash ? sanitizeInfoHash(searchee.infoHash) : ""}${searchee.clientHost ? `@${searchee.clientHost}` : ""}]`)}`
-			: searchee.path
-				? color(searchee.path)
-				: color(searchee.title);
+export function sanitizeUrl(url: string | URL): string {
+	if (typeof url === "string") {
+		url = new URL(url);
 	}
-	return searchee.infoHash || searchee.clientHost
-		? `${color(searchee.title)} ${chalk.dim(`[${searchee.name} [${searchee.infoHash ? sanitizeInfoHash(searchee.infoHash) : ""}${searchee.clientHost ? `@${searchee.clientHost}` : ""}]]`)}`
-		: searchee.path
-			? `${color(searchee.title)} ${chalk.dim(`[${searchee.path}]`)}`
-			: `${color(searchee.title)} ${chalk.dim(`[${searchee.name}]`)}`;
+	return url.origin + url.pathname;
 }
 
-export function formatAsList(
-	strings: string[],
-	options: {
-		sort: boolean;
-		style?: Intl.ListFormatStyle;
-		type?: Intl.ListFormatType;
-	},
-) {
-	if (options.sort) strings.sort((a, b) => a.localeCompare(b));
-	return new Intl.ListFormat("en", {
-		style: options.style ?? "long",
-		type: options.type ?? "conjunction",
-	}).format(strings);
-}
-
-export function fallback<T>(...args: T[]): T | undefined {
-	for (const arg of args) {
-		if (arg !== undefined) return arg;
-	}
-	return undefined;
+export function getApikey(url: string) {
+	return new URL(url).searchParams.get("apikey");
 }
 
 export function extractCredentialsFromUrl(
@@ -331,59 +341,40 @@ export function extractCredentialsFromUrl(
 	}
 }
 
-export function capitalizeFirstLetter(string: string): string {
-	return string.charAt(0).toUpperCase() + string.slice(1);
+// ================================ FUNCTIONAL ================================
+
+export const tap = (fn) => (value) => {
+	fn(value);
+	return value;
+};
+
+export function fallback<T>(...args: T[]): T | undefined {
+	for (const arg of args) {
+		if (arg !== undefined) return arg;
+	}
+	return undefined;
 }
 
-/**
- * Replaces the last occurrence of a GLOBAL regex match in a string
- * @param str The string to replace the last occurrence in
- * @param globalRegExp The regex to match (must be global)
- * @param newStr The string to replace the last occurrence with
- */
-export function replaceLastOccurrence(
-	str: string,
-	globalRegExp: RegExp,
-	newStr: string,
-): string {
-	const matches = Array.from(str.matchAll(globalRegExp));
-	if (matches.length === 0) return str;
-	const lastMatch = matches[matches.length - 1];
-	const lastMatchIndex = lastMatch.index!;
-	const lastMatchStr = lastMatch[0];
-	return (
-		str.slice(0, lastMatchIndex) +
-		newStr +
-		str.slice(lastMatchIndex + lastMatchStr.length)
-	);
+export async function inBatches<T>(
+	items: T[],
+	cb: (batch: T[]) => Promise<void>,
+	options = { batchSize: 100 },
+): Promise<void> {
+	for (let i = 0; i < items.length; i += options.batchSize) {
+		await cb(items.slice(i, i + options.batchSize));
+	}
 }
 
-export function escapeUnescapedQuotesInJsonValues(jsonStr: string): string {
-	return jsonStr.replace(
-		JSON_VALUES_REGEX,
-		(match, _p1, _offset, _str, groups) => {
-			const escapedValue = groups.value.replace(/(?<!\\)"/g, '\\"');
-			return match.replace(groups.value, escapedValue);
-		},
-	);
-}
-
-export function extractInt(str: string): number {
-	return parseInt(str.match(/\d+/)![0]);
-}
-
-export function getFuzzySizeFactor(searchee: Searchee): number {
-	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
-	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
-		? 1 - seasonFromEpisodes
-		: fuzzySizeThreshold;
-}
-
-export function getMinSizeRatio(searchee: Searchee): number {
-	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
-	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
-		? seasonFromEpisodes
-		: 1 - fuzzySizeThreshold;
+export async function fromBatches<T, R>(
+	items: T[],
+	cb: (batch: T[]) => Promise<R[]>,
+	options = { batchSize: 100 },
+): Promise<R[]> {
+	const results: R[] = [];
+	for (let i = 0; i < items.length; i += options.batchSize) {
+		results.push(...(await cb(items.slice(i, i + options.batchSize))));
+	}
+	return results;
 }
 
 /**
@@ -406,6 +397,73 @@ export function comparing<T>(...getters: ((e: T) => number | boolean)[]) {
 		}
 		return 0;
 	};
+}
+
+// ================================== ASYNC ==================================
+
+export async function filterAsync<T>(
+	arr: T[],
+	predicate: (e: T) => Promise<boolean>,
+): Promise<T[]> {
+	const results = await Promise.all(arr.map(predicate));
+	return arr.filter((_, index) => results[index]);
+}
+
+export async function mapAsync<T, R>(
+	arr: T[],
+	cb: (e: T) => Promise<R>,
+): Promise<R[]> {
+	return Promise.all(arr.map(cb));
+}
+
+export async function flatMapAsync<T, R>(
+	arr: T[],
+	cb: (e: T) => Promise<R[]>,
+): Promise<R[]> {
+	const results = await Promise.all(arr.map(cb));
+	return results.flat();
+}
+
+export async function reduceAsync<T, R>(
+	arr: T[],
+	cb: (acc: R, cur: T, index: number, arr: T[]) => Promise<R>,
+	initialValue: R,
+): Promise<R> {
+	let accumulator = initialValue;
+	for (let index = 0; index < arr.length; index++) {
+		accumulator = await cb(accumulator, arr[index], index, arr);
+	}
+	return accumulator;
+}
+
+export async function findAsync<T>(
+	it: Iterable<T>,
+	cb: (e: T) => Promise<boolean>,
+): Promise<T | undefined> {
+	for (const item of it) {
+		if (await cb(item)) return item;
+	}
+	return undefined;
+}
+
+export async function someAsync<T>(
+	it: Iterable<T>,
+	cb: (e: T) => Promise<boolean>,
+): Promise<boolean> {
+	for (const item of it) {
+		if (await cb(item)) return true;
+	}
+	return false;
+}
+
+export async function everyAsync<T>(
+	it: Iterable<T>,
+	cb: (e: T) => Promise<boolean>,
+): Promise<boolean> {
+	for (const item of it) {
+		if (!(await cb(item))) return false;
+	}
+	return true;
 }
 
 /**
@@ -451,6 +509,49 @@ export async function* combineAsyncIterables<T>(
 	return;
 }
 
+// ================================= STRINGS =================================
+
+export function capitalizeFirstLetter(string: string): string {
+	return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+/**
+ * Replaces the last occurrence of a GLOBAL regex match in a string
+ * @param str The string to replace the last occurrence in
+ * @param globalRegExp The regex to match (must be global)
+ * @param newStr The string to replace the last occurrence with
+ */
+export function replaceLastOccurrence(
+	str: string,
+	globalRegExp: RegExp,
+	newStr: string,
+): string {
+	const matches = Array.from(str.matchAll(globalRegExp));
+	if (matches.length === 0) return str;
+	const lastMatch = matches[matches.length - 1];
+	const lastMatchIndex = lastMatch.index!;
+	const lastMatchStr = lastMatch[0];
+	return (
+		str.slice(0, lastMatchIndex) +
+		newStr +
+		str.slice(lastMatchIndex + lastMatchStr.length)
+	);
+}
+
+export function escapeUnescapedQuotesInJsonValues(jsonStr: string): string {
+	return jsonStr.replace(
+		JSON_VALUES_REGEX,
+		(match, _p1, _offset, _str, groups) => {
+			const escapedValue = groups.value.replace(/(?<!\\)"/g, '\\"');
+			return match.replace(groups.value, escapedValue);
+		},
+	);
+}
+
+export function extractInt(str: string): number {
+	return parseInt(str.match(/\d+/)![0]);
+}
+
 export function getPathParts(
 	pathStr: string,
 	dirnameFunc = path.dirname,
@@ -469,62 +570,15 @@ export function getPathParts(
 	return parts;
 }
 
-export function countDirEntriesRec(
-	dirs: string[],
-	maxDataDepth: number,
-): number {
-	if (maxDataDepth === 0) return 0;
-	let count = 0;
-	for (const dir of dirs) {
-		const newDirs: string[] = [];
-		for (const entry of readdirSync(dir, { withFileTypes: true })) {
-			count++;
-			if (entry.isDirectory()) newDirs.push(path.join(dir, entry.name));
-		}
-		count += countDirEntriesRec(newDirs, maxDataDepth - 1);
-	}
-	return count;
-}
+// ================================== MUTEX ==================================
 
-export function findAFileWithExt(dir: string, exts: string[]): string | null {
-	try {
-		for (const entry of readdirSync(dir, { withFileTypes: true })) {
-			const fullPath = path.join(dir, entry.name);
-			if (entry.isFile() && exts.includes(path.extname(fullPath))) {
-				return fullPath;
-			}
-			if (entry.isDirectory()) {
-				const file = findAFileWithExt(fullPath, exts);
-				if (file) return file;
-			}
-		}
-	} catch (e) {
-		logger.debug(e);
-	}
-	return null;
+export enum Mutex {
+	INDEX_TORRENTS_AND_DATA_DIRS = "INDEX_TORRENTS_AND_DATA_DIRS",
+	CHECK_JOBS = "CHECK_JOBS",
+	CREATE_ALL_SEARCHEES = "CREATE_ALL_SEARCHEES",
+	CLIENT_INJECTION = "CLIENT_INJECTION",
 }
-
-export async function inBatches<T>(
-	items: T[],
-	cb: (batch: T[]) => Promise<void>,
-	options = { batchSize: 100 },
-): Promise<void> {
-	for (let i = 0; i < items.length; i += options.batchSize) {
-		await cb(items.slice(i, i + options.batchSize));
-	}
-}
-
-export async function fromBatches<T, R>(
-	items: T[],
-	cb: (batch: T[]) => Promise<R[]>,
-	options = { batchSize: 100 },
-): Promise<R[]> {
-	const results: R[] = [];
-	for (let i = 0; i < items.length; i += options.batchSize) {
-		results.push(...(await cb(items.slice(i, i + options.batchSize))));
-	}
-	return results;
-}
+const mutexes = new Map<Mutex, Promise<unknown>>();
 
 /**
  * Executes a callback function within a mutex for the given name.

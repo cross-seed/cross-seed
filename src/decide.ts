@@ -34,6 +34,9 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
 	File,
+	getFuzzySizeFactor,
+	getMediaType,
+	getMinSizeRatio,
 	getReleaseGroup,
 	Searchee,
 	SearcheeWithLabel,
@@ -41,10 +44,7 @@ import {
 import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
 import {
 	extractInt,
-	getFuzzySizeFactor,
 	getLogString,
-	getMediaType,
-	getMinSizeRatio,
 	sanitizeInfoHash,
 	stripExtension,
 } from "./utils.js";

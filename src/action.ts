@@ -24,6 +24,7 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromPath,
+	getMediaType,
 	getRoot,
 	getRootFolder,
 	getSearcheeSource,
@@ -37,7 +38,6 @@ import {
 	findAFileWithExt,
 	formatAsList,
 	getLogString,
-	getMediaType,
 	Mutex,
 	withMutex,
 } from "./utils.js";
