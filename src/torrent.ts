@@ -389,6 +389,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 					searchees,
 					infoHashPathMap,
 					clients[0].label,
+					clients[0].clientPriority,
 				);
 			}
 		} else {
@@ -404,6 +405,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 								return map;
 							}, new Map<string, string>()),
 							client.label,
+							client.clientPriority,
 						);
 						return searchees;
 					}),

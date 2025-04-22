@@ -1,5 +1,6 @@
 import ms from "ms";
 import path from "path";
+import { isDeepStrictEqual } from "util";
 import { testLinking } from "../action.js";
 import {
 	ABS_WIN_PATH_REGEX,
@@ -24,6 +25,7 @@ import {
 	hasExt,
 	humanReadableSize,
 	isTruthy,
+	sanitizeInfoHash,
 	wait,
 } from "../utils.js";
 import Deluge from "./Deluge.js";
@@ -161,6 +163,7 @@ export async function validateClientSavePaths(
 	searchees: SearcheeWithInfoHash[],
 	infoHashPathMapOrig: Map<string, string>,
 	label: string,
+	clientPriority: number,
 ): Promise<void> {
 	const { linkDirs } = getRuntimeConfig();
 	logger.info({
@@ -219,7 +222,11 @@ export async function validateClientSavePaths(
 			);
 		}
 		try {
-			testLinking(savePath);
+			testLinking(
+				savePath,
+				`torrentClient${clientPriority}Src.cross-seed`,
+				`torrentClient${clientPriority}Dest.cross-seed`,
+			);
 		} catch (e) {
 			logger.error(e);
 			throw new CrossSeedError(
@@ -227,6 +234,50 @@ export async function validateClientSavePaths(
 			);
 		}
 	}
+}
+
+export function clientSearcheeModified(
+	label: string,
+	dbTorrent,
+	name: string,
+	savePath: string,
+	options: { category?: string; tags?: string[] } = {},
+): boolean {
+	if (!dbTorrent) return true;
+	if (dbTorrent.name !== name) {
+		logger.warn({
+			label,
+			message: `Refreshing ${name} [${sanitizeInfoHash(dbTorrent.info_hash)}] as the name was updated: ${dbTorrent.name} -> ${name}`,
+		});
+		return true;
+	}
+	if (dbTorrent.save_path !== savePath) {
+		logger.warn({
+			label,
+			message: `Refreshing ${name} [${sanitizeInfoHash(dbTorrent.info_hash)}] as the savePath was updated: ${dbTorrent.save_path} -> ${savePath}`,
+		});
+		return true;
+	}
+	if ((dbTorrent.category ?? undefined) !== options.category) {
+		logger.warn({
+			label,
+			message: `Refreshing ${name} [${sanitizeInfoHash(dbTorrent.info_hash)}] as the category was updated: ${dbTorrent.category} -> ${options.category}`,
+		});
+		return true;
+	}
+	if (
+		!isDeepStrictEqual(
+			dbTorrent.tags ? JSON.parse(dbTorrent.tags) : [],
+			options.tags ?? [],
+		)
+	) {
+		logger.warn({
+			label,
+			message: `Refreshing ${name} [${sanitizeInfoHash(dbTorrent.info_hash)}] as the tags were updated: ${(dbTorrent.tags ? JSON.parse(dbTorrent.tags) : []).join(",")} -> ${options.tags}`,
+		});
+		return true;
+	}
+	return false;
 }
 
 export function organizeTrackers(trackers: Tracker[]): string[] {

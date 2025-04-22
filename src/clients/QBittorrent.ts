@@ -35,6 +35,7 @@ import {
 } from "../utils.js";
 import {
 	shouldResumeFromNonRelevantFiles,
+	clientSearcheeModified,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -647,13 +648,32 @@ export default class QBittorrent implements TorrentClient {
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
+			const { name } = torrent;
+			const savePath = torrent.save_path;
+			const category = torrent.category;
+			const tags = torrent.tags.length
+				? torrent.tags
+						.split(",")
+						.map((tag) => tag.trim())
+						.filter((tag) => tag.length)
+				: [];
+			const modified = clientSearcheeModified(
+				this.label,
+				dbTorrent,
+				name,
+				savePath,
+				{
+					category,
+					tags,
+				},
+			);
 			const refresh =
 				options?.refresh === undefined
 					? false
 					: options.refresh.length === 0
 						? true
 						: options.refresh.includes(infoHash);
-			if (dbTorrent && !refresh) {
+			if (!modified && !refresh) {
 				if (!options?.newSearcheesOnly) {
 					searchees.push(createSearcheeFromDB(dbTorrent));
 				}
@@ -682,12 +702,8 @@ export default class QBittorrent implements TorrentClient {
 				});
 				continue;
 			}
-			const { name } = torrent;
 			const title = parseTitle(name, files) ?? name;
 			const length = torrent.total_size;
-			const savePath = torrent.save_path;
-			const category = torrent.category;
-			const tags = torrent.tags.length ? torrent.tags.split(", ") : [];
 			const searchee: SearcheeClient = {
 				infoHash,
 				name,

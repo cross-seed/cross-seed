@@ -120,7 +120,11 @@ async function checkConfigPaths(): Promise<void> {
 	if (linkDirs.length) {
 		for (const dataDir of dataDirs) {
 			try {
-				testLinking(dataDir);
+				testLinking(
+					dataDir,
+					"dataDirSrc.cross-seed",
+					"dataDirDest.cross-seed",
+				);
 			} catch (e) {
 				logger.error(e);
 				logger.error("Failed to link from dataDirs to linkDir.");

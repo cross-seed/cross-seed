@@ -31,6 +31,7 @@ import {
 } from "../utils.js";
 import {
 	shouldResumeFromNonRelevantFiles,
+	clientSearcheeModified,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
 	getResumeStopTime,
@@ -729,13 +730,25 @@ export default class Deluge implements TorrentClient {
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
+			const name = torrent.name!;
+			const savePath = torrent.save_path!;
+			const category = torrent.label ?? "";
+			const modified = clientSearcheeModified(
+				this.label,
+				dbTorrent,
+				name,
+				savePath,
+				{
+					category,
+				},
+			);
 			const refresh =
 				options?.refresh === undefined
 					? false
 					: options.refresh.length === 0
 						? true
 						: options.refresh.includes(infoHash);
-			if (dbTorrent && !refresh) {
+			if (!modified && !refresh) {
 				if (!options?.newSearcheesOnly) {
 					searchees.push(createSearcheeFromDB(dbTorrent));
 				}
@@ -754,11 +767,8 @@ export default class Deluge implements TorrentClient {
 				continue;
 			}
 			const trackers = organizeTrackers(torrent.trackers!);
-			const name = torrent.name!;
 			const title = parseTitle(name, files) ?? name;
 			const length = torrent.total_size!;
-			const savePath = torrent.save_path!;
-			const category = torrent.label ?? "";
 			const searchee: SearcheeClient = {
 				infoHash,
 				name,
