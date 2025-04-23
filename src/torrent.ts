@@ -305,17 +305,10 @@ export async function findAllTorrentFilesInDir(
 		.map((fn) => resolve(join(torrentDir, fn)));
 }
 
-export async function createEnsemblePieces(
+export function createEnsemblePieces(
 	title: string,
 	files: File[],
-): Promise<
-	| {
-			key: string;
-			element: string | number;
-			largestFile: File;
-	  }[]
-	| null
-> {
+): { key: string; element: string | number; largestFile: File }[] | null {
 	const episodeKeys = getEpisodeKeys(stripExtension(title));
 	if (!episodeKeys) return null;
 	const element = episodeKeys.episode;
@@ -330,10 +323,7 @@ export async function cacheEnsembleTorrentEntry(
 	searchee: SearcheeWithInfoHash,
 	torrentSavePaths?: Map<string, string>,
 ): Promise<EnsembleEntry[] | null> {
-	const ensemblePieces = await createEnsemblePieces(
-		searchee.title,
-		searchee.files,
-	);
+	const ensemblePieces = createEnsemblePieces(searchee.title, searchee.files);
 	if (!ensemblePieces || !ensemblePieces.length) return null;
 
 	let savePath: string | undefined;
@@ -399,7 +389,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 			logger.info("Indexing client torrents for reverse lookup...");
 			searchees = await flatMapAsync(clients, async (client) => {
 				const { searchees } = await client.getClientSearchees();
-				validateClientSavePaths(
+				await validateClientSavePaths(
 					searchees,
 					searchees.reduce((map, searchee) => {
 						map.set(searchee.infoHash, searchee.savePath);
@@ -656,9 +646,7 @@ export async function getSimilarByName(name: string): Promise<{
 			LEVENSHTEIN_DIVISOR,
 	);
 
-	const filterEntries = async (
-		dbEntries: { title?: string; name?: string }[],
-	) => {
+	const filterEntries = (dbEntries: { title?: string; name?: string }[]) => {
 		return dbEntries.filter((dbEntry) => {
 			const entry = getKeysFromName(dbEntry.title ?? dbEntry.name!);
 			if (entry.element !== element) return false;
@@ -684,14 +672,14 @@ export async function getSimilarByName(name: string): Promise<{
 
 	if (useClientTorrents) {
 		clientSearchees.push(
-			...(await filterEntries(await db("client_searchee"))).map(
+			...filterEntries(await db("client_searchee")).map(
 				createSearcheeFromDB,
 			),
 		);
 	} else if (torrentDir) {
-		const filteredTorrentEntries = (await filterEntries(
+		const filteredTorrentEntries = filterEntries(
 			await db("torrent").select("name", "file_path"),
-		)) as { name: string; file_path: string }[];
+		) as { name: string; file_path: string }[];
 		if (filteredTorrentEntries.length) {
 			const client = getClients()[0];
 			const torrentInfos =
@@ -715,7 +703,7 @@ export async function getSimilarByName(name: string): Promise<{
 
 	const entriesToDelete: string[] = [];
 	const filteredDataEntries = await filterAsync(
-		(await filterEntries(await db("data"))) as {
+		filterEntries(await db("data")) as {
 			title: string;
 			path: string;
 		}[],

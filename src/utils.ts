@@ -123,7 +123,7 @@ export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
 
-export async function time<R>(cb: () => R, times: number[]) {
+export async function time<R>(cb: () => Promise<R>, times: number[]) {
 	const before = performance.now();
 	try {
 		return await cb();

@@ -254,7 +254,7 @@ export default class QBittorrent implements TorrentClient {
 						"Received 403 from API. Logging in again and retrying",
 				});
 				await this.login();
-				return this.request(path, body, headers, retries - 1);
+				return await this.request(path, body, headers, retries - 1);
 			}
 		} catch (e) {
 			if (retries > 0) {

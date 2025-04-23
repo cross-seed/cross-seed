@@ -222,7 +222,7 @@ async function createTorznabSearchQueries(
 ): Promise<Query[]> {
 	const stem = stripExtension(searchee.title);
 	const relevantIds: IdSearchParams = parsedMedia
-		? await getRelevantArrIds(caps, parsedMedia)
+		? getRelevantArrIds(caps, parsedMedia)
 		: {};
 	const useIds = Object.values(relevantIds).some(isTruthy);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
@@ -488,7 +488,7 @@ export async function searchTorznab(
 				categories: indexer.categories,
 				limits: indexer.limits,
 			};
-			return await createTorznabSearchQueries(
+			return createTorznabSearchQueries(
 				searchee,
 				mediaType,
 				caps,

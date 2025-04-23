@@ -239,7 +239,7 @@ export async function getFilesFromDataRoot(
 ): Promise<File[]> {
 	const parentDir = dirname(rootPath);
 	try {
-		return mapAsync(
+		return await mapAsync(
 			await getFileNamesFromRootRec(rootPath, memoizedPaths),
 			async (file) => ({
 				path: relative(parentDir, file),

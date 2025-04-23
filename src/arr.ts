@@ -171,7 +171,7 @@ async function getMediaFromArr(
 	uArrL: string,
 	title: string,
 ): Promise<Result<ParsedMedia, Error>> {
-	return await makeArrApiCall<ParsedMedia>(
+	return makeArrApiCall<ParsedMedia>(
 		uArrL,
 		"/api/v3/parse",
 		new URLSearchParams({ title }),
@@ -282,10 +282,10 @@ export async function scanAllArrsForMedia(
 	return resultOfErr(false);
 }
 
-export async function getRelevantArrIds(
+export function getRelevantArrIds(
 	caps: Caps,
 	parsedMedia: ParsedMedia,
-): Promise<IdSearchParams> {
+): IdSearchParams {
 	const idSearchCaps = parsedMedia.movie
 		? caps.movieIdSearch
 		: caps.tvIdSearch;

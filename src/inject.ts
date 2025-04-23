@@ -431,7 +431,7 @@ async function injectionAlreadyExists({
 	}
 }
 
-async function injectionSuccess({
+function injectionSuccess({
 	progress,
 	torrentFilePath,
 	client,
@@ -554,7 +554,7 @@ async function injectSavedTorrent(
 
 	switch (injectionResult) {
 		case InjectionResult.SUCCESS:
-			await injectionSuccess(injectionAftermath);
+			injectionSuccess(injectionAftermath);
 			break;
 		case InjectionResult.FAILURE:
 			injectionFailed(injectionAftermath);

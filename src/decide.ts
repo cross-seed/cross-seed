@@ -595,11 +595,11 @@ export async function getGuidInfoHashMap(): Promise<Map<string, string>> {
  * @param guidInfoHashMap The map of guids to info hashes. Necessary for optimal fuzzy lookups.
  * @returns The info hash of the torrent if found
  */
-async function guidLookup(
+function guidLookup(
 	guid: string,
 	link: string,
 	guidInfoHashMap: Map<string, string>,
-): Promise<string | undefined> {
+): string | undefined {
 	const infoHash = guidInfoHashMap.get(guid) ?? guidInfoHashMap.get(link);
 	if (infoHash) return infoHash;
 
@@ -636,7 +636,7 @@ export async function assessCandidateCaching(
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.title, guid })
 		.first();
-	const metaInfoHash = await guidLookup(guid, link, guidInfoHashMap);
+	const metaInfoHash = guidLookup(guid, link, guidInfoHashMap);
 	const metaOrCandidate = metaInfoHash
 		? (await existsInTorrentCache(metaInfoHash))
 			? (await getCachedTorrentFile(metaInfoHash)).orElse(candidate)

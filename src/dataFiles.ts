@@ -69,7 +69,7 @@ export async function indexDataDirs(options: {
 				);
 			}
 		}
-		return await indexDataPaths(searcheePaths);
+		return indexDataPaths(searcheePaths);
 	}
 
 	await mapAsync(dataDirs, async (dataDir) => {
@@ -165,7 +165,7 @@ async function indexEnsembleDataEntry(
 	path: string,
 	files: File[],
 ): Promise<EnsembleEntry[] | null> {
-	const ensemblePieces = await createEnsemblePieces(title, files);
+	const ensemblePieces = createEnsemblePieces(title, files);
 	if (!ensemblePieces || !ensemblePieces.length) return null;
 	return ensemblePieces.map((ensemblePiece) => ({
 		client_host: null,
