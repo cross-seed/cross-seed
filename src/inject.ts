@@ -612,7 +612,7 @@ function logInjectSummary(
 			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
 		});
 	}
-	if (injectDir) {
+	if (injectDir !== undefined) {
 		logger.info({
 			label: Label.INJECT,
 			message: `Waiting on post-injection tasks to complete...`,
@@ -642,7 +642,7 @@ export async function injectSavedTorrents(): Promise<void> {
 	const targetDir = injectDir ?? outputDir;
 	const targetDirLog = chalk.bold.magenta(targetDir);
 
-	if (injectDir) {
+	if (injectDir !== undefined) {
 		logger.warn({
 			label: Label.INJECT,
 			message: `Manually injecting torrents performs minimal filtering which slightly increases chances of false positives, see the docs for more info`,

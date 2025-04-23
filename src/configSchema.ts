@@ -680,7 +680,8 @@ export const VALIDATION_SCHEMA = z
 		return true;
 	})
 	.refine(
-		(config) => config.action === Action.INJECT || !config.injectDir,
+		(config) =>
+			config.action === Action.INJECT || config.injectDir === undefined,
 		ZodErrorMessages.injectNeedsInjectMode,
 	)
 	.refine(
