@@ -10,7 +10,7 @@ import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { migrations } from "./migrations/migrations.js";
 import { cacheEnsembleTorrentEntry } from "./torrent.js";
-import { filterAsync, inBatches, isTruthy, notExists } from "./utils.js";
+import { filterAsync, flatMapAsync, inBatches, notExists } from "./utils.js";
 
 const filename = join(appDir(), "cross-seed.db");
 const rawSqliteHandle = new Sqlite(filename);
@@ -30,27 +30,18 @@ export async function cleanupDB(): Promise<void> {
 	await Promise.all([
 		(async () => {
 			if (!useClientTorrents) return;
-			const searchees = (
-				await Promise.all(
-					getClients().map((client) =>
-						client.getClientSearchees({
-							refresh: [],
-						}),
-					),
-				)
-			)
-				.map((r) => r.searchees)
-				.flat();
+			const searchees = await flatMapAsync(
+				getClients(),
+				async (client) =>
+					(await client.getClientSearchees({ refresh: [] }))
+						.searchees,
+			);
 			if (!seasonFromEpisodes) return;
-			const ensembleRows = (
-				await Promise.all(
-					searchees.map((searchee) =>
-						cacheEnsembleTorrentEntry(searchee),
-					),
-				)
-			)
-				.flat()
-				.filter(isTruthy);
+			const ensembleRows = await flatMapAsync(
+				searchees,
+				async (searchee) =>
+					(await cacheEnsembleTorrentEntry(searchee)) ?? [],
+			);
 			await inBatches(ensembleRows, async (batch) => {
 				await db("ensemble")
 					.insert(batch)

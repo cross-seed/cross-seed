@@ -189,9 +189,7 @@ export async function getNewestFileAge(
 	absoluteFilePaths: string[],
 ): Promise<number> {
 	return (
-		await Promise.all(
-			absoluteFilePaths.map((file) => stat(file).then((s) => s.mtimeMs)),
-		)
+		await mapAsync(absoluteFilePaths, async (f) => (await stat(f)).mtimeMs)
 	).reduce((a, b) => Math.max(a, b));
 }
 

@@ -290,18 +290,20 @@ export async function searchForLocalTorrentByCriteria(
 	} else {
 		const memoizedPaths = new Map<string, string[]>();
 		const memoizedLengths = new Map<string, number>();
-		const searcheeResults = await Promise.all(
-			(await findPotentialNestedRoots(criteria.path, maxDataDepth)).map(
-				(path) =>
-					createSearcheeFromPath(
-						path,
-						memoizedPaths,
-						memoizedLengths,
-					),
-			),
-		);
 		rawSearchees.push(
-			...searcheeResults.filter(isOk).map((r) => r.unwrap()),
+			...(
+				await mapAsync(
+					await findPotentialNestedRoots(criteria.path, maxDataDepth),
+					(path) =>
+						createSearcheeFromPath(
+							path,
+							memoizedPaths,
+							memoizedLengths,
+						),
+				)
+			)
+				.filter(isOk)
+				.map((r) => r.unwrap()),
 		);
 	}
 	const searchees: SearcheeWithLabel[] = rawSearchees
@@ -630,27 +632,26 @@ export async function findAllSearchees(
 	const clients = getClients();
 	const rawSearchees: Searchee[] = [];
 	if (Array.isArray(torrents)) {
-		const torrentInfos = (
-			await Promise.all(clients.map((client) => client.getAllTorrents()))
-		).flat();
-		const searcheeResults = await Promise.all(
-			torrents.map((torrent) =>
-				createSearcheeFromTorrentFile(torrent, torrentInfos),
-			),
+		const torrentInfos = await flatMapAsync(clients, (client) =>
+			client.getAllTorrents(),
 		);
 		rawSearchees.push(
-			...searcheeResults.filter(isOk).map((r) => r.unwrap()),
+			...(
+				await mapAsync(torrents, (torrent) =>
+					createSearcheeFromTorrentFile(torrent, torrentInfos),
+				)
+			)
+				.filter(isOk)
+				.map((r) => r.unwrap()),
 		);
 	} else {
 		if (useClientTorrents) {
 			rawSearchees.push(
-				...(
-					await Promise.all(
-						clients.map((client) => client.getClientSearchees()),
-					)
-				)
-					.map((r) => r.searchees)
-					.flat(),
+				...(await flatMapAsync(
+					clients,
+					async (client) =>
+						(await client.getClientSearchees()).searchees,
+				)),
 			);
 		} else if (torrentDir) {
 			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
@@ -658,17 +659,20 @@ export async function findAllSearchees(
 		if (dataDirs.length) {
 			const memoizedPaths = new Map<string, string[]>();
 			const memoizedLengths = new Map<string, number>();
-			const searcheeResults = await Promise.all(
-				(await findSearcheesFromAllDataDirs()).map((path) =>
-					createSearcheeFromPath(
-						path,
-						memoizedPaths,
-						memoizedLengths,
-					),
-				),
-			);
 			rawSearchees.push(
-				...searcheeResults.filter(isOk).map((r) => r.unwrap()),
+				...(
+					await mapAsync(
+						await findSearcheesFromAllDataDirs(),
+						(path) =>
+							createSearcheeFromPath(
+								path,
+								memoizedPaths,
+								memoizedLengths,
+							),
+					)
+				)
+					.filter(isOk)
+					.map((r) => r.unwrap()),
 			);
 		}
 	}
@@ -736,10 +740,8 @@ async function findSearchableTorrents(options?: {
 	for (const [key, groupedSearchees] of grouping) {
 		// If one searchee needs to be searched, use the candidates for all
 		const filteredSearchees = filterDupesFromSimilar(groupedSearchees);
-		const results = await Promise.all(
-			filteredSearchees.map((searchee) =>
-				filterTimestamps(searchee, options),
-			),
+		const results = await mapAsync(filteredSearchees, (searchee) =>
+			filterTimestamps(searchee, options),
 		);
 		if (!results.some(isTruthy)) {
 			grouping.delete(key);

@@ -20,7 +20,7 @@ import {
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
-import { Awaitable, notExists, wait } from "./utils.js";
+import { Awaitable, mapAsync, notExists, wait } from "./utils.js";
 
 export async function exitGracefully() {
 	await db.destroy();
@@ -165,7 +165,7 @@ export async function doStartupValidation(): Promise<void> {
 	await checkConfigPaths(); // ensure paths are valid first
 	instantiateDownloadClients();
 	const validateClientConfig = () =>
-		Promise.all(getClients().map((client) => client.validateConfig()));
+		mapAsync(getClients(), (client) => client.validateConfig());
 	const errors = (
 		await Promise.allSettled([
 			retry(validateTorznabUrls, 5, ms("1 minute")),

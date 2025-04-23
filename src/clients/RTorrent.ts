@@ -28,6 +28,7 @@ import {
 	fromBatches,
 	humanReadableSize,
 	isTruthy,
+	mapAsync,
 	sanitizeInfoHash,
 	wait,
 } from "../utils.js";
@@ -96,7 +97,7 @@ async function createLibTorrentResumeTree(
 		};
 	}
 
-	const fileResumes = await Promise.all(meta.files.map(getFileResumeData));
+	const fileResumes = await mapAsync(meta.files, getFileResumeData);
 	return {
 		bitfield: Math.ceil(meta.length / meta.pieceLength),
 		files: fileResumes.filter(isTruthy),

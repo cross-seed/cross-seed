@@ -41,7 +41,6 @@ import {
 	flatMapAsync,
 	getLogString,
 	inBatches,
-	isTruthy,
 	mapAsync,
 	Mutex,
 	notExists,
@@ -405,30 +404,24 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		if (torrentDir) {
 			searchees = await indexTorrentDir(torrentDir);
 		} else {
-			searchees = (
-				await Promise.all(
-					clients.map((client) =>
-						client.getClientSearchees({
+			searchees = await flatMapAsync(
+				clients,
+				async (client) =>
+					(
+						await client.getClientSearchees({
 							newSearcheesOnly: true,
-						}),
-					),
-				)
-			)
-				.map((r) => r.newSearchees)
-				.flat();
+						})
+					).newSearchees,
+			);
 		}
 	}
 	if (!seasonFromEpisodes) return;
 
-	const ensembleRows = (
-		await Promise.all(
-			searchees.map((searchee) =>
-				cacheEnsembleTorrentEntry(searchee, infoHashPathMap),
-			),
-		)
-	)
-		.flat()
-		.filter(isTruthy);
+	const ensembleRows = await flatMapAsync(
+		searchees,
+		async (searchee) =>
+			(await cacheEnsembleTorrentEntry(searchee, infoHashPathMap)) ?? [],
+	);
 	await inBatches(ensembleRows, async (batch) => {
 		await db("ensemble")
 			.insert(batch)
