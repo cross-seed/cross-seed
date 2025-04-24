@@ -36,6 +36,7 @@ import { Label, logger } from "./logger.js";
 import { Candidate } from "./pipeline.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
+	getMediaType,
 	getSearcheeNewestFileAge,
 	Searchee,
 	SearcheeWithLabel,
@@ -49,7 +50,6 @@ import {
 	getAnimeQueries,
 	getApikey,
 	getLogString,
-	getMediaType,
 	humanReadableDate,
 	isTruthy,
 	nMsAgo,
@@ -222,7 +222,7 @@ async function createTorznabSearchQueries(
 ): Promise<Query[]> {
 	const stem = stripExtension(searchee.title);
 	const relevantIds: IdSearchParams = parsedMedia
-		? await getRelevantArrIds(caps, parsedMedia)
+		? getRelevantArrIds(caps, parsedMedia)
 		: {};
 	const useIds = Object.values(relevantIds).some(isTruthy);
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
@@ -488,7 +488,7 @@ export async function searchTorznab(
 				categories: indexer.categories,
 				limits: indexer.limits,
 			};
-			return await createTorznabSearchQueries(
+			return createTorznabSearchQueries(
 				searchee,
 				mediaType,
 				caps,

@@ -1,5 +1,4 @@
-import { stat } from "fs/promises";
-import { existsSync, readdirSync, statSync } from "fs";
+import { readdir, stat } from "fs/promises";
 import { basename, dirname, join, relative } from "path";
 import ms from "ms";
 import {
@@ -12,8 +11,11 @@ import {
 	ANIME_GROUP_REGEX,
 	ANIME_REGEX,
 	ARR_DIR_REGEX,
+	AUDIO_EXTENSIONS,
 	BAD_GROUP_PARSE_REGEX,
+	BOOK_EXTENSIONS,
 	EP_REGEX,
+	MediaType,
 	MOVIE_REGEX,
 	parseSource,
 	RELEASE_GROUP_REGEX,
@@ -21,6 +23,7 @@ import {
 	RES_STRICT_REGEX,
 	SEASON_REGEX,
 	SONARR_SUBFOLDERS_REGEX,
+	VIDEO_DISC_EXTENSIONS,
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { db } from "./db.js";
@@ -34,6 +37,7 @@ import {
 	createKeyTitle,
 	extractInt,
 	filesWithExt,
+	flatMapAsync,
 	getLogString,
 	hasExt,
 	humanReadableDate,
@@ -41,9 +45,13 @@ import {
 	inBatches,
 	isBadTitle,
 	isTruthy,
+	notExists,
+	mapAsync,
 	stripExtension,
 	WithRequired,
 	WithUndefined,
+	withMutex,
+	Mutex,
 } from "./utils.js";
 
 export interface File {
@@ -123,6 +131,42 @@ export function getSearcheeSource(searchee: Searchee): SearcheeSource {
 	}
 }
 
+export function getMediaType({ title, files }: Searchee): MediaType {
+	switch (true /* eslint-disable no-fallthrough */) {
+		case EP_REGEX.test(title):
+			return MediaType.EPISODE;
+		case SEASON_REGEX.test(title):
+			return MediaType.SEASON;
+		case hasExt(files, VIDEO_EXTENSIONS):
+			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
+			if (ANIME_REGEX.test(title)) return MediaType.ANIME;
+			return MediaType.VIDEO;
+		case hasExt(files, VIDEO_DISC_EXTENSIONS):
+			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
+			return MediaType.VIDEO;
+		case hasExt(files, [".rar"]):
+			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
+		default: // Minimally supported media types
+			if (hasExt(files, AUDIO_EXTENSIONS)) return MediaType.AUDIO;
+			if (hasExt(files, BOOK_EXTENSIONS)) return MediaType.BOOK;
+			return MediaType.OTHER;
+	}
+}
+
+export function getFuzzySizeFactor(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? 1 - seasonFromEpisodes
+		: fuzzySizeThreshold;
+}
+
+export function getMinSizeRatio(searchee: Searchee): number {
+	const { fuzzySizeThreshold, seasonFromEpisodes } = getRuntimeConfig();
+	return seasonFromEpisodes && !searchee.infoHash && !searchee.path
+		? seasonFromEpisodes
+		: 1 - fuzzySizeThreshold;
+}
+
 export function getRoot({ path }: File, dirnameFunc = dirname): string {
 	let root = path;
 	let parent = dirnameFunc(root);
@@ -147,9 +191,7 @@ export async function getNewestFileAge(
 	absoluteFilePaths: string[],
 ): Promise<number> {
 	return (
-		await Promise.all(
-			absoluteFilePaths.map((file) => stat(file).then((s) => s.mtimeMs)),
-		)
+		await mapAsync(absoluteFilePaths, async (f) => (await stat(f)).mtimeMs)
 	).reduce((a, b) => Math.max(a, b));
 }
 
@@ -160,48 +202,55 @@ export async function getSearcheeNewestFileAge(
 	if (!path) {
 		return getNewestFileAge(searchee.files.map((file) => file.path));
 	}
-	const pathStat = statSync(path);
+	const pathStat = await stat(path);
 	if (pathStat.isFile()) return pathStat.mtimeMs;
 	return getNewestFileAge(
 		searchee.files.map((file) => join(dirname(path), file.path)),
 	);
 }
 
-function getFileNamesFromRootRec(
+async function getFileNamesFromRootRec(
 	root: string,
 	memoizedPaths: Map<string, string[]>,
 	isDirHint?: boolean,
-): string[] {
+): Promise<string[]> {
 	if (memoizedPaths.has(root)) return memoizedPaths.get(root)!;
 	const isDir =
-		isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
+		isDirHint !== undefined ? isDirHint : (await stat(root)).isDirectory();
 	const paths = !isDir
 		? [root]
-		: readdirSync(root, { withFileTypes: true }).flatMap((dirent) =>
-				getFileNamesFromRootRec(
-					join(root, dirent.name),
-					memoizedPaths,
-					dirent.isDirectory(),
-				),
+		: await flatMapAsync(
+				await readdir(root, { withFileTypes: true }),
+				(dirent) =>
+					getFileNamesFromRootRec(
+						join(root, dirent.name),
+						memoizedPaths,
+						dirent.isDirectory(),
+					),
 			);
 	memoizedPaths.set(root, paths);
 	return paths;
 }
 
-export function getFilesFromDataRoot(
+export async function getFilesFromDataRoot(
 	rootPath: string,
 	memoizedPaths: Map<string, string[]>,
 	memoizedLengths: Map<string, number>,
-): File[] {
+): Promise<File[]> {
 	const parentDir = dirname(rootPath);
 	try {
-		return getFileNamesFromRootRec(rootPath, memoizedPaths).map((file) => ({
-			path: relative(parentDir, file),
-			name: basename(file),
-			length:
-				memoizedLengths.get(file) ??
-				memoizedLengths.set(file, statSync(file).size).get(file)!,
-		}));
+		return await mapAsync(
+			await getFileNamesFromRootRec(rootPath, memoizedPaths),
+			async (file) => ({
+				path: relative(parentDir, file),
+				name: basename(file),
+				length:
+					memoizedLengths.get(file) ??
+					memoizedLengths
+						.set(file, (await stat(file)).size)
+						.get(file)!,
+			}),
+		);
 	} catch (e) {
 		logger.debug(e);
 		return [];
@@ -412,7 +461,11 @@ export async function createSearcheeFromPath(
 	memoizedPaths = new Map<string, string[]>(),
 	memoizedLengths = new Map<string, number>(),
 ): Promise<Result<SearcheeWithoutInfoHash, Error>> {
-	const files = getFilesFromDataRoot(root, memoizedPaths, memoizedLengths);
+	const files = await getFilesFromDataRoot(
+		root,
+		memoizedPaths,
+		memoizedLengths,
+	);
 	if (files.length === 0) {
 		const msg = `Failed to retrieve files in ${root}`;
 		logger.verbose({
@@ -509,10 +562,10 @@ export function getEpisodeKeys(stem: string): {
 	const match = stem.match(EP_REGEX);
 	if (!match) return null;
 	const titles = getAllTitles([match.groups!.title]);
-	const season = match!.groups!.season
-		? `S${extractInt(match!.groups!.season)}`
-		: match!.groups!.year
-			? `S${match!.groups!.year}`
+	const season = match.groups!.season
+		? `S${extractInt(match.groups!.season)}`
+		: match.groups!.year
+			? `S${match.groups!.year}`
 			: undefined;
 	const keyTitles: string[] = [];
 	const ensembleTitles: string[] = [];
@@ -523,9 +576,9 @@ export function getEpisodeKeys(stem: string): {
 		ensembleTitles.push(`${title}${season ? `.${season}` : ""}`);
 	}
 	if (!keyTitles.length) return null;
-	const episode = match!.groups!.episode
-		? extractInt(match!.groups!.episode)
-		: `${match!.groups!.month}.${match!.groups!.day}`;
+	const episode = match.groups!.episode
+		? extractInt(match.groups!.episode)
+		: `${match.groups!.month}.${match.groups!.day}`;
 	return { ensembleTitles, keyTitles, season, episode };
 }
 
@@ -548,7 +601,7 @@ export function getAnimeKeys(stem: string): {
 		ensembleTitles.push(title);
 	}
 	if (!keyTitles.length) return null;
-	const release = extractInt(match!.groups!.release);
+	const release = extractInt(match.groups!.release);
 	return { ensembleTitles, keyTitles, release };
 }
 
@@ -557,7 +610,7 @@ export function getReleaseGroup(stem: string): string | null {
 	if (!predictedGroupMatch) {
 		return null;
 	}
-	const parsedGroupMatchString = predictedGroupMatch!.groups!.group.trim();
+	const parsedGroupMatchString = predictedGroupMatch.groups!.group.trim();
 	if (BAD_GROUP_PARSE_REGEX.test(parsedGroupMatchString)) return null;
 	const match =
 		stem.match(EP_REGEX) ??
@@ -704,12 +757,12 @@ function organizeEnsembleKeys(
 	return { keyMap, ensembleTitleMap };
 }
 
-function pushEnsembleEpisode(
+async function pushEnsembleEpisode(
 	searchee: SearcheeWithLabel,
 	episodeFiles: File[],
 	hosts: Map<string, number>,
 	torrentSavePaths: Map<string, string>,
-): void {
+): Promise<void> {
 	const savePath = searchee.path
 		? dirname(searchee.path)
 		: searchee.savePath ?? torrentSavePaths.get(searchee.infoHash!);
@@ -721,15 +774,15 @@ function pushEnsembleEpisode(
 		name: largestFile.name,
 		path: join(savePath, largestFile.path),
 	};
-	if (!existsSync(absoluteFile.path)) return;
+	if (await notExists(absoluteFile.path)) return;
 
 	// Use the oldest file for episode if dupe (cross seeds)
 	const duplicateFile = episodeFiles.find(
 		(file) => file.length === absoluteFile.length,
 	);
 	if (duplicateFile) {
-		const dupeFileAge = statSync(duplicateFile.path).mtimeMs;
-		const newFileAge = statSync(absoluteFile.path).mtimeMs;
+		const dupeFileAge = (await stat(duplicateFile.path)).mtimeMs;
+		const newFileAge = (await stat(absoluteFile.path)).mtimeMs;
 		if (dupeFileAge <= newFileAge) return;
 		episodeFiles.splice(episodeFiles.indexOf(duplicateFile), 1);
 	}
@@ -738,13 +791,13 @@ function pushEnsembleEpisode(
 	if (clientHost) hosts.set(clientHost, (hosts.get(clientHost) ?? 0) + 1);
 }
 
-function createVirtualSeasonSearchee(
+async function createVirtualSeasonSearchee(
 	key: string,
 	episodeSearchees: Map<string | number, SearcheeWithLabel[]>,
 	ensembleTitleMap: Map<string, string>,
 	torrentSavePaths: Map<string, string>,
 	options: { useFilters: boolean },
-): SearcheeWithLabel | null {
+): Promise<SearcheeWithLabel | null> {
 	const seasonFromEpisodes = getRuntimeConfig().seasonFromEpisodes!;
 	const minEpisodes = 3;
 	if (options.useFilters && episodeSearchees.size < minEpisodes) {
@@ -775,7 +828,7 @@ function createVirtualSeasonSearchee(
 	for (const [, searchees] of episodeSearchees) {
 		const episodeFiles: File[] = [];
 		for (const searchee of searchees) {
-			pushEnsembleEpisode(
+			await pushEnsembleEpisode(
 				searchee,
 				episodeFiles,
 				hosts,
@@ -786,7 +839,10 @@ function createVirtualSeasonSearchee(
 		const total = episodeFiles.reduce((a, b) => a + b.length, 0);
 		seasonSearchee.length += Math.round(total / episodeFiles.length);
 		seasonSearchee.files.push(...episodeFiles);
-		const fileAges = episodeFiles.map((f) => statSync(f.path).mtimeMs);
+		const fileAges = await mapAsync(
+			episodeFiles,
+			async (f) => (await stat(f.path)).mtimeMs,
+		);
 		newestFileAge = Math.max(newestFileAge, ...fileAges);
 	}
 	seasonSearchee.mtimeMs = newestFileAge;
@@ -821,44 +877,51 @@ export async function createEnsembleSearchees(
 	allSearchees: SearcheeWithLabel[],
 	options: { useFilters: boolean },
 ): Promise<SearcheeWithLabel[]> {
-	const { seasonFromEpisodes, useClientTorrents } = getRuntimeConfig();
-	if (!allSearchees.length) return [];
-	if (!seasonFromEpisodes) return [];
-	if (options.useFilters) {
-		logger.info({
-			label: allSearchees[0].label,
-			message: `Creating virtual seasons from episode searchees...`,
-		});
-	}
+	return withMutex(
+		Mutex.CREATE_ALL_SEARCHEES,
+		{ useQueue: true },
+		async () => {
+			const { seasonFromEpisodes, useClientTorrents } =
+				getRuntimeConfig();
+			if (!allSearchees.length) return [];
+			if (!seasonFromEpisodes) return [];
+			if (options.useFilters) {
+				logger.info({
+					label: allSearchees[0].label,
+					message: `Creating virtual seasons from episode searchees...`,
+				});
+			}
 
-	const { keyMap, ensembleTitleMap } = organizeEnsembleKeys(
-		allSearchees,
-		options,
+			const { keyMap, ensembleTitleMap } = organizeEnsembleKeys(
+				allSearchees,
+				options,
+			);
+			const torrentSavePaths = useClientTorrents
+				? new Map()
+				: (await getClients()[0]?.getAllDownloadDirs({
+						metas: allSearchees.filter(
+							hasInfoHash,
+						) as SearcheeWithInfoHash[],
+						onlyCompleted: false,
+					})) ?? new Map();
+
+			const seasonSearchees: SearcheeWithLabel[] = [];
+			for (const [key, episodeSearchees] of keyMap) {
+				const seasonSearchee = await createVirtualSeasonSearchee(
+					key,
+					episodeSearchees,
+					ensembleTitleMap,
+					torrentSavePaths,
+					options,
+				);
+				if (seasonSearchee) seasonSearchees.push(seasonSearchee);
+			}
+			logEnsemble(
+				`Created ${seasonSearchees.length} virtual season searchees...`,
+				options,
+			);
+
+			return seasonSearchees;
+		},
 	);
-	const torrentSavePaths = useClientTorrents
-		? new Map()
-		: (await getClients()[0]?.getAllDownloadDirs({
-				metas: allSearchees.filter(
-					hasInfoHash,
-				) as SearcheeWithInfoHash[],
-				onlyCompleted: false,
-			})) ?? new Map();
-
-	const seasonSearchees: SearcheeWithLabel[] = [];
-	for (const [key, episodeSearchees] of keyMap) {
-		const seasonSearchee = createVirtualSeasonSearchee(
-			key,
-			episodeSearchees,
-			ensembleTitleMap,
-			torrentSavePaths,
-			options,
-		);
-		if (seasonSearchee) seasonSearchees.push(seasonSearchee);
-	}
-	logEnsemble(
-		`Created ${seasonSearchees.length} virtual season searchees...`,
-		options,
-	);
-
-	return seasonSearchees;
 }

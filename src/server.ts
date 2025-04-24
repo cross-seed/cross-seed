@@ -154,7 +154,7 @@ async function search(
 	const injectJob = getJobs().find((job) => job.name === JobName.INJECT);
 	if (injectJob) {
 		injectJob.runAheadOfSchedule = true;
-		checkJobs({ isFirstRun: false, useQueue: true });
+		void checkJobs({ isFirstRun: false, useQueue: true });
 	}
 	await indexTorrentsAndDataDirs();
 	const dataStr = await getData(req);
@@ -408,7 +408,7 @@ async function runJob(
 			? Number.MAX_SAFE_INTEGER
 			: undefined,
 	};
-	checkJobs({ isFirstRun: false, useQueue: true });
+	void checkJobs({ isFirstRun: false, useQueue: true });
 	res.writeHead(200);
 	res.end(`${job.name}: running ahead of schedule`);
 }

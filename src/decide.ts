@@ -1,13 +1,12 @@
 import bencode from "bencode";
 import {
-	existsSync,
-	readdirSync,
-	readFileSync,
-	statSync,
-	unlinkSync,
-	utimesSync,
-	writeFileSync,
-} from "fs";
+	readdir,
+	readFile,
+	stat,
+	unlink,
+	utimes,
+	writeFile,
+} from "fs/promises";
 import ms from "ms";
 import path from "path";
 import { appDir } from "./configuration.js";
@@ -34,6 +33,9 @@ import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
 	File,
+	getFuzzySizeFactor,
+	getMediaType,
+	getMinSizeRatio,
 	getReleaseGroup,
 	Searchee,
 	SearcheeWithLabel,
@@ -41,10 +43,8 @@ import {
 import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
 import {
 	extractInt,
-	getFuzzySizeFactor,
 	getLogString,
-	getMediaType,
-	getMinSizeRatio,
+	notExists,
 	sanitizeInfoHash,
 	stripExtension,
 } from "./utils.js";
@@ -372,7 +372,7 @@ export async function assessCandidate(
 					: { decision: Decision.DOWNLOAD_FAILED };
 		}
 		metafile = res.unwrap();
-		metaCached = cacheTorrentFile(metafile);
+		metaCached = await cacheTorrentFile(metafile);
 		metaOrCandidate.size = metafile.length; // Trackers can be wrong
 	} else {
 		metafile = metaOrCandidate;
@@ -435,14 +435,14 @@ export async function assessCandidate(
 	return { decision: Decision.FILE_TREE_MISMATCH, metafile, metaCached };
 }
 
-function existsInTorrentCache(infoHash: string): boolean {
+async function existsInTorrentCache(infoHash: string): Promise<boolean> {
 	const torrentPath = path.join(
 		appDir(),
 		TORRENT_CACHE_FOLDER,
 		`${infoHash}.cached.torrent`,
 	);
-	if (!existsSync(torrentPath)) return false;
-	utimesSync(torrentPath, new Date(), statSync(torrentPath).mtime);
+	if (await notExists(torrentPath)) return false;
+	await utimes(torrentPath, new Date(), (await stat(torrentPath)).mtime);
 	return true;
 }
 
@@ -463,21 +463,19 @@ async function getCachedTorrentFile(
 			message: `Failed to parse cached torrent ${sanitizeInfoHash(infoHash)}${options.deleteOnFail ? " - deleting" : ""}: ${e.message}`,
 		});
 		logger.debug(e);
-		if (options.deleteOnFail) {
-			unlinkSync(torrentPath);
-		}
+		if (options.deleteOnFail) await unlink(torrentPath);
 		return resultOfErr(e);
 	}
 }
 
-function cacheTorrentFile(meta: Metafile): boolean {
-	if (existsInTorrentCache(meta.infoHash)) return false;
+async function cacheTorrentFile(meta: Metafile): Promise<boolean> {
+	if (await existsInTorrentCache(meta.infoHash)) return false;
 	const torrentPath = path.join(
 		appDir(),
 		TORRENT_CACHE_FOLDER,
 		`${meta.infoHash}.cached.torrent`,
 	);
-	writeFileSync(torrentPath, meta.encode());
+	await writeFile(torrentPath, new Uint8Array(meta.encode()));
 	return true;
 }
 
@@ -486,13 +484,13 @@ export async function updateTorrentCache(
 	newStr: string,
 ): Promise<void> {
 	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
-	const files = readdirSync(torrentCacheDir);
+	const files = await readdir(torrentCacheDir);
 	console.log(`Found ${files.length} files in cache, processing...`);
 	let count = 0;
 	for (const file of files) {
 		const filePath = path.join(torrentCacheDir, file);
 		try {
-			const torrent: Torrent = bencode.decode(readFileSync(filePath));
+			const torrent: Torrent = bencode.decode(await readFile(filePath));
 			const announce = torrent.announce?.toString();
 			const announceList = torrent["announce-list"]?.map((tier) =>
 				tier.map((url) => url.toString()),
@@ -527,7 +525,12 @@ export async function updateTorrentCache(
 					}),
 				);
 			}
-			if (updated) writeFileSync(filePath, bencode.encode(torrent));
+			if (updated) {
+				await writeFile(
+					filePath,
+					new Uint8Array(bencode.encode(torrent)),
+				);
+			}
 		} catch (e) {
 			console.error(`Error reading ${filePath}: ${e}`);
 		}
@@ -592,11 +595,11 @@ export async function getGuidInfoHashMap(): Promise<Map<string, string>> {
  * @param guidInfoHashMap The map of guids to info hashes. Necessary for optimal fuzzy lookups.
  * @returns The info hash of the torrent if found
  */
-async function guidLookup(
+function guidLookup(
 	guid: string,
 	link: string,
 	guidInfoHashMap: Map<string, string>,
-): Promise<string | undefined> {
+): string | undefined {
 	const infoHash = guidInfoHashMap.get(guid) ?? guidInfoHashMap.get(link);
 	if (infoHash) return infoHash;
 
@@ -633,9 +636,9 @@ export async function assessCandidateCaching(
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.title, guid })
 		.first();
-	const metaInfoHash = await guidLookup(guid, link, guidInfoHashMap);
+	const metaInfoHash = guidLookup(guid, link, guidInfoHashMap);
 	const metaOrCandidate = metaInfoHash
-		? existsInTorrentCache(metaInfoHash)
+		? (await existsInTorrentCache(metaInfoHash))
 			? (await getCachedTorrentFile(metaInfoHash)).orElse(candidate)
 			: candidate
 		: candidate;

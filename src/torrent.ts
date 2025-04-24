@@ -1,7 +1,6 @@
 import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
-import fs, { existsSync, statSync } from "fs";
-import { readdir, readFile, writeFile } from "fs/promises";
+import { readdir, readFile, stat, utimes, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
@@ -10,12 +9,18 @@ import {
 	TorrentMetadataInClient,
 	validateClientSavePaths,
 } from "./clients/TorrentClient.js";
+import { isChildPath } from "./configSchema.js";
 import {
 	LEVENSHTEIN_DIVISOR,
 	MediaType,
 	SAVED_TORRENTS_INFO_REGEX,
 	USER_AGENT,
 } from "./constants.js";
+import {
+	getDataByFuzzyName,
+	indexDataDirs,
+	shouldIgnorePathHeuristically,
+} from "./dataFiles.js";
 import { db } from "./db.js";
 import { Label, logger, logOnce } from "./logger.js";
 import { Metafile, updateMetafileMetadata } from "./parseTorrent.js";
@@ -37,19 +42,18 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import {
+	exists,
+	filterAsync,
+	flatMapAsync,
 	getLogString,
 	inBatches,
-	isTruthy,
+	mapAsync,
 	Mutex,
+	notExists,
 	stripExtension,
 	wait,
 	withMutex,
 } from "./utils.js";
-import {
-	getDataByFuzzyName,
-	indexDataDirs,
-	shouldIgnorePathHeuristically,
-} from "./dataFiles.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -95,7 +99,7 @@ export async function parseTorrentWithMetadata(
 			extname(filename),
 			".fastresume",
 		);
-		if (fs.existsSync(fastResumePath)) {
+		if (await exists(fastResumePath)) {
 			updateMetafileMetadata(
 				meta,
 				bencode.decode(await readFile(fastResumePath)),
@@ -262,7 +266,6 @@ export async function saveTorrentFile(
 	meta: Metafile,
 ): Promise<void> {
 	const { outputDir } = getRuntimeConfig();
-	const buf = meta.encode();
 	// Be sure to update parseInfoFromSavedTorrent if changing the format
 	const filePath = join(
 		outputDir,
@@ -270,11 +273,11 @@ export async function saveTorrentFile(
 			meta.getFileSystemSafeName(),
 		)}[${meta.infoHash}].torrent`,
 	);
-	if (fs.existsSync(filePath)) {
-		fs.utimesSync(filePath, new Date(), fs.statSync(filePath).mtime);
+	if (await exists(filePath)) {
+		await utimes(filePath, new Date(), (await stat(filePath)).mtime);
 		return;
 	}
-	await writeFile(filePath, buf, { mode: 0o644 });
+	await writeFile(filePath, new Uint8Array(meta.encode()));
 }
 
 export function parseMetadataFromFilename(
@@ -302,17 +305,10 @@ export async function findAllTorrentFilesInDir(
 		.map((fn) => resolve(join(torrentDir, fn)));
 }
 
-export async function createEnsemblePieces(
+export function createEnsemblePieces(
 	title: string,
 	files: File[],
-): Promise<
-	| {
-			key: string;
-			element: string | number;
-			largestFile: File;
-	  }[]
-	| null
-> {
+): { key: string; element: string | number; largestFile: File }[] | null {
 	const episodeKeys = getEpisodeKeys(stripExtension(title));
 	if (!episodeKeys) return null;
 	const element = episodeKeys.episode;
@@ -327,10 +323,7 @@ export async function cacheEnsembleTorrentEntry(
 	searchee: SearcheeWithInfoHash,
 	torrentSavePaths?: Map<string, string>,
 ): Promise<EnsembleEntry[] | null> {
-	const ensemblePieces = await createEnsemblePieces(
-		searchee.title,
-		searchee.files,
-	);
+	const ensemblePieces = createEnsemblePieces(searchee.title, searchee.files);
 	if (!ensemblePieces || !ensemblePieces.length) return null;
 
 	let savePath: string | undefined;
@@ -394,52 +387,42 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 			}
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
-			searchees = (
-				await Promise.all(
-					clients.map(async (client) => {
-						const { searchees } = await client.getClientSearchees();
-						validateClientSavePaths(
-							searchees,
-							searchees.reduce((map, searchee) => {
-								map.set(searchee.infoHash, searchee.savePath);
-								return map;
-							}, new Map<string, string>()),
-							client.label,
-							client.clientPriority,
-						);
-						return searchees;
-					}),
-				)
-			).flat();
+			searchees = await flatMapAsync(clients, async (client) => {
+				const { searchees } = await client.getClientSearchees();
+				await validateClientSavePaths(
+					searchees,
+					searchees.reduce((map, searchee) => {
+						map.set(searchee.infoHash, searchee.savePath);
+						return map;
+					}, new Map<string, string>()),
+					client.label,
+					client.clientPriority,
+				);
+				return searchees;
+			});
 		}
 	} else {
 		if (torrentDir) {
 			searchees = await indexTorrentDir(torrentDir);
 		} else {
-			searchees = (
-				await Promise.all(
-					clients.map((client) =>
-						client.getClientSearchees({
+			searchees = await flatMapAsync(
+				clients,
+				async (client) =>
+					(
+						await client.getClientSearchees({
 							newSearcheesOnly: true,
-						}),
-					),
-				)
-			)
-				.map((r) => r.newSearchees)
-				.flat();
+						})
+					).newSearchees,
+			);
 		}
 	}
 	if (!seasonFromEpisodes) return;
 
-	const ensembleRows = (
-		await Promise.all(
-			searchees.map((searchee) =>
-				cacheEnsembleTorrentEntry(searchee, infoHashPathMap),
-			),
-		)
-	)
-		.flat()
-		.filter(isTruthy);
+	const ensembleRows = await flatMapAsync(
+		searchees,
+		async (searchee) =>
+			(await cacheEnsembleTorrentEntry(searchee, infoHashPathMap)) ?? [],
+	);
 	await inBatches(ensembleRows, async (batch) => {
 		await db("ensemble")
 			.insert(batch)
@@ -508,45 +491,52 @@ export async function indexTorrentsAndDataDirs(
 		const { dataDirs, seasonFromEpisodes, torrentDir, useClientTorrents } =
 			getRuntimeConfig();
 		if (!useClientTorrents) {
-			const hashes = await db("client_searchee").select("info_hash");
+			const hashes = (
+				await db("client_searchee").select("info_hash")
+			).map((r) => r.info_hash);
 			await inBatches(hashes, async (batch) => {
-				await db("ensemble")
-					.whereIn(
-						"info_hash",
-						batch.map((row) => row.info_hash),
-					)
-					.del();
+				await db("ensemble").whereIn("info_hash", batch).del();
 			});
 			await db("client_searchee").del();
+		} else {
+			await inBatches(getClients(), async (batch) => {
+				const clientHosts = batch.map((client) => client.clientHost);
+				await db("client_searchee")
+					.whereNotIn("client_host", clientHosts)
+					.del();
+				await db("ensemble")
+					.whereNotIn("client_host", clientHosts)
+					.del();
+			});
 		}
 		if (!torrentDir) {
-			const hashes = await db("torrent").select("info_hash");
+			const hashes = (await db("torrent").select("info_hash")).map(
+				(r) => r.info_hash,
+			);
 			await inBatches(hashes, async (batch) => {
-				await db("ensemble")
-					.whereIn(
-						"info_hash",
-						batch.map((row) => row.info_hash),
-					)
-					.del();
+				await db("ensemble").whereIn("info_hash", batch).del();
 			});
 			await db("torrent").del();
 		}
 		if (!dataDirs.length) {
-			const paths = await db("data").select("path");
+			const paths = (await db("data").select("path")).map((r) => r.path);
 			await inBatches(paths, async (batch) => {
-				await db("ensemble")
-					.whereIn(
-						"path",
-						batch.map((row) => row.path),
-					)
-					.del();
+				await db("ensemble").whereIn("path", batch).del();
 			});
 			await db("data").del();
+		} else {
+			const paths = (await db("data").select("path")).map((r) => r.path);
+			const toDelete = paths.filter((p) => !isChildPath(p, dataDirs));
+			await inBatches(toDelete, async (batch) => {
+				await db("data").whereIn("path", batch).del();
+				await db("ensemble").whereIn("path", batch).del();
+			});
 		}
 		if (!seasonFromEpisodes) await db("ensemble").del();
 	}
 	return withMutex(
 		Mutex.INDEX_TORRENTS_AND_DATA_DIRS,
+		{ useQueue: false },
 		async () => {
 			const maxRetries = 3;
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -568,7 +558,6 @@ export async function indexTorrentsAndDataDirs(
 				}
 			}
 		},
-		{ useQueue: false },
 	);
 }
 
@@ -657,9 +646,7 @@ export async function getSimilarByName(name: string): Promise<{
 			LEVENSHTEIN_DIVISOR,
 	);
 
-	const filterEntries = async (
-		dbEntries: { title?: string; name?: string }[],
-	) => {
+	const filterEntries = (dbEntries: { title?: string; name?: string }[]) => {
 		return dbEntries.filter((dbEntry) => {
 			const entry = getKeysFromName(dbEntry.title ?? dbEntry.name!);
 			if (entry.element !== element) return false;
@@ -685,14 +672,14 @@ export async function getSimilarByName(name: string): Promise<{
 
 	if (useClientTorrents) {
 		clientSearchees.push(
-			...(await filterEntries(await db("client_searchee"))).map(
+			...filterEntries(await db("client_searchee")).map(
 				createSearcheeFromDB,
 			),
 		);
 	} else if (torrentDir) {
-		const filteredTorrentEntries = (await filterEntries(
+		const filteredTorrentEntries = filterEntries(
 			await db("torrent").select("name", "file_path"),
-		)) as { name: string; file_path: string }[];
+		) as { name: string; file_path: string }[];
 		if (filteredTorrentEntries.length) {
 			const client = getClients()[0];
 			const torrentInfos =
@@ -701,37 +688,39 @@ export async function getSimilarByName(name: string): Promise<{
 					: [];
 			clientSearchees.push(
 				...(
-					await Promise.all(
-						filteredTorrentEntries.map(async (dbTorrent) => {
-							return (
-								await createSearcheeFromTorrentFile(
-									dbTorrent.file_path,
-									torrentInfos,
-								)
-							).orElse(null);
-						}),
+					await mapAsync(filteredTorrentEntries, (dbTorrent) =>
+						createSearcheeFromTorrentFile(
+							dbTorrent.file_path,
+							torrentInfos,
+						),
 					)
-				).filter(isTruthy),
+				)
+					.filter(isOk)
+					.map((r) => r.unwrap()),
 			);
 		}
 	}
 
 	const entriesToDelete: string[] = [];
-	const filteredDataEntries = (
-		(await filterEntries(await db("data"))) as {
+	const filteredDataEntries = await filterAsync(
+		filterEntries(await db("data")) as {
 			title: string;
 			path: string;
-		}[]
-	).filter(({ path }) => {
-		if (
-			!existsSync(path) ||
-			shouldIgnorePathHeuristically(path, statSync(path).isDirectory())
-		) {
-			entriesToDelete.push(path);
-			return false;
-		}
-		return true;
-	});
+		}[],
+		async ({ path }) => {
+			if (
+				(await notExists(path)) ||
+				shouldIgnorePathHeuristically(
+					path,
+					(await stat(path)).isDirectory(),
+				)
+			) {
+				entriesToDelete.push(path);
+				return false;
+			}
+			return true;
+		},
+	);
 	await inBatches(entriesToDelete, async (batch) => {
 		await db("data").whereIn("path", batch).del();
 		await db("ensemble").whereIn("path", batch).del();
@@ -739,10 +728,8 @@ export async function getSimilarByName(name: string): Promise<{
 	if (filteredDataEntries.length) {
 		dataSearchees.push(
 			...(
-				await Promise.all(
-					filteredDataEntries.map(async (dbData) => {
-						return createSearcheeFromPath(dbData.path);
-					}),
+				await mapAsync(filteredDataEntries, (dbData) =>
+					createSearcheeFromPath(dbData.path),
 				)
 			)
 				.filter(isOk)

@@ -1,11 +1,5 @@
-import {
-	existsSync,
-	FSWatcher,
-	readdirSync,
-	readFileSync,
-	statSync,
-	watch,
-} from "fs";
+import { FSWatcher, watch } from "fs";
+import { readdir, readFile, stat } from "fs/promises";
 import Fuse from "fuse.js";
 import { basename, dirname, extname, join, resolve, sep } from "path";
 import { IGNORED_FOLDERS_SUBSTRINGS, VIDEO_EXTENSIONS } from "./constants.js";
@@ -20,7 +14,15 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import { createEnsemblePieces, EnsembleEntry } from "./torrent.js";
-import { createKeyTitle, inBatches, isTruthy } from "./utils.js";
+import {
+	createKeyTitle,
+	exists,
+	filterAsync,
+	flatMapAsync,
+	inBatches,
+	isTruthy,
+	mapAsync,
+} from "./utils.js";
 import { isOk } from "./Result.js";
 
 interface DataEntry {
@@ -57,40 +59,38 @@ export async function indexDataDirs(options: {
 			modifiedPaths.set(dataDir, new Set());
 			watchers.set(dataDir, createWatcher(dataDir));
 		}
-		const searcheePaths = findSearcheesFromAllDataDirs();
+		const searcheePaths = await findSearcheesFromAllDataDirs();
 		const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
-		if (existsSync(maxUserWatchesPath)) {
-			const limit = parseInt(readFileSync(maxUserWatchesPath, "utf8"));
+		if (await exists(maxUserWatchesPath)) {
+			const limit = parseInt(await readFile(maxUserWatchesPath, "utf8"));
 			if (limit < searcheePaths.length * 10) {
 				logger.error(
 					`max_user_watches too low for proper indexing of dataDirs. It is recommended to set fs.inotify.max_user_watches=1048576 in /etc/sysctl.conf (only on the host system if using docker) - current: ${limit}`,
 				);
 			}
 		}
-		return await indexDataPaths(searcheePaths);
+		return indexDataPaths(searcheePaths);
 	}
 
-	await Promise.all(
-		dataDirs.map(async (dataDir) => {
-			const modified = modifiedPaths.get(dataDir)!;
-			const eventPaths: string[] = [];
-			while (modified.size) {
-				const path: string | undefined = modified.values().next().value;
-				if (!path) continue;
-				if (!modified.delete(path)) continue;
-				eventPaths.push(path);
-			}
-			if (!eventPaths.length) return;
-			logger.verbose(
-				`Indexing dataDir ${dataDir} due to recent changes...`,
-			);
-			eventPaths.sort(
-				(a, b) =>
-					b.split(sep).filter(isTruthy).length -
-					a.split(sep).filter(isTruthy).length,
-			);
-			const deletedPaths: string[] = [];
-			const paths = Array.from(
+	await mapAsync(dataDirs, async (dataDir) => {
+		const modified = modifiedPaths.get(dataDir)!;
+		const eventPaths: string[] = [];
+		while (modified.size) {
+			const path: string | undefined = modified.values().next().value;
+			if (!path) continue;
+			if (!modified.delete(path)) continue;
+			eventPaths.push(path);
+		}
+		if (!eventPaths.length) return;
+		logger.verbose(`Indexing dataDir ${dataDir} due to recent changes...`);
+		eventPaths.sort(
+			(a, b) =>
+				b.split(sep).filter(isTruthy).length -
+				a.split(sep).filter(isTruthy).length,
+		);
+		const deletedPaths: string[] = [];
+		const paths = await filterAsync(
+			Array.from(
 				eventPaths.reduce<Set<string>>((acc, path) => {
 					const affectedPaths: string[] = [path];
 					let parentPath = dirname(path);
@@ -105,18 +105,19 @@ export async function indexDataDirs(options: {
 					}
 					return acc;
 				}, new Set()),
-			).filter((path) => {
-				if (existsSync(path)) return true;
+			),
+			async (path) => {
+				if (await exists(path)) return true;
 				deletedPaths.push(path);
 				return false;
-			});
-			await inBatches(deletedPaths, async (batch) => {
-				await db("data").whereIn("path", batch).del();
-				await db("ensemble").whereIn("path", batch).del();
-			});
-			return indexDataPaths(paths);
-		}),
-	);
+			},
+		);
+		await inBatches(deletedPaths, async (batch) => {
+			await db("data").whereIn("path", batch).del();
+			await db("ensemble").whereIn("path", batch).del();
+		});
+		return indexDataPaths(paths);
+	});
 }
 
 /**
@@ -130,7 +131,7 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 	const dataRows: DataEntry[] = [];
 	const ensembleRows: EnsembleEntry[] = [];
 	for (const path of paths) {
-		const files = getFilesFromDataRoot(
+		const files = await getFilesFromDataRoot(
 			path,
 			memoizedPaths,
 			memoizedLengths,
@@ -140,11 +141,7 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 		if (!title) continue;
 		dataRows.push({ title, path });
 		if (seasonFromEpisodes) {
-			const ensembleEntries = await indexEnsembleDataEntry(
-				title,
-				path,
-				files,
-			);
+			const ensembleEntries = indexEnsembleDataEntry(title, path, files);
 			if (ensembleEntries) ensembleRows.push(...ensembleEntries);
 		}
 	}
@@ -159,12 +156,12 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 	});
 }
 
-async function indexEnsembleDataEntry(
+function indexEnsembleDataEntry(
 	title: string,
 	path: string,
 	files: File[],
-): Promise<EnsembleEntry[] | null> {
-	const ensemblePieces = await createEnsemblePieces(title, files);
+): EnsembleEntry[] | null {
+	const ensemblePieces = createEnsemblePieces(title, files);
 	if (!ensemblePieces || !ensemblePieces.length) return null;
 	return ensemblePieces.map((ensemblePiece) => ({
 		client_host: null,
@@ -178,11 +175,11 @@ async function indexEnsembleDataEntry(
 export async function getDataByFuzzyName(
 	name: string,
 ): Promise<SearcheeWithoutInfoHash[]> {
-	const allDataEntries: { title: string; path: string }[] = await db("data");
+	const allDataEntries: DataEntry[] = await db("data");
 	const fullMatch = createKeyTitle(name);
 
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
-	let filteredNames: typeof allDataEntries = [];
+	let filteredNames: DataEntry[] = [];
 	if (fullMatch) {
 		filteredNames = allDataEntries.filter((dbData) => {
 			const dbMatch = createKeyTitle(dbData.title);
@@ -194,19 +191,21 @@ export async function getDataByFuzzyName(
 	filteredNames = filteredNames.length > 0 ? filteredNames : allDataEntries;
 
 	const entriesToDelete: string[] = [];
-	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(filteredNames, {
-		keys: ["title"],
-		distance: 6,
-		threshold: 0.25,
-	})
-		.search(name)
-		.filter((match) => {
+
+	const potentialMatches = await filterAsync(
+		// @ts-expect-error fuse types are confused
+		new Fuse(filteredNames, {
+			keys: ["title"],
+			distance: 6,
+			threshold: 0.25,
+		}).search(name) as { item: DataEntry }[],
+		async (match) => {
 			const path = match.item.path;
-			if (existsSync(path)) return true;
+			if (await exists(path)) return true;
 			entriesToDelete.push(path);
 			return false;
-		});
+		},
+	);
 	await inBatches(entriesToDelete, async (batch) => {
 		await db("data").whereIn("path", batch).del();
 		await db("ensemble").whereIn("path", batch).del();
@@ -228,24 +227,28 @@ export function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
 	}
 }
 
-export function findPotentialNestedRoots(
+export async function findPotentialNestedRoots(
 	root: string,
 	depth: number,
 	isDirHint?: boolean,
-): string[] {
+): Promise<string[]> {
 	try {
 		const isDir =
-			isDirHint !== undefined ? isDirHint : statSync(root).isDirectory();
+			isDirHint !== undefined
+				? isDirHint
+				: (await stat(root)).isDirectory();
 		if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir)) {
 			return [];
 		} else if (depth > 0 && isDir) {
-			const directChildren = readdirSync(root, { withFileTypes: true });
-			const allDescendants = directChildren.flatMap((dirent) =>
-				findPotentialNestedRoots(
-					join(root, dirent.name),
-					depth - 1,
-					dirent.isDirectory(),
-				),
+			const directChildren = await readdir(root, { withFileTypes: true });
+			const allDescendants = await flatMapAsync(
+				directChildren,
+				(dirent) =>
+					findPotentialNestedRoots(
+						join(root, dirent.name),
+						depth - 1,
+						dirent.isDirectory(),
+					),
 			);
 			return [...allDescendants, root]; // deepest paths first for memoization
 		} else {
@@ -258,11 +261,12 @@ export function findPotentialNestedRoots(
 	}
 }
 
-export function findSearcheesFromAllDataDirs(): string[] {
+export async function findSearcheesFromAllDataDirs(): Promise<string[]> {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
-	return dataDirs.flatMap((dataDir) =>
-		readdirSync(dataDir)
-			.map((dirent) => join(dataDir, dirent))
-			.flatMap((path) => findPotentialNestedRoots(path, maxDataDepth)),
+	return flatMapAsync(dataDirs, async (dataDir) =>
+		flatMapAsync(
+			(await readdir(dataDir)).map((dirent) => join(dataDir, dirent)),
+			(path) => findPotentialNestedRoots(path, maxDataDepth),
+		),
 	);
 }

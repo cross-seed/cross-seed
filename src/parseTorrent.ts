@@ -82,7 +82,7 @@ function ensure(bool: unknown, fieldName: string) {
 
 function sha1(buf: Buffer): string {
 	const hash = createHash("sha1");
-	hash.update(buf);
+	hash.update(new Uint8Array(buf));
 	return hash.digest("hex");
 }
 

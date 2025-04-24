@@ -1,5 +1,5 @@
 import Sqlite from "better-sqlite3";
-import { existsSync, readdirSync, statSync, unlinkSync } from "fs";
+import { readdir, stat, unlink } from "fs/promises";
 import knex from "knex";
 import ms from "ms";
 import { join } from "path";
@@ -10,7 +10,7 @@ import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { migrations } from "./migrations/migrations.js";
 import { cacheEnsembleTorrentEntry } from "./torrent.js";
-import { inBatches, isTruthy } from "./utils.js";
+import { filterAsync, flatMapAsync, inBatches, notExists } from "./utils.js";
 
 const filename = join(appDir(), "cross-seed.db");
 const rawSqliteHandle = new Sqlite(filename);
@@ -30,27 +30,18 @@ export async function cleanupDB(): Promise<void> {
 	await Promise.all([
 		(async () => {
 			if (!useClientTorrents) return;
-			const searchees = (
-				await Promise.all(
-					getClients().map((client) =>
-						client.getClientSearchees({
-							refresh: [],
-						}),
-					),
-				)
-			)
-				.map((r) => r.searchees)
-				.flat();
+			const searchees = await flatMapAsync(
+				getClients(),
+				async (client) =>
+					(await client.getClientSearchees({ refresh: [] }))
+						.searchees,
+			);
 			if (!seasonFromEpisodes) return;
-			const ensembleRows = (
-				await Promise.all(
-					searchees.map((searchee) =>
-						cacheEnsembleTorrentEntry(searchee),
-					),
-				)
-			)
-				.flat()
-				.filter(isTruthy);
+			const ensembleRows = await flatMapAsync(
+				searchees,
+				async (searchee) =>
+					(await cacheEnsembleTorrentEntry(searchee)) ?? [],
+			);
 			await inBatches(ensembleRows, async (batch) => {
 				await db("ensemble")
 					.insert(batch)
@@ -60,9 +51,10 @@ export async function cleanupDB(): Promise<void> {
 		})(),
 		(async () => {
 			if (!dataDirs.length) return;
-			const deletedPaths = (await db("data").select("path"))
-				.map((e) => e.path)
-				.filter((p) => !existsSync(p));
+			const deletedPaths = await filterAsync(
+				(await db("data").select("path")).map((e) => e.path),
+				(p) => notExists(p),
+			);
 			await inBatches(deletedPaths, async (batch) => {
 				await db("data").whereIn("path", batch).del();
 				await db("ensemble").whereIn("path", batch).del();
@@ -70,9 +62,10 @@ export async function cleanupDB(): Promise<void> {
 		})(),
 		(async () => {
 			if (!seasonFromEpisodes) return;
-			const deletedPaths = (await db("ensemble").select("path"))
-				.map((e) => e.path)
-				.filter((p) => !existsSync(p));
+			const deletedPaths = await filterAsync(
+				(await db("ensemble").select("path")).map((e) => e.path),
+				(p) => notExists(p),
+			);
 			await inBatches(deletedPaths, async (batch) => {
 				await db("data").whereIn("path", batch).del();
 				await db("ensemble").whereIn("path", batch).del();
@@ -80,16 +73,16 @@ export async function cleanupDB(): Promise<void> {
 		})(),
 		(async () => {
 			const torrentCacheDir = join(appDir(), TORRENT_CACHE_FOLDER);
-			const files = readdirSync(torrentCacheDir);
+			const files = await readdir(torrentCacheDir);
 			const now = Date.now();
 			for (const file of files) {
 				const filePath = join(torrentCacheDir, file);
-				if (now - statSync(filePath).atimeMs > ms("1 year")) {
+				if (now - (await stat(filePath)).atimeMs > ms("1 year")) {
 					logger.verbose(`Deleting ${filePath}`);
 					await db("decision")
 						.where("info_hash", file.split(".")[0])
 						.del();
-					unlinkSync(filePath);
+					await unlink(filePath);
 				}
 			}
 		})(),

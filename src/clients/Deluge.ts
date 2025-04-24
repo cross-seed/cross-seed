@@ -1,4 +1,4 @@
-import { readdirSync } from "fs";
+import { readdir } from "fs/promises";
 import ms from "ms";
 import { basename } from "path";
 import { inspect } from "util";
@@ -116,7 +116,7 @@ export default class Deluge implements TorrentClient {
 		});
 
 		if (!torrentDir) return;
-		if (!readdirSync(torrentDir).some((f) => f.endsWith(".state"))) {
+		if (!(await readdir(torrentDir)).some((f) => f.endsWith(".state"))) {
 			throw new CrossSeedError(
 				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
 			);
@@ -378,10 +378,10 @@ export default class Deluge implements TorrentClient {
 		torrentInfo: TorrentInfo,
 	): string {
 		const { linkCategory, duplicateCategories } = getRuntimeConfig();
-		if (!searchee.infoHash || !torrentInfo!.label) {
+		if (!searchee.infoHash || !torrentInfo.label) {
 			return this.delugeLabel;
 		}
-		const ogLabel = torrentInfo!.label;
+		const ogLabel = torrentInfo.label;
 		if (!duplicateCategories) {
 			return ogLabel;
 		}
@@ -518,7 +518,7 @@ export default class Deluge implements TorrentClient {
 					// leaves torrent ready to download - ~99%
 					await wait(1000);
 					await this.recheckTorrent(newTorrent.infoHash);
-					this.resumeInjection(newTorrent, decision, {
+					void this.resumeInjection(newTorrent, decision, {
 						checkOnce: false,
 					});
 				}
@@ -591,7 +591,7 @@ export default class Deluge implements TorrentClient {
 		if (!torrentResponse) {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		const torrent = torrentResponse![meta.infoHash!];
+		const torrent = torrentResponse[meta.infoHash];
 		if (!torrent) {
 			return resultOfErr("NOT_FOUND");
 		}

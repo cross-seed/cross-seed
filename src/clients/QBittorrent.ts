@@ -1,4 +1,4 @@
-import { readdirSync } from "fs";
+import { readdir } from "fs/promises";
 import ms from "ms";
 import path from "path";
 import { BodyInit } from "undici-types";
@@ -212,7 +212,9 @@ export default class QBittorrent implements TorrentClient {
 				`[${this.label}] torrentDir is not compatible with SQLite mode in qBittorrent, use https://www.cross-seed.org/docs/basics/options#useclienttorrents`,
 			);
 		}
-		if (!readdirSync(torrentDir).some((f) => f.endsWith(".fastresume"))) {
+		if (
+			!(await readdir(torrentDir)).some((f) => f.endsWith(".fastresume"))
+		) {
 			throw new CrossSeedError(
 				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
 			);
@@ -252,7 +254,7 @@ export default class QBittorrent implements TorrentClient {
 						"Received 403 from API. Logging in again and retrying",
 				});
 				await this.login();
-				return this.request(path, body, headers, retries - 1);
+				return await this.request(path, body, headers, retries - 1);
 			}
 		} catch (e) {
 			if (retries > 0) {
@@ -934,7 +936,7 @@ export default class QBittorrent implements TorrentClient {
 				return InjectionResult.TORRENT_NOT_COMPLETE;
 			}
 			const filename = `${newTorrent.getFileSystemSafeName()}.${TORRENT_TAG}.torrent`;
-			const buffer = new Blob([newTorrent.encode()], {
+			const buffer = new Blob([new Uint8Array(newTorrent.encode())], {
 				type: "application/x-bittorrent",
 			});
 			const toRecheck = shouldRecheck(searchee, decision);
@@ -993,7 +995,7 @@ export default class QBittorrent implements TorrentClient {
 			}
 			if (toRecheck) {
 				await this.recheckTorrent(newInfo.hash);
-				this.resumeInjection(newTorrent, decision, {
+				void this.resumeInjection(newTorrent, decision, {
 					checkOnce: false,
 				});
 			}

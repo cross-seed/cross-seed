@@ -7,7 +7,7 @@ import { Label, logger } from "./logger.js";
 import { bulkSearch, scanRssFeeds } from "./pipeline.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import { updateCaps } from "./torznab.js";
-import { Mutex, withMutex } from "./utils.js";
+import { humanReadableDate, Mutex, withMutex } from "./utils.js";
 
 export enum JobName {
 	RSS = "rss",
@@ -92,7 +92,11 @@ function logNextRun(
 
 	const eligibilityTs = lastRun ? lastRun + cadence : now;
 
-	const lastRunStr = lastRun ? `${ms(now - lastRun)} ago` : "never";
+	const lastRunStr = !lastRun
+		? "never"
+		: now >= lastRun
+			? `${ms(now - lastRun)} ago`
+			: `at ${humanReadableDate(lastRun - cadence)}`;
 	const nextRunStr =
 		now >= eligibilityTs ? "now" : `in ${ms(eligibilityTs - now)}`;
 
@@ -114,6 +118,7 @@ export async function checkJobs(
 ): Promise<void> {
 	return withMutex(
 		Mutex.CHECK_JOBS,
+		{ useQueue: options.useQueue },
 		async () => {
 			const now = Date.now();
 			for (const job of jobs) {
@@ -146,7 +151,6 @@ export async function checkJobs(
 				}
 			}
 		},
-		{ useQueue: options.useQueue },
 	);
 }
 

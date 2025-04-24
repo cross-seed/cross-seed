@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync } from "fs";
-import { access, constants, stat } from "fs/promises";
+import { access, constants, mkdir, stat } from "fs/promises";
 import ms from "ms";
 import { sep } from "path";
 import { inspect } from "util";
@@ -21,7 +20,7 @@ import {
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
-import { Awaitable, wait } from "./utils.js";
+import { Awaitable, mapAsync, notExists, wait } from "./utils.js";
 
 export async function exitGracefully() {
 	await db.destroy();
@@ -86,18 +85,18 @@ async function checkConfigPaths(): Promise<void> {
 		pathFailure++;
 	}
 
-	if (!existsSync(outputDir)) {
+	if (await notExists(outputDir)) {
 		logger.info(`Creating outputDir: ${outputDir}`);
-		mkdirSync(outputDir, { recursive: true });
+		await mkdir(outputDir, { recursive: true });
 	}
 	if (!(await verifyPath(outputDir, "outputDir", READ_AND_WRITE))) {
 		pathFailure++;
 	}
 
 	for (const linkDir of linkDirs) {
-		if (!existsSync(linkDir)) {
+		if (await notExists(linkDir)) {
 			logger.info(`Creating linkDir: ${linkDir}`);
-			mkdirSync(linkDir, { recursive: true });
+			await mkdir(linkDir, { recursive: true });
 		}
 		if (!(await verifyPath(linkDir, "linkDir", READ_AND_WRITE))) {
 			pathFailure++;
@@ -116,7 +115,7 @@ async function checkConfigPaths(): Promise<void> {
 	if (linkDirs.length) {
 		for (const dataDir of dataDirs) {
 			try {
-				testLinking(
+				await testLinking(
 					dataDir,
 					"dataDirSrc.cross-seed",
 					"dataDirDest.cross-seed",
@@ -165,8 +164,8 @@ async function retry<T>(
 export async function doStartupValidation(): Promise<void> {
 	await checkConfigPaths(); // ensure paths are valid first
 	instantiateDownloadClients();
-	const validateClientConfig = async () =>
-		Promise.all(getClients().map((client) => client.validateConfig()));
+	const validateClientConfig = () =>
+		mapAsync(getClients(), (client) => client.validateConfig());
 	const errors = (
 		await Promise.allSettled([
 			retry(validateTorznabUrls, 5, ms("1 minute")),

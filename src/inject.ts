@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { stat, unlink } from "fs/promises";
 import ms from "ms";
-import { copyFileSync, existsSync } from "fs";
+import { copyFile } from "fs/promises";
 import path, { basename } from "path";
 import { performActionWithoutMutex } from "./action.js";
 import {
@@ -36,6 +36,7 @@ import {
 import {
 	areMediaTitlesSimilar,
 	comparing,
+	exists,
 	formatAsList,
 	getLogString,
 	humanReadableDate,
@@ -322,7 +323,7 @@ async function injectFromStalledTorrent({
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
 		});
 		await client!.recheckTorrent(meta.infoHash);
-		client!.resumeInjection(meta, stalledDecision, {
+		void client!.resumeInjection(meta, stalledDecision, {
 			checkOnce: false,
 		});
 	} else {
@@ -388,7 +389,7 @@ async function injectionAlreadyExists({
 			label: Label.INJECT,
 			message: `${progress} ${filePathLog} is being checked by client - ${chalk.green(injectionResult)}`,
 		});
-		client!.resumeInjection(meta, decision, {
+		void client!.resumeInjection(meta, decision, {
 			checkOnce: false,
 		});
 	} else if (!isComplete && decision !== Decision.MATCH_PARTIAL) {
@@ -399,7 +400,7 @@ async function injectionAlreadyExists({
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
 		});
 		await client!.recheckTorrent(meta.infoHash);
-		client!.resumeInjection(meta, decision, {
+		void client!.resumeInjection(meta, decision, {
 			checkOnce: false,
 		});
 		if (Date.now() >= finalCheckTime) {
@@ -416,7 +417,7 @@ async function injectionAlreadyExists({
 				label: Label.INJECT,
 				message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)} (incomplete)`,
 			});
-			client!.resumeInjection(meta, decision, {
+			void client!.resumeInjection(meta, decision, {
 				checkOnce: true,
 			});
 		}
@@ -426,11 +427,15 @@ async function injectionAlreadyExists({
 	if (isComplete) {
 		await deleteTorrentFileIfSafe(torrentFilePath);
 	} else {
-		deleteTorrentFileIfComplete(torrentFilePath, client!, meta.infoHash);
+		void deleteTorrentFileIfComplete(
+			torrentFilePath,
+			client!,
+			meta.infoHash,
+		);
 	}
 }
 
-async function injectionSuccess({
+function injectionSuccess({
 	progress,
 	torrentFilePath,
 	client,
@@ -459,7 +464,7 @@ async function injectionSuccess({
 	} else {
 		summary.FULL_MATCHES++;
 	}
-	deleteTorrentFileIfComplete(torrentFilePath, client!, meta.infoHash);
+	void deleteTorrentFileIfComplete(torrentFilePath, client!, meta.infoHash);
 }
 
 async function loadMetafile(
@@ -553,7 +558,7 @@ async function injectSavedTorrent(
 
 	switch (injectionResult) {
 		case InjectionResult.SUCCESS:
-			await injectionSuccess(injectionAftermath);
+			injectionSuccess(injectionAftermath);
 			break;
 		case InjectionResult.FAILURE:
 			injectionFailed(injectionAftermath);
@@ -611,7 +616,7 @@ function logInjectSummary(
 			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
 		});
 	}
-	if (injectDir) {
+	if (injectDir !== undefined) {
 		logger.info({
 			label: Label.INJECT,
 			message: `Waiting on post-injection tasks to complete...`,
@@ -641,7 +646,7 @@ export async function injectSavedTorrents(): Promise<void> {
 	const targetDir = injectDir ?? outputDir;
 	const targetDirLog = chalk.bold.magenta(targetDir);
 
-	if (injectDir) {
+	if (injectDir !== undefined) {
 		logger.warn({
 			label: Label.INJECT,
 			message: `Manually injecting torrents performs minimal filtering which slightly increases chances of false positives, see the docs for more info`,
@@ -667,25 +672,16 @@ export async function injectSavedTorrents(): Promise<void> {
 		message: `Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to inject in ${targetDirLog}`,
 	});
 	const summary = createSummary(torrentFilePaths.length);
-	const { realSearchees, ensembleSearchees } = await withMutex(
-		Mutex.CREATE_ALL_SEARCHEES,
-		async () => {
-			const realSearchees = await findAllSearchees(Label.INJECT);
-			const ensembleSearchees = await createEnsembleSearchees(
-				realSearchees,
-				{
-					useFilters: false,
-				},
-			);
-			return { realSearchees, ensembleSearchees };
-		},
-		{ useQueue: true },
-	);
+	const realSearchees = await findAllSearchees(Label.INJECT);
+	const ensembleSearchees = await createEnsembleSearchees(realSearchees, {
+		useFilters: false,
+	});
 	const searchees = [...realSearchees, ...ensembleSearchees];
 	for (const [i, torrentFilePath] of torrentFilePaths.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${torrentFilePaths.length})`);
 		await withMutex(
 			Mutex.CLIENT_INJECTION,
+			{ useQueue: true },
 			async () => {
 				return injectSavedTorrent(
 					progress,
@@ -695,7 +691,6 @@ export async function injectSavedTorrents(): Promise<void> {
 					ignoreTitles ?? false,
 				);
 			},
-			{ useQueue: true },
 		);
 	}
 	logInjectSummary(summary, flatLinking, injectDir);
@@ -719,11 +714,11 @@ export async function restoreFromTorrentCache(): Promise<void> {
 			outputDir,
 			`[${MediaType.OTHER}][${UNKNOWN_TRACKER}]${basename(torrentFilePath)}`,
 		);
-		if (existsSync(dest)) {
+		if (await exists(dest)) {
 			existed++;
 			continue;
 		}
-		copyFileSync(torrentFilePath, dest);
+		await copyFile(torrentFilePath, dest);
 		if ((i + 1) % 100 === 0) {
 			console.log(
 				`${chalk.blue(`(${i + 1}/${torrentFilePaths.length})`)} ${chalk.bold.magenta(dest)}`,

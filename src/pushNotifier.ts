@@ -10,7 +10,7 @@ import { ResultAssessment } from "./decide.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { getSearcheeSource, SearcheeWithLabel } from "./searchee.js";
-import { formatAsList } from "./utils.js";
+import { formatAsList, mapAsync } from "./utils.js";
 
 export let pushNotifier: PushNotifier;
 
@@ -39,37 +39,35 @@ export class PushNotifier {
 		body,
 		...rest
 	}: PushNotification): Promise<void[]> {
-		return Promise.all(
-			this.urls.map(async (url) => {
-				try {
-					const response = await fetch(url, {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							"User-Agent": USER_AGENT,
-						},
-						body: JSON.stringify({ title, body, ...rest }),
-					});
+		return mapAsync(this.urls, async (url) => {
+			try {
+				const response = await fetch(url, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"User-Agent": USER_AGENT,
+					},
+					body: JSON.stringify({ title, body, ...rest }),
+				});
 
-					if (!response.ok) {
-						const responseText = await response.clone().text();
-						logger.error(
-							`${url} rejected push notification: ${response.status} ${response.statusText}`,
-						);
-						logger.debug(
-							`${url}: ${responseText.slice(0, 100)}${
-								responseText.length > 100 ? "..." : ""
-							}"`,
-						);
-					}
-				} catch (e) {
+				if (!response.ok) {
+					const responseText = await response.clone().text();
 					logger.error(
-						`${url} failed to send push notification: ${e.message}`,
+						`${url} rejected push notification: ${response.status} ${response.statusText}`,
 					);
-					logger.debug(e);
+					logger.debug(
+						`${url}: ${responseText.slice(0, 100)}${
+							responseText.length > 100 ? "..." : ""
+						}"`,
+					);
 				}
-			}),
-		);
+			} catch (e) {
+				logger.error(
+					`${url} failed to send push notification: ${e.message}`,
+				);
+				logger.debug(e);
+			}
+		});
 	}
 }
 
@@ -111,7 +109,7 @@ export function sendResultsNotification(
 			: "Saved";
 		const decisions = notableSuccesses.map(([{ decision }]) => decision);
 
-		pushNotifier.notify({
+		void pushNotifier.notify({
 			body: `${source}: ${performedAction} ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
 			extra: {
 				event: Event.RESULTS,
@@ -147,7 +145,7 @@ export function sendResultsNotification(
 		const trackersListStr = formatAsList(trackers, { sort: true });
 		const decisions = failures.map(([{ decision }]) => decision);
 
-		pushNotifier.notify({
+		void pushNotifier.notify({
 			body: `${source}: Failed to inject ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
 			extra: {
 				event: Event.RESULTS,
