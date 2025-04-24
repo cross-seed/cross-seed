@@ -817,16 +817,14 @@ export async function scanRssFeeds() {
 		message: "Querying RSS feeds...",
 	});
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
-	const numCandidates = (
-		await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
-			let i = 0;
-			for await (const candidate of candidates) {
-				await checkNewCandidateMatch(candidate, Label.RSS);
-				i++;
-			}
-			return i;
-		})
-	).reduce((acc, cur) => acc + cur, 0);
+	let numCandidates = 0;
+	await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
+		for await (const candidate of candidates) {
+			await checkNewCandidateMatch(candidate, Label.RSS);
+			await wait(100); // necessary to avoid bogarting the event loop
+			numCandidates++;
+		}
+	});
 
 	logger.info({
 		label: Label.RSS,
