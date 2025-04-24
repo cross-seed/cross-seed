@@ -9,12 +9,18 @@ import {
 	TorrentMetadataInClient,
 	validateClientSavePaths,
 } from "./clients/TorrentClient.js";
+import { isChildPath } from "./configSchema.js";
 import {
 	LEVENSHTEIN_DIVISOR,
 	MediaType,
 	SAVED_TORRENTS_INFO_REGEX,
 	USER_AGENT,
 } from "./constants.js";
+import {
+	getDataByFuzzyName,
+	indexDataDirs,
+	shouldIgnorePathHeuristically,
+} from "./dataFiles.js";
 import { db } from "./db.js";
 import { Label, logger, logOnce } from "./logger.js";
 import { Metafile, updateMetafileMetadata } from "./parseTorrent.js";
@@ -48,11 +54,6 @@ import {
 	wait,
 	withMutex,
 } from "./utils.js";
-import {
-	getDataByFuzzyName,
-	indexDataDirs,
-	shouldIgnorePathHeuristically,
-} from "./dataFiles.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -490,40 +491,46 @@ export async function indexTorrentsAndDataDirs(
 		const { dataDirs, seasonFromEpisodes, torrentDir, useClientTorrents } =
 			getRuntimeConfig();
 		if (!useClientTorrents) {
-			const hashes = await db("client_searchee").select("info_hash");
+			const hashes = (
+				await db("client_searchee").select("info_hash")
+			).map((r) => r.info_hash);
 			await inBatches(hashes, async (batch) => {
-				await db("ensemble")
-					.whereIn(
-						"info_hash",
-						batch.map((row) => row.info_hash),
-					)
-					.del();
+				await db("ensemble").whereIn("info_hash", batch).del();
 			});
 			await db("client_searchee").del();
+		} else {
+			await inBatches(getClients(), async (batch) => {
+				const clientHosts = batch.map((client) => client.clientHost);
+				await db("client_searchee")
+					.whereNotIn("client_host", clientHosts)
+					.del();
+				await db("ensemble")
+					.whereNotIn("client_host", clientHosts)
+					.del();
+			});
 		}
 		if (!torrentDir) {
-			const hashes = await db("torrent").select("info_hash");
+			const hashes = (await db("torrent").select("info_hash")).map(
+				(r) => r.info_hash,
+			);
 			await inBatches(hashes, async (batch) => {
-				await db("ensemble")
-					.whereIn(
-						"info_hash",
-						batch.map((row) => row.info_hash),
-					)
-					.del();
+				await db("ensemble").whereIn("info_hash", batch).del();
 			});
 			await db("torrent").del();
 		}
 		if (!dataDirs.length) {
-			const paths = await db("data").select("path");
+			const paths = (await db("data").select("path")).map((r) => r.path);
 			await inBatches(paths, async (batch) => {
-				await db("ensemble")
-					.whereIn(
-						"path",
-						batch.map((row) => row.path),
-					)
-					.del();
+				await db("ensemble").whereIn("path", batch).del();
 			});
 			await db("data").del();
+		} else {
+			const paths = (await db("data").select("path")).map((r) => r.path);
+			const toDelete = paths.filter((p) => !isChildPath(p, dataDirs));
+			await inBatches(toDelete, async (batch) => {
+				await db("data").whereIn("path", batch).del();
+				await db("ensemble").whereIn("path", batch).del();
+			});
 		}
 		if (!seasonFromEpisodes) await db("ensemble").del();
 	}

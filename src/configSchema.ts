@@ -321,14 +321,14 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 
 /**
  * check a potential child path being inside a array of parent paths
- * @param childDir path of the potential child (e.g outputDir)
+ * @param childPath path of the potential child (e.g outputDir)
  * @param parentDirs array of parentDir paths (e.g dataDirs)
  * @returns true if `childDir` is inside any `parentDirs` at any nesting level, false otherwise.
  */
-function isChildPath(childDir: string, parentDirs: string[]): boolean {
+export function isChildPath(childPath: string, parentDirs: string[]): boolean {
 	return parentDirs.some((parentDir) => {
 		const resolvedParent = resolve(parentDir);
-		const resolvedChild = resolve(childDir);
+		const resolvedChild = resolve(childPath);
 		const relativePath = relative(resolvedParent, resolvedChild);
 		// if the path does not start with '..' and is not absolute
 		return !(relativePath.startsWith("..") || isAbsolute(relativePath));
