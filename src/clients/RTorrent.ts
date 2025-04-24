@@ -368,26 +368,24 @@ export default class RTorrent implements TorrentClient {
 			hashes,
 			async (batch) => {
 				const args = [
-					batch
-						.map((hash) => {
-							const arg = [
-								{
-									methodName: "d.directory",
-									params: [hash],
-								},
-								{
-									methodName: "d.is_multi_file",
-									params: [hash],
-								},
-								{
-									methodName: "d.complete",
-									params: [hash],
-								},
-							];
-							numMethods = arg.length;
-							return arg;
-						})
-						.flat(),
+					batch.flatMap((hash) => {
+						const arg = [
+							{
+								methodName: "d.directory",
+								params: [hash],
+							},
+							{
+								methodName: "d.is_multi_file",
+								params: [hash],
+							},
+							{
+								methodName: "d.complete",
+								params: [hash],
+							},
+						];
+						numMethods = arg.length;
+						return arg;
+					}),
 				];
 				try {
 					const res = await this.methodCallP<ReturnType>(
@@ -573,47 +571,40 @@ export default class RTorrent implements TorrentClient {
 			hashes,
 			async (batch) => {
 				const args = [
-					batch
-						.map((hash) => {
-							const arg = [
-								{
-									methodName: "d.name",
-									params: [hash],
-								},
-								{
-									methodName: "d.size_bytes",
-									params: [hash],
-								},
-								{
-									methodName: "d.directory",
-									params: [hash],
-								},
-								{
-									methodName: "d.is_multi_file",
-									params: [hash],
-								},
-								{
-									methodName: "d.custom1",
-									params: [hash],
-								},
-								{
-									methodName: "f.multicall",
-									params: [
-										hash,
-										"",
-										"f.path=",
-										"f.size_bytes=",
-									],
-								},
-								{
-									methodName: "t.multicall",
-									params: [hash, "", "t.url=", "t.group="],
-								},
-							];
-							numMethods = arg.length;
-							return arg;
-						})
-						.flat(),
+					batch.flatMap((hash) => {
+						const arg = [
+							{
+								methodName: "d.name",
+								params: [hash],
+							},
+							{
+								methodName: "d.size_bytes",
+								params: [hash],
+							},
+							{
+								methodName: "d.directory",
+								params: [hash],
+							},
+							{
+								methodName: "d.is_multi_file",
+								params: [hash],
+							},
+							{
+								methodName: "d.custom1",
+								params: [hash],
+							},
+							{
+								methodName: "f.multicall",
+								params: [hash, "", "f.path=", "f.size_bytes="],
+							},
+							{
+								methodName: "t.multicall",
+								params: [hash, "", "t.url=", "t.group="],
+							},
+						];
+						numMethods = arg.length;
+						return arg;
+					}),
 				];
 				try {
 					const res = await this.methodCallP<ReturnType>(
