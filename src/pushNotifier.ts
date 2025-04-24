@@ -109,7 +109,7 @@ export function sendResultsNotification(
 			: "Saved";
 		const decisions = notableSuccesses.map(([{ decision }]) => decision);
 
-		pushNotifier.notify({
+		void pushNotifier.notify({
 			body: `${source}: ${performedAction} ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
 			extra: {
 				event: Event.RESULTS,
@@ -145,7 +145,7 @@ export function sendResultsNotification(
 		const trackersListStr = formatAsList(trackers, { sort: true });
 		const decisions = failures.map(([{ decision }]) => decision);
 
-		pushNotifier.notify({
+		void pushNotifier.notify({
 			body: `${source}: Failed to inject ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
 			extra: {
 				event: Event.RESULTS,

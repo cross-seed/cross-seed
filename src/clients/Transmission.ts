@@ -532,7 +532,7 @@ export default class Transmission implements TorrentClient {
 				},
 			);
 			if (toRecheck) {
-				this.resumeInjection(newTorrent, decision, {
+				void this.resumeInjection(newTorrent, decision, {
 					checkOnce: false,
 				});
 			}

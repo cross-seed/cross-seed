@@ -995,7 +995,7 @@ export default class QBittorrent implements TorrentClient {
 			}
 			if (toRecheck) {
 				await this.recheckTorrent(newInfo.hash);
-				this.resumeInjection(newTorrent, decision, {
+				void this.resumeInjection(newTorrent, decision, {
 					checkOnce: false,
 				});
 			}

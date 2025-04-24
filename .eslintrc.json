@@ -12,10 +12,14 @@
 		"plugin:@typescript-eslint/recommended"
 	],
 	"parserOptions": {
-		"ecmaVersion": 2022
+		"ecmaVersion": 2022,
+		"project": "./tsconfig.eslint.json"
 	},
 	"rules": {
 		"no-mixed-spaces-and-tabs": "off",
-		"@typescript-eslint/no-var-requires": "off"
+		"@typescript-eslint/no-var-requires": "off",
+		"@typescript-eslint/no-unnecessary-type-assertion": "error",
+		"@typescript-eslint/return-await": "error",
+		"@typescript-eslint/no-floating-promises": "error"
 	}
 }

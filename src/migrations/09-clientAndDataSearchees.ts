@@ -31,9 +31,9 @@ async function up(knex: Knex.Knex): Promise<void> {
 }
 
 async function down(knex: Knex.Knex): Promise<void> {
-	knex.schema.dropTable("client_searchee");
-	knex.schema.dropTable("data");
-	knex.schema.dropTable("ensemble");
+	void knex.schema.dropTable("client_searchee");
+	void knex.schema.dropTable("data");
+	void knex.schema.dropTable("ensemble");
 }
 
 export default { name: "09-clientAndDataSearchees", up, down };

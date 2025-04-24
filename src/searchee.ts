@@ -560,10 +560,10 @@ export function getEpisodeKeys(stem: string): {
 	const match = stem.match(EP_REGEX);
 	if (!match) return null;
 	const titles = getAllTitles([match.groups!.title]);
-	const season = match!.groups!.season
-		? `S${extractInt(match!.groups!.season)}`
-		: match!.groups!.year
-			? `S${match!.groups!.year}`
+	const season = match.groups!.season
+		? `S${extractInt(match.groups!.season)}`
+		: match.groups!.year
+			? `S${match.groups!.year}`
 			: undefined;
 	const keyTitles: string[] = [];
 	const ensembleTitles: string[] = [];
@@ -574,9 +574,9 @@ export function getEpisodeKeys(stem: string): {
 		ensembleTitles.push(`${title}${season ? `.${season}` : ""}`);
 	}
 	if (!keyTitles.length) return null;
-	const episode = match!.groups!.episode
-		? extractInt(match!.groups!.episode)
-		: `${match!.groups!.month}.${match!.groups!.day}`;
+	const episode = match.groups!.episode
+		? extractInt(match.groups!.episode)
+		: `${match.groups!.month}.${match.groups!.day}`;
 	return { ensembleTitles, keyTitles, season, episode };
 }
 
@@ -599,7 +599,7 @@ export function getAnimeKeys(stem: string): {
 		ensembleTitles.push(title);
 	}
 	if (!keyTitles.length) return null;
-	const release = extractInt(match!.groups!.release);
+	const release = extractInt(match.groups!.release);
 	return { ensembleTitles, keyTitles, release };
 }
 
@@ -608,7 +608,7 @@ export function getReleaseGroup(stem: string): string | null {
 	if (!predictedGroupMatch) {
 		return null;
 	}
-	const parsedGroupMatchString = predictedGroupMatch!.groups!.group.trim();
+	const parsedGroupMatchString = predictedGroupMatch.groups!.group.trim();
 	if (BAD_GROUP_PARSE_REGEX.test(parsedGroupMatchString)) return null;
 	const match =
 		stem.match(EP_REGEX) ??

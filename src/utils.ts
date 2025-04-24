@@ -532,7 +532,7 @@ export function replaceLastOccurrence(
 	const matches = Array.from(str.matchAll(globalRegExp));
 	if (matches.length === 0) return str;
 	const lastMatch = matches[matches.length - 1];
-	const lastMatchIndex = lastMatch.index!;
+	const lastMatchIndex = lastMatch.index;
 	const lastMatchStr = lastMatch[0];
 	return (
 		str.slice(0, lastMatchIndex) +

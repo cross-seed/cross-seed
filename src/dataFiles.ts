@@ -141,11 +141,7 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 		if (!title) continue;
 		dataRows.push({ title, path });
 		if (seasonFromEpisodes) {
-			const ensembleEntries = await indexEnsembleDataEntry(
-				title,
-				path,
-				files,
-			);
+			const ensembleEntries = indexEnsembleDataEntry(title, path, files);
 			if (ensembleEntries) ensembleRows.push(...ensembleEntries);
 		}
 	}
@@ -160,11 +156,11 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 	});
 }
 
-async function indexEnsembleDataEntry(
+function indexEnsembleDataEntry(
 	title: string,
 	path: string,
 	files: File[],
-): Promise<EnsembleEntry[] | null> {
+): EnsembleEntry[] | null {
 	const ensemblePieces = createEnsemblePieces(title, files);
 	if (!ensemblePieces || !ensemblePieces.length) return null;
 	return ensemblePieces.map((ensemblePiece) => ({

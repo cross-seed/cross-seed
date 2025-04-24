@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		"outDir": "./dist",
+		"allowJs": true,
+		"target": "es2022",
+		"lib": ["es2023"],
+		"module": "nodenext",
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
+		"sourceMap": true,
+		"strictNullChecks": true
+	},
+	"include": ["./src/**/*", "./tests/**/*"]
+}
