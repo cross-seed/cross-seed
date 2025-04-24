@@ -118,6 +118,7 @@ export async function checkJobs(
 ): Promise<void> {
 	return withMutex(
 		Mutex.CHECK_JOBS,
+		{ useQueue: options.useQueue },
 		async () => {
 			const now = Date.now();
 			for (const job of jobs) {
@@ -150,7 +151,6 @@ export async function checkJobs(
 				}
 			}
 		},
-		{ useQueue: options.useQueue },
 	);
 }
 

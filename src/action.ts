@@ -408,18 +408,9 @@ export async function performAction(
 	searchee: SearcheeWithLabel,
 	tracker: string,
 ): Promise<ActionReturn> {
-	return withMutex(
-		Mutex.CLIENT_INJECTION,
-		async () => {
-			return performActionWithoutMutex(
-				newMeta,
-				decision,
-				searchee,
-				tracker,
-			);
-		},
-		{ useQueue: true },
-	);
+	return withMutex(Mutex.CLIENT_INJECTION, { useQueue: true }, async () => {
+		return performActionWithoutMutex(newMeta, decision, searchee, tracker);
+	});
 }
 
 export async function performActionWithoutMutex(

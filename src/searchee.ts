@@ -50,6 +50,8 @@ import {
 	stripExtension,
 	WithRequired,
 	WithUndefined,
+	withMutex,
+	Mutex,
 } from "./utils.js";
 
 export interface File {
@@ -875,44 +877,51 @@ export async function createEnsembleSearchees(
 	allSearchees: SearcheeWithLabel[],
 	options: { useFilters: boolean },
 ): Promise<SearcheeWithLabel[]> {
-	const { seasonFromEpisodes, useClientTorrents } = getRuntimeConfig();
-	if (!allSearchees.length) return [];
-	if (!seasonFromEpisodes) return [];
-	if (options.useFilters) {
-		logger.info({
-			label: allSearchees[0].label,
-			message: `Creating virtual seasons from episode searchees...`,
-		});
-	}
+	return withMutex(
+		Mutex.CREATE_ALL_SEARCHEES,
+		{ useQueue: true },
+		async () => {
+			const { seasonFromEpisodes, useClientTorrents } =
+				getRuntimeConfig();
+			if (!allSearchees.length) return [];
+			if (!seasonFromEpisodes) return [];
+			if (options.useFilters) {
+				logger.info({
+					label: allSearchees[0].label,
+					message: `Creating virtual seasons from episode searchees...`,
+				});
+			}
 
-	const { keyMap, ensembleTitleMap } = organizeEnsembleKeys(
-		allSearchees,
-		options,
+			const { keyMap, ensembleTitleMap } = organizeEnsembleKeys(
+				allSearchees,
+				options,
+			);
+			const torrentSavePaths = useClientTorrents
+				? new Map()
+				: (await getClients()[0]?.getAllDownloadDirs({
+						metas: allSearchees.filter(
+							hasInfoHash,
+						) as SearcheeWithInfoHash[],
+						onlyCompleted: false,
+					})) ?? new Map();
+
+			const seasonSearchees: SearcheeWithLabel[] = [];
+			for (const [key, episodeSearchees] of keyMap) {
+				const seasonSearchee = await createVirtualSeasonSearchee(
+					key,
+					episodeSearchees,
+					ensembleTitleMap,
+					torrentSavePaths,
+					options,
+				);
+				if (seasonSearchee) seasonSearchees.push(seasonSearchee);
+			}
+			logEnsemble(
+				`Created ${seasonSearchees.length} virtual season searchees...`,
+				options,
+			);
+
+			return seasonSearchees;
+		},
 	);
-	const torrentSavePaths = useClientTorrents
-		? new Map()
-		: (await getClients()[0]?.getAllDownloadDirs({
-				metas: allSearchees.filter(
-					hasInfoHash,
-				) as SearcheeWithInfoHash[],
-				onlyCompleted: false,
-			})) ?? new Map();
-
-	const seasonSearchees: SearcheeWithLabel[] = [];
-	for (const [key, episodeSearchees] of keyMap) {
-		const seasonSearchee = await createVirtualSeasonSearchee(
-			key,
-			episodeSearchees,
-			ensembleTitleMap,
-			torrentSavePaths,
-			options,
-		);
-		if (seasonSearchee) seasonSearchees.push(seasonSearchee);
-	}
-	logEnsemble(
-		`Created ${seasonSearchees.length} virtual season searchees...`,
-		options,
-	);
-
-	return seasonSearchees;
 }

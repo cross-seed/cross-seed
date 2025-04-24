@@ -631,51 +631,62 @@ export async function findAllSearchees(
 		getRuntimeConfig();
 	const clients = getClients();
 	const rawSearchees: Searchee[] = [];
-	if (Array.isArray(torrents)) {
-		const torrentInfos = await flatMapAsync(clients, (client) =>
-			client.getAllTorrents(),
-		);
-		rawSearchees.push(
-			...(
-				await mapAsync(torrents, (torrent) =>
-					createSearcheeFromTorrentFile(torrent, torrentInfos),
-				)
-			)
-				.filter(isOk)
-				.map((r) => r.unwrap()),
-		);
-	} else {
-		if (useClientTorrents) {
-			rawSearchees.push(
-				...(await flatMapAsync(
-					clients,
-					async (client) =>
-						(await client.getClientSearchees()).searchees,
-				)),
-			);
-		} else if (torrentDir) {
-			rawSearchees.push(...(await loadTorrentDirLight(torrentDir)));
-		}
-		if (dataDirs.length) {
-			const memoizedPaths = new Map<string, string[]>();
-			const memoizedLengths = new Map<string, number>();
-			rawSearchees.push(
-				...(
-					await mapAsync(
-						await findSearcheesFromAllDataDirs(),
-						(path) =>
-							createSearcheeFromPath(
-								path,
-								memoizedPaths,
-								memoizedLengths,
+	await withMutex(
+		Mutex.CREATE_ALL_SEARCHEES,
+		{ useQueue: true },
+		async () => {
+			if (Array.isArray(torrents)) {
+				const torrentInfos = await flatMapAsync(clients, (client) =>
+					client.getAllTorrents(),
+				);
+				rawSearchees.push(
+					...(
+						await mapAsync(torrents, (torrent) =>
+							createSearcheeFromTorrentFile(
+								torrent,
+								torrentInfos,
 							),
+						)
 					)
-				)
-					.filter(isOk)
-					.map((r) => r.unwrap()),
-			);
-		}
-	}
+						.filter(isOk)
+						.map((r) => r.unwrap()),
+				);
+			} else {
+				if (useClientTorrents) {
+					rawSearchees.push(
+						...(await flatMapAsync(
+							clients,
+							async (client) =>
+								(await client.getClientSearchees()).searchees,
+						)),
+					);
+				} else if (torrentDir) {
+					rawSearchees.push(
+						...(await loadTorrentDirLight(torrentDir)),
+					);
+				}
+				if (dataDirs.length) {
+					const memoizedPaths = new Map<string, string[]>();
+					const memoizedLengths = new Map<string, number>();
+					rawSearchees.push(
+						...(
+							await mapAsync(
+								await findSearcheesFromAllDataDirs(),
+								(path) =>
+									createSearcheeFromPath(
+										path,
+										memoizedPaths,
+										memoizedLengths,
+									),
+							)
+						)
+							.filter(isOk)
+							.map((r) => r.unwrap()),
+					);
+				}
+			}
+		},
+	);
 	return rawSearchees.map((searchee) => ({
 		...searchee,
 		label: searcheeLabel,
@@ -692,24 +703,14 @@ async function findSearchableTorrents(options?: {
 		options?.configOverride,
 	);
 
-	const { realSearchees, ensembleSearchees } = await withMutex(
-		Mutex.CREATE_ALL_SEARCHEES,
-		async () => {
-			logger.info({
-				label: Label.SEARCH,
-				message: "Gathering searchees...",
-			});
-			const realSearchees = await findAllSearchees(Label.SEARCH);
-			const ensembleSearchees = await createEnsembleSearchees(
-				realSearchees,
-				{
-					useFilters: true,
-				},
-			);
-			return { realSearchees, ensembleSearchees };
-		},
-		{ useQueue: true },
-	);
+	logger.info({
+		label: Label.SEARCH,
+		message: "Gathering searchees...",
+	});
+	const realSearchees = await findAllSearchees(Label.SEARCH);
+	const ensembleSearchees = await createEnsembleSearchees(realSearchees, {
+		useFilters: true,
+	});
 	const ignoring = [
 		(!excludeOlder || excludeOlder === Number.MAX_SAFE_INTEGER) &&
 			"excludeOlder",

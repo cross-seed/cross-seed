@@ -586,14 +586,14 @@ const mutexes = new Map<Mutex, Promise<unknown>>();
 /**
  * Executes a callback function within a mutex for the given name.
  * @param name The name of the mutex to create/use.
- * @param cb The callback to execute.
  * @param options.useQueue If false, concurrent calls will share the pending result.
+ * @param cb The callback to execute.
  * @returns The result of the callback.
  */
 export async function withMutex<T>(
 	name: Mutex,
-	cb: () => Promise<T>,
 	options: { useQueue: boolean },
+	cb: () => Promise<T>,
 ): Promise<T> {
 	const existingMutex = mutexes.get(name) as Promise<T> | undefined;
 	if (existingMutex) {

@@ -529,6 +529,7 @@ export async function indexTorrentsAndDataDirs(
 	}
 	return withMutex(
 		Mutex.INDEX_TORRENTS_AND_DATA_DIRS,
+		{ useQueue: false },
 		async () => {
 			const maxRetries = 3;
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -550,7 +551,6 @@ export async function indexTorrentsAndDataDirs(
 				}
 			}
 		},
-		{ useQueue: false },
 	);
 }
 
