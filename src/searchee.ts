@@ -367,9 +367,11 @@ export async function updateSearcheeClientDB(
 	infoHashes: Set<string>,
 ): Promise<void> {
 	const removedInfoHashes: string[] = (
-		await db("client_searchee").select({ infoHash: "info_hash" })
+		await db("client_searchee")
+			.where("client_host", clientHost)
+			.select("info_hash")
 	)
-		.map((t) => t.infoHash)
+		.map((t) => t.info_hash)
 		.filter((infoHash) => !infoHashes.has(infoHash));
 	await inBatches(removedInfoHashes, async (batch) => {
 		await db("client_searchee")

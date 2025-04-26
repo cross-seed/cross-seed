@@ -380,6 +380,9 @@ export async function* rssPager(
 					query: { t: "search", q: "", limit, offset: i * limit },
 				})
 			).sort(comparing((candidate) => -candidate.pubDate!));
+			if (!currentPageCandidates.length) {
+				throw new Error(`no results returned`);
+			}
 			if (i === 0) {
 				newLastSeenGuid = currentPageCandidates[0].guid;
 				pageBackUntil =

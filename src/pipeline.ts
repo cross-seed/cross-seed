@@ -119,17 +119,22 @@ async function assessCandidates(
 	}, new Map<number, CandidateWithIndexerId[]>());
 	return flatMapAsync(
 		Array.from(candidatesByIndexer.values()),
-		(candidates) =>
-			mapAsync(candidates, async (candidate) => ({
-				assessment: await assessCandidateCaching(
-					candidate,
-					searchee,
-					infoHashesToExclude,
-					guidInfoHashMap,
-					options,
-				),
-				tracker: candidate.tracker,
-			})),
+		async (candidates) => {
+			const assessments: AssessmentWithTracker[] = [];
+			for (const candidate of candidates) {
+				assessments.push({
+					assessment: await assessCandidateCaching(
+						candidate,
+						searchee,
+						infoHashesToExclude,
+						guidInfoHashMap,
+						options,
+					),
+					tracker: candidate.tracker,
+				});
+			}
+			return assessments;
+		},
 	);
 }
 
@@ -822,8 +827,8 @@ export async function scanRssFeeds() {
 	await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
 		for await (const candidate of candidates) {
 			await checkNewCandidateMatch(candidate, Label.RSS);
-			await wait(100); // necessary to avoid bogarting the event loop
 			numCandidates++;
+			await wait(ms("1 second")); // necessary to avoid bogarting the event loop
 		}
 	});
 
