@@ -71,7 +71,46 @@ export function sourceRegexRemove(title: string): string {
 	return title;
 }
 
-export const VIDEO_EXTENSIONS = [".mkv", ".mp4", ".avi", ".ts"];
+export const VIDEO_EXTENSIONS = [
+	// OG extensions
+	".mkv",
+	".mp4",
+	".avi",
+	".ts",
+	// extensions from the sonarr
+	".m4v",
+	".3gp",
+	".nsv",
+	".ty",
+	".strm",
+	".rm",
+	".rmvb",
+	".mov",
+	".qt",
+	".divx",
+	".xvid",
+	".bivx",
+	".pva",
+	".wmv",
+	".asf",
+	".asx",
+	".ogm",
+	".ogv",
+	".m2v",
+	".dvr-ms",
+	".mpg",
+	".mpeg",
+	".avc",
+	".vp3",
+	".svq3",
+	".nuv",
+	".viv",
+	".dv",
+	".fli",
+	".flv",
+	".wpl",
+	".wtv",
+];
 export const VIDEO_DISC_EXTENSIONS = [".m2ts", ".ifo", ".vob", ".bup"];
 export const AUDIO_EXTENSIONS = [
 	".wav",
