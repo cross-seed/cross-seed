@@ -499,15 +499,14 @@ export async function indexTorrentsAndDataDirs(
 			});
 			await db("client_searchee").del();
 		} else {
-			await inBatches(getClients(), async (batch) => {
-				const clientHosts = batch.map((client) => client.clientHost);
-				await db("client_searchee")
-					.whereNotIn("client_host", clientHosts)
-					.del();
-				await db("ensemble")
-					.whereNotIn("client_host", clientHosts)
-					.del();
-			});
+			const clientHosts = getClients().map((client) => client.clientHost);
+			await db("client_searchee")
+				.whereNotIn("client_host", clientHosts)
+				.del();
+			await db("ensemble")
+				.whereNotNull("client_host")
+				.whereNotIn("client_host", clientHosts)
+				.del();
 		}
 		if (!torrentDir) {
 			const hashes = (await db("torrent").select("info_hash")).map(
@@ -521,7 +520,10 @@ export async function indexTorrentsAndDataDirs(
 		if (!dataDirs.length) {
 			const paths = (await db("data").select("path")).map((r) => r.path);
 			await inBatches(paths, async (batch) => {
-				await db("ensemble").whereIn("path", batch).del();
+				await db("ensemble")
+					.whereIn("path", batch)
+					.whereNull("client_host")
+					.del();
 			});
 			await db("data").del();
 		} else {
@@ -529,7 +531,10 @@ export async function indexTorrentsAndDataDirs(
 			const toDelete = paths.filter((p) => !isChildPath(p, dataDirs));
 			await inBatches(toDelete, async (batch) => {
 				await db("data").whereIn("path", batch).del();
-				await db("ensemble").whereIn("path", batch).del();
+				await db("ensemble")
+					.whereIn("path", batch)
+					.whereNull("client_host")
+					.del();
 			});
 		}
 		if (!seasonFromEpisodes) await db("ensemble").del();
