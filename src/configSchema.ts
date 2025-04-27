@@ -707,7 +707,8 @@ export const VALIDATION_SCHEMA = z
 		if (
 			config.torrentClients.every(
 				(c) =>
-					c.startsWith(Label.RTORRENT) || c.startsWith(Label.DELUGE),
+					c.startsWith(Label.RTORRENT) ||
+					c.startsWith(Label.TRANSMISSION),
 			) &&
 			config.blockList.some((b) =>
 				b.startsWith(`${BlocklistType.CATEGORY}:`),
