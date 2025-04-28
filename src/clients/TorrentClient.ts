@@ -25,7 +25,6 @@ import {
 	hasExt,
 	humanReadableSize,
 	isTruthy,
-	sanitizeInfoHash,
 	wait,
 } from "../utils.js";
 import Deluge from "./Deluge.js";
@@ -244,37 +243,15 @@ export function clientSearcheeModified(
 	options: { category?: string; tags?: string[] } = {},
 ): boolean {
 	if (!dbTorrent) return true;
-	if (dbTorrent.name !== name) {
-		logger.warn({
-			label,
-			message: `Refreshing ${name} [${sanitizeInfoHash(dbTorrent.info_hash)}] as the name was updated: ${dbTorrent.name} -> ${name}`,
-		});
-		return true;
-	}
-	if (dbTorrent.save_path !== savePath) {
-		logger.warn({
-			label,
-			message: `Refreshing ${name} [${sanitizeInfoHash(dbTorrent.info_hash)}] as the savePath was updated: ${dbTorrent.save_path} -> ${savePath}`,
-		});
-		return true;
-	}
-	if ((dbTorrent.category ?? undefined) !== options.category) {
-		logger.warn({
-			label,
-			message: `Refreshing ${name} [${sanitizeInfoHash(dbTorrent.info_hash)}] as the category was updated: ${dbTorrent.category} -> ${options.category}`,
-		});
-		return true;
-	}
+	if (dbTorrent.name !== name) return true;
+	if (dbTorrent.save_path !== savePath) return true;
+	if ((dbTorrent.category ?? undefined) !== options.category) return true;
 	if (
 		!isDeepStrictEqual(
 			dbTorrent.tags ? JSON.parse(dbTorrent.tags) : [],
 			options.tags ?? [],
 		)
 	) {
-		logger.warn({
-			label,
-			message: `Refreshing ${name} [${sanitizeInfoHash(dbTorrent.info_hash)}] as the tags were updated: ${(dbTorrent.tags ? JSON.parse(dbTorrent.tags) : []).join(",")} -> ${options.tags}`,
-		});
 		return true;
 	}
 	return false;
