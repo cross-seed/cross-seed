@@ -60,6 +60,7 @@ export interface TorrentClient {
 	clientType: TorrentClientType;
 	readonly: boolean;
 	label: string;
+	isTorrentInClient: (infoHash: string) => Promise<Result<boolean, Error>>;
 	isTorrentComplete: (
 		infoHash: string,
 	) => Promise<Result<boolean, "NOT_FOUND">>;

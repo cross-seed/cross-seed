@@ -54,9 +54,20 @@ I'd say _don't bump major_ unless we've talked about it in `#development`. Minor
 vs patch is kind of meaningless but mostly patch for fixes and minor for
 features.
 
+For pre-releases, you first select the `prepatch/preminor/premajor` option the
+first time, then for subsequent pre-releases you use the `prerelease` option to
+increment.
+
 Then it'll do a bunch of compiling, etc. Eventually it will open a tab in your
 browser asking you to create a release. Then you can just click the Submit
 button and you're done.
+
+If a non-pre-release version has been published, update the @next tag to point
+to latest as it's not done automatically.
+
+```
+npm dist-tag add cross-seed@x.x.x next
+```
 
 If you ever fuck up (often due to forgetting the github release), just release
 again with a `patch` version bump. no big deal

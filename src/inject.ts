@@ -316,7 +316,7 @@ async function injectFromStalledTorrent({
 		});
 	}
 
-	if ((await client!.isTorrentComplete(meta.infoHash)).isErr()) return;
+	if (!(await client!.isTorrentInClient(meta.infoHash)).orElse(false)) return;
 	if (linkedNewFiles) {
 		logger.info({
 			label: Label.INJECT,

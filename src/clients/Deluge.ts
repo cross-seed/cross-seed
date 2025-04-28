@@ -455,6 +455,9 @@ export default class Deluge implements TorrentClient {
 		options: { onlyCompleted: boolean; destinationDir?: string },
 	): Promise<InjectionResult> {
 		try {
+			const existsRes = await this.isTorrentInClient(newTorrent.infoHash);
+			if (existsRes.isErr()) return InjectionResult.FAILURE;
+			if (existsRes.unwrap()) return InjectionResult.ALREADY_EXISTS;
 			let torrentInfo: TorrentInfo;
 			if (options.onlyCompleted && searchee.infoHash) {
 				torrentInfo = await this.getTorrentInfo(searchee.infoHash);
@@ -630,6 +633,37 @@ export default class Deluge implements TorrentClient {
 			dirs.set(hash, torrent.save_path!);
 		}
 		return dirs;
+	}
+
+	/**
+	 * checks if a torrent exists in deluge
+	 * @param inputHash the infoHash of the torrent to check
+	 * @return Result containing either a boolean or reason it was not provided
+	 */
+	async isTorrentInClient(
+		inputHash: string,
+	): Promise<Result<boolean, Error>> {
+		const infoHash = inputHash.toLowerCase();
+		try {
+			const torrentsRes = await this.call<TorrentStatus>(
+				"web.update_ui",
+				[[], {}],
+			);
+			if (torrentsRes.isErr()) {
+				const err = torrentsRes.unwrapErr();
+				throw new Error(
+					`${err.code ? err.code + ": " : ""}${err.message}`,
+				);
+			}
+			const torrents = torrentsRes.unwrap().torrents;
+			if (!torrents) throw new Error("No torrents found");
+			for (const hash of Object.keys(torrents)) {
+				if (hash.toLowerCase() === infoHash) return resultOf(true);
+			}
+			return resultOf(false);
+		} catch (e) {
+			return resultOfErr(e);
+		}
 	}
 
 	/**
