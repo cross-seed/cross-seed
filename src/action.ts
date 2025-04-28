@@ -496,13 +496,19 @@ export async function performActionWithoutMutex(
 	}
 	for (const otherClient of clients) {
 		if (otherClient.clientHost === client.clientHost) continue;
-		if ((await otherClient.isTorrentComplete(newMeta.infoHash)).isErr()) {
-			continue;
+		const existsRes = await otherClient.isTorrentInClient(newMeta.infoHash);
+		if (existsRes.isOk()) {
+			if (!existsRes.unwrap()) continue;
+			warnOrVerbose({
+				label: searchee.label,
+				message: `Skipping ${getLogString(newMeta)} injection into ${client.clientHost} - already exists in ${otherClient.clientHost}`,
+			});
+		} else {
+			logger.error({
+				label: searchee.label,
+				message: `Failed to check if ${getLogString(newMeta)} exists in ${otherClient.clientHost}: ${existsRes.unwrapErr()}`,
+			});
 		}
-		warnOrVerbose({
-			label: searchee.label,
-			message: `Skipping ${getLogString(newMeta)} injection into ${client.clientHost} - already exists in ${otherClient.clientHost}`,
-		});
 		const actionResult = InjectionResult.FAILURE;
 		logActionResult(actionResult, newMeta, searchee, tracker, decision);
 		return { actionResult, linkedNewFiles };
@@ -752,11 +758,26 @@ export async function testLinking(
 		let srcFile = await findAFileWithExt(srcDir, ALL_EXTENSIONS);
 		if (!srcFile) {
 			try {
+				await access(srcDir, fs.constants.R_OK);
+			} catch (e) {
+				logger.error(e);
+				if (e.code === "ENOENT") {
+					logger.error(
+						`${srcDir} does not exist, cross-seed is unable to verify linking for this path.`,
+					);
+				} else {
+					logger.error(
+						`cross-seed does not have read access to ${srcDir}, cross-seed is unable to verify linking for this path.`,
+					);
+				}
+				return;
+			}
+			try {
 				await access(srcDir, fs.constants.W_OK);
 			} catch (e) {
 				logger.error(e);
 				logger.error(
-					`Failed to access ${srcDir}, cross-seed is unable to verify linking for this path.`,
+					`cross-seed does not have write access to ${srcDir}, cross-seed is unable to verify linking for this path.`,
 				);
 				return;
 			}

@@ -153,12 +153,22 @@ export default class RTorrent implements TorrentClient {
 		});
 	}
 
-	async checkForInfoHashInClient(infoHash: string): Promise<boolean> {
-		const downloadList = await this.methodCallP<string[]>(
-			"download_list",
-			[],
-		);
-		return downloadList.includes(infoHash.toUpperCase());
+	async isTorrentInClient(
+		inputHash: string,
+	): Promise<Result<boolean, Error>> {
+		const infoHash = inputHash.toLowerCase();
+		try {
+			const downloadList = await this.methodCallP<string[]>(
+				"download_list",
+				[],
+			);
+			for (const hash of downloadList) {
+				if (hash.toLowerCase() === infoHash) return resultOf(true);
+			}
+			return resultOf(false);
+		} catch (e) {
+			return resultOfErr(e);
+		}
 	}
 
 	private async checkOriginalTorrent(
@@ -342,9 +352,9 @@ export default class RTorrent implements TorrentClient {
 	): Promise<
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
-		if (!(await this.checkForInfoHashInClient(meta.infoHash))) {
-			return resultOfErr("NOT_FOUND");
-		}
+		const existsRes = await this.isTorrentInClient(meta.infoHash);
+		if (existsRes.isErr()) return resultOfErr("UNKNOWN_ERROR");
+		if (!existsRes.unwrap()) return resultOfErr("NOT_FOUND");
 		const result = await this.checkOriginalTorrent(meta.infoHash, options);
 		return result
 			.mapOk(({ directoryBase, isMultiFile }) => {
@@ -789,9 +799,9 @@ export default class RTorrent implements TorrentClient {
 		decision: DecisionAnyMatch,
 		options: { onlyCompleted: boolean; destinationDir?: string },
 	): Promise<InjectionResult> {
-		if (await this.checkForInfoHashInClient(meta.infoHash)) {
-			return InjectionResult.ALREADY_EXISTS;
-		}
+		const existsRes = await this.isTorrentInClient(meta.infoHash);
+		if (existsRes.isErr()) return InjectionResult.FAILURE;
+		if (existsRes.unwrap()) return InjectionResult.ALREADY_EXISTS;
 
 		const result = await this.getDownloadLocation(meta, searchee, options);
 		if (result.isErr()) {
@@ -847,7 +857,7 @@ export default class RTorrent implements TorrentClient {
 		}
 
 		for (let i = 0; i < 5; i++) {
-			if (await this.checkForInfoHashInClient(meta.infoHash)) {
+			if ((await this.isTorrentInClient(meta.infoHash)).orElse(false)) {
 				return InjectionResult.SUCCESS;
 			}
 			await wait(100 * Math.pow(2, i));

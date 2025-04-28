@@ -266,6 +266,28 @@ export default class Transmission implements TorrentClient {
 		}, new Map());
 	}
 
+	async isTorrentInClient(
+		inputHash: string,
+	): Promise<Result<boolean, Error>> {
+		const infoHash = inputHash.toLowerCase();
+		try {
+			const torrents = (
+				await this.request<TorrentGetResponseArgs>("torrent-get", {
+					fields: ["hashString"],
+				})
+			).torrents;
+			if (!torrents.length) throw new Error("No torrents found");
+			for (const torrent of torrents) {
+				if (torrent.hashString.toLowerCase() === infoHash) {
+					return resultOf(true);
+				}
+			}
+			return resultOf(false);
+		} catch (e) {
+			return resultOfErr(e);
+		}
+	}
+
 	async isTorrentComplete(
 		infoHash: string,
 	): Promise<Result<boolean, "NOT_FOUND">> {
@@ -500,6 +522,9 @@ export default class Transmission implements TorrentClient {
 		decision: DecisionAnyMatch,
 		options: { onlyCompleted: boolean; destinationDir?: string },
 	): Promise<InjectionResult> {
+		const existsRes = await this.isTorrentInClient(newTorrent.infoHash);
+		if (existsRes.isErr()) return InjectionResult.FAILURE;
+		if (existsRes.unwrap()) return InjectionResult.ALREADY_EXISTS;
 		let destinationDir: string;
 		if (options.destinationDir) {
 			destinationDir = options.destinationDir;

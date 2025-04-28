@@ -726,6 +726,32 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	/**
+	 * @param inputHash the infohash of the torrent
+	 * @returns whether the torrent is in client
+	 */
+	async isTorrentInClient(
+		inputHash: string,
+	): Promise<Result<boolean, Error>> {
+		const infoHash = inputHash.toLowerCase();
+		try {
+			const torrents = await this.getAllTorrentInfo();
+			if (!torrents.length) throw new Error("No torrents found");
+			for (const torrent of torrents) {
+				if (
+					torrent.hash.toLowerCase() === infoHash ||
+					torrent.infohash_v1?.toLowerCase() === infoHash ||
+					torrent.infohash_v2?.toLowerCase() === infoHash
+				) {
+					return resultOf(true);
+				}
+			}
+			return resultOf(false);
+		} catch (e) {
+			return resultOfErr(e);
+		}
+	}
+
+	/**
 	 * @param infoHash the infohash of the torrent
 	 * @returns whether the torrent is complete
 	 */
@@ -898,9 +924,9 @@ export default class QBittorrent implements TorrentClient {
 	): Promise<InjectionResult> {
 		const { linkCategory } = getRuntimeConfig();
 		try {
-			if (await this.getTorrentInfo(newTorrent.infoHash)) {
-				return InjectionResult.ALREADY_EXISTS;
-			}
+			const existsRes = await this.isTorrentInClient(newTorrent.infoHash);
+			if (existsRes.isErr()) return InjectionResult.FAILURE;
+			if (existsRes.unwrap()) return InjectionResult.ALREADY_EXISTS;
 			const searcheeInfo = await this.getTorrentInfo(searchee.infoHash);
 			if (!searcheeInfo) {
 				if (!options.destinationDir) {
