@@ -1,10 +1,10 @@
-import {
-	HeadContent,
-	Outlet,
-	Scripts,
-	createRootRouteWithContext,
-} from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
+import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import type { TRPCOptionsProxy } from "@trpc/tanstack-react-query";
+
+import type { AppRouter } from "../../../src/trpc/routers";
+import { AuthWrapper } from "../components/auth/AuthWrapper";
 
 import Header from "../components/Header";
 
@@ -12,15 +12,9 @@ import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
 import appCss from "../styles.css?url";
 
-import type { QueryClient } from "@tanstack/react-query";
-
-import type { TRPCRouter } from "@/integrations/trpc/router";
-import type { TRPCOptionsProxy } from "@trpc/tanstack-react-query";
-
 interface MyRouterContext {
 	queryClient: QueryClient;
-
-	trpc: TRPCOptionsProxy<TRPCRouter>;
+	trpc: TRPCOptionsProxy<AppRouter>;
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
@@ -34,7 +28,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: "TanStack Start Starter",
+				title: "Cross-Seed",
 			},
 		],
 		links: [
@@ -46,25 +40,15 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	}),
 
 	component: () => (
-		<RootDocument>
+		<>
 			<Header />
-			<Outlet />
-			<TanStackRouterDevtools />
+			<AuthWrapper>
+				<Outlet />
+			</AuthWrapper>
+			{process.env.NODE_ENV !== "production" && (
+				<TanStackRouterDevtools />
+			)}
 			<TanstackQueryLayout />
-		</RootDocument>
+		</>
 	),
 });
-
-function RootDocument({ children }: { children: React.ReactNode }) {
-	return (
-		<html lang="en">
-			<head>
-				<HeadContent />
-			</head>
-			<body>
-				{children}
-				<Scripts />
-			</body>
-		</html>
-	);
-}

@@ -7,6 +7,7 @@ import caps from "./05-caps.js";
 import uniqueDecisions from "./06-uniqueDecisions.js";
 import limits from "./07-limits.js";
 import rss from "./08-rss.js";
+import userAuth from "./09-user-auth.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -20,6 +21,7 @@ export const migrations = {
 			uniqueDecisions,
 			limits,
 			rss,
+			userAuth,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,

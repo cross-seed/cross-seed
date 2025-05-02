@@ -9,9 +9,11 @@ import fastify, {
 	FastifyReply,
 } from "fastify";
 import fastifyStatic from "@fastify/static";
+import fastifyCookie from "@fastify/cookie";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { checkApiKey } from "./auth.js";
+import { registerTRPC } from "./trpc/fastifyAdapter.js";
 import {
 	ActionResult,
 	Decision,
@@ -227,6 +229,12 @@ const createServer = (): FastifyInstance => {
 			}
 		},
 	);
+
+	// Register cookie plugin
+	app.register(fastifyCookie);
+
+	// Register tRPC router
+	registerTRPC(app);
 
 	// Serve static files from the client/dist directory
 	app.register(fastifyStatic, {

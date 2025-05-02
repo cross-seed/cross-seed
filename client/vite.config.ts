@@ -15,6 +15,17 @@ const config = defineConfig({
 	build: {
 		outDir: "dist",
 	},
+	server: {
+		port: 5173, // Default Vite port
+		proxy: {
+			// Proxy tRPC requests to port 2468
+			"/api/trpc": {
+				target: "http://localhost:2468",
+				changeOrigin: true,
+				secure: false,
+			},
+		},
+	},
 });
 
 export default config;
