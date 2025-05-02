@@ -67,8 +67,33 @@ export const authRouter = router({
 		.input(loginInputSchema)
 		.mutation(async ({ input, ctx }) => {
 			const { username, password } = input;
-			const user = await validateUserCredentials(username, password);
 
+			// Check if there are any users - if not, create the first user
+			const hasExistingUsers = await hasUsers();
+			if (!hasExistingUsers) {
+				logger.info({
+					label: Label.AUTH,
+					message: `No users exist, creating initial user: ${username}`,
+				});
+
+				const newUser = await createInitialUserIfNeeded(
+					username,
+					password,
+				);
+				if (newUser) {
+					const session = await createSession(newUser.id);
+					ctx.setSession(session.id);
+
+					logger.info({
+						label: Label.AUTH,
+						message: `Initial user created and logged in: ${username}`,
+					});
+					return;
+				}
+			}
+
+			// Normal authentication flow
+			const user = await validateUserCredentials(username, password);
 			if (!user) {
 				logger.warn({
 					label: Label.AUTH,
