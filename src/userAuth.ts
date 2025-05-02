@@ -3,7 +3,6 @@ import bcrypt from "bcryptjs";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 
-const SALT_ROUNDS = 10;
 const SESSION_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
 export interface User {
@@ -24,7 +23,7 @@ export async function createUser(
 	username: string,
 	password: string,
 ): Promise<User> {
-	const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+	const hashedPassword = await bcrypt.hash(password, 10);
 
 	const [user] = await db("user")
 		.insert({

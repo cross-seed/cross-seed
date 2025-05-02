@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { validateSession } from "./userAuth.js";
 
-const COOKIE_NAME = "cross_seed_session";
+const COOKIE_NAME = "cross-seed-session";
 const COOKIE_OPTIONS = {
 	httpOnly: true,
 	secure: process.env.NODE_ENV === "production", // Only set secure in production
