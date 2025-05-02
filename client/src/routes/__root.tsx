@@ -4,13 +4,14 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import type { TRPCOptionsProxy } from "@trpc/tanstack-react-query";
 
 import type { AppRouter } from "../../../src/trpc/routers";
-import { AuthWrapper } from "../components/auth/AuthWrapper";
-
-import Header from "../components/Header";
+import { Login } from "../components/auth/AuthWrapper";
+import { AppSidebar } from "../components/app-sidebar";
+import { SidebarProvider, SidebarInset } from "../components/ui/sidebar";
 
 import TanstackQueryLayout from "../integrations/tanstack-query/layout";
 
 import appCss from "../styles.css?url";
+import { Suspense } from "react";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -41,14 +42,22 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 	component: () => (
 		<>
-			<Header />
-			<AuthWrapper>
-				<Outlet />
-			</AuthWrapper>
+			<Suspense>
+				<Login>
+					<SidebarProvider defaultOpen={true}>
+						<AppSidebar />
+						<SidebarInset className="p-4">
+							<Outlet />
+						</SidebarInset>
+					</SidebarProvider>
+				</Login>
+			</Suspense>
 			{process.env.NODE_ENV !== "production" && (
-				<TanStackRouterDevtools />
+				<>
+					<TanStackRouterDevtools />
+					<TanstackQueryLayout />
+				</>
 			)}
-			<TanstackQueryLayout />
 		</>
 	),
 });
