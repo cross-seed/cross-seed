@@ -746,12 +746,13 @@ async function unwrapSymlinks(path: string): Promise<string> {
  * @param srcDir The directory to link from
  * @param testSrcName A unique name.cross-seed to create in srcDir if necessary
  * @param testDestName A unique name.cross-seed to create in the linkDir
+ * @returns true if the test was successful, false if it failed (or throws)
  */
 export async function testLinking(
 	srcDir: string,
 	testSrcName: string,
 	testDestName: string,
-): Promise<void> {
+): Promise<boolean> {
 	const { linkDirs, linkType } = getRuntimeConfig();
 	let tempFile: string | undefined;
 	try {
@@ -763,14 +764,14 @@ export async function testLinking(
 				logger.error(e);
 				if (e.code === "ENOENT") {
 					logger.error(
-						`${srcDir} does not exist, cross-seed is unable to verify linking for this path.`,
+						`${srcDir} does not exist, cross-seed is unable to verify linking for this path (likely due to incorrect/insufficient volume mounts https://www.cross-seed.org/docs/tutorials/linking#configuring-linkdirs).`,
 					);
 				} else {
 					logger.error(
 						`cross-seed does not have read access to ${srcDir}, cross-seed is unable to verify linking for this path.`,
 					);
 				}
-				return;
+				return false;
 			}
 			try {
 				await access(srcDir, fs.constants.W_OK);
@@ -779,7 +780,7 @@ export async function testLinking(
 				logger.error(
 					`cross-seed does not have write access to ${srcDir}, cross-seed is unable to verify linking for this path.`,
 				);
-				return;
+				return false;
 			}
 			tempFile = join(srcDir, testSrcName);
 			try {
@@ -788,7 +789,7 @@ export async function testLinking(
 					logger.error(
 						`Failed to verify test file at ${tempFile}, cross-seed is unable to verify linking for this path.`,
 					);
-					return;
+					return false;
 				}
 				srcFile = tempFile;
 			} catch (e) {
@@ -796,7 +797,7 @@ export async function testLinking(
 				logger.error(
 					`Failed to create test file in ${srcDir}, cross-seed is unable to verify linking for this path.`,
 				);
-				return;
+				return false;
 			}
 		}
 		const linkDir = await getLinkDir(srcDir);
@@ -804,6 +805,7 @@ export async function testLinking(
 		const testPath = join(linkDir, testDestName);
 		await linkFile(srcFile, testPath);
 		await rm(testPath);
+		return true;
 	} catch (e) {
 		logger.error(e);
 		throw new CrossSeedError(
