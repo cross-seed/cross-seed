@@ -1,6 +1,8 @@
 import { estimatePausedStatus } from "./clients/TorrentClient.js";
 import {
 	ActionResult,
+	Decision,
+	DecisionAnyMatch,
 	InjectionResult,
 	PROGRAM_NAME,
 	SaveResult,
@@ -10,7 +12,7 @@ import { ResultAssessment } from "./decide.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { getSearcheeSource, SearcheeWithLabel } from "./searchee.js";
-import { formatAsList, mapAsync } from "./utils.js";
+import { findFallback, formatAsList, mapAsync } from "./utils.js";
 
 export let pushNotifier: PushNotifier;
 
@@ -99,7 +101,15 @@ export function sendResultsNotification(
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
 		const trackersListStr = formatAsList(trackers, { sort: true });
 		const paused = notableSuccesses.some(([{ metafile }]) =>
-			estimatePausedStatus(metafile!, searchee),
+			estimatePausedStatus(
+				metafile!,
+				searchee,
+				(findFallback(
+					notableSuccesses,
+					[Decision.MATCH, Decision.MATCH_SIZE_ONLY],
+					(success, decision) => success[0].decision === decision,
+				)?.[0].decision ?? Decision.MATCH_PARTIAL) as DecisionAnyMatch,
+			),
 		);
 		const injected = notableSuccesses.some(
 			([, , actionResult]) => actionResult === InjectionResult.SUCCESS,

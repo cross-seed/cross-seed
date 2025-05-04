@@ -317,10 +317,13 @@ export function getResumeStopTime() {
 export function shouldResumeFromNonRelevantFiles(
 	meta: Metafile,
 	remainingSize: number,
+	decision: DecisionAnyMatch,
 	options?: { torrentLog: string; label: string },
 ): boolean {
-	const { ignoreNonRelevantFilesToResume } = getRuntimeConfig();
+	const { ignoreNonRelevantFilesToResume, matchMode } = getRuntimeConfig();
 	if (!ignoreNonRelevantFilesToResume) return false;
+	if (decision !== Decision.MATCH_PARTIAL) return false;
+	if (matchMode !== MatchMode.PARTIAL) return false;
 	if (remainingSize > 209715200) {
 		if (options) {
 			logger.warn({
@@ -371,9 +374,10 @@ export function shouldResumeFromNonRelevantFiles(
 export function estimatePausedStatus(
 	meta: Metafile,
 	searchee: Searchee,
+	decision: DecisionAnyMatch,
 ): boolean {
 	const { autoResumeMaxDownload } = getRuntimeConfig();
 	const remaining = (1 - getPartialSizeRatio(meta, searchee)) * meta.length;
 	if (remaining <= autoResumeMaxDownload) return false;
-	return !shouldResumeFromNonRelevantFiles(meta, remaining);
+	return !shouldResumeFromNonRelevantFiles(meta, remaining, decision);
 }

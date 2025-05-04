@@ -889,6 +889,7 @@ export default class QBittorrent implements TorrentClient {
 					!shouldResumeFromNonRelevantFiles(
 						meta,
 						torrentInfo.amount_left,
+						decision,
 						{ torrentLog, label: this.label },
 					)
 				) {
