@@ -49,7 +49,7 @@ export function HealthCheck() {
           </span>
         </p>
       </section>
-      <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
+      <ReactQueryDevtools initialIsOpen={false} buttonPosition="top-right" />
     </div>
   );
 }
