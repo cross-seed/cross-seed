@@ -10,7 +10,6 @@ const url = `http://${host}:${port}`;
 
 export const appRouter = router({
   healthcheck: publicProcedure.query(async () => {
-    console.log('pinging cross-seed');
     try {
       const response = await fetch(`${url}/api/ping`, {
         method: 'GET',
