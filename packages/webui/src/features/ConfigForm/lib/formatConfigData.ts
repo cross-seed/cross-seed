@@ -19,12 +19,12 @@ export function formatConfigDataForForm(config: Config) {
 
     // Update empty array fields to have an empty string so the form
     // fields show
-    dataDirs: config.dataDirs.length ? config.dataDirs : [''],
+    dataDirs: config.dataDirs?.length ? config.dataDirs : [''],
     linkDirs: config.linkDirs.length ? config.linkDirs : [''],
     torznab: config.torznab.length ? config.torznab : [''],
-    sonarr: config.sonarr.length ? config.sonarr : [''],
-    radarr: config.radarr.length ? config.radarr : [''],
-    notificationWebhookUrls: config.notificationWebhookUrls.length
+    sonarr: config.sonarr?.length ? config.sonarr : [''],
+    radarr: config.radarr?.length ? config.radarr : [''],
+    notificationWebhookUrls: config.notificationWebhookUrls?.length
       ? config.notificationWebhookUrls
       : [''],
     blockList: config.blockList?.length ? config.blockList : [''],
