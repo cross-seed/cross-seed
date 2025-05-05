@@ -1,28 +1,33 @@
-import type { FieldApi } from '@tanstack/react-form';
+import type { FieldMeta } from '@tanstack/react-form';
+import { FC } from 'react';
 
-export function FieldInfo({
-  field,
-  index,
+type FieldInfoProps = {
+  fieldMeta: FieldMeta | undefined;
+};
+
+export const FieldInfo: FC<FieldInfoProps> = ({
+  fieldMeta,
 }: {
-  field: FieldApi<any, any, any, any>;
-  index?: number;
-}) {
-  const errors = field.state.meta.errors;
+  fieldMeta: FieldMeta | undefined;
+}) => {
+  if (!fieldMeta) return null;
 
-  const getError = () => {
-    if (typeof index === 'undefined') {
-      return errors[0];
-    }
-
-    const errorArray =
-      typeof errors[0] === 'string' ? errors[0]?.split(',') : [];
-    return errorArray[index];
-  };
-  return (
-    <>
-      {field.state.meta.isTouched && errors && errors.length ? (
+  if (fieldMeta.errors && fieldMeta.errors.length > 0) {
+    return (
+      <>
+        {/* {fieldMeta.isTouched && fieldMeta.errors && fieldMeta.errors.length ? ( */}
+        <span className="text-sm text-red-600">
+          {fieldMeta.errors.map((error, i) => (
+            <span key={i}>{error}</span>
+          ))}
+        </span>
+        {/* )} */}
+        {/* {field.state.meta.isTouched && errors && errors.length ? (
         <span className="text-sm text-red-600">{getError()}</span>
-      ) : null}
-    </>
-  );
-}
+      ) : null} */}
+      </>
+    );
+  }
+
+  return null;
+};

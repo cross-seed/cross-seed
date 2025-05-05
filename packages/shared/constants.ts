@@ -134,7 +134,6 @@ export const defaultConfig = {
 	delugeRpcUrl: null,
 	duplicateCategories: false,
 	notificationWebhookUrls: [""],
-	notificationWebhookUrl: null,
 	port: null,
 	host: null,
 	rssCadence: null,
