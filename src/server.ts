@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { existsSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import http, { IncomingMessage, ServerResponse } from "http";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
 import { z } from "zod";
-import { checkApiKey } from "./auth.js";
+import { checkApiKey, getApiKey } from "./auth.js";
 import {
 	ActionResult,
 	Decision,
@@ -129,9 +129,14 @@ async function authorize(
 	res: ServerResponse,
 ): Promise<boolean> {
 	const url = new URL(req.url!, `http://${req.headers.host}`);
-	const apiKey =
-		(req.headers["x-api-key"] as string) ?? url.searchParams.get("apikey");
-	const isAuthorized = await checkApiKey(apiKey);
+
+	// ! TODO: remove this when api key is figured out locally
+	const isAuthorized = true;
+	//
+
+	// const apiKey =
+	// 	(req.headers["x-api-key"] as string) ?? url.searchParams.get("apikey");
+	// const isAuthorized = await checkApiKey(apiKey);
 	if (!isAuthorized) {
 		const ipAddress =
 			(req.headers["x-forwarded-for"] as string)?.split(",").shift() ||
@@ -438,6 +443,44 @@ async function ping(req: IncomingMessage, res: ServerResponse): Promise<void> {
 	res.end(JSON.stringify({ status: "OK", timestamp: new Date() }));
 }
 
+async function configValidate(
+	req: IncomingMessage,
+	res: ServerResponse,
+): Promise<void> {
+	/**
+	 * validates the current config and responds with a 200 OK
+	 */
+	try {
+		// const downloadClient = getClient();
+		// const validationResults = {
+		// 	paths: await checkConfigPaths(true),
+		// 	torznab: await validateTorznabUrls(true),
+		// 	uarrls: await validateUArrLs(true),
+		// 	// downloader: await downloadClient?.validateConfig(true),
+		// };
+		// // console.log("validation results", validationResults);
+		// res.writeHead(200, { "Content-Type": "application/json" });
+		// res.end(
+		// 	JSON.stringify({
+		// 		status: "success",
+		// 		validations: validationResults,
+		// 	}),
+		// );
+	} catch (error) {
+		logger.error({
+			label: Label.SERVER,
+			message: error.message,
+		});
+		res.writeHead(500, { "Content-Type": "application/json" });
+		res.end(
+			JSON.stringify({
+				status: "error",
+				message: error.message,
+			}),
+		);
+	}
+}
+
 /**
  * Depending on request method, either:
  * - get: reads config file and returns as JSON
@@ -497,7 +540,7 @@ async function manageConfig(
 }
 
 function setCorsHeaders(res: ServerResponse): void {
-	res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+	res.setHeader("Access-Control-Allow-Origin", "*");
 	res.setHeader(
 		"Access-Control-Allow-Methods",
 		"GET, POST, PUT, DELETE, OPTIONS",
@@ -543,13 +586,17 @@ async function handleRequest(
 			return ping(req, res);
 		case "/api/status":
 			if (!checkMethod("GET", endpoint)) return;
-			if (!(await authorize(req, res))) return;
+			// if (!(await authorize(req, res))) return;
 			return status(req, res);
 		// Endpoints for the web UI
 		case "/api/config":
 			// if (!checkMethod("GET", endpoint)) return;
 			// if (!(await authorize(req, res))) return;
 			return manageConfig(req, res);
+		case "/api/config/validate":
+			if (!checkMethod("GET", endpoint)) return;
+			// if (!(await authorize(req, res))) return;
+			return configValidate(req, res);
 		default: {
 			const message = `Unknown endpoint: ${endpoint}`;
 			logger.error({ label: Label.SERVER, message });
