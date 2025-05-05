@@ -14,7 +14,10 @@ export const baseValidationSchema = z.object({
     .lte(3600, ZodErrorMessages.delayUnsupported),
   torznab: z.array(z.string().url()),
   useClientTorrents: z.boolean(),
-  dataDirs: z.array(z.string()).transform((v) => v ?? []),
+  dataDirs: z
+    .array(z.string())
+    .transform((v) => v ?? [])
+    .nullable(),
   matchMode: z.nativeEnum(MatchMode),
   skipRecheck: z.boolean(),
   autoResumeMaxDownload: z
@@ -24,7 +27,7 @@ export const baseValidationSchema = z.object({
     .lte(52428800, ZodErrorMessages.autoResumeMaxDownloadUnsupported),
   linkCategory: z.string().nullish(),
   linkDir: z.string().nullish(),
-  linkDirs: z.array(z.string()),
+  linkDirs: z.array(z.string()).nullable(),
   linkType: z.nativeEnum(LinkType),
   flatLinking: z
     .boolean()
@@ -44,7 +47,7 @@ export const baseValidationSchema = z.object({
     .string()
     .nullable()
     .transform((v) => v ?? null),
-  outputDir: z.string(),
+  outputDir: z.string().min(1, ZodErrorMessages.emptyString),
   injectDir: z.string().optional(),
   includeSingleEpisodes: z.boolean(),
   includeNonVideos: z.boolean(),
@@ -74,8 +77,9 @@ export const baseValidationSchema = z.object({
   transmissionRpcUrl: z.string().url().nullish(),
   delugeRpcUrl: z.string().url().nullish(),
   duplicateCategories: z.boolean(),
-  notificationWebhookUrls: z.array(z.string().url()),
-  notificationWebhookUrl: z.string().url().nullish(),
+  notificationWebhookUrls: z
+    .array(z.string().url().or(z.literal('')))
+    .optional(),
   port: z.number().positive().lte(65535).nullish(),
   // .nullish(),
   host: z.string().ip().nullish(),
@@ -117,8 +121,14 @@ export const baseValidationSchema = z.object({
   blockList: z.array(z.string()).nullish(),
   // .transform(transformBlocklist),
   apiKey: z.string().min(24).nullish(),
-  radarr: z.array(z.string().url()).transform((v) => v ?? []),
-  sonarr: z.array(z.string().url()).transform((v) => v ?? []),
+  radarr: z
+    .array(z.string().url().or(z.literal('')))
+    .transform((v) => v ?? [])
+    .nullable(),
+  sonarr: z
+    .array(z.string().url().or(z.literal('')))
+    .transform((v) => v ?? [])
+    .nullable(),
 });
 
 export type Config = z.infer<typeof baseValidationSchema>;
