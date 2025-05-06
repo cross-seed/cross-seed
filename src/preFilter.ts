@@ -295,7 +295,7 @@ export async function filterTimestamps(
 			"indexer.id",
 			enabledIndexers
 				.filter((indexer) =>
-					indexerDoesSupportMediaType(mediaType, indexer.categories),
+					indexerDoesSupportMediaType(mediaType, indexer),
 				)
 				.map((indexer) => indexer.id),
 		)

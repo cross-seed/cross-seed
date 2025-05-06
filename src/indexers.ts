@@ -13,6 +13,7 @@ export enum IndexerStatus {
 
 export interface DbIndexer {
 	id: number;
+	name: string | null;
 	url: string;
 	apikey: string;
 	/**
@@ -24,6 +25,9 @@ export interface DbIndexer {
 	searchCap: boolean;
 	tvSearchCap: boolean;
 	movieSearchCap: boolean;
+	musicSearchCap: boolean;
+	audioSearchCap: boolean;
+	bookSearchCap: boolean;
 	tvIdCaps: string;
 	movieIdCaps: string;
 	catCaps: string;
@@ -52,6 +56,9 @@ export interface Caps {
 	search: boolean;
 	tvSearch: boolean;
 	movieSearch: boolean;
+	musicSearch: boolean;
+	audioSearch: boolean;
+	bookSearch: boolean;
 	movieIdSearch: IdSearchCaps;
 	tvIdSearch: IdSearchCaps;
 	categories: IndexerCategories;
@@ -67,6 +74,7 @@ export interface IdSearchCaps {
 
 export interface Indexer {
 	id: number;
+	name: string | null;
 	url: string;
 	apikey: string;
 	/**
@@ -78,6 +86,9 @@ export interface Indexer {
 	searchCap: boolean;
 	tvSearchCap: boolean;
 	movieSearchCap: boolean;
+	musicSearchCap: boolean;
+	audioSearchCap: boolean;
+	bookSearchCap: boolean;
 	tvIdCaps: IdSearchCaps;
 	movieIdCaps: IdSearchCaps;
 	categories: IndexerCategories;
@@ -88,12 +99,16 @@ const allFields = {
 	id: "id",
 	url: "url",
 	apikey: "apikey",
+	name: "name",
 	active: "active",
 	status: "status",
 	retryAfter: "retry_after",
 	searchCap: "search_cap",
 	tvSearchCap: "tv_search_cap",
 	movieSearchCap: "movie_search_cap",
+	musicSearchCap: "music_search_cap",
+	audioSearchCap: "audio_search_cap",
+	bookSearchCap: "book_search_cap",
 	tvIdCaps: "tv_id_caps",
 	movieIdCaps: "movie_id_caps",
 	catCaps: "cat_caps",
@@ -117,6 +132,9 @@ export const ALL_CAPS: Caps = {
 	},
 	tvSearch: true,
 	movieSearch: true,
+	musicSearch: true,
+	audioSearch: true,
+	bookSearch: true,
 	movieIdSearch: {
 		tvdbId: true,
 		tmdbId: true,
@@ -224,6 +242,9 @@ export async function updateIndexerCapsById(indexerId: number, caps: Caps) {
 			search_cap: caps.search,
 			tv_search_cap: caps.tvSearch,
 			movie_search_cap: caps.movieSearch,
+			music_search_cap: caps.musicSearch,
+			audio_search_cap: caps.audioSearch,
+			book_search_cap: caps.bookSearch,
 			movie_id_caps: JSON.stringify(caps.movieIdSearch),
 			tv_id_caps: JSON.stringify(caps.tvIdSearch),
 			cat_caps: JSON.stringify(caps.categories),
