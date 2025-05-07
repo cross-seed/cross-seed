@@ -340,6 +340,7 @@ export default class Deluge implements TorrentClient {
 						!shouldResumeFromNonRelevantFiles(
 							meta,
 							torrentInfo.total_remaining!,
+							decision,
 							{ torrentLog, label: this.label },
 						)
 					) {

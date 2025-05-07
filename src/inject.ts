@@ -37,6 +37,7 @@ import {
 	areMediaTitlesSimilar,
 	comparing,
 	exists,
+	findFallback,
 	formatAsList,
 	getLogString,
 	humanReadableDate,
@@ -375,10 +376,11 @@ async function injectionAlreadyExists({
 		false,
 	);
 	const decision =
-		clientMatches.find((m) => m.decision === Decision.MATCH)?.decision ??
-		clientMatches.find((m) => m.decision === Decision.MATCH_SIZE_ONLY)
-			?.decision ??
-		Decision.MATCH_PARTIAL;
+		findFallback(
+			clientMatches,
+			[Decision.MATCH, Decision.MATCH_SIZE_ONLY],
+			(match, decision) => match.decision === decision,
+		)?.decision ?? Decision.MATCH_PARTIAL;
 	if (linkedNewFiles) {
 		logger.info({
 			label: Label.INJECT,

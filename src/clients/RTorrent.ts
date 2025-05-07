@@ -771,6 +771,7 @@ export default class RTorrent implements TorrentClient {
 					!shouldResumeFromNonRelevantFiles(
 						meta,
 						torrentInfo.bytesLeft,
+						decision,
 						{ torrentLog, label: this.label },
 					)
 				) {

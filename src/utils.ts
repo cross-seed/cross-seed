@@ -358,6 +358,18 @@ export function fallback<T>(...args: T[]): T | undefined {
 	return undefined;
 }
 
+export function findFallback<T, U>(
+	arr: T[],
+	items: U[],
+	cb: (e: T, item: U) => boolean,
+): T | undefined {
+	for (const item of items) {
+		const found = arr.find((e) => cb(e, item));
+		if (found) return found;
+	}
+	return undefined;
+}
+
 export async function inBatches<T>(
 	items: T[],
 	cb: (batch: T[]) => Promise<void>,
