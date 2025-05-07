@@ -162,13 +162,7 @@ async function findOnOtherSites(
 	const cachedIndexers = cachedSearch.indexerCandidates.length;
 	const searchedIndexers = response.length - cachedIndexers;
 	cachedSearch.indexerCandidates = response;
-
-	const candidates: CandidateWithIndexerId[] = response.flatMap((e) =>
-		e.candidates.map((candidate) => ({
-			...candidate,
-			indexerId: e.indexerId,
-		})),
-	);
+	const candidates = response.flatMap((e) => e.candidates);
 
 	if (response.length) {
 		logger.verbose({
