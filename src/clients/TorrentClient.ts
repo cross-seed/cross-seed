@@ -215,6 +215,7 @@ export async function validateClientSavePaths(
 		)}`,
 	});
 
+	const linkingErrorMsg = `Failed to link from ${label} save paths to a linkDir. If you have multiple drives, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to the drives (https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking)`;
 	for (const savePath of uniqueSavePaths) {
 		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
 			throw new CrossSeedError(
@@ -222,16 +223,15 @@ export async function validateClientSavePaths(
 			);
 		}
 		try {
-			await testLinking(
+			const res = await testLinking(
 				savePath,
 				`torrentClient${clientPriority}Src.cross-seed`,
 				`torrentClient${clientPriority}Dest.cross-seed`,
 			);
+			if (!res) logger.error(linkingErrorMsg);
 		} catch (e) {
 			logger.error(e);
-			throw new CrossSeedError(
-				`Failed to link from ${label} save paths to a linkDir. If you have multiple drives, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to the drives (https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking)`,
-			);
+			throw new CrossSeedError(linkingErrorMsg);
 		}
 	}
 }
