@@ -23,6 +23,7 @@ export enum Label {
 	ANNOUNCE = "announce",
 	WEBHOOK = "webhook",
 	PERF = "perf",
+	CLEANUP = "cleanup",
 	ARRS = "arrs",
 	RADARR = "radarr",
 	SONARR = "sonarr",

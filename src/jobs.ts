@@ -122,6 +122,9 @@ export async function checkJobs(
 		async () => {
 			const now = Date.now();
 			for (const job of jobs) {
+				if (job.name === JobName.CLEANUP && !job.runAheadOfSchedule) {
+					if (jobs.some((j) => j.isActive)) continue; // cleanup uses lots of resources
+				}
 				const lastRun = await getJobLastRun(job.name);
 
 				// if it's never been run, you are eligible immediately

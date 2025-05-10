@@ -709,7 +709,14 @@ export async function updateCaps(): Promise<void> {
 	for (const [indexerId, caps] of fulfilled) {
 		await updateIndexerCapsById(indexerId, caps);
 	}
-	for (const indexer of indexers) {
+	for (const indexer of await getAllIndexers()) {
+		if (!indexer.categories) {
+			logger.error({
+				label: Label.TORZNAB,
+				message: `Indexer ${indexer.name ?? indexer.url} failed to fetch caps`,
+			});
+			continue;
+		}
 		const supported: string[] = [];
 		const unsupported: string[] = [];
 		for (const mediaType of Object.keys(MediaType)) {
