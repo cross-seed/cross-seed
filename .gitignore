@@ -45,3 +45,4 @@ test.db
 .tool-versions
 coverage/
 .vscode/
+**/.claude/settings.local.json
