@@ -25,11 +25,8 @@ if (!root) throw new Error('Root element not found');
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <TRPCProvider
-        trpcClient={trpcClient}
-        queryClient={queryClient}
-      >
-        <ThemeProvider defaultTheme="system" storageKey="xseed-ui-theme">
+      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+        <ThemeProvider defaultTheme="system" storageKey="cross-seed-ui-theme">
           <RouterProvider router={router} />
         </ThemeProvider>
         {process.env.NODE_ENV !== 'production' && (
@@ -37,5 +34,5 @@ createRoot(root).render(
         )}
       </TRPCProvider>
     </QueryClientProvider>
-  </StrictMode>
-)
+  </StrictMode>,
+);
