@@ -28,6 +28,7 @@ export enum Label {
 	ARRS = "arrs",
 	RADARR = "radarr",
 	SONARR = "sonarr",
+	AUTH = "auth",
 }
 
 export let logger: winston.Logger;
