@@ -29,7 +29,6 @@
     "@tanstack/react-router-devtools": "^1.114.3",
     "@tanstack/router-devtools": "^1.109.2",
     "@trpc/client": "^11.0.0",
-    "@trpc/react-query": "^11.1.1",
     "@trpc/server": "^11.0.0",
     "@trpc/tanstack-react-query": "^11.0.0",
     "class-variance-authority": "^0.7.1",
