@@ -1,8 +1,7 @@
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import { formatDistanceToNow } from 'date-fns';
 
 export function HealthCheck() {
   const trpc = useTRPC();
@@ -51,7 +50,7 @@ export function HealthCheck() {
           </span>
         </p>
       </section>
-      <ReactQueryDevtools initialIsOpen={false} buttonPosition="top-right" />
+      Ø
     </div>
   );
 }
