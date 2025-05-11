@@ -2,62 +2,64 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 .form-fieldset {
-    display: grid;
-    grid-template-areas: 'col1 col2';
-    padding: theme('spacing.4');
-    margin-block-end: theme('spacing.5');
-    border: theme('borderWidth.DEFAULT') solid theme('colors.slate.200');
+  display: grid;
+  grid-template-areas: 'col1 col2';
+  padding: theme('spacing.4');
+  margin-block-end: theme('spacing.5');
+  border: theme('borderWidth.DEFAULT') solid theme('colors.slate.200');
 
-    .dark & {
-        border-color: theme('colors.slate.700');
-    }
+  .dark & {
+    border-color: theme('colors.slate.700');
+  }
 
-    legend {
-        font-size: theme('fontSize.lg');
-        font-weight: theme('fontWeight.semibold');
-        color: theme('colors.slate.700');
-        padding-inline: theme('spacing.3');
-    }
+  legend {
+    font-size: theme('fontSize.lg');
+    font-weight: theme('fontWeight.semibold');
+    color: theme('colors.slate.700');
+    padding-inline: theme('spacing.3');
+  }
 }
 
 .form-fieldset:nth-child(odd) {
-    grid-area: col1;
+  grid-area: col1;
 }
 
 .form-fieldset:nth-child(even) {
-    grid-area: col2;
+  grid-area: col2;
 }
 
 .form-field-switches {
-    display: flex;
-    flex-direction: row;
-    grid-column: span 2;
+  display: flex;
+  flex-direction: row;
+  grid-column: span 2;
 
-    & .form-field__switch {
-        width: theme('width.1/6');
-        /* margin-inline-end: theme('spacing.5'); */
-    }
+  & .form-field__switch {
+    width: theme('width.1/6');
+    /* margin-inline-end: theme('spacing.5'); */
+  }
 }
 
 .form-input {
-    border: 1px solid theme('colors.slate.300');
-    padding-block: theme('spacing.1');
-    padding-inline: theme('spacing.2');
-    box-shadow: none;
-    background-color: theme('colors.white');
+  border: 1px solid theme('colors.slate.300');
+  padding-block: theme('spacing.1');
+  padding-inline: theme('spacing.2');
+  box-shadow: none;
+  background-color: theme('colors.white');
 
-    &:focus,
-    &:focus-visible {
-        border-color: currentColor;
-        box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-accent-300) 40%, transparent);
-    }
+  &:focus,
+  &:focus-visible {
+    border-color: currentColor;
+    box-shadow: 0 0 0 2px
+      color-mix(in oklab, var(--color-accent-300) 40%, transparent);
+  }
 
-    &[aria-invalid='true'] {
-        border-color: theme('colors.red.500');
-        box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-red-500) 40%, transparent);
-    }
+  &[aria-invalid='true'] {
+    border-color: theme('colors.red.500');
+    box-shadow: 0 0 0 2px
+      color-mix(in oklab, var(--color-red-500) 40%, transparent);
+  }
 
-    .dark & {
-        border-color: theme('colors.slate.600');
-    }
+  .dark & {
+    border-color: theme('colors.slate.600');
+  }
 }
