@@ -6,7 +6,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 
 export function HealthCheck() {
   const trpc = useTRPC();
-  const { data: healthcheckData, error } = useSuspenseQuery(
+  const { data: healthcheckData } = useSuspenseQuery(
     trpc.health.check.queryOptions(),
   );
 
