@@ -1,30 +1,30 @@
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useTRPC } from "@/lib/trpc";
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useTRPC } from '@/lib/trpc';
 import {
   useMutation,
   useSuspenseQuery,
   useQueryClient,
-} from "@tanstack/react-query";
+} from '@tanstack/react-query';
 
 export function LoginForm({
   className,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<'div'>) {
   const queryClient = useQueryClient();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const trpc = useTRPC();
 
   const { data: authStatus } = useSuspenseQuery(
@@ -39,35 +39,39 @@ export function LoginForm({
         });
       },
       onError: () => {
-        setError("Invalid username or password");
+        setError('Invalid username or password');
       },
     }),
   );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError('');
     login({ username, password });
   };
 
   const isSignUp = !authStatus?.userExists;
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className={cn('flex flex-col gap-6', className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle>{isSignUp ? "Initial Setup" : "Login to your account"}</CardTitle>
+          <CardTitle>
+            {isSignUp ? 'Initial Setup' : 'Login to your account'}
+          </CardTitle>
           <CardDescription>
             {isSignUp
-              ? "Create the first user account"
-              : "Enter your username and password to access your account"}
+              ? 'Create the first user account'
+              : 'Enter your username and password to access your account'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
               {error && (
-                <div className="text-destructive text-sm font-medium">{error}</div>
+                <div className="text-destructive text-sm font-medium">
+                  {error}
+                </div>
               )}
               <div className="grid gap-3">
                 <Label htmlFor="username">Username</Label>
@@ -94,10 +98,10 @@ export function LoginForm({
               </div>
               <Button type="submit" disabled={isPending} className="w-full">
                 {isPending
-                  ? "Processing..."
+                  ? 'Processing...'
                   : isSignUp
-                    ? "Create Account"
-                    : "Login"}
+                    ? 'Create Account'
+                    : 'Login'}
               </Button>
             </div>
           </form>
