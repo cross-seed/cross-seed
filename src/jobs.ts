@@ -122,8 +122,18 @@ export async function checkJobs(
 		async () => {
 			const now = Date.now();
 			for (const job of jobs) {
-				if (job.name === JobName.CLEANUP && !job.runAheadOfSchedule) {
-					if (jobs.some((j) => j.isActive)) continue; // cleanup uses lots of resources
+				if (!job.runAheadOfSchedule) {
+					if (jobs.find((j) => j.name === JobName.RSS)?.isActive) {
+						continue;
+					}
+					if (
+						jobs.find((j) => j.name === JobName.CLEANUP)?.isActive
+					) {
+						continue;
+					}
+					if (job.name === JobName.CLEANUP) {
+						if (jobs.some((j) => j.isActive)) continue;
+					}
 				}
 				const lastRun = await getJobLastRun(job.name);
 
