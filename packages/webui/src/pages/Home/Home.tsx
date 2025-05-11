@@ -1,10 +1,11 @@
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { trpc } from '@/lib/trpc';
+import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { useSuspenseQuery } from '@tanstack/react-query';
 
 export function HealthCheck() {
+  const trpc = useTRPC();
   const { data: healthcheckData, error } = useSuspenseQuery(
     trpc.health.check.queryOptions()
   );

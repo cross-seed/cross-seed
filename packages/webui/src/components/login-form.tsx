@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { trpc } from "@/lib/trpc";
+import { useTRPC } from "@/lib/trpc";
 import {
   useMutation,
   useSuspenseQuery,
@@ -25,6 +25,7 @@ export function LoginForm({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const trpc = useTRPC();
 
   const { data: authStatus } = useSuspenseQuery(
     trpc.auth.authStatus.queryOptions(),

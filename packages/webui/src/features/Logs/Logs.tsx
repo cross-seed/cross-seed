@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { trpc } from "@/lib/trpc";
+import { useTRPC } from "@/lib/trpc";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ interface LogEntry {
 export function Logs() {
   const [logLevel, setLogLevel] = useState<"error" | "warn" | "info" | "verbose" | "debug">("info");
   const [limit, setLimit] = useState<number>(100);
+  const trpc = useTRPC();
 
   const { data: logs, refetch, isLoading } = useSuspenseQuery(
     trpc.logs.getRecentLogs.queryOptions({
