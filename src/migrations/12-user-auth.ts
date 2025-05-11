@@ -23,4 +23,4 @@ async function down(knex: Knex.Knex): Promise<void> {
 	await knex.schema.dropTable("user");
 }
 
-export default { name: "11-user-auth", up, down };
+export default { name: "12-user-auth", up, down };
