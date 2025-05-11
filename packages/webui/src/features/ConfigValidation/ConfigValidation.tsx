@@ -6,7 +6,9 @@ import { useQuery } from '@tanstack/react-query';
 
 export const ConfigValidation: FC = () => {
   const trpc = useTRPC();
-  const { data, isLoading, isError, error } = useQuery(trpc.config.validate.queryOptions());
+  const { data, isLoading, isError, error } = useQuery(
+    trpc.config.validate.queryOptions(),
+  );
   return (
     <div className="mb-6">
       <h2 className="mb-6 text-2xl font-semibold dark:text-slate-100">

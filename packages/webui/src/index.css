@@ -1,9 +1,8 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 /*---break---*/
 @plugin "tailwindcss-animate";
 /*---break---*/
 @custom-variant dark (&:where(.dark, .dark *));
-
 
 @theme {
   --color-accent: oklch(61.3% 0.155 147deg);
