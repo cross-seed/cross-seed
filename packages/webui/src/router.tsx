@@ -3,12 +3,29 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router';
+import { QueryClient } from '@tanstack/react-query';
 import { Root } from '@/routes/root';
 import { Logs } from '@/features/Logs/Logs';
 import { HealthCheck } from '@/pages/Home/Home';
 import { Config } from '@/pages/Config/Config';
+import { trpc } from '@/lib/trpc';
 
-const rootRoute = createRootRoute({
+// Create a QueryClient
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+// Create routes with context
+interface RouterContext {
+  queryClient: QueryClient;
+  trpc: typeof trpc;
+}
+
+const rootRoute = createRootRoute<RouterContext>({
   component: Root,
 });
 
@@ -32,7 +49,14 @@ const configRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([homeRoute, logsRoute, configRoute]);
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({
+  routeTree,
+  context: {
+    queryClient,
+    trpc,
+  },
+  defaultPreloadStaleTime: 0,
+});
 
 declare module '@tanstack/react-router' {
   interface Register {
