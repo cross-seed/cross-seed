@@ -3,10 +3,12 @@ import path from "path";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
+import viteTsconfigPaths from "vite-tsconfig-paths";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    viteTsconfigPaths(),
     react(),
     tailwindcss(),
     TanStackRouterVite({ target: "react", autoCodeSplitting: true }),
@@ -15,6 +17,10 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  publicDir: "public",
+  build: {
+    outDir: "dist",
   },
   server: {
     port: 5173, // Default Vite port
