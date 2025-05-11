@@ -5,6 +5,7 @@ import { routeTree } from './routeTree.gen';
 
 // Create and export the router instance
 export const router = createRouter({
+  context: () => ({}),
   routeTree,
   defaultPreloadStaleTime: 0,
 });
