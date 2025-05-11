@@ -1,12 +1,6 @@
-import { FC, useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
-import { useForm } from '@tanstack/react-form';
-import { z } from 'zod';
-import './Form.css';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { FieldInfo } from './FieldInfo';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -15,14 +9,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Action, LinkType, MatchMode } from '../../../../shared/constants';
-import { baseValidationSchema, Config } from '@/types/config';
-import { Button } from '@/components/ui/button';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { Switch } from '@/components/ui/switch';
 import { useTRPC } from '@/lib/trpc';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { defaultConfig } from '../../../../shared/constants';
+import { cn } from '@/lib/utils';
+import { baseValidationSchema, Config } from '@/types/config';
+import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useForm } from '@tanstack/react-form';
+import { useQuery } from '@tanstack/react-query';
+import { FC, useEffect, useState } from 'react';
+import { z } from 'zod';
+import './Form.css';
+import {
+  Action,
+  defaultConfig,
+  LinkType,
+  MatchMode,
+} from '../../../../shared/constants';
+import { FieldInfo } from './FieldInfo';
 import { formatConfigDataForForm } from './lib/formatConfigData';
 import { removeEmptyArrayValues } from './lib/transformers';
 
@@ -36,15 +40,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
     data: configData,
     isLoading,
     isError,
-  } = useQuery(trpc.config.get.queryOptions(), {
-    select: (data) => ({
-      ...formatConfigDataForForm(data.config),
+  } = useQuery(
+    trpc.config.get.queryOptions({
+      select: (data) => formatConfigDataForForm(data.config),
     }),
-  });
-
-  // useEffect(() => {
-  //   console.log('configData', configData);
-  // }, [configData]);
+  );
 
   const form = useForm({
     defaultValues: configData ?? defaultConfig,
