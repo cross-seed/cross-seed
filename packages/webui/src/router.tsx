@@ -1,6 +1,5 @@
 import { createRouter } from '@tanstack/react-router';
 import { QueryClient } from '@tanstack/react-query';
-import { trpc } from '@/lib/trpc';
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
@@ -19,7 +18,6 @@ export const router = createRouter({
   routeTree,
   context: {
     queryClient,
-    trpc,
   },
   defaultPreloadStaleTime: 0,
 });

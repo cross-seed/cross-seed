@@ -23,7 +23,7 @@ import {
   SidebarSeparator,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { trpc } from "@/lib/trpc"
+import { useTRPC } from "@/lib/trpc"
 
 // Navigation data for Cross-Seed
 const navItems = [
@@ -71,6 +71,7 @@ const navItems = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const queryClient = useQueryClient()
+  const trpc = useTRPC()
   const { data: authStatus } = useSuspenseQuery(
     trpc.auth.authStatus.queryOptions()
   )

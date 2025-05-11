@@ -1,5 +1,5 @@
 import { LoginForm } from "@/components/login-form";
-import { trpc } from "@/lib/trpc";
+import { useTRPC } from "@/lib/trpc";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -8,6 +8,7 @@ type AuthWrapperProps = {
 };
 
 export function Login({ children }: AuthWrapperProps) {
+  const trpc = useTRPC();
   const { data: authStatus } = useSuspenseQuery(
     trpc.auth.authStatus.queryOptions(),
   );
