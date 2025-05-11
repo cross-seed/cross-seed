@@ -236,9 +236,9 @@ const createServer = (): FastifyInstance => {
 	// Register tRPC router
 	registerTRPC(app);
 
-	// Serve static files from the client/dist directory
+	// Serve static files from the packages/webui/dist directory
 	app.register(fastifyStatic, {
-		root: join(dirname(__dirname), "client", "build"),
+		root: join(dirname(__dirname), "packages", "webui", "dist"),
 		prefix: "/",
 		decorateReply: true,
 	});
