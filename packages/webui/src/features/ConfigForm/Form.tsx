@@ -20,7 +20,8 @@ import { baseValidationSchema, Config } from '@/types/config';
 import { Button } from '@/components/ui/button';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
-import { trpc } from '@/lib/trpc';
+import { useTRPC } from '@/lib/trpc';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { defaultConfig } from '../../../../shared/constants';
 import { formatConfigDataForForm } from './lib/formatConfigData';
 import { removeEmptyArrayValues } from './lib/transformers';
@@ -30,11 +31,12 @@ type FormProps = {
 };
 
 export const ConfigForm: FC<FormProps> = ({ className }) => {
+  const trpc = useTRPC();
   const {
     data: configData,
     isLoading,
     isError,
-  } = trpc.config.get.useQuery(undefined, {
+  } = useQuery(trpc.config.get.queryOptions(), {
     select: (data) => ({
       ...formatConfigDataForForm(data.config),
     }),
