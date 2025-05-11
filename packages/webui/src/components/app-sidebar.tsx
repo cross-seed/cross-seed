@@ -1,13 +1,20 @@
-import * as React from "react"
-import { Link } from "@tanstack/react-router"
-import { 
-  useMutation, 
-  useSuspenseQuery, 
-  useQueryClient 
-} from "@tanstack/react-query"
-import { LogOut, Home, Settings, Search, Database, RefreshCw } from "lucide-react"
+import * as React from 'react';
+import { Link } from '@tanstack/react-router';
+import {
+  useMutation,
+  useSuspenseQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import {
+  LogOut,
+  Home,
+  Settings,
+  Search,
+  Database,
+  RefreshCw,
+} from 'lucide-react';
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button';
 import {
   Sidebar,
   SidebarContent,
@@ -22,75 +29,74 @@ import {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { useTRPC } from "@/lib/trpc"
+} from '@/components/ui/sidebar';
+import { useTRPC } from '@/lib/trpc';
 
-// Navigation data for Cross-Seed
 const navItems = [
   {
-    title: "Main",
+    title: 'Main',
     items: [
       {
-        title: "Dashboard",
+        title: 'Dashboard',
         icon: <Home className="size-4" />,
-        url: "/",
+        url: '/',
       },
       {
-        title: "Search",
+        title: 'Search',
         icon: <Search className="size-4" />,
-        url: "/search",
+        url: '/search',
       },
     ],
   },
   {
-    title: "Management",
+    title: 'Management',
     items: [
       {
-        title: "Torrents",
+        title: 'Torrents',
         icon: <Database className="size-4" />,
-        url: "/torrents",
+        url: '/torrents',
       },
       {
-        title: "Jobs",
+        title: 'Jobs',
         icon: <RefreshCw className="size-4" />,
-        url: "/jobs",
+        url: '/jobs',
       },
     ],
   },
   {
-    title: "Configuration",
+    title: 'Configuration',
     items: [
       {
-        title: "Settings",
+        title: 'Settings',
         icon: <Settings className="size-4" />,
-        url: "/config",
+        url: '/config',
       },
     ],
   },
-]
+];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const queryClient = useQueryClient()
-  const trpc = useTRPC()
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
   const { data: authStatus } = useSuspenseQuery(
-    trpc.auth.authStatus.queryOptions()
-  )
+    trpc.auth.authStatus.queryOptions(),
+  );
 
   const { mutate: logout } = useMutation(
     trpc.auth.logOut.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries({
           queryKey: trpc.auth.authStatus.queryKey(),
-        })
+        });
       },
-    })
-  )
+    }),
+  );
 
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader className="flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-xl font-bold">Cross-Seed</span>
+          <span className="text-xl font-bold">cross-seed</span>
           <SidebarTrigger className="ml-auto" />
         </div>
       </SidebarHeader>
@@ -102,10 +108,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <SidebarMenu>
                 {section.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={item.title}
-                    >
+                    <SidebarMenuButton asChild tooltip={item.title}>
                       <Link to={item.url} activeProps={{ 'data-active': true }}>
                         {item.icon}
                         <span>{item.title}</span>
@@ -118,16 +121,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      
+
       <SidebarFooter>
         <SidebarSeparator />
         {authStatus?.isLoggedIn && (
           <div className="flex items-center justify-between px-4 py-2">
-            <div className="text-sm font-medium">{authStatus.user?.username}</div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="size-8" 
+            <div className="text-sm font-medium">
+              {authStatus.user?.username}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
               onClick={() => logout()}
               title="Logout"
             >
@@ -136,8 +141,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
         )}
       </SidebarFooter>
-      
+
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }

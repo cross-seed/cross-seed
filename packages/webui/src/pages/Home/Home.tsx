@@ -7,7 +7,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 export function HealthCheck() {
   const trpc = useTRPC();
   const { data: healthcheckData, error } = useSuspenseQuery(
-    trpc.health.check.queryOptions()
+    trpc.health.check.queryOptions(),
   );
 
   return (
@@ -45,7 +45,9 @@ export function HealthCheck() {
         <p>
           Last check:{' '}
           <span className="">
-            {healthcheckData?.timestamp ? formatDistanceToNow(new Date(healthcheckData.timestamp)) : 'unknown'}
+            {healthcheckData?.timestamp
+              ? formatDistanceToNow(new Date(healthcheckData.timestamp))
+              : 'unknown'}
           </span>
         </p>
       </section>
