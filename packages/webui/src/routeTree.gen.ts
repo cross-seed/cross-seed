@@ -10,104 +10,123 @@
 
 // Import Routes
 
-import { Route as rootRoute } from './routes/__root'
-import { Route as LogsImport } from './routes/logs'
-import { Route as ConfigImport } from './routes/config'
-import { Route as IndexImport } from './routes/index'
+import { Route as rootRoute } from './routes/__root';
+import { Route as SearchImport } from './routes/search';
+import { Route as LogsImport } from './routes/logs';
+import { Route as ConfigImport } from './routes/config';
+import { Route as IndexImport } from './routes/index';
 
 // Create/Update Routes
+
+const SearchRoute = SearchImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRoute,
+} as any);
 
 const LogsRoute = LogsImport.update({
   id: '/logs',
   path: '/logs',
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 const ConfigRoute = ConfigImport.update({
   id: '/config',
   path: '/config',
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexImport
-      parentRoute: typeof rootRoute
-    }
+      id: '/';
+      path: '/';
+      fullPath: '/';
+      preLoaderRoute: typeof IndexImport;
+      parentRoute: typeof rootRoute;
+    };
     '/config': {
-      id: '/config'
-      path: '/config'
-      fullPath: '/config'
-      preLoaderRoute: typeof ConfigImport
-      parentRoute: typeof rootRoute
-    }
+      id: '/config';
+      path: '/config';
+      fullPath: '/config';
+      preLoaderRoute: typeof ConfigImport;
+      parentRoute: typeof rootRoute;
+    };
     '/logs': {
-      id: '/logs'
-      path: '/logs'
-      fullPath: '/logs'
-      preLoaderRoute: typeof LogsImport
-      parentRoute: typeof rootRoute
-    }
+      id: '/logs';
+      path: '/logs';
+      fullPath: '/logs';
+      preLoaderRoute: typeof LogsImport;
+      parentRoute: typeof rootRoute;
+    };
+    '/search': {
+      id: '/search';
+      path: '/search';
+      fullPath: '/search';
+      preLoaderRoute: typeof SearchImport;
+      parentRoute: typeof rootRoute;
+    };
   }
 }
 
 // Create and export the route tree
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/config': typeof ConfigRoute
-  '/logs': typeof LogsRoute
+  '/': typeof IndexRoute;
+  '/config': typeof ConfigRoute;
+  '/logs': typeof LogsRoute;
+  '/search': typeof SearchRoute;
 }
 
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/config': typeof ConfigRoute
-  '/logs': typeof LogsRoute
+  '/': typeof IndexRoute;
+  '/config': typeof ConfigRoute;
+  '/logs': typeof LogsRoute;
+  '/search': typeof SearchRoute;
 }
 
 export interface FileRoutesById {
-  __root__: typeof rootRoute
-  '/': typeof IndexRoute
-  '/config': typeof ConfigRoute
-  '/logs': typeof LogsRoute
+  __root__: typeof rootRoute;
+  '/': typeof IndexRoute;
+  '/config': typeof ConfigRoute;
+  '/logs': typeof LogsRoute;
+  '/search': typeof SearchRoute;
 }
 
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/config' | '/logs'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/config' | '/logs'
-  id: '__root__' | '/' | '/config' | '/logs'
-  fileRoutesById: FileRoutesById
+  fileRoutesByFullPath: FileRoutesByFullPath;
+  fullPaths: '/' | '/config' | '/logs' | '/search';
+  fileRoutesByTo: FileRoutesByTo;
+  to: '/' | '/config' | '/logs' | '/search';
+  id: '__root__' | '/' | '/config' | '/logs' | '/search';
+  fileRoutesById: FileRoutesById;
 }
 
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  ConfigRoute: typeof ConfigRoute
-  LogsRoute: typeof LogsRoute
+  IndexRoute: typeof IndexRoute;
+  ConfigRoute: typeof ConfigRoute;
+  LogsRoute: typeof LogsRoute;
+  SearchRoute: typeof SearchRoute;
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfigRoute: ConfigRoute,
   LogsRoute: LogsRoute,
-}
+  SearchRoute: SearchRoute,
+};
 
 export const routeTree = rootRoute
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
 
 /* ROUTE_MANIFEST_START
 {
@@ -117,7 +136,8 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/config",
-        "/logs"
+        "/logs",
+        "/search"
       ]
     },
     "/": {
@@ -128,6 +148,9 @@ export const routeTree = rootRoute
     },
     "/logs": {
       "filePath": "logs.tsx"
+    },
+    "/search": {
+      "filePath": "search.tsx"
     }
   }
 }

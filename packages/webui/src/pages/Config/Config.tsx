@@ -3,7 +3,7 @@ import { ConfigForm } from '@/features/ConfigForm/Form';
 
 export function Config() {
   return (
-    <div className="">
+    <div>
       {/* <ConfigValidation /> */}
       <ConfigForm />
     </div>

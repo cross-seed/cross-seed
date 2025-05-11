@@ -1,4 +1,4 @@
-import * as React from "react";
+import * as React from 'react';
 
 // A hook that returns true if the window width is less than 768px
 export function useIsMobile() {
@@ -6,7 +6,7 @@ export function useIsMobile() {
 
   React.useEffect(() => {
     // Check if window is defined (to avoid SSR issues)
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       const checkIsMobile = () => {
         setIsMobile(window.innerWidth < 768);
       };
@@ -15,11 +15,11 @@ export function useIsMobile() {
       checkIsMobile();
 
       // Add event listener
-      window.addEventListener("resize", checkIsMobile);
+      window.addEventListener('resize', checkIsMobile);
 
       // Clean up
       return () => {
-        window.removeEventListener("resize", checkIsMobile);
+        window.removeEventListener('resize', checkIsMobile);
       };
     }
   }, []);
