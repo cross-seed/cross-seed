@@ -1,4 +1,3 @@
-import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 import { Suspense } from 'react';
@@ -6,14 +5,10 @@ import { Login } from '@/components/auth/AuthWrapper';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import Header from '@/components/Header/Header';
-import type { TRPCOptionsProxy } from '@trpc/tanstack-react-query';
-import type { AppRouter } from '../../../src/trpc/routers';
 
-// Define router context for TypeScript
-interface RouterContext {
-  queryClient: QueryClient;
-  trpc: TRPCOptionsProxy<AppRouter>;
-}
+// nothing in  router context right now
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface RouterContext {}
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: () => (
@@ -32,7 +27,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         </Login>
       </Suspense>
       {process.env.NODE_ENV !== 'production' && (
-        <TanStackRouterDevtools position="top-left" />
+        <TanStackRouterDevtools position="bottom-left" />
       )}
     </div>
   ),
