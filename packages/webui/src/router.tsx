@@ -1,26 +1,15 @@
 import { createRouter } from '@tanstack/react-router';
 import { QueryClient } from '@tanstack/react-query';
 import { trpc } from '@/lib/trpc';
+import { getContext } from '@/lib/trpc-setup';
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
 
-// Create a QueryClient
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
 // Create and export the router instance
 export const router = createRouter({
   routeTree,
-  context: {
-    queryClient,
-    trpc,
-  },
+  context: getContext(),
   defaultPreloadStaleTime: 0,
 });
 
