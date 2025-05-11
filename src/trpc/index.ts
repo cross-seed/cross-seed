@@ -7,7 +7,6 @@ import {
 	clearSessionCookie,
 } from "../sessionCookies.js";
 import { Label, logger } from "../logger.js";
-import superjson from "superjson";
 import { z } from "zod";
 
 // Create context type for tRPC
@@ -48,9 +47,7 @@ export async function createContext({
 }
 
 // Initialize tRPC
-const t = initTRPC.context<Context>().create({
-	transformer: superjson,
-});
+const t = initTRPC.context<Context>().create();
 
 // Base router and procedure helpers
 export const router = t.router;
