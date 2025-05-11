@@ -14,7 +14,7 @@ function App() {
       links: [
         httpBatchLink({
           // base url of the backend/server API
-          url: 'http://localhost:3000/api',
+          url: 'http://localhost:2468/api/trpc',
         }),
       ],
     }),
