@@ -1,10 +1,12 @@
 import { FC, Fragment } from 'react';
-import { trpc } from '@/lib/trpc';
+import { useTRPC } from '@/lib/trpc';
 import { StatusIndicator } from '@/components/StatusIndicator/StatusIndicator';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
 
 export const ConfigValidation: FC = () => {
-  const { data, isLoading, isError, error } = trpc.config.validate.useQuery();
+  const trpc = useTRPC();
+  const { data, isLoading, isError, error } = useQuery(trpc.config.validate.queryOptions());
   return (
     <div className="mb-6">
       <h2 className="mb-6 text-2xl font-semibold dark:text-slate-100">
