@@ -9,6 +9,7 @@ import limits from "./07-limits.js";
 import rss from "./08-rss.js";
 import clientAndDataSearchees from "./09-clientAndDataSearchees.js";
 import indexerNameAudioBookCaps from "./10-indexerNameAudioBookCaps.js";
+import userAuth from "./11-user-auth.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -24,6 +25,7 @@ export const migrations = {
 			rss,
 			clientAndDataSearchees,
 			indexerNameAudioBookCaps,
+			userAuth,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,
