@@ -7,6 +7,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { TRPCProvider, trpcClient } from './lib/trpc';
 import { QueryClient } from '@tanstack/react-query';
+import superjson from 'superjson';
 
 import './index.css';
 
@@ -25,7 +26,11 @@ if (!root) throw new Error('Root element not found');
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+      <TRPCProvider
+        trpcClient={trpcClient}
+        queryClient={queryClient}
+        transformer={superjson}
+      >
         <ThemeProvider defaultTheme="system" storageKey="xseed-ui-theme">
           <RouterProvider router={router} />
         </ThemeProvider>
