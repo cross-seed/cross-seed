@@ -41,7 +41,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
     isLoading,
     isError,
   } = useQuery(
-    trpc.config.get.queryOptions({
+    trpc.config.get.queryOptions(undefined, {
       select: (data) => formatConfigDataForForm(data.config),
     }),
   );
