@@ -50,7 +50,6 @@ export function HealthCheck() {
           </span>
         </p>
       </section>
-      Ø
     </div>
   );
 }
