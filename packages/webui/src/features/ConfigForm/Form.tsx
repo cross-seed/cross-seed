@@ -108,7 +108,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
 
   return (
     <div className={cn('mb-5', className)}>
-      <h2 className="mb-6 text-2xl font-semibold dark:text-slate-100">
+      <h2 className="mb-6 text-2xl font-semibold">
         Edit Config
       </h2>
       <form
@@ -121,7 +121,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
         noValidate
       >
         {/* form fields */}
-        <div className="flex flex-wrap gap-6 dark:text-slate-100">
+        <div className="flex flex-wrap gap-6">
           <fieldset className="form-fieldset w-full gap-6 rounded-md">
             <legend>Directories and Paths</legend>
             <div className="">
@@ -1733,10 +1733,10 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           ]}
         >
           {([canSubmit, isSubmitting, errors, fieldMeta]) => (
-            <div className="sticky right-0 bottom-0 left-0 -mx-4 border-t border-solid border-slate-200 bg-slate-50 p-6 dark:bg-slate-900">
+            <div className="sticky right-0 bottom-0 left-0 -mx-4 border-t border-solid border-border bg-background p-6">
               <Button
                 type="submit"
-                className="!bg-accent hover:!bg-accent-500 dark:bg-accent-800 w-full rounded-md px-4 py-6 text-white transition-colors duration-150 disabled:bg-slate-300 disabled:opacity-60"
+                className="bg-primary text-primary-foreground w-full rounded-md px-4 py-6 transition-colors duration-150 disabled:bg-muted disabled:opacity-60"
                 disabled={!canSubmit}
               >
                 {isSubmitting ? 'Saving...' : 'Save'} "
@@ -1766,7 +1766,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
         <form.Subscribe>
           {(state) => (
             <div
-              className="w-lg overflow-auto bg-white p-4 shadow-lg dark:bg-slate-800 dark:text-white"
+              className="w-lg overflow-auto bg-card text-card-foreground p-4 shadow-lg"
               // className="fixed right-0 bottom-0 z-50 max-h-96 w-lg overflow-auto bg-white p-4 shadow-lg dark:bg-slate-800 dark:text-white"
               style={{ opacity: 0.9 }}
             >
