@@ -12,12 +12,12 @@ const Header = () => {
           role="presentation"
           alt="cross-seed logo"
         />
-        <h1 className="text-2xl font-semibold dark:text-slate-100">
+        <h1 className="text-2xl font-semibold">
           cross-seed
         </h1>
       </header>
       <nav className="ml-auto">
-        <ul className="ml-0 flex list-none items-center gap-6 p-0 dark:text-slate-100">
+        <ul className="ml-0 flex list-none items-center gap-6 p-0">
           <li className="text-sm font-semibold">
             <Link
               to="/"
