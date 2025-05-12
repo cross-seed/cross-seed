@@ -6,11 +6,12 @@ type TIndicatorProps = {
 };
 
 export const StatusIndicator: FC<TIndicatorProps> = ({ status }) => {
+  // Using custom colors for status since they have specific meaning
   const colorMap = {
-    ok: 'bg-green-500 dark:bg-green-600',
-    error: 'bg-red-500 dark:bg-red-600',
-    warning: 'bg-yellow-500',
-    unknown: 'bg-slate-300 dark:bg-slate-700',
+    ok: 'bg-emerald-500',
+    error: 'bg-destructive',
+    warning: 'bg-amber-500',
+    unknown: 'bg-muted',
   };
 
   return (
@@ -18,11 +19,11 @@ export const StatusIndicator: FC<TIndicatorProps> = ({ status }) => {
       className={cn('relative', {
         'before:absolute before:inset-[-0px] before:animate-pulse before:rounded-full':
           status !== 'unknown',
-        'before:shadow-glow before:text-green-200 dark:before:text-green-700/60':
+        'before:shadow-glow before:text-emerald-200':
           status === 'ok',
-        'before:shadow-glow before:text-red-200 dark:before:text-red-700/70':
+        'before:shadow-glow before:text-destructive/20':
           status === 'error',
-        'before:shadow-glow before:text-yellow-200 dark:before:text-yellow-700/70':
+        'before:shadow-glow before:text-amber-200':
           status === 'warning',
       })}
     >
