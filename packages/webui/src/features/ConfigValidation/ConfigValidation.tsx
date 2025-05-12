@@ -11,7 +11,7 @@ export const ConfigValidation: FC = () => {
   );
   return (
     <div className="mb-6">
-      <h2 className="mb-6 text-2xl font-semibold dark:text-slate-100">
+      <h2 className="mb-6 text-2xl font-semibold">
         Config Validation
       </h2>
       {isLoading && <div>Loading...</div>}
@@ -23,7 +23,7 @@ export const ConfigValidation: FC = () => {
               key={section}
               title={section}
               content={section === 'uarrls' ? content.arr : content}
-              className="w-1/3 rounded-lg border border-solid border-slate-200 px-5 py-4 dark:border-slate-700"
+              className="w-1/3 rounded-lg border border-solid border-border px-5 py-4"
             />
           ))}
         </div>
@@ -51,17 +51,17 @@ const ValidationEntry = ({
   return (
     <div
       className={cn(
-        'mb-4 divide-y divide-solid divide-slate-50 dark:divide-slate-800',
+        'mb-4 divide-y divide-solid divide-muted',
         className,
       )}
     >
-      <h3 className="mb-4 text-lg font-medium dark:text-slate-100">
+      <h3 className="mb-4 text-lg font-medium">
         {heading}
       </h3>
       {entries.map(([key, value]) => (
         <div
           key={key}
-          className="flex min-w-40 items-center justify-between py-3 dark:text-slate-100"
+          className="flex min-w-40 items-center justify-between py-3"
         >
           <span className="font-mono text-sm">{key}</span>
           {title === 'paths' && (
