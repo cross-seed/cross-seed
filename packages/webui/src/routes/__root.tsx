@@ -12,7 +12,7 @@ interface RouterContext {}
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: () => (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen bg-background text-foreground">
       <Suspense fallback={<div>Loading...</div>}>
         <Login>
           <SidebarProvider defaultOpen={true}>
