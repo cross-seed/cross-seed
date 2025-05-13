@@ -66,13 +66,22 @@ function logDecision(
 	const { blockList, matchMode } = getRuntimeConfig(options?.configOverride);
 
 	let reason: string;
+	let match = "no match";
 	switch (decision) {
 		case Decision.MATCH_PARTIAL:
-			return;
+			match = decision;
+			reason = `${(
+				getPartialSizeRatio(metafile!, searchee) * 100
+			).toFixed(3)}% match`;
+			break;
 		case Decision.MATCH_SIZE_ONLY:
-			return;
+			match = decision;
+			reason = "100% match";
+			break;
 		case Decision.MATCH:
-			return;
+			match = decision;
+			reason = "100% match";
+			break;
 		case Decision.FUZZY_SIZE_MISMATCH:
 			reason = `the total sizes are outside of the fuzzySizeThreshold range: ${Math.abs((candidate.size! - searchee.length) / searchee.length).toFixed(3)} > ${getFuzzySizeFactor(searchee)}`;
 			break;
@@ -134,7 +143,7 @@ function logDecision(
 	}
 	logger.verbose({
 		label: Label.DECIDE,
-		message: `${getLogString(searchee)} - no match for ${tracker} torrent ${candidate.name}${metafile ? ` [${sanitizeInfoHash(metafile.infoHash)}]` : ""} - ${reason}`,
+		message: `${getLogString(searchee)} - ${match} for ${tracker} torrent ${candidate.name}${metafile ? ` [${sanitizeInfoHash(metafile.infoHash)}]` : ""} - ${reason}`,
 	});
 }
 

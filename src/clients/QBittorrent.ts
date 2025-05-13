@@ -246,6 +246,7 @@ export default class QBittorrent implements TorrentClient {
 				method: "post",
 				headers: { Cookie: this.cookie, ...headers },
 				body,
+				signal: AbortSignal.timeout(ms("5 minutes")),
 			});
 			if (response.status === 403 && retries > 0) {
 				logger.verbose({
