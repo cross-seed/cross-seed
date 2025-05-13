@@ -132,12 +132,11 @@ export default class Transmission implements TorrentClient {
 			headers.set("Authorization", `Basic ${credentials}`);
 		}
 
-		const signal = timeout ? AbortSignal.timeout(timeout) : undefined;
 		const response = await fetch(href, {
 			method: "POST",
 			body: JSON.stringify({ method, arguments: args }),
 			headers,
-			signal,
+			signal: AbortSignal.timeout(timeout || ms("5 minutes")),
 		});
 		if (response.status === 409) {
 			this.xTransmissionSessionId = response.headers.get(

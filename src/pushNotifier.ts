@@ -1,3 +1,4 @@
+import ms from "ms";
 import { estimatePausedStatus } from "./clients/TorrentClient.js";
 import {
 	ActionResult,
@@ -50,6 +51,7 @@ export class PushNotifier {
 						"User-Agent": USER_AGENT,
 					},
 					body: JSON.stringify({ title, body, ...rest }),
+					signal: AbortSignal.timeout(ms("5 minutes")),
 				});
 
 				if (!response.ok) {
