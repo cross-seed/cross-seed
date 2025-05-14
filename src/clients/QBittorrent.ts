@@ -246,7 +246,7 @@ export default class QBittorrent implements TorrentClient {
 				method: "post",
 				headers: { Cookie: this.cookie, ...headers },
 				body,
-				signal: AbortSignal.timeout(ms("5 minutes")),
+				signal: AbortSignal.timeout(ms("10 minutes")),
 			});
 			if (response.status === 403 && retries > 0) {
 				logger.verbose({
@@ -263,12 +263,13 @@ export default class QBittorrent implements TorrentClient {
 					label: this.label,
 					message: `Request failed, ${retries} retries remaining: ${e.message}`,
 				});
-				return this.request(path, body, headers, retries - 1);
+				return await this.request(path, body, headers, retries - 1);
 			}
 			logger.verbose({
 				label: this.label,
 				message: `Request failed after ${retries} retries: ${e.message}`,
 			});
+			logger.debug(e);
 		}
 		return response?.text();
 	}

@@ -149,9 +149,26 @@ async function linkAllFilesInMetafile(
 	return resultOf({ alreadyExisted, linkedNewFiles });
 }
 
-async function unlinkMetafile(meta: Metafile, destinationDir: string) {
+async function unlinkMetafile(
+	meta: Metafile,
+	destinationDir: string,
+	searcheeLabel: string,
+): Promise<void> {
+	const roots: string[] = [];
+	for (const file of meta.files) {
+		const res = getRoot(file);
+		if (res.isErr()) {
+			const err = res.unwrapErr();
+			logger.error({
+				label: searcheeLabel,
+				message: `Unable to unlink ${getLogString(meta)} in ${destinationDir}: ${err.message}`,
+			});
+			logger.debug(err);
+			return;
+		}
+		roots.push(join(destinationDir, res.unwrap()));
+	}
 	const destinationDirIno = (await stat(destinationDir)).ino;
-	const roots = meta.files.map((file) => join(destinationDir, getRoot(file)));
 	for (const root of roots) {
 		if (await notExists(root)) continue;
 		if (!root.startsWith(destinationDir)) continue; // assert: root is within destinationDir
@@ -242,7 +259,15 @@ async function getSavePath(
 		}
 		savePath = downloadDirResult.unwrap();
 	}
-	const rootFolder = getRootFolder(searchee.files[0]);
+	const rootFolderRes = getRootFolder(searchee.files[0]);
+	if (rootFolderRes.isErr()) {
+		logger.error({
+			label: searchee.label,
+			message: `Linking failed, ${rootFolderRes.unwrapErr().message}`,
+		});
+		return resultOfErr("INVALID_DATA");
+	}
+	const rootFolder = rootFolderRes.unwrap();
 	const sourceRootOrSavePath =
 		searchee.files.length === 1
 			? join(savePath, searchee.files[0].path)
@@ -429,8 +454,7 @@ export async function performActionWithoutMutex(
 		return { actionResult: SaveResult.SAVED };
 	}
 
-	const savePathRes = await getSavePath(searchee, options);
-	const savePath = savePathRes.orElse(undefined);
+	let savePath: string | undefined;
 	let destinationDir: string | undefined;
 	let unlinkOk = false;
 	let linkedNewFiles = false;
@@ -446,6 +470,7 @@ export async function performActionWithoutMutex(
 				);
 	const readonlySource = !client && !!searchee.clientHost;
 	if (linkDirs.length) {
+		const savePathRes = await getSavePath(searchee, options);
 		if (savePathRes.isErr()) {
 			const result = savePathRes.unwrapErr();
 			if (result === "TORRENT_NOT_COMPLETE") {
@@ -469,6 +494,7 @@ export async function performActionWithoutMutex(
 			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 			return { actionResult, linkedNewFiles };
 		}
+		savePath = savePathRes.unwrap();
 		const res = await getClientAndDestinationDir(
 			client,
 			searchee,
@@ -547,6 +573,8 @@ export async function performActionWithoutMutex(
 	} else if (searchee.path) {
 		destinationDir = dirname(searchee.path);
 	} else if (readonlySource) {
+		const savePathRes = await getSavePath(searchee, options);
+		savePath = savePathRes.orElse(undefined);
 		if (!savePath) {
 			logger.error({
 				label: searchee.label,
@@ -590,7 +618,7 @@ export async function performActionWithoutMutex(
 	} else {
 		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 		if (unlinkOk && destinationDir) {
-			await unlinkMetafile(newMeta, destinationDir);
+			await unlinkMetafile(newMeta, destinationDir, searchee.label);
 			linkedNewFiles = false;
 		}
 	}

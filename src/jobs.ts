@@ -122,6 +122,12 @@ export async function checkJobs(
 		async () => {
 			const now = Date.now();
 			for (const job of jobs) {
+				const lastRun = await getJobLastRun(job.name);
+				const eligibilityTs = lastRun ? lastRun + job.cadence : now;
+				if (options.isFirstRun) {
+					logNextRun(job.name, job.cadence, lastRun);
+				}
+
 				if (!job.runAheadOfSchedule) {
 					if (jobs.find((j) => j.name === JobName.RSS)?.isActive) {
 						continue;
@@ -134,13 +140,6 @@ export async function checkJobs(
 					if (job.name === JobName.CLEANUP) {
 						if (jobs.some((j) => j.isActive)) continue;
 					}
-				}
-				const lastRun = await getJobLastRun(job.name);
-
-				// if it's never been run, you are eligible immediately
-				const eligibilityTs = lastRun ? lastRun + job.cadence : now;
-				if (options.isFirstRun) {
-					logNextRun(job.name, job.cadence, lastRun);
 				}
 
 				if (job.runAheadOfSchedule || now >= eligibilityTs) {
