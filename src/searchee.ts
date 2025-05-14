@@ -1,5 +1,5 @@
 import { readdir, stat } from "fs/promises";
-import { basename, dirname, join, relative } from "path";
+import { basename, dirname, isAbsolute, join, relative } from "path";
 import ms from "ms";
 import {
 	byClientHostPriority,
@@ -7,6 +7,7 @@ import {
 	TorrentMetadataInClient,
 } from "./clients/TorrentClient.js";
 import {
+	ABS_WIN_PATH_REGEX,
 	AKA_REGEX,
 	ANIME_GROUP_REGEX,
 	ANIME_REGEX,
@@ -167,20 +168,36 @@ export function getMinSizeRatio(searchee: Searchee): number {
 		: 1 - fuzzySizeThreshold;
 }
 
-export function getRoot({ path }: File, dirnameFunc = dirname): string {
+export function getRoot(
+	{ path }: File,
+	options = { dirname, isAbsolute },
+): Result<string, Error> {
+	if (
+		options.isAbsolute(path) ||
+		path.startsWith("/") ||
+		ABS_WIN_PATH_REGEX.test(path)
+	) {
+		return resultOfErr(
+			new Error(
+				`absolute paths for the torrent file tree are not supported. File tree paths must be relative to the torrent save path: ${path}`,
+			),
+		);
+	}
 	let root = path;
-	let parent = dirnameFunc(root);
+	let parent = options.dirname(root);
 	while (parent !== ".") {
 		root = parent;
-		parent = dirnameFunc(root);
+		parent = options.dirname(root);
 	}
-	return root;
+	return resultOf(root);
 }
 
-export function getRootFolder(file: File): string | null {
-	const root = getRoot(file);
-	if (root === file.path) return null;
-	return root;
+export function getRootFolder(file: File): Result<string | null, Error> {
+	const res = getRoot(file);
+	if (res.isErr()) return res;
+	const root = res.unwrap();
+	if (root === file.path) return resultOf(null);
+	return resultOf(root);
 }
 
 export function getLargestFile(files: File[]): File {
