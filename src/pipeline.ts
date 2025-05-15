@@ -220,21 +220,19 @@ async function findMatchesBatch(
 	infoHashesToExclude: Set<string>,
 	options?: { configOverride: Partial<RuntimeConfig> },
 ) {
-	const { delay, searchLimit } = getRuntimeConfig(options?.configOverride);
+	const { searchLimit } = getRuntimeConfig(options?.configOverride);
 
 	const indexerSearchCount = new Map<number, number>();
 	let totalFound = 0;
-	let prevSearchTime = 0;
-	const cachedSearch: CachedSearch = { q: null, indexerCandidates: [] };
+	const cachedSearch: CachedSearch = {
+		q: null,
+		indexerCandidates: [],
+		lastSearch: 0,
+	};
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
+		const prevSearch = cachedSearch.lastSearch;
 		try {
-			const sleepTime = delay * 1000 - (Date.now() - prevSearchTime);
-			if (sleepTime > 0) {
-				await wait(sleepTime);
-			}
-			const searchTime = Date.now();
-
 			const { searchedIndexers, matches } = await findOnOtherSites(
 				searchee,
 				infoHashesToExclude,
@@ -260,8 +258,7 @@ async function findMatchesBatch(
 			}
 
 			// if all indexers were rate limited or cached, don't sleep
-			if (searchedIndexers === 0) continue;
-			prevSearchTime = searchTime;
+			if (searchedIndexers === 0) cachedSearch.lastSearch = prevSearch;
 		} catch (e) {
 			const searcheeLog = getLogString(searchee, chalk.bold.white);
 			logger.error({
@@ -281,7 +278,7 @@ export async function searchForLocalTorrentByCriteria(
 		ignoreCrossSeeds: boolean;
 	},
 ): Promise<number | null> {
-	const { delay, maxDataDepth, searchLimit } = getRuntimeConfig();
+	const { maxDataDepth, searchLimit } = getRuntimeConfig();
 
 	const rawSearchees: Searchee[] = [];
 	if (!criteria.path) {
@@ -329,9 +326,14 @@ export async function searchForLocalTorrentByCriteria(
 	const indexerSearchCount = new Map<number, number>();
 	let totalFound = 0;
 	let filtered = 0;
-	const cachedSearch: CachedSearch = { q: null, indexerCandidates: [] };
+	const cachedSearch: CachedSearch = {
+		q: null,
+		indexerCandidates: [],
+		lastSearch: 0,
+	};
 	for (const [i, searchee] of searchees.entries()) {
 		const progress = chalk.blue(`(${i + 1}/${searchees.length}) `);
+		const prevSearch = cachedSearch.lastSearch;
 		try {
 			if (
 				!(await filterByContent(searchee, {
@@ -343,8 +345,6 @@ export async function searchForLocalTorrentByCriteria(
 				filtered++;
 				continue;
 			}
-			const sleep = wait(delay * 1000);
-
 			const { matches, searchedIndexers } = await findOnOtherSites(
 				searchee,
 				infoHashesToExclude,
@@ -370,8 +370,7 @@ export async function searchForLocalTorrentByCriteria(
 			}
 
 			// if all indexers were rate limited, don't sleep
-			if (searchedIndexers === 0 || i === searchees.length - 1) continue;
-			await sleep;
+			if (searchedIndexers === 0) cachedSearch.lastSearch = prevSearch;
 		} catch (e) {
 			const searcheeLog = getLogString(searchee, chalk.bold.white);
 			logger.error({

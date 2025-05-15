@@ -56,6 +56,7 @@ import {
 	sanitizeUrl,
 	stripExtension,
 	stripMetaFromName,
+	wait,
 } from "./utils.js";
 
 export interface IdSearchParams {
@@ -124,6 +125,7 @@ export type IndexerCandidates = {
 export type CachedSearch = {
 	q: string | null;
 	indexerCandidates: IndexerCandidates[];
+	lastSearch: number;
 	ids?: ExternalIds;
 };
 
@@ -413,7 +415,7 @@ export async function* rssPager(
 		} catch (e) {
 			logger.error({
 				label: Label.TORZNAB,
-				message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: request failed - ${e.message}`,
+				message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: ${e.message}`,
 			});
 			logger.debug(e);
 			break;
@@ -639,9 +641,14 @@ async function fetchCaps(indexer: Indexer): Promise<Caps> {
 		let error: Error;
 		if (response.status === 429) {
 			error = new Error(
-				`${indexer.name ?? indexer.url} was rate limited when fetching caps`,
+				`${indexer.name ?? indexer.url} was rate limited when fetching caps${indexer.retryAfter && indexer.retryAfter > Date.now() ? `, snoozing until ${humanReadableDate(indexer.retryAfter)}` : ""}`,
 			);
 			logger.warn(error.message);
+		} else if (response.status === 401) {
+			error = new Error(
+				`${indexer.name ?? indexer.url} returned 401 Unauthorized when fetching caps, check your apikey (all torznab entries use the Prowlarr/Jackett apikey)`,
+			);
+			logger.error(error.message);
 		} else {
 			error = new Error(
 				`${indexer.name ?? indexer.url} responded with code ${response.status} when fetching caps, check verbose logs`,
@@ -773,8 +780,12 @@ export async function validateTorznabUrls() {
 /**
  * Snooze indexers based on the response headers and status code.
  * specifically for a search, probably not applicable to a caps fetch.
+ * @returns the retry time in ms
  */
-async function onResponseNotOk(response: Response, indexerId: number) {
+async function onResponseNotOk(
+	response: Response,
+	indexerId: number,
+): Promise<number> {
 	const retryAfterSeconds = Number(response.headers.get("Retry-After"));
 
 	const retryAfter = !Number.isNaN(retryAfterSeconds)
@@ -790,6 +801,7 @@ async function onResponseNotOk(response: Response, indexerId: number) {
 		retryAfter,
 		[indexerId],
 	);
+	return retryAfter;
 }
 
 async function makeRequest(
@@ -810,8 +822,10 @@ async function makeRequest(
 		signal: abortSignal,
 	});
 	if (!response.ok) {
-		await onResponseNotOk(response, request.indexerId);
-		throw new Error(`request failed with code: ${response.status}`);
+		const retryAffter = await onResponseNotOk(response, request.indexerId);
+		throw new Error(
+			`request failed with code ${response.status}${response.status === 429 ? " due to rate limiting" : ""}, snoozing until ${humanReadableDate(retryAffter)}`,
+		);
 	}
 	const xml = await response.text();
 	const torznabResults: unknown = await xml2js.parseStringPromise(xml);
@@ -861,7 +875,7 @@ async function makeRequests(
 		const indexer = indexers.find((i) => i.id === indexerId)!;
 		logger.warn({
 			label: Label.TORZNAB,
-			message: `Failed to reach ${indexer.name ?? indexer.url}`,
+			message: `Failed to reach ${indexer.name ?? indexer.url}: ${reason instanceof Error ? reason.message : reason}`,
 		});
 		logger.debug(reason);
 	}
@@ -881,6 +895,7 @@ async function getAndLogIndexers(
 	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<{ indexersToSearch: Indexer[]; parsedMedia?: ParsedMedia }> {
 	const {
+		delay,
 		excludeRecentSearch,
 		excludeOlder,
 		seasonFromEpisodes,
@@ -1006,6 +1021,12 @@ async function getAndLogIndexers(
 		cachedSearch.ids = parsedMedia?.movie ?? parsedMedia?.series;
 	}
 	const idsStr = cachedSearch.ids ? formatFoundIds(cachedSearch.ids) : "NONE";
+
+	if (indexersToSearch.length) {
+		const waitUntil = cachedSearch.lastSearch + ms(`${delay} seconds`);
+		if (Date.now() < waitUntil) await wait(waitUntil - Date.now());
+		cachedSearch.lastSearch = Date.now();
+	}
 
 	logger.info({
 		label: searchee.label,

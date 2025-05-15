@@ -150,7 +150,7 @@ async function makeArrApiCall<ResponseType>(
 		const bodySampleMessage = getBodySampleMessage(responseText);
 		return resultOfErr(
 			new Error(
-				`${response.status} ${response.statusText} ${bodySampleMessage}`,
+				`${response.status === 401 ? "401 Unauthorized (check apikey)" : response.status} ${response.statusText} ${bodySampleMessage}`,
 			),
 		);
 	}
