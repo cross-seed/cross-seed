@@ -56,6 +56,7 @@ import {
 	sanitizeUrl,
 	stripExtension,
 	stripMetaFromName,
+	wait,
 } from "./utils.js";
 
 export interface IdSearchParams {
@@ -124,6 +125,7 @@ export type IndexerCandidates = {
 export type CachedSearch = {
 	q: string | null;
 	indexerCandidates: IndexerCandidates[];
+	lastSearch: number;
 	ids?: ExternalIds;
 };
 
@@ -893,6 +895,7 @@ async function getAndLogIndexers(
 	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<{ indexersToSearch: Indexer[]; parsedMedia?: ParsedMedia }> {
 	const {
+		delay,
 		excludeRecentSearch,
 		excludeOlder,
 		seasonFromEpisodes,
@@ -1018,6 +1021,12 @@ async function getAndLogIndexers(
 		cachedSearch.ids = parsedMedia?.movie ?? parsedMedia?.series;
 	}
 	const idsStr = cachedSearch.ids ? formatFoundIds(cachedSearch.ids) : "NONE";
+
+	if (indexersToSearch.length) {
+		const waitUntil = cachedSearch.lastSearch + ms(`${delay} seconds`);
+		if (Date.now() < waitUntil) await wait(waitUntil - Date.now());
+		cachedSearch.lastSearch = Date.now();
+	}
 
 	logger.info({
 		label: searchee.label,
