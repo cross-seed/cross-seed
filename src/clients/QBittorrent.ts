@@ -857,7 +857,6 @@ export default class QBittorrent implements TorrentClient {
 	): Promise<void> {
 		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
-		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
 		while (Date.now() < stopTime) {
@@ -886,6 +885,10 @@ export default class QBittorrent implements TorrentClient {
 				});
 				return;
 			}
+			const maxRemainingBytes = getMaxRemainingBytes(meta, decision, {
+				torrentLog,
+				label: this.label,
+			});
 			if (torrentInfo.amount_left > maxRemainingBytes) {
 				if (
 					!shouldResumeFromNonRelevantFiles(
@@ -968,7 +971,7 @@ export default class QBittorrent implements TorrentClient {
 			const buffer = new Blob([new Uint8Array(newTorrent.encode())], {
 				type: "application/x-bittorrent",
 			});
-			const toRecheck = shouldRecheck(searchee, decision);
+			const toRecheck = shouldRecheck(newTorrent, decision);
 
 			// ---------------------- Building form data ----------------------
 			const formData = new FormData();

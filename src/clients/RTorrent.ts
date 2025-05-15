@@ -738,7 +738,6 @@ export default class RTorrent implements TorrentClient {
 	): Promise<void> {
 		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
-		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
 		while (Date.now() < stopTime) {
@@ -766,6 +765,10 @@ export default class RTorrent implements TorrentClient {
 				});
 				return;
 			}
+			const maxRemainingBytes = getMaxRemainingBytes(meta, decision, {
+				torrentLog,
+				label: this.label,
+			});
 			if (torrentInfo.bytesLeft > maxRemainingBytes) {
 				if (
 					!shouldResumeFromNonRelevantFiles(
@@ -822,7 +825,7 @@ export default class RTorrent implements TorrentClient {
 			libtorrent_resume: await createLibTorrentResumeTree(meta, basePath),
 		};
 
-		const toRecheck = shouldRecheck(searchee, decision);
+		const toRecheck = shouldRecheck(meta, decision);
 		const loadType = toRecheck ? "load.raw" : "load.raw_start";
 
 		const retries = 5;

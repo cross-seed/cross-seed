@@ -311,7 +311,6 @@ export default class Deluge implements TorrentClient {
 	): Promise<void> {
 		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
-		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
 		while (Date.now() < stopTime) {
@@ -335,6 +334,10 @@ export default class Deluge implements TorrentClient {
 					});
 					return;
 				}
+				const maxRemainingBytes = getMaxRemainingBytes(meta, decision, {
+					torrentLog,
+					label: this.label,
+				});
 				if (torrentInfo.total_remaining! > maxRemainingBytes) {
 					if (
 						!shouldResumeFromNonRelevantFiles(
@@ -481,7 +484,7 @@ export default class Deluge implements TorrentClient {
 			const destinationDir = options.destinationDir
 				? options.destinationDir
 				: torrentInfo!.save_path!;
-			const toRecheck = shouldRecheck(searchee, decision);
+			const toRecheck = shouldRecheck(newTorrent, decision);
 			const params = this.formatData(
 				torrentFileName,
 				encodedTorrentData,
