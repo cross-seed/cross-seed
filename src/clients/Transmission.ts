@@ -454,7 +454,6 @@ export default class Transmission implements TorrentClient {
 	): Promise<void> {
 		const infoHash = meta.infoHash;
 		let sleepTime = resumeSleepTime;
-		const maxRemainingBytes = getMaxRemainingBytes(decision);
 		const stopTime = getResumeStopTime();
 		let stop = false;
 		while (Date.now() < stopTime) {
@@ -486,6 +485,10 @@ export default class Transmission implements TorrentClient {
 				});
 				return;
 			}
+			const maxRemainingBytes = getMaxRemainingBytes(meta, decision, {
+				torrentLog,
+				label: this.label,
+			});
 			if (leftUntilDone > maxRemainingBytes) {
 				if (
 					!shouldResumeFromNonRelevantFiles(
@@ -550,7 +553,7 @@ export default class Transmission implements TorrentClient {
 		let addResponse: TorrentAddResponse;
 
 		try {
-			const toRecheck = shouldRecheck(searchee, decision);
+			const toRecheck = shouldRecheck(newTorrent, decision);
 			addResponse = await this.request<TorrentAddResponse>(
 				"torrent-add",
 				{

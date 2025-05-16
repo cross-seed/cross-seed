@@ -601,7 +601,7 @@ export async function performActionWithoutMutex(
 	logActionResult(actionResult, newMeta, searchee, tracker, decision);
 	if (actionResult === InjectionResult.SUCCESS) {
 		// cross-seed may need to process these with the inject job
-		if (shouldRecheck(searchee, decision) || !searchee.infoHash) {
+		if (shouldRecheck(newMeta, decision) || !searchee.infoHash) {
 			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 		}
 	} else if (actionResult === InjectionResult.ALREADY_EXISTS) {

@@ -280,21 +280,34 @@ export async function waitForTorrentToComplete(
 }
 
 export function shouldRecheck(
-	searchee: Searchee,
+	meta: Metafile,
 	decision: DecisionAnyMatch,
 ): boolean {
 	const { skipRecheck } = getRuntimeConfig();
 	if (!skipRecheck) return true;
 	if (decision === Decision.MATCH_PARTIAL) return true;
-	if (hasExt(searchee.files, VIDEO_DISC_EXTENSIONS)) return true;
+	if (hasExt(meta.files, VIDEO_DISC_EXTENSIONS)) return true;
 	return false; // Skip for MATCH | MATCH_SIZE_ONLY
 }
 
 // Resuming partials
-export function getMaxRemainingBytes(decision: DecisionAnyMatch) {
+export function getMaxRemainingBytes(
+	meta: Metafile,
+	decision: DecisionAnyMatch,
+	options?: { torrentLog: string; label: string },
+) {
 	const { matchMode, autoResumeMaxDownload } = getRuntimeConfig();
 	if (decision !== Decision.MATCH_PARTIAL) return 0;
 	if (matchMode !== MatchMode.PARTIAL) return 0;
+	if (hasExt(meta.files, VIDEO_DISC_EXTENSIONS)) {
+		if (options) {
+			logger.warn({
+				label: options.label,
+				message: `autoResumeMaxDownload will not resume ${options.torrentLog}: VIDEO_DISC_EXTENSIONS`,
+			});
+		}
+		return 0;
+	}
 	return autoResumeMaxDownload;
 }
 
@@ -324,6 +337,15 @@ export function shouldResumeFromNonRelevantFiles(
 	if (!ignoreNonRelevantFilesToResume) return false;
 	if (decision !== Decision.MATCH_PARTIAL) return false;
 	if (matchMode !== MatchMode.PARTIAL) return false;
+	if (hasExt(meta.files, VIDEO_DISC_EXTENSIONS)) {
+		if (options) {
+			logger.warn({
+				label: options.label,
+				message: `ignoreNonRelevantFilesToResume will not resume ${options.torrentLog}: VIDEO_DISC_EXTENSIONS`,
+			});
+		}
+		return false;
+	}
 	if (remainingSize > 209715200) {
 		if (options) {
 			logger.warn({
@@ -376,8 +398,7 @@ export function estimatePausedStatus(
 	searchee: Searchee,
 	decision: DecisionAnyMatch,
 ): boolean {
-	const { autoResumeMaxDownload } = getRuntimeConfig();
 	const remaining = (1 - getPartialSizeRatio(meta, searchee)) * meta.length;
-	if (remaining <= autoResumeMaxDownload) return false;
+	if (remaining <= getMaxRemainingBytes(meta, decision)) return false;
 	return !shouldResumeFromNonRelevantFiles(meta, remaining, decision);
 }
