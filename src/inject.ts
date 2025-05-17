@@ -284,6 +284,7 @@ async function injectFromStalledTorrent({
 	progress,
 	filePathLog,
 }: InjectionAftermath): Promise<void> {
+	let injected = false;
 	let linkedNewFiles = false;
 	const stalledDecision = Decision.MATCH_PARTIAL; // Should always be considered partial
 	for (const { searchee } of clientMatches) {
@@ -315,17 +316,15 @@ async function injectFromStalledTorrent({
 			label: Label.INJECT,
 			message: `${progress} Injected ${filePathLog} using stalled source ${searcheeLog}, you will need to resume or remove from client - ${chalk.green(injectionResult)}`,
 		});
+		injected = true;
 	}
 
+	if (injected) return;
 	if (!(await client!.isTorrentInClient(meta.infoHash)).orElse(false)) return;
 	if (linkedNewFiles) {
 		logger.info({
 			label: Label.INJECT,
 			message: `${progress} Rechecking ${filePathLog} as new files were linked - ${chalk.green(injectionResult)}`,
-		});
-		await client!.recheckTorrent(meta.infoHash);
-		void client!.resumeInjection(meta, stalledDecision, {
-			checkOnce: false,
 		});
 	} else {
 		logger.warn({
