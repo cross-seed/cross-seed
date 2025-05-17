@@ -460,6 +460,8 @@ export async function performActionWithoutMutex(
 	let linkedNewFiles = false;
 	const warnOrVerbose =
 		searchee.label !== Label.INJECT ? logger.warn : logger.verbose;
+	const infoOrVerbose =
+		searchee.label !== Label.INJECT ? logger.info : logger.verbose;
 
 	const clients = getClients();
 	let client =
@@ -606,7 +608,7 @@ export async function performActionWithoutMutex(
 		}
 	} else if (actionResult === InjectionResult.ALREADY_EXISTS) {
 		if (linkedNewFiles) {
-			logger.info({
+			infoOrVerbose({
 				label: client.label,
 				message: `Rechecking ${getLogString(newMeta)} as new files were linked from ${getLogString(searchee)}`,
 			});
