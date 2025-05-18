@@ -84,8 +84,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const { mutate: logout } = useMutation(
     trpc.auth.logOut.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
           queryKey: trpc.auth.authStatus.queryKey(),
         });
       },
@@ -94,10 +94,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar variant="inset" {...props}>
-      <SidebarHeader className="flex items-center justify-between px-4 py-2">
+      <SidebarHeader className="relative flex px-4 pt-3.5 pb-2">
         <div className="flex items-center gap-2">
+          <img
+            src="/assets/cross-seed.svg"
+            className="mt-1 h-4 w-4"
+            role="presentation"
+            alt="cross-seed logo"
+          />
           <span className="text-xl font-bold">cross-seed</span>
-          <SidebarTrigger className="ml-auto" />
+          <SidebarTrigger className="absolute -right-12 text-neutral-400" />
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -123,9 +129,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarSeparator />
+        <SidebarSeparator className="mx-0" />
         {authStatus?.isLoggedIn && (
-          <div className="flex items-center justify-between px-4 py-2">
+          <div className="flex items-center justify-between py-2">
             <div className="text-sm font-medium">
               {authStatus.user?.username}
             </div>
