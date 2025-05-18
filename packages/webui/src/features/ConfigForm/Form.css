@@ -16,7 +16,6 @@
   legend {
     font-size: theme('fontSize.lg');
     font-weight: theme('fontWeight.semibold');
-    color: theme('colors.slate.700');
     padding-inline: theme('spacing.3');
   }
 }

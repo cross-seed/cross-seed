@@ -60,15 +60,14 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
             console.error('FULL VALIDATION FAILED:', result.error.format());
           } else {
             console.log('Full validation success!', value, Object.keys(value));
-            // TODO: check all of the array fields and remove empty values
-            Object.keys(value).forEach((key, value) => {
-              console.log('before', key, value[key]);
-              if (Array.isArray(value[key])) {
-                return removeEmptyArrayValues(value[key]);
+            // remove empty values from array fields
+            Object.keys(value).forEach((attr) => {
+              if (Array.isArray(value[attr])) {
+                value[attr] = removeEmptyArrayValues(value[attr]);
               }
             });
-            // return { status: 'success' };
-            console.log('Submitting form data:', value);
+
+            console.log('cleaned values', value);
           }
         } catch (err) {
           console.error('Exception during full validation:', err);
@@ -83,10 +82,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
       onSubmit: baseValidationSchema,
     },
   });
-
-  useEffect(() => {
-    console.log('isSubmitting', form.state.isSubmitting);
-  }, []);
 
   const isFieldRequired = (fieldName: string) => {
     const schemaField = baseValidationSchema.shape[fieldName as keyof Config];
@@ -195,7 +190,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                             />
                                           )}
                                       </div>
-                                      {/* <FieldInfo fieldMeta={subfield} /> */}
                                     </>
                                   );
                                 }}
@@ -357,7 +351,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                           />
                                         )}
                                     </div>
-                                    {/* <FieldInfo fieldMeta={subfield} /> */}
                                   </>
                                 );
                               }}
@@ -464,7 +457,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                         />
                                       )}
                                     </div>
-                                    {/* <FieldInfo field={subfield} /> */}
                                   </>
                                 );
                               }}
@@ -567,7 +559,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                           />
                                         )}
                                     </div>
-                                    {/* <FieldInfo field={subfield} /> */}
                                   </>
                                 );
                               }}
@@ -669,7 +660,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                             />
                                           )}
                                       </div>
-                                      {/* <FieldInfo field={subfield} /> */}
                                     </>
                                   );
                                 }}
@@ -773,7 +763,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                             />
                                           )}
                                       </div>
-                                      {/* <FieldInfo field={subfield} /> */}
                                     </>
                                   );
                                 }}
@@ -1655,7 +1644,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                             />
                                           )}
                                       </div>
-                                      {/* <FieldInfo field={subfield} /> */}
                                     </>
                                   );
                                 }}
