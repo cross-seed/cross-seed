@@ -13,8 +13,6 @@ import { Switch } from '@/components/ui/switch';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { baseValidationSchema, Config } from '@/types/config';
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useForm } from '@tanstack/react-form';
 import { useQuery } from '@tanstack/react-query';
 import { FC, useEffect, useState } from 'react';
@@ -29,6 +27,8 @@ import {
 import { FieldInfo } from './FieldInfo';
 import { formatConfigDataForForm } from './lib/formatConfigData';
 import { removeEmptyArrayValues } from './lib/transformers';
+import DeleteOption from '@/components/Buttons/DeleteOption';
+import { LoaderCircle } from 'lucide-react';
 
 type FormProps = {
   className?: string;
@@ -51,34 +51,42 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
     onSubmit: async ({ value }) => {
       console.log('submitting form', value);
       // Full schema validation
-      try {
-        console.log('Full validation attempt...');
-        const result = baseValidationSchema.safeParse(value);
-        if (!result.success) {
-          console.error('FULL VALIDATION FAILED:', result.error.format());
-        } else {
-          console.log('Full validation success!', value, Object.keys(value));
-          // TODO: check all of the array fields and remove empty values
-          Object.keys(value).forEach((key, value) => {
-            console.log('before', key, value[key]);
-            if (Array.isArray(value[key])) {
-              return removeEmptyArrayValues(value[key]);
-            }
-          });
-          return { status: 'success' };
+      // Fake a long response delay
+      setTimeout(() => {
+        try {
+          console.log('Full validation attempt...');
+          const result = baseValidationSchema.safeParse(value);
+          if (!result.success) {
+            console.error('FULL VALIDATION FAILED:', result.error.format());
+          } else {
+            console.log('Full validation success!', value, Object.keys(value));
+            // TODO: check all of the array fields and remove empty values
+            Object.keys(value).forEach((key, value) => {
+              console.log('before', key, value[key]);
+              if (Array.isArray(value[key])) {
+                return removeEmptyArrayValues(value[key]);
+              }
+            });
+            // return { status: 'success' };
+            console.log('Submitting form data:', value);
+          }
+        } catch (err) {
+          console.error('Exception during full validation:', err);
+          return {
+            status: 'error',
+            error: { _form: 'An unexpected error occurred during validation' },
+          };
         }
-      } catch (err) {
-        console.error('Exception during full validation:', err);
-        return {
-          status: 'error',
-          error: { _form: 'An unexpected error occurred during validation' },
-        };
-      }
+      }, 2000);
     },
     validators: {
       onSubmit: baseValidationSchema,
     },
   });
+
+  useEffect(() => {
+    console.log('isSubmitting', form.state.isSubmitting);
+  }, []);
 
   const isFieldRequired = (fieldName: string) => {
     const schemaField = baseValidationSchema.shape[fieldName as keyof Config];
@@ -108,9 +116,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
 
   return (
     <div className={cn('mb-5', className)}>
-      <h2 className="mb-6 text-2xl font-semibold">
-        Edit Config
-      </h2>
+      <h2 className="mb-6 text-2xl font-semibold">Edit Config</h2>
       <form
         className="form flex flex-col gap-4"
         onSubmit={(e) => {
@@ -182,14 +188,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                         />
                                         {field.state.value &&
                                           field.state.value?.length > 1 && (
-                                            <Button
+                                            <DeleteOption
                                               onClick={() =>
                                                 field.removeValue(index)
                                               }
-                                              className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
-                                            >
-                                              <FontAwesomeIcon icon={faTrash} />
-                                            </Button>
+                                            />
                                           )}
                                       </div>
                                       {/* <FieldInfo fieldMeta={subfield} /> */}
@@ -222,7 +225,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             );
                           }
                         }}
-                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
                         Add
@@ -246,7 +248,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Switch
                       id={field.name}
-                      className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                       checked={field.state.value ?? false}
                       onCheckedChange={field.handleChange}
                     />
@@ -274,7 +275,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       defaultValue={field.state.value}
                       onValueChange={(e) => field.handleChange(e as LinkType)}
                     >
-                      <SelectTrigger className="focus-visible:ring-accent-300/40 border-slate-300 bg-white shadow-none">
+                      <SelectTrigger className="w-full shadow-none">
                         <SelectValue placeholder="Select a link type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -349,14 +350,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                       />
                                       {field.state.value &&
                                         field.state.value.length > 1 && (
-                                          <Button
+                                          <DeleteOption
                                             onClick={() =>
                                               field.removeValue(index)
                                             }
-                                            className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
-                                          >
-                                            <FontAwesomeIcon icon={faTrash} />
-                                          </Button>
+                                          />
                                         )}
                                     </div>
                                     {/* <FieldInfo fieldMeta={subfield} /> */}
@@ -387,7 +385,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             `${field.name}-${field.state.value ? field.state.value.length - 1 : 0}`,
                           );
                         }}
-                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
                         Add
@@ -460,14 +457,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                         }
                                       />
                                       {field.state.value.length > 1 && (
-                                        <Button
+                                        <DeleteOption
                                           onClick={() =>
                                             field.removeValue(index)
                                           }
-                                          className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
-                                        >
-                                          <FontAwesomeIcon icon={faTrash} />
-                                        </Button>
+                                        />
                                       )}
                                     </div>
                                     {/* <FieldInfo field={subfield} /> */}
@@ -498,7 +492,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             `${field.name}-${field.state.value.length - 1}`,
                           );
                         }}
-                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
                         Add
@@ -567,14 +560,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                       />
                                       {field.state.value &&
                                         field.state.value.length > 1 && (
-                                          <Button
+                                          <DeleteOption
                                             onClick={() =>
                                               field.removeValue(index)
                                             }
-                                            className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
-                                          >
-                                            <FontAwesomeIcon icon={faTrash} />
-                                          </Button>
+                                          />
                                         )}
                                     </div>
                                     {/* <FieldInfo field={subfield} /> */}
@@ -605,7 +595,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             `${field.name}-${field.state.value ? field.state.value.length - 1 : 0}`,
                           );
                         }}
-                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
                         Add
@@ -673,14 +662,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                         />
                                         {field.state.value &&
                                           field.state.value.length > 1 && (
-                                            <Button
+                                            <DeleteOption
                                               onClick={() =>
                                                 field.removeValue(index)
                                               }
-                                              className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
-                                            >
-                                              <FontAwesomeIcon icon={faTrash} />
-                                            </Button>
+                                            />
                                           )}
                                       </div>
                                       {/* <FieldInfo field={subfield} /> */}
@@ -713,7 +699,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             );
                           }
                         }}
-                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
                         Add
@@ -781,14 +766,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                         />
                                         {field.state.value &&
                                           field.state.value.length > 1 && (
-                                            <Button
+                                            <DeleteOption
                                               onClick={() =>
                                                 field.removeValue(index)
                                               }
-                                              className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
-                                            >
-                                              <FontAwesomeIcon icon={faTrash} />
-                                            </Button>
+                                            />
                                           )}
                                       </div>
                                       {/* <FieldInfo field={subfield} /> */}
@@ -821,7 +803,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             );
                           }
                         }}
-                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
                         Add
@@ -1094,7 +1075,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       defaultValue={field.state.value}
                       onValueChange={(e) => field.handleChange(e as Action)}
                     >
-                      <SelectTrigger className="focus-visible:ring-accent-300/40 border-slate-300 bg-white shadow-none">
+                      <SelectTrigger className="w-full shadow-none">
                         <SelectValue placeholder="Select an action" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1221,7 +1202,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       </Label>
                       <Switch
                         id={field.name}
-                        className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                         checked={field.state.value}
                         onCheckedChange={field.handleChange}
                       />
@@ -1238,7 +1218,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       </Label>
                       <Switch
                         id={field.name}
-                        className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                         checked={field.state.value}
                         onCheckedChange={field.handleChange}
                       />
@@ -1255,7 +1234,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       </Label>
                       <Switch
                         id={field.name}
-                        className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                         checked={field.state.value}
                         onCheckedChange={field.handleChange}
                       />
@@ -1321,7 +1299,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                       defaultValue={field.state.value}
                       onValueChange={(e) => field.handleChange(e as MatchMode)}
                     >
-                      <SelectTrigger className="focus-visible:ring-accent-300/40 border-slate-300 bg-white shadow-none">
+                      <SelectTrigger className="w-full shadow-none">
                         <SelectValue placeholder="Select a link type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1586,7 +1564,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Switch
                       id={field.name}
-                      className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                       checked={field.state.value}
                       onCheckedChange={field.handleChange}
                     />
@@ -1603,7 +1580,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                     </Label>
                     <Switch
                       id={field.name}
-                      className="data-[state='checked']:!bg-accent focus-visible:border-accent-700 focus-visible:ring-accent-300 shadow-none"
                       checked={field.state.value}
                       onCheckedChange={field.handleChange}
                     />
@@ -1672,14 +1648,11 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                         />
                                         {field.state.value &&
                                           field.state.value.length > 1 && (
-                                            <Button
+                                            <DeleteOption
                                               onClick={() =>
                                                 field.removeValue(index)
                                               }
-                                              className="rounded border border-red-500/30 bg-transparent text-red-500/30 shadow-none transition-all duration-150 outline-none hover:bg-red-500 hover:text-white focus:bg-red-500 focus:text-white focus-visible:border-red-500 focus-visible:ring-red-300/40"
-                                            >
-                                              <FontAwesomeIcon icon={faTrash} />
-                                            </Button>
+                                            />
                                           )}
                                       </div>
                                       {/* <FieldInfo field={subfield} /> */}
@@ -1710,7 +1683,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`,
                           );
                         }}
-                        className="focus-visible:ring-accent-300/40 h-auto rounded border border-slate-500 bg-slate-200 px-2.5 py-1.5 text-slate-800 shadow-none transition-colors duration-150 hover:bg-slate-100 disabled:opacity-35"
                         title={`Add ${field.name}`}
                       >
                         Add
@@ -1733,14 +1705,23 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           ]}
         >
           {([canSubmit, isSubmitting, errors, fieldMeta]) => (
-            <div className="sticky right-0 bottom-0 left-0 -mx-4 border-t border-solid border-border bg-background p-6">
+            <div className="form__submit border-border bg-background sticky right-0 bottom-0 left-0 -mr-4 -ml-11 border-t border-solid p-6">
               <Button
                 type="submit"
-                className="bg-primary text-primary-foreground w-full rounded-md px-4 py-6 transition-colors duration-150 disabled:bg-muted disabled:opacity-60"
+                className={cn(
+                  'w-full rounded-md px-4 py-6 transition-colors duration-150',
+                  { isSubmitting: 'opacity-70' },
+                )}
                 disabled={!canSubmit}
               >
-                {isSubmitting ? 'Saving...' : 'Save'} "
-                {canSubmit && 'can submit'}"
+                {isSubmitting ? (
+                  <>
+                    <LoaderCircle className="animate-spin" /> Saving...
+                  </>
+                ) : (
+                  'Save'
+                )}{' '}
+                "{canSubmit && 'can submit'}"
               </Button>
               {Object.keys(errors).length > 0 && (
                 <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
@@ -1766,7 +1747,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
         <form.Subscribe>
           {(state) => (
             <div
-              className="w-lg overflow-auto bg-card text-card-foreground p-4 shadow-lg"
+              className="bg-card text-card-foreground w-lg overflow-auto p-4 shadow-lg"
               // className="fixed right-0 bottom-0 z-50 max-h-96 w-lg overflow-auto bg-white p-4 shadow-lg dark:bg-slate-800 dark:text-white"
               style={{ opacity: 0.9 }}
             >
