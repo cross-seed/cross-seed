@@ -12,13 +12,13 @@ interface RouterContext {}
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: () => (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="bg-background text-foreground min-h-screen">
       <Suspense fallback={<div>Loading...</div>}>
         <Login>
           <SidebarProvider defaultOpen={true}>
             <AppSidebar />
             <SidebarInset>
-              <div className="px-4 pt-5">
+              <div className="ps-11 pe-4 pt-2">
                 <Header />
                 <Outlet />
               </div>
