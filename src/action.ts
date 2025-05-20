@@ -122,10 +122,18 @@ async function linkAllFilesInMetafile(
 	let alreadyExisted = false;
 	let linkedNewFiles = false;
 	try {
+		logger.verbose({
+			label: searchee.label,
+			message: `Linking ${getLogString(newMeta)} from ${getLogString(searchee)} to ${destinationDir}`,
+		});
 		const validPaths = await filterAsync(
 			paths,
 			async ([srcFilePath, destFilePath]) => {
 				if (await exists(destFilePath)) {
+					logger.verbose({
+						label: searchee.label,
+						message: `--- Skipping ${srcFilePath} -> ${destFilePath}, already exists`,
+					});
 					alreadyExisted = true;
 					return false;
 				}
@@ -139,8 +147,16 @@ async function linkAllFilesInMetafile(
 			if (await notExists(destFileParentPath)) {
 				await mkdir(destFileParentPath, { recursive: true });
 			}
-			if (await linkFile(srcFilePath, destFilePath)) {
-				linkedNewFiles = true;
+			try {
+				if (await linkFile(srcFilePath, destFilePath)) {
+					linkedNewFiles = true;
+				}
+			} catch (e) {
+				logger.error({
+					label: searchee.label,
+					message: `--- Linking failed, ${srcFilePath} -> ${destFilePath}: ${e.message}`,
+				});
+				throw e;
 			}
 		}
 	} catch (e) {
