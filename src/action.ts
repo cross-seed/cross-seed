@@ -309,7 +309,7 @@ async function getClientAndDestinationDir(
 			logger.debug(e);
 			return null;
 		}
-		let error: Error | undefined;
+		let error: Error;
 		for (const testClient of getClients().filter((c) => !c.readonly)) {
 			const torrentSavePaths = new Set(
 				(
@@ -319,6 +319,12 @@ async function getClientAndDestinationDir(
 					})
 				).values(),
 			);
+			if (!torrentSavePaths.size) {
+				error = new Error(
+					`No save paths found to test with for ${testClient.label}, add at least one torrent to the client.`,
+				);
+				continue;
+			}
 			for (const torrentSavePath of torrentSavePaths) {
 				try {
 					if (
@@ -346,7 +352,7 @@ async function getClientAndDestinationDir(
 			if (client) break;
 		}
 		if (!client) {
-			logger.debug(error);
+			logger.debug(error!);
 			return null;
 		}
 	}
