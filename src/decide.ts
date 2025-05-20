@@ -142,7 +142,7 @@ function logDecision(
 			break;
 	}
 	logger.verbose({
-		label: Label.DECIDE,
+		label: `${searchee.label}/${Label.DECIDE}`,
 		message: `${getLogString(searchee)} - ${match} for ${tracker} torrent ${candidate.name}${metafile ? ` [${sanitizeInfoHash(metafile.infoHash)}]` : ""} - ${reason}`,
 	});
 }
@@ -457,6 +457,7 @@ async function existsInTorrentCache(infoHash: string): Promise<boolean> {
 
 async function getCachedTorrentFile(
 	infoHash: string,
+	searcheeLabel: string,
 	options: { deleteOnFail: boolean } = { deleteOnFail: true },
 ): Promise<Result<Metafile, Error>> {
 	const torrentPath = path.join(
@@ -468,7 +469,7 @@ async function getCachedTorrentFile(
 		return resultOf(await parseTorrentFromFilename(torrentPath));
 	} catch (e) {
 		logger.error({
-			label: Label.DECIDE,
+			label: `${searcheeLabel}/${Label.DECIDE}`,
 			message: `Failed to parse cached torrent ${sanitizeInfoHash(infoHash)}${options.deleteOnFail ? " - deleting" : ""}: ${e.message}`,
 		});
 		logger.debug(e);
@@ -648,12 +649,14 @@ export async function assessCandidateCaching(
 	const metaInfoHash = guidLookup(guid, link, guidInfoHashMap);
 	const metaOrCandidate = metaInfoHash
 		? (await existsInTorrentCache(metaInfoHash))
-			? (await getCachedTorrentFile(metaInfoHash)).orElse(candidate)
+			? (await getCachedTorrentFile(metaInfoHash, searchee.label)).orElse(
+					candidate,
+				)
 			: candidate
 		: candidate;
 	if (metaOrCandidate instanceof Metafile) {
 		logger.verbose({
-			label: Label.DECIDE,
+			label: `${searchee.label}/${Label.DECIDE}`,
 			message: `Using cached torrent ${sanitizeInfoHash(metaInfoHash!)} for ${tracker} assessment ${name}`,
 		});
 		candidate.size = metaOrCandidate.length; // Trackers can be wrong

@@ -166,7 +166,7 @@ async function findOnOtherSites(
 
 	if (response.length) {
 		logger.verbose({
-			label: Label.DECIDE,
+			label: `${searchee.label}/${Label.DECIDE}`,
 			message: `Assessing ${candidates.length} candidates for ${searchee.title} from ${searchedIndexers}|${cachedIndexers} indexers by search|cache`,
 		});
 	}
