@@ -9,7 +9,7 @@ import { TORRENT_CACHE_FOLDER } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { migrations } from "./migrations/migrations.js";
-import { cacheEnsembleTorrentEntry } from "./torrent.js";
+import { cacheEnsembleTorrentEntry, snatchHistory } from "./torrent.js";
 import { filterAsync, flatMapAsync, inBatches, notExists } from "./utils.js";
 
 const filename = join(appDir(), "cross-seed.db");
@@ -88,6 +88,21 @@ export async function cleanupDB(): Promise<void> {
 	await (async () => {
 		logger.verbose({
 			label: Label.CLEANUP,
+			message: "Pruning failed snatch history entries",
+		});
+		for (const [url, ts] of snatchHistory.entries()) {
+			if (Date.now() - ts > ms("1 day")) {
+				logger.verbose({
+					label: Label.CLEANUP,
+					message: `Deleting snatch history entry for ${url}`,
+				});
+				snatchHistory.delete(url);
+			}
+		}
+	})();
+	await (async () => {
+		logger.verbose({
+			label: Label.CLEANUP,
 			message: "Pruning old torrent cache entries",
 		});
 		const torrentCacheDir = join(appDir(), TORRENT_CACHE_FOLDER);
@@ -96,7 +111,10 @@ export async function cleanupDB(): Promise<void> {
 		for (const file of files) {
 			const filePath = join(torrentCacheDir, file);
 			if (now - (await stat(filePath)).atimeMs > ms("1 year")) {
-				logger.verbose(`Deleting ${filePath}`);
+				logger.verbose({
+					label: Label.CLEANUP,
+					message: `Deleting torrent cache entry for ${filePath}`,
+				});
 				await db("decision")
 					.where("info_hash", file.split(".")[0])
 					.del();
