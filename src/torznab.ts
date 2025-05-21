@@ -1010,6 +1010,7 @@ async function getAndLogIndexers(
 		cachedSearch.indexerCandidates.length = 0;
 		cachedSearch.ids = undefined; // Don't prematurely get ids if skipping
 	}
+	const searchLimitedIndexers: Indexer[] = [];
 	const indexersToSearch = indexersToUse.filter((indexer) => {
 		if (
 			cachedSearch.indexerCandidates.some(
@@ -1023,13 +1024,22 @@ async function getAndLogIndexers(
 		if (!indexerSearchCount.has(indexer.id)) {
 			indexerSearchCount.set(indexer.id, 0);
 		}
-		if (indexerSearchCount.get(indexer.id)! >= searchLimit) return false;
+		if (indexerSearchCount.get(indexer.id)! >= searchLimit) {
+			searchLimitedIndexers.push(indexer);
+			return false;
+		}
 		indexerSearchCount.set(
 			indexer.id,
 			indexerSearchCount.get(indexer.id)! + 1,
 		);
 		return true;
 	});
+	if (searchLimitedIndexers.length) {
+		logger.verbose({
+			label: searchee.label,
+			message: `Skipping searching for ${searcheeLog} due to search limit on [${searchLimitedIndexers.map((i) => i.name ?? i.url).join(", ")}]`,
+		});
+	}
 
 	if (!indexersToSearch.length && !cachedSearch.indexerCandidates.length) {
 		cachedSearch.q = null; // Won't scan arrs for multiple skips in a row
