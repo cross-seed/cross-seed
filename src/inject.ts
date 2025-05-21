@@ -11,6 +11,7 @@ import {
 } from "./clients/TorrentClient.js";
 import { appDir } from "./configuration.js";
 import {
+	ActionResult,
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
@@ -50,6 +51,7 @@ import {
 type AllMatches = {
 	searchee: SearcheeWithLabel;
 	decision: DecisionAnyMatch;
+	actionResult?: ActionResult;
 }[];
 
 type InjectSummary = {
@@ -226,6 +228,7 @@ async function injectInitialAction(
 			client,
 		);
 		const actionResult = res.actionResult;
+		clientMatches.push({ searchee, decision, actionResult });
 		if (actionResult === InjectionResult.FAILURE) {
 			if (res.linkedNewFiles) break; // Since we couldn't unlink, process with the next job
 			continue;
@@ -235,19 +238,16 @@ async function injectInitialAction(
 		if (injectionResult === InjectionResult.SUCCESS) continue;
 		if (actionResult === InjectionResult.ALREADY_EXISTS) {
 			client = res.client;
-			clientMatches.push({ searchee, decision });
 			injectionResult = actionResult;
 			continue;
 		}
 		if (actionResult === InjectionResult.TORRENT_NOT_COMPLETE) {
 			if (injectionResult === InjectionResult.ALREADY_EXISTS) continue;
 			client = res.client;
-			clientMatches.push({ searchee, decision });
 			injectionResult = actionResult;
 			continue;
 		}
 		client = res.client;
-		clientMatches.push({ searchee, decision });
 		injectionResult = InjectionResult.SUCCESS;
 		matchedSearchee = searchee;
 		matchedDecision = decision;
@@ -378,7 +378,9 @@ async function injectionAlreadyExists({
 		findFallback(
 			clientMatches,
 			[Decision.MATCH, Decision.MATCH_SIZE_ONLY],
-			(match, decision) => match.decision === decision,
+			(match, decision) =>
+				match.decision === decision &&
+				match.actionResult === InjectionResult.ALREADY_EXISTS,
 		)?.decision ?? Decision.MATCH_PARTIAL;
 	if (linkedNewFiles) {
 		logger.info({
