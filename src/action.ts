@@ -122,10 +122,18 @@ async function linkAllFilesInMetafile(
 	let alreadyExisted = false;
 	let linkedNewFiles = false;
 	try {
+		logger.verbose({
+			label: searchee.label,
+			message: `Linking ${getLogString(newMeta)} from ${getLogString(searchee)} to ${destinationDir}`,
+		});
 		const validPaths = await filterAsync(
 			paths,
 			async ([srcFilePath, destFilePath]) => {
 				if (await exists(destFilePath)) {
+					logger.verbose({
+						label: searchee.label,
+						message: `--- Skipping ${srcFilePath} -> ${destFilePath}, already exists`,
+					});
 					alreadyExisted = true;
 					return false;
 				}
@@ -139,8 +147,16 @@ async function linkAllFilesInMetafile(
 			if (await notExists(destFileParentPath)) {
 				await mkdir(destFileParentPath, { recursive: true });
 			}
-			if (await linkFile(srcFilePath, destFilePath)) {
-				linkedNewFiles = true;
+			try {
+				if (await linkFile(srcFilePath, destFilePath)) {
+					linkedNewFiles = true;
+				}
+			} catch (e) {
+				logger.error({
+					label: searchee.label,
+					message: `--- Linking failed, ${srcFilePath} -> ${destFilePath}: ${e.message}`,
+				});
+				throw e;
 			}
 		}
 	} catch (e) {
@@ -309,7 +325,7 @@ async function getClientAndDestinationDir(
 			logger.debug(e);
 			return null;
 		}
-		let error: Error | undefined;
+		let error: Error;
 		for (const testClient of getClients().filter((c) => !c.readonly)) {
 			const torrentSavePaths = new Set(
 				(
@@ -319,6 +335,12 @@ async function getClientAndDestinationDir(
 					})
 				).values(),
 			);
+			if (!torrentSavePaths.size) {
+				error = new Error(
+					`No save paths found to test with for ${testClient.label}, add at least one torrent to the client.`,
+				);
+				continue;
+			}
 			for (const torrentSavePath of torrentSavePaths) {
 				try {
 					if (
@@ -346,7 +368,7 @@ async function getClientAndDestinationDir(
 			if (client) break;
 		}
 		if (!client) {
-			logger.debug(error);
+			logger.debug(error!);
 			return null;
 		}
 	}

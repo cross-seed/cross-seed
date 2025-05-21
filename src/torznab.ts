@@ -392,17 +392,20 @@ export async function* rssPager(
 
 		try {
 			currentPageCandidates = (
-				await makeRequest({
-					indexerId: indexer.id,
-					baseUrl: indexer.url,
-					apikey: indexer.apikey,
-					query: { t: "search", q: "", limit, offset: i * limit },
-					name: indexer.name,
-				})
+				await makeRequest(
+					{
+						indexerId: indexer.id,
+						baseUrl: indexer.url,
+						apikey: indexer.apikey,
+						query: { t: "search", q: "", limit, offset: i * limit },
+						name: indexer.name,
+					},
+					Label.RSS,
+				)
 			).sort(comparing((candidate) => -candidate.pubDate!));
 			if (!currentPageCandidates.length) {
 				(i === 0 ? logger.error : logger.verbose)({
-					label: Label.TORZNAB,
+					label: Label.RSS,
 					message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: no results returned`,
 				});
 				break;
@@ -414,7 +417,7 @@ export async function* rssPager(
 			}
 		} catch (e) {
 			logger.error({
-				label: Label.TORZNAB,
+				label: Label.RSS,
 				message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: ${e.message}`,
 			});
 			logger.debug(e);
@@ -438,21 +441,21 @@ export async function* rssPager(
 
 		if (!newCandidates.length) {
 			logger.verbose({
-				label: Label.TORZNAB,
+				label: Label.RSS,
 				message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: no new candidates`,
 			});
 			break;
 		}
 
 		logger.verbose({
-			label: Label.TORZNAB,
+			label: Label.RSS,
 			message: `${newCandidates.length} new candidates on ${indexer.name ?? indexer.url} page ${i + 1}`,
 		});
 		yield* newCandidates;
 
 		if (newCandidates.length !== currentPageCandidates.length) {
 			logger.verbose({
-				label: Label.TORZNAB,
+				label: Label.RSS,
 				message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: reached last seen guid or pageBackUntil ${humanReadableDate(pageBackUntil)}`,
 			});
 			break;
@@ -464,7 +467,7 @@ export async function* rssPager(
 		.merge(["last_seen_guid"]);
 	if (i >= maxPage) {
 		logger.verbose({
-			label: Label.TORZNAB,
+			label: Label.RSS,
 			message: `Paging ${indexer.name ?? indexer.url} stopped: reached ${maxPage} pages`,
 		});
 	}
@@ -505,6 +508,7 @@ export async function searchTorznab(
 	);
 	const indexerCandidates = await makeRequests(
 		indexersToSearch,
+		searchee.label,
 		async (indexer): Promise<Query[]> => {
 			const caps = {
 				search: indexer.searchCap,
@@ -625,7 +629,7 @@ async function fetchCaps(indexer: Indexer): Promise<Caps> {
 	try {
 		response = await fetch(
 			assembleUrl(indexer.url, indexer.apikey, { t: "caps" }),
-			{ signal: AbortSignal.timeout(ms("10 seconds")) },
+			{ signal: AbortSignal.timeout(ms("1 minute")) },
 		);
 	} catch (e) {
 		const error = new Error(
@@ -785,6 +789,7 @@ export async function validateTorznabUrls() {
 async function onResponseNotOk(
 	response: Response,
 	indexerId: number,
+	indexerName: string,
 ): Promise<number> {
 	const retryAfterSeconds = Number(response.headers.get("Retry-After"));
 
@@ -800,12 +805,14 @@ async function onResponseNotOk(
 			: IndexerStatus.UNKNOWN_ERROR,
 		retryAfter,
 		[indexerId],
+		[indexerName],
 	);
 	return retryAfter;
 }
 
 async function makeRequest(
 	request: TorznabRequest,
+	searcheeLabel: string,
 ): Promise<CandidateWithIndexerId[]> {
 	const { searchTimeout } = getRuntimeConfig();
 	const url = assembleUrl(request.baseUrl, request.apikey, request.query);
@@ -814,7 +821,7 @@ async function makeRequest(
 			? AbortSignal.timeout(searchTimeout)
 			: undefined;
 	logger.verbose({
-		label: Label.TORZNAB,
+		label: searcheeLabel,
 		message: `Querying ${request.name ?? request.indexerId} at ${request.baseUrl} with ${inspect(request.query)}`,
 	});
 	const response = await fetch(url, {
@@ -822,9 +829,13 @@ async function makeRequest(
 		signal: abortSignal,
 	});
 	if (!response.ok) {
-		const retryAffter = await onResponseNotOk(response, request.indexerId);
+		const retryAfter = await onResponseNotOk(
+			response,
+			request.indexerId,
+			request.name ?? request.baseUrl,
+		);
 		throw new Error(
-			`request failed with code ${response.status}${response.status === 429 ? " due to rate limiting" : ""}, snoozing until ${humanReadableDate(retryAffter)}`,
+			`request failed with code ${response.status}${response.status === 429 ? " due to rate limiting" : ""}, snoozing until ${humanReadableDate(retryAfter)}`,
 		);
 	}
 	const xml = await response.text();
@@ -843,6 +854,7 @@ async function makeRequest(
 
 async function makeRequests(
 	indexers: Indexer[],
+	searcheeLabel: string,
 	getQueriesForIndexer: (indexer: Indexer) => Promise<Query[]>,
 ): Promise<IndexerCandidates[]> {
 	const requests: TorznabRequest[] = [];
@@ -860,7 +872,7 @@ async function makeRequests(
 	}
 
 	const outcomes = await Promise.allSettled<CandidateWithIndexerId[]>(
-		requests.map(makeRequest),
+		requests.map((request) => makeRequest(request, searcheeLabel)),
 	);
 
 	const { rejected, fulfilled } = collateOutcomes<
@@ -874,7 +886,7 @@ async function makeRequests(
 	for (const [indexerId, reason] of rejected) {
 		const indexer = indexers.find((i) => i.id === indexerId)!;
 		logger.warn({
-			label: Label.TORZNAB,
+			label: searcheeLabel,
 			message: `Failed to reach ${indexer.name ?? indexer.url}: ${reason instanceof Error ? reason.message : reason}`,
 		});
 		logger.debug(reason);
@@ -904,6 +916,7 @@ async function getAndLogIndexers(
 	const searcheeLog = getLogString(searchee, chalk.bold.white);
 	const mediaTypeLog = chalk.white(mediaType.toUpperCase());
 
+	const allIndexers = await getAllIndexers();
 	const enabledIndexers = await getEnabledIndexers();
 
 	// search history for name across all indexers
@@ -912,7 +925,7 @@ async function getAndLogIndexers(
 		.join("indexer", "timestamp.indexer_id", "indexer.id")
 		.whereIn(
 			"indexer.id",
-			enabledIndexers.map((i) => i.id),
+			allIndexers.map((i) => i.id),
 		)
 		.andWhere("searchee.name", searchee.title)
 		.select({
@@ -932,16 +945,32 @@ async function getAndLogIndexers(
 	const newestFileAge = isEnsemble
 		? await getSearcheeNewestFileAge(searchee as SearcheeWithoutInfoHash)
 		: Number.POSITIVE_INFINITY;
-	const timeFilteredIndexers = enabledIndexers.filter((indexer) => {
+	const disabledIndexers: Indexer[] = [];
+	const timeFilteredIndexers = allIndexers.filter((indexer) => {
+		if (indexer.searchCap === false) return false;
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id,
 		);
-		if (!entry) return true;
+		if (!entry) {
+			if (!enabledIndexers.some((i) => i.id === indexer.id)) {
+				if (indexerDoesSupportMediaType(mediaType, indexer)) {
+					disabledIndexers.push(indexer);
+				}
+				return false;
+			}
+			return true;
+		}
 		if (
 			isEnsemble &&
 			entry.lastSearched &&
 			entry.lastSearched < newestFileAge
 		) {
+			if (!enabledIndexers.some((i) => i.id === indexer.id)) {
+				if (indexerDoesSupportMediaType(mediaType, indexer)) {
+					disabledIndexers.push(indexer);
+				}
+				return false;
+			}
 			return true;
 		}
 		if (entry.firstSearched && entry.firstSearched < skipBefore) {
@@ -950,12 +979,24 @@ async function getAndLogIndexers(
 		if (entry.lastSearched && entry.lastSearched > skipAfter) {
 			return false;
 		}
+		if (!enabledIndexers.some((i) => i.id === indexer.id)) {
+			if (indexerDoesSupportMediaType(mediaType, indexer)) {
+				disabledIndexers.push(indexer);
+			}
+			return false;
+		}
 		return true;
 	});
 
-	const indexersToUse = timeFilteredIndexers.filter((indexer) => {
-		return indexerDoesSupportMediaType(mediaType, indexer);
-	});
+	const indexersToUse = timeFilteredIndexers.filter((indexer) =>
+		indexerDoesSupportMediaType(mediaType, indexer),
+	);
+	if (disabledIndexers.length) {
+		logger.verbose({
+			label: searchee.label,
+			message: `Skipping searching for ${searcheeLog} on temporarily disabled indexers [${disabledIndexers.map((i) => i.name ?? i.url).join(", ")}]`,
+		});
+	}
 
 	// Invalidate cache if searchStr or ids is different
 	let shouldScanArr = true;
@@ -975,6 +1016,7 @@ async function getAndLogIndexers(
 		cachedSearch.indexerCandidates.length = 0;
 		cachedSearch.ids = undefined; // Don't prematurely get ids if skipping
 	}
+	const searchLimitedIndexers: Indexer[] = [];
 	const indexersToSearch = indexersToUse.filter((indexer) => {
 		if (
 			cachedSearch.indexerCandidates.some(
@@ -988,13 +1030,22 @@ async function getAndLogIndexers(
 		if (!indexerSearchCount.has(indexer.id)) {
 			indexerSearchCount.set(indexer.id, 0);
 		}
-		if (indexerSearchCount.get(indexer.id)! >= searchLimit) return false;
+		if (indexerSearchCount.get(indexer.id)! >= searchLimit) {
+			searchLimitedIndexers.push(indexer);
+			return false;
+		}
 		indexerSearchCount.set(
 			indexer.id,
 			indexerSearchCount.get(indexer.id)! + 1,
 		);
 		return true;
 	});
+	if (searchLimitedIndexers.length) {
+		logger.verbose({
+			label: searchee.label,
+			message: `Skipping searching for ${searcheeLog} due to search limit on [${searchLimitedIndexers.map((i) => i.name ?? i.url).join(", ")}]`,
+		});
+	}
 
 	if (!indexersToSearch.length && !cachedSearch.indexerCandidates.length) {
 		cachedSearch.q = null; // Won't scan arrs for multiple skips in a row
