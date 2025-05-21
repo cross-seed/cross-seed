@@ -24,6 +24,7 @@ import {
 	ResultAssessment,
 } from "./decide.js";
 import {
+	getAllIndexers,
 	IndexerStatus,
 	updateIndexerStatus,
 	updateSearchTimestamps,
@@ -177,10 +178,16 @@ async function findOnOtherSites(
 		options,
 	);
 
+	const allIndexers = await getAllIndexers();
+	const rateLimitedNames: string[] = [];
 	const { rateLimited, notRateLimited } = assessments.reduce(
 		(acc, cur, idx) => {
 			const candidate = candidates[idx];
 			if (cur.assessment.decision === Decision.RATE_LIMITED) {
+				const indexer = allIndexers.find(
+					(i) => i.id === candidate.indexerId,
+				)!;
+				rateLimitedNames.push(indexer.name ?? indexer.url);
 				acc.rateLimited.add(candidate.indexerId);
 				acc.notRateLimited.delete(candidate.indexerId);
 			}
@@ -203,6 +210,7 @@ async function findOnOtherSites(
 		IndexerStatus.RATE_LIMITED,
 		Date.now() + ms("1 hour"),
 		Array.from(rateLimited),
+		rateLimitedNames,
 	);
 
 	const zipped: [ResultAssessment, string, ActionResult][] = zip(

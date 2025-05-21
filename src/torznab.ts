@@ -789,6 +789,7 @@ export async function validateTorznabUrls() {
 async function onResponseNotOk(
 	response: Response,
 	indexerId: number,
+	indexerName: string,
 ): Promise<number> {
 	const retryAfterSeconds = Number(response.headers.get("Retry-After"));
 
@@ -804,6 +805,7 @@ async function onResponseNotOk(
 			: IndexerStatus.UNKNOWN_ERROR,
 		retryAfter,
 		[indexerId],
+		[indexerName],
 	);
 	return retryAfter;
 }
@@ -827,9 +829,13 @@ async function makeRequest(
 		signal: abortSignal,
 	});
 	if (!response.ok) {
-		const retryAffter = await onResponseNotOk(response, request.indexerId);
+		const retryAfter = await onResponseNotOk(
+			response,
+			request.indexerId,
+			request.name ?? request.baseUrl,
+		);
 		throw new Error(
-			`request failed with code ${response.status}${response.status === 429 ? " due to rate limiting" : ""}, snoozing until ${humanReadableDate(retryAffter)}`,
+			`request failed with code ${response.status}${response.status === 429 ? " due to rate limiting" : ""}, snoozing until ${humanReadableDate(retryAfter)}`,
 		);
 	}
 	const xml = await response.text();
