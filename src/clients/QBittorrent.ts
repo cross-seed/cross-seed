@@ -71,6 +71,7 @@ interface TorrentInfo {
 	downloaded_session: number;
 	eta: number;
 	f_l_piece_prio: boolean;
+	files?: TorrentFile[];
 	force_start: boolean;
 	hash: string;
 	inactive_seeding_time_limit?: number;
@@ -102,11 +103,34 @@ interface TorrentInfo {
 	time_active: number;
 	total_size: number;
 	tracker: string;
+	trackers?: TorrentTracker[];
 	trackers_count?: number;
 	up_limit: number;
 	uploaded: number;
 	uploaded_session: number;
 	upspeed: number;
+}
+
+interface TorrentTracker {
+	url: string;
+	status: number;
+	tier: number;
+	num_peers: number;
+	num_seeds: number;
+	num_leeches: number;
+	num_downloaded: number;
+	msg: string;
+}
+
+interface TorrentFile {
+	index?: number;
+	name: string;
+	size: number;
+	progress: number;
+	priority: number;
+	is_seed: boolean;
+	piece_range: number[];
+	availability: number;
 }
 
 interface CategoryInfo {
@@ -228,7 +252,7 @@ export default class QBittorrent implements TorrentClient {
 		retries = 3,
 	): Promise<string | undefined> {
 		const bodyStr =
-			body instanceof FormData
+			body instanceof FormData || body instanceof URLSearchParams
 				? JSON.stringify(Object.fromEntries(body))
 				: JSON.stringify(body).replace(
 						/(?:hashes=)([a-z0-9]{40})/i,
@@ -387,6 +411,14 @@ export default class QBittorrent implements TorrentClient {
 		return responseText ? Object.values(JSON.parse(responseText)) : [];
 	}
 
+	torrentFileToFile(torrentFile: TorrentFile): File {
+		return {
+			name: path.basename(torrentFile.name),
+			path: torrentFile.name,
+			length: torrentFile.size,
+		};
+	}
+
 	async getFiles(infoHash: string): Promise<File[] | null> {
 		const responseText = await this.request(
 			"/torrents/files",
@@ -395,11 +427,8 @@ export default class QBittorrent implements TorrentClient {
 		);
 		if (!responseText) return null;
 		try {
-			return JSON.parse(responseText).map((file) => ({
-				name: path.basename(file.name),
-				path: file.name,
-				length: file.size,
-			}));
+			const files: TorrentFile[] = JSON.parse(responseText);
+			return files.map(this.torrentFileToFile);
 		} catch (e) {
 			logger.debug({ label: this.label, message: e });
 			return null;
@@ -414,7 +443,8 @@ export default class QBittorrent implements TorrentClient {
 		);
 		if (!responseText) return null;
 		try {
-			return organizeTrackers(JSON.parse(responseText));
+			const trackers: TorrentTracker[] = JSON.parse(responseText);
+			return organizeTrackers(trackers);
 		} catch (e) {
 			logger.debug({ label: this.label, message: e });
 			return null;
@@ -562,11 +592,15 @@ export default class QBittorrent implements TorrentClient {
 	/*
 	 * @return array of all torrents in the client
 	 */
-	async getAllTorrentInfo(): Promise<TorrentInfo[]> {
-		const responseText = await this.request("/torrents/info", "");
-		if (!responseText) {
-			return [];
-		}
+	async getAllTorrentInfo(options?: {
+		includeTrackers?: boolean;
+		includeFiles?: boolean;
+	}): Promise<TorrentInfo[]> {
+		const params = new URLSearchParams();
+		if (options?.includeTrackers) params.append("includeTrackers", "true");
+		if (options?.includeFiles) params.append("includeFiles", "true");
+		const responseText = await this.request("/torrents/info", params);
+		if (!responseText) return [];
 		return JSON.parse(responseText);
 	}
 
@@ -613,12 +647,18 @@ export default class QBittorrent implements TorrentClient {
 	 * @return array of all torrents in the client
 	 */
 	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
-		const torrents = await this.getAllTorrentInfo();
+		const torrents = await this.getAllTorrentInfo({
+			includeTrackers: true,
+		});
 		return torrents.map((torrent) => ({
 			infoHash: torrent.hash,
 			category: torrent.category,
 			tags: torrent.tags.length ? torrent.tags.split(",") : [],
-			trackers: torrent.tracker.length ? [torrent.tracker] : undefined,
+			trackers: torrent.trackers
+				? organizeTrackers(torrent.trackers)
+				: torrent.tracker.length
+					? [torrent.tracker]
+					: undefined,
 		}));
 	}
 
@@ -635,7 +675,10 @@ export default class QBittorrent implements TorrentClient {
 		const searchees: SearcheeClient[] = [];
 		const newSearchees: SearcheeClient[] = [];
 		const infoHashes = new Set<string>();
-		const torrents = await this.getAllTorrentInfo();
+		const torrents = await this.getAllTorrentInfo({
+			includeFiles: true,
+			includeTrackers: true,
+		});
 		if (!torrents.length) {
 			logger.error({
 				label: this.label,
@@ -683,7 +726,9 @@ export default class QBittorrent implements TorrentClient {
 				}
 				continue;
 			}
-			const files = await this.getFiles(torrent.hash);
+			const files =
+				torrent.files?.map(this.torrentFileToFile) ??
+				(await this.getFiles(torrent.hash));
 			if (!files) {
 				logger.verbose({
 					label: this.label,
@@ -698,7 +743,9 @@ export default class QBittorrent implements TorrentClient {
 				});
 				continue;
 			}
-			const trackers = await this.getTrackers(torrent.hash);
+			const trackers = torrent.trackers
+				? organizeTrackers(torrent.trackers)
+				: await this.getTrackers(torrent.hash);
 			if (!trackers) {
 				logger.verbose({
 					label: this.label,
