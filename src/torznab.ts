@@ -910,6 +910,7 @@ async function getAndLogIndexers(
 	const searcheeLog = getLogString(searchee, chalk.bold.white);
 	const mediaTypeLog = chalk.white(mediaType.toUpperCase());
 
+	const allIndexers = await getAllIndexers();
 	const enabledIndexers = await getEnabledIndexers();
 
 	// search history for name across all indexers
@@ -918,7 +919,7 @@ async function getAndLogIndexers(
 		.join("indexer", "timestamp.indexer_id", "indexer.id")
 		.whereIn(
 			"indexer.id",
-			enabledIndexers.map((i) => i.id),
+			allIndexers.map((i) => i.id),
 		)
 		.andWhere("searchee.name", searchee.title)
 		.select({
@@ -938,16 +939,32 @@ async function getAndLogIndexers(
 	const newestFileAge = isEnsemble
 		? await getSearcheeNewestFileAge(searchee as SearcheeWithoutInfoHash)
 		: Number.POSITIVE_INFINITY;
-	const timeFilteredIndexers = enabledIndexers.filter((indexer) => {
+	const disabledIndexers: Indexer[] = [];
+	const timeFilteredIndexers = allIndexers.filter((indexer) => {
+		if (indexer.searchCap === false) return false;
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id,
 		);
-		if (!entry) return true;
+		if (!entry) {
+			if (!enabledIndexers.some((i) => i.id === indexer.id)) {
+				if (indexerDoesSupportMediaType(mediaType, indexer)) {
+					disabledIndexers.push(indexer);
+				}
+				return false;
+			}
+			return true;
+		}
 		if (
 			isEnsemble &&
 			entry.lastSearched &&
 			entry.lastSearched < newestFileAge
 		) {
+			if (!enabledIndexers.some((i) => i.id === indexer.id)) {
+				if (indexerDoesSupportMediaType(mediaType, indexer)) {
+					disabledIndexers.push(indexer);
+				}
+				return false;
+			}
 			return true;
 		}
 		if (entry.firstSearched && entry.firstSearched < skipBefore) {
@@ -956,12 +973,24 @@ async function getAndLogIndexers(
 		if (entry.lastSearched && entry.lastSearched > skipAfter) {
 			return false;
 		}
+		if (!enabledIndexers.some((i) => i.id === indexer.id)) {
+			if (indexerDoesSupportMediaType(mediaType, indexer)) {
+				disabledIndexers.push(indexer);
+			}
+			return false;
+		}
 		return true;
 	});
 
-	const indexersToUse = timeFilteredIndexers.filter((indexer) => {
-		return indexerDoesSupportMediaType(mediaType, indexer);
-	});
+	const indexersToUse = timeFilteredIndexers.filter((indexer) =>
+		indexerDoesSupportMediaType(mediaType, indexer),
+	);
+	if (disabledIndexers.length) {
+		logger.verbose({
+			label: searchee.label,
+			message: `Skipping searching for ${searcheeLog} on temporarily disabled indexers [${disabledIndexers.map((i) => i.name ?? i.url).join(", ")}]`,
+		});
+	}
 
 	// Invalidate cache if searchStr or ids is different
 	let shouldScanArr = true;
