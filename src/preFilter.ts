@@ -142,7 +142,7 @@ export async function filterByContent(
 
 	if (!includeNonVideos && nonVideoSizeRatio > fuzzySizeThreshold) {
 		logReason(
-			`nonVideoSizeRatio ${nonVideoSizeRatio} > ${fuzzySizeThreshold} fuzzySizeThreshold`,
+			`nonVideoSizeRatio ${nonVideoSizeRatio.toFixed(3)} > ${fuzzySizeThreshold} fuzzySizeThreshold`,
 			searchee,
 			mediaType,
 		);

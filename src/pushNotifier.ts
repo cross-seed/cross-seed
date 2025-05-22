@@ -109,7 +109,9 @@ export function sendResultsNotification(
 				(findFallback(
 					notableSuccesses,
 					[Decision.MATCH, Decision.MATCH_SIZE_ONLY],
-					(success, decision) => success[0].decision === decision,
+					(success, decision) =>
+						success[0].decision === decision &&
+						success[2] === InjectionResult.SUCCESS,
 				)?.[0].decision ?? Decision.MATCH_PARTIAL) as DecisionAnyMatch,
 			),
 		);
