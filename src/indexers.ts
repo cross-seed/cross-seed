@@ -197,12 +197,12 @@ export async function updateIndexerStatus(
 	status: IndexerStatus,
 	retryAfter: number,
 	indexerIds: number[],
-	indexerNames: string[],
+	indexerNames: Set<string>,
 ) {
 	if (indexerIds.length > 0) {
 		logger.verbose({
 			label: Label.TORZNAB,
-			message: `Snoozing indexers ${indexerNames} with ${status} until ${humanReadableDate(
+			message: `Snoozing indexers [${Array.from(indexerNames).join(", ")}] with ${status} until ${humanReadableDate(
 				retryAfter,
 			)}`,
 		});

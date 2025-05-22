@@ -805,7 +805,7 @@ async function onResponseNotOk(
 			: IndexerStatus.UNKNOWN_ERROR,
 		retryAfter,
 		[indexerId],
-		[indexerName],
+		new Set([indexerName]),
 	);
 	return retryAfter;
 }
