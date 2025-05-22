@@ -61,9 +61,14 @@ interface TorrentInfo {
 	auto_tmm: boolean;
 	availability: number;
 	category: string;
+	comment?: string;
 	completed: number;
 	completion_on: number;
+	connections_count?: number;
+	connections_limit?: number;
 	content_path: string;
+	created_by?: string;
+	creation_date?: number;
 	dl_limit: number;
 	dlspeed: number;
 	download_path?: string;
@@ -73,6 +78,7 @@ interface TorrentInfo {
 	f_l_piece_prio: boolean;
 	files?: TorrentFile[];
 	force_start: boolean;
+	has_metadata?: boolean;
 	hash: string;
 	inactive_seeding_time_limit?: number;
 	infohash_v1?: string;
@@ -87,21 +93,50 @@ interface TorrentInfo {
 	num_incomplete: number;
 	num_leechs: number;
 	num_seeds: number;
+	piece_size?: number;
+	pieces_have?: number;
+	pieces_num?: number;
+	popularity?: number;
 	priority: number;
+	private?: boolean;
 	progress: number;
 	ratio: number;
 	ratio_limit: number;
+	reannounce?: number;
+	root_path?: string;
 	save_path: string;
 	seeding_time: number;
 	seeding_time_limit: number;
 	seen_complete: number;
 	seq_dl: boolean;
 	size: number;
-	state: string;
+	state:
+		| "error"
+		| "missingFiles"
+		| "uploading"
+		| "pausedUP"
+		| "stoppedUP"
+		| "queuedUP"
+		| "stalledUP"
+		| "checkingUP"
+		| "forcedUP"
+		| "allocating"
+		| "downloading"
+		| "metaDL"
+		| "pausedDL"
+		| "stoppedDL"
+		| "queuedDL"
+		| "stalledDL"
+		| "checkingDL"
+		| "forcedDL"
+		| "checkingResumeData"
+		| "moving"
+		| "unknown";
 	super_seeding: boolean;
 	tags: string;
 	time_active: number;
 	total_size: number;
+	total_wasted?: number;
 	tracker: string;
 	trackers?: TorrentTracker[];
 	trackers_count?: number;
@@ -112,25 +147,25 @@ interface TorrentInfo {
 }
 
 interface TorrentTracker {
-	url: string;
-	status: number;
-	tier: number;
+	msg: string;
+	num_downloaded: number;
+	num_leeches: number;
 	num_peers: number;
 	num_seeds: number;
-	num_leeches: number;
-	num_downloaded: number;
-	msg: string;
+	status: 0 | 1 | 2 | 3 | 4;
+	tier: number;
+	url: string;
 }
 
 interface TorrentFile {
-	index?: number;
-	name: string;
-	size: number;
-	progress: number;
-	priority: number;
-	is_seed: boolean;
-	piece_range: number[];
 	availability: number;
+	index?: number;
+	is_seed: boolean;
+	name: string;
+	piece_range: [number, number];
+	priority: 0 | 1 | 6 | 7;
+	progress: number;
+	size: number;
 }
 
 interface CategoryInfo {

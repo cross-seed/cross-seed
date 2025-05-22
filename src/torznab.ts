@@ -1053,8 +1053,8 @@ async function getAndLogIndexers(
 			enabledIndexers.length > timeFilteredIndexers.length &&
 				"timestamps",
 			timeFilteredIndexers.length > indexersToUse.length && "category",
-			indexersToSearch.length + cachedSearch.indexerCandidates.length <
-				indexersToUse.length && "searchLimit",
+			disabledIndexers.length && "temporarily disabled indexers",
+			searchLimitedIndexers.length && "searchLimit",
 		].filter(isTruthy);
 		const reasonStr = filteringCauses.length
 			? ` (filtered by ${formatAsList(filteringCauses, { sort: true })})`
