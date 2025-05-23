@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -21,7 +20,6 @@ import { FieldInfo } from '@/components/Form/FieldInfo';
 import { useAppForm } from '@/hooks/form';
 import { formatConfigDataForForm } from './lib/formatConfigData';
 import { removeEmptyArrayValues } from './lib/transformers';
-import DeleteOption from '@/components/Buttons/DeleteOption';
 import { LoaderCircle } from 'lucide-react';
 import ConnectCrossSeedFields from './connect-crossseed-fields';
 import DownloadingFields from './downloading-fields';
@@ -130,10 +128,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               <form.Field
                 name="dataDirs"
                 mode="array"
-                validators={{
-                  onBlur: baseValidationSchema.shape.dataDirs,
-                  onChange: baseValidationSchema.shape.dataDirs,
-                }}
+                validators={
+                  {
+                    // onBlur: baseValidationSchema.shape.dataDirs,
+                    // onChange: baseValidationSchema.shape.dataDirs,
+                  }
+                }
               >
                 {(field) => {
                   return (
@@ -151,50 +151,25 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                               key={index}
                               className="gap-y- mb-3 flex flex-col"
                             >
-                              <form.Field
+                              <form.AppField
                                 name={`dataDirs[${index}]`}
                                 validators={{
                                   onBlur: z.string(),
                                 }}
                               >
-                                {(subfield) => {
-                                  return (
-                                    <>
-                                      <div className="flex items-center gap-2">
-                                        <Input
-                                          type="text"
-                                          id={`${field.name}-${index}`}
-                                          className="form-input"
-                                          value={subfield.state.value ?? ''}
-                                          aria-invalid={
-                                            !!(
-                                              subfield.state.meta.isTouched &&
-                                              (
-                                                subfield.state.meta.errorMap
-                                                  .onBlur as string
-                                              )?.length > 0
-                                            )
-                                          }
-                                          onBlur={subfield.handleBlur}
-                                          onChange={(e) =>
-                                            subfield.handleChange(
-                                              e.target.value,
-                                            )
-                                          }
-                                        />
-                                        {field.state.value &&
-                                          field.state.value?.length > 1 && (
-                                            <DeleteOption
-                                              onClick={() =>
-                                                field.removeValue(index)
-                                              }
-                                            />
-                                          )}
-                                      </div>
-                                    </>
-                                  );
-                                }}
-                              </form.Field>
+                                {(subfield) => (
+                                  <subfield.ArrayField
+                                    showDelete={
+                                      field.state.value &&
+                                      field.state.value?.length > 1
+                                    }
+                                    index={index}
+                                    onDelete={() => {
+                                      field.removeValue(index);
+                                    }}
+                                  />
+                                )}
+                              </form.AppField>
                               <form.Subscribe
                                 selector={(f) =>
                                   f.fieldMeta[
@@ -314,48 +289,26 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             key={index}
                             className="gap-y- mb-3 flex flex-col"
                           >
-                            <form.Field
+                            <form.AppField
                               name={`linkDirs[${index}]`}
                               validators={{
                                 onBlur: z.string(),
                               }}
                             >
-                              {(subfield) => {
-                                return (
-                                  <>
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        type="text"
-                                        className="form-input"
-                                        id={`${field.name}-${index}`}
-                                        value={subfield.state.value ?? ''}
-                                        aria-invalid={
-                                          !!(
-                                            subfield.state.meta.isTouched &&
-                                            (
-                                              subfield.state.meta.errorMap
-                                                .onBlur as string
-                                            )?.length > 0
-                                          )
-                                        }
-                                        onBlur={subfield.handleBlur}
-                                        onChange={(e) =>
-                                          subfield.handleChange(e.target.value)
-                                        }
-                                      />
-                                      {field.state.value &&
-                                        field.state.value.length > 1 && (
-                                          <DeleteOption
-                                            onClick={() =>
-                                              field.removeValue(index)
-                                            }
-                                          />
-                                        )}
-                                    </div>
-                                  </>
-                                );
-                              }}
-                            </form.Field>
+                              {(subfield) => (
+                                <subfield.ArrayField
+                                  showDelete={
+                                    (field.state.value &&
+                                      field.state.value?.length > 1) ??
+                                    undefined
+                                  }
+                                  index={index}
+                                  onDelete={() => {
+                                    field.removeValue(index);
+                                  }}
+                                />
+                              )}
+                            </form.AppField>
                             <form.Subscribe
                               selector={(f) =>
                                 f.fieldMeta[
@@ -421,47 +374,25 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             key={index}
                             className="gap-y- mb-3 flex flex-col"
                           >
-                            <form.Field
+                            <form.AppField
                               name={`torznab[${index}]`}
                               validators={{
                                 onBlur: z.string().url(),
                               }}
                             >
-                              {(subfield) => {
-                                return (
-                                  <>
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        type="text"
-                                        className="form-input"
-                                        id={`${field.name}-${index}`}
-                                        value={subfield.state.value ?? ''}
-                                        aria-invalid={
-                                          !!(
-                                            subfield.state.meta.isTouched &&
-                                            (
-                                              subfield.state.meta.errorMap
-                                                .onBlur as string
-                                            )?.length > 0
-                                          )
-                                        }
-                                        onBlur={subfield.handleBlur}
-                                        onChange={(e) =>
-                                          subfield.handleChange(e.target.value)
-                                        }
-                                      />
-                                      {field.state.value.length > 1 && (
-                                        <DeleteOption
-                                          onClick={() =>
-                                            field.removeValue(index)
-                                          }
-                                        />
-                                      )}
-                                    </div>
-                                  </>
-                                );
-                              }}
-                            </form.Field>
+                              {(subfield) => (
+                                <subfield.ArrayField
+                                  showDelete={
+                                    field.state.value &&
+                                    field.state.value?.length > 1
+                                  }
+                                  index={index}
+                                  onDelete={() => {
+                                    field.removeValue(index);
+                                  }}
+                                />
+                              )}
+                            </form.AppField>
                             <form.Subscribe
                               selector={(f) =>
                                 f.fieldMeta[
@@ -498,10 +429,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               <form.Field
                 name="notificationWebhookUrls"
                 mode="array"
-                validators={{
-                  onBlur: baseValidationSchema.shape.notificationWebhookUrls,
-                  onChange: baseValidationSchema.shape.notificationWebhookUrls,
-                }}
+                validators={
+                  {
+                    // onBlur: baseValidationSchema.shape.notificationWebhookUrls,
+                    // onChange: baseValidationSchema.shape.notificationWebhookUrls,
+                  }
+                }
               >
                 {(field) => {
                   return (
@@ -518,7 +451,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                             key={index}
                             className="gap-y- mb-3 flex flex-col"
                           >
-                            <form.Field
+                            <form.AppField
                               name={`notificationWebhookUrls[${index}]`}
                               validators={{
                                 onBlur: z
@@ -528,42 +461,19 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                                   .or(z.literal('')),
                               }}
                             >
-                              {(subfield) => {
-                                return (
-                                  <>
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        type="text"
-                                        className="form-input"
-                                        id={`${field.name}-${index}`}
-                                        value={subfield.state.value ?? ''}
-                                        aria-invalid={
-                                          !!(
-                                            subfield.state.meta.isTouched &&
-                                            (
-                                              subfield.state.meta.errorMap
-                                                .onBlur as string
-                                            )?.length > 0
-                                          )
-                                        }
-                                        onBlur={subfield.handleBlur}
-                                        onChange={(e) =>
-                                          subfield.handleChange(e.target.value)
-                                        }
-                                      />
-                                      {field.state.value &&
-                                        field.state.value.length > 1 && (
-                                          <DeleteOption
-                                            onClick={() =>
-                                              field.removeValue(index)
-                                            }
-                                          />
-                                        )}
-                                    </div>
-                                  </>
-                                );
-                              }}
-                            </form.Field>
+                              {(subfield) => (
+                                <subfield.ArrayField
+                                  showDelete={
+                                    field.state.value &&
+                                    field.state.value?.length > 1
+                                  }
+                                  index={index}
+                                  onDelete={() => {
+                                    field.removeValue(index);
+                                  }}
+                                />
+                              )}
+                            </form.AppField>
                             <form.Subscribe
                               selector={(f) =>
                                 f.fieldMeta[
@@ -600,10 +510,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               <form.Field
                 name="sonarr"
                 mode="array"
-                validators={{
-                  onBlur: baseValidationSchema.shape.sonarr,
-                  onChange: baseValidationSchema.shape.sonarr,
-                }}
+                validators={
+                  {
+                    // onBlur: baseValidationSchema.shape.sonarr,
+                    // onChange: baseValidationSchema.shape.sonarr,
+                  }
+                }
               >
                 {(field) => {
                   return (
@@ -621,50 +533,25 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                               key={index}
                               className="gap-y- mb-3 flex flex-col"
                             >
-                              <form.Field
+                              <form.AppField
                                 name={`sonarr[${index}]`}
                                 validators={{
                                   onBlur: z.string().url().or(z.literal('')),
                                 }}
                               >
-                                {(subfield) => {
-                                  return (
-                                    <>
-                                      <div className="flex items-center gap-2">
-                                        <Input
-                                          type="text"
-                                          className="form-input"
-                                          id={`${field.name}-${index}`}
-                                          value={subfield.state.value ?? ''}
-                                          aria-invalid={
-                                            !!(
-                                              subfield.state.meta.isTouched &&
-                                              (
-                                                subfield.state.meta.errorMap
-                                                  .onBlur as string
-                                              )?.length > 0
-                                            )
-                                          }
-                                          onBlur={subfield.handleBlur}
-                                          onChange={(e) =>
-                                            subfield.handleChange(
-                                              e.target.value,
-                                            )
-                                          }
-                                        />
-                                        {field.state.value &&
-                                          field.state.value.length > 1 && (
-                                            <DeleteOption
-                                              onClick={() =>
-                                                field.removeValue(index)
-                                              }
-                                            />
-                                          )}
-                                      </div>
-                                    </>
-                                  );
-                                }}
-                              </form.Field>
+                                {(subfield) => (
+                                  <subfield.ArrayField
+                                    showDelete={
+                                      field.state.value &&
+                                      field.state.value?.length > 1
+                                    }
+                                    index={index}
+                                    onDelete={() => {
+                                      field.removeValue(index);
+                                    }}
+                                  />
+                                )}
+                              </form.AppField>
                               <form.Subscribe
                                 selector={(f) =>
                                   f.fieldMeta[
@@ -703,10 +590,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               <form.Field
                 name="radarr"
                 mode="array"
-                validators={{
-                  onBlur: baseValidationSchema.shape.radarr,
-                  onChange: baseValidationSchema.shape.radarr,
-                }}
+                validators={
+                  {
+                    // onBlur: baseValidationSchema.shape.radarr,
+                    // onChange: baseValidationSchema.shape.radarr,
+                  }
+                }
               >
                 {(field) => {
                   return (
@@ -724,50 +613,25 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                               key={index}
                               className="gap-y- mb-3 flex flex-col"
                             >
-                              <form.Field
+                              <form.AppField
                                 name={`radarr[${index}]`}
                                 validators={{
                                   onBlur: z.string().url().or(z.literal('')),
                                 }}
                               >
-                                {(subfield) => {
-                                  return (
-                                    <>
-                                      <div className="flex items-center gap-2">
-                                        <Input
-                                          type="text"
-                                          className="form-input"
-                                          id={`${field.name}-${index}`}
-                                          value={subfield.state.value ?? ''}
-                                          aria-invalid={
-                                            !!(
-                                              subfield.state.meta.isTouched &&
-                                              (
-                                                subfield.state.meta.errorMap
-                                                  .onBlur as string
-                                              )?.length > 0
-                                            )
-                                          }
-                                          onBlur={subfield.handleBlur}
-                                          onChange={(e) =>
-                                            subfield.handleChange(
-                                              e.target.value,
-                                            )
-                                          }
-                                        />
-                                        {field.state.value &&
-                                          field.state.value.length > 1 && (
-                                            <DeleteOption
-                                              onClick={() =>
-                                                field.removeValue(index)
-                                              }
-                                            />
-                                          )}
-                                      </div>
-                                    </>
-                                  );
-                                }}
-                              </form.Field>
+                                {(subfield) => (
+                                  <subfield.ArrayField
+                                    showDelete={
+                                      field.state.value &&
+                                      field.state.value?.length > 1
+                                    }
+                                    index={index}
+                                    onDelete={() => {
+                                      field.removeValue(index);
+                                    }}
+                                  />
+                                )}
+                              </form.AppField>
                               <form.Subscribe
                                 selector={(f) =>
                                   f.fieldMeta[
@@ -851,10 +715,12 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
               <form.Field
                 name="blockList"
                 mode="array"
-                validators={{
-                  onBlur: baseValidationSchema.shape.blockList,
-                  onChange: baseValidationSchema.shape.blockList,
-                }}
+                validators={
+                  {
+                    // onBlur: baseValidationSchema.shape.blockList,
+                    // onChange: baseValidationSchema.shape.blockList,
+                  }
+                }
               >
                 {(field) => {
                   return (
@@ -875,50 +741,25 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
                               key={index}
                               className="gap-y- mb-3 flex flex-col"
                             >
-                              <form.Field
+                              <form.AppField
                                 name={`blockList[${index}]`}
                                 validators={{
                                   onBlur: z.string(),
                                 }}
                               >
-                                {(subfield) => {
-                                  return (
-                                    <>
-                                      <div className="flex items-center gap-2">
-                                        <Input
-                                          type="text"
-                                          className="form-input"
-                                          id={`${field.name}-${index}`}
-                                          value={subfield.state.value ?? ''}
-                                          aria-invalid={
-                                            !!(
-                                              subfield.state.meta.isTouched &&
-                                              (
-                                                subfield.state.meta.errorMap
-                                                  .onBlur as string
-                                              )?.length > 0
-                                            )
-                                          }
-                                          onBlur={subfield.handleBlur}
-                                          onChange={(e) =>
-                                            subfield.handleChange(
-                                              e.target.value,
-                                            )
-                                          }
-                                        />
-                                        {field.state.value &&
-                                          field.state.value.length > 1 && (
-                                            <DeleteOption
-                                              onClick={() =>
-                                                field.removeValue(index)
-                                              }
-                                            />
-                                          )}
-                                      </div>
-                                    </>
-                                  );
-                                }}
-                              </form.Field>
+                                {(subfield) => (
+                                  <subfield.ArrayField
+                                    showDelete={
+                                      field.state.value &&
+                                      field.state.value?.length > 1
+                                    }
+                                    index={index}
+                                    onDelete={() => {
+                                      field.removeValue(index);
+                                    }}
+                                  />
+                                )}
+                              </form.AppField>
                               <form.Subscribe
                                 selector={(f) =>
                                   f.fieldMeta[
