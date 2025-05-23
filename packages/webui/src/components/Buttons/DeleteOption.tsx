@@ -12,6 +12,7 @@ type DeleteOptionProps = {
 const DeleteOption: FC<DeleteOptionProps> = ({ className, onClick }) => {
   return (
     <Button
+      type="button"
       variant="destructive"
       className={cn('', className)}
       onClick={onClick}
