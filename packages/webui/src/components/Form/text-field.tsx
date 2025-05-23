@@ -10,18 +10,37 @@ import useConfigForm from '@/hooks/use-config-form';
 type TextFieldProps = React.HTMLProps<HTMLInputElement> & {
   className?: string;
   label: string;
+  hideLabel?: boolean;
 };
 
-const TextField: FC<TextFieldProps> = ({ className, label, ...rest }) => {
+/**
+ * TextField component for use with the form library.
+ * It provides a text input field with label, error handling, and required indicator.
+ *
+ * @param props - The props for the TextField component.
+ * @returns  The rendered TextField component.
+ *
+ * @example
+ * <TextField label="Name" />
+ */
+
+const TextField: FC<TextFieldProps> = ({
+  className,
+  label,
+  hideLabel = false,
+  ...rest
+}) => {
   const field = useFieldContext<string>();
   const { isFieldRequired } = useConfigForm();
 
   return (
     <div className={cn('space-y-3', className)}>
-      <Label htmlFor={field.name} className="block w-full">
-        {label}
-        {isFieldRequired(field.name) && <RequiredIndicator />}
-      </Label>
+      {!hideLabel && (
+        <Label htmlFor={field.name} className="block w-full">
+          {label}
+          {isFieldRequired(field.name) && <RequiredIndicator />}
+        </Label>
+      )}
       <Input
         type="text"
         className="form-input"
