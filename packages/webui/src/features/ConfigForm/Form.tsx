@@ -118,10 +118,18 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
         {/* form fields */}
         <div className="flex flex-wrap gap-6">
           {/* Directories and Paths */}
-          <DirectoriesPathsFields form={form} />
+          <DirectoriesPathsFields
+            form={form}
+            isFieldRequired={isFieldRequired}
+            onFieldAdded={setLastFieldAdded}
+          />
 
           {/* Connecting to Other Apps */}
-          <ConnectOtherAppsFields form={form} />
+          <ConnectOtherAppsFields
+            form={form}
+            isFieldRequired={isFieldRequired}
+            onFieldAdded={setLastFieldAdded}
+          />
 
           {/* Connect to Cross Seed  */}
           <ConnectCrossSeedFields form={form} />
