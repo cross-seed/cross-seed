@@ -12,7 +12,7 @@ type DirectoriesPathsFieldsProps = {
 };
 
 const DirectoriesPathsFields = withForm({
-  render: ({ form }, props: DirectoriesPathsFieldsProps = {}) => {
+  render: function Render({ form }, props: DirectoriesPathsFieldsProps = {}) {
     // Local state for tracking the last field added within this component
     const [localLastFieldAdded, setLocalLastFieldAdded] = useState<
       string | null
