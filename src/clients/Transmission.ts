@@ -6,6 +6,7 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	TORRENT_TAG,
+	USER_AGENT,
 } from "../constants.js";
 import { db } from "../db.js";
 import { CrossSeedError } from "../errors.js";
@@ -120,7 +121,7 @@ export default class Transmission implements TorrentClient {
 			),
 		);
 
-		const headers = new Headers();
+		const headers = new Headers({ "User-Agent": USER_AGENT });
 		headers.set("Content-Type", "application/json");
 		if (this.xTransmissionSessionId) {
 			headers.set(XTransmissionSessionId, this.xTransmissionSessionId);

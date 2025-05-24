@@ -7,6 +7,7 @@ import {
 	InjectionResult,
 	TORRENT_CATEGORY_SUFFIX,
 	TORRENT_TAG,
+	USER_AGENT,
 } from "../constants.js";
 import { db } from "../db.js";
 import { CrossSeedError } from "../errors.js";
@@ -212,7 +213,10 @@ export default class Deluge implements TorrentClient {
 				`[${this.label}] delugeRpcUrl must be percent-encoded`,
 			),
 		);
-		const headers = new Headers({ "Content-Type": "application/json" });
+		const headers = new Headers({
+			"Content-Type": "application/json",
+			"User-Agent": USER_AGENT,
+		});
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
 		let response: Response, json: DelugeJSON<ResultType>;

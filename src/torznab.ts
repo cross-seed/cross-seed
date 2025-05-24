@@ -629,7 +629,10 @@ async function fetchCaps(indexer: Indexer): Promise<Caps> {
 	try {
 		response = await fetch(
 			assembleUrl(indexer.url, indexer.apikey, { t: "caps" }),
-			{ signal: AbortSignal.timeout(ms("1 minute")) },
+			{
+				headers: { "User-Agent": USER_AGENT },
+				signal: AbortSignal.timeout(ms("1 minute")),
+			},
 		);
 	} catch (e) {
 		const error = new Error(
