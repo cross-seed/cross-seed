@@ -2,7 +2,7 @@ import chalk from "chalk";
 import ms from "ms";
 import { join as posixJoin } from "node:path/posix";
 import { URLSearchParams } from "node:url";
-import { MediaType, SCENE_TITLE_REGEX } from "./constants.js";
+import { MediaType, SCENE_TITLE_REGEX, USER_AGENT } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { Caps } from "./indexers.js";
 import { Label, logger } from "./logger.js";
@@ -133,7 +133,7 @@ async function makeArrApiCall<ResponseType>(
 	try {
 		response = await fetch(url, {
 			signal: AbortSignal.timeout(ms("30 seconds")),
-			headers: { "X-Api-Key": apikey },
+			headers: { "X-Api-Key": apikey, "User-Agent": USER_AGENT },
 		});
 		clonedResponse = response.clone();
 	} catch (networkError) {

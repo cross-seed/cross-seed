@@ -168,7 +168,7 @@ export async function validateClientSavePaths(
 	const { linkDirs } = getRuntimeConfig();
 	logger.info({
 		label,
-		message: `Validating all existing torrent save paths...`,
+		message: `Validating save paths for all ${searchees.length} torrents...`,
 	});
 	const infoHashPathMap = new Map(infoHashPathMapOrig);
 

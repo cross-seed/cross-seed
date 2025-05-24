@@ -68,45 +68,46 @@ function logDecision(
 	let reason: string;
 	let match = "no match";
 	switch (decision) {
-		case Decision.MATCH_PARTIAL:
-			match = decision;
-			reason = `${(
-				getPartialSizeRatio(metafile!, searchee) * 100
-			).toFixed(3)}% match`;
-			break;
-		case Decision.MATCH_SIZE_ONLY:
-			match = decision;
-			reason = "100% match";
-			break;
-		case Decision.MATCH:
-			match = decision;
-			reason = "100% match";
-			break;
-		case Decision.FUZZY_SIZE_MISMATCH:
-			reason = `the total sizes are outside of the fuzzySizeThreshold range: ${Math.abs((candidate.size! - searchee.length) / searchee.length).toFixed(3)} > ${getFuzzySizeFactor(searchee)}`;
-			break;
-		case Decision.SIZE_MISMATCH:
-			reason = `some files are missing or have different sizes${compareFileTreesPartial(metafile!, searchee) ? ` (will match in partial match mode)` : ""}`;
-			break;
-		case Decision.PARTIAL_SIZE_MISMATCH:
-			reason = `too many files are missing or have different sizes: torrent progress would be ${(getPartialSizeRatio(metafile!, searchee) * 100).toFixed(3)}%`;
+		case Decision.RELEASE_GROUP_MISMATCH:
+			reason = `it has a different release group: ${getReleaseGroup(
+				stripExtension(searchee.title),
+			)} -> ${getReleaseGroup(stripExtension(candidate.name))}`;
 			break;
 		case Decision.RESOLUTION_MISMATCH:
 			reason = `its resolution does not match: ${
 				searchee.title.match(RES_STRICT_REGEX)?.groups?.res
 			} -> ${candidate.name.match(RES_STRICT_REGEX)?.groups?.res}`;
 			break;
-		case Decision.NO_DOWNLOAD_LINK:
-			reason = "it doesn't have a download link";
+		case Decision.SOURCE_MISMATCH:
+			reason = `it has a different source: ${parseSource(searchee.title)} -> ${parseSource(candidate.name)}`;
 			break;
-		case Decision.RATE_LIMITED:
-			reason = "cross-seed has reached this tracker's rate limit";
+		case Decision.PROPER_REPACK_MISMATCH:
+			reason = `one is a different subsequent release: ${
+				searchee.title.match(REPACK_PROPER_REGEX)?.groups?.type ??
+				"INITIAL"
+			} -> ${candidate.name.match(REPACK_PROPER_REGEX)?.groups?.type ?? "INITIAL"}`;
 			break;
-		case Decision.DOWNLOAD_FAILED:
-			reason = "the torrent file failed to download";
+		case Decision.FUZZY_SIZE_MISMATCH:
+			reason = `the total sizes are outside of the fuzzySizeThreshold range: ${Math.abs((candidate.size! - searchee.length) / searchee.length).toFixed(3)} > ${getFuzzySizeFactor(searchee)}`;
 			break;
-		case Decision.MAGNET_LINK:
-			reason = "the torrent is a magnet link";
+		case Decision.MATCH:
+			match = decision;
+			reason =
+				"all file sizes and file names match: torrent progress will be 100%";
+			break;
+		case Decision.MATCH_SIZE_ONLY:
+			match = decision;
+			reason = "all file sizes match: torrent progress will be 100%";
+			break;
+		case Decision.MATCH_PARTIAL:
+			match = decision;
+			reason = `most file sizes match: torrent progress will be ~${(getPartialSizeRatio(metafile!, searchee) * 100).toFixed(3)}%`;
+			break;
+		case Decision.PARTIAL_SIZE_MISMATCH:
+			reason = `too many files are missing or have different sizes: torrent progress would be ${(getPartialSizeRatio(metafile!, searchee) * 100).toFixed(3)}%`;
+			break;
+		case Decision.SIZE_MISMATCH:
+			reason = `some files are missing or have different sizes${compareFileTreesPartial(metafile!, searchee) ? ` (will match in partial match mode)` : ""}`;
 			break;
 		case Decision.SAME_INFO_HASH:
 			reason = "the info hash is the same";
@@ -117,19 +118,17 @@ function logDecision(
 		case Decision.FILE_TREE_MISMATCH:
 			reason = `it has a different file tree${matchMode === MatchMode.STRICT ? " (will match in flexible or partial matchMode)" : ""}`;
 			break;
-		case Decision.RELEASE_GROUP_MISMATCH:
-			reason = `it has a different release group: ${getReleaseGroup(
-				stripExtension(searchee.title),
-			)} -> ${getReleaseGroup(stripExtension(candidate.name))}`;
+		case Decision.MAGNET_LINK:
+			reason = "the torrent is a magnet link";
 			break;
-		case Decision.PROPER_REPACK_MISMATCH:
-			reason = `one is a different subsequent release: ${
-				searchee.title.match(REPACK_PROPER_REGEX)?.groups?.type ??
-				"INITIAL"
-			} -> ${candidate.name.match(REPACK_PROPER_REGEX)?.groups?.type ?? "INITIAL"}`;
+		case Decision.RATE_LIMITED:
+			reason = "cross-seed has reached this tracker's rate limit";
 			break;
-		case Decision.SOURCE_MISMATCH:
-			reason = `it has a different source: ${parseSource(searchee.title)} -> ${parseSource(candidate.name)}`;
+		case Decision.DOWNLOAD_FAILED:
+			reason = "the torrent file failed to download";
+			break;
+		case Decision.NO_DOWNLOAD_LINK:
+			reason = "it doesn't have a download link";
 			break;
 		case Decision.BLOCKED_RELEASE:
 			reason = `it matches the blocklist: ${

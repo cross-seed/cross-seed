@@ -179,7 +179,7 @@ async function findOnOtherSites(
 	);
 
 	const allIndexers = await getAllIndexers();
-	const rateLimitedNames: string[] = [];
+	const rateLimitedNames = new Set<string>();
 	const { rateLimited, notRateLimited } = assessments.reduce(
 		(acc, cur, idx) => {
 			const candidate = candidates[idx];
@@ -187,7 +187,7 @@ async function findOnOtherSites(
 				const indexer = allIndexers.find(
 					(i) => i.id === candidate.indexerId,
 				)!;
-				rateLimitedNames.push(indexer.name ?? indexer.url);
+				rateLimitedNames.add(indexer.name ?? indexer.url);
 				acc.rateLimited.add(candidate.indexerId);
 				acc.notRateLimited.delete(candidate.indexerId);
 			}

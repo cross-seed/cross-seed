@@ -8,6 +8,7 @@ import {
 	InjectionResult,
 	TORRENT_CATEGORY_SUFFIX,
 	TORRENT_TAG,
+	USER_AGENT,
 } from "../constants.js";
 import { db } from "../db.js";
 import { CrossSeedError } from "../errors.js";
@@ -205,6 +206,7 @@ export default class QBittorrent implements TorrentClient {
 			response = await fetch(`${href}/auth/login`, {
 				method: "POST",
 				body: new URLSearchParams({ username, password }),
+				headers: { "User-Agent": USER_AGENT },
 				signal: AbortSignal.timeout(ms("10 seconds")),
 			});
 		} catch (e) {
@@ -303,7 +305,11 @@ export default class QBittorrent implements TorrentClient {
 		try {
 			response = await fetch(`${this.url.href}${path}`, {
 				method: "post",
-				headers: { Cookie: this.cookie, ...headers },
+				headers: {
+					Cookie: this.cookie,
+					"User-Agent": USER_AGENT,
+					...headers,
+				},
 				body,
 				signal: AbortSignal.timeout(ms("10 minutes")),
 			});

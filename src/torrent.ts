@@ -569,10 +569,8 @@ export async function indexTorrentsAndDataDirs(
 			const maxRetries = 3;
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
-					await Promise.all([
-						indexTorrents(options),
-						indexDataDirs(options),
-					]);
+					await indexDataDirs(options); // Running together may increase failures
+					await indexTorrents(options); // Run second so this data is more fresh
 					break;
 				} catch (e) {
 					const msg = `Indexing failed (${maxRetries - attempt}): ${e.message}`;
