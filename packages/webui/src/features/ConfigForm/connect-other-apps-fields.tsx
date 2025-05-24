@@ -11,7 +11,7 @@ type ConnectOtherAppsFieldsProps = {
 };
 
 const ConnectOtherAppsFields = withForm({
-  render: ({ form }, props: ConnectOtherAppsFieldsProps = {}) => {
+  render: function Render({ form }, props: ConnectOtherAppsFieldsProps = {}) {
     // Local state for tracking the last field added within this component
     const [localLastFieldAdded, setLocalLastFieldAdded] = useState<
       string | null
