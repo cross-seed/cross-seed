@@ -102,19 +102,24 @@ export function sendResultsNotification(
 		);
 		const trackers = notableSuccesses.map(([, tracker]) => tracker);
 		const trackersListStr = formatAsList(trackers, { sort: true });
-		const paused = notableSuccesses.some(([{ metafile }]) =>
-			estimatePausedStatus(
-				metafile!,
-				searchee,
-				(findFallback(
-					notableSuccesses,
-					[Decision.MATCH, Decision.MATCH_SIZE_ONLY],
-					(success, decision) =>
-						success[0].decision === decision &&
-						success[2] === InjectionResult.SUCCESS,
-				)?.[0].decision ?? Decision.MATCH_PARTIAL) as DecisionAnyMatch,
-			),
-		);
+		const paused = notableSuccesses.every(
+			([, , actionResult]) => actionResult === SaveResult.SAVED,
+		)
+			? true
+			: notableSuccesses.some(([{ metafile }]) =>
+					estimatePausedStatus(
+						metafile!,
+						searchee,
+						(findFallback(
+							notableSuccesses,
+							[Decision.MATCH, Decision.MATCH_SIZE_ONLY],
+							(success, decision) =>
+								success[0].decision === decision &&
+								success[2] === InjectionResult.SUCCESS,
+						)?.[0].decision ??
+							Decision.MATCH_PARTIAL) as DecisionAnyMatch,
+					),
+				);
 		const injected = notableSuccesses.some(
 			([, , actionResult]) => actionResult === InjectionResult.SUCCESS,
 		);
