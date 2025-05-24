@@ -12,7 +12,7 @@ type MiscSettingsFieldsProps = {
 };
 
 const MiscSettingsFields = withForm({
-  render: ({ form }, props: MiscSettingsFieldsProps = {}) => {
+  render: function Render({ form }, props: MiscSettingsFieldsProps = {}) {
     // Local state for tracking the last field added within this component
     const [localLastFieldAdded, setLocalLastFieldAdded] = useState<
       string | null
