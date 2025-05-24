@@ -1,8 +1,10 @@
 import { withForm } from '@/hooks/form';
-// import { validationSchema } from '@/hooks/use-config-form';
+// import { Config } from '@/types/config';
+// import { defaultConfig } from '../../../../shared/constants';
+import defaultValues from '@/hooks/use-config-form';
 
 const ConnectCrossSeedFields = withForm({
-  // ...defaultValues,
+  ...defaultValues,
   render: ({ form }) => {
     return (
       <fieldset className="form-fieldset w-full gap-6 rounded-md">
