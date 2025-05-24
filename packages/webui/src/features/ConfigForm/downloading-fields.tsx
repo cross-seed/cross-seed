@@ -26,6 +26,7 @@ const DownloadingFields = withForm({
                 <field.TextField
                   label="rTorrent RPC URL"
                   type="url"
+                  placeholder="http://username:password@localhost:1234/RPC2"
                   required={false}
                 />
               </>
@@ -45,6 +46,7 @@ const DownloadingFields = withForm({
               <field.TextField
                 label="qBittorrent URL"
                 type="url"
+                placeholder="http://username:password@localhost:8080"
                 required={false}
               />
             )}
@@ -63,6 +65,7 @@ const DownloadingFields = withForm({
               <field.TextField
                 label="Transmission RPC URL"
                 type="url"
+                placeholder="http://username:password@localhost:9091/transmission/rpc"
                 required={false}
               />
             )}
@@ -81,6 +84,7 @@ const DownloadingFields = withForm({
               <field.TextField
                 label="Deluge RPC URL"
                 type="url"
+                placeholder="http://:password@localhost:8112/json"
                 required={false}
               />
             )}
