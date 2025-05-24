@@ -1,14 +1,11 @@
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { baseValidationSchema, Config } from '@/types/config';
 import { useQuery } from '@tanstack/react-query';
 import { FC, useEffect, useState } from 'react';
-import { z } from 'zod';
 import './Form.css';
 import { defaultConfig } from '../../../../shared/constants';
-import { FieldInfo } from '@/components/Form/FieldInfo';
 import { useAppForm } from '@/hooks/form';
 import { formatConfigDataForForm } from './lib/formatConfigData';
 import { removeEmptyArrayValues } from './lib/transformers';
@@ -56,8 +53,10 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
             console.log('Full validation success!', value, Object.keys(value));
             // remove empty values from array fields
             Object.keys(value).forEach((attr) => {
-              if (Array.isArray(value[attr])) {
-                value[attr] = removeEmptyArrayValues(value[attr]);
+              const val = value[attr as keyof typeof configData];
+              if (val && Array.isArray(val)) {
+                (value[attr as keyof typeof configData] as unknown) =
+                  removeEmptyArrayValues(val);
               }
             });
 
