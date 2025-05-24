@@ -63,13 +63,14 @@ export async function indexDataDirs(options: {
 		const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
 		if (await exists(maxUserWatchesPath)) {
 			const limit = parseInt(await readFile(maxUserWatchesPath, "utf8"));
-			if (limit < searcheePaths.length * 10) {
+			if (limit < searcheePaths.length * 2) {
 				logger.error(
 					`max_user_watches too low for proper indexing of dataDirs. It is recommended to set fs.inotify.max_user_watches=1048576 in /etc/sysctl.conf (only on the host system if using docker) - current: ${limit}`,
 				);
 			}
 		}
-		return indexDataPaths(searcheePaths);
+		const numEntries = await indexDataPaths(searcheePaths);
+		logger.info(`Validated ${numEntries} entries from dataDirs...`);
 	}
 
 	await mapAsync(dataDirs, async (dataDir) => {
@@ -116,7 +117,7 @@ export async function indexDataDirs(options: {
 			await db("data").whereIn("path", batch).del();
 			await db("ensemble").whereIn("path", batch).del();
 		});
-		return indexDataPaths(paths);
+		await indexDataPaths(paths);
 	});
 }
 
@@ -124,7 +125,7 @@ export async function indexDataDirs(options: {
  * Adds the data and ensemble entries to the database.
  * @param paths The paths to index.
  */
-async function indexDataPaths(paths: string[]): Promise<void> {
+async function indexDataPaths(paths: string[]): Promise<number> {
 	const { seasonFromEpisodes } = getRuntimeConfig();
 	const memoizedPaths = new Map<string, string[]>();
 	const memoizedLengths = new Map<string, number>();
@@ -154,6 +155,7 @@ async function indexDataPaths(paths: string[]): Promise<void> {
 			.onConflict(["client_host", "path"])
 			.merge();
 	});
+	return dataRows.length;
 }
 
 function indexEnsembleDataEntry(
