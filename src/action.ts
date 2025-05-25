@@ -53,6 +53,7 @@ import {
 	findAsync,
 	formatAsList,
 	getLogString,
+	mapAsync,
 	Mutex,
 	notExists,
 	withMutex,
@@ -674,8 +675,11 @@ async function getLinkDir(pathStr: string): Promise<string | null> {
 	const pathStat = await stat(pathStr);
 	const pathDev = pathStat.dev; // Windows always returns 0
 	if (pathDev) {
-		for (const linkDir of linkDirs) {
-			if ((await stat(linkDir)).dev === pathDev) return linkDir;
+		const devs = await mapAsync(linkDirs, async (d) => (await stat(d)).dev);
+		if (new Set(devs).size === linkDirs.length) {
+			for (const [index, linkDir] of linkDirs.entries()) {
+				if (devs[index] === pathDev) return linkDir;
+			}
 		}
 	}
 	let srcFile = pathStat.isFile()

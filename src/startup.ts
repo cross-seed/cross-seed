@@ -77,6 +77,8 @@ async function checkConfigPaths(): Promise<void> {
 	const READ_ONLY = constants.R_OK;
 	const READ_AND_WRITE = constants.R_OK | constants.W_OK;
 	let pathFailure: number = 0;
+	const linkDev: { path: string; dev: number }[] = [];
+	const dataDev: { path: string; dev: number }[] = [];
 
 	if (
 		torrentDir &&
@@ -98,12 +100,16 @@ async function checkConfigPaths(): Promise<void> {
 			logger.info(`Creating linkDir: ${linkDir}`);
 			await mkdir(linkDir, { recursive: true });
 		}
-		if (!(await verifyPath(linkDir, "linkDir", READ_AND_WRITE))) {
+		if (await verifyPath(linkDir, "linkDir", READ_AND_WRITE)) {
+			linkDev.push({ path: linkDir, dev: (await stat(linkDir)).dev });
+		} else {
 			pathFailure++;
 		}
 	}
 	for (const dataDir of dataDirs) {
-		if (!(await verifyPath(dataDir, "dataDirs", READ_ONLY))) {
+		if (await verifyPath(dataDir, "dataDirs", READ_ONLY)) {
+			dataDev.push({ path: dataDir, dev: (await stat(dataDir)).dev });
+		} else {
 			pathFailure++;
 		}
 	}
@@ -136,6 +142,12 @@ async function checkConfigPaths(): Promise<void> {
 				pathFailure > 1 ? "errors" : "error"
 			} above for details.`,
 		);
+	}
+	if (linkDev.length) {
+		logger.verbose(`Storage device for each linkDir: ${inspect(linkDev)}`);
+	}
+	if (dataDev.length) {
+		logger.verbose(`Storage device for each dataDir: ${inspect(dataDev)}`);
 	}
 }
 
