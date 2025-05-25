@@ -124,46 +124,10 @@ const DirectoriesPathsFields = withForm({
           )}
         </form.AppField>
         <div className="">
-          <form.AppField
-            name="linkType"
-            validators={
-              {
-                // onChange: baseValidationSchema.shape.linkType,
-              }
-            }
-          >
+          <form.AppField name="linkType">
             {(field) => (
               <field.SelectField label="Link Type" options={LinkType} />
             )}
-            {/* <div className="space-y-3"> */}
-            {/*   <Label htmlFor={field.name} className="block w-full"> */}
-            {/*     Link Type */}
-            {/*     {fieldRequired(field.name) && ( */}
-            {/*       <span className="pl-1 text-red-500">*</span> */}
-            {/*     )} */}
-            {/*   </Label> */}
-            {/*   <Select */}
-            {/*     name={field.name} */}
-            {/*     defaultValue={field.state.value} */}
-            {/*     onValueChange={(e) => field.handleChange(e as LinkType)} */}
-            {/*   > */}
-            {/*     <SelectTrigger className="w-full shadow-none"> */}
-            {/*       <SelectValue placeholder="Select a link type" /> */}
-            {/*     </SelectTrigger> */}
-            {/*     <SelectContent> */}
-            {/*       {Object.keys(LinkType).map((key) => ( */}
-            {/*         <SelectItem */}
-            {/*           key={key.toLowerCase()} */}
-            {/*           value={key.toLowerCase()} */}
-            {/*         > */}
-            {/*           {key.toLowerCase()} */}
-            {/*         </SelectItem> */}
-            {/*       ))} */}
-            {/*     </SelectContent> */}
-            {/*   </Select> */}
-            {/*   <FieldInfo fieldMeta={field.state.meta} /> */}
-            {/*   {field.state.value} */}
-            {/* </div> */}
           </form.AppField>
         </div>
         <div className="">

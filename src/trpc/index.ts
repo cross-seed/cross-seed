@@ -10,10 +10,15 @@ import { Label, logger } from "../logger.js";
 import { z } from "zod";
 
 // Create context type for tRPC
+type AuthenticatedUser = {
+	id: number;
+	username: string;
+};
+
 export interface Context {
 	req: CreateFastifyContextOptions["req"];
 	res: CreateFastifyContextOptions["res"];
-	user: { id: number; username: string } | null;
+	user: AuthenticatedUser | null;
 	setSession: (sessionId: string) => void;
 	deleteSession: () => void;
 }
@@ -25,7 +30,7 @@ export async function createContext({
 }: CreateFastifyContextOptions): Promise<Context> {
 	const sessionId = getSessionCookie(req);
 
-	let user: { id: number; username: string } | null = null;
+	let user: AuthenticatedUser | null = null;
 	if (sessionId) {
 		// Validate the session and get user if valid
 		const validatedUser = await validateSession(sessionId);
