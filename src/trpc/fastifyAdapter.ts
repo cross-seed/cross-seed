@@ -6,7 +6,7 @@ import { FastifyInstance } from "fastify";
 import { appRouter } from "./routers/index.js";
 import { createContext } from "./index.js";
 
-export function registerTRPC(app: FastifyInstance) {
+export async function registerTRPC(app: FastifyInstance) {
 	// Register the tRPC plugin with Fastify
 	void app.register(fastifyTRPCPlugin, {
 		prefix: "/api/trpc",
