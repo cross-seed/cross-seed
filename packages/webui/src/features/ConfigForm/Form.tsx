@@ -200,7 +200,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           {(state) => (
             <div
               className="bg-card text-card-foreground w-lg overflow-auto p-4 shadow-lg"
-              // className="fixed right-0 bottom-0 z-50 max-h-96 w-lg overflow-auto bg-white p-4 shadow-lg dark:bg-slate-800 dark:text-white"
               style={{ opacity: 0.9 }}
             >
               <h3 className="mb-2 text-lg font-bold">Form Debug</h3>
