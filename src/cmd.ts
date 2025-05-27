@@ -381,7 +381,11 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 		(n) => parseInt(n),
 		fallback(fileConfig.port, 2468),
 	)
-	.option("--host <host>", "Bind to a specific IP address", fileConfig.host)
+	.option(
+		"--host <host>",
+		"Bind to a specific IP address",
+		fallback(fileConfig.host, "0.0.0.0"),
+	)
 	.option("--no-port", "Do not listen on any port")
 	.option(
 		"--search-cadence <cadence>",
