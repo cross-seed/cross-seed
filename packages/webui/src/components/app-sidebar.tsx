@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Link } from '@tanstack/react-router';
+import Logo from '@/assets/cross-seed.svg';
 import {
   useMutation,
   useSuspenseQuery,
@@ -97,7 +98,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader className="relative flex px-4 pt-3.5 pb-2">
         <div className="flex items-center gap-2">
           <img
-            src="/assets/cross-seed.svg"
+            src={Logo}
             className="mt-1 h-4 w-4"
             role="presentation"
             alt="cross-seed logo"
