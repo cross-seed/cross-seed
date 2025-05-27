@@ -30,9 +30,11 @@ export const logsRouter = router({
 	getRecentLogs: publicProcedure
 		.input(
 			z.object({
-				level: z.enum(["error", "warn", "info", "verbose", "debug"]).default("info"),
+				level: z
+					.enum(["error", "warn", "info", "verbose", "debug"])
+					.default("info"),
 				limit: z.number().min(1).max(1000).default(100),
-			})
+			}),
 		)
 		.query(async ({ input }) => {
 			try {
@@ -72,7 +74,8 @@ export const logsRouter = router({
 					try {
 						const entry = JSON.parse(lines[i]);
 						logEntries.push({
-							timestamp: entry.timestamp || new Date().toISOString(),
+							timestamp:
+								entry.timestamp || new Date().toISOString(),
 							level: entry.level || input.level,
 							label: entry.label || "UNKNOWN",
 							message: entry.message || lines[i],
