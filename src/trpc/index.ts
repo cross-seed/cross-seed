@@ -25,7 +25,7 @@ export async function createContext({
 }: CreateFastifyContextOptions): Promise<Context> {
 	const sessionId = getSessionCookie(req);
 
-	let user = null;
+	let user: { id: number; username: string } | null = null;
 	if (sessionId) {
 		// Validate the session and get user if valid
 		const validatedUser = await validateSession(sessionId);
