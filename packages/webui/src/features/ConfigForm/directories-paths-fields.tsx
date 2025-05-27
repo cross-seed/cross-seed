@@ -94,7 +94,7 @@ const DirectoriesPathsFields = withForm({
                     onClick={() => {
                       field.pushValue('');
                       if (field.state.value?.length) {
-                        setLastFieldAdded(
+                        setLocalLastFieldAdded(
                           `${field.name}-${field.state.value.length - 1}`,
                         );
                       }
