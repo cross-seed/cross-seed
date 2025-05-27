@@ -11,11 +11,11 @@ const COOKIE_OPTIONS = {
 };
 
 export function setSessionCookie(reply: FastifyReply, sessionId: string): void {
-	reply.setCookie(COOKIE_NAME, sessionId, COOKIE_OPTIONS);
+	void reply.setCookie(COOKIE_NAME, sessionId, COOKIE_OPTIONS);
 }
 
 export function clearSessionCookie(reply: FastifyReply): void {
-	reply.clearCookie(COOKIE_NAME, { path: "/" });
+	void reply.clearCookie(COOKIE_NAME, { path: "/" });
 }
 
 export function getSessionCookie(request: FastifyRequest): string | undefined {
