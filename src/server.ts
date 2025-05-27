@@ -135,7 +135,7 @@ async function authorize(
 			label: Label.SERVER,
 			message: `Unauthorized API access attempt to ${request.url} from ${ipAddress}`,
 		});
-		reply
+		void reply
 			.code(401)
 			.send(
 				"Specify the API key in an X-Api-Key header or an apikey query param.",
@@ -231,13 +231,13 @@ const createServer = (): FastifyInstance => {
 	);
 
 	// Register cookie plugin
-	app.register(fastifyCookie);
+	await app.register(fastifyCookie);
 
 	// Register tRPC router
 	registerTRPC(app);
 
 	// Serve static files from the dist/webui directory
-	app.register(fastifyStatic, {
+	await app.register(fastifyStatic, {
 		root: join(dirname(__dirname), "dist", "webui"),
 		prefix: "/",
 		decorateReply: true,
@@ -278,7 +278,7 @@ const createServer = (): FastifyInstance => {
 			return reply.code(400).send(message);
 		}
 
-		reply.code(204).send();
+		void reply.code(204).send();
 
 		const criteriaStr = data.infoHash
 			? inspect(data).replace(
@@ -378,7 +378,7 @@ const createServer = (): FastifyInstance => {
 				Label.ANNOUNCE,
 			);
 			if (!result.decision) {
-				return reply.code(204).send();
+				return await reply.code(204).send();
 			}
 
 			const { status, state } = determineResponse(result);
@@ -388,7 +388,7 @@ const createServer = (): FastifyInstance => {
 					message: `${state} ${candidateLog} (status: ${status})`,
 				});
 			}
-			return reply.code(status).send();
+			return await reply.code(status).send();
 		} catch (e) {
 			logger.error({
 				label: Label.ANNOUNCE,
@@ -493,12 +493,12 @@ const createServer = (): FastifyInstance => {
 		if (request.url.startsWith("/api")) {
 			const message = `Unknown endpoint: ${request.url}`;
 			logger.error({ label: Label.SERVER, message });
-			reply.code(404).send(message);
+			void reply.code(404).send(message);
 			return;
 		}
 
 		// For all other requests, serve the SPA index.html to support client-side routing
-		reply.sendFile("index.html");
+		void reply.sendFile("index.html");
 	});
 
 	// Handle method not allowed
@@ -508,7 +508,7 @@ const createServer = (): FastifyInstance => {
 			logger.error({ label: Label.SERVER, message });
 			return reply.code(405).send(message);
 		}
-		reply.send(error);
+		void reply.send(error);
 	});
 
 	return app;
