@@ -187,7 +187,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Create Fastify app
-const createServer = (): FastifyInstance => {
+const createServer = async (): Promise<FastifyInstance> => {
 	const app = fastify({
 		logger: false, // We'll use our own logger
 	});
@@ -523,9 +523,9 @@ const createServer = (): FastifyInstance => {
  */
 export async function serve(port?: number, host?: string): Promise<void> {
 	if (!port) return;
-	return new Promise((resolve) => {
-		const server = createServer();
+	const server = await createServer();
 
+	return new Promise((resolve) => {
 		server.listen({ port, host }, (err) => {
 			if (err) {
 				logger.error({
