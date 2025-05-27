@@ -1,4 +1,3 @@
-import Logo from '../../../assets/cross-seed.svg';
 import { ModeToggle } from '@/components/ModeToggle/ModeToggle';
 import { useSidebar } from '@/components/ui/sidebar';
 
@@ -10,7 +9,7 @@ const Header = () => {
       {!open && (
         <header className="flex items-center gap-2">
           <img
-            src={Logo}
+            src="/assets/cross-seed.svg"
             className="mt-1 h-6 w-6"
             role="presentation"
             alt="cross-seed logo"
