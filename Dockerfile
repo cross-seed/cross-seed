@@ -5,6 +5,7 @@ COPY packages/webui/package*.json ./
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 RUN npm ci --no-fund
 COPY packages/webui ./
+COPY packages/shared ../shared
 RUN npm run build
 
 # Backend Build Stage  
