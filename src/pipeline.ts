@@ -1,6 +1,9 @@
 import chalk from "chalk";
 import { stat } from "fs/promises";
-import { zip } from "lodash-es";
+// Utility function to replace lodash zip
+function zip<T, U, V>(arr1: T[], arr2: U[], arr3: V[]): [T, U, V][] {
+	return arr1.map((item, index) => [item, arr2[index], arr3[index]]);
+}
 import ms from "ms";
 import { basename } from "path";
 import { performAction, performActions } from "./action.js";
