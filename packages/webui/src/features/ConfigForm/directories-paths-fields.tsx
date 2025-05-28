@@ -31,7 +31,7 @@ const DirectoriesPathsFields = withForm({
     };
 
     return (
-      <fieldset className="form-fieldset w-full gap-6 rounded-md">
+      <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
         <legend>Directories and Paths</legend>
         <div className="">
           <form.Field
