@@ -238,7 +238,7 @@ const createServer = async (): Promise<FastifyInstance> => {
 	await app.register(fastifyCookie);
 
 	// Register tRPC router
-	registerTRPC(app);
+	await registerTRPC(app);
 
 	// Serve static files from the dist/webui directory
 	await app.register(fastifyStatic, {
