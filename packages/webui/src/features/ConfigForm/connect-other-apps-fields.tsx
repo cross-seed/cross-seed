@@ -30,7 +30,7 @@ const ConnectOtherAppsFields = withForm({
     };
 
     return (
-      <fieldset className="form-fieldset w-full gap-6 rounded-md">
+      <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
         <legend>Connecting to Other Apps</legend>
         <div className="">
           <form.Field

@@ -5,7 +5,7 @@ const SearchingRssFields = withForm({
   // ...defaultValues,
   render: ({ form }) => {
     return (
-      <fieldset className="form-fieldset w-full gap-6 rounded-md">
+      <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
         <legend>Searching and RSS</legend>
 
         {/* TODO: Error states or validations don't seem to work for these fields */}
