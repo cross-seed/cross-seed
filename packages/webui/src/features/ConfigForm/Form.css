@@ -1,18 +1,11 @@
 @import 'tailwindcss';
 
-@custom-variant dark (&:is(.dark *));
-
 .form-fieldset {
   display: grid;
   grid-template-areas: 'col1 col2';
   grid-template-columns: repeat(2, 1fr);
   padding: theme('spacing.4');
   margin-block-end: theme('spacing.5');
-  border: theme('borderWidth.DEFAULT') solid theme('colors.slate.200');
-
-  .dark & {
-    border-color: theme('colors.slate.700');
-  }
 
   legend {
     font-size: theme('fontSize.lg');
