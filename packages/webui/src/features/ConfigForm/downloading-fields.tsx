@@ -6,9 +6,9 @@ const DownloadingFields = withForm({
   // ...defaultValues,
   render: ({ form }) => {
     return (
-      <fieldset className="form-fieldset w-full gap-6 rounded-md">
+      <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
         <legend>Downloading</legend>
-        <p className="col-span-2 text-sm text-slate-400">
+        <p className="text-muted-foreground col-span-2 text-sm">
           Choose one client application to use for downloading and add its
           details here.
         </p>
