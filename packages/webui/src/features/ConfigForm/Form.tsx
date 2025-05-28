@@ -17,6 +17,7 @@ import SearchingRssFields from './searching-rss-fields';
 import MiscSettingsFields from './misc-settings-fields';
 import ConnectOtherAppsFields from './connect-other-apps-fields';
 // import useConfigForm from '@/hooks/use-config-form';
+import { useSaveConfigHook } from './hooks/saveFormHook';
 
 type FormProps = {
   className?: string;
@@ -34,42 +35,45 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
     }),
   );
 
+  const {
+    saveConfig,
+    // isLoading: isSaving,
+    // isError: isSaveError,
+  } = useSaveConfigHook();
+
   // const { config: configData, validationSchema: baseValidationSchema } =
   //   useConfigForm();
 
   const form = useAppForm({
     defaultValues: configData ?? defaultConfig,
     onSubmit: async ({ value }) => {
-      console.log('submitting form', value);
       // Full schema validation
       // Fake a long response delay
-      setTimeout(() => {
-        try {
-          console.log('Full validation attempt...');
-          const result = baseValidationSchema.safeParse(value);
-          if (!result.success) {
-            console.error('FULL VALIDATION FAILED:', result.error.format());
-          } else {
-            console.log('Full validation success!', value, Object.keys(value));
-            // remove empty values from array fields
-            Object.keys(value).forEach((attr) => {
-              const val = value[attr as keyof typeof configData];
-              if (val && Array.isArray(val)) {
-                (value[attr as keyof typeof configData] as unknown) =
-                  removeEmptyArrayValues(val);
-              }
-            });
+      // setTimeout(() => {
+      try {
+        const result = baseValidationSchema.safeParse(value);
+        if (!result.success) {
+          console.error('FULL VALIDATION FAILED:', result.error.format());
+        } else {
+          // remove empty values from array fields
+          Object.keys(value).forEach((attr) => {
+            const val = value[attr as keyof typeof configData];
+            if (val && Array.isArray(val)) {
+              (value[attr as keyof typeof configData] as unknown) =
+                removeEmptyArrayValues(val);
+            }
+          });
 
-            console.log('cleaned values', value);
-          }
-        } catch (err) {
-          console.error('Exception during full validation:', err);
-          return {
-            status: 'error',
-            error: { _form: 'An unexpected error occurred during validation' },
-          };
+          saveConfig(value);
         }
-      }, 2000);
+      } catch (err) {
+        console.error('Exception during full validation:', err);
+        return {
+          status: 'error',
+          error: { _form: 'An unexpected error occurred during validation' },
+        };
+      }
+      // }, 2000);
     },
     validators: {
       onSubmit: baseValidationSchema,

@@ -3,6 +3,11 @@ import { Label, logger } from "../../logger.js";
 import { getRuntimeConfig } from "../../runtimeConfig.js";
 import { getApiKey } from "../../auth.js";
 import { z } from "zod";
+import {
+	getFileConfig,
+	mergeConfig,
+	writeConfig,
+} from "../../configuration.js";
 
 export const configRouter = router({
 	get: publicProcedure.query(async () => {
@@ -25,14 +30,19 @@ export const configRouter = router({
 	// We'll need to implement the save functionality
 	save: publicProcedure
 		.input(z.object({}).passthrough())
-		.mutation(async () => {
+		.mutation(async ({ input }) => {
 			try {
-				// This is a placeholder for now
-				// We need to implement proper config saving functionality
 				logger.info({
 					label: Label.SERVER,
-					message: "Config save requested",
+					message: `Saving config updates...`,
 				});
+
+				// Load the config file
+				const currentConfig = await getFileConfig();
+				// Merge the current config with the new input
+				const mergedConfig = mergeConfig(currentConfig, input);
+				// Write the merged config back to the file
+				await writeConfig(mergedConfig);
 
 				// Return success for now
 				return { success: true };
