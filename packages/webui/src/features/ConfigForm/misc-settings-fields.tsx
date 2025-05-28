@@ -31,7 +31,7 @@ const MiscSettingsFields = withForm({
     };
 
     return (
-      <fieldset className="form-fieldset w-full gap-6 rounded-md">
+      <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
         <legend>Misc. Settings</legend>
         <form.AppField name="includeNonVideos">
           {(field) => <field.SwitchField label="Include Non-Videos" />}

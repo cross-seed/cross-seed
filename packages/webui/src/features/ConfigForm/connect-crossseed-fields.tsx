@@ -7,7 +7,7 @@ const ConnectCrossSeedFields = withForm({
   ...defaultValues,
   render: ({ form }) => {
     return (
-      <fieldset className="form-fieldset w-full gap-6 rounded-md">
+      <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
         <legend>Connect to Cross Seed</legend>
         <div>
           <form.AppField
