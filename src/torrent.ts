@@ -650,11 +650,7 @@ export async function indexTorrentsAndDataDirs(
 export async function getInfoHashesToExclude(): Promise<Set<string>> {
 	const { useClientTorrents } = getRuntimeConfig();
 	const database = useClientTorrents ? db("client_searchee") : db("torrent");
-	return new Set(
-		(await database.select({ infoHash: "info_hash" })).map(
-			(e) => e.infoHash,
-		),
-	);
+	return new Set((await database.select("*")).map((e) => e.info_hash));
 }
 
 export async function loadTorrentDirLight(
