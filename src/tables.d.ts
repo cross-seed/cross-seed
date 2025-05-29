@@ -16,16 +16,20 @@ declare module "knex/types/tables.js" {
 		id: number;
 		url: string;
 		apikey: string;
-		active?: boolean;
-		status?: string | null;
-		retry_after?: number | null;
-		search_cap?: boolean | null;
-		movie_search_cap?: boolean | null;
-		tv_search_cap?: boolean | null;
-		cat_caps?: string | null;
-		limits_caps?: string | null;
-		movie_id_caps?: string | null;
-		tv_id_caps?: string | null;
+		name: string | null;
+		active: boolean;
+		status: string | null;
+		retry_after: number | null;
+		search_cap: boolean | null;
+		tv_search_cap: boolean | null;
+		movie_search_cap: boolean | null;
+		music_search_cap: boolean | null;
+		audio_search_cap: boolean | null;
+		book_search_cap: boolean | null;
+		tv_id_caps: string | null;
+		movie_id_caps: string | null;
+		cat_caps: string | null;
+		limits_caps: string | null;
 	}
 
 	interface JobLog {
@@ -47,6 +51,7 @@ declare module "knex/types/tables.js" {
 	}
 
 	interface Settings {
+		id: number;
 		settings_json: string;
 	}
 
@@ -77,7 +82,7 @@ declare module "knex/types/tables.js" {
 			Searchee,
 			Omit<Searchee, "id" | "first_searched" | "last_searched">
 		>;
-		settings: Settings;
+		settings: Knex.CompositeTableType<Settings, Omit<Settings, "id">>;
 		timestamp: Knex.CompositeTableType<
 			Timestamp,
 			Timestamp,
