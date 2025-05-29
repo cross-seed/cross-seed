@@ -616,17 +616,17 @@ async function assessAndSaveResults(
 		options,
 	);
 
-	if (assessment.metaCached) {
+	if (assessment.metaCached && assessment.metafile) {
 		await withMutex(
 			Mutex.GUID_INFO_HASH_MAP,
 			{ useQueue: true },
 			async () => {
 				guidInfoHashMap.set(guid, assessment.metafile!.infoHash);
 				await db.transaction(async (trx) => {
-					const { id } = await trx("searchee")
+					const { id } = (await trx("searchee")
 						.select("id")
 						.where({ name: searchee.title })
-						.first();
+						.first())!;
 					await trx("decision")
 						.insert({
 							searchee_id: id,
@@ -721,7 +721,7 @@ export async function assessCandidateCaching(
 	}
 
 	let assessment: ResultAssessment;
-	if (infoHashesToExclude.has(cacheEntry?.infoHash)) {
+	if (cacheEntry && infoHashesToExclude.has(cacheEntry.infoHash)) {
 		// Already injected fast path, preserve match decision
 		assessment = { decision: Decision.INFO_HASH_ALREADY_EXISTS };
 		await db("decision")
