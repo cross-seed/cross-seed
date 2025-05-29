@@ -11,6 +11,7 @@ import clientAndDataSearchees from "./09-clientAndDataSearchees.js";
 import indexerNameAudioBookCaps from "./10-indexerNameAudioBookCaps.js";
 import trackers from "./11-trackers.js";
 import userAuth from "./12-user-auth.js";
+import settings from "./13-settings.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -28,6 +29,7 @@ export const migrations = {
 			indexerNameAudioBookCaps,
 			trackers,
 			userAuth,
+			settings,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,
