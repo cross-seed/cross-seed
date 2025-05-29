@@ -490,7 +490,7 @@ export async function* rssPager(
 		}
 	}
 	await db("rss")
-		.insert({ indexer_id: indexer.id, last_seen_guid: newLastSeenGuid })
+		.insert({ indexer_id: indexer.id, last_seen_guid: newLastSeenGuid! })
 		.onConflict("indexer_id")
 		.merge(["last_seen_guid"]);
 	if (i >= maxPage) {
@@ -609,8 +609,21 @@ export async function syncWithDb() {
 			.insert(
 				inConfigButNotInDb.map((url) => ({
 					url: sanitizeUrl(url),
-					apikey: getApikey(url),
+					apikey: getApikey(url)!,
 					active: true,
+					name: null,
+					status: null,
+					retry_after: null,
+					search_cap: null,
+					tv_search_cap: null,
+					movie_search_cap: null,
+					music_search_cap: null,
+					audio_search_cap: null,
+					book_search_cap: null,
+					tv_id_caps: null,
+					movie_id_caps: null,
+					cat_caps: null,
+					limits_caps: null,
 				})),
 			)
 			.onConflict("url")
@@ -793,7 +806,7 @@ export async function validateTorznabUrls() {
 
 	const indexersWithoutSearch = await db("indexer")
 		.where({ search_cap: false, active: true })
-		.select({ id: "id", url: "url" });
+		.select({ id: "id", url: "url", name: "name" });
 
 	for (const indexer of indexersWithoutSearch) {
 		logger.warn(
@@ -874,7 +887,9 @@ async function makeRequest(
 	if (candidates.length && candidates[0].tracker !== UNKNOWN_TRACKER) {
 		await db("indexer")
 			.where({ id: request.indexerId })
-			.update({ name: candidates[0].tracker });
+			.update({ name: candidates[0].tracker } as Partial<
+				Omit<Indexer, "id">
+			>);
 	}
 	return candidates;
 }

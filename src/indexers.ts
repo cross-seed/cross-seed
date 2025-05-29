@@ -238,10 +238,10 @@ export async function updateSearchTimestamps(
 	for (const indexerId of indexerIds) {
 		await db.transaction(async (trx) => {
 			const now = Date.now();
-			const { id: searchee_id } = await trx("searchee")
+			const { id: searchee_id } = (await trx("searchee")
 				.where({ name })
 				.select("id")
-				.first();
+				.first())!;
 
 			await trx("timestamp")
 				.insert({
@@ -251,7 +251,7 @@ export async function updateSearchTimestamps(
 					first_searched: now,
 				})
 				.onConflict(["searchee_id", "indexer_id"])
-				.merge(["searchee_id", "indexer_id", "last_searched"]);
+				.merge(["last_searched"] as const);
 		});
 	}
 }
