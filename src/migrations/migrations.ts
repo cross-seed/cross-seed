@@ -10,6 +10,7 @@ import rss from "./08-rss.js";
 import clientAndDataSearchees from "./09-clientAndDataSearchees.js";
 import indexerNameAudioBookCaps from "./10-indexerNameAudioBookCaps.js";
 import userAuth from "./11-user-auth.js";
+import settings from "./12-settings.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -26,6 +27,7 @@ export const migrations = {
 			clientAndDataSearchees,
 			indexerNameAudioBookCaps,
 			userAuth,
+			settings,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,
