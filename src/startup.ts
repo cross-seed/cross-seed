@@ -260,24 +260,46 @@ export function withFullRuntime(
 
 		let runtimeConfig: RuntimeConfig;
 		if (isDbConfigEnabled()) {
+			logger.info(
+				"DB_CONFIG=true detected, attempting to load config from database",
+			);
 			try {
 				// Load config from database
 				runtimeConfig = await getDbConfig();
-			} catch {
+				logger.info("Successfully loaded config from database");
+			} catch (dbError) {
+				logger.info(
+					`Failed to load config from database: ${dbError.message}`,
+				);
+				logger.info(
+					"Attempting migration from file config or template",
+				);
+
 				// No complete config in database, migrate from file or template
 				try {
 					// Try to load and migrate from file config
+					logger.info("Attempting to load file config for migration");
 					const fileConfig = await getFileConfig();
+					logger.info(
+						"File config loaded successfully, migrating to database",
+					);
 					runtimeConfig = parseRuntimeConfigAndLogErrors({
 						...fileConfig,
 						...(options as Record<string, unknown>),
 					});
 					await setDbConfig(runtimeConfig);
-					logger.info("Migrated file config to database");
-				} catch {
+					logger.info(
+						"Successfully migrated file config to database",
+					);
+				} catch (fileError) {
+					logger.info(
+						`Failed to load file config: ${fileError.message}`,
+					);
+					logger.info("Using template config as fallback");
+
 					// No file config - use template directly
 					const templateConfig =
-						require("../config.template.cjs").default;
+						require("../../config.template.cjs").default;
 					const configToMerge =
 						templateConfig && typeof templateConfig === "object"
 							? templateConfig
@@ -288,7 +310,7 @@ export function withFullRuntime(
 					});
 					await setDbConfig(runtimeConfig);
 					logger.info(
-						"Created initial database config from template",
+						"Successfully created initial database config from template",
 					);
 				}
 			}
