@@ -8,9 +8,11 @@ import {
 	instantiateDownloadClients,
 } from "./clients/TorrentClient.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
+import { getFileConfig } from "./configuration.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
-import { getDbConfig, isDbConfigEnabled } from "./dbConfig.js";
+import { getDbConfig, isDbConfigEnabled, setDbConfig } from "./dbConfig.js";
+import { createRequire } from "module";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { initializePushNotifier } from "./pushNotifier.js";
@@ -21,6 +23,8 @@ import {
 } from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
 import { Awaitable, mapAsync, notExists, verifyDir, wait } from "./utils.js";
+
+const require = createRequire(import.meta.url);
 
 export async function exitGracefully() {
 	await db.destroy();
@@ -256,8 +260,38 @@ export function withFullRuntime(
 
 		let runtimeConfig: RuntimeConfig;
 		if (isDbConfigEnabled()) {
-			// Load config from database, ignoring CLI options except for logging
-			runtimeConfig = await getDbConfig();
+			try {
+				// Load config from database
+				runtimeConfig = await getDbConfig();
+			} catch {
+				// No complete config in database, migrate from file or template
+				try {
+					// Try to load and migrate from file config
+					const fileConfig = await getFileConfig();
+					runtimeConfig = parseRuntimeConfigAndLogErrors({
+						...fileConfig,
+						...(options as Record<string, unknown>),
+					});
+					await setDbConfig(runtimeConfig);
+					logger.info("Migrated file config to database");
+				} catch {
+					// No file config - use template directly
+					const templateConfig =
+						require("../config.template.cjs").default;
+					const configToMerge =
+						templateConfig && typeof templateConfig === "object"
+							? templateConfig
+							: {};
+					runtimeConfig = parseRuntimeConfigAndLogErrors({
+						...configToMerge,
+						...(options as Record<string, unknown>),
+					});
+					await setDbConfig(runtimeConfig);
+					logger.info(
+						"Created initial database config from template",
+					);
+				}
+			}
 		} else {
 			// Load config from file + CLI options
 			runtimeConfig = parseRuntimeConfigAndLogErrors(options);
