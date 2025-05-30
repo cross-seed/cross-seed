@@ -27,6 +27,8 @@ import { Awaitable, notExists } from "./utils.js";
 import { getLogWatcher } from "./utils/logWatcher.js";
 import { omitUndefined } from "./utils/object.js";
 
+const require = createRequire(import.meta.url);
+
 export async function exitGracefully() {
 	await db.destroy();
 	process.exit();
