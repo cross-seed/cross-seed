@@ -11,6 +11,7 @@ import {
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
+import { getDbConfig, isDbConfigEnabled } from "./dbConfig.js";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { initializePushNotifier } from "./pushNotifier.js";
@@ -290,7 +291,16 @@ export function withFullRuntime(
 ): CommanderActionCb {
 	return withMinimalRuntime(async (options) => {
 		initializeLogger(options as Record<string, unknown>);
-		const runtimeConfig = parseRuntimeConfigAndLogErrors(options);
+
+		let runtimeConfig: RuntimeConfig;
+		if (isDbConfigEnabled()) {
+			// Load config from database, ignoring CLI options except for logging
+			runtimeConfig = await getDbConfig();
+		} else {
+			// Load config from file + CLI options
+			runtimeConfig = parseRuntimeConfigAndLogErrors(options);
+		}
+
 		setRuntimeConfig(runtimeConfig);
 		initializePushNotifier();
 		await doStartupValidation();
