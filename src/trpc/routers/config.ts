@@ -8,6 +8,7 @@ import {
 	mergeConfig,
 	writeConfig,
 } from "../../configuration.js";
+import { isDbConfigEnabled, updateDbConfig } from "../../dbConfig.js";
 
 export const configRouter = router({
 	get: publicProcedure.query(async () => {
@@ -17,6 +18,7 @@ export const configRouter = router({
 			return {
 				config: runtimeConfig,
 				apikey,
+				isDbConfig: isDbConfigEnabled(),
 			};
 		} catch (error) {
 			logger.error({
@@ -37,14 +39,16 @@ export const configRouter = router({
 					message: `Saving config updates...`,
 				});
 
-				// Load the config file
-				const currentConfig = await getFileConfig();
-				// Merge the current config with the new input
-				const mergedConfig = mergeConfig(currentConfig, input);
-				// Write the merged config back to the file
-				await writeConfig(mergedConfig);
+				if (isDbConfigEnabled()) {
+					// Save to database
+					await updateDbConfig(input);
+				} else {
+					// Save to file
+					const currentConfig = await getFileConfig();
+					const mergedConfig = mergeConfig(currentConfig, input);
+					await writeConfig(mergedConfig);
+				}
 
-				// Return success for now
 				return { success: true };
 			} catch (error) {
 				logger.error({
