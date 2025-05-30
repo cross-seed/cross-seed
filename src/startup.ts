@@ -276,14 +276,10 @@ export function withFullRuntime(
 					logger.info("Migrated file config to database");
 				} catch {
 					// No file config - use template directly
-					const templateConfig =
-						require("./config.template.cjs").default;
-					const configToMerge =
-						templateConfig && typeof templateConfig === "object"
-							? templateConfig
-							: {};
+					const templateConfig = require("./config.template.cjs")
+						.default as Record<string, unknown>;
 					runtimeConfig = parseRuntimeConfigAndLogErrors({
-						...configToMerge,
+						...templateConfig,
 						...(options as Record<string, unknown>),
 					});
 					await setDbConfig(runtimeConfig);
