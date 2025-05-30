@@ -24,6 +24,7 @@ export async function setDbConfig(config: RuntimeConfig): Promise<void> {
 			});
 		} else {
 			await trx("settings").insert({
+				apikey: null,
 				settings_json: JSON.stringify(config),
 			});
 		}
@@ -36,13 +37,16 @@ export async function updateDbConfig(
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
-			const currentConfig = JSON.parse(existingRow.settings_json);
+			const currentConfig = existingRow.settings_json
+				? JSON.parse(existingRow.settings_json)
+				: {};
 			const updatedConfig = { ...currentConfig, ...partialConfig };
 			await trx("settings").update({
 				settings_json: JSON.stringify(updatedConfig),
 			});
 		} else {
 			await trx("settings").insert({
+				apikey: null,
 				settings_json: JSON.stringify(partialConfig),
 			});
 		}
