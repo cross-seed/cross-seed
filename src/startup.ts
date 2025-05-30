@@ -310,6 +310,15 @@ export function withFullRuntime(
 						...fileConfig,
 						...(options as Record<string, unknown>),
 					});
+
+					// Preserve existing API key from apikey column
+					const existingApiKey = await db("settings")
+						.select("apikey")
+						.first();
+					if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
+						runtimeConfig.apiKey = existingApiKey.apikey;
+					}
+
 					await setDbConfig(runtimeConfig);
 					logger.info("Migrated file config to database");
 				} catch {
@@ -320,6 +329,15 @@ export function withFullRuntime(
 						...templateConfig,
 						...(options as Record<string, unknown>),
 					});
+
+					// Preserve existing API key from apikey column
+					const existingApiKey = await db("settings")
+						.select("apikey")
+						.first();
+					if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
+						runtimeConfig.apiKey = existingApiKey.apikey;
+					}
+
 					await setDbConfig(runtimeConfig);
 					logger.info(
 						"Created initial database config from template",
