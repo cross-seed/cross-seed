@@ -10,6 +10,9 @@
 		"copy:webui": "rimraf dist/webui && cp -r packages/webui/dist dist/webui",
 		"build:all": "npm run build:webui && npm run build && npm run copy:webui",
 		"watch": "tsc --watch",
+		"dev": "concurrently --names \"TS,BE,FE\" --prefix-colors \"blue,green,magenta\" \"npm run watch\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+		"dev:backend": "node --watch dist/cmd.js daemon",
+		"dev:frontend": "cd packages/webui && npm run dev",
 		"prepublishOnly": "rimraf dist && npm run build:all && husky install",
 		"lint": "prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' && eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'",
 		"typecheck": "tsc --noEmit"
@@ -69,6 +72,7 @@
 		"@typescript-eslint/eslint-plugin": "^6.16.0",
 		"@typescript-eslint/parser": "^6.16.0",
 		"@vitest/coverage-v8": "^3.1.1",
+		"concurrently": "^9.1.2",
 		"eslint": "^8.56.0",
 		"husky": "^7.0.0",
 		"lint-staged": "^12.1.4",
