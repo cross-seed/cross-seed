@@ -52,7 +52,8 @@ declare module "knex/types/tables.js" {
 
 	interface Settings {
 		id: number;
-		settings_json: string;
+		apikey: string | null;
+		settings_json: string | null;
 	}
 
 	interface Timestamp {
