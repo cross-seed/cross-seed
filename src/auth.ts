@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { getDbConfig, updateDbConfig } from "./dbConfig.js";
+import { updateDbConfig } from "./dbConfig.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { db } from "./db.js";
 
@@ -17,15 +17,9 @@ export async function getApiKey(): Promise<string> {
 	const { apiKey: runtimeConfigApiKey } = getRuntimeConfig();
 	if (runtimeConfigApiKey) return runtimeConfigApiKey;
 
-	// Try new JSON config first
-	try {
-		const { apiKey } = await getDbConfig();
-		if (apiKey) return apiKey;
-	} catch {
-		// Fall back to old apikey column
-		const row = await db("settings").select("apikey").first();
-		if (row?.apikey) return row.apikey;
-	}
+	// Fall back to old apikey column (when DB_CONFIG!=true)
+	const row = await db("settings").select("apikey").first();
+	if (row?.apikey) return row.apikey;
 
 	// No API key found anywhere, generate one
 	return resetApiKey();
