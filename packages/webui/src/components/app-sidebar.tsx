@@ -103,6 +103,11 @@ const navItems = [
         icon: <FileText className="size-4" />,
         url: '/logs',
       },
+      {
+        title: 'Logs',
+        icon: <FileText className="size-4" />,
+        url: '/logs',
+      },
     ],
   },
 ];

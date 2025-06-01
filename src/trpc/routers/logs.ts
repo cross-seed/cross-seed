@@ -3,6 +3,13 @@ import { authedProcedure, router } from "../index.js";
 import { Label, logger } from "../../logger.js";
 import { getLogWatcher, type LogEntry } from "../../utils/logWatcher.js";
 
+function shouldIncludeLevel(logLevel: string, filterLevel: string): boolean {
+	const levels = ["error", "warn", "info", "verbose", "debug"];
+	const logIndex = levels.indexOf(logLevel);
+	const filterIndex = levels.indexOf(filterLevel);
+	return logIndex <= filterIndex;
+}
+
 export const logsRouter = router({
 	getVerbose: authedProcedure.query(async () => {
 		try {
