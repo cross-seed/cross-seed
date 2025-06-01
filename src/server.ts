@@ -23,6 +23,7 @@ import {
 } from "./constants.js";
 import { checkJobs, getJobLastRun, getJobs, JobName } from "./jobs.js";
 import { Label, logger } from "./logger.js";
+import { getLogWatcher } from "./utils/logWatcher.js";
 import {
 	Candidate,
 	checkNewCandidateMatch,
@@ -191,6 +192,9 @@ const createServer = async (): Promise<FastifyInstance> => {
 	const app = fastify({
 		logger: false, // We'll use our own logger
 	});
+
+	// Initialize log watcher
+	getLogWatcher();
 
 	// Add query string parsing support
 	app.addContentTypeParser(
