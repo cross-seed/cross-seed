@@ -13,6 +13,7 @@ import {
   Search,
   Database,
   RefreshCw,
+  FileText,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,11 @@ const navItems = [
         title: 'Settings',
         icon: <Settings className="size-4" />,
         url: '/config',
+      },
+      {
+        title: 'Logs',
+        icon: <FileText className="size-4" />,
+        url: '/logs',
       },
     ],
   },
