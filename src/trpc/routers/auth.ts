@@ -1,7 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import {
-	publicProcedure,
-	protectedProcedure,
+	unauthedProcedure,
 	router,
 	loginInputSchema,
 	setupInputSchema,
@@ -16,7 +15,7 @@ import { Label, logger } from "../../logger.js";
 
 export const authRouter = router({
 	// Check auth status - similar to rtgc's authStatus
-	authStatus: publicProcedure.query(async ({ ctx }) => {
+	authStatus: unauthedProcedure.query(async ({ ctx }) => {
 		const hasExistingUsers = await hasUsers();
 		return {
 			userExists: hasExistingUsers,
@@ -26,7 +25,7 @@ export const authRouter = router({
 	}),
 
 	// Setup initial admin user
-	setup: publicProcedure
+	setup: unauthedProcedure
 		.input(setupInputSchema)
 		.mutation(async ({ input, ctx }) => {
 			const { username, password } = input;
@@ -63,7 +62,7 @@ export const authRouter = router({
 		}),
 
 	// Login with username and password
-	logIn: publicProcedure
+	logIn: unauthedProcedure
 		.input(loginInputSchema)
 		.mutation(async ({ input, ctx }) => {
 			const { username, password } = input;
@@ -112,20 +111,12 @@ export const authRouter = router({
 			});
 		}),
 
-	// Logout current user
-	logOut: publicProcedure.mutation(async ({ ctx }) => {
+	logOut: unauthedProcedure.mutation(async ({ ctx }) => {
 		ctx.deleteSession();
 
 		logger.info({
 			label: Label.AUTH,
 			message: `User logged out`,
 		});
-	}),
-
-	// Protected route example - only accessible when logged in
-	getProtectedData: protectedProcedure.query(({ ctx }) => {
-		return {
-			message: `Hello, ${ctx.user.username}! This is protected data.`,
-		};
 	}),
 });
