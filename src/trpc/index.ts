@@ -56,10 +56,10 @@ const t = initTRPC.context<Context>().create();
 
 // Base router and procedure helpers
 export const router = t.router;
-export const publicProcedure = t.procedure;
+export const unauthedProcedure = t.procedure;
 
 // Procedure that requires authentication
-export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
+export const authedProcedure = t.procedure.use(async ({ ctx, next }) => {
 	if (!ctx.user) {
 		logger.warn({
 			label: Label.AUTH,

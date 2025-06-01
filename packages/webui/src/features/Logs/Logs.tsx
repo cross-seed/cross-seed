@@ -1,9 +1,13 @@
-import { useState } from "react";
-import { useTRPC } from "@/lib/trpc";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef } from 'react';
+import { useTRPC } from '@/lib/trpc';
+import { useSubscription } from '@trpc/tanstack-react-query';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface LogEntry {
   timestamp: string;
@@ -13,93 +17,161 @@ interface LogEntry {
 }
 
 export function Logs() {
-  const [logLevel, setLogLevel] = useState<"error" | "warn" | "info" | "verbose" | "debug">("info");
-  const [limit, setLimit] = useState<number>(100);
+  const [logLevel, setLogLevel] = useState<
+    'error' | 'warn' | 'info' | 'verbose' | 'debug'
+  >('info');
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [autoScroll, setAutoScroll] = useState(true);
   const trpc = useTRPC();
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  const { data: logs, refetch, isLoading } = useSuspenseQuery(
-    trpc.logs.getRecentLogs.queryOptions({
-      input: { level: logLevel, limit }
-    })
+  // Real-time log subscription - always active
+  const subscription = useSubscription(
+    trpc.logs.subscribe.subscriptionOptions(
+      { level: logLevel },
+      {
+        enabled: true,
+        onData: (newLog) => {
+          setLogs((prev) => {
+            const updated = [...prev, newLog];
+            // Keep only last 500 logs to prevent memory issues
+            return updated.slice(-500);
+          });
+        },
+        onError: (err) => {
+          console.error('Log subscription error:', err);
+        },
+      },
+    ),
   );
 
+  // Auto-scroll to bottom when new logs arrive
+  useEffect(() => {
+    if (autoScroll && tableContainerRef.current) {
+      // Find the ScrollArea's viewport
+      const viewport = tableContainerRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
+    }
+  }, [logs, autoScroll]);
+
+  // Reset logs when log level changes
+  useEffect(() => {
+    setLogs([]);
+  }, [logLevel]);
+
   return (
-    <div className="container mx-auto py-8">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Logs</CardTitle>
-          <div className="flex items-center gap-4">
-            <select
-              className="form-select rounded-md border border-gray-300 px-3 py-1 text-sm"
-              value={logLevel}
-              onChange={(e) => setLogLevel(e.target.value)}
-            >
-              <option value="info">Info</option>
-              <option value="warn">Warning</option>
-              <option value="error">Error</option>
-              <option value="debug">Debug</option>
-              <option value="verbose">Verbose</option>
-            </select>
-            <select
-              className="form-select rounded-md border border-gray-300 px-3 py-1 text-sm"
-              value={limit.toString()}
-              onChange={(e) => setLimit(Number(e.target.value))}
-            >
-              <option value="50">50 entries</option>
-              <option value="100">100 entries</option>
-              <option value="200">200 entries</option>
-              <option value="500">500 entries</option>
-            </select>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => refetch()} 
-              disabled={isLoading}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight">Logs</h1>
+          <Badge variant="outline" className="flex items-center gap-1.5">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
+            Live
+          </Badge>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="log-level" className="text-sm font-medium">
+              Level
+            </Label>
+            <Select value={logLevel} onValueChange={(value) => setLogLevel(value as any)}>
+              <SelectTrigger id="log-level" className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="error">Error</SelectItem>
+                <SelectItem value="warn">Warning</SelectItem>
+                <SelectItem value="info">Info</SelectItem>
+                <SelectItem value="verbose">Verbose</SelectItem>
+                <SelectItem value="debug">Debug</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-10">Loading logs...</div>
-          ) : logs && logs.length > 0 ? (
-            <div className="overflow-auto max-h-[600px] border rounded-md">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left font-medium text-gray-500">Time</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-500">Level</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-500">Label</th>
-                    <th className="px-6 py-3 text-left font-medium text-gray-500">Message</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="auto-scroll"
+              checked={autoScroll}
+              onCheckedChange={setAutoScroll}
+            />
+            <Label htmlFor="auto-scroll" className="text-sm font-medium">
+              Auto-scroll
+            </Label>
+          </div>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {logs.length > 0 ? (
+            <ScrollArea className="h-[600px]" ref={tableContainerRef}>
+              <Table>
+                <TableHeader className="sticky top-0 bg-background">
+                  <TableRow>
+                    <TableHead className="w-48">Time</TableHead>
+                    <TableHead className="w-24">Level</TableHead>
+                    <TableHead className="w-32">Label</TableHead>
+                    <TableHead>Message</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {logs.map((log, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-2 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
-                      <td className="px-6 py-2 whitespace-nowrap">
-                        <span className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
-                          log.level === 'error' ? 'bg-red-100 text-red-800' :
-                          log.level === 'warn' ? 'bg-yellow-100 text-yellow-800' :
-                          log.level === 'info' ? 'bg-blue-100 text-blue-800' :
-                          log.level === 'debug' ? 'bg-purple-100 text-purple-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
+                    <TableRow
+                      key={`${log.timestamp}-${index}`}
+                      className="hover:bg-muted/50"
+                    >
+                      <TableCell className="font-mono text-xs">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            log.level === 'error'
+                              ? 'destructive'
+                              : log.level === 'warn'
+                              ? 'secondary'
+                              : log.level === 'info'
+                              ? 'default'
+                              : log.level === 'debug'
+                              ? 'outline'
+                              : 'secondary'
+                          }
+                          className={
+                            log.level === 'warn'
+                              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+                              : log.level === 'verbose'
+                              ? 'bg-purple-100 text-purple-800 hover:bg-purple-100'
+                              : ''
+                          }
+                        >
                           {log.level}
-                        </span>
-                      </td>
-                      <td className="px-6 py-2 whitespace-nowrap">{log.label}</td>
-                      <td className="px-6 py-2 font-mono text-sm break-all">{log.message}</td>
-                    </tr>
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {log.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm max-w-0">
+                        <div className="truncate" title={log.message}>
+                          {log.message}
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+              </Table>
+            </ScrollArea>
           ) : (
-            <div className="text-center py-10 text-gray-500">
-              No logs available. Adjust filters or refresh to see logs.
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
+                <span className="text-sm font-medium">Waiting for logs...</span>
+              </div>
+              <p className="text-xs">
+                Filtering by <Badge variant="outline">{logLevel}</Badge> level
+              </p>
             </div>
           )}
         </CardContent>
