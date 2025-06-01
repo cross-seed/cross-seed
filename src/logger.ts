@@ -4,6 +4,7 @@ import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import { parseClientEntry } from "./clients/TorrentClient.js";
 import { appDir, createAppDirHierarchy } from "./configuration.js";
+import { StreamTransport } from "./transports/StreamTransport.js";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -31,6 +32,7 @@ export enum Label {
 }
 
 export let logger: winston.Logger;
+export let streamTransport: StreamTransport;
 
 const REDACTED_MSG = "[REDACTED]";
 const ERROR_PREFIX_REGEX = /^\s*error:\s*/i;
@@ -117,6 +119,9 @@ export function logOnce(cacheKey: string, cb: () => void, ttl?: number) {
 
 export function initializeLogger(options: Record<string, unknown>): void {
 	createAppDirHierarchy();
+
+	streamTransport = new StreamTransport({ level: "silly" });
+
 	logger = winston.createLogger({
 		level: "info",
 		format: winston.format.combine(
@@ -191,6 +196,7 @@ export function initializeLogger(options: Record<string, unknown>): void {
 					),
 				),
 			}),
+			streamTransport,
 		],
 	});
 }
