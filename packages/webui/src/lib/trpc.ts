@@ -1,4 +1,9 @@
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
+import {
+  createTRPCClient,
+  httpBatchLink,
+  splitLink,
+  httpSubscriptionLink,
+} from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import type { AppRouter } from '../../../../src/trpc/routers';
 
@@ -18,14 +23,20 @@ export function getBaseUrl() {
   return '';
 }
 
-// Create the tRPC context for React hooks
-export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
-
 // Create a tRPC client (for usage outside of React)
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [
-    httpBatchLink({
-      url: `${getBaseUrl()}/api/trpc`,
+    splitLink({
+      condition: (op) => op.type === 'subscription',
+      true: httpSubscriptionLink({
+        url: `${getBaseUrl()}/api/trpc`,
+      }),
+      false: httpBatchLink({
+        url: `${getBaseUrl()}/api/trpc`,
+      }),
     }),
   ],
 });
+
+// Create the tRPC context for React hooks
+export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();

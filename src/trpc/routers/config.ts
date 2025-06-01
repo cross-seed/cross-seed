@@ -1,4 +1,4 @@
-import { publicProcedure, router } from "../index.js";
+import { authedProcedure, router } from "../index.js";
 import { Label, logger } from "../../logger.js";
 import { getRuntimeConfig } from "../../runtimeConfig.js";
 import { getApiKey } from "../../auth.js";
@@ -11,7 +11,7 @@ import {
 import { isDbConfigEnabled, updateDbConfig } from "../../dbConfig.js";
 
 export const configRouter = router({
-	get: publicProcedure.query(async () => {
+	get: authedProcedure.query(async () => {
 		try {
 			const runtimeConfig = getRuntimeConfig();
 			const apikey = await getApiKey();
@@ -30,7 +30,7 @@ export const configRouter = router({
 	}),
 
 	// We'll need to implement the save functionality
-	save: publicProcedure
+	save: authedProcedure
 		.input(z.object({}).passthrough())
 		.mutation(async ({ input }) => {
 			try {
@@ -59,7 +59,7 @@ export const configRouter = router({
 			}
 		}),
 
-	validate: publicProcedure.query(async () => {
+	validate: authedProcedure.query(async () => {
 		try {
 			// This is a placeholder for config validation
 			// We need to implement proper validation logic

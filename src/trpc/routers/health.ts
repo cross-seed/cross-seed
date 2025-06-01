@@ -1,8 +1,8 @@
-import { publicProcedure, router } from "../index.js";
+import { authedProcedure, router } from "../index.js";
 import { Label, logger } from "../../logger.js";
 
 export const healthRouter = router({
-	check: publicProcedure.query(async () => {
+	check: authedProcedure.query(async () => {
 		try {
 			// Return basic health status
 			return {
