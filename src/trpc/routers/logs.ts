@@ -1,8 +1,9 @@
 import { promises as fs } from "fs";
 import { join } from "path";
 import { z } from "zod";
-import { publicProcedure, router } from "../index.js";
-import { Label, logger } from "../../logger.js";
+import { authedProcedure, router } from "../index.js";
+import { Label, logger, streamTransport } from "../../logger.js";
+import type { LogStreamEvent } from "../../transports/StreamTransport.js";
 
 export interface LogEntry {
 	timestamp: string;
@@ -11,8 +12,15 @@ export interface LogEntry {
 	message: string;
 }
 
+function shouldIncludeLevel(logLevel: string, filterLevel: string): boolean {
+	const levels = ["error", "warn", "info", "verbose", "debug"];
+	const logIndex = levels.indexOf(logLevel);
+	const filterIndex = levels.indexOf(filterLevel);
+	return logIndex <= filterIndex;
+}
+
 export const logsRouter = router({
-	getVerbose: publicProcedure.query(async () => {
+	getVerbose: authedProcedure.query(async () => {
 		try {
 			// Get the logs directory from the current working directory
 			const logPath = join(process.cwd(), "logs/verbose.current.log");
@@ -27,7 +35,7 @@ export const logsRouter = router({
 		}
 	}),
 
-	getRecentLogs: publicProcedure
+	getRecentLogs: authedProcedure
 		.input(
 			z.object({
 				level: z
@@ -97,6 +105,45 @@ export const logsRouter = router({
 					message: `Failed to read logs: ${error.message}`,
 				});
 				throw new Error(`Failed to read logs: ${error.message}`);
+			}
+		}),
+
+	subscribe: authedProcedure
+		.input(
+			z.object({
+				level: z
+					.enum(["error", "warn", "info", "verbose", "debug"])
+					.default("info"),
+			}),
+		)
+		.subscription(async function* ({ input }) {
+			const logQueue: LogStreamEvent[] = [];
+			let resolve: (() => void) | null = null;
+
+			const unsubscribe = streamTransport.subscribe(
+				(logEvent: LogStreamEvent) => {
+					if (shouldIncludeLevel(logEvent.level, input.level)) {
+						logQueue.push(logEvent);
+						if (resolve) {
+							resolve();
+							resolve = null;
+						}
+					}
+				},
+			);
+
+			try {
+				while (true) {
+					if (logQueue.length > 0) {
+						yield logQueue.shift()!;
+					} else {
+						await new Promise<void>((res) => {
+							resolve = res;
+						});
+					}
+				}
+			} finally {
+				unsubscribe();
 			}
 		}),
 });
