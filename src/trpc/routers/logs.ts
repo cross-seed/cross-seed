@@ -1,16 +1,9 @@
-import { promises as fs } from "fs";
-import { join } from "path";
 import { z } from "zod";
 import { authedProcedure, router } from "../index.js";
-import { Label, logger, streamTransport } from "../../logger.js";
-import type { LogStreamEvent } from "../../transports/StreamTransport.js";
+import { Label, logger } from "../../logger.js";
+import { getLogWatcher, type LogEntry } from "../../utils/logWatcher.js";
 
-export interface LogEntry {
-	timestamp: string;
-	level: string;
-	label: string;
-	message: string;
-}
+// Remove duplicate interface - using the one from logWatcher
 
 function shouldIncludeLevel(logLevel: string, filterLevel: string): boolean {
 	const levels = ["error", "warn", "info", "verbose", "debug"];
@@ -22,10 +15,15 @@ function shouldIncludeLevel(logLevel: string, filterLevel: string): boolean {
 export const logsRouter = router({
 	getVerbose: authedProcedure.query(async () => {
 		try {
-			// Get the logs directory from the current working directory
-			const logPath = join(process.cwd(), "logs/verbose.current.log");
-			const logData = await fs.readFile(logPath, "utf-8");
-			return logData;
+			const logWatcher = getLogWatcher();
+			const logs = await logWatcher.getRecentLogs("verbose", 1000);
+			// Convert back to text format for compatibility
+			return logs
+				.map(
+					(log) =>
+						`${log.timestamp} ${log.level}: ${log.label ? `[${log.label}] ` : ""}${log.message}`,
+				)
+				.join("\n");
 		} catch (error) {
 			logger.error({
 				label: Label.SERVER,
@@ -46,59 +44,12 @@ export const logsRouter = router({
 		)
 		.query(async ({ input }) => {
 			try {
-				// Map level to appropriate log file
-				const logFileMap = {
-					error: "error.current.log",
-					warn: "warn.current.log",
-					info: "info.current.log",
-					verbose: "verbose.current.log",
-					debug: "debug.current.log",
-				};
-
-				const logFileName = logFileMap[input.level];
-				const logPath = join(process.cwd(), "logs", logFileName);
-
-				// Check if the file exists
-				try {
-					await fs.access(logPath);
-				} catch (e) {
-					logger.warn({
-						label: Label.SERVER,
-						message: `Log file not found: ${logPath}`,
-					});
-					return [];
-				}
-
-				// Read the file
-				const logData = await fs.readFile(logPath, "utf-8");
-
-				// Parse the log file (assumes each line is a valid JSON object)
-				const logEntries: LogEntry[] = [];
-				const lines = logData.split("\n").filter(Boolean);
-
-				// Process the most recent lines up to the limit
-				const startIndex = Math.max(0, lines.length - input.limit);
-				for (let i = startIndex; i < lines.length; i++) {
-					try {
-						const entry = JSON.parse(lines[i]);
-						logEntries.push({
-							timestamp:
-								entry.timestamp || new Date().toISOString(),
-							level: entry.level || input.level,
-							label: entry.label || "UNKNOWN",
-							message: entry.message || lines[i],
-						});
-					} catch (e) {
-						// Skip malformed log entries
-						logger.debug({
-							label: Label.SERVER,
-							message: `Failed to parse log entry: ${lines[i]}`,
-						});
-					}
-				}
-
-				// Return the entries in reverse order (newest first)
-				return logEntries.reverse();
+				const logWatcher = getLogWatcher();
+				const logs = await logWatcher.getRecentLogs(
+					input.level,
+					input.limit,
+				);
+				return logs.reverse(); // Return newest first
 			} catch (error) {
 				logger.error({
 					label: Label.SERVER,
@@ -114,25 +65,47 @@ export const logsRouter = router({
 				level: z
 					.enum(["error", "warn", "info", "verbose", "debug"])
 					.default("info"),
+				limit: z.number().min(1).max(500).default(100),
 			}),
 		)
 		.subscription(async function* ({ input }) {
-			const logQueue: LogStreamEvent[] = [];
+			const logQueue: LogEntry[] = [];
 			let resolve: (() => void) | null = null;
 
-			const unsubscribe = streamTransport.subscribe(
-				(logEvent: LogStreamEvent) => {
-					if (shouldIncludeLevel(logEvent.level, input.level)) {
-						logQueue.push(logEvent);
-						if (resolve) {
-							resolve();
-							resolve = null;
-						}
+			// First, emit historical logs
+			try {
+				const logWatcher = getLogWatcher();
+				const historicalLogs = await logWatcher.getRecentLogs(
+					input.level,
+					input.limit,
+				);
+
+				// Emit each historical log
+				for (const log of historicalLogs.reverse()) {
+					// reverse to get oldest first
+					yield log;
+				}
+			} catch (error) {
+				logger.error({
+					label: Label.SERVER,
+					message: `Failed to load historical logs: ${error.message}`,
+				});
+			}
+
+			// Then set up real-time streaming
+			const logWatcher = getLogWatcher();
+			const unsubscribe = logWatcher.subscribe((logEntry: LogEntry) => {
+				if (shouldIncludeLevel(logEntry.level, input.level)) {
+					logQueue.push(logEntry);
+					if (resolve) {
+						resolve();
+						resolve = null;
 					}
-				},
-			);
+				}
+			});
 
 			try {
+				// Stream new logs indefinitely
 				while (true) {
 					if (logQueue.length > 0) {
 						yield logQueue.shift()!;
