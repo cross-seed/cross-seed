@@ -121,10 +121,8 @@ export function Logs() {
     }
   }, [logs, autoScroll]);
 
-  // Reset logs when log level changes
-  useEffect(() => {
-    setLogs([]);
-  }, [logLevel]);
+		return () => window.removeEventListener("scroll", handleScroll);
+	}, []);
 
   return (
     <div className="w-full space-y-6">

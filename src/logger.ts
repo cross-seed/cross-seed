@@ -33,7 +33,6 @@ export enum Label {
 }
 
 export let logger: winston.Logger;
-export let streamTransport: StreamTransport;
 
 const REDACTED_MSG = "[REDACTED]";
 const ERROR_PREFIX_REGEX = /^\s*error:\s*/i;
@@ -198,7 +197,6 @@ export function initializeLogger(options: Record<string, unknown>): void {
 					),
 				),
 			}),
-			streamTransport,
 		],
 	});
 }
