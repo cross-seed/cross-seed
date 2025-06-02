@@ -161,10 +161,13 @@ export async function doStartupValidation(): Promise<void> {
 		);
 	}
 	logger.verbose({
-		label: Label.CONFIGDUMP,
+		label: Label.CONFIG,
 		message: inspect(getRuntimeConfig()),
 	});
-	logger.info("Your configuration is valid!");
+	logger.info({
+		label: Label.CONFIG,
+		message: "Your configuration is valid!",
+	});
 }
 
 /**
@@ -183,7 +186,7 @@ export function parseRuntimeConfigAndLogErrors(
 		}) as RuntimeConfig;
 	} catch (error) {
 		logger.verbose({
-			label: Label.CONFIGDUMP,
+			label: Label.CONFIG,
 			message: inspect(options),
 		});
 		if ("errors" in error && Array.isArray(error.errors)) {
