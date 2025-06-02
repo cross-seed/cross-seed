@@ -3,20 +3,11 @@ import { authedProcedure, router } from "../index.js";
 import { Label, logger } from "../../logger.js";
 import { getLogWatcher, type LogEntry } from "../../utils/logWatcher.js";
 
-// Remove duplicate interface - using the one from logWatcher
-
-function shouldIncludeLevel(logLevel: string, filterLevel: string): boolean {
-	const levels = ["error", "warn", "info", "verbose", "debug"];
-	const logIndex = levels.indexOf(logLevel);
-	const filterIndex = levels.indexOf(filterLevel);
-	return logIndex <= filterIndex;
-}
-
 export const logsRouter = router({
 	getVerbose: authedProcedure.query(async () => {
 		try {
 			const logWatcher = getLogWatcher();
-			const logs = await logWatcher.getRecentLogs("verbose", 1000);
+			const logs = await logWatcher.getRecentLogs(1000);
 			// Convert back to text format for compatibility
 			return logs
 				.map(
@@ -36,19 +27,13 @@ export const logsRouter = router({
 	getRecentLogs: authedProcedure
 		.input(
 			z.object({
-				level: z
-					.enum(["error", "warn", "info", "verbose", "debug"])
-					.default("info"),
 				limit: z.number().min(1).max(1000).default(100),
 			}),
 		)
 		.query(async ({ input }) => {
 			try {
 				const logWatcher = getLogWatcher();
-				const logs = await logWatcher.getRecentLogs(
-					input.level,
-					input.limit,
-				);
+				const logs = await logWatcher.getRecentLogs(input.limit);
 				return logs.reverse(); // Return newest first
 			} catch (error) {
 				logger.error({
@@ -62,9 +47,6 @@ export const logsRouter = router({
 	subscribe: authedProcedure
 		.input(
 			z.object({
-				level: z
-					.enum(["error", "warn", "info", "verbose", "debug"])
-					.default("info"),
 				limit: z.number().min(1).max(500).default(100),
 			}),
 		)
@@ -76,12 +58,11 @@ export const logsRouter = router({
 			try {
 				const logWatcher = getLogWatcher();
 				const historicalLogs = await logWatcher.getRecentLogs(
-					input.level,
 					input.limit,
 				);
 
 				// Emit each historical log
-				for (const log of historicalLogs.reverse()) {
+				for (const log of historicalLogs) {
 					// reverse to get oldest first
 					yield log;
 				}
@@ -95,12 +76,10 @@ export const logsRouter = router({
 			// Then set up real-time streaming
 			const logWatcher = getLogWatcher();
 			const unsubscribe = logWatcher.subscribe((logEntry: LogEntry) => {
-				if (shouldIncludeLevel(logEntry.level, input.level)) {
-					logQueue.push(logEntry);
-					if (resolve) {
-						resolve();
-						resolve = null;
-					}
+				logQueue.push(logEntry);
+				if (resolve) {
+					resolve();
+					resolve = null;
 				}
 			});
 

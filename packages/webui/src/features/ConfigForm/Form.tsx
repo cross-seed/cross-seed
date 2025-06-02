@@ -70,7 +70,9 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
         console.error('Exception during full validation:', err);
         return {
           status: 'error',
-          error: { _form: 'An unexpected error occurred during validation' },
+          error: {
+            _form: 'An unexpected error occurred during validation',
+          },
         };
       }
       // }, 2000);
