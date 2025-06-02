@@ -469,7 +469,10 @@ export async function createSearcheeFromTorrentFile(
 		const meta = await parseTorrentWithMetadata(filePath, torrentInfos);
 		return createSearcheeFromMetafile(meta);
 	} catch (e) {
-		logger.error(`Failed to parse ${basename(filePath)}: ${e.message}`);
+		logger.error({
+			label: Label.INDEX,
+			message: `Failed to parse ${basename(filePath)}: ${e.message}`,
+		});
 		logger.debug(e);
 		return resultOfErr(e);
 	}

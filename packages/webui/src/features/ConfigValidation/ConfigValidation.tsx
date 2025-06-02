@@ -11,9 +11,7 @@ export const ConfigValidation: FC = () => {
   );
   return (
     <div className="mb-6">
-      <h2 className="mb-6 text-2xl font-semibold">
-        Config Validation
-      </h2>
+      <h2 className="mb-6 text-2xl font-semibold">Config Validation</h2>
       {isLoading && <div>Loading...</div>}
       {isError && <div>Error: {error.message}</div>}
       {data && (
@@ -23,7 +21,7 @@ export const ConfigValidation: FC = () => {
               key={section}
               title={section}
               content={section === 'uarrls' ? content.arr : content}
-              className="w-1/3 rounded-lg border border-solid border-border px-5 py-4"
+              className="border-border w-1/3 rounded-lg border border-solid px-5 py-4"
             />
           ))}
         </div>
@@ -49,15 +47,8 @@ const ValidationEntry = ({
   const heading = titleMap[title as keyof typeof titleMap] ?? title;
   const entries = Object.entries(content[title] ?? content);
   return (
-    <div
-      className={cn(
-        'mb-4 divide-y divide-solid divide-muted',
-        className,
-      )}
-    >
-      <h3 className="mb-4 text-lg font-medium">
-        {heading}
-      </h3>
+    <div className={cn('divide-muted mb-4 divide-y divide-solid', className)}>
+      <h3 className="mb-4 text-lg font-medium">{heading}</h3>
       {entries.map(([key, value]) => (
         <div
           key={key}

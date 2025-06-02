@@ -1,6 +1,7 @@
 import { promises as fs, watch } from "fs";
 import { join } from "path";
 import { appDir } from "../configuration.js";
+import { logger } from "../logger.js";
 
 export interface LogEntry {
 	timestamp: string;
@@ -82,17 +83,10 @@ class LogWatcher {
 			await stream.close();
 
 			const newContent = buffer.toString("utf8");
-			const lines = newContent.split("\n").filter((line) => line.trim());
+			const logEntries = this.parseLogContent(newContent);
 
-			for (const line of lines) {
-				try {
-					const logEntry = this.parseLogLine(line);
-					if (logEntry) {
-						this.notifySubscribers(logEntry);
-					}
-				} catch (error) {
-					console.error("Error parsing log line:", line, error);
-				}
+			for (const logEntry of logEntries) {
+				this.notifySubscribers(logEntry);
 			}
 
 			this.lastPositions.set(filePath, stats.size);
@@ -101,7 +95,43 @@ class LogWatcher {
 		}
 	}
 
-	private parseLogLine(line: string): LogEntry | null {
+	private parseLogContent(content: string): LogEntry[] {
+		const logEntries: LogEntry[] = [];
+		const lines = content.split("\n");
+		let currentEntry: LogEntry | null = null;
+
+		for (const line of lines) {
+			if (!line.trim()) continue;
+
+			const parsedEntry = this.tryParseLogLine(line);
+			if (parsedEntry) {
+				// This is a new log entry
+				if (currentEntry) {
+					logEntries.push(currentEntry);
+				}
+				currentEntry = parsedEntry;
+			} else if (currentEntry) {
+				// This is a continuation line (stack trace, etc.)
+				currentEntry.message += "\n" + line;
+			} else {
+				// Orphan line with no preceding log entry
+				logEntries.push({
+					timestamp: new Date().toISOString(),
+					level: "info",
+					label: "raw",
+					message: line,
+				});
+			}
+		}
+
+		if (currentEntry) {
+			logEntries.push(currentEntry);
+		}
+
+		return logEntries;
+	}
+
+	private tryParseLogLine(line: string): LogEntry | null {
 		// Parse winston text format: "2025-06-01 00:00:35 info: [scheduler] starting job: rss"
 		const logRegex =
 			/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w+):\s*(?:\[([^\]]+)\])?\s*(.*)$/;
@@ -117,13 +147,7 @@ class LogWatcher {
 			};
 		}
 
-		// If parsing fails, treat as plain message with current timestamp
-		return {
-			timestamp: new Date().toISOString(),
-			level: "info",
-			label: "raw",
-			message: line,
-		};
+		return null;
 	}
 
 	private notifySubscribers(logEntry: LogEntry) {
@@ -141,41 +165,15 @@ class LogWatcher {
 		return () => this.subscribers.delete(callback);
 	}
 
-	async getRecentLogs(
-		level: string,
-		limit: number = 100,
-	): Promise<LogEntry[]> {
-		const logFileMap: Record<string, string> = {
-			error: "error.current.log",
-			warn: "info.current.log", // warnings show up in info log
-			info: "info.current.log",
-			verbose: "verbose.current.log",
-			debug: "verbose.current.log", // debug shows up in verbose log
-		};
-
-		const fileName = logFileMap[level] || "info.current.log";
-		const filePath = join(appDir(), "logs", fileName);
+	async getRecentLogs(limit: number = 100): Promise<LogEntry[]> {
+		const filePath = join(appDir(), "logs", "verbose.current.log");
 
 		try {
 			const fileContent = await fs.readFile(filePath, "utf-8");
-			const lines = fileContent.split("\n").filter((line) => line.trim());
-
-			const logs: LogEntry[] = [];
-			const startIndex = Math.max(0, lines.length - limit);
-
-			for (let i = startIndex; i < lines.length; i++) {
-				const logEntry = this.parseLogLine(lines[i]);
-				if (
-					logEntry &&
-					this.shouldIncludeLevel(logEntry.level, level)
-				) {
-					logs.push(logEntry);
-				}
-			}
-
-			return logs;
+			const allEntries = this.parseLogContent(fileContent);
+			return allEntries.slice(-limit);
 		} catch (error) {
-			console.error(`Error reading log file ${filePath}:`, error);
+			logger.error(`Error reading log file ${filePath}:`, error);
 			return [];
 		}
 	}

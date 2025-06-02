@@ -452,7 +452,10 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 
 	if (options.startup) {
 		if (torrentDir) {
-			logger.info("Indexing torrentDir for reverse lookup...");
+			logger.info({
+				label: Label.INDEX,
+				message: "Indexing torrentDir for reverse lookup...",
+			});
 			searchees = await loadTorrentDirLight(torrentDir);
 			if (clients.length) {
 				infoHashPathMap = await clients[0].getAllDownloadDirs({
@@ -534,7 +537,10 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 			meta = await parseTorrentFromPath(filePath);
 		} catch (e) {
 			logOnce(`Failed to parse ${filePath}`, () => {
-				logger.error(`Failed to parse ${filePath}`);
+				logger.error({
+					label: Label.INDEX,
+					message: `Failed to parse ${filePath}`,
+				});
 				logger.debug(e);
 			});
 			continue;
@@ -637,12 +643,15 @@ export async function indexTorrentsAndDataDirs(
 					await indexTorrents(options); // Run second so this data is more fresh
 					break;
 				} catch (e) {
-					const msg = `Indexing failed (${maxRetries - attempt}): ${e.message}`;
+					const log = {
+						label: Label.INDEX,
+						message: `Indexing failed (${maxRetries - attempt}): ${e.message}`,
+					};
 					logger.debug(e);
 					if (attempt < maxRetries) {
-						logger.verbose(msg);
+						logger.verbose(log);
 					} else {
-						logger.error(msg);
+						logger.error(log);
 						if (options.startup) throw e;
 					}
 				}

@@ -19,12 +19,9 @@ export const StatusIndicator: FC<TIndicatorProps> = ({ status }) => {
       className={cn('relative', {
         'before:absolute before:inset-[-0px] before:animate-pulse before:rounded-full':
           status !== 'unknown',
-        'before:shadow-glow before:text-emerald-200':
-          status === 'ok',
-        'before:shadow-glow before:text-destructive/20':
-          status === 'error',
-        'before:shadow-glow before:text-amber-200':
-          status === 'warning',
+        'before:shadow-glow before:text-emerald-200': status === 'ok',
+        'before:shadow-glow before:text-destructive/20': status === 'error',
+        'before:shadow-glow before:text-amber-200': status === 'warning',
       })}
     >
       <div className={cn(`relative h-4 w-4 rounded-full ${colorMap[status]}`)}>
