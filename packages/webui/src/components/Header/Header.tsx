@@ -1,25 +1,36 @@
-import Logo from '@/assets/cross-seed.svg';
+import { useLocation } from '@tanstack/react-router';
 import { ModeToggle } from '@/components/ModeToggle/ModeToggle';
-import { useSidebar } from '@/components/ui/sidebar';
+import { Separator } from '@/components/ui/separator';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+
+const getPageTitle = (pathname: string): string => {
+  switch (pathname) {
+    case '/':
+      return 'Dashboard';
+    case '/logs':
+      return 'Logs';
+    case '/search':
+      return 'Search';
+    case '/settings':
+      return 'Settings';
+    default:
+      return 'cross-seed';
+  }
+};
 
 const Header = () => {
-  const { open } = useSidebar();
+  const location = useLocation();
+  const pageTitle = getPageTitle(location.pathname);
 
   return (
-    <div className="mb-6 flex items-center justify-between">
-      {!open && (
-        <header className="flex items-center gap-2">
-          <img
-            src={Logo}
-            className="mt-1 h-6 w-6"
-            role="presentation"
-            alt="cross-seed logo"
-          />
-          <h1 className="text-2xl font-semibold">cross-seed</h1>
-        </header>
-      )}
-      <ModeToggle className="ml-auto justify-self-end" />
-    </div>
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+      <SidebarTrigger className="-ml-1" />
+      <Separator orientation="vertical" className="mr-2 h-4" />
+      <h1 className="text-base font-medium">{pageTitle}</h1>
+      <div className="ml-auto">
+        <ModeToggle />
+      </div>
+    </header>
   );
 };
 

@@ -30,7 +30,6 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
-  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { useTRPC } from '@/lib/trpc';
 
@@ -110,7 +109,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             alt="cross-seed logo"
           />
           <span className="text-xl font-bold">cross-seed</span>
-          <SidebarTrigger className="absolute -right-12 text-neutral-400" />
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -122,7 +120,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 {section.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild tooltip={item.title}>
-                      <Link to={item.url} activeProps={{ 'data-active': true }}>
+                      <Link
+                        to={item.url}
+                        activeProps={{
+                          'data-active': true,
+                        }}
+                      >
                         {item.icon}
                         <span>{item.title}</span>
                       </Link>
