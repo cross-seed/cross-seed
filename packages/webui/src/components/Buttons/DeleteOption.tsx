@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { FC } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type DeleteOptionProps = {
@@ -18,7 +17,7 @@ const DeleteOption: FC<DeleteOptionProps> = ({ className, onClick }) => {
       onClick={onClick}
     >
       <span className="sr-only">Delete option</span>
-      <FontAwesomeIcon icon={faTrash} />
+      <Trash2 className="size-4" />
     </Button>
   );
 };
