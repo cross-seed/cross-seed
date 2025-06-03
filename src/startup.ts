@@ -149,10 +149,16 @@ async function checkConfigPaths(): Promise<void> {
 		);
 	}
 	if (linkDev.length) {
-		logger.verbose(`Storage device for each linkDir: ${inspect(linkDev)}`);
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each linkDir: ${inspect(linkDev)}`,
+		});
 	}
 	if (dataDev.length) {
-		logger.verbose(`Storage device for each dataDir: ${inspect(dataDev)}`);
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each dataDir: ${inspect(dataDev)}`,
+		});
 	}
 }
 
