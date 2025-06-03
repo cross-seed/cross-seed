@@ -116,6 +116,18 @@ async function checkConfigPaths(): Promise<void> {
 			} above for details.`,
 		);
 	}
+	if (linkDev.length) {
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each linkDir: ${inspect(linkDev)}`,
+		});
+	}
+	if (dataDev.length) {
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each dataDir: ${inspect(dataDev)}`,
+		});
+	}
 }
 
 async function retry<T>(
