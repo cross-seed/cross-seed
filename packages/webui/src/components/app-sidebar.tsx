@@ -42,35 +42,15 @@ const navItems = [
         icon: <Home className="size-4" />,
         url: '/',
       },
-      {
-        title: 'Search',
-        icon: <Search className="size-4" />,
-        url: '/search',
-      },
     ],
   },
   {
-    title: 'Management',
-    items: [
-      {
-        title: 'Torrents',
-        icon: <Database className="size-4" />,
-        url: '/torrents',
-      },
-      {
-        title: 'Jobs',
-        icon: <RefreshCw className="size-4" />,
-        url: '/jobs',
-      },
-    ],
-  },
-  {
-    title: 'Configuration',
+    title: 'Settings',
     items: [
       {
         title: 'Settings',
         icon: <Settings className="size-4" />,
-        url: '/config',
+        url: '/settings',
       },
       {
         title: 'Logs',
