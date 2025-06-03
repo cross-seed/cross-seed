@@ -161,7 +161,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
         ]}
       >
         {([canSubmit, isSubmitting, errors, fieldMeta]) => (
-          <div className="form__submit border-border bg-background sticky right-0 bottom-0 left-0 p-6">
+          <div className="form__submit border-border bg-background sticky right-0 bottom-0 left-0 border-t border-solid p-6">
             <Button
               type="submit"
               className={cn(
