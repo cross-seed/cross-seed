@@ -693,7 +693,10 @@ async function fetchCaps(indexer: Indexer): Promise<Caps> {
 			error = new Error(
 				`${indexer.name ?? indexer.url} was rate limited when fetching caps${indexer.retryAfter && indexer.retryAfter > Date.now() ? `, snoozing until ${humanReadableDate(indexer.retryAfter)}` : ""}`,
 			);
-			logger.warn(error.message);
+			logger.warn({
+				label: Label.TORZNAB,
+				message: error.message,
+			});
 		} else if (response.status === 401) {
 			error = new Error(
 				`${indexer.name ?? indexer.url} returned 401 Unauthorized when fetching caps, check your apikey (all torznab entries use the Prowlarr/Jackett apikey)`,
