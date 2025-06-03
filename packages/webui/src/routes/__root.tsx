@@ -1,6 +1,6 @@
 import Header from '@/components/Header/Header.tsx';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/router-devtools';
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Suspense } from 'react';
 import { Login } from '@/components/auth/AuthWrapper';
 import { AppSidebar } from '@/components/app-sidebar';
