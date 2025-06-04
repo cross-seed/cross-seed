@@ -1,5 +1,7 @@
 import { constants, mkdir, stat } from "fs/promises";
 import ms from "ms";
+import { spawn } from "node:child_process";
+import { sep } from "path";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { validateUArrLs } from "./arr.js";
@@ -331,4 +333,17 @@ export function withFullRuntime(
 		await doStartupValidation();
 		await entrypoint(runtimeConfig);
 	});
+}
+
+export async function restartCrossSeed() {
+	logger.info("Restarting cross-seed");
+	process.on("exit", () => {
+		spawn(process.argv[0], process.argv.slice(1), {
+			cwd: process.cwd(),
+			stdio: "inherit",
+			detached: false,
+		});
+	});
+
+	await exitGracefully();
 }
