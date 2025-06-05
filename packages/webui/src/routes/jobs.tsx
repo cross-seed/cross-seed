@@ -70,62 +70,60 @@ function RouteComponent() {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Jobs</h1>
-      </div>
-
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Interval</TableHead>
-              <TableHead>Last Execution</TableHead>
-              <TableHead>Next Execution</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader className="bg-muted">
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Interval</TableHead>
+            <TableHead>Last Execution</TableHead>
+            <TableHead>Next Execution</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {jobs?.map((job) => (
+            <TableRow key={job.name}>
+              <TableCell className="font-medium">
+                {formatJobName(job.name)}
+              </TableCell>
+              <TableCell>{job.interval}</TableCell>
+              <TableCell>
+                {job.lastExecution
+                  ? formatRelativeTime(job.lastExecution)
+                  : 'Never'}
+              </TableCell>
+              <TableCell>
+                {job.nextExecution === 'now'
+                  ? 'Now'
+                  : formatRelativeTime(job.nextExecution)}
+              </TableCell>
+              <TableCell>{getStatusBadge(job)}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={job.isActive || !job.canRunNow}
+                  onClick={() => triggerJob({ name: job.name })}
+                >
+                  {triggeredJobs.has(job.name) ? (
+                    <>
+                      <Check className="mr-1 h-4 w-4 text-green-600" />
+                      Started
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-1 h-4 w-4" />
+                      Run
+                    </>
+                  )}
+                </Button>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {jobs?.map((job) => (
-              <TableRow key={job.name}>
-                <TableCell className="font-medium">
-                  {formatJobName(job.name)}
-                </TableCell>
-                <TableCell>{job.interval}</TableCell>
-                <TableCell>
-                  {job.lastExecution ? formatRelativeTime(job.lastExecution) : 'Never'}
-                </TableCell>
-                <TableCell>
-                  {job.nextExecution === 'now' ? 'Now' : formatRelativeTime(job.nextExecution)}
-                </TableCell>
-                <TableCell>{getStatusBadge(job)}</TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={job.isActive || !job.canRunNow}
-                    onClick={() => triggerJob({ name: job.name })}
-                  >
-                    {triggeredJobs.has(job.name) ? (
-                      <>
-                        <Check className="mr-1 h-4 w-4 text-green-600" />
-                        Started
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-1 h-4 w-4" />
-                        Run
-                      </>
-                    )}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
