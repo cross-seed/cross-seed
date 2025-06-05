@@ -1,4 +1,5 @@
 import Header from '@/components/Header/Header.tsx';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Suspense } from 'react';
@@ -9,6 +10,23 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 // nothing in  router context right now
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface RouterContext {}
+
+function getIsDevtoolsEnabled(): boolean {
+  try {
+    if (
+      process.env.NODE_ENV === 'production' ||
+      window.localStorage.getItem('DISABLE_DEVTOOLS') === 'true'
+    ) {
+      return false;
+    }
+    return true;
+  } catch (e) {
+    // localStorage not available, assume devtools are enabled
+    return true;
+  }
+}
+
+const isDevtoolsEnabled = getIsDevtoolsEnabled();
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: () => (
@@ -38,8 +56,11 @@ export const Route = createRootRouteWithContext<RouterContext>()({
           </SidebarProvider>
         </Login>
       </Suspense>
-      {process.env.NODE_ENV !== 'production' && (
-        <TanStackRouterDevtools position="bottom-left" />
+      {isDevtoolsEnabled && (
+        <>
+          <ReactQueryDevtools initialIsOpen={false} />
+          <TanStackRouterDevtools position="bottom-left" />
+        </>
       )}
     </div>
   ),
