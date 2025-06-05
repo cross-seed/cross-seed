@@ -10,7 +10,7 @@ import {
 import { useTRPC } from "@/lib/trpc";
 import { useSubscription } from "@trpc/tanstack-react-query";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import ms from "ms";
+import { formatRelativeTime } from "@/lib/time";
 
 interface LogEntry {
 	timestamp: string;
@@ -19,29 +19,6 @@ interface LogEntry {
 	message: string;
 }
 
-function formatRelativeTime(timestamp: string): string {
-	const date = new Date(timestamp);
-	const now = new Date();
-	const diffInMs = now.getTime() - date.getTime();
-
-	// More than 7 days, fall back to absolute date
-	if (Math.abs(diffInMs) > ms("7d")) {
-		return date.toLocaleDateString("en", {
-			month: "short",
-			day: "numeric",
-			hour: "2-digit",
-			minute: "2-digit",
-		});
-	}
-
-	// Use ms to format the difference
-	const formatted = ms(Math.ceil(diffInMs / 1000) * 1000, { long: true });
-	const [number, unit] = formatted.split(" ");
-
-	const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-	return rtf.format(-parseInt(number), unit as Intl.RelativeTimeFormatUnit);
-}
 
 export function Logs() {
 	const [logs, setLogs] = useState<LogEntry[]>([]);

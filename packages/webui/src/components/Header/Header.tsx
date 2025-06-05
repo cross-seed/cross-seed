@@ -9,6 +9,8 @@ const getPageTitle = (pathname: string): string => {
       return 'Dashboard';
     case '/logs':
       return 'Logs';
+    case '/jobs':
+      return 'Jobs';
     case '/search':
       return 'Search';
     case '/settings':
