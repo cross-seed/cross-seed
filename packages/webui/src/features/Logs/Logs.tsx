@@ -52,7 +52,7 @@ export function Logs() {
     const handleScroll = () => {
       const position = window.innerHeight + window.scrollY;
       const height = document.documentElement.scrollHeight;
-      const atBottom = position >= height;
+      const atBottom = position >= height && window.scrollY > 0;
       setIsAtBottom(atBottom);
     };
 
