@@ -1,12 +1,10 @@
+import { ThemeProvider } from '@/contexts/Theme/ThemeProvider';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { RouterProvider } from '@tanstack/react-router';
+import { trpcClient, TRPCProvider } from './lib/trpc';
 import { router } from './router';
-import { ThemeProvider } from '@/contexts/Theme/ThemeProvider';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { TRPCProvider, trpcClient } from './lib/trpc';
-import { QueryClient } from '@tanstack/react-query';
 
 import './index.css';
 
@@ -29,9 +27,6 @@ createRoot(root).render(
         <ThemeProvider defaultTheme="system" storageKey="cross-seed-ui-theme">
           <RouterProvider router={router} />
         </ThemeProvider>
-        {process.env.NODE_ENV !== 'production' && (
-          <ReactQueryDevtools initialIsOpen={false} />
-        )}
       </TRPCProvider>
     </QueryClientProvider>
   </StrictMode>,
