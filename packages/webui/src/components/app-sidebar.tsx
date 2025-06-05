@@ -14,6 +14,7 @@ import {
   Database,
   RefreshCw,
   FileText,
+  Clock,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,11 @@ const navItems = [
         title: 'Dashboard',
         icon: <Home className="size-4" />,
         url: '/',
+      },
+      {
+        title: 'Jobs',
+        icon: <Clock className="size-4" />,
+        url: '/jobs',
       },
     ],
   },
