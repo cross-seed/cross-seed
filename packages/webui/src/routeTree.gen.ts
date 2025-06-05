@@ -13,6 +13,7 @@
 import { Route as rootRoute } from './routes/__root';
 import { Route as SettingsImport } from './routes/settings';
 import { Route as LogsImport } from './routes/logs';
+import { Route as JobsImport } from './routes/jobs';
 import { Route as IndexImport } from './routes/index';
 
 // Create/Update Routes
@@ -26,6 +27,12 @@ const SettingsRoute = SettingsImport.update({
 const LogsRoute = LogsImport.update({
   id: '/logs',
   path: '/logs',
+  getParentRoute: () => rootRoute,
+} as any);
+
+const JobsRoute = JobsImport.update({
+  id: '/jobs',
+  path: '/jobs',
   getParentRoute: () => rootRoute,
 } as any);
 
@@ -44,6 +51,13 @@ declare module '@tanstack/react-router' {
       path: '/';
       fullPath: '/';
       preLoaderRoute: typeof IndexImport;
+      parentRoute: typeof rootRoute;
+    };
+    '/jobs': {
+      id: '/jobs';
+      path: '/jobs';
+      fullPath: '/jobs';
+      preLoaderRoute: typeof JobsImport;
       parentRoute: typeof rootRoute;
     };
     '/logs': {
@@ -67,12 +81,14 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
+  '/jobs': typeof JobsRoute;
   '/logs': typeof LogsRoute;
   '/settings': typeof SettingsRoute;
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
+  '/jobs': typeof JobsRoute;
   '/logs': typeof LogsRoute;
   '/settings': typeof SettingsRoute;
 }
@@ -80,27 +96,30 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute;
   '/': typeof IndexRoute;
+  '/jobs': typeof JobsRoute;
   '/logs': typeof LogsRoute;
   '/settings': typeof SettingsRoute;
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/logs' | '/settings';
+  fullPaths: '/' | '/jobs' | '/logs' | '/settings';
   fileRoutesByTo: FileRoutesByTo;
-  to: '/' | '/logs' | '/settings';
-  id: '__root__' | '/' | '/logs' | '/settings';
+  to: '/' | '/jobs' | '/logs' | '/settings';
+  id: '__root__' | '/' | '/jobs' | '/logs' | '/settings';
   fileRoutesById: FileRoutesById;
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  JobsRoute: typeof JobsRoute;
   LogsRoute: typeof LogsRoute;
   SettingsRoute: typeof SettingsRoute;
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  JobsRoute: JobsRoute,
   LogsRoute: LogsRoute,
   SettingsRoute: SettingsRoute,
 };
@@ -116,12 +135,16 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/jobs",
         "/logs",
         "/settings"
       ]
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/jobs": {
+      "filePath": "jobs.tsx"
     },
     "/logs": {
       "filePath": "logs.tsx"
