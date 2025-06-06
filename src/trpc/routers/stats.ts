@@ -1,3 +1,4 @@
+import { Decision } from "../../constants.js";
 import { authedProcedure, router } from "../index.js";
 import { db } from "../../db.js";
 
@@ -37,12 +38,19 @@ export const statsRouter = router({
 			)
 			.reduce((sum, row) => sum + Number(row.count || 0), 0);
 
-		// All persisted decisions represent downloaded torrents
-		const totalDecisions = decisionsByType.reduce(
-			(sum, row) => sum + Number(row.count || 0),
-			0,
-		);
-		const snatchAttempts = totalDecisions;
+		const postSnatchDecisions = new Set<Decision>([
+			Decision.MATCH,
+			Decision.MATCH_SIZE_ONLY,
+			Decision.MATCH_PARTIAL,
+			Decision.SAME_INFO_HASH,
+			Decision.INFO_HASH_ALREADY_EXISTS,
+			Decision.FILE_TREE_MISMATCH,
+			Decision.SIZE_MISMATCH,
+			Decision.PARTIAL_SIZE_MISMATCH,
+		]);
+		const snatchAttempts = decisionsByType
+			.filter((row) => postSnatchDecisions.has(row.decision))
+			.reduce((sum, row) => sum + Number(row.count || 0), 0);
 
 		const totalSearchees = Number(searcheeResult?.count || 0);
 		const matchRate =
