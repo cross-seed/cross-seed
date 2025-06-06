@@ -1,8 +1,9 @@
 import { Knex } from "knex";
+import type { Decision as DecisionType } from "./constants.js";
 
 declare module "knex/types/tables.js" {
 	interface Decision {
-		decision: string;
+		decision: DecisionType;
 		first_seen: number;
 		fuzzy_size_factor: number;
 		guid: string;
