@@ -113,8 +113,13 @@ export default class RTorrent implements TorrentClient {
 	readonly label: string;
 	readonly batchSize = 500;
 
-	constructor(url: string, priority: number, readonly: boolean) {
-		this.clientHost = new URL(url).host;
+	constructor(
+		url: string,
+		clientHost: string,
+		priority: number,
+		readonly: boolean,
+	) {
+		this.clientHost = clientHost;
 		this.clientPriority = priority;
 		this.readonly = readonly;
 		this.label = `${this.clientType}@${this.clientHost}`;

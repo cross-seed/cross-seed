@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "fs";
 import ms from "ms";
 import { isAbsolute, join, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
-import { parseClientEntry } from "./clients/TorrentClient.js";
+import { clientsAreUnique, parseClientEntry } from "./clients/TorrentClient.js";
 import { appDir } from "./configuration.js";
 import {
 	Action,
@@ -613,15 +613,12 @@ export const VALIDATION_SCHEMA = z
 			!config.dataDirs.length,
 		ZodErrorMessages.multipleClientsNoLinking,
 	)
-	.refine(
-		(config) =>
-			new Set(
-				config.torrentClients.map(
-					(entry) => new URL(parseClientEntry(entry)!.url).host,
-				),
-			).size === config.torrentClients.length,
-		ZodErrorMessages.duplicateClients,
-	)
+	.refine((config) => {
+		const { uniqueHosts, uniqueWithPathname } = clientsAreUnique(
+			config.torrentClients,
+		);
+		return uniqueHosts || uniqueWithPathname;
+	}, ZodErrorMessages.duplicateClients)
 	.refine(
 		(config) =>
 			!config.searchCadence ||

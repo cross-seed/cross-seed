@@ -96,9 +96,14 @@ export default class Transmission implements TorrentClient {
 	readonly readonly: boolean;
 	readonly label: string;
 
-	constructor(url: string, priority: number, readonly: boolean) {
+	constructor(
+		url: string,
+		clientHost: string,
+		priority: number,
+		readonly: boolean,
+	) {
 		this.url = url;
-		this.clientHost = new URL(url).host;
+		this.clientHost = clientHost;
 		this.clientPriority = priority;
 		this.readonly = readonly;
 		this.label = `${this.clientType}@${this.clientHost}`;

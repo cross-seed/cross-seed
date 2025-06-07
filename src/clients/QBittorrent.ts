@@ -187,8 +187,13 @@ export default class QBittorrent implements TorrentClient {
 	readonly readonly: boolean;
 	readonly label: string;
 
-	constructor(url: string, priority: number, readonly: boolean) {
-		this.clientHost = new URL(url).host;
+	constructor(
+		url: string,
+		clientHost: string,
+		priority: number,
+		readonly: boolean,
+	) {
+		this.clientHost = clientHost;
 		this.clientPriority = priority;
 		this.readonly = readonly;
 		this.label = `${this.clientType}@${this.clientHost}`;
@@ -289,7 +294,7 @@ export default class QBittorrent implements TorrentClient {
 		retries = 3,
 	): Promise<string | undefined> {
 		const bodyStr =
-			body instanceof FormData || body instanceof URLSearchParams
+			body instanceof URLSearchParams || body instanceof FormData
 				? JSON.stringify(Object.fromEntries(body))
 				: JSON.stringify(body).replace(
 						/(?:hashes=)([a-z0-9]{40})/i,
