@@ -15,6 +15,17 @@ import { Route as SettingsImport } from './routes/settings';
 import { Route as LogsImport } from './routes/logs';
 import { Route as JobsImport } from './routes/jobs';
 import { Route as IndexImport } from './routes/index';
+import { Route as rootRoute } from './routes/__root'
+import { Route as SettingsImport } from './routes/settings'
+import { Route as LogsImport } from './routes/logs'
+import { Route as ConfigImport } from './routes/config'
+import { Route as IndexImport } from './routes/index'
+import { Route as SettingsIndexImport } from './routes/settings/index'
+import { Route as SettingsSearchImport } from './routes/settings/search'
+import { Route as SettingsIndexersImport } from './routes/settings/indexers'
+import { Route as SettingsDownloadersImport } from './routes/settings/downloaders'
+import { Route as SettingsDirectoriesImport } from './routes/settings/directories'
+import { Route as SettingsConnectImport } from './routes/settings/connect'
 
 // Create/Update Routes
 
@@ -22,13 +33,19 @@ const SettingsRoute = SettingsImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => rootRoute,
-} as any);
+} as any)
 
 const LogsRoute = LogsImport.update({
   id: '/logs',
   path: '/logs',
   getParentRoute: () => rootRoute,
-} as any);
+} as any)
+
+const ConfigRoute = ConfigImport.update({
+  id: '/config',
+  path: '/config',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const JobsRoute = JobsImport.update({
   id: '/jobs',
@@ -40,7 +57,43 @@ const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRoute,
-} as any);
+} as any)
+
+const SettingsIndexRoute = SettingsIndexImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
+} as any)
+
+const SettingsSearchRoute = SettingsSearchImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => SettingsRoute,
+} as any)
+
+const SettingsIndexersRoute = SettingsIndexersImport.update({
+  id: '/indexers',
+  path: '/indexers',
+  getParentRoute: () => SettingsRoute,
+} as any)
+
+const SettingsDownloadersRoute = SettingsDownloadersImport.update({
+  id: '/downloaders',
+  path: '/downloaders',
+  getParentRoute: () => SettingsRoute,
+} as any)
+
+const SettingsDirectoriesRoute = SettingsDirectoriesImport.update({
+  id: '/directories',
+  path: '/directories',
+  getParentRoute: () => SettingsRoute,
+} as any)
+
+const SettingsConnectRoute = SettingsConnectImport.update({
+  id: '/connect',
+  path: '/connect',
+  getParentRoute: () => SettingsRoute,
+} as any)
 
 // Populate the FileRoutesByPath interface
 
@@ -61,23 +114,87 @@ declare module '@tanstack/react-router' {
       parentRoute: typeof rootRoute;
     };
     '/logs': {
-      id: '/logs';
-      path: '/logs';
-      fullPath: '/logs';
-      preLoaderRoute: typeof LogsImport;
-      parentRoute: typeof rootRoute;
-    };
+      id: '/logs'
+      path: '/logs'
+      fullPath: '/logs'
+      preLoaderRoute: typeof LogsImport
+      parentRoute: typeof rootRoute
+    }
     '/settings': {
-      id: '/settings';
-      path: '/settings';
-      fullPath: '/settings';
-      preLoaderRoute: typeof SettingsImport;
-      parentRoute: typeof rootRoute;
-    };
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsImport
+      parentRoute: typeof rootRoute
+    }
+    '/settings/connect': {
+      id: '/settings/connect'
+      path: '/connect'
+      fullPath: '/settings/connect'
+      preLoaderRoute: typeof SettingsConnectImport
+      parentRoute: typeof SettingsImport
+    }
+    '/settings/directories': {
+      id: '/settings/directories'
+      path: '/directories'
+      fullPath: '/settings/directories'
+      preLoaderRoute: typeof SettingsDirectoriesImport
+      parentRoute: typeof SettingsImport
+    }
+    '/settings/downloaders': {
+      id: '/settings/downloaders'
+      path: '/downloaders'
+      fullPath: '/settings/downloaders'
+      preLoaderRoute: typeof SettingsDownloadersImport
+      parentRoute: typeof SettingsImport
+    }
+    '/settings/indexers': {
+      id: '/settings/indexers'
+      path: '/indexers'
+      fullPath: '/settings/indexers'
+      preLoaderRoute: typeof SettingsIndexersImport
+      parentRoute: typeof SettingsImport
+    }
+    '/settings/search': {
+      id: '/settings/search'
+      path: '/search'
+      fullPath: '/settings/search'
+      preLoaderRoute: typeof SettingsSearchImport
+      parentRoute: typeof SettingsImport
+    }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexImport
+      parentRoute: typeof SettingsImport
+    }
   }
 }
 
 // Create and export the route tree
+
+interface SettingsRouteChildren {
+  SettingsConnectRoute: typeof SettingsConnectRoute
+  SettingsDirectoriesRoute: typeof SettingsDirectoriesRoute
+  SettingsDownloadersRoute: typeof SettingsDownloadersRoute
+  SettingsIndexersRoute: typeof SettingsIndexersRoute
+  SettingsSearchRoute: typeof SettingsSearchRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsConnectRoute: SettingsConnectRoute,
+  SettingsDirectoriesRoute: SettingsDirectoriesRoute,
+  SettingsDownloadersRoute: SettingsDownloadersRoute,
+  SettingsIndexersRoute: SettingsIndexersRoute,
+  SettingsSearchRoute: SettingsSearchRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
@@ -115,18 +232,100 @@ export interface RootRouteChildren {
   JobsRoute: typeof JobsRoute;
   LogsRoute: typeof LogsRoute;
   SettingsRoute: typeof SettingsRoute;
+  '/': typeof IndexRoute
+  '/config': typeof ConfigRoute
+  '/logs': typeof LogsRoute
+  '/settings': typeof SettingsRouteWithChildren
+  '/settings/connect': typeof SettingsConnectRoute
+  '/settings/directories': typeof SettingsDirectoriesRoute
+  '/settings/downloaders': typeof SettingsDownloadersRoute
+  '/settings/indexers': typeof SettingsIndexersRoute
+  '/settings/search': typeof SettingsSearchRoute
+  '/settings/': typeof SettingsIndexRoute
+}
+
+export interface FileRoutesByTo {
+  '/': typeof IndexRoute
+  '/config': typeof ConfigRoute
+  '/logs': typeof LogsRoute
+  '/settings/connect': typeof SettingsConnectRoute
+  '/settings/directories': typeof SettingsDirectoriesRoute
+  '/settings/downloaders': typeof SettingsDownloadersRoute
+  '/settings/indexers': typeof SettingsIndexersRoute
+  '/settings/search': typeof SettingsSearchRoute
+  '/settings': typeof SettingsIndexRoute
+}
+
+export interface FileRoutesById {
+  __root__: typeof rootRoute
+  '/': typeof IndexRoute
+  '/config': typeof ConfigRoute
+  '/logs': typeof LogsRoute
+  '/settings': typeof SettingsRouteWithChildren
+  '/settings/connect': typeof SettingsConnectRoute
+  '/settings/directories': typeof SettingsDirectoriesRoute
+  '/settings/downloaders': typeof SettingsDownloadersRoute
+  '/settings/indexers': typeof SettingsIndexersRoute
+  '/settings/search': typeof SettingsSearchRoute
+  '/settings/': typeof SettingsIndexRoute
+}
+
+export interface FileRouteTypes {
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/'
+    | '/config'
+    | '/logs'
+    | '/settings'
+    | '/settings/connect'
+    | '/settings/directories'
+    | '/settings/downloaders'
+    | '/settings/indexers'
+    | '/settings/search'
+    | '/settings/'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/'
+    | '/config'
+    | '/logs'
+    | '/settings/connect'
+    | '/settings/directories'
+    | '/settings/downloaders'
+    | '/settings/indexers'
+    | '/settings/search'
+    | '/settings'
+  id:
+    | '__root__'
+    | '/'
+    | '/config'
+    | '/logs'
+    | '/settings'
+    | '/settings/connect'
+    | '/settings/directories'
+    | '/settings/downloaders'
+    | '/settings/indexers'
+    | '/settings/search'
+    | '/settings/'
+  fileRoutesById: FileRoutesById
+}
+
+export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
+  ConfigRoute: typeof ConfigRoute
+  LogsRoute: typeof LogsRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   JobsRoute: JobsRoute,
   LogsRoute: LogsRoute,
-  SettingsRoute: SettingsRoute,
-};
+  SettingsRoute: SettingsRouteWithChildren,
+}
 
 export const routeTree = rootRoute
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()
 
 /* ROUTE_MANIFEST_START
 {
@@ -150,7 +349,39 @@ export const routeTree = rootRoute
       "filePath": "logs.tsx"
     },
     "/settings": {
-      "filePath": "settings.tsx"
+      "filePath": "settings.tsx",
+      "children": [
+        "/settings/connect",
+        "/settings/directories",
+        "/settings/downloaders",
+        "/settings/indexers",
+        "/settings/search",
+        "/settings/"
+      ]
+    },
+    "/settings/connect": {
+      "filePath": "settings/connect.tsx",
+      "parent": "/settings"
+    },
+    "/settings/directories": {
+      "filePath": "settings/directories.tsx",
+      "parent": "/settings"
+    },
+    "/settings/downloaders": {
+      "filePath": "settings/downloaders.tsx",
+      "parent": "/settings"
+    },
+    "/settings/indexers": {
+      "filePath": "settings/indexers.tsx",
+      "parent": "/settings"
+    },
+    "/settings/search": {
+      "filePath": "settings/search.tsx",
+      "parent": "/settings"
+    },
+    "/settings/": {
+      "filePath": "settings/index.tsx",
+      "parent": "/settings"
     }
   }
 }
