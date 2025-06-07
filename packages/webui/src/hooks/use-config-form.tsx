@@ -1,7 +1,7 @@
 import { useTRPC } from '@/lib/trpc';
 import { baseValidationSchema } from '@/types/config';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { formatConfigDataForForm } from '@/features/ConfigForm/lib/formatConfigData';
+import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { Config } from '@/types/config';
 // import { defaultConfig } from '../../../shared/constants';
 // import { formOptions } from '@tanstack/react-form';

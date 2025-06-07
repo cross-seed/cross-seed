@@ -1,23 +1,17 @@
 import { Button } from '@/components/ui/button';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import { baseValidationSchema, Config } from '@/types/config';
+import { baseValidationSchema } from '@/types/config';
 import { useQuery } from '@tanstack/react-query';
 import { FC, useEffect, useState } from 'react';
 import './Form.css';
 import { defaultConfig } from '../../../../shared/constants';
 import { useAppForm } from '@/hooks/form';
-import { formatConfigDataForForm } from './lib/formatConfigData';
-import { removeEmptyArrayValues } from './lib/transformers';
+import { formatConfigDataForForm } from '@/lib/formatConfigData';
+import { removeEmptyArrayValues } from '@/lib/transformers';
 import { LoaderCircle } from 'lucide-react';
-import DirectoriesPathsFields from './directories-paths-fields';
-import ConnectCrossSeedFields from './connect-crossseed-fields';
-import DownloadingFields from './downloading-fields';
-import SearchingRssFields from './searching-rss-fields';
-import MiscSettingsFields from './misc-settings-fields';
-import ConnectOtherAppsFields from './connect-other-apps-fields';
 // import useConfigForm from '@/hooks/use-config-form';
-import { useSaveConfigHook } from './hooks/saveFormHook';
+import { useSaveConfigHook } from '@/hooks/saveFormHook';
 
 type FormProps = {
   className?: string;
@@ -59,7 +53,7 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           Object.keys(value).forEach((attr) => {
             const val = value[attr as keyof typeof configData];
             if (val && Array.isArray(val)) {
-              (value[attr as keyof typeof configData] as unknown) =
+              value[attr as keyof typeof configData] =
                 removeEmptyArrayValues(val);
             }
           });
@@ -81,11 +75,6 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
       onSubmit: baseValidationSchema,
     },
   });
-
-  const isFieldRequired = (fieldName: string) => {
-    const schemaField = baseValidationSchema.shape[fieldName as keyof Config];
-    return !schemaField.isOptional() && !schemaField.isNullable();
-  };
 
   /**
    * Focus on the newly added field in array fields
@@ -160,13 +149,54 @@ export const ConfigForm: FC<FormProps> = ({ className }) => {
           state.fieldMeta,
         ]}
       >
-        {([canSubmit, isSubmitting, errors, fieldMeta]) => (
-          <div className="form__submit border-border bg-background sticky right-0 bottom-0 left-0 border-t border-solid p-6">
-            <Button
-              type="submit"
-              className={cn(
-                'w-full rounded-md px-4 py-6 transition-colors duration-150',
-                { isSubmitting: 'opacity-70' },
+        {/* form fields */}
+        <div className="flex flex-wrap gap-6"></div>
+
+        {/* The submit button */}
+        <form.Subscribe
+          selector={(state) => [
+            state.canSubmit,
+            state.isSubmitting,
+            state.errors,
+            state.fieldMeta,
+          ]}
+        >
+          {([canSubmit, isSubmitting, errors, fieldMeta]) => (
+            <div className="form__submit border-border bg-background sticky right-0 bottom-0 left-0 -mr-4 -ml-11 border-t border-solid p-6">
+              <Button
+                type="submit"
+                className={cn(
+                  'w-full rounded-md px-4 py-6 transition-colors duration-150',
+                  { isSubmitting: 'opacity-70' },
+                )}
+                disabled={!canSubmit}
+              >
+                {isSubmitting ? (
+                  <>
+                    <LoaderCircle className="animate-spin" /> Saving...
+                  </>
+                ) : (
+                  'Save'
+                )}{' '}
+                "{canSubmit && 'can submit'}"
+              </Button>
+              {Object.keys(errors).length > 0 && (
+                <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
+                  <h4 className="font-medium">
+                    Please fix the following errors:
+                  </h4>
+                  <ul className="mt-2 list-disc pl-5">
+                    {JSON.stringify(fieldMeta)}
+                    {Object.entries(errors).map(([field, error]) => (
+                      <li key={field}>
+                        {field}:{' '}
+                        {typeof error === 'string'
+                          ? error
+                          : JSON.stringify(error)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
               disabled={!canSubmit}
             >
