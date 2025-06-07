@@ -311,6 +311,11 @@ async function createTorznabSearchQueries(
 	] as const;
 }
 
+/**
+ * Used to calculate what searchees should share the same cached search.
+ * @param searchee - The searchee object to generate the search string for.
+ * @returns The search string that would be used to query indexers.
+ */
 export async function getSearchString(searchee: Searchee): Promise<string> {
 	const mediaType = getMediaType(searchee);
 	const params = (
@@ -319,6 +324,21 @@ export async function getSearchString(searchee: Searchee): Promise<string> {
 	const season = params.season !== undefined ? `.S${params.season}` : "";
 	const ep = params.ep !== undefined ? `.E${params.ep}` : "";
 	return `${params.q}${season}${ep}`.toLowerCase();
+}
+
+/**
+ * Useful for calculating the number of unique queries with just a searchee name.
+ * @param name - The name of the searchee.
+ * @return The search string that would be used to query indexers.
+ */
+export async function estimateSearchString(name: string): Promise<string> {
+	const searchee: Searchee = {
+		name,
+		title: name,
+		length: 1,
+		files: [{ name: "a.mkv", path: "a.mkv", length: 1 }],
+	};
+	return getSearchString(searchee);
 }
 
 /**
@@ -950,7 +970,7 @@ async function getAndLogIndexers(
 		: Number.POSITIVE_INFINITY;
 	const disabledIndexers: Indexer[] = [];
 	const timeFilteredIndexers = allIndexers.filter((indexer) => {
-		if (indexer.searchCap === false) return false;
+		if (indexer.searchCap === false || !indexer.categories) return false;
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id,
 		);
