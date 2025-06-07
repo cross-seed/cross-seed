@@ -82,7 +82,7 @@ const navItems = [
         url: '/settings/connect',
       },
       {
-        title: 'Directories & Paths',
+        title: 'Directories',
         icon: <Folders className="size-4" />,
         url: '/settings/directories',
       },
