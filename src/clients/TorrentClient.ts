@@ -124,22 +124,56 @@ export function parseClientEntry(
 	};
 }
 
+export function clientsAreUnique(torrentClients: string[]): {
+	uniqueHosts: boolean;
+	uniqueWithPathname: boolean;
+} {
+	const uniqueHosts =
+		new Set(
+			torrentClients.map(
+				(entry) => new URL(parseClientEntry(entry)!.url).host,
+			),
+		).size === torrentClients.length;
+	if (uniqueHosts) return { uniqueHosts: true, uniqueWithPathname: true };
+	const uniqueWithPathname =
+		new Set(
+			torrentClients.map((entry) => {
+				const url = new URL(parseClientEntry(entry)!.url);
+				return `${url.host}${url.pathname.replace(/\/+/g, "/").replace(/\/$/, "")}`;
+			}),
+		).size === torrentClients.length;
+	return { uniqueHosts, uniqueWithPathname };
+}
+
 export function instantiateDownloadClients() {
 	const { torrentClients } = getRuntimeConfig();
+	const { uniqueHosts } = clientsAreUnique(torrentClients);
 	for (const [priority, clientEntryRaw] of torrentClients.entries()) {
 		const { clientType, readonly, url } = parseClientEntry(clientEntryRaw)!;
+		const urlObj = new URL(url);
+		const clientHost = uniqueHosts
+			? urlObj.host
+			: `${urlObj.host}${urlObj.pathname}`;
 		switch (clientType) {
 			case Label.QBITTORRENT:
-				activeClients.push(new QBittorrent(url, priority, readonly));
+				activeClients.push(
+					new QBittorrent(url, clientHost, priority, readonly),
+				);
 				break;
 			case Label.RTORRENT:
-				activeClients.push(new RTorrent(url, priority, readonly));
+				activeClients.push(
+					new RTorrent(url, clientHost, priority, readonly),
+				);
 				break;
 			case Label.TRANSMISSION:
-				activeClients.push(new Transmission(url, priority, readonly));
+				activeClients.push(
+					new Transmission(url, clientHost, priority, readonly),
+				);
 				break;
 			case Label.DELUGE:
-				activeClients.push(new Deluge(url, priority, readonly));
+				activeClients.push(
+					new Deluge(url, clientHost, priority, readonly),
+				);
 				break;
 			default:
 				throw new Error(`Invalid client type: ${clientType}`);
