@@ -17,7 +17,7 @@ import {
   // Workflow,
   Folders,
   Webhook,
-  CloudDownload,
+  Popcorn,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -63,7 +63,7 @@ const navItems = [
       },
       {
         title: 'Indexers',
-        icon: <CloudDownload className="size-4" />,
+        icon: <Popcorn className="size-4" />,
         url: '/settings/indexers',
       },
       {
@@ -139,6 +139,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         activeProps={{
                           'data-active': true,
                         }}
+                        activeOptions={{exact: true}}
                       >
                         {item.icon}
                         <span>{item.title}</span>
