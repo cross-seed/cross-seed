@@ -1,21 +1,20 @@
-import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { ConfigFormProvider } from '@/contexts/Form/config-form-provider';
-// import { Settings } from '@/pages/Settings/Settings.tsx';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 import '/assets/form.css';
 
-export const Route = createFileRoute('/settings')({
-  component: SettingsLayoutComponent,
+export const Route = createFileRoute('/config')({
+  component: ConfigLayoutComponent,
 });
 
-function SettingsLayoutComponent() {
+function ConfigLayoutComponent() {
   return (
     <ConfigFormProvider>
-      <SettingsFormLayout />
+      <ConfigFormLayout />
     </ConfigFormProvider>
   );
 }
 
-function SettingsFormLayout() {
+function ConfigFormLayout() {
   return (
     <div className="mb-5">
       <h2 className="mb-6 text-2xl font-semibold">Edit Config</h2>
