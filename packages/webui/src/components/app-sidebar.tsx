@@ -20,6 +20,7 @@ import {
   Popcorn,
   Library,
   AlertTriangle,
+  CloudDownload,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -102,6 +103,31 @@ const navItems = [
         title: 'Logs',
         icon: <FileText className="size-4" />,
         url: '/logs',
+      },
+      {
+        title: 'Indexers',
+        icon: <CloudDownload className="size-4" />,
+        url: '/settings/indexers',
+      },
+      {
+        title: 'Download Clients',
+        icon: <Download className="size-4" />,
+        url: '/settings/downloaders',
+      },
+      {
+        title: 'Search & RSS',
+        icon: <Search className="size-4" />,
+        url: '/settings/search',
+      },
+      {
+        title: 'Connect',
+        icon: <Webhook className="size-4" />,
+        url: '/settings/connect',
+      },
+      {
+        title: 'Directories & Paths',
+        icon: <Folders className="size-4" />,
+        url: '/settings/directories',
       },
       {
         title: 'Logs',
