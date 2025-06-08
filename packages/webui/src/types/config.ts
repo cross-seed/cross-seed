@@ -6,51 +6,21 @@ import {
   ZodErrorMessages,
 } from '../../../shared/constants';
 
-export const baseValidationSchema = z.object({
-  delay: z
-    .number()
-    .nonnegative(ZodErrorMessages.delayNegative)
-    .gte(import.meta.env.DEV ? 0 : 30, ZodErrorMessages.delayUnsupported)
-    .lte(3600, ZodErrorMessages.delayUnsupported),
-  torznab: z.array(z.string().url()),
-  useClientTorrents: z.boolean(),
-  dataDirs: z
-    .array(z.string())
-    .transform((v) => v ?? [])
-    .nullable(),
-  matchMode: z.nativeEnum(MatchMode),
-  skipRecheck: z.boolean(),
+export const generalValidationSchema = z.object({
+  includeSingleEpisodes: z.boolean(),
+  includeNonVideos: z.boolean(),
+  blockList: z.array(z.string()).nullish(),
+  // .transform(transformBlocklist),
+  snatchTimeout: z
+    .string()
+    .min(1, ZodErrorMessages.emptyString)
+    // .transform(transformDurationString)
+    .nullish(),
   autoResumeMaxDownload: z
     .number()
     .int()
     .gte(0, ZodErrorMessages.autoResumeMaxDownloadUnsupported)
     .lte(52428800, ZodErrorMessages.autoResumeMaxDownloadUnsupported),
-  linkCategory: z.string().nullish(),
-  linkDir: z.string().nullish(),
-  linkDirs: z.array(z.string()).nullable(),
-  linkType: z.nativeEnum(LinkType),
-  flatLinking: z
-    .boolean()
-    .transform((v) => (typeof v === 'boolean' ? v : false)),
-  maxDataDepth: z
-    .number()
-    .gte(1)
-    .refine((maxDataDepth) => {
-      if (maxDataDepth > 3) {
-        console.error(
-          `Your maxDataDepth is most likely incorrect, please read: https://www.cross-seed.org/docs/tutorials/data-based-matching#setting-up-data-based-matching`,
-        );
-      }
-      return true;
-    }),
-  torrentDir: z
-    .string()
-    .nullable()
-    .transform((v) => v ?? null),
-  outputDir: z.string().min(1, ZodErrorMessages.emptyString),
-  injectDir: z.string().optional(),
-  includeSingleEpisodes: z.boolean(),
-  includeNonVideos: z.boolean(),
   fuzzySizeThreshold: z
     .number()
     .positive()
@@ -60,29 +30,37 @@ export const baseValidationSchema = z.object({
     .positive()
     .lte(1, ZodErrorMessages.numberMustBeRatio)
     .nullish(),
-  excludeOlder: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullable(),
-  excludeRecentSearch: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullable(),
+});
 
-  action: z.nativeEnum(Action),
+export const trackerValidationSchema = z.object({
+  torznab: z.array(z.string().url()),
+});
+
+export const downloaderValidationSchema = z.object({
   qbittorrentUrl: z.string().url().nullish(),
   rtorrentRpcUrl: z.string().url().nullish(),
   transmissionRpcUrl: z.string().url().nullish(),
   delugeRpcUrl: z.string().url().nullish(),
+  action: z.nativeEnum(Action),
   duplicateCategories: z.boolean(),
-  notificationWebhookUrls: z
-    .array(z.string().url().or(z.literal('')))
-    .optional(),
-  port: z.number().positive().lte(65535).nullish(),
-  // .nullish(),
-  host: z.string().ip().nullish(),
+  useClientTorrents: z.boolean(),
+  linkCategory: z.string().nullish(),
+  skipRecheck: z.boolean(),
+  torrentDir: z
+    .string()
+    .nullable()
+    .transform((v) => v ?? null),
+  outputDir: z.string().min(1, ZodErrorMessages.emptyString),
+  injectDir: z.string().optional(),
+});
+
+export const searchValidationSchema = z.object({
+  delay: z
+    .number()
+    .nonnegative(ZodErrorMessages.delayNegative)
+    .gte(import.meta.env.DEV ? 0 : 30, ZodErrorMessages.delayUnsupported)
+    .lte(3600, ZodErrorMessages.delayUnsupported),
+  matchMode: z.nativeEnum(MatchMode),
   rssCadence: z
     .string()
     .min(1, ZodErrorMessages.emptyString)
@@ -105,21 +83,28 @@ export const baseValidationSchema = z.object({
   // 		process.env.DEV || !cadence || cadence >= ms("1 day"),
   // 	ZodErrorMessages.searchCadenceUnsupported,
   // ),
-  snatchTimeout: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullish(),
   searchTimeout: z
     .string()
     .min(1, ZodErrorMessages.emptyString)
     // .transform(transformDurationString)
     .nullish(),
   searchLimit: z.number().nonnegative().nullish(),
-  verbose: z.boolean(),
-  torrents: z.array(z.string()).optional(),
-  blockList: z.array(z.string()).nullish(),
-  // .transform(transformBlocklist),
+  excludeOlder: z
+    .string()
+    .min(1, ZodErrorMessages.emptyString)
+    // .transform(transformDurationString)
+    .nullable(),
+  excludeRecentSearch: z
+    .string()
+    .min(1, ZodErrorMessages.emptyString)
+    // .transform(transformDurationString)
+    .nullable(),
+});
+
+export const connectValidationSchema = z.object({
+  host: z.string().ip().nullish(),
+  port: z.number().positive().lte(65535).nullish(),
+  // .nullish(),
   apiKey: z.string().min(24).nullish(),
   radarr: z
     .array(z.string().url().or(z.literal('')))
@@ -129,6 +114,38 @@ export const baseValidationSchema = z.object({
     .array(z.string().url().or(z.literal('')))
     .transform((v) => v ?? [])
     .nullable(),
+  notificationWebhookUrls: z
+    .array(z.string().url().or(z.literal('')))
+    .optional(),
+});
+
+export const directoryValidationSchema = z.object({
+  dataDirs: z
+    .array(z.string())
+    .transform((v) => v ?? [])
+    .nullable(),
+  flatLinking: z
+    .boolean()
+    .transform((v) => (typeof v === 'boolean' ? v : false)),
+  linkDir: z.string().nullish(),
+  linkDirs: z.array(z.string()).nullable(),
+  linkType: z.nativeEnum(LinkType),
+  maxDataDepth: z
+    .number()
+    .gte(1)
+    .refine((maxDataDepth) => {
+      if (maxDataDepth > 3) {
+        console.error(
+          `Your maxDataDepth is most likely incorrect, please read: https://www.cross-seed.org/docs/tutorials/data-based-matching#setting-up-data-based-matching`,
+        );
+      }
+      return true;
+    }),
+});
+
+export const baseValidationSchema = z.object({
+  verbose: z.boolean(),
+  torrents: z.array(z.string()).optional(),
 });
 
 export type Config = z.infer<typeof baseValidationSchema>;

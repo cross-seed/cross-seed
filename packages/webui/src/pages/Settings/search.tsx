@@ -1,19 +1,21 @@
 import { withForm } from '@/hooks/form';
 import { MatchMode } from '../../../../shared/constants';
 import { formOpts } from '../../components/Form/shared-form';
-// import { useConfigFormContext } from '@/contexts/Form/use-config-form-context';
 import { useAppForm } from '@/hooks/form';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues } from '@/lib/transformers';
-import { baseValidationSchema } from '@/types/config';
+import { searchValidationSchema } from '@/types/config';
+import useConfigForm from '@/hooks/use-config-form';
+import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 
 const SearchRssSettings = withForm({
   ...formOpts,
   render: function Render() {
     const trpc = useTRPC();
+    const { isFieldRequired } = useConfigForm(searchValidationSchema);
     const {
       data: configData,
       // isLoading,
@@ -38,7 +40,7 @@ const SearchRssSettings = withForm({
         // Fake a long response delay
         // setTimeout(() => {
         try {
-          const result = baseValidationSchema.safeParse(value);
+          const result = searchValidationSchema.safeParse(value);
           if (!result.success) {
             console.error('FULL VALIDATION FAILED:', result.error.format());
           } else {
@@ -63,11 +65,12 @@ const SearchRssSettings = withForm({
         // }, 2000);
       },
       validators: {
-        onSubmit: baseValidationSchema,
+        onSubmit: searchValidationSchema,
       },
     });
 
     return (
+      <FormValidationProvider isFieldRequired={isFieldRequired}>
       <form
         className="form flex flex-col gap-4"
         onSubmit={(e) => {
@@ -129,18 +132,6 @@ const SearchRssSettings = withForm({
             </div>
             <div className="">
               <form.AppField
-                name="snatchTimeout"
-                validators={
-                  {
-                    // onBlur: baseValidationSchema.shape.snatchTimeout,
-                  }
-                }
-              >
-                {(field) => <field.TextField label="Snatch Timeout" />}
-              </form.AppField>
-            </div>
-            <div className="">
-              <form.AppField
                 name="searchTimeout"
                 validators={
                   {
@@ -195,6 +186,7 @@ const SearchRssSettings = withForm({
           </form.AppForm>
         </div>
       </form>
+      </FormValidationProvider>
     );
   },
 });

@@ -4,7 +4,7 @@ import { FieldInfo } from '@/components/Form/FieldInfo';
 import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { useConfigForm } from '@/hooks/use-config-form';
+import useConfigForm from '@/hooks/use-config-form';
 import { formOpts } from '../../components/Form/shared-form';
 import { useAppForm } from '@/hooks/form';
 import { useQuery } from '@tanstack/react-query';
@@ -12,12 +12,13 @@ import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues } from '@/lib/transformers';
-import { baseValidationSchema } from '@/types/config';
+import { connectValidationSchema } from '@/types/config';
+import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 
 const ConnectSettings = withForm({
   ...formOpts,
   render: function Render() {
-    const { isFieldRequired } = useConfigForm();
+    const { isFieldRequired } = useConfigForm(connectValidationSchema);
 
     const trpc = useTRPC();
     const {
@@ -44,7 +45,7 @@ const ConnectSettings = withForm({
         // Fake a long response delay
         // setTimeout(() => {
         try {
-          const result = baseValidationSchema.safeParse(value);
+          const result = connectValidationSchema.safeParse(value);
           if (!result.success) {
             console.error('FULL VALIDATION FAILED:', result.error.format());
           } else {
@@ -69,7 +70,7 @@ const ConnectSettings = withForm({
         // }, 2000);
       },
       validators: {
-        onSubmit: baseValidationSchema,
+        onSubmit: connectValidationSchema,
       },
     });
 
@@ -86,6 +87,7 @@ const ConnectSettings = withForm({
     }, [lastFieldAdded]);
 
     return (
+      <FormValidationProvider isFieldRequired={isFieldRequired}>
       <form
         className="form flex flex-col gap-4"
         onSubmit={(e) => {
@@ -378,6 +380,7 @@ const ConnectSettings = withForm({
           </form.AppForm>
         </div>
       </form>
+      </FormValidationProvider>
     );
   },
 });
