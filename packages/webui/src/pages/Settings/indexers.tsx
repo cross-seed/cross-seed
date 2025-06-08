@@ -12,12 +12,13 @@ import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues } from '@/lib/transformers';
-import { baseValidationSchema } from '@/types/config';
+import { trackerValidationSchema } from '@/types/config';
+import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 
 const IndexerSettings = withForm({
   ...formOpts,
   render: function Render() {
-    const { isFieldRequired } = useConfigForm();
+    const { isFieldRequired } = useConfigForm(trackerValidationSchema);
 
     const trpc = useTRPC();
     const {
@@ -44,7 +45,7 @@ const IndexerSettings = withForm({
         // Fake a long response delay
         // setTimeout(() => {
         try {
-          const result = baseValidationSchema.safeParse(value);
+          const result = trackerValidationSchema.safeParse(value);
           if (!result.success) {
             console.error('FULL VALIDATION FAILED:', result.error.format());
           } else {
@@ -69,7 +70,7 @@ const IndexerSettings = withForm({
         // }, 2000);
       },
       validators: {
-        onSubmit: baseValidationSchema,
+        onSubmit: trackerValidationSchema,
       },
     });
     /**
@@ -85,105 +86,107 @@ const IndexerSettings = withForm({
     }, [lastFieldAdded]);
 
     return (
-      <form
-        className="form flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-        noValidate
-      >
-        {/* form fields */}
-        <div className="flex flex-wrap gap-6">
-          <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-            <legend>Torznab</legend>
-            <div className="">
-              <form.Field
-                name="torznab"
-                mode="array"
-                // validators={{
-                //   onBlur: baseValidationSchema.shape.torznab,
-                //   onChange: ({ value }) => {
-                //     const results = baseValidationSchema.shape.torznab.safeParse(value);
-                //     if (!results.success) {
-                //       return results.error.format()._errors;
-                //     }
-                //     return undefined;
-                //   }
-                // }}
-              >
-                {(field) => {
-                  return (
-                    <div className="space-y-3">
-                      <Label htmlFor={field.name} className="block w-full">
-                        Torznab URL(s)
-                        {isFieldRequired(field.name) && (
-                          <span className="pl-1 text-red-500">*</span>
-                        )}
-                      </Label>
-                      {field.state.value.map((_: string, index: number) => {
-                        return (
-                          <div
-                            key={index}
-                            className="gap-y- mb-3 flex flex-col"
-                          >
-                            <form.AppField
-                              name={`torznab[${index}]`}
-                              validators={{
-                                onBlur: z.string().url(),
-                              }}
+      <FormValidationProvider isFieldRequired={isFieldRequired}>
+        <form
+          className="form flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+          noValidate
+        >
+          {/* form fields */}
+          <div className="flex flex-wrap gap-6">
+            <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
+              <legend>Torznab</legend>
+              <div className="">
+                <form.Field
+                  name="torznab"
+                  mode="array"
+                  // validators={{
+                  //   onBlur: baseValidationSchema.shape.torznab,
+                  //   onChange: ({ value }) => {
+                  //     const results = baseValidationSchema.shape.torznab.safeParse(value);
+                  //     if (!results.success) {
+                  //       return results.error.format()._errors;
+                  //     }
+                  //     return undefined;
+                  //   }
+                  // }}
+                >
+                  {(field) => {
+                    return (
+                      <div className="space-y-3">
+                        <Label htmlFor={field.name} className="block w-full">
+                          Torznab URL(s)
+                          {isFieldRequired(field.name) && (
+                            <span className="pl-1 text-red-500">*</span>
+                          )}
+                        </Label>
+                        {field.state.value.map((_: string, index: number) => {
+                          return (
+                            <div
+                              key={index}
+                              className="gap-y- mb-3 flex flex-col"
                             >
-                              {(subfield) => (
-                                <subfield.ArrayField
-                                  showDelete={
-                                    field.state.value &&
-                                    field.state.value?.length > 1
-                                  }
-                                  index={index}
-                                  onDelete={() => {
-                                    field.removeValue(index);
-                                  }}
-                                />
-                              )}
-                            </form.AppField>
-                            <form.Subscribe
-                              selector={(f) =>
-                                f.fieldMeta[
-                                  `${field.name}[${index}]` as keyof typeof f.fieldMeta
-                                ]
-                              }
-                            >
-                              {(fieldMeta) => (
-                                <FieldInfo fieldMeta={fieldMeta} />
-                              )}
-                            </form.Subscribe>
-                          </div>
-                        );
-                      })}
-                      <Button
-                        variant="secondary"
-                        type="button"
-                        onClick={() => {
-                          field.pushValue('');
-                          const newFieldId = `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`;
-                          setLastFieldAdded(newFieldId);
-                        }}
-                        title={`Add ${field.name}`}
-                      >
-                        Add
-                      </Button>
-                    </div>
-                  );
-                }}
-              </form.Field>
-            </div>
-          </fieldset>
-          <form.AppForm>
-            <form.SubmitButton />
-          </form.AppForm>
-        </div>
-      </form>
+                              <form.AppField
+                                name={`torznab[${index}]`}
+                                validators={{
+                                  onBlur: z.string().url(),
+                                }}
+                              >
+                                {(subfield) => (
+                                  <subfield.ArrayField
+                                    showDelete={
+                                      field.state.value &&
+                                      field.state.value?.length > 1
+                                    }
+                                    index={index}
+                                    onDelete={() => {
+                                      field.removeValue(index);
+                                    }}
+                                  />
+                                )}
+                              </form.AppField>
+                              <form.Subscribe
+                                selector={(f) =>
+                                  f.fieldMeta[
+                                    `${field.name}[${index}]` as keyof typeof f.fieldMeta
+                                  ]
+                                }
+                              >
+                                {(fieldMeta) => (
+                                  <FieldInfo fieldMeta={fieldMeta} />
+                                )}
+                              </form.Subscribe>
+                            </div>
+                          );
+                        })}
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          onClick={() => {
+                            field.pushValue('');
+                            const newFieldId = `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`;
+                            setLastFieldAdded(newFieldId);
+                          }}
+                          title={`Add ${field.name}`}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    );
+                  }}
+                </form.Field>
+              </div>
+            </fieldset>
+            <form.AppForm>
+              <form.SubmitButton />
+            </form.AppForm>
+          </div>
+        </form>
+      </FormValidationProvider>
     );
   },
 });
