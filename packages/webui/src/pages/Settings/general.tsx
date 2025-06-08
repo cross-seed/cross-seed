@@ -36,7 +36,7 @@ const GeneralSettings = withForm({
       // isLoading,
       // isError,
     } = useQuery(
-      trpc.config.get.queryOptions(undefined, {
+      trpc.settings.get.queryOptions(undefined, {
         select: (data) => formatConfigDataForForm(data.config),
       }),
     );
