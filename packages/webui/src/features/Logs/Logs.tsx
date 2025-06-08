@@ -1,4 +1,7 @@
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label.tsx';
+import { Separator } from '@/components/ui/separator.tsx';
+import { Switch } from '@/components/ui/switch.tsx';
 import {
   Table,
   TableBody,
@@ -7,10 +10,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatRelativeTime } from '@/lib/time';
 import { useTRPC } from '@/lib/trpc';
 import { useSubscription } from '@trpc/tanstack-react-query';
+import { SeparatorVertical, SeparatorVerticalIcon } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { formatRelativeTime } from '@/lib/time';
 
 interface LogEntry {
   timestamp: string;
@@ -25,6 +29,7 @@ export function Logs() {
   const [levelFilters, setLevelFilters] = useState<Set<string>>(
     new Set(['error', 'warn', 'info', 'verbose', 'debug']),
   );
+  const [isReversed, setIsReversed] = useState(false);
   const [labelFilters, setLabelFilters] = useState<Set<string>>(new Set());
   const trpc = useTRPC();
   const tableRef = useRef<HTMLTableElement>(null);
@@ -94,16 +99,20 @@ export function Logs() {
 
   // Filter logs based on level and label filters
   const filteredLogs = useMemo(() => {
-    return logs.filter((log) => {
+    const ret = logs.filter((log) => {
       const levelMatch = levelFilters.has(log.level);
       const labelMatch = !log.label || labelFilters.has(log.label);
       return levelMatch && labelMatch;
     });
-  }, [logs, levelFilters, labelFilters]);
+    if (isReversed) {
+      ret.reverse();
+    }
+    return ret;
+  }, [logs, isReversed, levelFilters, labelFilters]);
 
   return (
     <div className="w-full space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-stretch justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2">
           {(['error', 'warn', 'info', 'verbose', 'debug'] as const).map(
             (level) => (
@@ -150,30 +159,35 @@ export function Logs() {
             ),
           )}
         </div>
-        {uniqueLabels.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            {uniqueLabels.map((label) => (
-              <Badge
-                key={label}
-                variant={labelFilters.has(label) ? 'default' : 'outline'}
-                className="hover:bg-muted cursor-pointer font-mono text-xs select-none"
-                onClick={() => {
-                  setLabelFilters((prev) => {
-                    const newFilters = new Set(prev);
-                    if (newFilters.has(label)) {
-                      newFilters.delete(label);
-                    } else {
-                      newFilters.add(label);
-                    }
-                    return newFilters;
-                  });
-                }}
-              >
-                {label}
-              </Badge>
-            ))}
-          </div>
-        )}
+        <div>
+          <Separator orientation="vertical" className="h-6" />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {uniqueLabels.map((label) => (
+            <Badge
+              key={label}
+              variant={labelFilters.has(label) ? 'default' : 'outline'}
+              className="hover:bg-muted cursor-pointer font-mono text-xs select-none"
+              onClick={() => {
+                setLabelFilters((prev) => {
+                  const newFilters = new Set(prev);
+                  if (newFilters.has(label)) {
+                    newFilters.delete(label);
+                  } else {
+                    newFilters.add(label);
+                  }
+                  return newFilters;
+                });
+              }}
+            >
+              {label}
+            </Badge>
+          ))}
+        </div>
+        <Label className="ml-auto">
+          <span className="text-sm font-medium">Show newest first</span>
+          <Switch checked={isReversed} onCheckedChange={setIsReversed} />
+        </Label>
       </div>
 
       {filteredLogs.length > 0 ? (
