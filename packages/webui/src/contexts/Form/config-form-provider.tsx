@@ -12,7 +12,7 @@ import { ConfigFormContext } from './config-form-context';
 export function ConfigFormProvider({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
   const { data: configData, isLoading } = useQuery(
-    trpc.config.get.queryOptions(undefined, {
+    trpc.settings.get.queryOptions(undefined, {
       select: (data) => formatConfigDataForForm(data.config),
     }),
   );
