@@ -10,7 +10,7 @@ import {
 } from "../../configuration.js";
 import { isDbConfigEnabled, updateDbConfig } from "../../dbConfig.js";
 
-export const configRouter = router({
+export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
 		try {
 			const runtimeConfig = getRuntimeConfig();
@@ -21,10 +21,7 @@ export const configRouter = router({
 				isDbConfig: isDbConfigEnabled(),
 			};
 		} catch (error) {
-			logger.error({
-				label: Label.SERVER,
-				message: error.message,
-			});
+			logger.error({ label: Label.SERVER, message: error.message });
 			throw new Error(`Failed to read config: ${error.message}`);
 		}
 	}),
@@ -51,10 +48,7 @@ export const configRouter = router({
 
 				return { success: true };
 			} catch (error) {
-				logger.error({
-					label: Label.SERVER,
-					message: error.message,
-				});
+				logger.error({ label: Label.SERVER, message: error.message });
 				throw new Error(`Failed to save config: ${error.message}`);
 			}
 		}),
@@ -65,16 +59,10 @@ export const configRouter = router({
 			// We need to implement proper validation logic
 			return {
 				status: "success",
-				validations: {
-					paths: true,
-					torznab: true,
-				},
+				validations: { paths: true, torznab: true },
 			};
 		} catch (error) {
-			logger.error({
-				label: Label.SERVER,
-				message: error.message,
-			});
+			logger.error({ label: Label.SERVER, message: error.message });
 			throw new Error(`Failed to validate config: ${error.message}`);
 		}
 	}),
