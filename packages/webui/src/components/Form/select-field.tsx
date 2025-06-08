@@ -10,7 +10,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import RequiredIndicator from './required-indicator';
-import useConfigForm from '@/hooks/use-config-form';
+import { useFormValidation } from '@/contexts/Form/use-form-validation-context';
 
 type SelectFieldProps<T extends Record<string, string>> = {
   className?: string;
@@ -38,7 +38,7 @@ function SelectField<T extends Record<string, string>>({
   options,
 }: SelectFieldProps<T>) {
   const field = useFieldContext();
-  const { isFieldRequired } = useConfigForm();
+  const { isFieldRequired } = useFormValidation();
 
   return (
     <div className={cn('space-y-3', className)}>

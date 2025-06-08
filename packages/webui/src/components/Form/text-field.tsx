@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { FieldInfo } from './FieldInfo';
 import RequiredIndicator from './required-indicator';
-import useConfigForm from '@/hooks/use-config-form';
+import { useFormValidation } from '@/contexts/Form/use-form-validation-context';
 
 type TextFieldProps = React.HTMLProps<HTMLInputElement> & {
   className?: string;
@@ -31,7 +31,7 @@ const TextField: FC<TextFieldProps> = ({
   ...rest
 }) => {
   const field = useFieldContext<string>();
-  const { isFieldRequired } = useConfigForm();
+  const { isFieldRequired } = useFormValidation();
 
   return (
     <div className={cn('space-y-3', className)}>

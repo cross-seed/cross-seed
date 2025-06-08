@@ -1,6 +1,4 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { ConfigFormProvider } from '@/contexts/Form/config-form-provider';
-// import { Settings } from '@/pages/Settings/Settings.tsx';
 import '/assets/form.css';
 
 export const Route = createFileRoute('/settings')({
@@ -9,9 +7,7 @@ export const Route = createFileRoute('/settings')({
 
 function SettingsLayoutComponent() {
   return (
-    <ConfigFormProvider>
       <SettingsFormLayout />
-    </ConfigFormProvider>
   );
 }
 
