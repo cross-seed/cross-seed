@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { FieldInfo } from '@/components/Form/FieldInfo';
 import { useState, useEffect } from 'react';
-import { useConfigForm } from '@/hooks/use-config-form';
+import useConfigForm from '@/hooks/use-config-form';
 import { formOpts } from '../../components/Form/shared-form';
 import { useAppForm } from '@/hooks/form';
 import { useQuery } from '@tanstack/react-query';
@@ -13,12 +13,13 @@ import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues } from '@/lib/transformers';
-import { baseValidationSchema } from '@/types/config';
+import { directoryValidationSchema } from '@/types/config';
+import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 
 const DirectoriesPathsFields = withForm({
   ...formOpts,
   render: function Render() {
-    const { isFieldRequired } = useConfigForm();
+    const { isFieldRequired } = useConfigForm(directoryValidationSchema);
 
     const trpc = useTRPC();
     const {
@@ -45,7 +46,7 @@ const DirectoriesPathsFields = withForm({
         // Fake a long response delay
         // setTimeout(() => {
         try {
-          const result = baseValidationSchema.safeParse(value);
+          const result = directoryValidationSchema.safeParse(value);
           if (!result.success) {
             console.error('FULL VALIDATION FAILED:', result.error.format());
           } else {
@@ -70,7 +71,7 @@ const DirectoriesPathsFields = withForm({
         // }, 2000);
       },
       validators: {
-        onSubmit: baseValidationSchema,
+        onSubmit: directoryValidationSchema,
       },
     });
 
@@ -87,6 +88,7 @@ const DirectoriesPathsFields = withForm({
     }, [lastFieldAdded]);
 
     return (
+      <FormValidationProvider isFieldRequired={isFieldRequired}>
       <form
         className="form flex flex-col gap-4"
         onSubmit={(e) => {
@@ -279,12 +281,27 @@ const DirectoriesPathsFields = withForm({
                 }}
               </form.Field>
             </div>
+            <div className="">
+              <form.AppField
+                name="maxDataDepth"
+                validators={
+                  {
+                    // onBlur: baseValidationSchema.shape.delay,
+                  }
+                }
+              >
+                {(field) => (
+                  <field.TextField label="Max Data Depth" type="number" />
+                )}
+              </form.AppField>
+            </div>
           </fieldset>
           <form.AppForm>
             <form.SubmitButton />
           </form.AppForm>
         </div>
       </form>
+      </FormValidationProvider>
     );
   },
 });
