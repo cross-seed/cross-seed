@@ -667,9 +667,7 @@ export async function getSimilarByName(name: string): Promise<{
 		return { keys: [], clientSearchees, dataSearchees };
 	}
 	const candidateMaxDistance = Math.floor(
-		keyTitles.reduce((sum, title) => sum + title.length, 0) /
-			keyTitles.length /
-			LEVENSHTEIN_DIVISOR,
+		Math.min(...keyTitles.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
 	);
 
 	const filterEntries = (dbEntries: { title?: string; name?: string }[]) => {
@@ -677,14 +675,10 @@ export async function getSimilarByName(name: string): Promise<{
 			const entry = getKeysFromName(dbEntry.title ?? dbEntry.name!);
 			if (entry.element !== element) return false;
 			if (!entry.keyTitles.length) return false;
-			const maxDistance = Math.max(
+			const maxDistance = Math.min(
 				candidateMaxDistance,
 				Math.floor(
-					entry.keyTitles.reduce(
-						(sum, title) => sum + title.length,
-						0,
-					) /
-						entry.keyTitles.length /
+					Math.min(...entry.keyTitles.map((t) => t.length)) /
 						LEVENSHTEIN_DIVISOR,
 				),
 			);
