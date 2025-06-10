@@ -1,5 +1,5 @@
-import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
+import { distance } from "fastest-levenshtein";
 import { readdir, readFile, stat, utimes, writeFile } from "fs/promises";
 import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
@@ -117,7 +117,7 @@ export async function parseTorrentWithMetadata(
 	const torrentInfo = torrentInfos.find((t) => t.infoHash === meta.infoHash);
 	if (torrentInfo) {
 		meta.category = torrentInfo.category;
-		meta.tags = torrentInfo.tags;
+		meta.tags = torrentInfo.tags!;
 		if (!meta.trackers.length && torrentInfo.trackers) {
 			meta.trackers = torrentInfo.trackers;
 		}
