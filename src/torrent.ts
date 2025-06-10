@@ -221,7 +221,10 @@ async function snatchOnce(
 	}
 }
 
-export const snatchHistory = new Map<string, number>();
+export const snatchHistory = new Map<
+	string,
+	{ initialFailureAt: number; numFailures: number }
+>();
 
 export async function snatch(
 	candidate: Candidate,
@@ -252,10 +255,31 @@ export async function snatch(
 			return resultOfErr(snatchError);
 		}
 		const { extra, retryAfterMs } = snatchResult;
-		if (snatchHistory.has(candidate.link)) {
+		let linkHistory = snatchHistory.get(candidate.link);
+		if (linkHistory) {
+			++linkHistory.numFailures;
+		} else {
+			linkHistory = { initialFailureAt: Date.now(), numFailures: 1 };
+			snatchHistory.set(candidate.link, linkHistory);
+		}
+		let trackerHistory = snatchHistory.get(candidate.tracker);
+		if (trackerHistory) {
+			++trackerHistory.numFailures;
+		} else {
+			trackerHistory = { initialFailureAt: Date.now(), numFailures: 1 };
+			snatchHistory.set(candidate.tracker, trackerHistory);
+		}
+		if (linkHistory.numFailures > retries + 1) {
 			logger.warn({
 				label,
 				message: `Snatching ${candidate.name} from ${candidate.tracker} stopped after attempt ${progress}, this snatch has failed too many times recently: ${snatchError}${extra ? ` - ${extra}` : ""}`,
+			});
+			return resultOfErr(snatchError);
+		}
+		if (trackerHistory.numFailures > retries * 2 + 1) {
+			logger.warn({
+				label,
+				message: `Snatching ${candidate.name} from ${candidate.tracker} stopped after attempt ${progress}, this tracker has failed too many times recently: ${snatchError}${extra ? ` - ${extra}` : ""}`,
 			});
 			return resultOfErr(snatchError);
 		}
@@ -264,9 +288,6 @@ export async function snatch(
 				label,
 				message: `Snatching ${candidate.name} from ${candidate.tracker} stopped after attempt ${progress}, Retry-After of ${retryAfterMs / 1000}s exceeds timeout: ${snatchError}${extra ? ` - ${extra}` : ""}`,
 			});
-			if (!snatchHistory.has(candidate.link)) {
-				snatchHistory.set(candidate.link, Date.now());
-			}
 			return resultOfErr(snatchError);
 		}
 		const delayMs = Math.max(options.delayMs, retryAfterMs ?? 0);
@@ -276,9 +297,6 @@ export async function snatch(
 		});
 		if (i >= retries) break;
 		await wait(delayMs);
-	}
-	if (!snatchHistory.has(candidate.link)) {
-		snatchHistory.set(candidate.link, Date.now());
 	}
 	return resultOfErr(snatchError!);
 }
