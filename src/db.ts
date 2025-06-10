@@ -90,13 +90,16 @@ export async function cleanupDB(): Promise<void> {
 			label: Label.CLEANUP,
 			message: "Pruning failed snatch history entries",
 		});
-		for (const [url, ts] of snatchHistory.entries()) {
-			if (Date.now() - ts > ms("1 day")) {
+		for (const [
+			str,
+			{ initialFailureAt, numFailures },
+		] of snatchHistory.entries()) {
+			if (Date.now() - initialFailureAt > ms("1 day")) {
 				logger.verbose({
 					label: Label.CLEANUP,
-					message: `Deleting snatch history entry for ${url}`,
+					message: `Deleting snatch history entry for ${str}: ${numFailures} failures`,
 				});
-				snatchHistory.delete(url);
+				snatchHistory.delete(str);
 			}
 		}
 	})();

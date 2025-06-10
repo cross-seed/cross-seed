@@ -221,7 +221,10 @@ async function snatchOnce(
 	}
 }
 
-export const snatchHistory = new Map<string, number>();
+export const snatchHistory = new Map<
+	string,
+	{ initialFailureAt: number; numFailures: number }
+>();
 
 export async function snatch(
 	candidate: Candidate,
@@ -252,10 +255,31 @@ export async function snatch(
 			return resultOfErr(snatchError);
 		}
 		const { extra, retryAfterMs } = snatchResult;
-		if (snatchHistory.has(candidate.link)) {
+		let linkHistory = snatchHistory.get(candidate.link);
+		if (linkHistory) {
+			++linkHistory.numFailures;
+		} else {
+			linkHistory = { initialFailureAt: Date.now(), numFailures: 1 };
+			snatchHistory.set(candidate.link, linkHistory);
+		}
+		let trackerHistory = snatchHistory.get(candidate.tracker);
+		if (trackerHistory) {
+			++trackerHistory.numFailures;
+		} else {
+			trackerHistory = { initialFailureAt: Date.now(), numFailures: 1 };
+			snatchHistory.set(candidate.tracker, trackerHistory);
+		}
+		if (linkHistory.numFailures > retries + 1) {
 			logger.warn({
 				label,
 				message: `Snatching ${candidate.name} from ${candidate.tracker} stopped after attempt ${progress}, this snatch has failed too many times recently: ${snatchError}${extra ? ` - ${extra}` : ""}`,
+			});
+			return resultOfErr(snatchError);
+		}
+		if (trackerHistory.numFailures > retries * 2 + 1) {
+			logger.warn({
+				label,
+				message: `Snatching ${candidate.name} from ${candidate.tracker} stopped after attempt ${progress}, this tracker has failed too many times recently: ${snatchError}${extra ? ` - ${extra}` : ""}`,
 			});
 			return resultOfErr(snatchError);
 		}
@@ -264,9 +288,6 @@ export async function snatch(
 				label,
 				message: `Snatching ${candidate.name} from ${candidate.tracker} stopped after attempt ${progress}, Retry-After of ${retryAfterMs / 1000}s exceeds timeout: ${snatchError}${extra ? ` - ${extra}` : ""}`,
 			});
-			if (!snatchHistory.has(candidate.link)) {
-				snatchHistory.set(candidate.link, Date.now());
-			}
 			return resultOfErr(snatchError);
 		}
 		const delayMs = Math.max(options.delayMs, retryAfterMs ?? 0);
@@ -276,9 +297,6 @@ export async function snatch(
 		});
 		if (i >= retries) break;
 		await wait(delayMs);
-	}
-	if (!snatchHistory.has(candidate.link)) {
-		snatchHistory.set(candidate.link, Date.now());
 	}
 	return resultOfErr(snatchError!);
 }
@@ -667,9 +685,7 @@ export async function getSimilarByName(name: string): Promise<{
 		return { keys: [], clientSearchees, dataSearchees };
 	}
 	const candidateMaxDistance = Math.floor(
-		keyTitles.reduce((sum, title) => sum + title.length, 0) /
-			keyTitles.length /
-			LEVENSHTEIN_DIVISOR,
+		Math.min(...keyTitles.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
 	);
 
 	const filterEntries = (dbEntries: { title?: string; name?: string }[]) => {
@@ -677,14 +693,10 @@ export async function getSimilarByName(name: string): Promise<{
 			const entry = getKeysFromName(dbEntry.title ?? dbEntry.name!);
 			if (entry.element !== element) return false;
 			if (!entry.keyTitles.length) return false;
-			const maxDistance = Math.max(
+			const maxDistance = Math.min(
 				candidateMaxDistance,
 				Math.floor(
-					entry.keyTitles.reduce(
-						(sum, title) => sum + title.length,
-						0,
-					) /
-						entry.keyTitles.length /
+					Math.min(...entry.keyTitles.map((t) => t.length)) /
 						LEVENSHTEIN_DIVISOR,
 				),
 			);
