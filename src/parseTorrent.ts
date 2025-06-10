@@ -188,6 +188,12 @@ export class Metafile {
 			seedpool: "seedpool",
 			"tv-v": "tvvault",
 			upload: "ulcx",
+			"mebytes.tv": "AnimeBytes",
+			"kabt.me": "BakaBT",
+			"geddon.net": "Cinemageddon",
+			"ke.uno": "Hawke-Uno",
+			"garga.in": "Karagarga",
+			"uhdbits.org": "UHDBits",
 		};
 		const meta = new Metafile(bencode.decode(buf));
 

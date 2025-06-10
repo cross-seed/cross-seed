@@ -8,7 +8,8 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	MatchMode,
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	RESUME_EXCLUDED_EXTS,
+	RESUME_EXCLUDED_KEYWORDS,
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
 import { getPartialSizeRatio } from "../decide.js";
@@ -112,6 +113,7 @@ export interface TorrentClient {
 
 const PARSE_CLIENT_REGEX =
 	/^(?<clientType>.+?):(?:(?<readonly>readonly):)?(?<url>.*)$/;
+
 export function parseClientEntry(
 	clientEntry: string,
 ): { clientType: TorrentClientType; readonly: boolean; url: string } | null {
@@ -314,7 +316,9 @@ export async function waitForTorrentToComplete(
 }
 
 export function shouldRecheck(
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	meta: Metafile,
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	decision: DecisionAnyMatch,
 ): boolean {
 	return false; /*

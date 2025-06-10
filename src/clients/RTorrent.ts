@@ -33,7 +33,6 @@ import {
 	wait,
 } from "../utils.js";
 import {
-	shouldResumeFromNonRelevantFiles,
 	clientSearcheeModified,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
@@ -41,7 +40,7 @@ import {
 	organizeTrackers,
 	resumeErrSleepTime,
 	resumeSleepTime,
-	//shouldRecheck,
+	shouldResumeFromNonRelevantFiles,
 	TorrentClient,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
@@ -146,18 +145,6 @@ export default class RTorrent implements TorrentClient {
 		});
 	}
 
-	private async methodCallP<R>(method: string, args): Promise<R> {
-		const msg = `Calling method ${method} with params ${inspect(args, { depth: null, compact: true })}`;
-		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
-		logger.verbose({ label: this.label, message });
-		return new Promise((resolve, reject) => {
-			this.client.methodCall(method, args, (err, data) => {
-				if (err) return reject(err);
-				return resolve(data);
-			});
-		});
-	}
-
 	async isTorrentInClient(
 		inputHash: string,
 	): Promise<Result<boolean, Error>> {
@@ -173,158 +160,6 @@ export default class RTorrent implements TorrentClient {
 			return resultOf(false);
 		} catch (e) {
 			return resultOfErr(e);
-		}
-	}
-
-	private async checkOriginalTorrent(
-		infoHash: string,
-		options: { onlyCompleted: boolean },
-	): Promise<
-		Result<
-			{
-				name: string;
-				directoryBase: string;
-				bytesLeft: number;
-				hashing: 0 | 1 | 2 | 3;
-				isMultiFile: boolean;
-				isActive: boolean;
-			},
-			"FAILURE" | "TORRENT_NOT_COMPLETE" | "NOT_FOUND"
-		>
-	> {
-		const hash = infoHash.toUpperCase();
-		type ReturnType =
-			| [
-					[string],
-					[string],
-					[string],
-					["0" | "1" | "2" | "3"],
-					["0" | "1"],
-					["0" | "1"],
-					["0" | "1"],
-			  ]
-			| Fault[];
-
-		let response: ReturnType;
-		const args = [
-			[
-				{
-					methodName: "d.name",
-					params: [hash],
-				},
-				{
-					methodName: "d.directory",
-					params: [hash],
-				},
-				{
-					methodName: "d.left_bytes",
-					params: [hash],
-				},
-				{
-					methodName: "d.hashing",
-					params: [hash],
-				},
-				{
-					methodName: "d.complete",
-					params: [hash],
-				},
-				{
-					methodName: "d.is_multi_file",
-					params: [hash],
-				},
-				{
-					methodName: "d.is_active",
-					params: [hash],
-				},
-			],
-		];
-		try {
-			response = await this.methodCallP<ReturnType>(
-				"system.multicall",
-				args,
-			);
-		} catch (e) {
-			logger.debug({ label: this.label, message: e });
-			return resultOfErr("FAILURE");
-		}
-
-		function isFault(response: ReturnType): response is Fault[] {
-			return "faultString" in response[0];
-		}
-
-		try {
-			if (isFault(response)) {
-				if (response[0].faultString === COULD_NOT_FIND_INFO_HASH) {
-					return resultOfErr("NOT_FOUND");
-				} else {
-					throw new Error(
-						"Unknown rTorrent fault while checking original torrent",
-					);
-				}
-			}
-			const [
-				[name],
-				[directoryBase],
-				[bytesLeftStr],
-				[hashingStr],
-				[isCompleteStr],
-				[isMultiFileStr],
-				[isActiveStr],
-			] = response;
-			const isComplete = Boolean(Number(isCompleteStr));
-			if (options.onlyCompleted && !isComplete) {
-				return resultOfErr("TORRENT_NOT_COMPLETE");
-			}
-			return resultOf({
-				name,
-				directoryBase,
-				bytesLeft: Number(bytesLeftStr),
-				hashing: Number(hashingStr) as 0 | 1 | 2 | 3,
-				isMultiFile: Boolean(Number(isMultiFileStr)),
-				isActive: Boolean(Number(isActiveStr)),
-			});
-		} catch (e) {
-			logger.error({ label: this.label, message: e });
-			logger.debug("Failure caused by server response below:");
-			logger.debug(inspect(response));
-			return resultOfErr("FAILURE");
-		}
-	}
-
-	private async getDownloadLocation(
-		meta: Metafile,
-		searchee: Searchee,
-		options: { onlyCompleted: boolean; destinationDir?: string },
-	): Promise<
-		Result<
-			DownloadLocation,
-			"NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "FAILURE"
-		>
-	> {
-		if (options.destinationDir) {
-			// resolve to absolute because we send the path to rTorrent
-			const basePath = resolve(options.destinationDir, meta.name);
-			const directoryBase = meta.isSingleFileTorrent
-				? options.destinationDir
-				: basePath;
-			return resultOf({
-				downloadDir: options.destinationDir,
-				basePath,
-				directoryBase,
-			});
-		} else {
-			const result = await this.checkOriginalTorrent(searchee.infoHash!, {
-				onlyCompleted: options.onlyCompleted,
-			});
-			return result.mapOk(({ directoryBase }) => ({
-				directoryBase,
-				downloadDir: meta.isSingleFileTorrent
-					? directoryBase
-					: dirname(directoryBase),
-				basePath: meta.isSingleFileTorrent
-					? join(directoryBase, searchee.name)
-					: directoryBase,
-			}));
 		}
 	}
 
@@ -848,7 +683,7 @@ export default class RTorrent implements TorrentClient {
 					].filter((e) => e !== null),
 				);
 				// if (toRecheck) {
-				this.resumeInjection(meta, decision, {
+				await this.resumeInjection(meta, decision, {
 					checkOnce: false,
 				});
 				// }
@@ -870,5 +705,169 @@ export default class RTorrent implements TorrentClient {
 			await wait(100 * Math.pow(2, i));
 		}
 		return InjectionResult.FAILURE;
+	}
+
+	private async methodCallP<R>(method: string, args): Promise<R> {
+		const msg = `Calling method ${method} with params ${inspect(args, { depth: null, compact: true })}`;
+		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
+		logger.verbose({ label: this.label, message });
+		return new Promise((resolve, reject) => {
+			this.client.methodCall(method, args, (err, data) => {
+				if (err) return reject(err);
+				return resolve(data);
+			});
+		});
+	}
+
+	private async checkOriginalTorrent(
+		infoHash: string,
+		options: { onlyCompleted: boolean },
+	): Promise<
+		Result<
+			{
+				name: string;
+				directoryBase: string;
+				bytesLeft: number;
+				hashing: 0 | 1 | 2 | 3;
+				isMultiFile: boolean;
+				isActive: boolean;
+			},
+			"FAILURE" | "TORRENT_NOT_COMPLETE" | "NOT_FOUND"
+		>
+	> {
+		const hash = infoHash.toUpperCase();
+		type ReturnType =
+			| [
+					[string],
+					[string],
+					[string],
+					["0" | "1" | "2" | "3"],
+					["0" | "1"],
+					["0" | "1"],
+					["0" | "1"],
+			  ]
+			| Fault[];
+
+		let response: ReturnType;
+		const args = [
+			[
+				{
+					methodName: "d.name",
+					params: [hash],
+				},
+				{
+					methodName: "d.directory",
+					params: [hash],
+				},
+				{
+					methodName: "d.left_bytes",
+					params: [hash],
+				},
+				{
+					methodName: "d.hashing",
+					params: [hash],
+				},
+				{
+					methodName: "d.complete",
+					params: [hash],
+				},
+				{
+					methodName: "d.is_multi_file",
+					params: [hash],
+				},
+				{
+					methodName: "d.is_active",
+					params: [hash],
+				},
+			],
+		];
+		try {
+			response = await this.methodCallP<ReturnType>(
+				"system.multicall",
+				args,
+			);
+		} catch (e) {
+			logger.debug({ label: this.label, message: e });
+			return resultOfErr("FAILURE");
+		}
+
+		function isFault(response: ReturnType): response is Fault[] {
+			return "faultString" in response[0];
+		}
+
+		try {
+			if (isFault(response)) {
+				if (response[0].faultString === COULD_NOT_FIND_INFO_HASH) {
+					return resultOfErr("NOT_FOUND");
+				} else {
+					throw new Error(
+						"Unknown rTorrent fault while checking original torrent",
+					);
+				}
+			}
+			const [
+				[name],
+				[directoryBase],
+				[bytesLeftStr],
+				[hashingStr],
+				[isCompleteStr],
+				[isMultiFileStr],
+				[isActiveStr],
+			] = response;
+			const isComplete = Boolean(Number(isCompleteStr));
+			if (options.onlyCompleted && !isComplete) {
+				return resultOfErr("TORRENT_NOT_COMPLETE");
+			}
+			return resultOf({
+				name,
+				directoryBase,
+				bytesLeft: Number(bytesLeftStr),
+				hashing: Number(hashingStr) as 0 | 1 | 2 | 3,
+				isMultiFile: Boolean(Number(isMultiFileStr)),
+				isActive: Boolean(Number(isActiveStr)),
+			});
+		} catch (e) {
+			logger.error({ label: this.label, message: e });
+			logger.debug("Failure caused by server response below:");
+			logger.debug(inspect(response));
+			return resultOfErr("FAILURE");
+		}
+	}
+
+	private async getDownloadLocation(
+		meta: Metafile,
+		searchee: Searchee,
+		options: { onlyCompleted: boolean; destinationDir?: string },
+	): Promise<
+		Result<
+			DownloadLocation,
+			"NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "FAILURE"
+		>
+	> {
+		if (options.destinationDir) {
+			// resolve to absolute because we send the path to rTorrent
+			const basePath = resolve(options.destinationDir, meta.name);
+			const directoryBase = meta.isSingleFileTorrent
+				? options.destinationDir
+				: basePath;
+			return resultOf({
+				downloadDir: options.destinationDir,
+				basePath,
+				directoryBase,
+			});
+		} else {
+			const result = await this.checkOriginalTorrent(searchee.infoHash!, {
+				onlyCompleted: options.onlyCompleted,
+			});
+			return result.mapOk(({ directoryBase }) => ({
+				directoryBase,
+				downloadDir: meta.isSingleFileTorrent
+					? directoryBase
+					: dirname(directoryBase),
+				basePath: meta.isSingleFileTorrent
+					? join(directoryBase, searchee.name)
+					: directoryBase,
+			}));
+		}
 	}
 }

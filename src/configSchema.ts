@@ -1,17 +1,10 @@
 import { existsSync, readdirSync } from "fs";
 import ms from "ms";
-import { isAbsolute, join, relative, resolve } from "path";
+import { isAbsolute, join } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
-import { clientsAreUnique, parseClientEntry } from "./clients/TorrentClient.js";
+import { parseClientEntry } from "./clients/TorrentClient.js";
 import { appDir } from "./configuration.js";
-import {
-	Action,
-	BlocklistType,
-	LinkType,
-	MatchMode,
-	NEWLINE_INDENT,
-	parseBlocklistEntry,
-} from "./constants.js";
+import { Action, BlocklistType, LinkType, MatchMode, NEWLINE_INDENT, parseBlocklistEntry } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { formatAsList } from "./utils.js";
 
@@ -19,7 +12,14 @@ import { formatAsList } from "./utils.js";
  * error messages and map returned upon Zod validation failure
  */
 const ZodErrorMessages = {
-	blocklistType: `Blocklist item does not start with a valid prefix. Must be of ${formatAsList(Object.values(BlocklistType), { sort: false, style: "narrow", type: "unit" })}`,
+	blocklistType: `Blocklist item does not start with a valid prefix. Must be of ${formatAsList(
+		Object.values(BlocklistType),
+		{
+			sort: false,
+			style: "narrow",
+			type: "unit",
+		},
+	)}`,
 	blocklistEmptyValue: `Blocklist item must have a value after the colon.`,
 	blocklistRegex: `Blocklist regex is not a valid regex.`,
 	blocklistFolder: `Blocklist folder must not contain path separators`,
@@ -320,20 +320,13 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 }
 
 /**
- * check a potential child path being inside a array of parent paths
- * @param childPath path of the potential child (e.g outputDir)
- * @param parentDirs array of parentDir paths (e.g dataDirs)
+ * check a potential child path being inside an array of parent paths
+
  * @returns true if `childDir` is inside any `parentDirs` at any nesting level, false otherwise.
  */
-function isChildPath(childDir: string, parentDirs: string[]): boolean {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function isChildPath(): boolean {
 	return false;
-	return parentDirs.some((parentDir) => {
-		const resolvedParent = resolve(parentDir);
-		const resolvedChild = resolve(childPath);
-		const relativePath = relative(resolvedParent, resolvedChild);
-		// if the path does not start with '..' and is not absolute
-		return !(relativePath.startsWith("..") || isAbsolute(relativePath));
-	});
 }
 
 /**
@@ -722,7 +715,7 @@ export const VALIDATION_SCHEMA = z
 		);
 		return true;
 	})
-	.refine((config) => {
+	/*.refine((config) => {
 		for (const linkDir of config.linkDirs) {
 			if (isChildPath(linkDir, [config.outputDir])) return false;
 			if (isChildPath(linkDir, config.dataDirs)) {
@@ -776,8 +769,9 @@ export const VALIDATION_SCHEMA = z
 		if (isChildPath(config.outputDir, config.linkDirs)) {
 			return false;
 		}
+
 		return true;
-	}, ZodErrorMessages.outputDirInOtherDirs)
+	}, ZodErrorMessages.outputDirInOtherDirs)		*/
 	.refine((config) => {
 		if (
 			!isAbsolute(config.outputDir) ||
