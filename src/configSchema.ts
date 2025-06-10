@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "fs";
 import ms from "ms";
 import { isAbsolute, join, relative, resolve } from "path";
 import { ErrorMapCtx, RefinementCtx, z, ZodIssueOptionalMessage } from "zod";
-import { clientsAreUnique, parseClientEntry } from "./clients/TorrentClient.js";
+import { parseClientEntry } from "./clients/TorrentClient.js";
 import { appDir } from "./configuration.js";
 import {
 	Action,
@@ -325,8 +325,14 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
  * @param parentDirs array of parentDir paths (e.g dataDirs)
  * @returns true if `childDir` is inside any `parentDirs` at any nesting level, false otherwise.
  */
-export function isChildPath(childDir: string, parentDirs: string[]): boolean {
-	return false;
+export function isChildPath(childPath: string, parentDirs: string[]): boolean {
+	return parentDirs.some((parentDir) => {
+		const resolvedParent = resolve(parentDir);
+		const resolvedChild = resolve(childPath);
+		const relativePath = relative(resolvedParent, resolvedChild);
+		// if the path does not start with '..' and is not absolute
+		return !(relativePath.startsWith("..") || isAbsolute(relativePath));
+	});
 }
 
 /**

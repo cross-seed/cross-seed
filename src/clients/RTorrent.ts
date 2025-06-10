@@ -848,7 +848,7 @@ export default class RTorrent implements TorrentClient {
 					].filter((e) => e !== null),
 				);
 				// if (toRecheck) {
-				this.resumeInjection(meta, decision, {
+				void this.resumeInjection(meta, decision, {
 					checkOnce: false,
 				});
 				// }
