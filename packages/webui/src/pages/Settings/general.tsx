@@ -14,6 +14,7 @@ import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues } from '@/lib/transformers';
 import { generalValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
+import { pickSchemaFields } from '@/lib/pick-schema-fields';
 
 const GeneralSettings = withForm({
   ...formOpts,
@@ -28,7 +29,16 @@ const GeneralSettings = withForm({
       // isError,
     } = useQuery(
       trpc.settings.get.queryOptions(undefined, {
-        select: (data) => formatConfigDataForForm(data.config),
+        select: (data) => {
+          const fullDataset = formatConfigDataForForm(data.config);
+          const filteredData = pickSchemaFields(
+            generalValidationSchema,
+            fullDataset,
+            { includeUndefined: true },
+          );
+
+          return filteredData;
+        },
       }),
     );
 
