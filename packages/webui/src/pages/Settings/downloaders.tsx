@@ -13,6 +13,7 @@ import { removeEmptyArrayValues } from '@/lib/transformers';
 import { downloaderValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
+import { toast } from 'sonner';
 
 const DownloadersFields = withForm({
   ...formOpts,
@@ -40,6 +41,7 @@ const DownloadersFields = withForm({
 
     const {
       saveConfig,
+      isSuccess,
       // isLoading: isSaving,
       // isError: isSaveError,
     } = useSaveConfigHook();
@@ -49,8 +51,6 @@ const DownloadersFields = withForm({
       defaultValues: configData ?? formOpts.defaultValues,
       onSubmit: async ({ value }) => {
         // Full schema validation
-        // Fake a long response delay
-        // setTimeout(() => {
         try {
           const result = downloaderValidationSchema.safeParse(value);
           if (!result.success) {
@@ -74,7 +74,6 @@ const DownloadersFields = withForm({
             error: { _form: 'An unexpected error occurred during validation' },
           };
         }
-        // }, 2000);
       },
       validators: {
         onSubmit: downloaderValidationSchema,
@@ -92,6 +91,14 @@ const DownloadersFields = withForm({
         setLastFieldAdded(null);
       }
     }, [lastFieldAdded]);
+
+    useEffect(() => {
+      if (isSuccess) {
+          toast.success('Configuration saved successfully!', {
+            description: 'Your changes will take effect on the next restart.',
+          });
+      }
+    }, [isSuccess]);
 
     return (
       <FormValidationProvider isFieldRequired={isFieldRequired}>
