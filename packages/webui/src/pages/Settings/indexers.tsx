@@ -14,6 +14,7 @@ import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues } from '@/lib/transformers';
 import { trackerValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
+import { pickSchemaFields } from '@/lib/pick-schema-fields';
 
 const IndexerSettings = withForm({
   ...formOpts,
@@ -27,7 +28,16 @@ const IndexerSettings = withForm({
       // isError,
     } = useQuery(
       trpc.settings.get.queryOptions(undefined, {
-        select: (data) => formatConfigDataForForm(data.config),
+        select: (data) => {
+          const fullDataset = formatConfigDataForForm(data.config);
+          const filteredData = pickSchemaFields(
+            trackerValidationSchema,
+            fullDataset,
+            { includeUndefined: true },
+          );
+
+          return filteredData;
+        },
       }),
     );
 
