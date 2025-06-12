@@ -15,6 +15,7 @@ import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues } from '@/lib/transformers';
 import { directoryValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
+import { pickSchemaFields } from '@/lib/pick-schema-fields';
 
 const DirectoriesPathsFields = withForm({
   ...formOpts,
@@ -28,7 +29,16 @@ const DirectoriesPathsFields = withForm({
       // isError,
     } = useQuery(
       trpc.settings.get.queryOptions(undefined, {
-        select: (data) => formatConfigDataForForm(data.config),
+        select: (data) => {
+          const fullDataset = formatConfigDataForForm(data.config);
+          const filteredData = pickSchemaFields(
+            directoryValidationSchema,
+            fullDataset,
+            { includeUndefined: true },
+          );
+
+          return filteredData;
+        },
       }),
     );
 
@@ -89,48 +99,149 @@ const DirectoriesPathsFields = withForm({
 
     return (
       <FormValidationProvider isFieldRequired={isFieldRequired}>
-      <form
-        className="form flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-        noValidate
-      >
-        {/* form fields */}
-        <div className="flex flex-wrap gap-6">
-          <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-            <legend>Directories and Paths</legend>
-            <div className="">
-              <form.Field
-                name="dataDirs"
-                mode="array"
+        <form
+          className="form flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+          noValidate
+        >
+          {/* form fields */}
+          <div className="flex flex-wrap gap-6">
+            <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
+              <legend>Directories and Paths</legend>
+              <div className="">
+                <form.Field
+                  name="dataDirs"
+                  mode="array"
+                  validators={
+                    {
+                      // onBlur: baseValidationSchema.shape.dataDirs,
+                      // onChange: baseValidationSchema.shape.dataDirs,
+                    }
+                  }
+                >
+                  {(field) => {
+                    return (
+                      <div className="space-y-3">
+                        <Label htmlFor={field.name} className="block w-full">
+                          Data Directories
+                          {isFieldRequired(field.name) && (
+                            <span className="pl-1 text-red-500">*</span>
+                          )}
+                        </Label>
+                        {field.state.value &&
+                          field.state.value.map((_: string, index: number) => {
+                            return (
+                              <div
+                                key={index}
+                                className="gap-y- mb-3 flex flex-col"
+                              >
+                                <form.AppField
+                                  name={`dataDirs[${index}]`}
+                                  validators={{
+                                    onBlur: z.string(),
+                                  }}
+                                >
+                                  {(subfield) => (
+                                    <subfield.ArrayField
+                                      showDelete={
+                                        field.state.value &&
+                                        field.state.value?.length > 1
+                                      }
+                                      index={index}
+                                      onDelete={() => {
+                                        field.removeValue(index);
+                                      }}
+                                    />
+                                  )}
+                                </form.AppField>
+                                <form.Subscribe
+                                  selector={(f) =>
+                                    f.fieldMeta[
+                                      `${field.name}[${index}]` as keyof typeof f.fieldMeta
+                                    ]
+                                  }
+                                >
+                                  {(fieldMeta) => (
+                                    <FieldInfo fieldMeta={fieldMeta} />
+                                  )}
+                                </form.Subscribe>
+                              </div>
+                            );
+                          })}
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          onClick={() => {
+                            field.pushValue('');
+                            if (field.state.value?.length) {
+                              setLastFieldAdded(
+                                `${field.name}-${field.state.value.length - 1}`,
+                              );
+                            }
+                          }}
+                          title={`Add ${field.name}`}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    );
+                  }}
+                </form.Field>
+              </div>
+              <form.AppField
+                name="flatLinking"
                 validators={
                   {
-                    // onBlur: baseValidationSchema.shape.dataDirs,
-                    // onChange: baseValidationSchema.shape.dataDirs,
+                    // onChange: baseValidationSchema.shape.flatLinking,
                   }
                 }
               >
-                {(field) => {
-                  return (
-                    <div className="space-y-3">
-                      <Label htmlFor={field.name} className="block w-full">
-                        Data Directories
-                        {isFieldRequired(field.name) && (
-                          <span className="pl-1 text-red-500">*</span>
-                        )}
-                      </Label>
-                      {field.state.value &&
-                        field.state.value.map((_: string, index: number) => {
+                {(field) => (
+                  <field.SwitchField
+                    label="Flat Linking"
+                    className="form-field__switch flex flex-col items-start gap-5"
+                  />
+                )}
+              </form.AppField>
+              <div className="">
+                <form.AppField name="linkType">
+                  {(field) => (
+                    <field.SelectField label="Link Type" options={LinkType} />
+                  )}
+                </form.AppField>
+              </div>
+              <div className="">
+                <form.Field
+                  name="linkDirs"
+                  mode="array"
+                  validators={
+                    {
+                      // onBlur: baseValidationSchema.shape.linkDirs,
+                      // onChange: baseValidationSchema.shape.linkDirs,
+                    }
+                  }
+                >
+                  {(field) => {
+                    return (
+                      <div className="space-y-3">
+                        <Label htmlFor={field.name} className="block w-full">
+                          Link Directories
+                          {isFieldRequired(field.name) && (
+                            <span className="pl-1 text-red-500">*</span>
+                          )}
+                        </Label>
+                        {field.state.value?.map((_: string, index: number) => {
                           return (
                             <div
                               key={index}
                               className="gap-y- mb-3 flex flex-col"
                             >
                               <form.AppField
-                                name={`dataDirs[${index}]`}
+                                name={`linkDirs[${index}]`}
                                 validators={{
                                   onBlur: z.string(),
                                 }}
@@ -138,8 +249,9 @@ const DirectoriesPathsFields = withForm({
                                 {(subfield) => (
                                   <subfield.ArrayField
                                     showDelete={
-                                      field.state.value &&
-                                      field.state.value?.length > 1
+                                      (field.state.value &&
+                                        field.state.value?.length > 1) ??
+                                      undefined
                                     }
                                     index={index}
                                     onDelete={() => {
@@ -162,145 +274,43 @@ const DirectoriesPathsFields = withForm({
                             </div>
                           );
                         })}
-                      <Button
-                        variant="secondary"
-                        type="button"
-                        onClick={() => {
-                          field.pushValue('');
-                          if (field.state.value?.length) {
-                            setLastFieldAdded(
-                              `${field.name}-${field.state.value.length - 1}`,
-                            );
-                          }
-                        }}
-                        title={`Add ${field.name}`}
-                      >
-                        Add
-                      </Button>
-                    </div>
-                  );
-                }}
-              </form.Field>
-            </div>
-            <form.AppField
-              name="flatLinking"
-              validators={
-                {
-                  // onChange: baseValidationSchema.shape.flatLinking,
-                }
-              }
-            >
-              {(field) => (
-                <field.SwitchField
-                  label="Flat Linking"
-                  className="form-field__switch flex flex-col items-start gap-5"
-                />
-              )}
-            </form.AppField>
-            <div className="">
-              <form.AppField name="linkType">
-                {(field) => (
-                  <field.SelectField label="Link Type" options={LinkType} />
-                )}
-              </form.AppField>
-            </div>
-            <div className="">
-              <form.Field
-                name="linkDirs"
-                mode="array"
-                validators={
-                  {
-                    // onBlur: baseValidationSchema.shape.linkDirs,
-                    // onChange: baseValidationSchema.shape.linkDirs,
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          onClick={() => {
+                            field.pushValue('');
+                            const newFieldId = `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`;
+                            setLastFieldAdded(newFieldId);
+                          }}
+                          title={`Add ${field.name}`}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    );
+                  }}
+                </form.Field>
+              </div>
+              <div className="">
+                <form.AppField
+                  name="maxDataDepth"
+                  validators={
+                    {
+                      // onBlur: baseValidationSchema.shape.delay,
+                    }
                   }
-                }
-              >
-                {(field) => {
-                  return (
-                    <div className="space-y-3">
-                      <Label htmlFor={field.name} className="block w-full">
-                        Link Directories
-                        {isFieldRequired(field.name) && (
-                          <span className="pl-1 text-red-500">*</span>
-                        )}
-                      </Label>
-                      {field.state.value?.map((_: string, index: number) => {
-                        return (
-                          <div
-                            key={index}
-                            className="gap-y- mb-3 flex flex-col"
-                          >
-                            <form.AppField
-                              name={`linkDirs[${index}]`}
-                              validators={{
-                                onBlur: z.string(),
-                              }}
-                            >
-                              {(subfield) => (
-                                <subfield.ArrayField
-                                  showDelete={
-                                    (field.state.value &&
-                                      field.state.value?.length > 1) ??
-                                    undefined
-                                  }
-                                  index={index}
-                                  onDelete={() => {
-                                    field.removeValue(index);
-                                  }}
-                                />
-                              )}
-                            </form.AppField>
-                            <form.Subscribe
-                              selector={(f) =>
-                                f.fieldMeta[
-                                  `${field.name}[${index}]` as keyof typeof f.fieldMeta
-                                ]
-                              }
-                            >
-                              {(fieldMeta) => (
-                                <FieldInfo fieldMeta={fieldMeta} />
-                              )}
-                            </form.Subscribe>
-                          </div>
-                        );
-                      })}
-                      <Button
-                        variant="secondary"
-                        type="button"
-                        onClick={() => {
-                          field.pushValue('');
-                          const newFieldId = `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`;
-                          setLastFieldAdded(newFieldId);
-                        }}
-                        title={`Add ${field.name}`}
-                      >
-                        Add
-                      </Button>
-                    </div>
-                  );
-                }}
-              </form.Field>
-            </div>
-            <div className="">
-              <form.AppField
-                name="maxDataDepth"
-                validators={
-                  {
-                    // onBlur: baseValidationSchema.shape.delay,
-                  }
-                }
-              >
-                {(field) => (
-                  <field.TextField label="Max Data Depth" type="number" />
-                )}
-              </form.AppField>
-            </div>
-          </fieldset>
-          <form.AppForm>
-            <form.SubmitButton />
-          </form.AppForm>
-        </div>
-      </form>
+                >
+                  {(field) => (
+                    <field.TextField label="Max Data Depth" type="number" />
+                  )}
+                </form.AppField>
+              </div>
+            </fieldset>
+            <form.AppForm>
+              <form.SubmitButton />
+            </form.AppForm>
+          </div>
+        </form>
       </FormValidationProvider>
     );
   },
