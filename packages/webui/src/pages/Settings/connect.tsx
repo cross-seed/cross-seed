@@ -15,6 +15,7 @@ import { removeEmptyArrayValues } from '@/lib/transformers';
 import { connectValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
+import { toast } from 'sonner';
 
 const ConnectSettings = withForm({
   ...formOpts,
@@ -43,6 +44,7 @@ const ConnectSettings = withForm({
 
     const {
       saveConfig,
+      isSuccess,
       // isLoading: isSaving,
       // isError: isSaveError,
     } = useSaveConfigHook();
@@ -52,8 +54,6 @@ const ConnectSettings = withForm({
       defaultValues: configData ?? formOpts.defaultValues,
       onSubmit: async ({ value }) => {
         // Full schema validation
-        // Fake a long response delay
-        // setTimeout(() => {
         try {
           const result = connectValidationSchema.safeParse(value);
           if (!result.success) {
@@ -77,7 +77,6 @@ const ConnectSettings = withForm({
             error: { _form: 'An unexpected error occurred during validation' },
           };
         }
-        // }, 2000);
       },
       validators: {
         onSubmit: connectValidationSchema,
@@ -95,6 +94,14 @@ const ConnectSettings = withForm({
         setLastFieldAdded(null);
       }
     }, [lastFieldAdded]);
+
+    useEffect(() => {
+      if (isSuccess) {
+          toast.success('Configuration saved successfully!', {
+            description: 'Your changes will take effect on the next restart.',
+          });
+      }
+    }, [isSuccess]);
 
     return (
       <FormValidationProvider isFieldRequired={isFieldRequired}>

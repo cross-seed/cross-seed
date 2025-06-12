@@ -4,9 +4,6 @@ import { useMutation } from '@tanstack/react-query';
 export const useSaveConfigHook = () => {
   const trpc = useTRPC();
   const options = trpc.settings.save.mutationOptions({
-    onSuccess: (data) => {
-      console.log('Config saved successfully:', data);
-    },
     onError: (error) => {
       console.error('Error saving config:', error);
     },

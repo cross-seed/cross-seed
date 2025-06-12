@@ -11,6 +11,8 @@ import { searchValidationSchema } from '@/types/config';
 import useConfigForm from '@/hooks/use-config-form';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 const SearchRssSettings = withForm({
   ...formOpts,
@@ -38,6 +40,7 @@ const SearchRssSettings = withForm({
 
     const {
       saveConfig,
+      isSuccess,
       // isLoading: isSaving,
       // isError: isSaveError,
     } = useSaveConfigHook();
@@ -78,6 +81,14 @@ const SearchRssSettings = withForm({
         onSubmit: searchValidationSchema,
       },
     });
+
+    useEffect(() => {
+      if (isSuccess) {
+          toast.success('Configuration saved successfully!', {
+            description: 'Your changes will take effect on the next restart.',
+          });
+      }
+    }, [isSuccess]);
 
     return (
       <FormValidationProvider isFieldRequired={isFieldRequired}>
