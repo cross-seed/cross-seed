@@ -14,7 +14,7 @@ import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues } from '@/lib/transformers';
 import { baseValidationSchema } from '@/types/config';
 
-const IndexerSettings = withForm({
+export const TrackerSettings = withForm({
   ...formOpts,
   render: function Render() {
     const { isFieldRequired } = useConfigForm();
@@ -187,5 +187,3 @@ const IndexerSettings = withForm({
     );
   },
 });
-
-export default IndexerSettings;
