@@ -17,7 +17,7 @@ import { FormValidationProvider } from '@/contexts/Form/form-validation-provider
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { toast } from 'sonner';
 
-const IndexerSettings = withForm({
+export const TrackerSettings = withForm({
   ...formOpts,
   render: function Render() {
     const { isFieldRequired } = useConfigForm(trackerValidationSchema);
@@ -96,9 +96,9 @@ const IndexerSettings = withForm({
 
     useEffect(() => {
       if (isSuccess) {
-          toast.success('Configuration saved successfully!', {
-            description: 'Your changes will take effect on the next restart.',
-          });
+        toast.success('Configuration saved successfully!', {
+          description: 'Your changes will take effect on the next restart.',
+        });
       }
     }, [isSuccess]);
 
@@ -207,5 +207,3 @@ const IndexerSettings = withForm({
     );
   },
 });
-
-export default IndexerSettings;
