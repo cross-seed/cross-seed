@@ -6,7 +6,7 @@ async function up(knex: Knex.Knex): Promise<void> {
 		table.check("id = 0");
 		table.string("apikey");
 	});
-	await knex("settings").insert({ id: 0 });
+	await knex.raw("INSERT INTO settings (id, apikey) VALUES (0, '')");
 }
 
 async function down(knex: Knex.Knex): Promise<void> {
