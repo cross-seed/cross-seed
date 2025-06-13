@@ -22,5 +22,10 @@ export function formatRelativeTime(timestamp: string | number): string {
 
   const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
+  // Handle milliseconds case - convert to seconds since Intl.RelativeTimeFormat doesn't support ms
+  if (unit === 'ms') {
+    return rtf.format(0, 'second'); // Show as "now" for sub-second differences
+  }
+
   return rtf.format(-parseInt(number), unit as Intl.RelativeTimeFormatUnit);
 }
