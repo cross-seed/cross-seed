@@ -59,7 +59,7 @@ const navItems = [
       {
         title: 'General',
         icon: <Settings className="size-4" />,
-        url: '/settings',
+        url: '/settings/general',
       },
       {
         title: 'Trackers',
