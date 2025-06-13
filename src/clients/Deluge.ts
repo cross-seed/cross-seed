@@ -398,7 +398,7 @@ export default class Deluge implements TorrentClient {
 			ogLabel !== linkCategory; // not data
 
 		return !searchee.infoHash
-			? linkCategory ?? ""
+			? (linkCategory ?? "")
 			: shouldSuffixLabel
 				? `${ogLabel}${this.delugeLabelSuffix}`
 				: ogLabel;
