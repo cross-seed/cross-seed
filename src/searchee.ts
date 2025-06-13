@@ -788,7 +788,7 @@ async function pushEnsembleEpisode(
 ): Promise<void> {
 	const savePath = searchee.path
 		? dirname(searchee.path)
-		: searchee.savePath ?? torrentSavePaths.get(searchee.infoHash!);
+		: (searchee.savePath ?? torrentSavePaths.get(searchee.infoHash!));
 	if (!savePath) return;
 	const largestFile = getLargestFile(searchee.files);
 	if (largestFile.length / searchee.length < 0.5) return;
@@ -927,12 +927,12 @@ export async function createEnsembleSearchees(
 			);
 			const torrentSavePaths = useClientTorrents
 				? new Map()
-				: (await getClients()[0]?.getAllDownloadDirs({
+				: ((await getClients()[0]?.getAllDownloadDirs({
 						metas: allSearchees.filter(
 							hasInfoHash,
 						) as SearcheeWithInfoHash[],
 						onlyCompleted: false,
-					})) ?? new Map();
+					})) ?? new Map());
 
 			const seasonSearchees: SearcheeWithLabel[] = [];
 			for (const [key, episodeSearchees] of keyMap) {
