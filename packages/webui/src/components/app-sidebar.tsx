@@ -62,9 +62,9 @@ const navItems = [
         url: '/settings',
       },
       {
-        title: 'Indexers',
+        title: 'Trackers',
         icon: <Popcorn className="size-4" />,
-        url: '/settings/indexers',
+        url: '/settings/trackers',
       },
       {
         title: 'Download Clients',
@@ -139,7 +139,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         activeProps={{
                           'data-active': true,
                         }}
-                        activeOptions={{exact: true}}
+                        activeOptions={{ exact: true }}
                       >
                         {item.icon}
                         <span>{item.title}</span>
