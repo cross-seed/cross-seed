@@ -14,6 +14,7 @@ const getPageTitle = (pathname: string): string => {
     case '/search':
       return 'Search';
     case '/settings':
+    case '/settings/general':
       return 'Settings';
     default:
       return 'cross-seed';
