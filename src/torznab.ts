@@ -19,6 +19,7 @@ import {
 	USER_AGENT,
 } from "./constants.js";
 import { db } from "./db.js";
+import { isDbConfigEnabled } from "./dbConfig.js";
 import { CrossSeedError } from "./errors.js";
 import {
 	ALL_CAPS,
@@ -806,23 +807,29 @@ export async function updateCaps(): Promise<void> {
 
 export async function validateTorznabUrls() {
 	const { torznab } = getRuntimeConfig();
-	if (!torznab) return;
 
-	const urls: URL[] = torznab.map((str) => new URL(str));
-	for (const url of urls) {
-		if (!url.pathname.endsWith("/api")) {
-			throw new CrossSeedError(
-				`Torznab url ${url} must have a path ending in /api`,
-			);
+	// When DB_CONFIG is enabled, skip torznab array validation and sync
+	if (isDbConfigEnabled()) {
+		await updateCaps();
+	} else {
+		if (!torznab) return;
+
+		const urls: URL[] = torznab.map((str) => new URL(str));
+		for (const url of urls) {
+			if (!url.pathname.endsWith("/api")) {
+				throw new CrossSeedError(
+					`Torznab url ${url} must have a path ending in /api`,
+				);
+			}
+			if (!url.searchParams.has("apikey")) {
+				throw new CrossSeedError(
+					`Torznab url ${url} does not specify an apikey`,
+				);
+			}
 		}
-		if (!url.searchParams.has("apikey")) {
-			throw new CrossSeedError(
-				`Torznab url ${url} does not specify an apikey`,
-			);
-		}
+		await syncWithDb();
+		await updateCaps();
 	}
-	await syncWithDb();
-	await updateCaps();
 
 	const indexersWithoutSearch = await db("indexer")
 		.where({ search_cap: false, active: true })
