@@ -12,20 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { 
   Plus, 
-  Edit, 
-  Trash2, 
   TestTube, 
   ToggleLeft, 
   ToggleRight 
@@ -56,26 +44,11 @@ function TrackerSettings() {
   const trpc = useTRPC();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingTracker, setEditingTracker] = useState<Indexer | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [trackerToDelete, setTrackerToDelete] = useState<Indexer | null>(null);
   const [testingTracker, setTestingTracker] = useState<number | null>(null);
 
   const { data: indexers } = useSuspenseQuery(
     trpc.indexers.getAll.queryOptions(undefined, {
       refetchInterval: 10000, // Refresh every 10 seconds
-    }),
-  );
-
-  const { mutate: deleteIndexer } = useMutation(
-    trpc.indexers.delete.mutationOptions({
-      onSuccess: () => {
-        toast.success('Tracker deleted successfully');
-        setDeleteDialogOpen(false);
-        setTrackerToDelete(null);
-      },
-      onError: (error) => {
-        toast.error(`Failed to delete tracker: ${error.message}`);
-      },
     }),
   );
 
@@ -141,11 +114,6 @@ function TrackerSettings() {
     setSheetOpen(true);
   };
 
-  const handleDeleteTracker = (indexer: Indexer) => {
-    setTrackerToDelete(indexer);
-    setDeleteDialogOpen(true);
-  };
-
   const handleToggleActive = (indexer: Indexer) => {
     updateIndexer({
       id: indexer.id,
@@ -156,12 +124,6 @@ function TrackerSettings() {
   const handleTestTracker = (indexer: Indexer) => {
     setTestingTracker(indexer.id);
     testIndexer({ id: indexer.id });
-  };
-
-  const confirmDelete = () => {
-    if (trackerToDelete) {
-      deleteIndexer({ id: trackerToDelete.id });
-    }
   };
 
   return (
@@ -186,12 +148,16 @@ function TrackerSettings() {
               <TableHead>Name</TableHead>
               <TableHead>URL</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-40">Actions</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {indexers?.map((indexer) => (
-              <TableRow key={indexer.id}>
+              <TableRow 
+                key={indexer.id}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => handleEditTracker(indexer)}
+              >
                 <TableCell className="font-medium">
                   {indexer.name || 'Unnamed'}
                 </TableCell>
@@ -200,11 +166,14 @@ function TrackerSettings() {
                 </TableCell>
                 <TableCell>{getStatusBadge(indexer)}</TableCell>
                 <TableCell className="text-right">
-                  <div className="flex gap-1 w-40">
+                  <div className="flex justify-end gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleToggleActive(indexer)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleActive(indexer);
+                      }}
                       title={indexer.active ? 'Disable' : 'Enable'}
                     >
                       {indexer.active ? (
@@ -216,27 +185,14 @@ function TrackerSettings() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleTestTracker(indexer)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTestTracker(indexer);
+                      }}
                       disabled={testingTracker === indexer.id}
                       title="Test Connection"
                     >
                       <TestTube className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditTracker(indexer)}
-                      title="Edit"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteTracker(indexer)}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 </TableCell>
@@ -260,24 +216,6 @@ function TrackerSettings() {
         onOpenChange={setSheetOpen}
         editingTracker={editingTracker}
       />
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Tracker</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{trackerToDelete?.name || trackerToDelete?.url}"?
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
