@@ -12,12 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { 
-  Plus, 
-  TestTube, 
-  ToggleLeft, 
-  ToggleRight 
-} from 'lucide-react';
+import { Plus, TestTube, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from 'sonner';
 import TrackerSheet from '@/components/settings/TrackerSheet';
 
@@ -89,14 +84,14 @@ function TrackerSettings() {
     if (!indexer.active) {
       return <Badge variant="secondary">Disabled</Badge>;
     }
-    
+
     if (indexer.status === 'RATE_LIMITED') {
       // Check if rate limit has expired
       if (indexer.retryAfter && Date.now() < indexer.retryAfter) {
         // Still rate limited
         return (
-          <Badge 
-            variant="destructive" 
+          <Badge
+            variant="destructive"
             className="bg-red-700"
             title={`Rate limited until ${formatRetryAfter(indexer.retryAfter)}`}
           >
@@ -105,22 +100,34 @@ function TrackerSettings() {
         );
       } else {
         // Rate limit has expired, show as OK
-        return <Badge variant="default" className="bg-green-700">OK</Badge>;
+        return (
+          <Badge variant="default" className="bg-green-700">
+            OK
+          </Badge>
+        );
       }
     }
-    
+
     if (indexer.status === 'UNKNOWN_ERROR') {
-      return <Badge variant="destructive" className="bg-red-700">Error</Badge>;
+      return (
+        <Badge variant="destructive" className="bg-red-700">
+          Error
+        </Badge>
+      );
     }
-    
+
     if (indexer.searchCap === null) {
       return <Badge variant="outline">Unknown</Badge>;
     }
-    
+
     if (indexer.status === null || indexer.status === 'OK') {
-      return <Badge variant="default" className="bg-green-700">OK</Badge>;
+      return (
+        <Badge variant="default" className="bg-green-700">
+          OK
+        </Badge>
+      );
     }
-    
+
     return <Badge variant="outline">{indexer.status}</Badge>;
   };
 
@@ -148,7 +155,7 @@ function TrackerSettings() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Trackers</h1>
           <p className="text-muted-foreground">
@@ -173,9 +180,9 @@ function TrackerSettings() {
           </TableHeader>
           <TableBody>
             {indexers?.map((indexer) => (
-              <TableRow 
+              <TableRow
                 key={indexer.id}
-                className="cursor-pointer hover:bg-muted/50"
+                className="hover:bg-muted/50 cursor-pointer"
                 onClick={() => handleEditTracker(indexer)}
               >
                 <TableCell className="font-medium">
@@ -192,21 +199,6 @@ function TrackerSettings() {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleToggleActive(indexer);
-                      }}
-                      title={indexer.active ? 'Disable' : 'Enable'}
-                    >
-                      {indexer.active ? (
-                        <ToggleRight className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <ToggleLeft className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
                         handleTestTracker(indexer);
                       }}
                       disabled={testingTracker === indexer.id}
@@ -214,15 +206,31 @@ function TrackerSettings() {
                     >
                       <TestTube className="h-4 w-4" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleActive(indexer);
+                      }}
+                      title={indexer.active ? 'Disable' : 'Enable'}
+                    >
+                      {indexer.active ? (
+                        <ToggleRight className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <ToggleLeft className="text-muted-foreground h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
             ))}
             {indexers?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
+                <TableCell colSpan={4} className="py-8 text-center">
                   <div className="text-muted-foreground">
-                    No trackers configured. Add your first tracker to get started.
+                    No trackers configured. Add your first tracker to get
+                    started.
                   </div>
                 </TableCell>
               </TableRow>
