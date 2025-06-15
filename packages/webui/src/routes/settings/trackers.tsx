@@ -80,17 +80,37 @@ function TrackerSettings() {
     }),
   );
 
+  const formatRetryAfter = (retryAfter: number) => {
+    const date = new Date(retryAfter);
+    return date.toLocaleString();
+  };
+
   const getStatusBadge = (indexer: Indexer) => {
     if (!indexer.active) {
       return <Badge variant="secondary">Disabled</Badge>;
     }
     
     if (indexer.status === 'RATE_LIMITED') {
-      return <Badge variant="destructive">Rate Limited</Badge>;
+      // Check if rate limit has expired
+      if (indexer.retryAfter && Date.now() < indexer.retryAfter) {
+        // Still rate limited
+        return (
+          <Badge 
+            variant="destructive" 
+            className="bg-red-700"
+            title={`Rate limited until ${formatRetryAfter(indexer.retryAfter)}`}
+          >
+            Rate Limited
+          </Badge>
+        );
+      } else {
+        // Rate limit has expired, show as OK
+        return <Badge variant="default" className="bg-green-700">OK</Badge>;
+      }
     }
     
     if (indexer.status === 'UNKNOWN_ERROR') {
-      return <Badge variant="destructive">Error</Badge>;
+      return <Badge variant="destructive" className="bg-red-700">Error</Badge>;
     }
     
     if (indexer.searchCap === null) {
@@ -98,7 +118,7 @@ function TrackerSettings() {
     }
     
     if (indexer.status === null || indexer.status === 'OK') {
-      return <Badge variant="default" className="bg-green-500">Working</Badge>;
+      return <Badge variant="default" className="bg-green-700">OK</Badge>;
     }
     
     return <Badge variant="outline">{indexer.status}</Badge>;
