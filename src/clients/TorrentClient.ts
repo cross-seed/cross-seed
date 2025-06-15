@@ -240,7 +240,7 @@ export async function validateClientSavePaths(
 	);
 	logger.verbose({
 		label,
-		message: `Excluded save paths from linking test due to filters: ${formatAsList(
+		message: `Excluded ${ignoredSavePaths.length}/${uniqueSavePaths.size + ignoredSavePaths.length} save paths from linking test due to filters: ${formatAsList(
 			ignoredSavePaths,
 			{
 				sort: true,
@@ -250,13 +250,19 @@ export async function validateClientSavePaths(
 	});
 
 	const linkingErrorMsg = `Failed to link from ${label} save paths to a linkDir. If you have multiple drives, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to the drives (https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking)`;
+	let count = 0;
 	for (const savePath of uniqueSavePaths) {
+		count++;
 		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
 			throw new CrossSeedError(
 				`Cannot use linkDirs with cross platform cross-seed and ${label}, please run cross-seed in docker or natively to match your torrent client (https://www.cross-seed.org/docs/basics/managing-the-daemon): ${savePath}`,
 			);
 		}
 		try {
+			logger.verbose({
+				label,
+				message: `[${count}/${uniqueSavePaths.size}] Testing linking for savePath: ${savePath}`,
+			});
 			const res = await testLinking(
 				savePath,
 				`torrentClient${clientPriority}Src.cross-seed`,

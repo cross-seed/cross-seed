@@ -672,13 +672,21 @@ export async function performActions(
 
 async function getLinkDir(pathStr: string): Promise<string | null> {
 	const { linkDirs, linkType } = getRuntimeConfig();
+	logger.verbose(
+		`--- Finding linkDir for ${pathStr} with linkType ${linkType}`,
+	);
 	const pathStat = await stat(pathStr);
 	const pathDev = pathStat.dev; // Windows always returns 0
 	if (pathDev) {
 		const devs = await mapAsync(linkDirs, async (d) => (await stat(d)).dev);
 		if (new Set(devs).size === linkDirs.length) {
 			for (const [index, linkDir] of linkDirs.entries()) {
-				if (devs[index] === pathDev) return linkDir;
+				if (devs[index] === pathDev) {
+					logger.verbose(
+						`--- Found linkDir using stat.dev: ${linkDir}`,
+					);
+					return linkDir;
+				}
 			}
 		}
 	}
@@ -687,8 +695,12 @@ async function getLinkDir(pathStr: string): Promise<string | null> {
 		: pathStat.isDirectory()
 			? await findAFileWithExt(pathStr, ALL_EXTENSIONS)
 			: null;
+	srcFile
+		? logger.verbose(`--- Found source file: ${srcFile}`)
+		: logger.verbose(`--- No source file found in ${pathStr}`);
 	let tempFile: string | undefined;
 	if (!srcFile) {
+		logger.verbose(`--- Creating test file in ${pathStr}`);
 		tempFile = pathStat.isDirectory()
 			? join(pathStr, linkDirSrcName)
 			: join(dirname(pathStr), linkDirSrcName);
@@ -712,6 +724,7 @@ async function getLinkDir(pathStr: string): Promise<string | null> {
 				);
 				await rm(testPath);
 				if (tempFile && (await exists(tempFile))) await rm(tempFile);
+				logger.verbose(`--- Found linkDir: ${linkDir}`);
 				return linkDir;
 			} catch {
 				continue;
@@ -813,7 +826,11 @@ export async function testLinking(
 	let tempFile: string | undefined;
 	try {
 		let srcFile = await findAFileWithExt(srcDir, ALL_EXTENSIONS);
+		srcFile
+			? logger.verbose(`--- Found source file: ${srcFile}`)
+			: logger.verbose(`--- No source file found in ${srcDir}`);
 		if (!srcFile) {
+			logger.verbose(`--- Checking for read access on ${srcDir}`);
 			try {
 				await access(srcDir, fs.constants.R_OK);
 			} catch (e) {
@@ -829,6 +846,7 @@ export async function testLinking(
 				}
 				return false;
 			}
+			logger.verbose(`--- Checking for write access on ${srcDir}`);
 			try {
 				await access(srcDir, fs.constants.W_OK);
 			} catch (e) {
@@ -838,6 +856,7 @@ export async function testLinking(
 				);
 				return false;
 			}
+			logger.verbose(`--- Creating test file in ${srcDir}`);
 			tempFile = join(srcDir, testSrcName);
 			try {
 				await writeFile(tempFile, "");
