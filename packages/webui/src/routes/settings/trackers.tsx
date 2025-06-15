@@ -1,195 +1,283 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { withForm } from '@/hooks/form';
-import { useEffect, useState } from 'react';
-import { z } from 'zod';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { FieldInfo } from '@/components/Form/FieldInfo';
-import useConfigForm from '@/hooks/use-config-form';
-import { formOpts } from '@/components/Form/shared-form';
-import { useAppForm } from '@/hooks/form';
-import { useQuery } from '@tanstack/react-query';
+import { useSuspenseQuery, useMutation } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useTRPC } from '@/lib/trpc';
-import { formatConfigDataForForm } from '@/lib/formatConfigData';
-import { useSaveConfigHook } from '@/hooks/saveFormHook';
-import { removeEmptyArrayValues } from '@/lib/transformers';
-import { trackerValidationSchema } from '@/types/config';
-import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
-import { pickSchemaFields } from '@/lib/pick-schema-fields';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  TestTube, 
+  ToggleLeft, 
+  ToggleRight 
+} from 'lucide-react';
 import { toast } from 'sonner';
-
-const TrackerSettings = withForm({
-  ...formOpts,
-  render: function Render() {
-    const { isFieldRequired } = useConfigForm(trackerValidationSchema);
-
-    const trpc = useTRPC();
-    const {
-      data: configData,
-    } = useQuery(
-      trpc.settings.get.queryOptions(undefined, {
-        select: (data) => {
-          const fullDataset = formatConfigDataForForm(data.config);
-          const filteredData = pickSchemaFields(
-            trackerValidationSchema,
-            fullDataset,
-            { includeUndefined: true },
-          );
-
-          return filteredData;
-        },
-      }),
-    );
-
-    const {
-      saveConfig,
-      isSuccess,
-    } = useSaveConfigHook();
-
-    const form = useAppForm({
-      ...formOpts,
-      defaultValues: configData ?? formOpts.defaultValues,
-      onSubmit: async ({ value }) => {
-        try {
-          const result = trackerValidationSchema.safeParse(value);
-          if (!result.success) {
-            console.error('FULL VALIDATION FAILED:', result.error.format());
-          } else {
-            Object.keys(value).forEach((attr) => {
-              const val = value[attr as keyof typeof configData];
-              if (val && Array.isArray(val)) {
-                value[attr as keyof typeof configData] =
-                  removeEmptyArrayValues(val);
-              }
-            });
-
-            saveConfig(value);
-          }
-        } catch (err) {
-          console.error('Exception during full validation:', err);
-          return {
-            status: 'error',
-            error: { _form: 'An unexpected error occurred during validation' },
-          };
-        }
-      },
-      validators: {
-        onSubmit: trackerValidationSchema,
-      },
-    });
-
-    const [lastFieldAdded, setLastFieldAdded] = useState<string | null>(null);
-    useEffect(() => {
-      if (lastFieldAdded) {
-        const el = document.getElementById(lastFieldAdded);
-        el?.focus();
-        setLastFieldAdded(null);
-      }
-    }, [lastFieldAdded]);
-
-    useEffect(() => {
-      if (isSuccess) {
-        toast.success('Configuration saved successfully!', {
-          description: 'Your changes will take effect on the next restart.',
-        });
-      }
-    }, [isSuccess]);
-
-    return (
-      <FormValidationProvider isFieldRequired={isFieldRequired}>
-        <form
-          className="form flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            form.handleSubmit();
-          }}
-          noValidate
-        >
-          <div className="flex flex-wrap gap-6">
-            <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-              <legend>Torznab</legend>
-              <div className="">
-                <form.Field
-                  name="torznab"
-                  mode="array"
-                >
-                  {(field) => {
-                    return (
-                      <div className="space-y-3">
-                        <Label htmlFor={field.name} className="block w-full">
-                          Torznab URL(s)
-                          {isFieldRequired(field.name) && (
-                            <span className="pl-1 text-red-500">*</span>
-                          )}
-                        </Label>
-                        {field.state.value.map((_: string, index: number) => {
-                          return (
-                            <div
-                              key={index}
-                              className="gap-y- mb-3 flex flex-col"
-                            >
-                              <form.AppField
-                                name={`torznab[${index}]`}
-                                validators={{
-                                  onBlur: z.string().url(),
-                                }}
-                              >
-                                {(subfield) => (
-                                  <subfield.ArrayField
-                                    showDelete={
-                                      field.state.value &&
-                                      field.state.value?.length > 1
-                                    }
-                                    index={index}
-                                    onDelete={() => {
-                                      field.removeValue(index);
-                                    }}
-                                  />
-                                )}
-                              </form.AppField>
-                              <form.Subscribe
-                                selector={(f) =>
-                                  f.fieldMeta[
-                                    `${field.name}[${index}]` as keyof typeof f.fieldMeta
-                                  ]
-                                }
-                              >
-                                {(fieldMeta) => (
-                                  <FieldInfo fieldMeta={fieldMeta} />
-                                )}
-                              </form.Subscribe>
-                            </div>
-                          );
-                        })}
-                        <Button
-                          variant="secondary"
-                          type="button"
-                          onClick={() => {
-                            field.pushValue('');
-                            const newFieldId = `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`;
-                            setLastFieldAdded(newFieldId);
-                          }}
-                          title={`Add ${field.name}`}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    );
-                  }}
-                </form.Field>
-              </div>
-            </fieldset>
-            <form.AppForm>
-              <form.SubmitButton />
-            </form.AppForm>
-          </div>
-        </form>
-      </FormValidationProvider>
-    );
-  },
-});
+import TrackerSheet from '@/components/settings/TrackerSheet';
 
 export const Route = createFileRoute('/settings/trackers')({
   component: TrackerSettings,
 });
+
+type Indexer = {
+  id: number;
+  name: string | null;
+  url: string;
+  active: boolean;
+  status: string | null;
+  retryAfter: number | null;
+  searchCap: boolean | null;
+  tvSearchCap: boolean | null;
+  movieSearchCap: boolean | null;
+  musicSearchCap: boolean | null;
+  audioSearchCap: boolean | null;
+  bookSearchCap: boolean | null;
+};
+
+function TrackerSettings() {
+  const trpc = useTRPC();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editingTracker, setEditingTracker] = useState<Indexer | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [trackerToDelete, setTrackerToDelete] = useState<Indexer | null>(null);
+  const [testingTracker, setTestingTracker] = useState<number | null>(null);
+
+  const { data: indexers } = useSuspenseQuery(
+    trpc.indexers.getAll.queryOptions(undefined, {
+      refetchInterval: 10000, // Refresh every 10 seconds
+    }),
+  );
+
+  const { mutate: deleteIndexer } = useMutation(
+    trpc.indexers.delete.mutationOptions({
+      onSuccess: () => {
+        toast.success('Tracker deleted successfully');
+        setDeleteDialogOpen(false);
+        setTrackerToDelete(null);
+      },
+      onError: (error) => {
+        toast.error(`Failed to delete tracker: ${error.message}`);
+      },
+    }),
+  );
+
+  const { mutate: updateIndexer } = useMutation(
+    trpc.indexers.update.mutationOptions({
+      onSuccess: () => {
+        toast.success('Tracker updated successfully');
+      },
+      onError: (error) => {
+        toast.error(`Failed to update tracker: ${error.message}`);
+      },
+    }),
+  );
+
+  const { mutate: testIndexer } = useMutation(
+    trpc.indexers.test.mutationOptions({
+      onSuccess: (result) => {
+        setTestingTracker(null);
+        if (result.success) {
+          toast.success(result.message);
+        } else {
+          toast.error(result.message);
+        }
+      },
+      onError: (error) => {
+        setTestingTracker(null);
+        toast.error(`Test failed: ${error.message}`);
+      },
+    }),
+  );
+
+  const getStatusBadge = (indexer: Indexer) => {
+    if (!indexer.active) {
+      return <Badge variant="secondary">Disabled</Badge>;
+    }
+    
+    if (indexer.status === 'RATE_LIMITED') {
+      return <Badge variant="destructive">Rate Limited</Badge>;
+    }
+    
+    if (indexer.status === 'UNKNOWN_ERROR') {
+      return <Badge variant="destructive">Error</Badge>;
+    }
+    
+    if (indexer.searchCap === null) {
+      return <Badge variant="outline">Unknown</Badge>;
+    }
+    
+    if (indexer.status === null || indexer.status === 'OK') {
+      return <Badge variant="default" className="bg-green-500">Working</Badge>;
+    }
+    
+    return <Badge variant="outline">{indexer.status}</Badge>;
+  };
+
+  const handleAddTracker = () => {
+    setEditingTracker(null);
+    setSheetOpen(true);
+  };
+
+  const handleEditTracker = (indexer: Indexer) => {
+    setEditingTracker(indexer);
+    setSheetOpen(true);
+  };
+
+  const handleDeleteTracker = (indexer: Indexer) => {
+    setTrackerToDelete(indexer);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleToggleActive = (indexer: Indexer) => {
+    updateIndexer({
+      id: indexer.id,
+      active: !indexer.active,
+    });
+  };
+
+  const handleTestTracker = (indexer: Indexer) => {
+    setTestingTracker(indexer.id);
+    testIndexer({ id: indexer.id });
+  };
+
+  const confirmDelete = () => {
+    if (trackerToDelete) {
+      deleteIndexer({ id: trackerToDelete.id });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">Trackers</h1>
+          <p className="text-muted-foreground">
+            Manage your torznab indexers and trackers
+          </p>
+        </div>
+        <Button onClick={handleAddTracker}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Tracker
+        </Button>
+      </div>
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader className="bg-muted">
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>URL</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-40">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {indexers?.map((indexer) => (
+              <TableRow key={indexer.id}>
+                <TableCell className="font-medium">
+                  {indexer.name || 'Unnamed'}
+                </TableCell>
+                <TableCell className="font-mono text-sm">
+                  {indexer.url}
+                </TableCell>
+                <TableCell>{getStatusBadge(indexer)}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex gap-1 w-40">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleActive(indexer)}
+                      title={indexer.active ? 'Disable' : 'Enable'}
+                    >
+                      {indexer.active ? (
+                        <ToggleRight className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <ToggleLeft className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleTestTracker(indexer)}
+                      disabled={testingTracker === indexer.id}
+                      title="Test Connection"
+                    >
+                      <TestTube className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditTracker(indexer)}
+                      title="Edit"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteTracker(indexer)}
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {indexers?.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-8">
+                  <div className="text-muted-foreground">
+                    No trackers configured. Add your first tracker to get started.
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <TrackerSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        editingTracker={editingTracker}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Tracker</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{trackerToDelete?.name || trackerToDelete?.url}"?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
