@@ -769,8 +769,12 @@ async function linkFile(
 ): Promise<boolean> {
 	if (!linkType) linkType = getRuntimeConfig().linkType;
 	try {
+		logger.verbose(`--- Unwrapping symlinks for ${oldPath}`);
 		const ogFileResolvedPath = await unwrapSymlinks(oldPath);
 
+		logger.verbose(
+			`--- ${linkType}ing ${ogFileResolvedPath} to ${newPath}`,
+		);
 		switch (linkType) {
 			case LinkType.HARDLINK:
 				await link(ogFileResolvedPath, newPath);
@@ -878,7 +882,9 @@ export async function testLinking(
 		const linkDir = await getLinkDir(srcDir);
 		if (!linkDir) throw new Error(`No valid linkDir found for ${srcDir}`);
 		const testPath = join(linkDir, testDestName);
+		logger.verbose(`--- Linking ${srcFile} to ${testPath}`);
 		await linkFile(srcFile, testPath);
+		logger.verbose(`--- Removing test file ${testPath}`);
 		await rm(testPath);
 		return true;
 	} catch (e) {
