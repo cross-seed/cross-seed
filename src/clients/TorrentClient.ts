@@ -240,7 +240,7 @@ export async function validateClientSavePaths(
 	);
 	logger.verbose({
 		label,
-		message: `Excluded save paths from linking test due to filters: ${formatAsList(
+		message: `Excluded ${ignoredSavePaths.length}/${uniqueSavePaths.size + ignoredSavePaths.length} save paths from linking test due to filters: ${formatAsList(
 			ignoredSavePaths,
 			{
 				sort: true,
