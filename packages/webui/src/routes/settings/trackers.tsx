@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Plus, TestTube, ToggleLeft, ToggleRight, MoreHorizontal, Eye, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
-import TrackerSheet from '@/components/settings/TrackerSheet';
+import TrackerViewSheet from '@/components/settings/TrackerViewSheet';
+import TrackerEditSheet from '@/components/settings/TrackerEditSheet';
 
 export const Route = createFileRoute('/settings/trackers')({
   component: TrackerSettings,
@@ -46,8 +47,9 @@ type Indexer = {
 function TrackerSettings() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [sheetMode, setSheetMode] = useState<'view' | 'edit' | 'create'>('create');
+  const [viewSheetOpen, setViewSheetOpen] = useState(false);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [editMode, setEditMode] = useState<'edit' | 'create'>('create');
   const [selectedTracker, setSelectedTracker] = useState<Indexer | null>(null);
   const [testingTracker, setTestingTracker] = useState<number | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
@@ -171,12 +173,19 @@ function TrackerSettings() {
 
   const handleAddTracker = () => {
     setSelectedTracker(null);
-    setSheetMode('create');
-    setSheetOpen(true);
+    setEditMode('create');
+    setEditSheetOpen(true);
   };
 
-  const handleSheetOpenChange = (open: boolean) => {
-    setSheetOpen(open);
+  const handleViewSheetOpenChange = (open: boolean) => {
+    setViewSheetOpen(open);
+    if (!open) {
+      setOpenDropdown(null); // Close any open dropdown when sheet closes
+    }
+  };
+
+  const handleEditSheetOpenChange = (open: boolean) => {
+    setEditSheetOpen(open);
     if (!open) {
       setOpenDropdown(null); // Close any open dropdown when sheet closes
     }
@@ -185,15 +194,14 @@ function TrackerSettings() {
   const handleViewTracker = (indexer: Indexer) => {
     setOpenDropdown(null); // Close any open dropdown
     setSelectedTracker(indexer);
-    setSheetMode('view');
-    setSheetOpen(true);
+    setViewSheetOpen(true);
   };
 
   const handleEditTracker = (indexer: Indexer) => {
     setOpenDropdown(null); // Close any open dropdown
     setSelectedTracker(indexer);
-    setSheetMode('edit');
-    setSheetOpen(true);
+    setEditMode('edit');
+    setEditSheetOpen(true);
   };
 
   const handleToggleActive = (indexer: Indexer) => {
@@ -309,10 +317,16 @@ function TrackerSettings() {
         </Table>
       </div>
 
-      <TrackerSheet
-        open={sheetOpen}
-        onOpenChange={handleSheetOpenChange}
-        mode={sheetMode}
+      <TrackerViewSheet
+        open={viewSheetOpen}
+        onOpenChange={handleViewSheetOpenChange}
+        tracker={selectedTracker}
+      />
+      
+      <TrackerEditSheet
+        open={editSheetOpen}
+        onOpenChange={handleEditSheetOpenChange}
+        mode={editMode}
         tracker={selectedTracker}
       />
     </div>
