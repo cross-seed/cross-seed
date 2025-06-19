@@ -50,6 +50,7 @@ function TrackerSettings() {
   const [sheetMode, setSheetMode] = useState<'view' | 'edit' | 'create'>('create');
   const [selectedTracker, setSelectedTracker] = useState<Indexer | null>(null);
   const [testingTracker, setTestingTracker] = useState<number | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
 
   const { data: indexers } = useSuspenseQuery(
     trpc.indexers.getAll.queryOptions(undefined, {
@@ -174,13 +175,22 @@ function TrackerSettings() {
     setSheetOpen(true);
   };
 
+  const handleSheetOpenChange = (open: boolean) => {
+    setSheetOpen(open);
+    if (!open) {
+      setOpenDropdown(null); // Close any open dropdown when sheet closes
+    }
+  };
+
   const handleViewTracker = (indexer: Indexer) => {
+    setOpenDropdown(null); // Close any open dropdown
     setSelectedTracker(indexer);
     setSheetMode('view');
     setSheetOpen(true);
   };
 
   const handleEditTracker = (indexer: Indexer) => {
+    setOpenDropdown(null); // Close any open dropdown
     setSelectedTracker(indexer);
     setSheetMode('edit');
     setSheetOpen(true);
@@ -239,7 +249,10 @@ function TrackerSettings() {
                 <TableCell>{getStatusBadge(indexer)}</TableCell>
                 <TableCell>{getCapsBadges(indexer)}</TableCell>
                 <TableCell className="text-right">
-                  <DropdownMenu>
+                  <DropdownMenu 
+                    open={openDropdown === indexer.id}
+                    onOpenChange={(open) => setOpenDropdown(open ? indexer.id : null)}
+                  >
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="h-8 w-8 p-0">
                         <span className="sr-only">Open menu</span>
@@ -298,7 +311,7 @@ function TrackerSettings() {
 
       <TrackerSheet
         open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        onOpenChange={handleSheetOpenChange}
         mode={sheetMode}
         tracker={selectedTracker}
       />
