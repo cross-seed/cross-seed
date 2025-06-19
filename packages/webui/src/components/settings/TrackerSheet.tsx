@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,15 @@ export default function TrackerSheet({
   const [url, setUrl] = useState(tracker?.url || '');
   const [apikey, setApikey] = useState('');
   const [isTesting, setIsTesting] = useState(false);
+
+  // Sync form state when tracker changes
+  useEffect(() => {
+    if (open) {
+      setName(tracker?.name || '');
+      setUrl(tracker?.url || '');
+      setApikey(''); // Always reset API key for security
+    }
+  }, [open, tracker]);
 
   const { mutate: createIndexer, isPending: isCreating } = useMutation(
     trpc.indexers.create.mutationOptions({
