@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useSuspenseQuery, useMutation } from '@tanstack/react-query';
+import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,7 @@ type Indexer = {
 
 function TrackerSettings() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingTracker, setEditingTracker] = useState<Indexer | null>(null);
   const [testingTracker, setTestingTracker] = useState<number | null>(null);
@@ -49,9 +50,11 @@ function TrackerSettings() {
 
   const { mutate: updateIndexer } = useMutation(
     trpc.indexers.update.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
         toast.success('Tracker updated successfully');
-        trpc.indexers.getAll.invalidate();
+        await queryClient.invalidateQueries({
+          queryKey: trpc.indexers.getAll.queryKey(),
+        });
       },
       onError: (error) => {
         toast.error(`Failed to update tracker: ${error.message}`);
