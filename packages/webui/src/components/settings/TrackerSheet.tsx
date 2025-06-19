@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,7 @@ export default function TrackerSheet({
   editingTracker,
 }: TrackerSheetProps) {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const [name, setName] = useState(editingTracker?.name || '');
   const [url, setUrl] = useState(editingTracker?.url || '');
   const [apikey, setApikey] = useState('');
@@ -50,8 +51,11 @@ export default function TrackerSheet({
 
   const { mutate: createIndexer, isPending: isCreating } = useMutation(
     trpc.indexers.create.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
         toast.success('Tracker created successfully');
+        await queryClient.invalidateQueries({
+          queryKey: trpc.indexers.getAll.queryKey(),
+        });
         onOpenChange(false);
       },
       onError: (error) => {
@@ -62,8 +66,11 @@ export default function TrackerSheet({
 
   const { mutate: updateIndexer, isPending: isUpdating } = useMutation(
     trpc.indexers.update.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
         toast.success('Tracker updated successfully');
+        await queryClient.invalidateQueries({
+          queryKey: trpc.indexers.getAll.queryKey(),
+        });
         onOpenChange(false);
       },
       onError: (error) => {
