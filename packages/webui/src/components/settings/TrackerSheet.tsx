@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
@@ -43,26 +43,10 @@ export default function TrackerSheet({
   editingTracker,
 }: TrackerSheetProps) {
   const trpc = useTRPC();
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
+  const [name, setName] = useState(editingTracker?.name || '');
+  const [url, setUrl] = useState(editingTracker?.url || '');
   const [apikey, setApikey] = useState('');
   const [isTesting, setIsTesting] = useState(false);
-
-  // Reset form when opening/closing or changing tracker
-  useEffect(() => {
-    if (open) {
-      if (editingTracker) {
-        setName(editingTracker.name || '');
-        setUrl(editingTracker.url || '');
-        // Don't populate API key for security - user must re-enter if changing
-        setApikey('');
-      } else {
-        setName('');
-        setUrl('');
-        setApikey('');
-      }
-    }
-  }, [open, editingTracker]);
 
   const { mutate: createIndexer, isPending: isCreating } = useMutation(
     trpc.indexers.create.mutationOptions({
@@ -88,8 +72,25 @@ export default function TrackerSheet({
     }),
   );
 
-  const { mutate: testIndexer } = useMutation(
-    trpc.indexers.test.mutationOptions({
+  const { mutate: testNewIndexer } = useMutation(
+    trpc.indexers.testNew.mutationOptions({
+      onSuccess: (result) => {
+        setIsTesting(false);
+        if (result.success) {
+          toast.success('Connection test successful!');
+        } else {
+          toast.error(`Connection test failed: ${result.message}`);
+        }
+      },
+      onError: (error) => {
+        setIsTesting(false);
+        toast.error(`Test failed: ${error.message}`);
+      },
+    }),
+  );
+
+  const { mutate: testExistingIndexer } = useMutation(
+    trpc.indexers.testExisting.mutationOptions({
       onSuccess: (result) => {
         setIsTesting(false);
         if (result.success) {
@@ -135,16 +136,21 @@ export default function TrackerSheet({
   };
 
   const handleTest = () => {
-    if (!url.trim() || !apikey.trim()) {
-      toast.error('URL and API key are required for testing');
-      return;
-    }
-
     setIsTesting(true);
-    testIndexer({
-      url: url.trim(),
-      apikey: apikey.trim(),
-    });
+    
+    if (editingTracker) {
+      testExistingIndexer({ id: editingTracker.id });
+    } else {
+      if (!url.trim() || !apikey.trim()) {
+        toast.error('URL and API key are required for testing');
+        setIsTesting(false);
+        return;
+      }
+      testNewIndexer({
+        url: url.trim(),
+        apikey: apikey.trim(),
+      });
+    }
   };
 
   const isLoading = isCreating || isUpdating;
@@ -209,7 +215,7 @@ export default function TrackerSheet({
               type="button"
               variant="outline"
               onClick={handleTest}
-              disabled={isTesting || !url.trim() || !apikey.trim()}
+              disabled={isTesting || (!editingTracker && (!url.trim() || !apikey.trim()))}
               className="w-full"
             >
               {isTesting ? (
