@@ -132,6 +132,25 @@ export default function TrackerEditSheet({
       return;
     }
 
+    // Validate URL format for torznab API
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl.endsWith('/api')) {
+      toast.error('URL must end with /api');
+      return;
+    }
+
+    // Check for apikey parameter in URL
+    try {
+      const urlObj = new URL(trimmedUrl);
+      if (!urlObj.searchParams.has('apikey')) {
+        toast.error('URL must include apikey parameter (e.g., ?apikey=YOUR_KEY)');
+        return;
+      }
+    } catch {
+      toast.error('Invalid URL format');
+      return;
+    }
+
     if (!apikey.trim()) {
       toast.error('API key is required');
       return;
@@ -211,9 +230,6 @@ export default function TrackerEditSheet({
                 autoComplete="url"
                 required
               />
-              <p className="text-muted-foreground text-sm">
-                Must end with /api and include apikey parameter
-              </p>
             </div>
 
             <div className="grid gap-3">
