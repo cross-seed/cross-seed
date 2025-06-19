@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -32,19 +31,19 @@ type Indexer = {
   bookSearchCap: boolean | null;
 };
 
-interface TrackerSheetProps {
+interface TrackerEditSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: 'view' | 'edit' | 'create';
+  mode: 'edit' | 'create';
   tracker: Indexer | null;
 }
 
-export default function TrackerSheet({
+export default function TrackerEditSheet({
   open,
   onOpenChange,
   mode,
   tracker,
-}: TrackerSheetProps) {
+}: TrackerEditSheetProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [name, setName] = useState(tracker?.name || '');
@@ -60,7 +59,6 @@ export default function TrackerSheet({
       setApikey(''); // Always reset API key for security
     }
   }, [open, tracker]);
-
 
   const { mutate: createIndexer, isPending: isCreating } = useMutation(
     trpc.indexers.create.mutationOptions({
@@ -181,120 +179,55 @@ export default function TrackerSheet({
         <form onSubmit={handleSubmit}>
           <SheetHeader>
             <SheetTitle>
-              {mode === 'view' ? 'View Tracker' : mode === 'edit' ? 'Edit Tracker' : 'Add Tracker'}
+              {mode === 'edit' ? 'Edit Tracker' : 'Add Tracker'}
             </SheetTitle>
             <SheetDescription>
-              {mode === 'view'
-                ? 'View tracker details and capabilities.'
-                : mode === 'edit'
+              {mode === 'edit'
                 ? 'Update the tracker details below.'
                 : 'Add a new torznab indexer or tracker.'}
             </SheetDescription>
           </SheetHeader>
 
           <div className="grid flex-1 auto-rows-min gap-6 px-4">
-            {mode === 'view' ? (
-              // View mode - display-only layout
-              <>
-                <div className="grid gap-3">
-                  <Label>Tracker Name</Label>
-                  <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm">
-                    {tracker?.name || 'Unnamed'}
-                  </div>
-                </div>
+            <div className="grid gap-3">
+              <Label htmlFor="name">Tracker Name</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="My Indexer"
+                autoComplete="off"
+              />
+            </div>
 
-                <div className="grid gap-3">
-                  <Label>URL</Label>
-                  <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm font-mono break-all">
-                    {tracker?.url}
-                  </div>
-                </div>
+            <div className="grid gap-3">
+              <Label htmlFor="url">URL</Label>
+              <Input
+                id="url"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://indexer.example.com/api"
+                autoComplete="url"
+                required
+              />
+              <p className="text-muted-foreground text-sm">
+                Must end with /api and include apikey parameter
+              </p>
+            </div>
 
-                <div className="grid gap-3">
-                  <Label>API Key</Label>
-                  <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm text-muted-foreground">
-                    Hidden for security
-                  </div>
-                </div>
-              </>
-            ) : (
-              // Edit/Create mode - interactive forms
-              <>
-                <div className="grid gap-3">
-                  <Label htmlFor="name">Tracker Name</Label>
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="My Indexer"
-                    autoComplete="off"
-                  />
-                </div>
-
-                <div className="grid gap-3">
-                  <Label htmlFor="url">URL</Label>
-                  <Input
-                    id="url"
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://indexer.example.com/api"
-                    autoComplete="url"
-                    required
-                  />
-                  <p className="text-muted-foreground text-sm">
-                    Must end with /api and include apikey parameter
-                  </p>
-                </div>
-
-                <div className="grid gap-3">
-                  <Label htmlFor="apikey">API Key</Label>
-                  <Input
-                    id="apikey"
-                    type="password"
-                    value={apikey}
-                    onChange={(e) => setApikey(e.target.value)}
-                    placeholder="Enter API key"
-                    autoComplete="off"
-                    required
-                  />
-                </div>
-              </>
-            )}
-
-            {mode === 'view' && tracker && (
-              <div className="grid gap-3">
-                <Label>Capabilities</Label>
-                <div className="flex flex-wrap gap-2">
-                  {tracker.searchCap && <Badge variant="outline" className="text-xs">Search</Badge>}
-                  {tracker.tvSearchCap && <Badge variant="outline" className="text-xs">TV</Badge>}
-                  {tracker.movieSearchCap && <Badge variant="outline" className="text-xs">Movies</Badge>}
-                  {tracker.musicSearchCap && <Badge variant="outline" className="text-xs">Music</Badge>}
-                  {tracker.audioSearchCap && <Badge variant="outline" className="text-xs">Audio</Badge>}
-                  {tracker.bookSearchCap && <Badge variant="outline" className="text-xs">Books</Badge>}
-                  {!tracker.searchCap && !tracker.tvSearchCap && !tracker.movieSearchCap && 
-                   !tracker.musicSearchCap && !tracker.audioSearchCap && !tracker.bookSearchCap && (
-                    <span className="text-muted-foreground text-sm">No capabilities detected</span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {mode === 'view' && tracker && (
-              <div className="grid gap-3">
-                <Label>Status</Label>
-                <div>
-                  {tracker.active ? (
-                    <Badge variant="default" className="bg-green-700">Active</Badge>
-                  ) : (
-                    <Badge variant="secondary">Disabled</Badge>
-                  )}
-                  {tracker.status && tracker.status !== 'OK' && (
-                    <Badge variant="outline" className="ml-2">{tracker.status}</Badge>
-                  )}
-                </div>
-              </div>
-            )}
+            <div className="grid gap-3">
+              <Label htmlFor="apikey">API Key</Label>
+              <Input
+                id="apikey"
+                type="password"
+                value={apikey}
+                onChange={(e) => setApikey(e.target.value)}
+                placeholder="Enter API key"
+                autoComplete="off"
+                required
+              />
+            </div>
 
             <Button
               type="button"
@@ -318,23 +251,21 @@ export default function TrackerSheet({
           </div>
 
           <SheetFooter>
-            {mode !== 'view' && (
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {mode === 'edit' ? 'Updating...' : 'Creating...'}
-                  </>
-                ) : mode === 'edit' ? (
-                  'Update'
-                ) : (
-                  'Create'
-                )}
-              </Button>
-            )}
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {mode === 'edit' ? 'Updating...' : 'Creating...'}
+                </>
+              ) : mode === 'edit' ? (
+                'Update'
+              ) : (
+                'Create'
+              )}
+            </Button>
             <SheetClose asChild>
               <Button type="button" variant="outline" disabled={isLoading}>
-                {mode === 'view' ? 'Close' : 'Cancel'}
+                Cancel
               </Button>
             </SheetClose>
           </SheetFooter>
