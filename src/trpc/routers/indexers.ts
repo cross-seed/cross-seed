@@ -21,6 +21,50 @@ const indexerUpdateSchema = z.object({
 	active: z.boolean().optional(),
 });
 
+async function testConnection(url: string, apikey: string, name: string) {
+	try {
+		const response = await fetch(assembleUrl(url, apikey, { t: "caps" }), {
+			headers: { "User-Agent": USER_AGENT },
+			signal: AbortSignal.timeout(ms("30 seconds")),
+		});
+
+		if (!response.ok) {
+			if (response.status === 401) {
+				throw new Error("Authentication failed - check API key");
+			} else if (response.status === 429) {
+				throw new Error("Rate limited by indexer");
+			} else {
+				throw new Error(
+					`HTTP ${response.status}: ${response.statusText}`,
+				);
+			}
+		}
+
+		logger.info({
+			label: Label.TORZNAB,
+			message: `Test connection successful for: ${name}`,
+		});
+
+		return {
+			success: true,
+			message: "Connection successful",
+		};
+	} catch (error) {
+		const message =
+			error instanceof Error ? error.message : "Unknown error";
+
+		logger.warn({
+			label: Label.TORZNAB,
+			message: `Test connection failed for ${name}: ${message}`,
+		});
+
+		return {
+			success: false,
+			message: `Connection failed: ${message}`,
+		};
+	}
+}
+
 export const indexersRouter = router({
 	// Get all indexers
 	getAll: authedProcedure.query(async () => {
@@ -102,19 +146,14 @@ export const indexersRouter = router({
 			}
 
 			// Prepare update object
-			const updateData: {
-				name?: string | null;
-				url?: string;
-				apikey?: string;
-				active?: boolean;
-			} = {};
-			if (updates.name !== undefined) updateData.name = updates.name;
-			if (updates.url !== undefined)
-				updateData.url = sanitizeUrl(updates.url);
-			if (updates.apikey !== undefined)
-				updateData.apikey = updates.apikey;
-			if (updates.active !== undefined)
-				updateData.active = updates.active;
+			const updateData = {
+				...(updates.name !== undefined && { name: updates.name }),
+				...(updates.url !== undefined && {
+					url: sanitizeUrl(updates.url),
+				}),
+				...(updates.apikey !== undefined && { apikey: updates.apikey }),
+				...(updates.active !== undefined && { active: updates.active }),
+			};
 
 			const [updatedIndexer] = await db("indexer")
 				.where({ id })
@@ -151,89 +190,33 @@ export const indexersRouter = router({
 			return { success: true };
 		}),
 
-	// Test indexer connection
-	test: authedProcedure
+	// Test existing indexer connection
+	testExisting: authedProcedure
+		.input(z.object({ id: z.number().int().positive() }))
+		.mutation(async ({ input }) => {
+			const indexer = await db("indexer").where({ id: input.id }).first();
+
+			if (!indexer) {
+				throw new Error(`Indexer with ID ${input.id} not found`);
+			}
+
+			return testConnection(
+				indexer.url,
+				indexer.apikey,
+				indexer.name || indexer.url,
+			);
+		}),
+
+	// Test new indexer connection before creating
+	testNew: authedProcedure
 		.input(
 			z.object({
-				id: z.number().int().positive().optional(),
-				url: z.string().url().optional(),
-				apikey: z.string().min(1).optional(),
+				url: z.string().url(),
+				apikey: z.string().min(1),
 			}),
 		)
 		.mutation(async ({ input }) => {
-			let testUrl: string;
-			let testApikey: string;
-			let indexerName: string;
-
-			if (input.id) {
-				// Test existing indexer
-				const indexer = await db("indexer")
-					.where({ id: input.id })
-					.first();
-
-				if (!indexer) {
-					throw new Error(`Indexer with ID ${input.id} not found`);
-				}
-
-				testUrl = indexer.url;
-				testApikey = indexer.apikey;
-				indexerName = indexer.name || indexer.url;
-			} else if (input.url && input.apikey) {
-				// Test new indexer before creating
-				testUrl = sanitizeUrl(input.url);
-				testApikey = input.apikey;
-				indexerName = testUrl;
-			} else {
-				throw new Error(
-					"Either id or both url and apikey must be provided",
-				);
-			}
-
-			try {
-				const response = await fetch(
-					assembleUrl(testUrl, testApikey, { t: "caps" }),
-					{
-						headers: { "User-Agent": USER_AGENT },
-						signal: AbortSignal.timeout(ms("30 seconds")),
-					},
-				);
-
-				if (!response.ok) {
-					if (response.status === 401) {
-						throw new Error(
-							"Authentication failed - check API key",
-						);
-					} else if (response.status === 429) {
-						throw new Error("Rate limited by indexer");
-					} else {
-						throw new Error(
-							`HTTP ${response.status}: ${response.statusText}`,
-						);
-					}
-				}
-
-				logger.info({
-					label: Label.TORZNAB,
-					message: `Test connection successful for: ${indexerName}`,
-				});
-
-				return {
-					success: true,
-					message: "Connection successful",
-				};
-			} catch (error) {
-				const message =
-					error instanceof Error ? error.message : "Unknown error";
-
-				logger.warn({
-					label: Label.TORZNAB,
-					message: `Test connection failed for ${indexerName}: ${message}`,
-				});
-
-				return {
-					success: false,
-					message: `Connection failed: ${message}`,
-				};
-			}
+			const testUrl = sanitizeUrl(input.url);
+			return testConnection(testUrl, input.apikey, testUrl);
 		}),
 });
