@@ -51,6 +51,7 @@ function TrackerSettings() {
     trpc.indexers.update.mutationOptions({
       onSuccess: () => {
         toast.success('Tracker updated successfully');
+        trpc.indexers.getAll.invalidate();
       },
       onError: (error) => {
         toast.error(`Failed to update tracker: ${error.message}`);
