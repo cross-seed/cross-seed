@@ -135,6 +135,30 @@ function TrackerSettings() {
     return <Badge variant="outline">{indexer.status}</Badge>;
   };
 
+  const getCapsBadges = (indexer: Indexer) => {
+    const caps = [];
+    if (indexer.searchCap) caps.push('Search');
+    if (indexer.tvSearchCap) caps.push('TV');
+    if (indexer.movieSearchCap) caps.push('Movies');
+    if (indexer.musicSearchCap) caps.push('Music');
+    if (indexer.audioSearchCap) caps.push('Audio');
+    if (indexer.bookSearchCap) caps.push('Books');
+
+    if (caps.length === 0) {
+      return <span className="text-muted-foreground text-sm">Unknown</span>;
+    }
+
+    return (
+      <div className="flex flex-wrap gap-1">
+        {caps.map((cap) => (
+          <Badge key={cap} variant="outline" className="text-xs">
+            {cap}
+          </Badge>
+        ))}
+      </div>
+    );
+  };
+
   const handleAddTracker = () => {
     setEditingTracker(null);
     setSheetOpen(true);
@@ -179,6 +203,7 @@ function TrackerSettings() {
               <TableHead>Name</TableHead>
               <TableHead>URL</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Capabilities</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -196,6 +221,7 @@ function TrackerSettings() {
                   {indexer.url}
                 </TableCell>
                 <TableCell>{getStatusBadge(indexer)}</TableCell>
+                <TableCell>{getCapsBadges(indexer)}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
                     <Button
