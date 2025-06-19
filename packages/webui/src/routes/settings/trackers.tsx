@@ -12,7 +12,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, TestTube, ToggleLeft, ToggleRight } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Plus, TestTube, ToggleLeft, ToggleRight, MoreHorizontal, Eye, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import TrackerSheet from '@/components/settings/TrackerSheet';
 
@@ -39,7 +47,8 @@ function TrackerSettings() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editingTracker, setEditingTracker] = useState<Indexer | null>(null);
+  const [sheetMode, setSheetMode] = useState<'view' | 'edit' | 'create'>('create');
+  const [selectedTracker, setSelectedTracker] = useState<Indexer | null>(null);
   const [testingTracker, setTestingTracker] = useState<number | null>(null);
 
   const { data: indexers } = useSuspenseQuery(
@@ -160,12 +169,20 @@ function TrackerSettings() {
   };
 
   const handleAddTracker = () => {
-    setEditingTracker(null);
+    setSelectedTracker(null);
+    setSheetMode('create');
+    setSheetOpen(true);
+  };
+
+  const handleViewTracker = (indexer: Indexer) => {
+    setSelectedTracker(indexer);
+    setSheetMode('view');
     setSheetOpen(true);
   };
 
   const handleEditTracker = (indexer: Indexer) => {
-    setEditingTracker(indexer);
+    setSelectedTracker(indexer);
+    setSheetMode('edit');
     setSheetOpen(true);
   };
 
@@ -211,8 +228,7 @@ function TrackerSettings() {
             {indexers?.map((indexer) => (
               <TableRow
                 key={indexer.id}
-                className="hover:bg-muted/50 cursor-pointer"
-                onClick={() => handleEditTracker(indexer)}
+                className="hover:bg-muted/50"
               >
                 <TableCell className="font-medium">
                   {indexer.name || 'Unnamed'}
@@ -223,35 +239,46 @@ function TrackerSettings() {
                 <TableCell>{getStatusBadge(indexer)}</TableCell>
                 <TableCell>{getCapsBadges(indexer)}</TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTestTracker(indexer);
-                      }}
-                      disabled={testingTracker === indexer.id}
-                      title="Test Connection"
-                    >
-                      <TestTube className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleActive(indexer);
-                      }}
-                      title={indexer.active ? 'Disable' : 'Enable'}
-                    >
-                      {indexer.active ? (
-                        <ToggleRight className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <ToggleLeft className="text-muted-foreground h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleViewTracker(indexer)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditTracker(indexer)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => handleTestTracker(indexer)}
+                        disabled={testingTracker === indexer.id}
+                      >
+                        <TestTube className="mr-2 h-4 w-4" />
+                        {testingTracker === indexer.id ? 'Testing...' : 'Test Connection'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleToggleActive(indexer)}>
+                        {indexer.active ? (
+                          <>
+                            <ToggleLeft className="mr-2 h-4 w-4" />
+                            Disable
+                          </>
+                        ) : (
+                          <>
+                            <ToggleRight className="mr-2 h-4 w-4" />
+                            Enable
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -272,7 +299,8 @@ function TrackerSettings() {
       <TrackerSheet
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        editingTracker={editingTracker}
+        mode={sheetMode}
+        tracker={selectedTracker}
       />
     </div>
   );
