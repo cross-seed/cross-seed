@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -34,18 +35,20 @@ type Indexer = {
 interface TrackerSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editingTracker: Indexer | null;
+  mode: 'view' | 'edit' | 'create';
+  tracker: Indexer | null;
 }
 
 export default function TrackerSheet({
   open,
   onOpenChange,
-  editingTracker,
+  mode,
+  tracker,
 }: TrackerSheetProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [name, setName] = useState(editingTracker?.name || '');
-  const [url, setUrl] = useState(editingTracker?.url || '');
+  const [name, setName] = useState(tracker?.name || '');
+  const [url, setUrl] = useState(tracker?.url || '');
   const [apikey, setApikey] = useState('');
   const [isTesting, setIsTesting] = useState(false);
 
@@ -126,14 +129,14 @@ export default function TrackerSheet({
       return;
     }
 
-    if (editingTracker) {
+    if (mode === 'edit' && tracker) {
       updateIndexer({
-        id: editingTracker.id,
+        id: tracker.id,
         name: name.trim() || null,
         url: url.trim(),
         apikey: apikey.trim(),
       });
-    } else {
+    } else if (mode === 'create') {
       createIndexer({
         name: name.trim() || undefined,
         url: url.trim(),
@@ -145,8 +148,8 @@ export default function TrackerSheet({
   const handleTest = () => {
     setIsTesting(true);
     
-    if (editingTracker) {
-      testExistingIndexer({ id: editingTracker.id });
+    if (mode === 'edit' && tracker) {
+      testExistingIndexer({ id: tracker.id });
     } else {
       if (!url.trim() || !apikey.trim()) {
         toast.error('URL and API key are required for testing');
@@ -168,10 +171,12 @@ export default function TrackerSheet({
         <form onSubmit={handleSubmit}>
           <SheetHeader>
             <SheetTitle>
-              {editingTracker ? 'Edit Tracker' : 'Add Tracker'}
+              {mode === 'view' ? 'View Tracker' : mode === 'edit' ? 'Edit Tracker' : 'Add Tracker'}
             </SheetTitle>
             <SheetDescription>
-              {editingTracker
+              {mode === 'view'
+                ? 'View tracker details and capabilities.'
+                : mode === 'edit'
                 ? 'Update the tracker details below.'
                 : 'Add a new torznab indexer or tracker.'}
             </SheetDescription>
@@ -186,6 +191,7 @@ export default function TrackerSheet({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="My Indexer"
                 autoComplete="off"
+                readOnly={mode === 'view'}
               />
             </div>
 
@@ -198,7 +204,8 @@ export default function TrackerSheet({
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://indexer.example.com/api"
                 autoComplete="url"
-                required
+                required={mode !== 'view'}
+                readOnly={mode === 'view'}
               />
               <p className="text-muted-foreground text-sm">
                 Must end with /api and include apikey parameter
@@ -212,17 +219,52 @@ export default function TrackerSheet({
                 type="password"
                 value={apikey}
                 onChange={(e) => setApikey(e.target.value)}
-                placeholder="Enter API key"
+                placeholder={mode === 'view' ? 'Hidden for security' : 'Enter API key'}
                 autoComplete="off"
-                required
+                required={mode !== 'view'}
+                readOnly={mode === 'view'}
               />
             </div>
+
+            {mode === 'view' && tracker && (
+              <div className="grid gap-3">
+                <Label>Capabilities</Label>
+                <div className="flex flex-wrap gap-2">
+                  {tracker.searchCap && <Badge variant="outline" className="text-xs">Search</Badge>}
+                  {tracker.tvSearchCap && <Badge variant="outline" className="text-xs">TV</Badge>}
+                  {tracker.movieSearchCap && <Badge variant="outline" className="text-xs">Movies</Badge>}
+                  {tracker.musicSearchCap && <Badge variant="outline" className="text-xs">Music</Badge>}
+                  {tracker.audioSearchCap && <Badge variant="outline" className="text-xs">Audio</Badge>}
+                  {tracker.bookSearchCap && <Badge variant="outline" className="text-xs">Books</Badge>}
+                  {!tracker.searchCap && !tracker.tvSearchCap && !tracker.movieSearchCap && 
+                   !tracker.musicSearchCap && !tracker.audioSearchCap && !tracker.bookSearchCap && (
+                    <span className="text-muted-foreground text-sm">No capabilities detected</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {mode === 'view' && tracker && (
+              <div className="grid gap-3">
+                <Label>Status</Label>
+                <div>
+                  {tracker.active ? (
+                    <Badge variant="default" className="bg-green-700">Active</Badge>
+                  ) : (
+                    <Badge variant="secondary">Disabled</Badge>
+                  )}
+                  {tracker.status && tracker.status !== 'OK' && (
+                    <Badge variant="outline" className="ml-2">{tracker.status}</Badge>
+                  )}
+                </div>
+              </div>
+            )}
 
             <Button
               type="button"
               variant="outline"
               onClick={handleTest}
-              disabled={isTesting || (!editingTracker && (!url.trim() || !apikey.trim()))}
+              disabled={isTesting || (mode === 'create' && (!url.trim() || !apikey.trim()))}
               className="w-full"
             >
               {isTesting ? (
@@ -240,21 +282,23 @@ export default function TrackerSheet({
           </div>
 
           <SheetFooter>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {editingTracker ? 'Updating...' : 'Creating...'}
-                </>
-              ) : editingTracker ? (
-                'Update'
-              ) : (
-                'Create'
-              )}
-            </Button>
+            {mode !== 'view' && (
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {mode === 'edit' ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : mode === 'edit' ? (
+                  'Update'
+                ) : (
+                  'Create'
+                )}
+              </Button>
+            )}
             <SheetClose asChild>
               <Button type="button" variant="outline" disabled={isLoading}>
-                Cancel
+                {mode === 'view' ? 'Close' : 'Cancel'}
               </Button>
             </SheetClose>
           </SheetFooter>
