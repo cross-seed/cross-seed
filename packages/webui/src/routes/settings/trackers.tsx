@@ -201,6 +201,7 @@ function TrackerSettings() {
     setOpenDropdown(null); // Close any open dropdown
     setSelectedTracker(indexer);
     setEditMode('edit');
+    setViewSheetOpen(false); // Close view sheet if open
     setEditSheetOpen(true);
   };
 
@@ -321,6 +322,7 @@ function TrackerSettings() {
         open={viewSheetOpen}
         onOpenChange={handleViewSheetOpenChange}
         tracker={selectedTracker}
+        onEdit={handleEditTracker}
       />
       
       <TrackerEditSheet

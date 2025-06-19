@@ -13,7 +13,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { toast } from 'sonner';
-import { TestTube, Loader2 } from 'lucide-react';
+import { TestTube, Loader2, Pencil } from 'lucide-react';
 import { useState } from 'react';
 
 type Indexer = {
@@ -35,12 +35,14 @@ interface TrackerViewSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tracker: Indexer | null;
+  onEdit?: (tracker: Indexer) => void;
 }
 
 export default function TrackerViewSheet({
   open,
   onOpenChange,
   tracker,
+  onEdit,
 }: TrackerViewSheetProps) {
   const trpc = useTRPC();
   const [isTesting, setIsTesting] = useState(false);
@@ -154,8 +156,18 @@ export default function TrackerViewSheet({
         </div>
 
         <SheetFooter>
+          {onEdit && (
+            <Button 
+              type="button" 
+              onClick={() => onEdit(tracker)}
+              className="flex-1"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          )}
           <SheetClose asChild>
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" className="flex-1">
               Close
             </Button>
           </SheetClose>
