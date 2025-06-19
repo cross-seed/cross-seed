@@ -59,7 +59,7 @@ function TrackerSettings() {
   );
 
   const { mutate: testIndexer } = useMutation(
-    trpc.indexers.test.mutationOptions({
+    trpc.indexers.testExisting.mutationOptions({
       onSuccess: (result) => {
         setTestingTracker(null);
         if (result.success) {
