@@ -61,6 +61,7 @@ export default function TrackerSheet({
     }
   }, [open, tracker]);
 
+
   const { mutate: createIndexer, isPending: isCreating } = useMutation(
     trpc.indexers.create.mutationOptions({
       onSuccess: async () => {
@@ -192,48 +193,74 @@ export default function TrackerSheet({
           </SheetHeader>
 
           <div className="grid flex-1 auto-rows-min gap-6 px-4">
-            <div className="grid gap-3">
-              <Label htmlFor="name">Tracker Name</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="My Indexer"
-                autoComplete="off"
-                readOnly={mode === 'view'}
-              />
-            </div>
+            {mode === 'view' ? (
+              // View mode - display-only layout
+              <>
+                <div className="grid gap-3">
+                  <Label>Tracker Name</Label>
+                  <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm">
+                    {tracker?.name || 'Unnamed'}
+                  </div>
+                </div>
 
-            <div className="grid gap-3">
-              <Label htmlFor="url">URL</Label>
-              <Input
-                id="url"
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://indexer.example.com/api"
-                autoComplete="url"
-                required={mode !== 'view'}
-                readOnly={mode === 'view'}
-              />
-              <p className="text-muted-foreground text-sm">
-                Must end with /api and include apikey parameter
-              </p>
-            </div>
+                <div className="grid gap-3">
+                  <Label>URL</Label>
+                  <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm font-mono break-all">
+                    {tracker?.url}
+                  </div>
+                </div>
 
-            <div className="grid gap-3">
-              <Label htmlFor="apikey">API Key</Label>
-              <Input
-                id="apikey"
-                type="password"
-                value={apikey}
-                onChange={(e) => setApikey(e.target.value)}
-                placeholder={mode === 'view' ? 'Hidden for security' : 'Enter API key'}
-                autoComplete="off"
-                required={mode !== 'view'}
-                readOnly={mode === 'view'}
-              />
-            </div>
+                <div className="grid gap-3">
+                  <Label>API Key</Label>
+                  <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm text-muted-foreground">
+                    Hidden for security
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Edit/Create mode - interactive forms
+              <>
+                <div className="grid gap-3">
+                  <Label htmlFor="name">Tracker Name</Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="My Indexer"
+                    autoComplete="off"
+                  />
+                </div>
+
+                <div className="grid gap-3">
+                  <Label htmlFor="url">URL</Label>
+                  <Input
+                    id="url"
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://indexer.example.com/api"
+                    autoComplete="url"
+                    required
+                  />
+                  <p className="text-muted-foreground text-sm">
+                    Must end with /api and include apikey parameter
+                  </p>
+                </div>
+
+                <div className="grid gap-3">
+                  <Label htmlFor="apikey">API Key</Label>
+                  <Input
+                    id="apikey"
+                    type="password"
+                    value={apikey}
+                    onChange={(e) => setApikey(e.target.value)}
+                    placeholder="Enter API key"
+                    autoComplete="off"
+                    required
+                  />
+                </div>
+              </>
+            )}
 
             {mode === 'view' && tracker && (
               <div className="grid gap-3">
