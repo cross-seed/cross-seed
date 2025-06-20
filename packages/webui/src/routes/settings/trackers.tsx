@@ -279,23 +279,23 @@ function TrackerSettings() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => handleViewTracker(indexer)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewTracker(indexer); }}>
                         <Eye className="mr-2 h-4 w-4" />
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEditTracker(indexer)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditTracker(indexer); }}>
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
-                        onClick={() => handleTestTracker(indexer)}
+                        onClick={(e) => { e.stopPropagation(); handleTestTracker(indexer); }}
                         disabled={testingTracker === indexer.id}
                       >
                         <TestTube className="mr-2 h-4 w-4" />
                         {testingTracker === indexer.id ? 'Testing...' : 'Test Connection'}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleToggleActive(indexer)}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleActive(indexer); }}>
                         {indexer.active ? (
                           <>
                             <ToggleLeft className="mr-2 h-4 w-4" />
