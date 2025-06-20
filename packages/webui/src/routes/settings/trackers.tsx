@@ -42,6 +42,10 @@ type Indexer = {
   musicSearchCap: boolean | null;
   audioSearchCap: boolean | null;
   bookSearchCap: boolean | null;
+  tvIdCaps: Record<string, boolean> | null;
+  movieIdCaps: Record<string, boolean> | null;
+  categories: Record<string, boolean> | null;
+  limits: Record<string, number> | null;
 };
 
 function TrackerSettings() {
@@ -247,7 +251,8 @@ function TrackerSettings() {
             {indexers?.map((indexer) => (
               <TableRow
                 key={indexer.id}
-                className="hover:bg-muted/50"
+                className="hover:bg-muted/50 cursor-pointer"
+                onClick={() => handleViewTracker(indexer)}
               >
                 <TableCell className="font-medium">
                   {indexer.name || 'Unnamed'}
@@ -263,7 +268,11 @@ function TrackerSettings() {
                     onOpenChange={(open) => setOpenDropdown(open ? indexer.id : null)}
                   >
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
+                      <Button 
+                        variant="ghost" 
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <span className="sr-only">Open menu</span>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
