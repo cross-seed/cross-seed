@@ -226,6 +226,17 @@ export default function TrackerViewSheet({
             </div>
           </div>
 
+          <div className="grid gap-3">
+            <Label>Supported External IDs</Label>
+            <div className="flex flex-wrap gap-2">
+              <ExternalIdBadges 
+                tvIdCaps={tracker.tvIdCaps} 
+                movieIdCaps={tracker.movieIdCaps} 
+              />
+            </div>
+          </div>
+
+
           <Button
             type="button"
             variant="outline"
