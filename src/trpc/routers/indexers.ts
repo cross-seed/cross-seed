@@ -6,6 +6,7 @@ import { sanitizeUrl } from "../../utils.js";
 import { assembleUrl } from "../../torznab.js";
 import { USER_AGENT } from "../../constants.js";
 import ms from "ms";
+import { getAllIndexers } from "../../indexers.js";
 
 const indexerCreateSchema = z.object({
 	name: z.string().min(1).optional(),
@@ -68,22 +69,10 @@ async function testConnection(url: string, apikey: string, name: string) {
 export const indexersRouter = router({
 	// Get all indexers
 	getAll: authedProcedure.query(async () => {
-		const rawIndexers = await db("indexer").select("*").orderBy("name");
-
-		return rawIndexers.map((indexer) => ({
-			id: indexer.id,
-			name: indexer.name,
-			url: indexer.url,
-			active: indexer.active,
-			status: indexer.status,
-			retryAfter: indexer.retry_after,
-			searchCap: indexer.search_cap,
-			tvSearchCap: indexer.tv_search_cap,
-			movieSearchCap: indexer.movie_search_cap,
-			musicSearchCap: indexer.music_search_cap,
-			audioSearchCap: indexer.audio_search_cap,
-			bookSearchCap: indexer.book_search_cap,
-		}));
+		const indexers = await getAllIndexers({ includeInactive: true });
+		return indexers.sort((a, b) =>
+			(a.name || "").localeCompare(b.name || ""),
+		);
 	}),
 
 	// Create new indexer
