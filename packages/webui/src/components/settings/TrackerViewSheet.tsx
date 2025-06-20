@@ -29,7 +29,62 @@ type Indexer = {
   musicSearchCap: boolean | null;
   audioSearchCap: boolean | null;
   bookSearchCap: boolean | null;
+  tvIdCaps: Record<string, boolean> | null;
+  movieIdCaps: Record<string, boolean> | null;
+  categories: Record<string, boolean> | null;
+  limits: Record<string, number> | null;
 };
+
+function ExternalIdBadges({ tvIdCaps, movieIdCaps }: { 
+  tvIdCaps: Record<string, boolean> | null; 
+  movieIdCaps: Record<string, boolean> | null; 
+}) {
+  const allProviders = new Set([
+    ...(tvIdCaps ? Object.keys(tvIdCaps) : []),
+    ...(movieIdCaps ? Object.keys(movieIdCaps) : [])
+  ]);
+
+  const badges = [];
+
+  // Non-parenthesized (both TV and Movies) first
+  allProviders.forEach(provider => {
+    if (tvIdCaps?.[provider] && movieIdCaps?.[provider]) {
+      badges.push(
+        <Badge key={provider} variant="outline" className="text-xs">
+          {provider}
+        </Badge>
+      );
+    }
+  });
+
+  // TV-only badges
+  allProviders.forEach(provider => {
+    if (tvIdCaps?.[provider] && !movieIdCaps?.[provider]) {
+      badges.push(
+        <Badge key={`${provider}-tv`} variant="outline" className="text-xs">
+          {provider} (TV)
+        </Badge>
+      );
+    }
+  });
+
+  // Movie-only badges
+  allProviders.forEach(provider => {
+    if (!tvIdCaps?.[provider] && movieIdCaps?.[provider]) {
+      badges.push(
+        <Badge key={`${provider}-movie`} variant="outline" className="text-xs">
+          {provider} (Movies)
+        </Badge>
+      );
+    }
+  });
+
+  return badges.length > 0 ? (
+    <>{badges}</>
+  ) : (
+    <span className="text-muted-foreground text-sm">No external ID support detected</span>
+  );
+}
 
 interface TrackerViewSheetProps {
   open: boolean;
@@ -97,29 +152,10 @@ export default function TrackerViewSheet({
             </div>
           </div>
 
-          <div className="grid gap-3">
-            <Label>API Key</Label>
-            <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm text-muted-foreground">
-              Hidden for security
-            </div>
-          </div>
+
 
           <div className="grid gap-3">
-            <Label>Status</Label>
-            <div>
-              {tracker.active ? (
-                <Badge variant="default" className="bg-green-700">Active</Badge>
-              ) : (
-                <Badge variant="secondary">Disabled</Badge>
-              )}
-              {tracker.status && tracker.status !== 'OK' && (
-                <Badge variant="outline" className="ml-2">{tracker.status}</Badge>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-3">
-            <Label>Capabilities</Label>
+            <Label>Search Capabilities</Label>
             <div className="flex flex-wrap gap-2">
               {tracker.searchCap && <Badge variant="outline" className="text-xs">Search</Badge>}
               {tracker.tvSearchCap && <Badge variant="outline" className="text-xs">TV</Badge>}
@@ -129,10 +165,21 @@ export default function TrackerViewSheet({
               {tracker.bookSearchCap && <Badge variant="outline" className="text-xs">Books</Badge>}
               {!tracker.searchCap && !tracker.tvSearchCap && !tracker.movieSearchCap && 
                !tracker.musicSearchCap && !tracker.audioSearchCap && !tracker.bookSearchCap && (
-                <span className="text-muted-foreground text-sm">No capabilities detected</span>
+                <span className="text-muted-foreground text-sm">No search capabilities detected</span>
               )}
             </div>
           </div>
+
+          <div className="grid gap-3">
+            <Label>Supported External IDs</Label>
+            <div className="flex flex-wrap gap-2">
+              <ExternalIdBadges 
+                tvIdCaps={tracker.tvIdCaps} 
+                movieIdCaps={tracker.movieIdCaps} 
+              />
+            </div>
+          </div>
+
 
           <Button
             type="button"

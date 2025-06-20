@@ -152,11 +152,18 @@ export const ALL_CAPS: Caps = {
 	},
 };
 
-function deserialize(dbIndexer: DbIndexer): Indexer {
+export function deserialize(dbIndexer: DbIndexer): Indexer {
 	const { trackers, tvIdCaps, movieIdCaps, catCaps, limitsCaps, ...rest } =
 		dbIndexer;
 	return {
 		...rest,
+		active: Boolean(rest.active),
+		searchCap: Boolean(rest.searchCap),
+		tvSearchCap: Boolean(rest.tvSearchCap),
+		movieSearchCap: Boolean(rest.movieSearchCap),
+		musicSearchCap: Boolean(rest.musicSearchCap),
+		audioSearchCap: Boolean(rest.audioSearchCap),
+		bookSearchCap: Boolean(rest.bookSearchCap),
 		trackers: JSON.parse(trackers ?? "null"),
 		tvIdCaps: JSON.parse(tvIdCaps ?? "null"),
 		movieIdCaps: JSON.parse(movieIdCaps ?? "null"),
@@ -168,8 +175,15 @@ function deserialize(dbIndexer: DbIndexer): Indexer {
 /**
  * All indexers in the database, regardless of whether they are currently configured or working.
  */
-export async function getAllIndexers(): Promise<Indexer[]> {
-	return (await db("indexer").select(allFields)).map(deserialize);
+export async function getAllIndexers({ includeInactive = false } = {}): Promise<
+	Indexer[]
+> {
+	let query = db("indexer").select(allFields);
+	if (!includeInactive) {
+		query = query.where({ active: true });
+	}
+	const rawIndexers = await query;
+	return rawIndexers.map(deserialize);
 }
 
 /**
