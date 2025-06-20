@@ -107,22 +107,6 @@ export default function TrackerEditSheet({
     }),
   );
 
-  const { mutate: testExistingIndexer } = useMutation(
-    trpc.indexers.testExisting.mutationOptions({
-      onSuccess: (result) => {
-        setIsTesting(false);
-        if (result.success) {
-          toast.success('Connection test successful!');
-        } else {
-          toast.error(`Connection test failed: ${result.message}`);
-        }
-      },
-      onError: (error) => {
-        setIsTesting(false);
-        toast.error(`Test failed: ${error.message}`);
-      },
-    }),
-  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,21 +157,16 @@ export default function TrackerEditSheet({
   };
 
   const handleTest = () => {
-    setIsTesting(true);
-    
-    if (mode === 'edit' && tracker) {
-      testExistingIndexer({ id: tracker.id });
-    } else {
-      if (!url.trim() || !apikey.trim()) {
-        toast.error('URL and API key are required for testing');
-        setIsTesting(false);
-        return;
-      }
-      testNewIndexer({
-        url: url.trim(),
-        apikey: apikey.trim(),
-      });
+    if (!url.trim() || !apikey.trim()) {
+      toast.error('URL and API key are required for testing');
+      return;
     }
+    
+    setIsTesting(true);
+    testNewIndexer({
+      url: url.trim(),
+      apikey: apikey.trim(),
+    });
   };
 
   const isLoading = isCreating || isUpdating;
@@ -249,7 +228,7 @@ export default function TrackerEditSheet({
               type="button"
               variant="outline"
               onClick={handleTest}
-              disabled={isTesting || (mode === 'create' && (!url.trim() || !apikey.trim()))}
+              disabled={isTesting || !url.trim() || !apikey.trim()}
               className="w-full"
             >
               {isTesting ? (
