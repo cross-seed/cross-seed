@@ -72,9 +72,7 @@ function TrackerSettings() {
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
 
   const { data: indexers } = useSuspenseQuery(
-    trpc.indexers.getAll.queryOptions(undefined, {
-      refetchInterval: 10000, // Refresh every 10 seconds
-    }),
+    trpc.indexers.getAll.queryOptions(),
   );
 
   const { mutate: updateIndexer } = useMutation(
@@ -250,118 +248,118 @@ function TrackerSettings() {
             Manage your torznab indexers and trackers
           </p>
         </div>
-        
+
         <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader className="bg-muted sticky top-0 z-10">
-            <TableRow className="border-b">
-              <TableHead>Name</TableHead>
-              <TableHead>URL</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Capabilities</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {indexers?.map((indexer) => (
-              <TableRow
-                key={indexer.id}
-                className="hover:bg-muted/50 cursor-pointer"
-                onClick={() => handleViewTracker(indexer)}
-              >
-                <TableCell className="font-medium">
-                  {indexer.name || 'Unnamed'}
-                </TableCell>
-                <TableCell className="font-mono text-sm">
-                  {indexer.url}
-                </TableCell>
-                <TableCell>{getStatusBadge(indexer)}</TableCell>
-                <TableCell>{getCapsBadges(indexer)}</TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu
-                    open={openDropdown === indexer.id}
-                    onOpenChange={(open) =>
-                      setOpenDropdown(open ? indexer.id : null)
-                    }
-                  >
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="h-8 w-8 p-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewTracker(indexer);
-                        }}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditTracker(indexer);
-                        }}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTestTracker(indexer);
-                        }}
-                        disabled={testingTracker === indexer.id}
-                      >
-                        <TestTube className="mr-2 h-4 w-4" />
-                        {testingTracker === indexer.id
-                          ? 'Testing...'
-                          : 'Test Connection'}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleActive(indexer);
-                        }}
-                      >
-                        {indexer.active ? (
-                          <>
-                            <ToggleLeft className="mr-2 h-4 w-4" />
-                            Disable
-                          </>
-                        ) : (
-                          <>
-                            <ToggleRight className="mr-2 h-4 w-4" />
-                            Enable
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+          <Table>
+            <TableHeader className="bg-muted sticky top-0 z-10">
+              <TableRow className="border-b">
+                <TableHead>Name</TableHead>
+                <TableHead>URL</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Capabilities</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ))}
-            {indexers?.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="py-8 text-center">
-                  <div className="text-muted-foreground">
-                    No trackers configured. Add your first tracker to get
-                    started.
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {indexers?.map((indexer) => (
+                <TableRow
+                  key={indexer.id}
+                  className="hover:bg-muted/50 cursor-pointer"
+                  onClick={() => handleViewTracker(indexer)}
+                >
+                  <TableCell className="font-medium">
+                    {indexer.name || 'Unnamed'}
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {indexer.url}
+                  </TableCell>
+                  <TableCell>{getStatusBadge(indexer)}</TableCell>
+                  <TableCell>{getCapsBadges(indexer)}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu
+                      open={openDropdown === indexer.id}
+                      onOpenChange={(open) =>
+                        setOpenDropdown(open ? indexer.id : null)
+                      }
+                    >
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewTracker(indexer);
+                          }}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditTracker(indexer);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTestTracker(indexer);
+                          }}
+                          disabled={testingTracker === indexer.id}
+                        >
+                          <TestTube className="mr-2 h-4 w-4" />
+                          {testingTracker === indexer.id
+                            ? 'Testing...'
+                            : 'Test Connection'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleActive(indexer);
+                          }}
+                        >
+                          {indexer.active ? (
+                            <>
+                              <ToggleLeft className="mr-2 h-4 w-4" />
+                              Disable
+                            </>
+                          ) : (
+                            <>
+                              <ToggleRight className="mr-2 h-4 w-4" />
+                              Enable
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {indexers?.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-8 text-center">
+                    <div className="text-muted-foreground">
+                      No trackers configured. Add your first tracker to get
+                      started.
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
       </div>
 
