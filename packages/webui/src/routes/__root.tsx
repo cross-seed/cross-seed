@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { Login } from '@/components/auth/AuthWrapper';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // nothing in  router context right now
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -30,7 +31,7 @@ const isDevtoolsEnabled = getIsDevtoolsEnabled();
 function RootRoute() {
   return (
     <div className="bg-background text-foreground min-h-screen">
-      <Suspense fallback={<div>Loading...</div>}>
+      <Suspense fallback={<LoadingSpinner size="lg" />}>
         <Login>
           <SidebarProvider
             defaultOpen={true}
@@ -43,7 +44,7 @@ function RootRoute() {
           >
             <AppSidebar />
             <SidebarInset>
-              <Suspense fallback={<div>Loading...</div>}>
+              <Suspense fallback={<LoadingSpinner size="lg" fullScreen={false} />}>
                 <Outlet />
               </Suspense>
             </SidebarInset>
