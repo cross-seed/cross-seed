@@ -24,13 +24,10 @@ import { Plus, TestTube, ToggleLeft, ToggleRight, MoreHorizontal, Eye, Pencil } 
 import { toast } from 'sonner';
 import TrackerViewSheet from '@/components/settings/TrackerViewSheet';
 import TrackerEditSheet from '@/components/settings/TrackerEditSheet';
-import { PageLayout } from '@/components/PageLayout';
+import { Page } from '@/components/Page';
 
 export const Route = createFileRoute('/settings/trackers')({
   component: TrackerSettings,
-  meta: {
-    customLayout: true,
-  },
 });
 
 type Indexer = {
@@ -233,9 +230,9 @@ function TrackerSettings() {
   );
 
   return (
-    <PageLayout 
+    <Page 
       breadcrumbs={['Settings', 'Trackers']}
-      headerActions={addTrackerButton}
+      actions={addTrackerButton}
     >
 
       <div className="rounded-md border">
@@ -342,6 +339,6 @@ function TrackerSettings() {
         mode={editMode}
         tracker={selectedTracker}
       />
-    </PageLayout>
+    </Page>
   );
 }
