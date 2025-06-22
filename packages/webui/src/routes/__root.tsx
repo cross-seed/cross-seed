@@ -3,6 +3,8 @@ import {
   createRootRouteWithContext,
   Outlet,
   useMatches,
+  useRouter,
+  useLocation,
 } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Suspense } from 'react';
@@ -31,9 +33,23 @@ function getIsDevtoolsEnabled(): boolean {
 const isDevtoolsEnabled = getIsDevtoolsEnabled();
 
 function RootRoute() {
-  const matches = useMatches();
-  const currentRoute = matches[matches.length - 1];
-  const hasCustomLayout = currentRoute?.route?.options?.meta?.customLayout;
+  const router = useRouter();
+  const location = useLocation();
+  
+  // Find route definition in router's route tree
+  const findRouteInTree = (tree, pathname) => {
+    if (tree.fullPath === pathname) return tree;
+    if (tree.children) {
+      for (const child of tree.children) {
+        const found = findRouteInTree(child, pathname);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  
+  const targetRoute = findRouteInTree(router.routeTree, location.pathname);
+  const hasCustomLayout = targetRoute?.options?.meta?.customLayout || false;
 
   return (
     <div className="bg-background text-foreground min-h-screen">
