@@ -253,7 +253,7 @@ function TrackerSettings() {
         
         <div className="overflow-x-auto rounded-lg border">
         <Table>
-          <TableHeader className="bg-muted">
+          <TableHeader className="bg-muted rounded-t-lg">
             <TableRow>
               <TableHead className="first:rounded-tl-lg">Name</TableHead>
               <TableHead>URL</TableHead>
