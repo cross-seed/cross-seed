@@ -15,6 +15,8 @@ import { FormValidationProvider } from '@/contexts/Form/form-validation-provider
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
+import { SettingsLayout } from '@/components/SettingsLayout';
+import { Page } from '@/components/Page';
 
 const DownloadersFields = withForm({
   ...formOpts,
@@ -102,7 +104,9 @@ const DownloadersFields = withForm({
     }, [isSuccess]);
 
     return (
-      <FormValidationProvider isFieldRequired={isFieldRequired}>
+      <Page>
+        <SettingsLayout>
+        <FormValidationProvider isFieldRequired={isFieldRequired}>
         <form
           className="form flex flex-col gap-4"
           onSubmit={(e) => {
@@ -273,7 +277,9 @@ const DownloadersFields = withForm({
             </form.AppForm>
           </div>
         </form>
-      </FormValidationProvider>
+        </FormValidationProvider>
+        </SettingsLayout>
+      </Page>
     );
   },
 });

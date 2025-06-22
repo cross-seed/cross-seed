@@ -14,6 +14,8 @@ import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
+import { SettingsLayout } from '@/components/SettingsLayout';
+import { Page } from '@/components/Page';
 
 const SearchRssSettings = withForm({
   ...formOpts,
@@ -92,7 +94,9 @@ const SearchRssSettings = withForm({
     }, [isSuccess]);
 
     return (
-      <FormValidationProvider isFieldRequired={isFieldRequired}>
+      <Page>
+        <SettingsLayout>
+        <FormValidationProvider isFieldRequired={isFieldRequired}>
         <form
           className="form flex flex-col gap-4"
           onSubmit={(e) => {
@@ -208,7 +212,9 @@ const SearchRssSettings = withForm({
             </form.AppForm>
           </div>
         </form>
-      </FormValidationProvider>
+        </FormValidationProvider>
+        </SettingsLayout>
+      </Page>
     );
   },
 });

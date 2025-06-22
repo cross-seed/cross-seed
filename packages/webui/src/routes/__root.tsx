@@ -1,4 +1,3 @@
-import Header from '@/components/Header/Header.tsx';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
@@ -28,8 +27,8 @@ function getIsDevtoolsEnabled(): boolean {
 
 const isDevtoolsEnabled = getIsDevtoolsEnabled();
 
-export const Route = createRootRouteWithContext<RouterContext>()({
-  component: () => (
+function RootRoute() {
+  return (
     <div className="bg-background text-foreground min-h-screen">
       <Suspense fallback={<div>Loading...</div>}>
         <Login>
@@ -44,14 +43,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
           >
             <AppSidebar />
             <SidebarInset>
-              <Header />
-              <div className="flex flex-1 flex-col">
-                <div className="@container/main">
-                  <div className="flex flex-col gap-4 p-4">
-                    <Outlet />
-                  </div>
-                </div>
-              </div>
+              <Outlet />
             </SidebarInset>
           </SidebarProvider>
         </Login>
@@ -63,5 +55,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         </>
       )}
     </div>
-  ),
+  );
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
+  component: RootRoute,
 });
