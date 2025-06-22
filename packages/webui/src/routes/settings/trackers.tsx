@@ -1,5 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useSuspenseQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
@@ -20,7 +24,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, TestTube, ToggleLeft, ToggleRight, MoreHorizontal, Eye, Pencil } from 'lucide-react';
+import {
+  Plus,
+  TestTube,
+  ToggleLeft,
+  ToggleRight,
+  MoreHorizontal,
+  Eye,
+  Pencil,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import TrackerViewSheet from '@/components/settings/TrackerViewSheet';
 import TrackerEditSheet from '@/components/settings/TrackerEditSheet';
@@ -223,19 +235,23 @@ function TrackerSettings() {
   };
 
   const addTrackerButton = (
-    <Button onClick={handleAddTracker}>
+    <Button onClick={handleAddTracker} size="sm">
       <Plus className="mr-2 h-4 w-4" />
       Add Tracker
     </Button>
   );
 
   return (
-    <Page 
-      breadcrumbs={['Settings', 'Trackers']}
-      actions={addTrackerButton}
-    >
-
-      <div className="rounded-md border">
+    <Page breadcrumbs={['Settings', 'Trackers']} actions={addTrackerButton}>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold">Trackers</h1>
+          <p className="text-muted-foreground">
+            Manage your torznab indexers and trackers
+          </p>
+        </div>
+        
+        <div className="rounded-md border">
         <Table>
           <TableHeader className="bg-muted">
             <TableRow>
@@ -262,13 +278,15 @@ function TrackerSettings() {
                 <TableCell>{getStatusBadge(indexer)}</TableCell>
                 <TableCell>{getCapsBadges(indexer)}</TableCell>
                 <TableCell className="text-right">
-                  <DropdownMenu 
+                  <DropdownMenu
                     open={openDropdown === indexer.id}
-                    onOpenChange={(open) => setOpenDropdown(open ? indexer.id : null)}
+                    onOpenChange={(open) =>
+                      setOpenDropdown(open ? indexer.id : null)
+                    }
                   >
                     <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         className="h-8 w-8 p-0"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -278,23 +296,43 @@ function TrackerSettings() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewTracker(indexer); }}>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewTracker(indexer);
+                        }}
+                      >
                         <Eye className="mr-2 h-4 w-4" />
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditTracker(indexer); }}>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditTracker(indexer);
+                        }}
+                      >
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={(e) => { e.stopPropagation(); handleTestTracker(indexer); }}
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTestTracker(indexer);
+                        }}
                         disabled={testingTracker === indexer.id}
                       >
                         <TestTube className="mr-2 h-4 w-4" />
-                        {testingTracker === indexer.id ? 'Testing...' : 'Test Connection'}
+                        {testingTracker === indexer.id
+                          ? 'Testing...'
+                          : 'Test Connection'}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleActive(indexer); }}>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleActive(indexer);
+                        }}
+                      >
                         {indexer.active ? (
                           <>
                             <ToggleLeft className="mr-2 h-4 w-4" />
@@ -324,6 +362,7 @@ function TrackerSettings() {
             )}
           </TableBody>
         </Table>
+        </div>
       </div>
 
       <TrackerViewSheet
@@ -332,7 +371,7 @@ function TrackerSettings() {
         tracker={selectedTracker}
         onEdit={handleEditTracker}
       />
-      
+
       <TrackerEditSheet
         open={editSheetOpen}
         onOpenChange={handleEditSheetOpenChange}
