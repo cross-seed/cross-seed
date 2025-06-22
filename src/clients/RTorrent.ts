@@ -7,6 +7,7 @@ import {
 	DecisionAnyMatch,
 	InjectionResult,
 	TORRENT_TAG,
+	USER_AGENT,
 } from "../constants.js";
 import { db } from "../db.js";
 import { CrossSeedError } from "../errors.js";
@@ -143,6 +144,9 @@ export default class RTorrent implements TorrentClient {
 			basic_auth: shouldUseAuth
 				? { user: username, pass: password }
 				: undefined,
+			headers: {
+				"User-Agent": USER_AGENT,
+			},
 		});
 	}
 
