@@ -253,13 +253,13 @@ function TrackerSettings() {
         
         <div className="overflow-x-auto rounded-lg border">
         <Table>
-          <TableHeader className="bg-muted rounded-t-lg">
-            <TableRow>
-              <TableHead className="first:rounded-tl-lg">Name</TableHead>
+          <TableHeader className="bg-muted sticky top-0 z-10">
+            <TableRow className="border-b">
+              <TableHead>Name</TableHead>
               <TableHead>URL</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Capabilities</TableHead>
-              <TableHead className="text-right last:rounded-tr-lg">Actions</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
