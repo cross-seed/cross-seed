@@ -44,9 +44,7 @@ function RootRoute() {
           >
             <AppSidebar />
             <SidebarInset>
-              <Suspense fallback={<LoadingSpinner size="lg" fullScreen={false} />}>
-                <Outlet />
-              </Suspense>
+              <Outlet />
             </SidebarInset>
           </SidebarProvider>
         </Login>
