@@ -72,16 +72,16 @@ function RouteComponent() {
 
   return (
     <Page>
-      <div className="rounded-md border">
+      <div className="overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader className="bg-muted">
           <TableRow>
-            <TableHead>Name</TableHead>
+            <TableHead className="first:rounded-tl-lg">Name</TableHead>
             <TableHead>Interval</TableHead>
             <TableHead>Last Execution</TableHead>
             <TableHead>Next Execution</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-right last:rounded-tr-lg">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
