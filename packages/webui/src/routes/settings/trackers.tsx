@@ -24,9 +24,13 @@ import { Plus, TestTube, ToggleLeft, ToggleRight, MoreHorizontal, Eye, Pencil } 
 import { toast } from 'sonner';
 import TrackerViewSheet from '@/components/settings/TrackerViewSheet';
 import TrackerEditSheet from '@/components/settings/TrackerEditSheet';
+import { PageLayout } from '@/components/PageLayout';
 
 export const Route = createFileRoute('/settings/trackers')({
   component: TrackerSettings,
+  meta: {
+    customLayout: true,
+  },
 });
 
 type Indexer = {
@@ -221,20 +225,18 @@ function TrackerSettings() {
     testIndexer({ id: indexer.id });
   };
 
+  const addTrackerButton = (
+    <Button onClick={handleAddTracker}>
+      <Plus className="mr-2 h-4 w-4" />
+      Add Tracker
+    </Button>
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Trackers</h1>
-          <p className="text-muted-foreground">
-            Manage your torznab indexers and trackers
-          </p>
-        </div>
-        <Button onClick={handleAddTracker}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Tracker
-        </Button>
-      </div>
+    <PageLayout 
+      breadcrumbs={['Settings', 'Trackers']}
+      headerActions={addTrackerButton}
+    >
 
       <div className="rounded-md border">
         <Table>
@@ -340,6 +342,6 @@ function TrackerSettings() {
         mode={editMode}
         tracker={selectedTracker}
       />
-    </div>
+    </PageLayout>
   );
 }
