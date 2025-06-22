@@ -43,7 +43,9 @@ function RootRoute() {
           >
             <AppSidebar />
             <SidebarInset>
-              <Outlet />
+              <Suspense fallback={<div>Loading...</div>}>
+                <Outlet />
+              </Suspense>
             </SidebarInset>
           </SidebarProvider>
         </Login>
