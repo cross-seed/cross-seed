@@ -22,7 +22,7 @@ export function LoadingSpinner({
   return (
     <div className={cn(
       "flex flex-col items-center justify-center gap-2",
-      fullScreen ? "min-h-screen" : "min-h-[50vh] p-8"
+      fullScreen ? "min-h-screen" : "flex-1 p-8"
     )}>
       <svg
         className={cn(
