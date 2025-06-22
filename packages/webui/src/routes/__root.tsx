@@ -1,5 +1,9 @@
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
+import {
+  createRootRouteWithContext,
+  Outlet,
+  useMatches,
+} from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Suspense } from 'react';
 import { Login } from '@/components/auth/AuthWrapper';
@@ -26,14 +30,22 @@ function getIsDevtoolsEnabled(): boolean {
 
 const isDevtoolsEnabled = getIsDevtoolsEnabled();
 
-export const Route = createRootRouteWithContext<RouterContext>()({
-  component: () => (
+function RootRoute() {
+  const matches = useMatches();
+  const currentRoute = matches[matches.length - 1];
+  const hasCustomLayout = currentRoute?.route?.options?.meta?.customLayout;
+
+  return (
     <div className="bg-background text-foreground min-h-screen">
       <Suspense fallback={<div>Loading...</div>}>
         <Login>
-          <PageLayout>
+          {hasCustomLayout ? (
             <Outlet />
-          </PageLayout>
+          ) : (
+            <PageLayout>
+              <Outlet />
+            </PageLayout>
+          )}
         </Login>
       </Suspense>
       {isDevtoolsEnabled && (
@@ -43,5 +55,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         </>
       )}
     </div>
-  ),
+  );
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
+  component: RootRoute,
 });
