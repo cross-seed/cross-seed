@@ -1,15 +1,10 @@
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import {
-  createRootRouteWithContext,
-  Outlet,
-  useMatches,
-  useRouter,
-  useLocation,
-} from '@tanstack/react-router';
+import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Suspense } from 'react';
 import { Login } from '@/components/auth/AuthWrapper';
-import { PageLayout } from '@/components/PageLayout';
+import { AppSidebar } from '@/components/app-sidebar';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 
 // nothing in  router context right now
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -33,35 +28,24 @@ function getIsDevtoolsEnabled(): boolean {
 const isDevtoolsEnabled = getIsDevtoolsEnabled();
 
 function RootRoute() {
-  const router = useRouter();
-  const location = useLocation();
-  
-  // Find route definition in router's route tree
-  const findRouteInTree = (tree, pathname) => {
-    if (tree.fullPath === pathname) return tree;
-    if (tree.children) {
-      for (const child of tree.children) {
-        const found = findRouteInTree(child, pathname);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-  
-  const targetRoute = findRouteInTree(router.routeTree, location.pathname);
-  const hasCustomLayout = targetRoute?.options?.meta?.customLayout || false;
-
   return (
     <div className="bg-background text-foreground min-h-screen">
       <Suspense fallback={<div>Loading...</div>}>
         <Login>
-          {hasCustomLayout ? (
-            <Outlet />
-          ) : (
-            <PageLayout>
+          <SidebarProvider
+            defaultOpen={true}
+            style={
+              {
+                '--sidebar-width': 'calc(var(--spacing) * 48)',
+                '--header-height': 'calc(var(--spacing) * 12)',
+              } as React.CSSProperties
+            }
+          >
+            <AppSidebar />
+            <SidebarInset>
               <Outlet />
-            </PageLayout>
-          )}
+            </SidebarInset>
+          </SidebarProvider>
         </Login>
       </Suspense>
       {isDevtoolsEnabled && (

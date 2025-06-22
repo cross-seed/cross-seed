@@ -15,6 +15,7 @@ import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
 import { SettingsLayout } from '@/components/SettingsLayout';
+import { Page } from '@/components/Page';
 
 const SearchRssSettings = withForm({
   ...formOpts,
@@ -93,7 +94,8 @@ const SearchRssSettings = withForm({
     }, [isSuccess]);
 
     return (
-      <SettingsLayout>
+      <Page>
+        <SettingsLayout>
         <FormValidationProvider isFieldRequired={isFieldRequired}>
         <form
           className="form flex flex-col gap-4"
@@ -211,7 +213,8 @@ const SearchRssSettings = withForm({
           </div>
         </form>
         </FormValidationProvider>
-      </SettingsLayout>
+        </SettingsLayout>
+      </Page>
     );
   },
 });

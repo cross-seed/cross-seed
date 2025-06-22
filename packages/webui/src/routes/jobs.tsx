@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Play, Check } from 'lucide-react';
 import { formatRelativeTime } from '@/lib/time';
+import { Page } from '@/components/Page';
 
 export const Route = createFileRoute('/jobs')({
   component: RouteComponent,
@@ -70,7 +71,8 @@ function RouteComponent() {
   };
 
   return (
-    <div className="rounded-md border">
+    <Page>
+      <div className="rounded-md border">
       <Table>
         <TableHeader className="bg-muted">
           <TableRow>
@@ -124,6 +126,7 @@ function RouteComponent() {
           ))}
         </TableBody>
       </Table>
-    </div>
+      </div>
+    </Page>
   );
 }

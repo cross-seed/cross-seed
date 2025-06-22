@@ -3,6 +3,7 @@ import { useTRPC } from '@/lib/trpc';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { StatCard } from '@/components/ui/stat-card';
 import { Badge } from '@/components/ui/badge';
+import { Page } from '@/components/Page';
 
 function Home() {
   const trpc = useTRPC();
@@ -14,7 +15,8 @@ function Home() {
   );
 
   return (
-    <div className="main space-y-8">
+    <Page>
+      <div className="main space-y-8">
       <section className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
@@ -81,7 +83,8 @@ function Home() {
         </div>
       </section>
 
-    </div>
+      </div>
+    </Page>
   );
 }
 

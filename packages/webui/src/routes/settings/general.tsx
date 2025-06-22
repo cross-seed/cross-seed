@@ -18,6 +18,7 @@ import { FormValidationProvider } from '@/contexts/Form/form-validation-provider
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { toast } from 'sonner';
 import { SettingsLayout } from '@/components/SettingsLayout';
+import { Page } from '@/components/Page';
 
 const GeneralSettings = withForm({
   ...formOpts,
@@ -97,7 +98,8 @@ const GeneralSettings = withForm({
     }, [isSuccess]);
 
     return (
-      <SettingsLayout>
+      <Page>
+        <SettingsLayout>
         <FormValidationProvider isFieldRequired={isFieldRequired}>
         <form
           className="form flex flex-col gap-4"
@@ -263,7 +265,8 @@ const GeneralSettings = withForm({
           </div>
         </form>
         </FormValidationProvider>
-      </SettingsLayout>
+        </SettingsLayout>
+      </Page>
     );
   },
 });
