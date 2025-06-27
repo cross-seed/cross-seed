@@ -297,7 +297,7 @@ export default class QBittorrent implements TorrentClient {
 			body instanceof URLSearchParams || body instanceof FormData
 				? JSON.stringify(Object.fromEntries(body))
 				: JSON.stringify(body).replace(
-						/(?:hashes=)([a-z0-9]{40})/i,
+						/(?:hash(?:es)?=)([a-z0-9]{40})/i,
 						(match, hash) =>
 							match.replace(hash, sanitizeInfoHash(hash)),
 					);

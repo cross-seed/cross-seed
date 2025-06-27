@@ -248,14 +248,17 @@ async function getSavePath(
 			: clients.find((c) => c.clientHost === searchee.clientHost)!;
 	let savePath: string;
 	if (searchee.savePath) {
-		const refreshedSearchee = (
-			await client.getClientSearchees({
-				newSearcheesOnly: true,
-				refresh: [searchee.infoHash],
-			})
-		).newSearchees.find((s) => s.infoHash === searchee.infoHash);
-		if (!refreshedSearchee) return resultOfErr("TORRENT_NOT_FOUND");
-		Object.assign(searchee, refreshedSearchee);
+		if (searchee.label !== Label.INJECT) {
+			// This check is too slow for the number of searchees from the inject job
+			const refreshedSearchee = (
+				await client.getClientSearchees({
+					newSearcheesOnly: true,
+					refresh: [searchee.infoHash],
+				})
+			).newSearchees.find((s) => s.infoHash === searchee.infoHash);
+			if (!refreshedSearchee) return resultOfErr("TORRENT_NOT_FOUND");
+			Object.assign(searchee, refreshedSearchee);
+		}
 		if (
 			!(await client.isTorrentComplete(searchee.infoHash)).orElse(false)
 		) {
