@@ -14,7 +14,7 @@ import ms from 'ms';
  * @returns The formatted configuration data suitable for a configuration form.
  */
 export function formatConfigDataForForm(config: Config) {
-  return {
+  const x = {
     ...config,
 
     // Update empty array fields to have an empty string so the form
@@ -37,6 +37,8 @@ export function formatConfigDataForForm(config: Config) {
     snatchTimeout: convertNumberToRelativeTime(Number(config.snatchTimeout)),
     searchTimeout: convertNumberToRelativeTime(Number(config.searchTimeout)),
   };
+  console.log(x);
+  return x;
 }
 
 /**
@@ -46,5 +48,10 @@ export function formatConfigDataForForm(config: Config) {
  * @returns A human-readable relative time string (e.g. "1 minute", "2 hours", "3 days").
  */
 export function convertNumberToRelativeTime(value: number) {
-  return ms(value, { long: true });
+  try {
+    return ms(value, { long: true });
+  } catch (error) {
+    console.log(value);
+    return '0 seconds';
+  }
 }
