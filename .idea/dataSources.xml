@@ -13,5 +13,15 @@
         </library>
       </libraries>
     </data-source>
+    <data-source source="LOCAL" name="prowlarr-x-seed" uuid="c94197a4-c6fc-4fa7-a690-21b2ce0b6ee6">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/../prowlarr-x-seed/data/cross-seed/cross-seed.db</jdbc-url>
+      <jdbc-additional-properties>
+        <property name="com.intellij.clouds.kubernetes.db.enabled" value="false" />
+      </jdbc-additional-properties>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>

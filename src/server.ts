@@ -32,6 +32,7 @@ import {
 import { indexTorrentsAndDataDirs } from "./torrent.js";
 import { formatAsList, humanReadableDate, sanitizeInfoHash } from "./utils.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
+import { indexerApiPlugin } from "./routes/indexerApi.js";
 
 const ANNOUNCE_SCHEMA = z
 	.object({
@@ -239,6 +240,9 @@ const createServer = async (): Promise<FastifyInstance> => {
 
 	// Register tRPC router
 	await registerTRPC(app);
+
+	// Register Prowlarr integration API routes
+	await app.register(indexerApiPlugin);
 
 	// Serve static files from the dist/webui directory
 	await app.register(fastifyStatic, {
