@@ -420,7 +420,7 @@ export async function filterAsync<T>(
 	arr: T[],
 	predicate: (e: T) => Promise<boolean>,
 ): Promise<T[]> {
-	const results = await Promise.all(arr.map(predicate));
+	const results = await mapAsync(arr, predicate);
 	return arr.filter((_, index) => results[index]);
 }
 
@@ -428,15 +428,16 @@ export async function mapAsync<T, R>(
 	arr: T[],
 	cb: (e: T) => Promise<R>,
 ): Promise<R[]> {
-	return Promise.all(arr.map(cb));
+	return fromBatches(arr, async (batch) => Promise.all(batch.map(cb)), {
+		batchSize: 10000,
+	});
 }
 
 export async function flatMapAsync<T, R>(
 	arr: T[],
 	cb: (e: T) => Promise<R[]>,
 ): Promise<R[]> {
-	const results = await Promise.all(arr.map(cb));
-	return results.flat();
+	return (await mapAsync(arr, cb)).flat();
 }
 
 export async function reduceAsync<T, R>(
