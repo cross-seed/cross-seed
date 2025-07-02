@@ -66,6 +66,7 @@ type InjectSummary = {
 	FAILED: number;
 	UNMATCHED: number;
 	FOUND_BAD_FORMAT: boolean;
+	PROMISES: Promise<void>[];
 };
 
 type InjectionAftermath = {
@@ -392,9 +393,11 @@ async function injectionAlreadyExists({
 			label: Label.INJECT,
 			message: `${progress} ${filePathLog} is being checked by client - ${chalk.green(injectionResult)}`,
 		});
-		void client!.resumeInjection(meta, decision, {
-			checkOnce: false,
-		});
+		summary.PROMISES.push(
+			client!.resumeInjection(meta, decision, {
+				checkOnce: false,
+			}),
+		);
 	} else if (!isComplete && decision !== Decision.MATCH_PARTIAL) {
 		const finalCheckTime =
 			(await stat(torrentFilePath)).mtimeMs + ms("1 day");
@@ -403,9 +406,11 @@ async function injectionAlreadyExists({
 			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
 		});
 		await client!.recheckTorrent(meta.infoHash);
-		void client!.resumeInjection(meta, decision, {
-			checkOnce: false,
-		});
+		summary.PROMISES.push(
+			client!.resumeInjection(meta, decision, {
+				checkOnce: false,
+			}),
+		);
 		if (Date.now() >= finalCheckTime) {
 			isComplete = true; // Prevent infinite recheck in rare case of corrupted cross seed
 		}
@@ -420,9 +425,11 @@ async function injectionAlreadyExists({
 				label: Label.INJECT,
 				message: `${progress} ${filePathLog} - ${chalk.yellow(injectionResult)} (incomplete)`,
 			});
-			void client!.resumeInjection(meta, decision, {
-				checkOnce: true,
-			});
+			summary.PROMISES.push(
+				client!.resumeInjection(meta, decision, {
+					checkOnce: true,
+				}),
+			);
 		}
 	}
 	summary.ALREADY_EXISTS++;
@@ -430,10 +437,12 @@ async function injectionAlreadyExists({
 	if (isComplete) {
 		await deleteTorrentFileIfSafe(torrentFilePath);
 	} else {
-		void deleteTorrentFileIfComplete(
-			torrentFilePath,
-			client!,
-			meta.infoHash,
+		summary.PROMISES.push(
+			deleteTorrentFileIfComplete(
+				torrentFilePath,
+				client!,
+				meta.infoHash,
+			),
 		);
 	}
 }
@@ -467,7 +476,9 @@ function injectionSuccess({
 	} else {
 		summary.FULL_MATCHES++;
 	}
-	void deleteTorrentFileIfComplete(torrentFilePath, client!, meta.infoHash);
+	summary.PROMISES.push(
+		deleteTorrentFileIfComplete(torrentFilePath, client!, meta.infoHash),
+	);
 }
 
 async function loadMetafile(
@@ -575,11 +586,7 @@ async function injectSavedTorrent(
 	}
 }
 
-function logInjectSummary(
-	summary: InjectSummary,
-	flatLinking: boolean,
-	injectDir: string | undefined,
-) {
+function logInjectSummary(summary: InjectSummary, flatLinking: boolean) {
 	const incompleteMsg = `${chalk.bold.yellow(summary.ALREADY_EXISTS)} existed in client${
 		summary.INCOMPLETE_CANDIDATES
 			? chalk.dim(` (${summary.INCOMPLETE_CANDIDATES} were incomplete)`)
@@ -619,12 +626,6 @@ function logInjectSummary(
 			message: `Some torrents could be linked to linkDir/${UNKNOWN_TRACKER} - follow .torrent naming format in the docs to avoid this`,
 		});
 	}
-	if (injectDir !== undefined) {
-		logger.info({
-			label: Label.INJECT,
-			message: `Waiting on post-injection tasks to complete...`,
-		});
-	}
 }
 
 function createSummary(total: number): InjectSummary {
@@ -640,6 +641,7 @@ function createSummary(total: number): InjectSummary {
 		FAILED: 0,
 		UNMATCHED: 0,
 		FOUND_BAD_FORMAT: false,
+		PROMISES: [],
 	};
 }
 
@@ -696,7 +698,14 @@ export async function injectSavedTorrents(): Promise<void> {
 			},
 		);
 	}
-	logInjectSummary(summary, flatLinking, injectDir);
+	logInjectSummary(summary, flatLinking);
+	if (injectDir !== undefined) {
+		logger.info({
+			label: Label.INJECT,
+			message: `Waiting on post-injection tasks to complete...`,
+		});
+		await Promise.all(summary.PROMISES);
+	}
 }
 
 export async function restoreFromTorrentCache(): Promise<void> {
