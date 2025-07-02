@@ -10,6 +10,18 @@ import { fileURLToPath } from "url";
 import { getAllIndexers } from "../indexers.js";
 import { Label, logger } from "../logger.js";
 import { checkApiKey } from "../auth.js";
+import {
+	indexerCreateSchema,
+	indexerUpdateSchema,
+	indexerTestSchema,
+	createIndexer,
+	updateIndexer,
+	deleteIndexer,
+	getIndexerById,
+	listAllIndexers,
+	testNewIndexer,
+	testExistingIndexer,
+} from "../services/indexerService.js";
 
 // Get the directory of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -93,6 +105,245 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			return await reply
 				.code(500)
 				.send({ error: "Failed to get status" });
+		}
+	});
+
+	/**
+	 * List all indexers
+	 */
+	app.get<{
+		Querystring: { apikey?: string; includeInactive?: boolean };
+	}>("/api/indexer/v1", async (request, reply) => {
+		if (!(await authorize(request, reply))) return;
+
+		try {
+			const { includeInactive = false } = request.query;
+			const indexers = await listAllIndexers({ includeInactive });
+			return await reply.code(200).send(indexers);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Unknown error";
+			logger.error({
+				label: Label.SERVER,
+				message: `Error listing indexers: ${message}`,
+			});
+			return await reply
+				.code(500)
+				.send({ error: "Failed to list indexers" });
+		}
+	});
+
+	/**
+	 * Get indexer by ID
+	 */
+	app.get<{
+		Params: { id: string };
+		Querystring: { apikey?: string };
+	}>("/api/indexer/v1/:id", async (request, reply) => {
+		if (!(await authorize(request, reply))) return;
+
+		try {
+			const id = parseInt(request.params.id, 10);
+			if (isNaN(id)) {
+				return await reply
+					.code(400)
+					.send({ error: "Invalid indexer ID" });
+			}
+
+			const indexer = await getIndexerById(id);
+			return await reply.code(200).send(indexer);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Unknown error";
+			logger.error({
+				label: Label.SERVER,
+				message: `Error getting indexer: ${message}`,
+			});
+
+			if (message.includes("not found")) {
+				return await reply.code(404).send({ error: message });
+			}
+
+			return await reply
+				.code(500)
+				.send({ error: "Failed to get indexer" });
+		}
+	});
+
+	/**
+	 * Create new indexer
+	 */
+	app.post<{
+		Body: {
+			name?: string;
+			url: string;
+			apikey: string;
+			active?: boolean;
+		};
+		Querystring: { apikey?: string };
+	}>("/api/indexer/v1", async (request, reply) => {
+		if (!(await authorize(request, reply))) return;
+
+		try {
+			const validatedData = indexerCreateSchema.parse(request.body);
+			const indexer = await createIndexer(validatedData);
+			return await reply.code(201).send(indexer);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Unknown error";
+			logger.error({
+				label: Label.SERVER,
+				message: `Error creating indexer: ${message}`,
+			});
+
+			if (message.includes("already exists")) {
+				return await reply.code(409).send({ error: message });
+			}
+
+			if (message.includes("validation")) {
+				return await reply.code(400).send({ error: message });
+			}
+
+			return await reply
+				.code(500)
+				.send({ error: "Failed to create indexer" });
+		}
+	});
+
+	/**
+	 * Update existing indexer
+	 */
+	app.put<{
+		Params: { id: string };
+		Body: {
+			name?: string | null;
+			url?: string;
+			apikey?: string;
+			active?: boolean;
+		};
+		Querystring: { apikey?: string };
+	}>("/api/indexer/v1/:id", async (request, reply) => {
+		if (!(await authorize(request, reply))) return;
+
+		try {
+			const id = parseInt(request.params.id, 10);
+			if (isNaN(id)) {
+				return await reply
+					.code(400)
+					.send({ error: "Invalid indexer ID" });
+			}
+
+			const validatedData = indexerUpdateSchema.parse({
+				id,
+				...request.body,
+			});
+
+			const indexer = await updateIndexer(validatedData);
+			return await reply.code(200).send(indexer);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Unknown error";
+			logger.error({
+				label: Label.SERVER,
+				message: `Error updating indexer: ${message}`,
+			});
+
+			if (message.includes("not found")) {
+				return await reply.code(404).send({ error: message });
+			}
+
+			if (message.includes("validation")) {
+				return await reply.code(400).send({ error: message });
+			}
+
+			return await reply
+				.code(500)
+				.send({ error: "Failed to update indexer" });
+		}
+	});
+
+	/**
+	 * Delete indexer
+	 */
+	app.delete<{
+		Params: { id: string };
+		Querystring: { apikey?: string };
+	}>("/api/indexer/v1/:id", async (request, reply) => {
+		if (!(await authorize(request, reply))) return;
+
+		try {
+			const id = parseInt(request.params.id, 10);
+			if (isNaN(id)) {
+				return await reply
+					.code(400)
+					.send({ error: "Invalid indexer ID" });
+			}
+
+			const result = await deleteIndexer(id);
+			return await reply.code(200).send(result);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Unknown error";
+			logger.error({
+				label: Label.SERVER,
+				message: `Error deleting indexer: ${message}`,
+			});
+
+			if (message.includes("not found")) {
+				return await reply.code(404).send({ error: message });
+			}
+
+			return await reply
+				.code(500)
+				.send({ error: "Failed to delete indexer" });
+		}
+	});
+
+	/**
+	 * Test indexer connection
+	 */
+	app.post<{
+		Body: {
+			url: string;
+			apikey: string;
+			id?: number;
+		};
+		Querystring: { apikey?: string };
+	}>("/api/indexer/v1/test", async (request, reply) => {
+		if (!(await authorize(request, reply))) return;
+
+		try {
+			let result;
+
+			if (request.body.id) {
+				// Test existing indexer
+				result = await testExistingIndexer(request.body.id);
+			} else {
+				// Test new indexer configuration
+				const validatedData = indexerTestSchema.parse(request.body);
+				result = await testNewIndexer(validatedData);
+			}
+
+			return await reply.code(200).send(result);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Unknown error";
+			logger.error({
+				label: Label.SERVER,
+				message: `Error testing indexer: ${message}`,
+			});
+
+			if (message.includes("not found")) {
+				return await reply.code(404).send({ error: message });
+			}
+
+			if (message.includes("validation")) {
+				return await reply.code(400).send({ error: message });
+			}
+
+			return await reply
+				.code(500)
+				.send({ error: "Failed to test indexer" });
 		}
 	});
 };
