@@ -636,7 +636,7 @@ export async function findAllSearchees(
 	const { dataDirs, torrentDir, torrents, useClientTorrents } =
 		getRuntimeConfig();
 	const clients = getClients();
-	const rawSearchees: Searchee[] = [];
+	let rawSearchees: Searchee[] = [];
 	await withMutex(
 		Mutex.CREATE_ALL_SEARCHEES,
 		{ useQueue: true },
@@ -659,23 +659,23 @@ export async function findAllSearchees(
 				);
 			} else {
 				if (useClientTorrents) {
-					rawSearchees.push(
-						...(await flatMapAsync(
+					rawSearchees = rawSearchees.concat(
+						await flatMapAsync(
 							clients,
 							async (client) =>
 								(await client.getClientSearchees()).searchees,
-						)),
+						),
 					);
 				} else if (torrentDir) {
-					rawSearchees.push(
-						...(await loadTorrentDirLight(torrentDir)),
+					rawSearchees = rawSearchees.concat(
+						await loadTorrentDirLight(torrentDir),
 					);
 				}
 				if (dataDirs.length) {
 					const memoizedPaths = new Map<string, string[]>();
 					const memoizedLengths = new Map<string, number>();
-					rawSearchees.push(
-						...(
+					rawSearchees = rawSearchees.concat(
+						(
 							await mapAsync(
 								await findSearcheesFromAllDataDirs(),
 								(path) =>
