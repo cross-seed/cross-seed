@@ -627,6 +627,12 @@ export async function checkNewCandidateMatch(
 			[matchedAssessment!, candidate.tracker, actionResult!],
 		]);
 	}
+	if (actionResult === InjectionResult.SUCCESS) {
+		await indexTorrentsAndDataDirs({
+			startup: false,
+			indexDataDirs: false,
+		});
+	}
 	return { decision, actionResult };
 }
 

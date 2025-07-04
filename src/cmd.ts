@@ -399,7 +399,10 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 	.addOption(apiKeyOption)
 	.action(
 		withFullRuntime(async (options) => {
-			await indexTorrentsAndDataDirs({ startup: true });
+			await indexTorrentsAndDataDirs({
+				startup: true,
+				indexDataDirs: true,
+			});
 			// technically this will never resolve, but it's necessary to keep the process running
 			await Promise.all([serve(options.port, options.host), jobsLoop()]);
 		}),
@@ -407,7 +410,7 @@ createCommandWithSharedOptions("daemon", "Start the cross-seed daemon")
 
 createCommandWithSharedOptions("rss", "Run an rss scan").action(
 	withFullRuntime(async () => {
-		await indexTorrentsAndDataDirs({ startup: true });
+		await indexTorrentsAndDataDirs({ startup: true, indexDataDirs: true });
 		await scanRssFeeds();
 	}),
 );
