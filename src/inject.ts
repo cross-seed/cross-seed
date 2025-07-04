@@ -28,7 +28,11 @@ import { findAllSearchees } from "./pipeline.js";
 import { sendResultsNotification } from "./pushNotifier.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
-import { createEnsembleSearchees, SearcheeWithLabel } from "./searchee.js";
+import {
+	createEnsembleSearchees,
+	createSearcheeFromMetafile,
+	SearcheeWithLabel,
+} from "./searchee.js";
 import {
 	findAllTorrentFilesInDir,
 	parseMetadataFromFilename,
@@ -447,18 +451,21 @@ async function injectionAlreadyExists({
 	}
 }
 
-function injectionSuccess({
-	progress,
-	torrentFilePath,
-	client,
-	injectionResult,
-	summary,
-	matchedSearchee,
-	matchedDecision,
-	meta,
-	tracker,
-	filePathLog,
-}: InjectionAftermath) {
+function injectionSuccess(
+	{
+		progress,
+		torrentFilePath,
+		client,
+		injectionResult,
+		summary,
+		matchedSearchee,
+		matchedDecision,
+		meta,
+		tracker,
+		filePathLog,
+	}: InjectionAftermath,
+	searchees: SearcheeWithLabel[],
+) {
 	logger.info({
 		label: Label.INJECT,
 		message: `${progress} Injected ${filePathLog} - ${chalk.green(injectionResult)}`,
@@ -479,6 +486,8 @@ function injectionSuccess({
 	summary.PROMISES.push(
 		deleteTorrentFileIfComplete(torrentFilePath, client!, meta.infoHash),
 	);
+	const res = createSearcheeFromMetafile(meta);
+	if (res.isOk()) searchees.push({ ...res.unwrap(), label: Label.INJECT });
 }
 
 async function loadMetafile(
@@ -572,7 +581,7 @@ async function injectSavedTorrent(
 
 	switch (injectionResult) {
 		case InjectionResult.SUCCESS:
-			injectionSuccess(injectionAftermath);
+			injectionSuccess(injectionAftermath, searchees);
 			break;
 		case InjectionResult.FAILURE:
 			injectionFailed(injectionAftermath);
