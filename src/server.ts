@@ -35,6 +35,10 @@ const ANNOUNCE_SCHEMA = z
 			.string()
 			.transform((tracker) => tracker.trim())
 			.refine((tracker) => tracker.length > 0),
+		cookie: z
+			.string()
+			.nullish()
+			.transform((cookie) => cookie?.trim() || undefined),
 	})
 	.strict()
 	.required()
