@@ -4,7 +4,7 @@ import Fuse from "fuse.js";
 import { basename, dirname, extname, join, resolve, sep } from "path";
 import { IGNORED_FOLDERS_SUBSTRINGS, VIDEO_EXTENSIONS } from "./constants.js";
 import { db } from "./db.js";
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromPath,
@@ -54,7 +54,10 @@ export async function indexDataDirs(options: {
 	if (!dataDirs.length) return;
 
 	if (options.startup) {
-		logger.info("Indexing dataDirs for reverse lookup...");
+		logger.info({
+			label: Label.INDEX,
+			message: "Indexing dataDirs for reverse lookup...",
+		});
 		for (const dataDir of dataDirs) {
 			modifiedPaths.set(dataDir, new Set());
 			watchers.set(dataDir, createWatcher(dataDir));
