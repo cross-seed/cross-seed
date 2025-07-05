@@ -92,6 +92,7 @@ export interface Candidate {
 	size?: number;
 	pubDate?: number;
 	indexerId?: number;
+	cookie?: string;
 }
 
 export type CandidateWithIndexerId = WithRequired<Candidate, "indexerId">;

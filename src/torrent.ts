@@ -154,7 +154,10 @@ async function snatchOnce(
 	let response: Response;
 	try {
 		response = await fetch(url, {
-			headers: { "User-Agent": USER_AGENT },
+			headers: {
+				...(candidate.cookie ? { Cookie: candidate.cookie } : {}),
+				"User-Agent": USER_AGENT,
+			},
 			signal:
 				typeof snatchTimeout === "number"
 					? AbortSignal.timeout(snatchTimeout)
