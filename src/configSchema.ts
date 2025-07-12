@@ -587,13 +587,17 @@ export const VALIDATION_SCHEMA = z
 		(config) => !config.useClientTorrents || config.torrentClients.length,
 		ZodErrorMessages.needsClient,
 	)
-	.refine(
-		(config) =>
-			process.env.DEV ||
-			!config.useClientTorrents ||
-			!config.torrentClients.some((c) => c.startsWith(Label.DELUGE)),
-		"Deluge does not currently support useClientTorrents, use torrentDir instead.",
-	)
+	.refine((config) => {
+		if (
+			config.useClientTorrents &&
+			config.torrentClients.some((c) => c.startsWith(Label.DELUGE))
+		) {
+			logger.warn(
+				"Deluge with Docker can have a desyncing issue with the WebUI daemon after prolonged uptime with useClientTorrents, if you notice strange behavior you may need to use torrentDir instead.",
+			);
+		}
+		return true;
+	})
 	.refine(
 		(config) =>
 			config.action !== Action.INJECT ||

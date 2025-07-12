@@ -82,6 +82,8 @@ module.exports = {
 	 * torrentClients: ["transmission:http://username:password@localhost:9091/transmission/rpc"]
 	 *
 	 * torrentClients: ["deluge:http://:password@localhost:8112/json"]
+	 * Deluge with Docker can have a desyncing issue with the WebUI daemon after prolonged uptime
+	 * with useClientTorrents, if you notice strange behavior you may need to use torrentDir instead.
 	 *
 	 * You can optionally add readonly: after the prefix to use a client as a
 	 * source for finding cross seeds but not for injecting.
@@ -98,6 +100,9 @@ module.exports = {
 	 * Use the torrents already in your torrent client to find matches.
 	 * This is the preferred method of cross-seeding, only set to false
 	 * if you want to EXCLUSIVELY use dataDirs.
+	 *
+	 * Deluge with Docker can have a desyncing issue with the WebUI daemon after prolonged uptime
+	 * with useClientTorrents, if you notice strange behavior you may need to use torrentDir instead.
 	 */
 	useClientTorrents: true,
 
