@@ -13,20 +13,20 @@ export enum Label {
 	DECIDE = "decide",
 	INJECT = "inject",
 	PREFILTER = "prefilter",
-	CONFIGDUMP = "configdump",
+	CONFIG = "config",
 	TORZNAB = "torznab",
 	SERVER = "server",
-	STARTUP = "startup",
 	SCHEDULER = "scheduler",
 	SEARCH = "search",
 	RSS = "rss",
 	ANNOUNCE = "announce",
 	WEBHOOK = "webhook",
-	PERF = "perf",
 	CLEANUP = "cleanup",
 	ARRS = "arrs",
 	RADARR = "radarr",
 	SONARR = "sonarr",
+	AUTH = "auth",
+	INDEX = "index",
 }
 
 export let logger: winston.Logger;

@@ -1,19 +1,36 @@
-# Build Stage
-FROM node:20-alpine AS build-stage
-WORKDIR /usr/src/cross-seed
-COPY package*.json ./
+# Frontend Build Stage
+FROM node:22-alpine AS frontend-build
+WORKDIR /usr/src/frontend
+COPY packages/webui/package*.json ./
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 RUN npm ci --no-fund
-COPY tsconfig.json ./
-COPY src src
-RUN npm run build && \
-    npm prune --omit=dev && \
-    rm -rf src tsconfig.json
+COPY packages/webui ./
+COPY packages/shared ../shared
+RUN npm run build
 
-# Production Stage
-FROM node:20-alpine
+# Backend Build Stage  
+FROM node:22-alpine AS backend-build
+WORKDIR /usr/src/backend
+COPY package*.json tsconfig*.json ./
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+RUN npm ci --no-fund
+COPY src src
+RUN npm run build && npm prune --omit=dev
+
+# Production Assembly Stage
+FROM node:22-alpine AS production-stage
 WORKDIR /usr/src/cross-seed
-COPY --from=build-stage /usr/src/cross-seed ./
+# Copy backend build and dependencies
+COPY --from=backend-build /usr/src/backend/dist ./dist
+COPY --from=backend-build /usr/src/backend/node_modules ./node_modules
+COPY --from=backend-build /usr/src/backend/package*.json ./
+# Copy frontend build to correct location
+COPY --from=frontend-build /usr/src/frontend/dist ./dist/webui
+
+# Final Production Stage
+FROM node:22-alpine
+WORKDIR /usr/src/cross-seed
+COPY --from=production-stage /usr/src/cross-seed ./
 RUN apk add --no-cache catatonit curl tzdata && \
     npm link
 ENV CONFIG_DIR=/config

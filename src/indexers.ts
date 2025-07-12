@@ -149,10 +149,17 @@ export const ALL_CAPS: Caps = {
 	},
 };
 
-function deserialize(dbIndexer: DbIndexer): Indexer {
+export function deserialize(dbIndexer: DbIndexer): Indexer {
 	const { tvIdCaps, movieIdCaps, catCaps, limitsCaps, ...rest } = dbIndexer;
 	return {
 		...rest,
+		active: Boolean(rest.active),
+		searchCap: Boolean(rest.searchCap),
+		tvSearchCap: Boolean(rest.tvSearchCap),
+		movieSearchCap: Boolean(rest.movieSearchCap),
+		musicSearchCap: Boolean(rest.musicSearchCap),
+		audioSearchCap: Boolean(rest.audioSearchCap),
+		bookSearchCap: Boolean(rest.bookSearchCap),
 		tvIdCaps: JSON.parse(tvIdCaps),
 		movieIdCaps: JSON.parse(movieIdCaps),
 		categories: JSON.parse(catCaps),
@@ -160,10 +167,14 @@ function deserialize(dbIndexer: DbIndexer): Indexer {
 	};
 }
 
-export async function getAllIndexers(): Promise<Indexer[]> {
-	const rawIndexers = await db("indexer")
-		.where({ active: true })
-		.select(allFields);
+export async function getAllIndexers({ includeInactive = false } = {}): Promise<
+	Indexer[]
+> {
+	let query = db("indexer").select(allFields);
+	if (!includeInactive) {
+		query = query.where({ active: true });
+	}
+	const rawIndexers = await query;
 	return rawIndexers.map(deserialize);
 }
 
@@ -221,10 +232,10 @@ export async function updateSearchTimestamps(
 	for (const indexerId of indexerIds) {
 		await db.transaction(async (trx) => {
 			const now = Date.now();
-			const { id: searchee_id } = await trx("searchee")
+			const { id: searchee_id } = (await trx("searchee")
 				.where({ name })
 				.select("id")
-				.first();
+				.first())!;
 
 			await trx("timestamp")
 				.insert({
@@ -234,7 +245,7 @@ export async function updateSearchTimestamps(
 					first_searched: now,
 				})
 				.onConflict(["searchee_id", "indexer_id"])
-				.merge(["searchee_id", "indexer_id", "last_searched"]);
+				.merge(["last_searched"] as const);
 		});
 	}
 }
