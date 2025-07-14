@@ -22,6 +22,8 @@ export const RUNTIME_CONFIG_SCHEMA = z.object({
 	linkType: z.nativeEnum(LinkType),
 	flatLinking: z.boolean(),
 	maxDataDepth: z.number().int().min(1),
+	categoryTemplate: z.string().optional(),
+	tagsTemplate: z.array(z.string()).optional(),
 	linkCategory: z.string().optional(),
 	torrentDir: z.string().optional(),
 	outputDir: z.string(),

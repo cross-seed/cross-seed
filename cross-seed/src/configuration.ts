@@ -43,6 +43,8 @@ export interface FileConfig {
 	linkType?: string;
 	flatLinking?: boolean;
 	maxDataDepth?: number;
+	categoryTemplate?: string;
+	tagsTemplate?: string[] | string;
 	linkCategory?: string;
 	torrentDir?: string;
 	torznab?: string[];
@@ -127,6 +129,8 @@ export function getDefaultRuntimeConfig(): RuntimeConfig {
 		linkType: LinkType.HARDLINK,
 		flatLinking: false,
 		maxDataDepth: 2,
+		categoryTemplate: undefined,
+		tagsTemplate: undefined,
 		linkCategory: "cross-seed-link",
 		outputDir: path.join(appDir(), "cross-seeds"),
 		ignoreTitles: false,
@@ -241,6 +245,18 @@ export function transformFileConfig(
 
 	if (typeof fileConfig.maxDataDepth === "number") {
 		result.maxDataDepth = fileConfig.maxDataDepth;
+	}
+
+	if (typeof fileConfig.categoryTemplate === "string") {
+		result.categoryTemplate = fileConfig.categoryTemplate;
+	}
+
+	if (typeof fileConfig.tagsTemplate === "string") {
+		result.tagsTemplate = fileConfig.tagsTemplate
+			.split(",")
+			.map((tag) => tag.trim());
+	} else if (isStringArray(fileConfig.tagsTemplate)) {
+		result.tagsTemplate = fileConfig.tagsTemplate;
 	}
 
 	if (typeof fileConfig.linkCategory === "string") {
