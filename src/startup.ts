@@ -106,12 +106,18 @@ async function checkConfigPaths(): Promise<void> {
 			pathFailure++;
 		}
 	}
+	if (linkDev.length) {
+		logger.verbose(`Storage device for each linkDir: ${inspect(linkDev)}`);
+	}
 	for (const dataDir of dataDirs) {
 		if (await verifyPath(dataDir, "dataDirs", READ_ONLY)) {
 			dataDev.push({ path: dataDir, dev: (await stat(dataDir)).dev });
 		} else {
 			pathFailure++;
 		}
+	}
+	if (dataDev.length) {
+		logger.verbose(`Storage device for each dataDir: ${inspect(dataDev)}`);
 	}
 	if (injectDir) {
 		if (!(await verifyPath(injectDir, "injectDir", READ_AND_WRITE))) {
@@ -142,12 +148,6 @@ async function checkConfigPaths(): Promise<void> {
 				pathFailure > 1 ? "errors" : "error"
 			} above for details.`,
 		);
-	}
-	if (linkDev.length) {
-		logger.verbose(`Storage device for each linkDir: ${inspect(linkDev)}`);
-	}
-	if (dataDev.length) {
-		logger.verbose(`Storage device for each dataDir: ${inspect(dataDev)}`);
 	}
 }
 
