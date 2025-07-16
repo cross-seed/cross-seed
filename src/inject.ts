@@ -20,6 +20,7 @@ import {
 	SaveResult,
 	TORRENT_CACHE_FOLDER,
 	UNKNOWN_TRACKER,
+	VIDEO_DISC_EXTENSIONS,
 } from "./constants.js";
 import { assessCandidate } from "./decide.js";
 import { Label, logger } from "./logger.js";
@@ -45,6 +46,7 @@ import {
 	findFallback,
 	formatAsList,
 	getLogString,
+	hasExt,
 	humanReadableDate,
 	isTruthy,
 	Mutex,
@@ -405,11 +407,18 @@ async function injectionAlreadyExists({
 	} else if (!isComplete && decision !== Decision.MATCH_PARTIAL) {
 		const finalCheckTime =
 			(await stat(torrentFilePath)).mtimeMs + ms("1 day");
-		logger.info({
-			label: Label.INJECT,
-			message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
-		});
-		await client!.recheckTorrent(meta.infoHash);
+		if (hasExt(meta.files, VIDEO_DISC_EXTENSIONS)) {
+			logger.warn({
+				label: Label.INJECT,
+				message: `${progress} Skipping recheck for ${filePathLog}: VIDEO_DISC_EXTENSIONS - ${chalk.yellow(injectionResult)}`,
+			});
+		} else {
+			logger.info({
+				label: Label.INJECT,
+				message: `${progress} Rechecking ${filePathLog} as it's not complete but has all files (final check at ${humanReadableDate(finalCheckTime)}) - ${chalk.yellow(injectionResult)}`,
+			});
+			await client!.recheckTorrent(meta.infoHash);
+		}
 		summary.PROMISES.push(
 			client!.resumeInjection(meta, decision, {
 				checkOnce: false,
