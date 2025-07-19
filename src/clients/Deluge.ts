@@ -777,8 +777,21 @@ export default class Deluge implements TorrentClient {
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
-			const name = torrent.name!;
-			const savePath = torrent.save_path!;
+			if (
+				!torrent.name ||
+				!torrent.save_path ||
+				!torrent.files ||
+				torrent.trackers === undefined ||
+				!torrent.total_size
+			) {
+				logger.warn({
+					label: this.label,
+					message: `Skipping torrent ${infoHash} as it's missing data: ${inspect({ ...torrent, trackers: organizeTrackers(torrent.trackers ?? []) })}`,
+				});
+				continue;
+			}
+			const name = torrent.name;
+			const savePath = torrent.save_path;
 			const category = torrent.label ?? "";
 			const modified = clientSearcheeModified(
 				this.label,
@@ -801,7 +814,7 @@ export default class Deluge implements TorrentClient {
 				}
 				continue;
 			}
-			const files = torrent.files!.map((file) => ({
+			const files = torrent.files.map((file) => ({
 				name: basename(file.path),
 				path: file.path,
 				length: file.size,
@@ -813,9 +826,9 @@ export default class Deluge implements TorrentClient {
 				});
 				continue;
 			}
-			const trackers = organizeTrackers(torrent.trackers!);
+			const trackers = organizeTrackers(torrent.trackers);
 			const title = parseTitle(name, files) ?? name;
-			const length = torrent.total_size!;
+			const length = torrent.total_size;
 			const searchee: SearcheeClient = {
 				infoHash,
 				name,
