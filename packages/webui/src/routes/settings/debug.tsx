@@ -16,23 +16,24 @@ function DebugSettings() {
   const queryClient = useQueryClient();
 
   const { data: settingsData, isLoading } = useQuery(
-    trpc.settings.get.queryOptions(undefined)
+    trpc.settings.get.queryOptions(),
   );
 
-  const saveMutation = useMutation({
-    mutationFn: (config: any) => trpc.settings.save.mutate(config),
-    onSuccess: () => {
-      toast.success('Settings saved successfully!', {
-        description: 'Your changes will take effect on the next restart.',
-      });
-      queryClient.invalidateQueries({ queryKey: ['settings.get'] });
-    },
-    onError: (error: any) => {
-      toast.error('Failed to save settings', {
-        description: error.message || 'An unknown error occurred',
-      });
-    },
-  });
+  const saveMutation = useMutation(
+    trpc.settings.save.mutationOptions({
+      onSuccess: () => {
+        toast.success('Settings saved successfully!', {
+          description: 'Your changes will take effect on the next restart.',
+        });
+        queryClient.invalidateQueries({ queryKey: ['settings.get'] });
+      },
+      onError: (error: any) => {
+        toast.error('Failed to save settings', {
+          description: error.message || 'An unknown error occurred',
+        });
+      },
+    }),
+  );
 
   useEffect(() => {
     if (settingsData?.config) {
@@ -114,7 +115,7 @@ function DebugSettings() {
               </Button>
             </div>
           </div>
-          
+
           {!isValid && (
             <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
               <strong>JSON Error:</strong> {parseError}
@@ -125,11 +126,11 @@ function DebugSettings() {
             <textarea
               value={jsonValue}
               onChange={(e) => handleJsonChange(e.target.value)}
-              className={`w-full h-96 p-3 font-mono text-sm border rounded-md resize-none ${
-                isValid 
-                  ? 'border-gray-300 dark:border-gray-600' 
+              className={`h-96 w-full resize-none rounded-md border p-3 font-mono text-sm ${
+                isValid
+                  ? 'border-gray-300 dark:border-gray-600'
                   : 'border-red-500 dark:border-red-400'
-              } bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100`}
+              } bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100`}
               spellCheck={false}
               placeholder="Loading settings..."
             />
@@ -137,9 +138,10 @@ function DebugSettings() {
 
           <div className="text-sm text-gray-600 dark:text-gray-400">
             <p>
-              <strong>Warning:</strong> This is a raw JSON editor for debugging purposes. 
-              Invalid configuration may cause the application to malfunction. 
-              Use the regular settings pages for safe configuration changes.
+              <strong>Warning:</strong> This is a raw JSON editor for debugging
+              purposes. Invalid configuration may cause the application to
+              malfunction. Use the regular settings pages for safe configuration
+              changes.
             </p>
           </div>
         </div>
