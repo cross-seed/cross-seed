@@ -94,9 +94,11 @@ function SidebarProvider({
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const isMac =
+        navigator.platform.startsWith('Mac') || navigator.platform === 'iPhone';
       if (
         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
+        ((isMac && event.metaKey) || (!isMac && event.ctrlKey))
       ) {
         event.preventDefault();
         toggleSidebar();
