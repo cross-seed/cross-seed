@@ -118,7 +118,21 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 
 		try {
 			const { includeInactive = false } = request.query;
+			logger.debug({
+				label: Label.SERVER,
+				message: `cross-seed: GET /api/indexer/v1 called with includeInactive=${includeInactive}`,
+			});
 			const indexers = await listAllIndexers({ includeInactive });
+			logger.debug({
+				label: Label.SERVER,
+				message: `cross-seed: Returning ${indexers.length} indexers`,
+			});
+			for (const indexer of indexers) {
+				logger.debug({
+					label: Label.SERVER,
+					message: `cross-seed: Indexer ${indexer.name} (ID: ${indexer.id}, URL: ${indexer.url}, Active: ${indexer.active})`,
+				});
+			}
 			return await reply.code(200).send(indexers);
 		} catch (error) {
 			const message =
@@ -171,7 +185,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 	});
 
 	/**
-	 * Create new indexer
+	 * Create new indexer (upsert)
 	 */
 	app.post<{
 		Body: {
@@ -193,12 +207,8 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 				error instanceof Error ? error.message : "Unknown error";
 			logger.error({
 				label: Label.SERVER,
-				message: `Error creating indexer: ${message}`,
+				message: `Error creating/updating indexer: ${message}`,
 			});
-
-			if (message.includes("already exists")) {
-				return await reply.code(409).send({ error: message });
-			}
 
 			if (message.includes("validation")) {
 				return await reply.code(400).send({ error: message });
@@ -206,7 +216,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 
 			return await reply
 				.code(500)
-				.send({ error: "Failed to create indexer" });
+				.send({ error: "Failed to create/update indexer" });
 		}
 	});
 

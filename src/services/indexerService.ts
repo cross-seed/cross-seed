@@ -86,9 +86,25 @@ export async function createIndexer(
 	const existing = await db("indexer").where({ url: sanitizedUrl }).first();
 
 	if (existing) {
-		throw new Error(`Indexer with URL ${sanitizedUrl} already exists`);
+		// Upsert: update existing indexer and set active=true (reactivate if it was soft-deleted)
+		const [updatedIndexer] = await db("indexer")
+			.where({ url: sanitizedUrl })
+			.update({
+				name: input.name || existing.name,
+				apikey: input.apikey,
+				active: input.active ?? true,
+			})
+			.returning("*");
+
+		logger.info({
+			label: Label.TORZNAB,
+			message: `Updated existing indexer (upsert): ${input.name || sanitizedUrl}`,
+		});
+
+		return updatedIndexer;
 	}
 
+	// Create new indexer
 	const [indexer] = await db("indexer")
 		.insert({
 			name: input.name || null,
@@ -160,14 +176,19 @@ export async function deleteIndexer(id: number) {
 		throw new Error(`Indexer with ID ${id} not found`);
 	}
 
-	await db("indexer").where({ id }).del();
+	// Soft delete - set active to false instead of actually deleting
+	// This preserves cache data and download history
+	const [updatedIndexer] = await db("indexer")
+		.where({ id })
+		.update({ active: false })
+		.returning("*");
 
 	logger.info({
 		label: Label.TORZNAB,
-		message: `Deleted indexer: ${existing.name || existing.url}`,
+		message: `Soft deleted indexer (set active=false): ${existing.name || existing.url}`,
 	});
 
-	return { success: true };
+	return { success: true, indexer: updatedIndexer };
 }
 
 export async function getIndexerById(id: number) {
@@ -183,7 +204,16 @@ export async function getIndexerById(id: number) {
 export async function listAllIndexers({
 	includeInactive = false,
 } = {}): Promise<Indexer[]> {
-	return getAllIndexers({ includeInactive });
+	logger.debug({
+		label: Label.TORZNAB,
+		message: `cross-seed: listAllIndexers called with includeInactive=${includeInactive}`,
+	});
+	const result = await getAllIndexers({ includeInactive });
+	logger.debug({
+		label: Label.TORZNAB,
+		message: `cross-seed: getAllIndexers returned ${result.length} indexers`,
+	});
+	return result;
 }
 
 export async function testExistingIndexer(id: number) {
