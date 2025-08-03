@@ -349,6 +349,7 @@ export async function searchForLocalTorrentByCriteria(
 					configOverride: options.configOverride,
 					allowSeasonPackEpisodes,
 					ignoreCrossSeeds: options.ignoreCrossSeeds,
+					blockListOnly: false,
 				}))
 			) {
 				filtered++;
@@ -741,7 +742,14 @@ async function findSearchableTorrents(options?: {
 	// Group the exact same search queries together for easy cache use later
 	const grouping = new Map<string, SearcheeWithLabel[]>();
 	const validSearchees = [
-		...ensembleSearchees,
+		...(await filterAsync(ensembleSearchees, (searchee) =>
+			filterByContent(searchee, {
+				configOverride: {},
+				allowSeasonPackEpisodes: false,
+				ignoreCrossSeeds: false,
+				blockListOnly: true, // Only option that matters
+			}),
+		)),
 		...(await filterAsync(realSearchees, filterByContent)),
 	];
 	for (const searchee of validSearchees) {
