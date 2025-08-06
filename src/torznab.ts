@@ -406,6 +406,8 @@ export async function* rssPager(
 	let newLastSeenGuid: string | undefined = lastSeenGuid;
 	let pageBackUntil = 0;
 	const maxPage = 10;
+	const maxCandidates = 10000;
+	let totalCandidates = 0;
 	let i = -1;
 	while (++i < maxPage) {
 		let currentPageCandidates: CandidateWithIndexerId[];
@@ -471,12 +473,20 @@ export async function* rssPager(
 			label: Label.RSS,
 			message: `${newCandidates.length} new candidates on ${indexer.name ?? indexer.url} page ${i + 1}`,
 		});
+		totalCandidates += newCandidates.length;
 		yield* newCandidates;
 
 		if (newCandidates.length !== currentPageCandidates.length) {
 			logger.verbose({
 				label: Label.RSS,
 				message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: reached last seen guid or pageBackUntil ${humanReadableDate(pageBackUntil)}`,
+			});
+			break;
+		}
+		if (totalCandidates >= maxCandidates) {
+			logger.verbose({
+				label: Label.RSS,
+				message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: reached max candidates ${maxCandidates}`,
 			});
 			break;
 		}
