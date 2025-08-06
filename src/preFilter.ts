@@ -88,6 +88,7 @@ export async function filterByContent(
 		configOverride: Partial<RuntimeConfig>;
 		allowSeasonPackEpisodes: boolean;
 		ignoreCrossSeeds: boolean;
+		blockListOnly: boolean;
 	},
 ): Promise<boolean> {
 	const {
@@ -108,6 +109,7 @@ export async function filterByContent(
 		);
 		return false;
 	}
+	if (options?.blockListOnly) return true;
 
 	if (
 		(!options?.allowSeasonPackEpisodes || !includeSingleEpisodes) &&
