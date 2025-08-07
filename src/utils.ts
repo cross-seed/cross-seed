@@ -1,6 +1,13 @@
 import chalk, { ChalkInstance } from "chalk";
 import { distance } from "fastest-levenshtein";
-import { access, readdir } from "fs/promises";
+import {
+	access,
+	constants,
+	readdir,
+	stat,
+	unlink,
+	writeFile,
+} from "fs/promises";
 import path from "path";
 import {
 	ALL_EXTENSIONS,
@@ -38,22 +45,82 @@ export function isTruthy<T>(value: T): value is Truthy<T> {
 
 // ==================================== OS ====================================
 
-export async function exists(path: string): Promise<boolean> {
+export async function exists(srcPath: string): Promise<boolean> {
 	try {
-		await access(path);
+		await access(srcPath);
 		return true;
 	} catch {
 		return false;
 	}
 }
 
-export async function notExists(path: string): Promise<boolean> {
+export async function notExists(srcPath: string): Promise<boolean> {
 	try {
-		await access(path);
+		await access(srcPath);
 		return false;
 	} catch {
 		return true;
 	}
+}
+
+export async function verifyDir(
+	srcDir: string,
+	testSrcName: string,
+	permissions: number,
+): Promise<boolean> {
+	try {
+		if (await notExists(srcDir)) {
+			throw new Error("does not exist");
+		}
+		if (!(await stat(srcDir)).isDirectory()) {
+			throw new Error("not a directory");
+		}
+		if (permissions & constants.R_OK) {
+			try {
+				await readdir(srcDir);
+			} catch (e) {
+				logger.debug(e);
+				throw new Error("no read permissions");
+			}
+		}
+		if (permissions & constants.W_OK) {
+			const tempFile = path.join(srcDir, testSrcName);
+			try {
+				await writeFile(tempFile, testSrcName);
+				if (await notExists(tempFile)) {
+					throw new Error(
+						"no write permissions - could not verify test file",
+					);
+				}
+				await unlink(tempFile);
+			} catch (e) {
+				logger.debug(e);
+				throw new Error("no write permissions");
+			}
+		}
+		return true;
+	} catch (e) {
+		if (e.code === "ENOENT") {
+			logger.error(
+				`\tYour ${testSrcName} "${srcDir}" is not a valid directory on the filesystem: ${e.message}.`,
+			);
+			if (
+				path.sep === "\\" &&
+				!srcDir.includes("\\") &&
+				!srcDir.includes("/")
+			) {
+				logger.error(
+					"\tIt may not be formatted properly for Windows.\n" +
+						'\t\t\t\tMake sure to use "\\\\" or "/" for directory separators.',
+				);
+			}
+		} else {
+			logger.error(
+				`\tYour ${testSrcName} "${srcDir}" has invalid permissions: ${e.message}.`,
+			);
+		}
+	}
+	return false;
 }
 
 export async function countDirEntriesRec(

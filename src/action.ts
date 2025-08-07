@@ -1,7 +1,6 @@
 import chalk from "chalk";
 import fs from "fs";
 import {
-	access,
 	copyFile,
 	link,
 	lstat,
@@ -56,6 +55,7 @@ import {
 	mapAsync,
 	Mutex,
 	notExists,
+	verifyDir,
 	withMutex,
 } from "./utils.js";
 
@@ -817,44 +817,26 @@ export async function testLinking(
 	try {
 		let srcFile = await findAFileWithExt(srcDir, ALL_EXTENSIONS);
 		if (!srcFile) {
-			try {
-				await access(srcDir, fs.constants.R_OK);
-			} catch (e) {
-				logger.error(e);
-				if (e.code === "ENOENT") {
-					logger.error(
-						`${srcDir} does not exist, cross-seed is unable to verify linking for this path (likely due to incorrect/insufficient volume mounts https://www.cross-seed.org/docs/tutorials/linking#configuring-linkdirs).`,
-					);
-				} else {
-					logger.error(
-						`cross-seed does not have read access to ${srcDir}, cross-seed is unable to verify linking for this path.`,
-					);
-				}
-				return false;
-			}
-			try {
-				await access(srcDir, fs.constants.W_OK);
-			} catch (e) {
-				logger.error(e);
+			if (
+				!(await verifyDir(
+					srcDir,
+					testSrcName,
+					fs.constants.R_OK | fs.constants.W_OK,
+				))
+			) {
 				logger.error(
-					`cross-seed does not have write access to ${srcDir}, cross-seed is unable to verify linking for this path.`,
+					`cross-seed is unable to verify linking for ${srcDir} (likely due to incorrect/insufficient volume mounts https://www.cross-seed.org/docs/tutorials/linking#configuring-linkdirs).`,
 				);
 				return false;
 			}
 			tempFile = join(srcDir, testSrcName);
 			try {
-				await writeFile(tempFile, "");
-				if (await notExists(tempFile)) {
-					logger.error(
-						`Failed to verify test file at ${tempFile}, cross-seed is unable to verify linking for this path.`,
-					);
-					return false;
-				}
+				await writeFile(tempFile, testSrcName);
 				srcFile = tempFile;
 			} catch (e) {
-				logger.error(e);
+				logger.debug(e);
 				logger.error(
-					`Failed to create test file in ${srcDir}, cross-seed is unable to verify linking for this path.`,
+					`Failed to create test file in ${srcDir} for linking test.`,
 				);
 				return false;
 			}
