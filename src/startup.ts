@@ -1,6 +1,5 @@
-import { access, constants, mkdir, stat } from "fs/promises";
+import { constants, mkdir, stat } from "fs/promises";
 import ms from "ms";
-import { sep } from "path";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { validateUArrLs } from "./arr.js";
@@ -20,7 +19,7 @@ import {
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
-import { Awaitable, mapAsync, notExists, wait } from "./utils.js";
+import { Awaitable, mapAsync, notExists, verifyDir, wait } from "./utils.js";
 
 export async function exitGracefully() {
 	await db.destroy();
@@ -29,43 +28,6 @@ export async function exitGracefully() {
 
 process.on("SIGINT", exitGracefully);
 process.on("SIGTERM", exitGracefully);
-
-/**
- * validates existence, permission, and that a path is a directory
- * @param path string of path to validate
- * @param optionName name of the configuration key
- * @param permissions number (see constants in calling function) of permission
- * @returns true if path exists and has required permission
- */
-async function verifyPath(
-	path: string,
-	optionName: string,
-	permissions: number,
-): Promise<boolean> {
-	try {
-		if ((await stat(path)).isDirectory()) {
-			await access(path, permissions);
-			return true;
-		}
-	} catch (error) {
-		if (error.code === "ENOENT") {
-			logger.error(
-				`\tYour ${optionName} "${path}" is not a valid directory on the filesystem.`,
-			);
-			if (sep === "\\" && !path.includes("\\") && !path.includes("/")) {
-				logger.error(
-					"\tIt may not be formatted properly for Windows.\n" +
-						'\t\t\t\tMake sure to use "\\\\" or "/" for directory separators.',
-				);
-			}
-		} else {
-			logger.error(
-				`\tYour ${optionName} "${path}" has invalid permissions.`,
-			);
-		}
-	}
-	return false;
-}
 
 /**
  * verifies the config paths provided against the filesystem
@@ -80,10 +42,7 @@ async function checkConfigPaths(): Promise<void> {
 	const linkDev: { path: string; dev: number }[] = [];
 	const dataDev: { path: string; dev: number }[] = [];
 
-	if (
-		torrentDir &&
-		!(await verifyPath(torrentDir, "torrentDir", READ_ONLY))
-	) {
+	if (torrentDir && !(await verifyDir(torrentDir, "torrentDir", READ_ONLY))) {
 		pathFailure++;
 	}
 
@@ -91,16 +50,17 @@ async function checkConfigPaths(): Promise<void> {
 		logger.info(`Creating outputDir: ${outputDir}`);
 		await mkdir(outputDir, { recursive: true });
 	}
-	if (!(await verifyPath(outputDir, "outputDir", READ_AND_WRITE))) {
+	if (!(await verifyDir(outputDir, "outputDir", READ_AND_WRITE))) {
 		pathFailure++;
 	}
 
-	for (const linkDir of linkDirs) {
+	for (const [index, linkDir] of linkDirs.entries()) {
+		const linkDirName = `linkDir${index}`;
 		if (await notExists(linkDir)) {
-			logger.info(`Creating linkDir: ${linkDir}`);
+			logger.info(`Creating ${linkDirName}: ${linkDir}`);
 			await mkdir(linkDir, { recursive: true });
 		}
-		if (await verifyPath(linkDir, "linkDir", READ_AND_WRITE)) {
+		if (await verifyDir(linkDir, linkDirName, READ_AND_WRITE)) {
 			linkDev.push({ path: linkDir, dev: (await stat(linkDir)).dev });
 		} else {
 			pathFailure++;
@@ -109,8 +69,9 @@ async function checkConfigPaths(): Promise<void> {
 	if (linkDev.length) {
 		logger.verbose(`Storage device for each linkDir: ${inspect(linkDev)}`);
 	}
-	for (const dataDir of dataDirs) {
-		if (await verifyPath(dataDir, "dataDirs", READ_ONLY)) {
+	for (const [index, dataDir] of dataDirs.entries()) {
+		const dataDirName = `dataDir${index}`;
+		if (await verifyDir(dataDir, dataDirName, READ_ONLY)) {
 			dataDev.push({ path: dataDir, dev: (await stat(dataDir)).dev });
 		} else {
 			pathFailure++;
@@ -120,24 +81,25 @@ async function checkConfigPaths(): Promise<void> {
 		logger.verbose(`Storage device for each dataDir: ${inspect(dataDev)}`);
 	}
 	if (injectDir) {
-		if (!(await verifyPath(injectDir, "injectDir", READ_AND_WRITE))) {
+		if (!(await verifyDir(injectDir, "injectDir", READ_AND_WRITE))) {
 			pathFailure++;
 		}
 	}
 	if (linkDirs.length) {
-		for (const dataDir of dataDirs) {
+		for (const [index, dataDir] of dataDirs.entries()) {
+			const dataDirName = `dataDir${index}`;
 			try {
 				const res = await testLinking(
 					dataDir,
-					"dataDirSrc.cross-seed",
-					"dataDirDest.cross-seed",
+					`${dataDirName}Src.cross-seed`,
+					`${dataDirName}Dest.cross-seed`,
 				);
 				if (!res) {
-					logger.error("Failed to link from dataDirs to linkDir.");
+					logger.error("Failed to link from dataDirs to linkDirs.");
 				}
 			} catch (e) {
 				logger.error(e);
-				logger.error("Failed to link from dataDirs to linkDir.");
+				logger.error("Failed to link from dataDirs to linkDirs.");
 				pathFailure++;
 			}
 		}
