@@ -1,7 +1,6 @@
 import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
 import { readdir, readFile, stat, utimes, writeFile } from "fs/promises";
-import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
 import {
@@ -79,6 +78,7 @@ export enum SnatchError {
 interface TorrentEntry {
 	title?: string;
 	name?: string;
+	file_path?: string;
 }
 
 export interface EnsembleEntry {
@@ -675,7 +675,7 @@ function getKeysFromName(name: string): {
 	if (animeKeys) {
 		const keyTitles = animeKeys.keyTitles;
 		const element = animeKeys.release;
-		return { keyTitles, element, useFallback: true };
+		return { keyTitles, element, useFallback: false };
 	}
 	return { keyTitles: [], useFallback: true };
 }
@@ -814,27 +814,33 @@ async function getTorrentByFuzzyName(
 	// If none match, proceed with fuzzy name check on all names.
 	filteredNames = filteredNames.length > 0 ? filteredNames : database;
 
-	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(filteredNames, {
-		keys: useClientTorrents ? ["title"] : ["name"],
-		distance: 6,
-		threshold: 0.25,
-	}).search(name);
-	if (potentialMatches.length === 0) return [];
-	if (useClientTorrents) {
-		return [createSearcheeFromDB(potentialMatches[0].item)];
-	}
+	const candidateMaxDistance = Math.floor(name.length / LEVENSHTEIN_DIVISOR);
+	const potentialMatches = await filterAsync(
+		filteredNames,
+		async (dbEntry) => {
+			await yieldToEventLoop();
+			const dbTitle = dbEntry.title ?? dbEntry.name!;
+			const maxDistance = Math.min(
+				candidateMaxDistance,
+				Math.floor(dbTitle.length / LEVENSHTEIN_DIVISOR),
+			);
+			return distance(name, dbTitle) <= maxDistance;
+		},
+	);
+
+	if (useClientTorrents) return potentialMatches.map(createSearcheeFromDB);
 	const client = getClients()[0];
 	const torrentInfos =
 		client && client.clientType !== Label.QBITTORRENT
 			? await client.getAllTorrents()
 			: [];
-	const res = await createSearcheeFromTorrentFile(
-		potentialMatches[0].item.file_path,
-		torrentInfos,
-	);
-	if (res.isOk()) return [res.unwrap()];
-	return [];
+	return (
+		await mapAsync(potentialMatches, (dbTorrent) =>
+			createSearcheeFromTorrentFile(dbTorrent.file_path!, torrentInfos),
+		)
+	)
+		.filter(isOk)
+		.map((r) => r.unwrap());
 }
 
 export async function getTorrentByCriteria(
