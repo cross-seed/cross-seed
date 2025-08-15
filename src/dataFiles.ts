@@ -22,6 +22,7 @@ import {
 	inBatches,
 	isTruthy,
 	mapAsync,
+	yieldToEventLoop,
 } from "./utils.js";
 import { isOk } from "./Result.js";
 
@@ -183,7 +184,8 @@ export async function getDataByFuzzyName(
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
 	let filteredNames: DataEntry[] = [];
 	if (fullMatch) {
-		filteredNames = allDataEntries.filter((dbData) => {
+		filteredNames = await filterAsync(allDataEntries, async (dbData) => {
+			await yieldToEventLoop();
 			const dbMatch = createKeyTitle(dbData.title);
 			return fullMatch === dbMatch;
 		});

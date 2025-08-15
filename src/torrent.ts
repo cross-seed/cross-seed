@@ -42,6 +42,7 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import {
+	createKeyTitle,
 	exists,
 	filterAsync,
 	flatMapAsync,
@@ -53,6 +54,7 @@ import {
 	stripExtension,
 	wait,
 	withMutex,
+	yieldToEventLoop,
 } from "./utils.js";
 
 export interface TorrentLocator {
@@ -72,6 +74,11 @@ export enum SnatchError {
 	MAGNET_LINK = "MAGNET_LINK",
 	INVALID_CONTENTS = "INVALID_CONTENTS",
 	UNKNOWN_ERROR = "UNKNOWN_ERROR",
+}
+
+interface TorrentEntry {
+	title?: string;
+	name?: string;
 }
 
 export interface EnsembleEntry {
@@ -691,8 +698,9 @@ export async function getSimilarByName(name: string): Promise<{
 		Math.min(...keyTitles.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
 	);
 
-	const filterEntries = (dbEntries: { title?: string; name?: string }[]) => {
-		return dbEntries.filter((dbEntry) => {
+	const filterEntries = async (dbEntries: TorrentEntry[]) => {
+		return filterAsync(dbEntries, async (dbEntry) => {
+			await yieldToEventLoop();
 			const entry = getKeysFromName(dbEntry.title ?? dbEntry.name!);
 			if (entry.element !== element) return false;
 			if (!entry.keyTitles.length) return false;
@@ -713,14 +721,14 @@ export async function getSimilarByName(name: string): Promise<{
 
 	if (useClientTorrents) {
 		clientSearchees.push(
-			...filterEntries(await db("client_searchee")).map(
+			...(await filterEntries(await db("client_searchee"))).map(
 				createSearcheeFromDB,
 			),
 		);
 	} else if (torrentDir) {
-		const filteredTorrentEntries = filterEntries(
+		const filteredTorrentEntries = (await filterEntries(
 			await db("torrent").select("name", "file_path"),
-		) as { name: string; file_path: string }[];
+		)) as { name: string; file_path: string }[];
 		if (filteredTorrentEntries.length) {
 			const client = getClients()[0];
 			const torrentInfos =
@@ -744,7 +752,7 @@ export async function getSimilarByName(name: string): Promise<{
 
 	const entriesToDelete: string[] = [];
 	const filteredDataEntries = await filterAsync(
-		filterEntries(await db("data")) as {
+		(await filterEntries(await db("data"))) as {
 			title: string;
 			path: string;
 		}[],
@@ -788,13 +796,27 @@ async function getTorrentByFuzzyName(
 ): Promise<SearcheeWithInfoHash[]> {
 	const { useClientTorrents } = getRuntimeConfig();
 
-	const database = useClientTorrents
+	const database: TorrentEntry[] = useClientTorrents
 		? await db("client_searchee")
 		: await db("torrent");
+	const fullMatch = createKeyTitle(name);
+
+	// Attempt to filter torrents in DB to match incoming data before fuzzy check
+	let filteredNames: TorrentEntry[] = [];
+	if (fullMatch) {
+		filteredNames = await filterAsync(database, async (dbEntry) => {
+			await yieldToEventLoop();
+			const dbMatch = createKeyTitle(dbEntry.title ?? dbEntry.name!);
+			return fullMatch === dbMatch;
+		});
+	}
+
+	// If none match, proceed with fuzzy name check on all names.
+	filteredNames = filteredNames.length > 0 ? filteredNames : database;
 
 	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(database, {
-		keys: ["title", "name"],
+	const potentialMatches = new Fuse(filteredNames, {
+		keys: useClientTorrents ? ["title"] : ["name"],
 		distance: 6,
 		threshold: 0.25,
 	}).search(name);

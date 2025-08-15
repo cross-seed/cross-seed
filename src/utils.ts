@@ -190,6 +190,15 @@ export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
 
+/**
+ * Yield control to the event loop allowing all pending tasks to be processed
+ * regardless of the current phase.
+ */
+export async function yieldToEventLoop(n: number = 0): Promise<void> {
+	await wait(n);
+	return new Promise((resolve) => setImmediate(resolve));
+}
+
 export async function time<R>(cb: () => Promise<R>, times: number[]) {
 	const before = performance.now();
 	try {
@@ -692,4 +701,33 @@ export async function withMutex<T>(
 	})();
 	mutexes.set(name, mutex);
 	return mutex;
+}
+
+export class AsyncSemaphore {
+	private permits: number;
+	private waiting: (() => void)[] = [];
+
+	constructor(permits: number) {
+		if (permits <= 0) throw new Error("Permits count must be positive");
+		this.permits = permits;
+	}
+
+	acquire(): Promise<void> {
+		return new Promise<void>((resolve) => {
+			if (this.permits > 0) {
+				this.permits--;
+				resolve();
+			} else {
+				this.waiting.push(resolve);
+			}
+		});
+	}
+
+	release(): void {
+		if (this.waiting.length > 0) {
+			this.waiting.shift()!();
+		} else {
+			this.permits++;
+		}
+	}
 }
