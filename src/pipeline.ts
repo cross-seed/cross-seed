@@ -402,7 +402,7 @@ async function getSearcheesForCandidate(
 	const { keys, clientSearchees, dataSearchees } = await getSimilarByName(
 		candidate.name,
 	);
-	const method = keys.length ? `[${keys}]` : "Fuse fallback";
+	const method = keys.length ? `[${keys}]` : "fuzzy fallback";
 	if (!clientSearchees.length && !dataSearchees.length) {
 		logger.verbose({
 			label: searcheeLabel,
