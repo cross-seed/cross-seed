@@ -44,6 +44,7 @@ import {
 	createKeyTitle,
 	exists,
 	filterAsync,
+	filterAsyncYield,
 	flatMapAsync,
 	getLogString,
 	inBatches,
@@ -53,7 +54,6 @@ import {
 	stripExtension,
 	wait,
 	withMutex,
-	yieldToEventLoop,
 } from "./utils.js";
 
 export interface TorrentLocator {
@@ -702,8 +702,7 @@ export async function getSimilarByName(name: string): Promise<{
 	);
 
 	const filterEntries = async (dbEntries: TorrentEntry[]) => {
-		return filterAsync(dbEntries, async (dbEntry) => {
-			await yieldToEventLoop();
+		return filterAsyncYield(dbEntries, async (dbEntry) => {
 			const entry = getKeysFromName(dbEntry.title ?? dbEntry.name!);
 			if (entry.element !== element) return false;
 			if (!entry.keyTitles.length) return false;
@@ -807,8 +806,7 @@ async function getTorrentByFuzzyName(
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
 	let filteredNames: TorrentEntry[] = [];
 	if (fullMatch) {
-		filteredNames = await filterAsync(database, async (dbEntry) => {
-			await yieldToEventLoop();
+		filteredNames = await filterAsyncYield(database, async (dbEntry) => {
 			const dbMatch = createKeyTitle(dbEntry.title ?? dbEntry.name!);
 			return fullMatch === dbMatch;
 		});
@@ -818,10 +816,9 @@ async function getTorrentByFuzzyName(
 	filteredNames = filteredNames.length > 0 ? filteredNames : database;
 
 	const candidateMaxDistance = Math.floor(name.length / LEVENSHTEIN_DIVISOR);
-	const potentialMatches = await filterAsync(
+	const potentialMatches = await filterAsyncYield(
 		filteredNames,
 		async (dbEntry) => {
-			await yieldToEventLoop();
 			const dbTitle = dbEntry.title ?? dbEntry.name!;
 			const maxDistance = Math.min(
 				candidateMaxDistance,

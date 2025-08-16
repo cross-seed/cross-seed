@@ -49,7 +49,6 @@ import {
 	sanitizeInfoHash,
 	stripExtension,
 	withMutex,
-	yieldToEventLoop,
 } from "./utils.js";
 
 export interface ResultAssessment {
@@ -616,24 +615,20 @@ export async function getGuidInfoHashMap(): Promise<Map<string, string>> {
  * @param guidInfoHashMap The map of guids to info hashes. Necessary for optimal fuzzy lookups.
  * @returns The info hash of the torrent if found
  */
-async function guidLookup(
+function guidLookup(
 	guid: string,
 	link: string,
 	guidInfoHashMap: Map<string, string>,
-): Promise<string | undefined> {
+): string | undefined {
 	const infoHash = guidInfoHashMap.get(guid) ?? guidInfoHashMap.get(link);
 	if (infoHash) return infoHash;
 
+	const torrentIdRegex = /\.tv\/torrent\/(\d+)\/group/;
 	for (const guidOrLink of [guid, link]) {
-		if (!guidOrLink.includes(".tv/torrent/")) continue;
-		const torrentIdRegex = /\.tv\/torrent\/(\d+)\/group/;
 		const torrentIdStr = guidOrLink.match(torrentIdRegex)?.[1];
 		if (!torrentIdStr) continue;
 		for (const [key, value] of guidInfoHashMap) {
-			await yieldToEventLoop();
-			if (key.match(torrentIdRegex)?.[1] === torrentIdStr) {
-				return value;
-			}
+			if (key.match(torrentIdRegex)?.[1] === torrentIdStr) return value;
 		}
 	}
 }
@@ -658,7 +653,7 @@ export async function assessCandidateCaching(
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.title, guid })
 		.first();
-	const metaInfoHash = await guidLookup(guid, link, guidInfoHashMap);
+	const metaInfoHash = guidLookup(guid, link, guidInfoHashMap);
 	const metaOrCandidate = metaInfoHash
 		? (await existsInTorrentCache(metaInfoHash))
 			? (await getCachedTorrentFile(metaInfoHash, searchee.label)).orElse(

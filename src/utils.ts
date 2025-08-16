@@ -501,6 +501,30 @@ export async function filterAsync<T>(
 	return arr.filter((_, index) => results[index]);
 }
 
+/**
+ * Filters an array asynchronously in batches, yielding to the event loop
+ * between batches to avoid blocking the event loop for too long.
+ * @param arr The array to filter.
+ * @param predicate The asynchronous predicate function to test each element.
+ * @param options.batchSize The size of each batch to process.
+ * @returns A promise that resolves to an array of elements that satisfy the predicate.
+ */
+export async function filterAsyncYield<T>(
+	arr: T[],
+	predicate: (e: T) => Promise<boolean>,
+	options = { batchSize: 1000 },
+): Promise<T[]> {
+	const results = await fromBatches(
+		arr,
+		async (batch) => {
+			await yieldToEventLoop();
+			return Promise.all(batch.map(predicate));
+		},
+		options,
+	);
+	return arr.filter((_, index) => results[index]);
+}
+
 export async function mapAsync<T, R>(
 	arr: T[],
 	cb: (e: T) => Promise<R>,

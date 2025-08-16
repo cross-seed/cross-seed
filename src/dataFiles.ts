@@ -21,11 +21,11 @@ import {
 	createKeyTitle,
 	exists,
 	filterAsync,
+	filterAsyncYield,
 	flatMapAsync,
 	inBatches,
 	isTruthy,
 	mapAsync,
-	yieldToEventLoop,
 } from "./utils.js";
 import { isOk } from "./Result.js";
 import { distance } from "fastest-levenshtein";
@@ -188,11 +188,13 @@ export async function getDataByFuzzyName(
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
 	let filteredNames: DataEntry[] = [];
 	if (fullMatch) {
-		filteredNames = await filterAsync(allDataEntries, async (dbData) => {
-			await yieldToEventLoop();
-			const dbMatch = createKeyTitle(dbData.title);
-			return fullMatch === dbMatch;
-		});
+		filteredNames = await filterAsyncYield(
+			allDataEntries,
+			async (dbData) => {
+				const dbMatch = createKeyTitle(dbData.title);
+				return fullMatch === dbMatch;
+			},
+		);
 	}
 
 	// If none match, proceed with fuzzy name check on all names.
@@ -201,10 +203,9 @@ export async function getDataByFuzzyName(
 	const entriesToDelete: string[] = [];
 
 	const candidateMaxDistance = Math.floor(name.length / LEVENSHTEIN_DIVISOR);
-	const potentialMatches = await filterAsync(
+	const potentialMatches = await filterAsyncYield(
 		filteredNames,
 		async (dbEntry) => {
-			await yieldToEventLoop();
 			const dbTitle = dbEntry.title;
 			const maxDistance = Math.min(
 				candidateMaxDistance,

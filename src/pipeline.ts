@@ -848,7 +848,7 @@ export async function scanRssFeeds() {
 			await semaphore.acquire();
 			try {
 				await checkNewCandidateMatch(candidate, Label.RSS);
-				await yieldToEventLoop(100); // Allow other tasks to run between candidates
+				await yieldToEventLoop(10); // Allow other tasks to run between candidates
 			} finally {
 				semaphore.release();
 			}
