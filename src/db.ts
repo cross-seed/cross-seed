@@ -10,7 +10,15 @@ import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { migrations } from "./migrations/migrations.js";
 import { cacheEnsembleTorrentEntry, snatchHistory } from "./torrent.js";
-import { filterAsync, flatMapAsync, inBatches, notExists } from "./utils.js";
+import {
+	filterAsync,
+	flatMapAsync,
+	inBatches,
+	Mutex,
+	notExists,
+	withMutex,
+} from "./utils.js";
+import { rawGuidInfoHashMap } from "./decide.js";
 
 const filename = join(appDir(), "cross-seed.db");
 const rawSqliteHandle = new Sqlite(filename);
@@ -36,7 +44,13 @@ export async function cleanupDB(): Promise<void> {
 		const searchees = await flatMapAsync(
 			getClients(),
 			async (client) =>
-				(await client.getClientSearchees({ refresh: [] })).searchees,
+				(
+					await client.getClientSearchees({
+						refresh: [],
+						includeFiles: true,
+						includeTrackers: true,
+					})
+				).searchees,
 		);
 		if (!seasonFromEpisodes) return;
 		logger.verbose({
@@ -125,4 +139,21 @@ export async function cleanupDB(): Promise<void> {
 			}
 		}
 	})();
+	await withMutex(
+		Mutex.CREATE_GUID_INFO_HASH_MAP,
+		{ useQueue: true },
+		async () => {
+			logger.verbose({
+				label: Label.CLEANUP,
+				message: "Rebuilding guidInfoHashMap",
+			});
+			const res = await db("decision")
+				.select("guid", "info_hash")
+				.whereNotNull("info_hash");
+			rawGuidInfoHashMap.clear();
+			for (const { guid, info_hash } of res) {
+				rawGuidInfoHashMap.set(guid, info_hash);
+			}
+		},
+	);
 }

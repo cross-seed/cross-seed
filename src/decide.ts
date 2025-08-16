@@ -44,9 +44,11 @@ import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
 import {
 	extractInt,
 	getLogString,
+	Mutex,
 	notExists,
 	sanitizeInfoHash,
 	stripExtension,
+	withMutex,
 } from "./utils.js";
 
 export interface ResultAssessment {
@@ -587,14 +589,23 @@ async function assessAndSaveResults(
 	return assessment;
 }
 
+export const rawGuidInfoHashMap: Map<string, string> = new Map();
 export async function getGuidInfoHashMap(): Promise<Map<string, string>> {
-	return new Map(
-		(
-			await db("decision")
+	if (rawGuidInfoHashMap.size) return rawGuidInfoHashMap;
+	await withMutex(
+		Mutex.CREATE_GUID_INFO_HASH_MAP,
+		{ useQueue: false },
+		async () => {
+			const res = await db("decision")
 				.select("guid", "info_hash")
-				.whereNotNull("info_hash")
-		).map(({ guid, info_hash }) => [guid, info_hash]),
+				.whereNotNull("info_hash");
+			rawGuidInfoHashMap.clear();
+			for (const { guid, info_hash } of res) {
+				rawGuidInfoHashMap.set(guid, info_hash);
+			}
+		},
 	);
+	return rawGuidInfoHashMap;
 }
 
 /**
@@ -612,15 +623,12 @@ function guidLookup(
 	const infoHash = guidInfoHashMap.get(guid) ?? guidInfoHashMap.get(link);
 	if (infoHash) return infoHash;
 
+	const torrentIdRegex = /\.tv\/torrent\/(\d+)\/group/;
 	for (const guidOrLink of [guid, link]) {
-		if (!guidOrLink.includes(".tv/torrent/")) continue;
-		const torrentIdRegex = /\.tv\/torrent\/(\d+)\/group/;
 		const torrentIdStr = guidOrLink.match(torrentIdRegex)?.[1];
 		if (!torrentIdStr) continue;
 		for (const [key, value] of guidInfoHashMap) {
-			if (key.match(torrentIdRegex)?.[1] === torrentIdStr) {
-				return value;
-			}
+			if (key.match(torrentIdRegex)?.[1] === torrentIdStr) return value;
 		}
 	}
 }

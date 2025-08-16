@@ -190,6 +190,16 @@ export function wait(n: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, n));
 }
 
+/**
+ * Yield control to the event loop allowing all pending tasks to be processed
+ * regardless of the current phase.
+ * @param n Optional number of milliseconds to wait before yielding.
+ */
+export async function yieldToEventLoop(n: number = 0): Promise<void> {
+	await wait(n);
+	return new Promise((resolve) => setImmediate(resolve));
+}
+
 export async function time<R>(cb: () => Promise<R>, times: number[]) {
 	const before = performance.now();
 	try {
@@ -491,6 +501,30 @@ export async function filterAsync<T>(
 	return arr.filter((_, index) => results[index]);
 }
 
+/**
+ * Filters an array asynchronously in batches, yielding to the event loop
+ * between batches to avoid blocking the event loop for too long.
+ * @param arr The array to filter.
+ * @param predicate The asynchronous predicate function to test each element.
+ * @param options.batchSize The size of each batch to process.
+ * @returns A promise that resolves to an array of elements that satisfy the predicate.
+ */
+export async function filterAsyncYield<T>(
+	arr: T[],
+	predicate: (e: T) => Promise<boolean>,
+	options = { batchSize: 1000 },
+): Promise<T[]> {
+	const results = await fromBatches(
+		arr,
+		async (batch) => {
+			await yieldToEventLoop();
+			return Promise.all(batch.map(predicate));
+		},
+		options,
+	);
+	return arr.filter((_, index) => results[index]);
+}
+
 export async function mapAsync<T, R>(
 	arr: T[],
 	cb: (e: T) => Promise<R>,
@@ -659,6 +693,7 @@ export enum Mutex {
 	INDEX_TORRENTS_AND_DATA_DIRS = "INDEX_TORRENTS_AND_DATA_DIRS",
 	CHECK_JOBS = "CHECK_JOBS",
 	CREATE_ALL_SEARCHEES = "CREATE_ALL_SEARCHEES",
+	CREATE_GUID_INFO_HASH_MAP = "CREATE_GUID_INFO_HASH_MAP",
 	CLIENT_INJECTION = "CLIENT_INJECTION",
 }
 const mutexes = new Map<Mutex, Promise<unknown>>();
@@ -692,4 +727,33 @@ export async function withMutex<T>(
 	})();
 	mutexes.set(name, mutex);
 	return mutex;
+}
+
+export class AsyncSemaphore {
+	private permits: number;
+	private waiting: (() => void)[] = [];
+
+	constructor(permits: number) {
+		if (permits <= 0) throw new Error("Permits count must be positive");
+		this.permits = permits;
+	}
+
+	acquire(): Promise<void> {
+		return new Promise<void>((resolve) => {
+			if (this.permits > 0) {
+				this.permits--;
+				resolve();
+			} else {
+				this.waiting.push(resolve);
+			}
+		});
+	}
+
+	release(): void {
+		if (this.waiting.length > 0) {
+			this.waiting.shift()!();
+		} else {
+			this.permits++;
+		}
+	}
 }

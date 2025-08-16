@@ -1,8 +1,11 @@
 import { FSWatcher, watch } from "fs";
 import { readdir, readFile, stat } from "fs/promises";
-import Fuse from "fuse.js";
 import { basename, dirname, extname, join, resolve, sep } from "path";
-import { IGNORED_FOLDERS_SUBSTRINGS, VIDEO_EXTENSIONS } from "./constants.js";
+import {
+	IGNORED_FOLDERS_SUBSTRINGS,
+	LEVENSHTEIN_DIVISOR,
+	VIDEO_EXTENSIONS,
+} from "./constants.js";
 import { db } from "./db.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -18,12 +21,14 @@ import {
 	createKeyTitle,
 	exists,
 	filterAsync,
+	filterAsyncYield,
 	flatMapAsync,
 	inBatches,
 	isTruthy,
 	mapAsync,
 } from "./utils.js";
 import { isOk } from "./Result.js";
+import { distance } from "fastest-levenshtein";
 
 interface DataEntry {
 	title: string;
@@ -183,10 +188,13 @@ export async function getDataByFuzzyName(
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
 	let filteredNames: DataEntry[] = [];
 	if (fullMatch) {
-		filteredNames = allDataEntries.filter((dbData) => {
-			const dbMatch = createKeyTitle(dbData.title);
-			return fullMatch === dbMatch;
-		});
+		filteredNames = await filterAsyncYield(
+			allDataEntries,
+			async (dbData) => {
+				const dbMatch = createKeyTitle(dbData.title);
+				return fullMatch === dbMatch;
+			},
+		);
 	}
 
 	// If none match, proceed with fuzzy name check on all names.
@@ -194,26 +202,31 @@ export async function getDataByFuzzyName(
 
 	const entriesToDelete: string[] = [];
 
-	const potentialMatches = await filterAsync(
-		// @ts-expect-error fuse types are confused
-		new Fuse(filteredNames, {
-			keys: ["title"],
-			distance: 6,
-			threshold: 0.25,
-		}).search(name) as { item: DataEntry }[],
-		async (match) => {
-			const path = match.item.path;
-			if (await exists(path)) return true;
-			entriesToDelete.push(path);
+	const candidateMaxDistance = Math.floor(name.length / LEVENSHTEIN_DIVISOR);
+	const potentialMatches = await filterAsyncYield(
+		filteredNames,
+		async (dbEntry) => {
+			const dbTitle = dbEntry.title;
+			const maxDistance = Math.min(
+				candidateMaxDistance,
+				Math.floor(dbTitle.length / LEVENSHTEIN_DIVISOR),
+			);
+			if (distance(name, dbTitle) > maxDistance) return false;
+			if (await exists(dbEntry.path)) return true;
+			entriesToDelete.push(dbEntry.path);
 			return false;
 		},
 	);
+
 	await inBatches(entriesToDelete, async (batch) => {
 		await db("data").whereIn("path", batch).del();
 		await db("ensemble").whereIn("path", batch).del();
 	});
-	if (potentialMatches.length === 0) return [];
-	return [await createSearcheeFromPath(potentialMatches[0].item.path)]
+	return (
+		await mapAsync(potentialMatches, (dbData) =>
+			createSearcheeFromPath(dbData.path),
+		)
+	)
 		.filter(isOk)
 		.map((r) => r.unwrap());
 }

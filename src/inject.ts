@@ -149,12 +149,7 @@ async function whichSearcheesMatchTorrent(
 		areMediaTitlesSimilar(searchee.title, meta.title) ||
 		areMediaTitlesSimilar(searchee.title, meta.name) ||
 		areMediaTitlesSimilar(searchee.name, meta.name) ||
-		areMediaTitlesSimilar(searchee.name, meta.title) ||
-		meta.files.some((metaFile) =>
-			searchee.files.some((searcheeFile) =>
-				areMediaTitlesSimilar(searcheeFile.name, metaFile.name),
-			),
-		);
+		areMediaTitlesSimilar(searchee.name, meta.title);
 	let foundBlocked = false;
 	let fuzzyFail = false;
 	const matches: AllMatches = [];

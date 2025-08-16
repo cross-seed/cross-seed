@@ -65,6 +65,7 @@ import {
 	searchTorznab,
 } from "./torznab.js";
 import {
+	AsyncSemaphore,
 	comparing,
 	filterAsync,
 	flatMapAsync,
@@ -79,9 +80,9 @@ import {
 	notExists,
 	reduceAsync,
 	stripExtension,
-	wait,
 	withMutex,
 	WithRequired,
+	yieldToEventLoop,
 } from "./utils.js";
 
 export interface Candidate {
@@ -402,7 +403,7 @@ async function getSearcheesForCandidate(
 	const { keys, clientSearchees, dataSearchees } = await getSimilarByName(
 		candidate.name,
 	);
-	const method = keys.length ? `[${keys}]` : "Fuse fallback";
+	const method = keys.length ? `[${keys}]` : "fuzzy fallback";
 	if (!clientSearchees.length && !dataSearchees.length) {
 		logger.verbose({
 			label: searcheeLabel,
@@ -519,7 +520,7 @@ async function getEnsembleForCandidate(
 	}));
 	logger.verbose({
 		label: searcheeLabel,
-		message: `Using ${method} [${ensembleTitles}] for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
+		message: `Using (${searchees.length}) ${method} [${ensembleTitles}] for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
 	});
 	return { searchees, method };
 }
@@ -547,7 +548,7 @@ export async function checkNewCandidateMatch(
 
 	logger.verbose({
 		label: searcheeLabel,
-		message: `Unique entries [${searchees.map((m) => m.title)}] using ${formatAsList(methods, { sort: true })} for ${chalk.bold.white(candidate.name)} from ${candidate.tracker}`,
+		message: `Unique entries (${searchees.length}) [${searchees.map((m) => m.title)}] using ${formatAsList(methods, { sort: true })} for ${chalk.bold.white(candidate.name)} from ${candidate.tracker}`,
 	});
 	searchees.sort(
 		comparing(
@@ -838,13 +839,21 @@ export async function scanRssFeeds() {
 		label: Label.RSS,
 		message: "Querying RSS feeds...",
 	});
+
+	const semaphore = new AsyncSemaphore(1); // Limit concurrent candidate processing to avoid bogarting the event loop
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
 	let numCandidates = 0;
 	await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
 		for await (const candidate of candidates) {
-			await checkNewCandidateMatch(candidate, Label.RSS);
+			await semaphore.acquire();
+			try {
+				await checkNewCandidateMatch(candidate, Label.RSS);
+				await yieldToEventLoop(10); // Allow other tasks to run between candidates
+			} finally {
+				semaphore.release();
+			}
 			numCandidates++;
-			await wait(ms("1 second")); // necessary to avoid bogarting the event loop
+			await yieldToEventLoop(); // Allow other trackers to acquire semaphore
 		}
 	});
 

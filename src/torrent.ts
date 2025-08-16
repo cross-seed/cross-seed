@@ -1,7 +1,6 @@
 import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
 import { readdir, readFile, stat, utimes, writeFile } from "fs/promises";
-import Fuse from "fuse.js";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
 import {
@@ -42,8 +41,10 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import {
+	createKeyTitle,
 	exists,
 	filterAsync,
+	filterAsyncYield,
 	flatMapAsync,
 	getLogString,
 	inBatches,
@@ -72,6 +73,12 @@ export enum SnatchError {
 	MAGNET_LINK = "MAGNET_LINK",
 	INVALID_CONTENTS = "INVALID_CONTENTS",
 	UNKNOWN_ERROR = "UNKNOWN_ERROR",
+}
+
+interface TorrentEntry {
+	title?: string;
+	name?: string;
+	file_path?: string;
 }
 
 export interface EnsembleEntry {
@@ -432,7 +439,10 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
 			searchees = await flatMapAsync(clients, async (client) => {
-				const { searchees } = await client.getClientSearchees();
+				const { searchees } = await client.getClientSearchees({
+					includeFiles: true,
+					includeTrackers: true,
+				});
 				await validateClientSavePaths(
 					searchees,
 					searchees.reduce((map, searchee) => {
@@ -668,7 +678,7 @@ function getKeysFromName(name: string): {
 	if (animeKeys) {
 		const keyTitles = animeKeys.keyTitles;
 		const element = animeKeys.release;
-		return { keyTitles, element, useFallback: true };
+		return { keyTitles, element, useFallback: false };
 	}
 	return { keyTitles: [], useFallback: true };
 }
@@ -691,8 +701,8 @@ export async function getSimilarByName(name: string): Promise<{
 		Math.min(...keyTitles.map((t) => t.length)) / LEVENSHTEIN_DIVISOR,
 	);
 
-	const filterEntries = (dbEntries: { title?: string; name?: string }[]) => {
-		return dbEntries.filter((dbEntry) => {
+	const filterEntries = async (dbEntries: TorrentEntry[]) => {
+		return filterAsyncYield(dbEntries, async (dbEntry) => {
 			const entry = getKeysFromName(dbEntry.title ?? dbEntry.name!);
 			if (entry.element !== element) return false;
 			if (!entry.keyTitles.length) return false;
@@ -713,14 +723,14 @@ export async function getSimilarByName(name: string): Promise<{
 
 	if (useClientTorrents) {
 		clientSearchees.push(
-			...filterEntries(await db("client_searchee")).map(
+			...(await filterEntries(await db("client_searchee"))).map(
 				createSearcheeFromDB,
 			),
 		);
 	} else if (torrentDir) {
-		const filteredTorrentEntries = filterEntries(
+		const filteredTorrentEntries = (await filterEntries(
 			await db("torrent").select("name", "file_path"),
-		) as { name: string; file_path: string }[];
+		)) as { name: string; file_path: string }[];
 		if (filteredTorrentEntries.length) {
 			const client = getClients()[0];
 			const torrentInfos =
@@ -744,7 +754,7 @@ export async function getSimilarByName(name: string): Promise<{
 
 	const entriesToDelete: string[] = [];
 	const filteredDataEntries = await filterAsync(
-		filterEntries(await db("data")) as {
+		(await filterEntries(await db("data"))) as {
 			title: string;
 			path: string;
 		}[],
@@ -788,31 +798,49 @@ async function getTorrentByFuzzyName(
 ): Promise<SearcheeWithInfoHash[]> {
 	const { useClientTorrents } = getRuntimeConfig();
 
-	const database = useClientTorrents
+	const database: TorrentEntry[] = useClientTorrents
 		? await db("client_searchee")
 		: await db("torrent");
+	const fullMatch = createKeyTitle(name);
 
-	// @ts-expect-error fuse types are confused
-	const potentialMatches = new Fuse(database, {
-		keys: ["title", "name"],
-		distance: 6,
-		threshold: 0.25,
-	}).search(name);
-	if (potentialMatches.length === 0) return [];
-	if (useClientTorrents) {
-		return [createSearcheeFromDB(potentialMatches[0].item)];
+	// Attempt to filter torrents in DB to match incoming data before fuzzy check
+	let filteredNames: TorrentEntry[] = [];
+	if (fullMatch) {
+		filteredNames = await filterAsyncYield(database, async (dbEntry) => {
+			const dbMatch = createKeyTitle(dbEntry.title ?? dbEntry.name!);
+			return fullMatch === dbMatch;
+		});
 	}
+
+	// If none match, proceed with fuzzy name check on all names.
+	filteredNames = filteredNames.length > 0 ? filteredNames : database;
+
+	const candidateMaxDistance = Math.floor(name.length / LEVENSHTEIN_DIVISOR);
+	const potentialMatches = await filterAsyncYield(
+		filteredNames,
+		async (dbEntry) => {
+			const dbTitle = dbEntry.title ?? dbEntry.name!;
+			const maxDistance = Math.min(
+				candidateMaxDistance,
+				Math.floor(dbTitle.length / LEVENSHTEIN_DIVISOR),
+			);
+			return distance(name, dbTitle) <= maxDistance;
+		},
+	);
+
+	if (useClientTorrents) return potentialMatches.map(createSearcheeFromDB);
 	const client = getClients()[0];
 	const torrentInfos =
 		client && client.clientType !== Label.QBITTORRENT
 			? await client.getAllTorrents()
 			: [];
-	const res = await createSearcheeFromTorrentFile(
-		potentialMatches[0].item.file_path,
-		torrentInfos,
-	);
-	if (res.isOk()) return [res.unwrap()];
-	return [];
+	return (
+		await mapAsync(potentialMatches, (dbTorrent) =>
+			createSearcheeFromTorrentFile(dbTorrent.file_path!, torrentInfos),
+		)
+	)
+		.filter(isOk)
+		.map((r) => r.unwrap());
 }
 
 export async function getTorrentByCriteria(
