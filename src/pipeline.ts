@@ -82,6 +82,7 @@ import {
 	stripExtension,
 	withMutex,
 	WithRequired,
+	yieldToEventLoop,
 } from "./utils.js";
 
 export interface Candidate {
@@ -839,7 +840,7 @@ export async function scanRssFeeds() {
 		message: "Querying RSS feeds...",
 	});
 
-	const semaphore = new AsyncSemaphore(10); // Limit concurrent candidate processing to avoid bogarting the event loop
+	const semaphore = new AsyncSemaphore(1); // Limit concurrent candidate processing to avoid bogarting the event loop
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
 	let numCandidates = 0;
 	await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
@@ -847,10 +848,12 @@ export async function scanRssFeeds() {
 			await semaphore.acquire();
 			try {
 				await checkNewCandidateMatch(candidate, Label.RSS);
+				await yieldToEventLoop(100); // Allow other tasks to run between candidates
 			} finally {
 				semaphore.release();
 			}
 			numCandidates++;
+			await yieldToEventLoop(); // Allow other trackers to acquire semaphore
 		}
 	});
 

@@ -193,6 +193,7 @@ export function wait(n: number): Promise<void> {
 /**
  * Yield control to the event loop allowing all pending tasks to be processed
  * regardless of the current phase.
+ * @param n Optional number of milliseconds to wait before yielding.
  */
 export async function yieldToEventLoop(n: number = 0): Promise<void> {
 	await wait(n);

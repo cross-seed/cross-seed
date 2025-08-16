@@ -639,12 +639,12 @@ export default class QBittorrent implements TorrentClient {
 	 * @return array of all torrents in the client
 	 */
 	async getAllTorrentInfo(options?: {
-		includeTrackers?: boolean;
 		includeFiles?: boolean;
+		includeTrackers?: boolean;
 	}): Promise<TorrentInfo[]> {
 		const params = new URLSearchParams();
-		if (options?.includeTrackers) params.append("includeTrackers", "true");
 		if (options?.includeFiles) params.append("includeFiles", "true");
+		if (options?.includeTrackers) params.append("includeTrackers", "true");
 		const responseText = await this.request("/torrents/info", params);
 		if (!responseText) return [];
 		return JSON.parse(responseText);
@@ -712,18 +712,22 @@ export default class QBittorrent implements TorrentClient {
 	 * Get all searchees from the client and update the db
 	 * @param options.newSearcheesOnly only return searchees that are not in the db
 	 * @param options.refresh undefined uses the cache, [] refreshes all searchees, or a list of infoHashes to refresh
+	 * @param options.includeFiles include files in the torrents info request
+	 * @param options.includeTrackers include trackers in the torrents info request
 	 * @return an object containing all searchees and new searchees (refreshed searchees are considered new)
 	 */
 	async getClientSearchees(options?: {
 		newSearcheesOnly?: boolean;
 		refresh?: string[];
+		includeFiles?: boolean;
+		includeTrackers?: boolean;
 	}): Promise<ClientSearcheeResult> {
 		const searchees: SearcheeClient[] = [];
 		const newSearchees: SearcheeClient[] = [];
 		const infoHashes = new Set<string>();
 		const torrents = await this.getAllTorrentInfo({
-			includeFiles: true,
-			includeTrackers: true,
+			includeFiles: options?.includeFiles,
+			includeTrackers: options?.includeTrackers,
 		});
 		if (!torrents.length) {
 			logger.error({

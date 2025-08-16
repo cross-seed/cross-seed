@@ -72,11 +72,15 @@ export interface TorrentClient {
 	 * Get all searchees from the client and update the db
 	 * @param options.newSearcheesOnly only return searchees that are not in the db
 	 * @param options.refresh undefined uses the cache, [] refreshes all searchees, or a list of infoHashes to refresh
+	 * @param options.includeFiles include files in the torrents info request
+	 * @param options.includeTrackers include trackers in the torrents info request
 	 * @return an object containing all searchees and new searchees (refreshed searchees are considered new)
 	 */
 	getClientSearchees: (options?: {
 		newSearcheesOnly?: boolean;
 		refresh?: string[];
+		includeFiles?: boolean;
+		includeTrackers?: boolean;
 	}) => Promise<ClientSearcheeResult>;
 	getDownloadDir: (
 		meta: SearcheeWithInfoHash | Metafile,

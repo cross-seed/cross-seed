@@ -44,7 +44,13 @@ export async function cleanupDB(): Promise<void> {
 		const searchees = await flatMapAsync(
 			getClients(),
 			async (client) =>
-				(await client.getClientSearchees({ refresh: [] })).searchees,
+				(
+					await client.getClientSearchees({
+						refresh: [],
+						includeFiles: true,
+						includeTrackers: true,
+					})
+				).searchees,
 		);
 		if (!seasonFromEpisodes) return;
 		logger.verbose({

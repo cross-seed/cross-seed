@@ -439,7 +439,10 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
 			searchees = await flatMapAsync(clients, async (client) => {
-				const { searchees } = await client.getClientSearchees();
+				const { searchees } = await client.getClientSearchees({
+					includeFiles: true,
+					includeTrackers: true,
+				});
 				await validateClientSavePaths(
 					searchees,
 					searchees.reduce((map, searchee) => {
