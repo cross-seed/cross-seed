@@ -310,7 +310,11 @@ async function getClientAndDestinationDir(
 	savePath: string | undefined,
 	newMeta: Metafile,
 	tracker: string,
-): Promise<{ client: TorrentClient; destinationDir: string } | null> {
+): Promise<{
+	client: TorrentClient;
+	destinationDir: string;
+	destinationDirFromClient: boolean;
+} | null> {
 	const { flatLinking, linkType } = getRuntimeConfig();
 	if (!client) {
 		let srcPath: string;
@@ -378,11 +382,13 @@ async function getClientAndDestinationDir(
 	}
 
 	let destinationDir: string;
+	let destinationDirFromClient = false;
 	const clientSavePathRes = await client.getDownloadDir(newMeta, {
 		onlyCompleted: false,
 	});
 	if (clientSavePathRes.isOk()) {
 		destinationDir = clientSavePathRes.unwrap();
+		destinationDirFromClient = true;
 	} else {
 		if (clientSavePathRes.unwrapErr() === "INVALID_DATA") {
 			return null;
@@ -393,7 +399,7 @@ async function getClientAndDestinationDir(
 		if (!linkDir) return null;
 		destinationDir = flatLinking ? linkDir : join(linkDir, tracker);
 	}
-	return { client, destinationDir };
+	return { client, destinationDir, destinationDirFromClient };
 }
 
 function logActionResult(
@@ -482,6 +488,7 @@ export async function performActionWithoutMutex(
 
 	let savePath: string | undefined;
 	let destinationDir: string | undefined;
+	let destinationDirFromClient = false;
 	let unlinkOk = false;
 	let linkedNewFiles = false;
 	const warnOrVerbose =
@@ -533,6 +540,7 @@ export async function performActionWithoutMutex(
 		if (res) {
 			client = res.client;
 			destinationDir = res.destinationDir;
+			destinationDirFromClient = res.destinationDirFromClient;
 		} else {
 			client = undefined;
 		}
@@ -616,15 +624,19 @@ export async function performActionWithoutMutex(
 		destinationDir = savePath;
 	}
 
-	const actionResult = await client.inject(
-		newMeta,
-		readonlySource ? { ...searchee, infoHash: undefined } : searchee, // treat as data-based
-		decision,
-		{
-			onlyCompleted: options.onlyCompleted,
-			destinationDir,
-		},
-	);
+	const actionResult = destinationDirFromClient
+		? InjectionResult.ALREADY_EXISTS
+		: await client.inject(
+				newMeta,
+				readonlySource
+					? { ...searchee, infoHash: undefined } // treat as data-based
+					: searchee,
+				decision,
+				{
+					onlyCompleted: options.onlyCompleted,
+					destinationDir,
+				},
+			);
 
 	logActionResult(actionResult, newMeta, searchee, tracker, decision);
 	if (actionResult === InjectionResult.SUCCESS) {
