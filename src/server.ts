@@ -341,7 +341,7 @@ async function announce(
 }
 
 /**
- * Run a job ahead of schedule if elligible
+ * Run a job ahead of schedule if eligible
  */
 async function runJob(
 	req: IncomingMessage,
@@ -395,7 +395,7 @@ async function runJob(
 
 	const lastRun = (await getJobLastRun(job.name)) ?? 0;
 	if (Date.now() < lastRun) {
-		const message = `${job.name}: not elligible to run ahead of schedule, next scheduled run is at ${humanReadableDate(lastRun + job.cadence)} (triggering an early run is allowed after ${humanReadableDate(lastRun)})`;
+		const message = `${job.name}: not eligible to run ahead of schedule, next scheduled run is at ${humanReadableDate(lastRun + job.cadence)} (triggering an early run is allowed after ${humanReadableDate(lastRun)})`;
 		logger.error({ label: Label.SCHEDULER, message });
 		res.writeHead(409);
 		res.end(message);
