@@ -17,7 +17,6 @@ import {
 	createIndexer,
 	updateIndexer,
 	deleteIndexer,
-	getIndexerById,
 	listAllIndexers,
 	testNewIndexer,
 	testExistingIndexer,
@@ -144,43 +143,6 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			return await reply
 				.code(500)
 				.send({ error: "Failed to list indexers" });
-		}
-	});
-
-	/**
-	 * Get indexer by ID
-	 */
-	app.get<{
-		Params: { id: string };
-		Querystring: { apikey?: string };
-	}>("/api/indexer/v1/:id", async (request, reply) => {
-		if (!(await authorize(request, reply))) return;
-
-		try {
-			const id = parseInt(request.params.id, 10);
-			if (isNaN(id)) {
-				return await reply
-					.code(400)
-					.send({ error: "Invalid indexer ID" });
-			}
-
-			const indexer = await getIndexerById(id);
-			return await reply.code(200).send(indexer);
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown error";
-			logger.error({
-				label: Label.SERVER,
-				message: `Error getting indexer: ${message}`,
-			});
-
-			if (message.includes("not found")) {
-				return await reply.code(404).send({ error: message });
-			}
-
-			return await reply
-				.code(500)
-				.send({ error: "Failed to get indexer" });
 		}
 	});
 
