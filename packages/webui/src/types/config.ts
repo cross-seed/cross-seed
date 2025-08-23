@@ -37,10 +37,21 @@ export const trackerValidationSchema = z.object({
 });
 
 export const downloaderValidationSchema = z.object({
-  qbittorrentUrl: z.string().url().nullish(),
-  rtorrentRpcUrl: z.string().url().nullish(),
-  transmissionRpcUrl: z.string().url().nullish(),
-  delugeRpcUrl: z.string().url().nullish(),
+  torrentClients: z.array(
+    z.object({
+      name: z.string().min(1, ZodErrorMessages.emptyString).nullish(),
+      client: z.string().min(1, ZodErrorMessages.emptyString),
+      url: z.string().url(),
+      user: z.string(),
+      password: z.string(),
+      readOnly: z.boolean().optional(),
+    })
+  ).nullish(),
+  // torrentClients: z.array(z.string()).nullish(),
+  // qbittorrentUrl: z.string().url().nullish(),
+  // rtorrentRpcUrl: z.string().url().nullish(),
+  // transmissionRpcUrl: z.string().url().nullish(),
+  // delugeRpcUrl: z.string().url().nullish(),
   action: z.nativeEnum(Action),
   duplicateCategories: z.boolean(),
   useClientTorrents: z.boolean(),
