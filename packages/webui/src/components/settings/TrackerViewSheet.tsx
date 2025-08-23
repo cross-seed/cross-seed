@@ -225,7 +225,6 @@ export default function TrackerViewSheet({
               />
             </div>
           </div>
-
           <Button
             type="button"
             variant="outline"
