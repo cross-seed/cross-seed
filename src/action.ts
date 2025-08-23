@@ -362,7 +362,7 @@ async function getClientAndDestinationDir(
 					await linkFile(
 						srcPath,
 						testPath,
-						linkType === LinkType.REFLINK
+						linkType === LinkType.REFLINK || linkType === LinkType.REFLINK_OR_COPY
 							? linkType
 							: LinkType.HARDLINK,
 					);
@@ -721,7 +721,7 @@ async function getLinkDir(pathStr: string): Promise<string | null> {
 				await linkFile(
 					srcFile,
 					testPath,
-					linkType === LinkType.REFLINK
+					linkType === LinkType.REFLINK || linkType === LinkType.REFLINK_OR_COPY
 						? linkType
 						: LinkType.HARDLINK,
 				);
@@ -787,6 +787,14 @@ async function linkFile(
 					ogFileResolvedPath,
 					newPath,
 					fs.constants.COPYFILE_FICLONE_FORCE,
+				);
+				break;
+			case LinkType.REFLINK_OR_COPY:
+				// this will silently fall back to copy if it can't reflink
+				await copyFile(
+					ogFileResolvedPath,
+					newPath,
+					fs.constants.COPYFILE_FICLONE,
 				);
 				break;
 			default:
