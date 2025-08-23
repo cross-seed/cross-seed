@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { TestTube, Loader2, Pencil } from 'lucide-react';
 import { useState } from 'react';
 
+// ! FIXME: consolidate this type in a types.ts file and import it
+// Same as the one in trackers.tsx (probably)
 type Indexer = {
   id: number;
   name: string | null;
@@ -35,46 +37,49 @@ type Indexer = {
   limits: Record<string, number> | null;
 };
 
-function ExternalIdBadges({ tvIdCaps, movieIdCaps }: { 
-  tvIdCaps: Record<string, boolean> | null; 
-  movieIdCaps: Record<string, boolean> | null; 
+function ExternalIdBadges({
+  tvIdCaps,
+  movieIdCaps,
+}: {
+  tvIdCaps: Record<string, boolean> | null;
+  movieIdCaps: Record<string, boolean> | null;
 }) {
   const allProviders = new Set([
     ...(tvIdCaps ? Object.keys(tvIdCaps) : []),
-    ...(movieIdCaps ? Object.keys(movieIdCaps) : [])
+    ...(movieIdCaps ? Object.keys(movieIdCaps) : []),
   ]);
 
   const badges = [];
 
   // Non-parenthesized (both TV and Movies) first
-  allProviders.forEach(provider => {
+  allProviders.forEach((provider) => {
     if (tvIdCaps?.[provider] && movieIdCaps?.[provider]) {
       badges.push(
         <Badge key={provider} variant="outline" className="text-xs">
           {provider}
-        </Badge>
+        </Badge>,
       );
     }
   });
 
   // TV-only badges
-  allProviders.forEach(provider => {
+  allProviders.forEach((provider) => {
     if (tvIdCaps?.[provider] && !movieIdCaps?.[provider]) {
       badges.push(
         <Badge key={`${provider}-tv`} variant="outline" className="text-xs">
           {provider} (TV)
-        </Badge>
+        </Badge>,
       );
     }
   });
 
   // Movie-only badges
-  allProviders.forEach(provider => {
+  allProviders.forEach((provider) => {
     if (!tvIdCaps?.[provider] && movieIdCaps?.[provider]) {
       badges.push(
         <Badge key={`${provider}-movie`} variant="outline" className="text-xs">
           {provider} (Movies)
-        </Badge>
+        </Badge>,
       );
     }
   });
@@ -82,7 +87,9 @@ function ExternalIdBadges({ tvIdCaps, movieIdCaps }: {
   return badges.length > 0 ? (
     <>{badges}</>
   ) : (
-    <span className="text-muted-foreground text-sm">No external ID support detected</span>
+    <span className="text-muted-foreground text-sm">
+      No external ID support detected
+    </span>
   );
 }
 
@@ -140,46 +147,73 @@ export default function TrackerViewSheet({
         <div className="grid flex-1 auto-rows-min gap-6 px-4">
           <div className="grid gap-3">
             <Label>Tracker Name</Label>
-            <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm">
+            <div className="bg-muted/50 rounded-md border px-3 py-2 text-sm">
               {tracker.name || 'Unnamed'}
             </div>
           </div>
 
           <div className="grid gap-3">
             <Label>URL</Label>
-            <div className="px-3 py-2 border rounded-md bg-muted/50 text-sm font-mono break-all">
+            <div className="bg-muted/50 rounded-md border px-3 py-2 font-mono text-sm break-all">
               {tracker.url}
             </div>
           </div>
 
-
-
           <div className="grid gap-3">
             <Label>Search Capabilities</Label>
             <div className="flex flex-wrap gap-2">
-              {tracker.searchCap && <Badge variant="outline" className="text-xs">Search</Badge>}
-              {tracker.tvSearchCap && <Badge variant="outline" className="text-xs">TV</Badge>}
-              {tracker.movieSearchCap && <Badge variant="outline" className="text-xs">Movies</Badge>}
-              {tracker.musicSearchCap && <Badge variant="outline" className="text-xs">Music</Badge>}
-              {tracker.audioSearchCap && <Badge variant="outline" className="text-xs">Audio</Badge>}
-              {tracker.bookSearchCap && <Badge variant="outline" className="text-xs">Books</Badge>}
-              {!tracker.searchCap && !tracker.tvSearchCap && !tracker.movieSearchCap && 
-               !tracker.musicSearchCap && !tracker.audioSearchCap && !tracker.bookSearchCap && (
-                <span className="text-muted-foreground text-sm">No search capabilities detected</span>
+              {tracker.searchCap && (
+                <Badge variant="outline" className="text-xs">
+                  Search
+                </Badge>
               )}
+              {tracker.tvSearchCap && (
+                <Badge variant="outline" className="text-xs">
+                  TV
+                </Badge>
+              )}
+              {tracker.movieSearchCap && (
+                <Badge variant="outline" className="text-xs">
+                  Movies
+                </Badge>
+              )}
+              {tracker.musicSearchCap && (
+                <Badge variant="outline" className="text-xs">
+                  Music
+                </Badge>
+              )}
+              {tracker.audioSearchCap && (
+                <Badge variant="outline" className="text-xs">
+                  Audio
+                </Badge>
+              )}
+              {tracker.bookSearchCap && (
+                <Badge variant="outline" className="text-xs">
+                  Books
+                </Badge>
+              )}
+              {!tracker.searchCap &&
+                !tracker.tvSearchCap &&
+                !tracker.movieSearchCap &&
+                !tracker.musicSearchCap &&
+                !tracker.audioSearchCap &&
+                !tracker.bookSearchCap && (
+                  <span className="text-muted-foreground text-sm">
+                    No search capabilities detected
+                  </span>
+                )}
             </div>
           </div>
 
           <div className="grid gap-3">
             <Label>Supported External IDs</Label>
             <div className="flex flex-wrap gap-2">
-              <ExternalIdBadges 
-                tvIdCaps={tracker.tvIdCaps} 
-                movieIdCaps={tracker.movieIdCaps} 
+              <ExternalIdBadges
+                tvIdCaps={tracker.tvIdCaps}
+                movieIdCaps={tracker.movieIdCaps}
               />
             </div>
           </div>
-
 
           <Button
             type="button"
@@ -204,8 +238,8 @@ export default function TrackerViewSheet({
 
         <SheetFooter>
           {onEdit && (
-            <Button 
-              type="button" 
+            <Button
+              type="button"
               onClick={() => onEdit(tracker)}
               className="flex-1"
             >
@@ -223,3 +257,4 @@ export default function TrackerViewSheet({
     </Sheet>
   );
 }
+
