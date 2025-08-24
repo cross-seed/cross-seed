@@ -194,7 +194,6 @@ export default function ClientEditSheet({
                   Test Connection
                 </>
               )}
-              Test Connection
             </Button>
           </div>
 
