@@ -362,7 +362,8 @@ async function getClientAndDestinationDir(
 					await linkFile(
 						srcPath,
 						testPath,
-						linkType === LinkType.REFLINK || linkType === LinkType.REFLINK_OR_COPY
+						linkType === LinkType.REFLINK ||
+							linkType === LinkType.REFLINK_OR_COPY
 							? linkType
 							: LinkType.HARDLINK,
 					);
@@ -721,7 +722,8 @@ async function getLinkDir(pathStr: string): Promise<string | null> {
 				await linkFile(
 					srcFile,
 					testPath,
-					linkType === LinkType.REFLINK || linkType === LinkType.REFLINK_OR_COPY
+					linkType === LinkType.REFLINK ||
+						linkType === LinkType.REFLINK_OR_COPY
 						? linkType
 						: LinkType.HARDLINK,
 				);
