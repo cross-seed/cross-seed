@@ -465,6 +465,8 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 					(
 						await client.getClientSearchees({
 							newSearcheesOnly: true,
+							includeFiles: true,
+							includeTrackers: true,
 						})
 					).newSearchees,
 			);

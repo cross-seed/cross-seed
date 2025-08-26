@@ -672,7 +672,12 @@ export async function findAllSearchees(
 						await flatMapAsync(
 							clients,
 							async (client) =>
-								(await client.getClientSearchees()).searchees,
+								(
+									await client.getClientSearchees({
+										includeFiles: true,
+										includeTrackers: true,
+									})
+								).searchees,
 						),
 					);
 				} else if (torrentDir) {
