@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { db } from "../db.js";
 import { Label, logger } from "../logger.js";
-import { sanitizeUrl } from "../utils.js";
 import { assembleUrl } from "../torznab.js";
 import { USER_AGENT } from "../constants.js";
 import { getAllIndexers, type Indexer } from "../indexers.js";
@@ -37,7 +36,7 @@ export async function testIndexerConnection(
 	try {
 		const response = await fetch(assembleUrl(url, apikey, { t: "caps" }), {
 			headers: { "User-Agent": USER_AGENT },
-			signal: AbortSignal.timeout(ms("30 seconds")),
+			signal: AbortSignal.timeout(ms("5 seconds")),
 		});
 
 		if (!response.ok) {
@@ -80,35 +79,11 @@ export async function testIndexerConnection(
 export async function createIndexer(
 	input: z.infer<typeof indexerCreateSchema>,
 ) {
-	const sanitizedUrl = sanitizeUrl(input.url);
-
-	// Check if indexer already exists
-	const existing = await db("indexer").where({ url: sanitizedUrl }).first();
-
-	if (existing) {
-		// Upsert: update existing indexer and set active=true (reactivate if it was soft-deleted)
-		const [updatedIndexer] = await db("indexer")
-			.where({ url: sanitizedUrl })
-			.update({
-				name: input.name || existing.name,
-				apikey: input.apikey,
-				active: input.active ?? true,
-			})
-			.returning("*");
-
-		logger.info({
-			label: Label.TORZNAB,
-			message: `Updated existing indexer (upsert): ${input.name || sanitizedUrl}`,
-		});
-
-		return updatedIndexer;
-	}
-
-	// Create new indexer
+	// Use atomic upsert with .onConflict() clause
 	const [indexer] = await db("indexer")
 		.insert({
 			name: input.name || null,
-			url: sanitizedUrl,
+			url: input.url,
 			apikey: input.apikey,
 			active: input.active ?? true,
 			status: null,
@@ -124,11 +99,17 @@ export async function createIndexer(
 			cat_caps: null,
 			limits_caps: null,
 		})
+		.onConflict("url")
+		.merge({
+			name: input.name || db.raw("indexer.name"),
+			apikey: input.apikey,
+			active: input.active ?? true,
+		})
 		.returning("*");
 
 	logger.info({
 		label: Label.TORZNAB,
-		message: `Created new indexer: ${input.name || sanitizedUrl}`,
+		message: `Created/updated indexer: ${input.name || input.url}`,
 	});
 
 	return indexer;
@@ -139,27 +120,23 @@ export async function updateIndexer(
 ) {
 	const { id, ...updates } = input;
 
-	// Check if indexer exists
-	const existing = await db("indexer").where({ id }).first();
-
-	if (!existing) {
-		throw new Error(`Indexer with ID ${id} not found`);
-	}
-
 	// Prepare update object
 	const updateData = {
 		...(updates.name !== undefined && { name: updates.name }),
-		...(updates.url !== undefined && {
-			url: sanitizeUrl(updates.url),
-		}),
+		...(updates.url !== undefined && { url: updates.url }),
 		...(updates.apikey !== undefined && { apikey: updates.apikey }),
 		...(updates.active !== undefined && { active: updates.active }),
 	};
 
+	// Atomic update with existence check
 	const [updatedIndexer] = await db("indexer")
 		.where({ id })
 		.update(updateData)
 		.returning("*");
+
+	if (!updatedIndexer) {
+		throw new Error(`Indexer with ID ${id} not found`);
+	}
 
 	logger.info({
 		label: Label.TORZNAB,
@@ -169,26 +146,24 @@ export async function updateIndexer(
 	return updatedIndexer;
 }
 
-export async function deleteIndexer(id: number) {
-	const existing = await db("indexer").where({ id }).first();
-
-	if (!existing) {
-		throw new Error(`Indexer with ID ${id} not found`);
-	}
-
+export async function deactivateIndexer(id: number) {
 	// Soft delete - set active to false instead of actually deleting
 	// This preserves cache data and download history
-	const [updatedIndexer] = await db("indexer")
+	const [deactivatedIndexer] = await db("indexer")
 		.where({ id })
 		.update({ active: false })
 		.returning("*");
 
+	if (!deactivatedIndexer) {
+		throw new Error(`Indexer with ID ${id} not found`);
+	}
+
 	logger.info({
 		label: Label.TORZNAB,
-		message: `Soft deleted indexer (set active=false): ${existing.name || existing.url}`,
+		message: `Deactivated indexer (set active=false): ${deactivatedIndexer.name || deactivatedIndexer.url}`,
 	});
 
-	return { success: true, indexer: updatedIndexer };
+	return { success: true, indexer: deactivatedIndexer };
 }
 
 export async function getIndexerById(id: number) {
@@ -204,16 +179,7 @@ export async function getIndexerById(id: number) {
 export async function listAllIndexers({
 	includeInactive = false,
 } = {}): Promise<Indexer[]> {
-	logger.debug({
-		label: Label.TORZNAB,
-		message: `cross-seed: listAllIndexers called with includeInactive=${includeInactive}`,
-	});
-	const result = await getAllIndexers({ includeInactive });
-	logger.debug({
-		label: Label.TORZNAB,
-		message: `cross-seed: getAllIndexers returned ${result.length} indexers`,
-	});
-	return result;
+	return getAllIndexers({ includeInactive });
 }
 
 export async function testExistingIndexer(id: number) {
@@ -227,6 +193,5 @@ export async function testExistingIndexer(id: number) {
 }
 
 export async function testNewIndexer(input: z.infer<typeof indexerTestSchema>) {
-	const testUrl = sanitizeUrl(input.url);
-	return testIndexerConnection(testUrl, input.apikey, testUrl);
+	return testIndexerConnection(input.url, input.apikey, input.url);
 }

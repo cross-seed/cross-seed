@@ -16,7 +16,7 @@ import {
 	indexerTestSchema,
 	createIndexer,
 	updateIndexer,
-	deleteIndexer,
+	deactivateIndexer,
 	listAllIndexers,
 	testNewIndexer,
 	testExistingIndexer,
@@ -117,21 +117,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 
 		try {
 			const { includeInactive = false } = request.query;
-			logger.debug({
-				label: Label.SERVER,
-				message: `cross-seed: GET /api/indexer/v1 called with includeInactive=${includeInactive}`,
-			});
 			const indexers = await listAllIndexers({ includeInactive });
-			logger.debug({
-				label: Label.SERVER,
-				message: `cross-seed: Returning ${indexers.length} indexers`,
-			});
-			for (const indexer of indexers) {
-				logger.debug({
-					label: Label.SERVER,
-					message: `cross-seed: Indexer ${indexer.name} (ID: ${indexer.id}, URL: ${indexer.url}, Active: ${indexer.active})`,
-				});
-			}
 			return await reply.code(200).send(indexers);
 		} catch (error) {
 			const message =
@@ -235,7 +221,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 	});
 
 	/**
-	 * Delete indexer
+	 * Deactivate indexer (soft delete)
 	 */
 	app.delete<{
 		Params: { id: string };
@@ -251,14 +237,14 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 					.send({ error: "Invalid indexer ID" });
 			}
 
-			const result = await deleteIndexer(id);
+			const result = await deactivateIndexer(id);
 			return await reply.code(200).send(result);
 		} catch (error) {
 			const message =
 				error instanceof Error ? error.message : "Unknown error";
 			logger.error({
 				label: Label.SERVER,
-				message: `Error deleting indexer: ${message}`,
+				message: `Error deactivating indexer: ${message}`,
 			});
 
 			if (message.includes("not found")) {
@@ -267,7 +253,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 
 			return await reply
 				.code(500)
-				.send({ error: "Failed to delete indexer" });
+				.send({ error: "Failed to deactivate indexer" });
 		}
 	});
 

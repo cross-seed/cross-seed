@@ -5,7 +5,7 @@ import {
 	indexerUpdateSchema,
 	createIndexer,
 	updateIndexer,
-	deleteIndexer,
+	deactivateIndexer,
 	testExistingIndexer,
 	testNewIndexer,
 	listAllIndexers,
@@ -34,11 +34,11 @@ export const indexersRouter = router({
 			return updateIndexer(input);
 		}),
 
-	// Delete indexer
+	// Deactivate indexer (soft delete)
 	delete: authedProcedure
 		.input(z.object({ id: z.number().int().positive() }))
 		.mutation(async ({ input }) => {
-			return deleteIndexer(input.id);
+			return deactivateIndexer(input.id);
 		}),
 
 	// Test existing indexer connection
