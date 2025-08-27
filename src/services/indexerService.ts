@@ -3,8 +3,29 @@ import { db } from "../db.js";
 import { Label, logger } from "../logger.js";
 import { assembleUrl } from "../torznab.js";
 import { USER_AGENT } from "../constants.js";
-import { getAllIndexers, type Indexer } from "../indexers.js";
+import {
+	getAllIndexers,
+	type Indexer,
+	deserialize,
+	type DbIndexer,
+} from "../indexers.js";
+import { Result, resultOf, resultOfErr } from "../Result.js";
 import ms from "ms";
+
+// Error handling types
+export type IndexerErrorCode =
+	| "INDEXER_NOT_FOUND"
+	| "VALIDATION_ERROR"
+	| "CONNECTION_FAILED"
+	| "TIMEOUT"
+	| "AUTH_FAILED"
+	| "RATE_LIMITED"
+	| "DATABASE_ERROR";
+
+export type IndexerError = {
+	code: IndexerErrorCode;
+	message: string;
+};
 
 // Validation schemas
 export const indexerCreateSchema = z.object({
@@ -32,7 +53,7 @@ export async function testIndexerConnection(
 	url: string,
 	apikey: string,
 	name: string,
-) {
+): Promise<Result<{ success: true; message: string }, IndexerError>> {
 	try {
 		const response = await fetch(assembleUrl(url, apikey, { t: "caps" }), {
 			headers: { "User-Agent": USER_AGENT },
@@ -41,13 +62,20 @@ export async function testIndexerConnection(
 
 		if (!response.ok) {
 			if (response.status === 401) {
-				throw new Error("Authentication failed - check API key");
+				return resultOfErr({
+					code: "AUTH_FAILED",
+					message: "Authentication failed - check API key",
+				});
 			} else if (response.status === 429) {
-				throw new Error("Rate limited by indexer");
+				return resultOfErr({
+					code: "RATE_LIMITED",
+					message: "Rate limited by indexer",
+				});
 			} else {
-				throw new Error(
-					`HTTP ${response.status}: ${response.statusText}`,
-				);
+				return resultOfErr({
+					code: "CONNECTION_FAILED",
+					message: `HTTP ${response.status}: ${response.statusText}`,
+				});
 			}
 		}
 
@@ -56,23 +84,30 @@ export async function testIndexerConnection(
 			message: `Test connection successful for: ${name}`,
 		});
 
-		return {
+		return resultOf({
 			success: true,
 			message: "Connection successful",
-		};
+		});
 	} catch (error) {
-		const message =
-			error instanceof Error ? error.message : "Unknown error";
+		const message = error.message;
 
 		logger.warn({
 			label: Label.TORZNAB,
 			message: `Test connection failed for ${name}: ${message}`,
 		});
 
-		return {
-			success: false,
+		// Handle timeout specifically
+		if (message.includes("timeout") || message.includes("aborted")) {
+			return resultOfErr({
+				code: "TIMEOUT",
+				message: "Connection timed out",
+			});
+		}
+
+		return resultOfErr({
+			code: "CONNECTION_FAILED",
 			message: `Connection failed: ${message}`,
-		};
+		});
 	}
 }
 
@@ -117,63 +152,105 @@ export async function createIndexer(
 
 export async function updateIndexer(
 	input: z.infer<typeof indexerUpdateSchema>,
-) {
-	const { id, ...updates } = input;
+): Promise<Result<Indexer, IndexerError>> {
+	try {
+		const { id, ...updates } = input;
 
-	// Prepare update object
-	const updateData = {
-		...(updates.name !== undefined && { name: updates.name }),
-		...(updates.url !== undefined && { url: updates.url }),
-		...(updates.apikey !== undefined && { apikey: updates.apikey }),
-		...(updates.active !== undefined && { active: updates.active }),
-	};
+		// Prepare update object
+		const updateData = {
+			...(updates.name !== undefined && { name: updates.name }),
+			...(updates.url !== undefined && { url: updates.url }),
+			...(updates.apikey !== undefined && { apikey: updates.apikey }),
+			...(updates.active !== undefined && { active: updates.active }),
+		};
 
-	// Atomic update with existence check
-	const [updatedIndexer] = await db("indexer")
-		.where({ id })
-		.update(updateData)
-		.returning("*");
+		// Atomic update with existence check
+		const updatedRows = await db("indexer")
+			.where({ id })
+			.update(updateData)
+			.returning("*");
 
-	if (!updatedIndexer) {
-		throw new Error(`Indexer with ID ${id} not found`);
+		const updatedDbIndexer = updatedRows[0] as unknown as DbIndexer;
+
+		if (!updatedDbIndexer) {
+			return resultOfErr({
+				code: "INDEXER_NOT_FOUND",
+				message: `Indexer with ID ${id} not found`,
+			});
+		}
+
+		const updatedIndexer = deserialize(updatedDbIndexer);
+		logger.info({
+			label: Label.TORZNAB,
+			message: `Updated indexer: ${updatedIndexer.name || updatedIndexer.url}`,
+		});
+
+		return resultOf(updatedIndexer);
+	} catch (error) {
+		return resultOfErr({
+			code: "DATABASE_ERROR",
+			message: `Failed to update indexer: ${error.message}`,
+		});
 	}
-
-	logger.info({
-		label: Label.TORZNAB,
-		message: `Updated indexer: ${updatedIndexer.name || updatedIndexer.url}`,
-	});
-
-	return updatedIndexer;
 }
 
-export async function deactivateIndexer(id: number) {
-	// Soft delete - set active to false instead of actually deleting
-	// This preserves cache data and download history
-	const [deactivatedIndexer] = await db("indexer")
-		.where({ id })
-		.update({ active: false })
-		.returning("*");
+export async function deactivateIndexer(
+	id: number,
+): Promise<Result<{ success: true; indexer: Indexer }, IndexerError>> {
+	try {
+		// Soft delete - set active to false instead of actually deleting
+		// This preserves cache data and download history
+		const deactivatedRows = await db("indexer")
+			.where({ id })
+			.update({ active: false })
+			.returning("*");
 
-	if (!deactivatedIndexer) {
-		throw new Error(`Indexer with ID ${id} not found`);
+		const deactivatedDbIndexer = deactivatedRows[0] as unknown as DbIndexer;
+
+		if (!deactivatedDbIndexer) {
+			return resultOfErr({
+				code: "INDEXER_NOT_FOUND",
+				message: `Indexer with ID ${id} not found`,
+			});
+		}
+
+		const deactivatedIndexer = deserialize(deactivatedDbIndexer);
+		logger.info({
+			label: Label.TORZNAB,
+			message: `Deactivated indexer (set active=false): ${deactivatedIndexer.name || deactivatedIndexer.url}`,
+		});
+
+		return resultOf({ success: true, indexer: deactivatedIndexer });
+	} catch (error) {
+		return resultOfErr({
+			code: "DATABASE_ERROR",
+			message: `Failed to deactivate indexer: ${error.message}`,
+		});
 	}
-
-	logger.info({
-		label: Label.TORZNAB,
-		message: `Deactivated indexer (set active=false): ${deactivatedIndexer.name || deactivatedIndexer.url}`,
-	});
-
-	return { success: true, indexer: deactivatedIndexer };
 }
 
-export async function getIndexerById(id: number) {
-	const indexer = await db("indexer").where({ id }).first();
+export async function getIndexerById(
+	id: number,
+): Promise<Result<Indexer, IndexerError>> {
+	try {
+		const dbIndexer = (await db("indexer")
+			.where({ id })
+			.first()) as unknown as DbIndexer | undefined;
 
-	if (!indexer) {
-		throw new Error(`Indexer with ID ${id} not found`);
+		if (!dbIndexer) {
+			return resultOfErr({
+				code: "INDEXER_NOT_FOUND",
+				message: `Indexer with ID ${id} not found`,
+			});
+		}
+
+		return resultOf(deserialize(dbIndexer));
+	} catch (error) {
+		return resultOfErr({
+			code: "DATABASE_ERROR",
+			message: `Failed to fetch indexer: ${error.message}`,
+		});
 	}
-
-	return indexer;
 }
 
 export async function listAllIndexers({
@@ -182,9 +259,15 @@ export async function listAllIndexers({
 	return getAllIndexers({ includeInactive });
 }
 
-export async function testExistingIndexer(id: number) {
-	const indexer = await getIndexerById(id);
+export async function testExistingIndexer(
+	id: number,
+): Promise<Result<{ success: true; message: string }, IndexerError>> {
+	const indexerResult = await getIndexerById(id);
+	if (indexerResult.isErr()) {
+		return indexerResult;
+	}
 
+	const indexer = indexerResult.unwrap();
 	return testIndexerConnection(
 		indexer.url,
 		indexer.apikey,
@@ -192,6 +275,8 @@ export async function testExistingIndexer(id: number) {
 	);
 }
 
-export async function testNewIndexer(input: z.infer<typeof indexerTestSchema>) {
+export async function testNewIndexer(
+	input: z.infer<typeof indexerTestSchema>,
+): Promise<Result<{ success: true; message: string }, IndexerError>> {
 	return testIndexerConnection(input.url, input.apikey, input.url);
 }

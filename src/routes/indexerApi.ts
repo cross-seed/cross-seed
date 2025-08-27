@@ -12,7 +12,29 @@ import {
 	listAllIndexers,
 	testNewIndexer,
 	testExistingIndexer,
+	type IndexerErrorCode,
 } from "../services/indexerService.js";
+
+/**
+ * Maps error codes to HTTP status codes
+ */
+function getStatusCodeForError(code: IndexerErrorCode): number {
+	switch (code) {
+		case "VALIDATION_ERROR":
+		case "RATE_LIMITED":
+			return 400;
+		case "AUTH_FAILED":
+			return 401;
+		case "INDEXER_NOT_FOUND":
+			return 404;
+		case "TIMEOUT":
+			return 504;
+		case "CONNECTION_FAILED":
+		case "DATABASE_ERROR":
+		default:
+			return 500;
+	}
+}
 
 /**
  * Prowlarr Integration API Routes
@@ -37,15 +59,14 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 
 			return await reply.code(200).send(statusResponse);
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown error";
 			logger.error({
 				label: Label.SERVER,
-				message: `Error getting indexer status: ${message}`,
+				message: `Error getting indexer status: ${error.message}`,
 			});
-			return await reply
-				.code(500)
-				.send({ error: "Failed to get status" });
+			return reply.code(500).send({
+				code: "INTERNAL_ERROR",
+				message: "Failed to get status",
+			});
 		}
 	});
 
@@ -62,15 +83,14 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			const indexers = await listAllIndexers({ includeInactive });
 			return await reply.code(200).send(indexers);
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown error";
 			logger.error({
 				label: Label.SERVER,
-				message: `Error listing indexers: ${message}`,
+				message: `Error listing indexers: ${error.message}`,
 			});
-			return await reply
-				.code(500)
-				.send({ error: "Failed to list indexers" });
+			return reply.code(500).send({
+				code: "DATABASE_ERROR",
+				message: "Failed to list indexers",
+			});
 		}
 	});
 
@@ -93,20 +113,15 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			const indexer = await createIndexer(validatedData);
 			return await reply.code(201).send(indexer);
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown error";
 			logger.error({
 				label: Label.SERVER,
-				message: `Error creating/updating indexer: ${message}`,
+				message: `Error creating/updating indexer: ${error.message}`,
 			});
 
-			if (message.includes("validation")) {
-				return await reply.code(400).send({ error: message });
-			}
-
-			return await reply
-				.code(500)
-				.send({ error: "Failed to create/update indexer" });
+			return reply.code(400).send({
+				code: "VALIDATION_ERROR",
+				message: error.message,
+			});
 		}
 	});
 
@@ -128,9 +143,10 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 		try {
 			const id = parseInt(request.params.id, 10);
 			if (isNaN(id)) {
-				return await reply
-					.code(400)
-					.send({ error: "Invalid indexer ID" });
+				return await reply.code(400).send({
+					code: "VALIDATION_ERROR",
+					message: "Invalid indexer ID",
+				});
 			}
 
 			const validatedData = indexerUpdateSchema.parse({
@@ -138,27 +154,24 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 				...request.body,
 			});
 
-			const indexer = await updateIndexer(validatedData);
-			return await reply.code(200).send(indexer);
+			const result = await updateIndexer(validatedData);
+			if (result.isErr()) {
+				const error = result.unwrapErr();
+				const statusCode = getStatusCodeForError(error.code);
+				return await reply.code(statusCode).send(error);
+			}
+
+			return await reply.code(200).send(result.unwrap());
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown error";
 			logger.error({
 				label: Label.SERVER,
-				message: `Error updating indexer: ${message}`,
+				message: `Error updating indexer: ${error.message}`,
 			});
 
-			if (message.includes("not found")) {
-				return await reply.code(404).send({ error: message });
-			}
-
-			if (message.includes("validation")) {
-				return await reply.code(400).send({ error: message });
-			}
-
-			return await reply
-				.code(500)
-				.send({ error: "Failed to update indexer" });
+			return reply.code(400).send({
+				code: "VALIDATION_ERROR",
+				message: error.message,
+			});
 		}
 	});
 
@@ -171,32 +184,26 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 	}>("/api/indexer/v1/:id", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
-		try {
-			const id = parseInt(request.params.id, 10);
-			if (isNaN(id)) {
-				return await reply
-					.code(400)
-					.send({ error: "Invalid indexer ID" });
-			}
+		const id = parseInt(request.params.id, 10);
+		if (isNaN(id)) {
+			return reply.code(400).send({
+				code: "VALIDATION_ERROR",
+				message: "Invalid indexer ID",
+			});
+		}
 
-			const result = await deactivateIndexer(id);
-			return await reply.code(200).send(result);
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown error";
+		const result = await deactivateIndexer(id);
+		if (result.isErr()) {
+			const error = result.unwrapErr();
+			const statusCode = getStatusCodeForError(error.code);
 			logger.error({
 				label: Label.SERVER,
-				message: `Error deactivating indexer: ${message}`,
+				message: `Error deactivating indexer: ${error.message}`,
 			});
-
-			if (message.includes("not found")) {
-				return await reply.code(404).send({ error: message });
-			}
-
-			return await reply
-				.code(500)
-				.send({ error: "Failed to deactivate indexer" });
+			return reply.code(statusCode).send(error);
 		}
+
+		return reply.code(200).send(result.unwrap());
 	});
 
 	/**
@@ -224,26 +231,27 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 				result = await testNewIndexer(validatedData);
 			}
 
-			return await reply.code(200).send(result);
+			if (result.isErr()) {
+				const error = result.unwrapErr();
+				const statusCode = getStatusCodeForError(error.code);
+				logger.error({
+					label: Label.SERVER,
+					message: `Error testing indexer: ${error.message}`,
+				});
+				return await reply.code(statusCode).send(error);
+			}
+
+			return await reply.code(200).send(result.unwrap());
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "Unknown error";
 			logger.error({
 				label: Label.SERVER,
-				message: `Error testing indexer: ${message}`,
+				message: `Error testing indexer: ${error.message}`,
 			});
 
-			if (message.includes("not found")) {
-				return await reply.code(404).send({ error: message });
-			}
-
-			if (message.includes("validation")) {
-				return await reply.code(400).send({ error: message });
-			}
-
-			return await reply
-				.code(500)
-				.send({ error: "Failed to test indexer" });
+			return reply.code(400).send({
+				code: "VALIDATION_ERROR",
+				message: error.message,
+			});
 		}
 	});
 };
