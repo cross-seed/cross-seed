@@ -170,39 +170,12 @@ export function deserialize(dbIndexer: DbIndexer): Indexer {
 export async function getAllIndexers({ includeInactive = false } = {}): Promise<
 	Indexer[]
 > {
-	logger.verbose({
-		label: Label.TORZNAB,
-		message: `cross-seed: getAllIndexers called with includeInactive=${includeInactive}`,
-	});
 	let query = db("indexer").select(allFields);
 	if (!includeInactive) {
 		query = query.where({ active: true });
-		logger.verbose({
-			label: Label.TORZNAB,
-			message: `cross-seed: Filtering to active indexers only`,
-		});
-	} else {
-		logger.verbose({
-			label: Label.TORZNAB,
-			message: `cross-seed: Including inactive indexers`,
-		});
 	}
 	const rawIndexers = await query;
-	logger.verbose({
-		label: Label.TORZNAB,
-		message: `cross-seed: Database query returned ${rawIndexers.length} raw indexers`,
-	});
 	const result = rawIndexers.map(deserialize);
-	logger.verbose({
-		label: Label.TORZNAB,
-		message: `cross-seed: After deserialization: ${result.length} indexers`,
-	});
-	for (const indexer of result) {
-		logger.verbose({
-			label: Label.TORZNAB,
-			message: `cross-seed: DB Indexer ${indexer.name} (ID: ${indexer.id}, URL: ${indexer.url}, Active: ${indexer.active})`,
-		});
-	}
 	return result;
 }
 
