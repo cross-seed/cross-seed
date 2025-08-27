@@ -26,10 +26,11 @@ const GeneralSettings = withForm({
     const { isFieldRequired } = useConfigForm(generalValidationSchema);
 
     const trpc = useTRPC();
-    const { data: configData } = useQuery(
+    const {
+      data: configData,
+    } = useQuery(
       trpc.settings.get.queryOptions(undefined, {
         select: (data) => {
-          console.log(data);
           const fullDataset = formatConfigDataForForm(data.config);
           const filteredData = pickSchemaFields(
             generalValidationSchema,
@@ -42,7 +43,10 @@ const GeneralSettings = withForm({
       }),
     );
 
-    const { saveConfig, isSuccess } = useSaveConfigHook();
+    const {
+      saveConfig,
+      isSuccess,
+    } = useSaveConfigHook();
 
     const form = useAppForm({
       ...formOpts,
@@ -87,154 +91,180 @@ const GeneralSettings = withForm({
 
     useEffect(() => {
       if (isSuccess) {
-        toast.success('Configuration saved successfully!', {
-          description: 'Your changes will take effect on the next restart.',
-        });
+          toast.success('Configuration saved successfully!', {
+            description: 'Your changes will take effect on the next restart.',
+          });
       }
     }, [isSuccess]);
 
     return (
       <Page>
         <SettingsLayout>
-          <FormValidationProvider isFieldRequired={isFieldRequired}>
-            <form
-              className="form flex flex-col gap-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                form.handleSubmit();
-              }}
-              noValidate
-            >
-              <div className="flex flex-wrap gap-6">
-                <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-                  <legend>Misc. Settings</legend>
-                  <form.AppField name="includeNonVideos">
-                    {(field) => (
-                      <field.SwitchField label="Include Non-Videos" />
-                    )}
-                  </form.AppField>
-                  <form.AppField name="includeSingleEpisodes">
-                    {(field) => (
-                      <field.SwitchField label="Include Single Episodes" />
-                    )}
-                  </form.AppField>
-                  <div className="">
-                    <form.AppField name="snatchTimeout" validators={{}}>
-                      {(field) => <field.TextField label="Snatch Timeout" />}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField name="fuzzySizeThreshold" validators={{}}>
-                      {(field) => (
-                        <field.TextField
-                          label="Fuzzy Size Threshold"
-                          type="number"
-                        />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField name="seasonFromEpisodes" validators={{}}>
-                      {(field) => (
-                        <field.TextField
-                          label="Season from Episodes"
-                          type="number"
-                        />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField name="autoResumeMaxDownload" validators={{}}>
-                      {(field) => (
-                        <field.TextField
-                          label="Auto-resume Max Download"
-                          type="number"
-                        />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.Field name="blockList" mode="array" validators={{}}>
-                      {(field) => {
-                        return (
-                          <div className="space-y-3">
-                            <Label
-                              htmlFor={field.name}
-                              className="block w-full"
-                            >
-                              Block List
-                              {isFieldRequired(field.name) && (
-                                <span className="pl-1 text-red-500">*</span>
-                              )}
-                            </Label>
-                            {field.state.value &&
-                              (field.state.value.length
-                                ? field.state.value
-                                : ['']
-                              ).map((_: string, index: number) => {
-                                return (
-                                  <div
-                                    key={index}
-                                    className="gap-y- mb-3 flex flex-col"
-                                  >
-                                    <form.AppField
-                                      name={`blockList[${index}]`}
-                                      validators={{
-                                        onBlur: z.string(),
-                                      }}
-                                    >
-                                      {(subfield) => (
-                                        <subfield.ArrayField
-                                          showDelete={
-                                            field.state.value &&
-                                            field.state.value?.length > 1
-                                          }
-                                          index={index}
-                                          onDelete={() => {
-                                            field.removeValue(index);
-                                          }}
-                                        />
-                                      )}
-                                    </form.AppField>
-                                    <form.Subscribe
-                                      selector={(f) =>
-                                        f.fieldMeta[
-                                          `${field.name}[${index}]` as keyof typeof f.fieldMeta
-                                        ]
-                                      }
-                                    >
-                                      {(fieldMeta) => (
-                                        <FieldInfo fieldMeta={fieldMeta} />
-                                      )}
-                                    </form.Subscribe>
-                                  </div>
-                                );
-                              })}
-                            <Button
-                              variant="secondary"
-                              type="button"
-                              onClick={() => {
-                                field.pushValue('');
-                                const newFieldId = `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`;
-                                setLastFieldAdded(newFieldId);
-                              }}
-                              title={`Add ${field.name}`}
-                            >
-                              Add
-                            </Button>
-                          </div>
-                        );
-                      }}
-                    </form.Field>
-                  </div>
-                </fieldset>
-                <form.AppForm>
-                  <form.SubmitButton />
-                </form.AppForm>
+        <FormValidationProvider isFieldRequired={isFieldRequired}>
+        <form
+          className="form flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+          noValidate
+        >
+          <div className="flex flex-wrap gap-6">
+            <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
+              <legend>Misc. Settings</legend>
+              <form.AppField name="includeNonVideos">
+                {(field) => <field.SwitchField label="Include Non-Videos" />}
+              </form.AppField>
+              <form.AppField name="includeSingleEpisodes">
+                {(field) => (
+                  <field.SwitchField label="Include Single Episodes" />
+                )}
+              </form.AppField>
+              <div className="">
+                <form.AppField
+                  name="snatchTimeout"
+                  validators={
+                    {
+                    }
+                  }
+                >
+                  {(field) => <field.TextField label="Snatch Timeout" />}
+                </form.AppField>
               </div>
-            </form>
-          </FormValidationProvider>
+              <div className="">
+                <form.AppField
+                  name="fuzzySizeThreshold"
+                  validators={
+                    {
+                    }
+                  }
+                >
+                  {(field) => (
+                    <field.TextField
+                      label="Fuzzy Size Threshold"
+                      type="number"
+                    />
+                  )}
+                </form.AppField>
+              </div>
+              <div className="">
+                <form.AppField
+                  name="seasonFromEpisodes"
+                  validators={
+                    {
+                    }
+                  }
+                >
+                  {(field) => (
+                    <field.TextField
+                      label="Season from Episodes"
+                      type="number"
+                    />
+                  )}
+                </form.AppField>
+              </div>
+              <div className="">
+                <form.AppField
+                  name="autoResumeMaxDownload"
+                  validators={
+                    {
+                    }
+                  }
+                >
+                  {(field) => (
+                    <field.TextField
+                      label="Auto-resume Max Download"
+                      type="number"
+                    />
+                  )}
+                </form.AppField>
+              </div>
+              <div className="">
+                <form.Field
+                  name="blockList"
+                  mode="array"
+                  validators={
+                    {
+                    }
+                  }
+                >
+                  {(field) => {
+                    return (
+                      <div className="space-y-3">
+                        <Label htmlFor={field.name} className="block w-full">
+                          Block List
+                          {isFieldRequired(field.name) && (
+                            <span className="pl-1 text-red-500">*</span>
+                          )}
+                        </Label>
+                        {field.state.value &&
+                          (field.state.value.length
+                            ? field.state.value
+                            : ['']
+                          ).map((_: string, index: number) => {
+                            return (
+                              <div
+                                key={index}
+                                className="gap-y- mb-3 flex flex-col"
+                              >
+                                <form.AppField
+                                  name={`blockList[${index}]`}
+                                  validators={{
+                                    onBlur: z.string(),
+                                  }}
+                                >
+                                  {(subfield) => (
+                                    <subfield.ArrayField
+                                      showDelete={
+                                        field.state.value &&
+                                        field.state.value?.length > 1
+                                      }
+                                      index={index}
+                                      onDelete={() => {
+                                        field.removeValue(index);
+                                      }}
+                                    />
+                                  )}
+                                </form.AppField>
+                                <form.Subscribe
+                                  selector={(f) =>
+                                    f.fieldMeta[
+                                      `${field.name}[${index}]` as keyof typeof f.fieldMeta
+                                    ]
+                                  }
+                                >
+                                  {(fieldMeta) => (
+                                    <FieldInfo fieldMeta={fieldMeta} />
+                                  )}
+                                </form.Subscribe>
+                              </div>
+                            );
+                          })}
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          onClick={() => {
+                            field.pushValue('');
+                            const newFieldId = `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`;
+                            setLastFieldAdded(newFieldId);
+                          }}
+                          title={`Add ${field.name}`}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    );
+                  }}
+                </form.Field>
+              </div>
+            </fieldset>
+            <form.AppForm>
+              <form.SubmitButton />
+            </form.AppForm>
+          </div>
+        </form>
+        </FormValidationProvider>
         </SettingsLayout>
       </Page>
     );
