@@ -175,8 +175,7 @@ export async function getAllIndexers({ includeInactive = false } = {}): Promise<
 		query = query.where({ active: true });
 	}
 	const rawIndexers = await query;
-	const result = rawIndexers.map(deserialize);
-	return result;
+	return rawIndexers.map(deserialize);
 }
 
 export async function getEnabledIndexers(): Promise<Indexer[]> {
