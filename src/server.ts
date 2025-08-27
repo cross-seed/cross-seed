@@ -3,16 +3,12 @@ import { existsSync } from "fs";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
 import { z } from "zod";
-import fastify, {
-	FastifyInstance,
-	FastifyRequest,
-	FastifyReply,
-} from "fastify";
+import fastify, { FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifyCookie from "@fastify/cookie";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { checkApiKey } from "./auth.js";
+import { authorize } from "./utils/authUtils.js";
 import { registerTRPC } from "./trpc/fastifyAdapter.js";
 import {
 	ActionResult,
@@ -113,37 +109,6 @@ function parseData(data: string) {
 	}
 
 	return parsed;
-}
-
-/**
- * Checks all http API requests for authorized apiKey
- * uses param `?apikey=` or as header `x-api-key`
- */
-async function authorize(
-	request: FastifyRequest<{
-		Querystring: { apikey?: string };
-	}>,
-	reply: FastifyReply,
-): Promise<boolean> {
-	const apiKey =
-		(request.headers["x-api-key"] as string) || request.query.apikey || "";
-	const isAuthorized = await checkApiKey(apiKey);
-	if (!isAuthorized) {
-		const ipAddress =
-			(request.headers["x-forwarded-for"] as string)
-				?.split(",")
-				.shift() || request.socket.remoteAddress;
-		logger.error({
-			label: Label.SERVER,
-			message: `Unauthorized API access attempt to ${request.url} from ${ipAddress}`,
-		});
-		void reply
-			.code(401)
-			.send(
-				"Specify the API key in an X-Api-Key header or an apikey query param.",
-			);
-	}
-	return isAuthorized;
 }
 
 function determineResponse(result: {

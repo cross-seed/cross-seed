@@ -1,15 +1,7 @@
-import {
-	FastifyInstance,
-	FastifyPluginAsync,
-	FastifyRequest,
-	FastifyReply,
-} from "fastify";
-import { join, dirname } from "path";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { getAllIndexers } from "../indexers.js";
+import { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { Label, logger } from "../logger.js";
-import { checkApiKey } from "../auth.js";
+import { PROGRAM_VERSION } from "../constants.js";
+import { authorize } from "../utils/authUtils.js";
 import {
 	indexerCreateSchema,
 	indexerUpdateSchema,
@@ -21,40 +13,6 @@ import {
 	testNewIndexer,
 	testExistingIndexer,
 } from "../services/indexerService.js";
-
-// Get the directory of the current module
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-/**
- * Authorization function for API routes
- */
-async function authorize(
-	request: FastifyRequest,
-	reply: FastifyReply,
-): Promise<boolean> {
-	const apiKey =
-		(request.headers["x-api-key"] as string) ||
-		(request.query as { apikey?: string }).apikey ||
-		"";
-	const isAuthorized = await checkApiKey(apiKey);
-	if (!isAuthorized) {
-		const ipAddress =
-			(request.headers["x-forwarded-for"] as string)
-				?.split(",")
-				.shift() || request.socket.remoteAddress;
-		logger.error({
-			label: Label.SERVER,
-			message: `Unauthorized API access attempt to ${request.url} from ${ipAddress}`,
-		});
-		void reply
-			.code(401)
-			.send(
-				"Specify the API key in an X-Api-Key header or an apikey query param.",
-			);
-	}
-	return isAuthorized;
-}
 
 /**
  * Prowlarr Integration API Routes
@@ -72,25 +30,9 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 		if (!(await authorize(request, reply))) return;
 
 		try {
-			// Get version from package.json
-			const packagePath = join(
-				dirname(dirname(__dirname)),
-				"package.json",
-			);
-			const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
-			const version = packageJson.version;
-
-			// Get indexer statistics
-			const allIndexers = await getAllIndexers({ includeInactive: true });
-			const activeIndexers = allIndexers.filter(
-				(indexer) => indexer.active,
-			);
-
 			const statusResponse = {
-				version,
+				version: PROGRAM_VERSION,
 				appName: "cross-seed",
-				indexerCount: allIndexers.length,
-				activeIndexers: activeIndexers.length,
 			};
 
 			return await reply.code(200).send(statusResponse);
