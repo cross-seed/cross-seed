@@ -96,8 +96,8 @@ export async function testIndexerConnection(
 			message: `Test connection failed for ${name}: ${message}`,
 		});
 
-		// Handle timeout specifically
-		if (message.includes("timeout") || message.includes("aborted")) {
+		// Handle timeout specifically - AbortSignal.timeout() throws TimeoutError (DOMException)
+		if (error.name === "TimeoutError" || error.name === "AbortError") {
 			return resultOfErr({
 				code: "TIMEOUT",
 				message: "Connection timed out",
