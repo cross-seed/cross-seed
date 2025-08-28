@@ -12,29 +12,7 @@ import {
 	listAllIndexers,
 	testNewIndexer,
 	testExistingIndexer,
-	type IndexerErrorCode,
 } from "../services/indexerService.js";
-
-/**
- * Maps error codes to HTTP status codes
- */
-function getStatusCodeForError(code: IndexerErrorCode): number {
-	switch (code) {
-		case "VALIDATION_ERROR":
-		case "RATE_LIMITED":
-			return 400;
-		case "AUTH_FAILED":
-			return 401;
-		case "INDEXER_NOT_FOUND":
-			return 404;
-		case "TIMEOUT":
-			return 504;
-		case "CONNECTION_FAILED":
-		case "DATABASE_ERROR":
-		default:
-			return 500;
-	}
-}
 
 /**
  * Prowlarr Integration API Routes
@@ -157,7 +135,9 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			const result = await updateIndexer(validatedData);
 			if (result.isErr()) {
 				const error = result.unwrapErr();
-				const statusCode = getStatusCodeForError(error.code);
+				// Most update errors are either not found (404) or database issues (500)
+				const statusCode =
+					error.code === "INDEXER_NOT_FOUND" ? 404 : 500;
 				return await reply.code(statusCode).send(error);
 			}
 
@@ -195,7 +175,8 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 		const result = await deactivateIndexer(id);
 		if (result.isErr()) {
 			const error = result.unwrapErr();
-			const statusCode = getStatusCodeForError(error.code);
+			// Most deactivation errors are either not found (404) or database issues (500)
+			const statusCode = error.code === "INDEXER_NOT_FOUND" ? 404 : 500;
 			logger.error({
 				label: Label.SERVER,
 				message: `Error deactivating indexer: ${error.message}`,
@@ -233,15 +214,22 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 
 			if (result.isErr()) {
 				const error = result.unwrapErr();
-				const statusCode = getStatusCodeForError(error.code);
-				logger.error({
+				logger.warn({
 					label: Label.SERVER,
-					message: `Error testing indexer: ${error.message}`,
+					message: `Connection test failed: ${error.message}`,
 				});
-				return await reply.code(statusCode).send(error);
+				return await reply.code(200).send({
+					ok: false,
+					code: error.code,
+					message: error.message,
+				});
 			}
 
-			return await reply.code(200).send(result.unwrap());
+			const success = result.unwrap();
+			return await reply.code(200).send({
+				ok: true,
+				message: success.message,
+			});
 		} catch (error) {
 			logger.error({
 				label: Label.SERVER,
