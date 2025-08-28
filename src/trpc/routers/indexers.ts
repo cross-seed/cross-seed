@@ -33,8 +33,7 @@ export const indexersRouter = router({
 		.mutation(async ({ input }) => {
 			const result = await updateIndexer(input);
 			if (result.isErr()) {
-				const error = result.unwrapErr();
-				throw new Error(error.message);
+				throw new Error(`Indexer with ID ${input.id} not found`);
 			}
 			return result.unwrap();
 		}),
@@ -45,8 +44,7 @@ export const indexersRouter = router({
 		.mutation(async ({ input }) => {
 			const result = await deactivateIndexer(input.id);
 			if (result.isErr()) {
-				const error = result.unwrapErr();
-				throw new Error(error.message);
+				throw new Error(`Indexer with ID ${input.id} not found`);
 			}
 			return result.unwrap();
 		}),
@@ -57,8 +55,15 @@ export const indexersRouter = router({
 		.mutation(async ({ input }) => {
 			const result = await testExistingIndexer(input.id);
 			if (result.isErr()) {
-				const error = result.unwrapErr();
-				throw new Error(error.message);
+				const errorCode = result.unwrapErr();
+				const errorMessages = {
+					INDEXER_NOT_FOUND: `Indexer with ID ${input.id} not found`,
+					CONNECTION_FAILED: "Connection failed",
+					TIMEOUT: "Connection timed out",
+					AUTH_FAILED: "Authentication failed - check API key",
+					RATE_LIMITED: "Rate limited by indexer",
+				};
+				throw new Error(errorMessages[errorCode]);
 			}
 			return result.unwrap();
 		}),
@@ -74,8 +79,14 @@ export const indexersRouter = router({
 		.mutation(async ({ input }) => {
 			const result = await testNewIndexer(input);
 			if (result.isErr()) {
-				const error = result.unwrapErr();
-				throw new Error(error.message);
+				const errorCode = result.unwrapErr();
+				const errorMessages = {
+					CONNECTION_FAILED: "Connection failed",
+					TIMEOUT: "Connection timed out",
+					AUTH_FAILED: "Authentication failed - check API key",
+					RATE_LIMITED: "Rate limited by indexer",
+				};
+				throw new Error(errorMessages[errorCode]);
 			}
 			return result.unwrap();
 		}),

@@ -66,7 +66,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 				message: `Error listing indexers: ${error.message}`,
 			});
 			return reply.code(500).send({
-				code: "DATABASE_ERROR",
+				code: "INTERNAL_ERROR",
 				message: "Failed to list indexers",
 			});
 		}
@@ -134,11 +134,10 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 
 			const result = await updateIndexer(validatedData);
 			if (result.isErr()) {
-				const error = result.unwrapErr();
-				// Most update errors are either not found (404) or database issues (500)
-				const statusCode =
-					error.code === "INDEXER_NOT_FOUND" ? 404 : 500;
-				return await reply.code(statusCode).send(error);
+				return await reply.code(404).send({
+					code: "INDEXER_NOT_FOUND",
+					message: `Indexer with ID ${id} not found`,
+				});
 			}
 
 			return await reply.code(200).send(result.unwrap());
@@ -172,19 +171,26 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			});
 		}
 
-		const result = await deactivateIndexer(id);
-		if (result.isErr()) {
-			const error = result.unwrapErr();
-			// Most deactivation errors are either not found (404) or database issues (500)
-			const statusCode = error.code === "INDEXER_NOT_FOUND" ? 404 : 500;
+		try {
+			const result = await deactivateIndexer(id);
+			if (result.isErr()) {
+				return await reply.code(404).send({
+					code: "INDEXER_NOT_FOUND",
+					message: `Indexer with ID ${id} not found`,
+				});
+			}
+
+			return await reply.code(200).send(result.unwrap());
+		} catch (error) {
 			logger.error({
 				label: Label.SERVER,
 				message: `Error deactivating indexer: ${error.message}`,
 			});
-			return reply.code(statusCode).send(error);
+			return reply.code(500).send({
+				code: "INTERNAL_ERROR",
+				message: "Failed to deactivate indexer",
+			});
 		}
-
-		return reply.code(200).send(result.unwrap());
 	});
 
 	/**
@@ -213,15 +219,24 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			}
 
 			if (result.isErr()) {
-				const error = result.unwrapErr();
+				const errorCode = result.unwrapErr();
+				const errorMessages = {
+					INDEXER_NOT_FOUND: "Indexer not found",
+					CONNECTION_FAILED: "Connection failed",
+					TIMEOUT: "Connection timed out",
+					AUTH_FAILED: "Authentication failed - check API key",
+					RATE_LIMITED: "Rate limited by indexer",
+				};
+
 				logger.warn({
 					label: Label.SERVER,
-					message: `Connection test failed: ${error.message}`,
+					message: `Connection test failed: ${errorMessages[errorCode]}`,
 				});
+
 				return await reply.code(200).send({
 					ok: false,
-					code: error.code,
-					message: error.message,
+					code: errorCode,
+					message: errorMessages[errorCode],
 				});
 			}
 
