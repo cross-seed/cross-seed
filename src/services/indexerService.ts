@@ -8,33 +8,28 @@ import { Result, resultOf, resultOfErr } from "../Result.js";
 import ms from "ms";
 
 // Helper function to deserialize raw database row (snake_case columns) to Indexer
-function deserializeRawRow(rawRow: Record<string, unknown>): Indexer {
+function deserializeRawRow(rawRow: unknown): Indexer {
+	const row = rawRow as Record<string, unknown>;
 	return {
-		id: rawRow.id,
-		name: rawRow.name,
-		url: rawRow.url,
-		apikey: rawRow.apikey,
-		active: Boolean(rawRow.active),
-		status: rawRow.status,
-		retryAfter: rawRow.retry_after,
-		searchCap: Boolean(rawRow.search_cap),
-		tvSearchCap: Boolean(rawRow.tv_search_cap),
-		movieSearchCap: Boolean(rawRow.movie_search_cap),
-		musicSearchCap: Boolean(rawRow.music_search_cap),
-		audioSearchCap: Boolean(rawRow.audio_search_cap),
-		bookSearchCap: Boolean(rawRow.book_search_cap),
-		tvIdCaps: rawRow.tv_id_caps
-			? JSON.parse(rawRow.tv_id_caps as string)
+		id: row.id,
+		name: row.name,
+		url: row.url,
+		apikey: row.apikey,
+		active: Boolean(row.active),
+		status: row.status,
+		retryAfter: row.retry_after,
+		searchCap: Boolean(row.search_cap),
+		tvSearchCap: Boolean(row.tv_search_cap),
+		movieSearchCap: Boolean(row.movie_search_cap),
+		musicSearchCap: Boolean(row.music_search_cap),
+		audioSearchCap: Boolean(row.audio_search_cap),
+		bookSearchCap: Boolean(row.book_search_cap),
+		tvIdCaps: row.tv_id_caps ? JSON.parse(row.tv_id_caps as string) : null,
+		movieIdCaps: row.movie_id_caps
+			? JSON.parse(row.movie_id_caps as string)
 			: null,
-		movieIdCaps: rawRow.movie_id_caps
-			? JSON.parse(rawRow.movie_id_caps as string)
-			: null,
-		categories: rawRow.cat_caps
-			? JSON.parse(rawRow.cat_caps as string)
-			: null,
-		limits: rawRow.limits_caps
-			? JSON.parse(rawRow.limits_caps as string)
-			: null,
+		categories: row.cat_caps ? JSON.parse(row.cat_caps as string) : null,
+		limits: row.limits_caps ? JSON.parse(row.limits_caps as string) : null,
 	} as Indexer;
 }
 
