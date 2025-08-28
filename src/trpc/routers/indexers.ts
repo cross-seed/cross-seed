@@ -31,21 +31,36 @@ export const indexersRouter = router({
 	update: authedProcedure
 		.input(indexerUpdateSchema)
 		.mutation(async ({ input }) => {
-			return updateIndexer(input);
+			const result = await updateIndexer(input);
+			if (result.isErr()) {
+				const error = result.unwrapErr();
+				throw new Error(error.message);
+			}
+			return result.unwrap();
 		}),
 
 	// Deactivate indexer (soft delete)
 	delete: authedProcedure
 		.input(z.object({ id: z.number().int().positive() }))
 		.mutation(async ({ input }) => {
-			return deactivateIndexer(input.id);
+			const result = await deactivateIndexer(input.id);
+			if (result.isErr()) {
+				const error = result.unwrapErr();
+				throw new Error(error.message);
+			}
+			return result.unwrap();
 		}),
 
 	// Test existing indexer connection
 	testExisting: authedProcedure
 		.input(z.object({ id: z.number().int().positive() }))
 		.mutation(async ({ input }) => {
-			return testExistingIndexer(input.id);
+			const result = await testExistingIndexer(input.id);
+			if (result.isErr()) {
+				const error = result.unwrapErr();
+				throw new Error(error.message);
+			}
+			return result.unwrap();
 		}),
 
 	// Test new indexer connection before creating
@@ -57,6 +72,11 @@ export const indexersRouter = router({
 			}),
 		)
 		.mutation(async ({ input }) => {
-			return testNewIndexer(input);
+			const result = await testNewIndexer(input);
+			if (result.isErr()) {
+				const error = result.unwrapErr();
+				throw new Error(error.message);
+			}
+			return result.unwrap();
 		}),
 });
