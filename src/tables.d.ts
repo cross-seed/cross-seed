@@ -1,5 +1,6 @@
 import { Knex } from "knex";
 import type { Decision as DecisionType } from "./constants.js";
+import { IndexerStatus } from "./indexers.js";
 
 declare module "knex/types/tables.js" {
 	interface Decision {
@@ -19,7 +20,7 @@ declare module "knex/types/tables.js" {
 		apikey: string;
 		name: string | null;
 		active: boolean;
-		status: string | null;
+		status: IndexerStatus | null;
 		retry_after: number | null;
 		search_cap: boolean | null;
 		tv_search_cap: boolean | null;
