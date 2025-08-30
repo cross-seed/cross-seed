@@ -24,7 +24,7 @@ import { CrossSeedError } from "./errors.js";
 import {
 	ALL_CAPS,
 	Caps,
-	getActiveIndexers,
+	getAllIndexers,
 	getEnabledIndexers,
 	IdSearchCaps,
 	Indexer,
@@ -582,36 +582,40 @@ export async function searchTorznab(
 export async function syncWithDb() {
 	const { torznab } = getRuntimeConfig();
 
-	const activeIndexers = await getActiveIndexers();
+	const allIndexers = await getAllIndexers();
 
 	const inConfigButNotInDb = torznab.filter(
 		(configIndexer) =>
-			!activeIndexers.some(
+			!allIndexers.some(
 				(dbIndexer) => dbIndexer.url === sanitizeUrl(configIndexer),
 			),
 	);
 
-	const inDbButNotInConfig = activeIndexers.filter(
+	const inDbButNotInConfig = allIndexers.filter(
 		(dbIndexer) =>
 			!torznab.some(
 				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url,
 			),
 	);
 
-	const apikeyUpdates = activeIndexers.reduce<
-		{ id: number; apikey: string }[]
-	>((acc, dbIndexer) => {
-		const configIndexer = torznab.find(
-			(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url,
-		);
-		if (configIndexer && dbIndexer.apikey !== getApikey(configIndexer)) {
-			acc.push({
-				id: dbIndexer.id,
-				apikey: getApikey(configIndexer)!,
-			});
-		}
-		return acc;
-	}, []);
+	const apikeyUpdates = allIndexers.reduce<{ id: number; apikey: string }[]>(
+		(acc, dbIndexer) => {
+			const configIndexer = torznab.find(
+				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url,
+			);
+			if (
+				configIndexer &&
+				dbIndexer.apikey !== getApikey(configIndexer)
+			) {
+				acc.push({
+					id: dbIndexer.id,
+					apikey: getApikey(configIndexer)!,
+				});
+			}
+			return acc;
+		},
+		[],
+	);
 
 	if (inDbButNotInConfig.length > 0) {
 		await db("indexer")
@@ -629,6 +633,7 @@ export async function syncWithDb() {
 					url: sanitizeUrl(url),
 					apikey: getApikey(url)!,
 					active: true,
+					enabled: true,
 					name: null,
 					status: null,
 					retry_after: null,
@@ -770,18 +775,18 @@ function collateOutcomes<Correlator, SuccessReturnType>(
 }
 
 export async function updateCaps(): Promise<void> {
-	const activeIndexers = await getActiveIndexers();
+	const allIndexers = await getAllIndexers();
 	const outcomes = await Promise.allSettled<Caps>(
-		activeIndexers.map((indexer) => fetchCaps(indexer)),
+		allIndexers.map((indexer) => fetchCaps(indexer)),
 	);
 	const { fulfilled } = collateOutcomes<number, Caps>(
-		activeIndexers.map((i) => i.id),
+		allIndexers.map((i) => i.id),
 		outcomes,
 	);
 	for (const [indexerId, caps] of fulfilled) {
 		await updateIndexerCapsById(indexerId, caps);
 	}
-	for (const indexer of await getActiveIndexers()) {
+	for (const indexer of await getAllIndexers()) {
 		if (!indexer.categories) {
 			logger.error({
 				label: Label.TORZNAB,
@@ -985,7 +990,7 @@ async function getAndLogIndexers(
 	const searcheeLog = getLogString(searchee, chalk.bold.white);
 	const mediaTypeLog = chalk.white(mediaType.toUpperCase());
 
-	const activeIndexers = await getActiveIndexers();
+	const allIndexers = await getAllIndexers();
 	const enabledIndexers = await getEnabledIndexers();
 
 	// search history for name across all indexers
@@ -994,7 +999,7 @@ async function getAndLogIndexers(
 		.join("indexer", "timestamp.indexer_id", "indexer.id")
 		.whereIn(
 			"indexer.id",
-			activeIndexers.map((i) => i.id),
+			allIndexers.map((i) => i.id),
 		)
 		.andWhere("searchee.name", searchee.title)
 		.select({
@@ -1015,7 +1020,7 @@ async function getAndLogIndexers(
 		? await getSearcheeNewestFileAge(searchee as SearcheeWithoutInfoHash)
 		: Number.POSITIVE_INFINITY;
 	const disabledIndexers: Indexer[] = [];
-	const timeFilteredIndexers = activeIndexers.filter((indexer) => {
+	const timeFilteredIndexers = allIndexers.filter((indexer) => {
 		if (indexer.searchCap === false || !indexer.categories) return false;
 		const entry = timestampDataSql.find(
 			(entry) => entry.indexerId === indexer.id,
