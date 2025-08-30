@@ -42,6 +42,8 @@ function getClientLabel(name: string) {
 	}
 }
 
+// TODO use it
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function testConnection(
 	url: string,
 	username: string,
