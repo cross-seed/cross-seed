@@ -618,6 +618,7 @@ export async function syncWithDb() {
 					url: sanitizeUrl(url),
 					apikey: getApikey(url)!,
 					active: true,
+					enabled: true,
 					name: null,
 					status: null,
 					retry_after: null,
