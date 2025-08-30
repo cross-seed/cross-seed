@@ -20,6 +20,7 @@ export interface DbIndexer {
 	 * Whether the indexer is currently specified in config
 	 */
 	active: boolean;
+	enabled: boolean;
 	status: IndexerStatus;
 	retryAfter: number;
 	searchCap: boolean;
@@ -81,6 +82,7 @@ export interface Indexer {
 	 * Whether the indexer is currently specified in config
 	 */
 	active: boolean;
+	enabled: boolean;
 	status: IndexerStatus;
 	retryAfter: number;
 	searchCap: boolean;
@@ -101,6 +103,7 @@ const allFields = {
 	apikey: "apikey",
 	name: "name",
 	active: "active",
+	enabled: "enabled",
 	status: "status",
 	retryAfter: "retry_after",
 	searchCap: "search_cap",
@@ -154,6 +157,7 @@ export function deserialize(dbIndexer: DbIndexer): Indexer {
 	return {
 		...rest,
 		active: Boolean(rest.active),
+		enabled: Boolean(rest.enabled),
 		searchCap: Boolean(rest.searchCap),
 		tvSearchCap: Boolean(rest.tvSearchCap),
 		movieSearchCap: Boolean(rest.movieSearchCap),
@@ -192,7 +196,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 			cat_caps: null,
 			limits_caps: null,
 		})
-		.where({ active: true, search_cap: true })
+		.where({ active: true, enabled: true, search_cap: true })
 		.where((i) =>
 			i
 				.where({ status: null })
