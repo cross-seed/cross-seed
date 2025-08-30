@@ -12,6 +12,7 @@ import indexerNameAudioBookCaps from "./10-indexerNameAudioBookCaps.js";
 import trackers from "./11-trackers.js";
 import userAuth from "./12-user-auth.js";
 import settings from "./13-settings.js";
+import indexerEnabledFlag from "./14-indexer-enabled-flag.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -30,6 +31,7 @@ export const migrations = {
 			trackers,
 			userAuth,
 			settings,
+			indexerEnabledFlag,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,
