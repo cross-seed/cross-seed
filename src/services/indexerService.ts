@@ -16,6 +16,7 @@ function deserializeRawRow(rawRow: unknown): Indexer {
 		url: row.url,
 		apikey: row.apikey,
 		active: Boolean(row.active),
+		enabled: Boolean(row.enabled),
 		status: row.status,
 		retryAfter: row.retry_after,
 		searchCap: Boolean(row.search_cap),
@@ -39,6 +40,7 @@ export const indexerCreateSchema = z.object({
 	url: z.string().url(),
 	apikey: z.string().min(1),
 	active: z.boolean().optional().default(true),
+	enabled: z.boolean(),
 });
 
 export const indexerUpdateSchema = z.object({
@@ -47,6 +49,7 @@ export const indexerUpdateSchema = z.object({
 	url: z.string().url().optional(),
 	apikey: z.string().min(1).optional(),
 	active: z.boolean().optional(),
+	enabled: z.boolean().optional(),
 });
 
 export const indexerTestSchema = z.object({
@@ -137,6 +140,7 @@ export async function createIndexer(
 			url: input.url,
 			apikey: input.apikey,
 			active: input.active ?? true,
+			enabled: input.enabled,
 			status: null,
 			retry_after: null,
 			search_cap: null,
@@ -155,6 +159,7 @@ export async function createIndexer(
 			name: input.name || db.raw("indexer.name"),
 			apikey: input.apikey,
 			active: input.active ?? true,
+			enabled: input.enabled,
 		})
 		.returning("id");
 
@@ -182,6 +187,7 @@ export async function updateIndexer(
 		...(updates.url !== undefined && { url: updates.url }),
 		...(updates.apikey !== undefined && { apikey: updates.apikey }),
 		...(updates.active !== undefined && { active: updates.active }),
+		...(updates.enabled !== undefined && { enabled: updates.enabled }),
 	};
 
 	// Atomic update with existence check
