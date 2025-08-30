@@ -46,7 +46,7 @@ type Indexer = {
   id: number;
   name: string | null;
   url: string;
-  active: boolean;
+  enabled: boolean;
   status: string | null;
   retryAfter: number | null;
   searchCap: boolean | null;
@@ -112,7 +112,7 @@ function TrackerSettings() {
   };
 
   const getStatusBadge = (indexer: Indexer) => {
-    if (!indexer.active) {
+    if (!indexer.enabled) {
       return <Badge variant="secondary">Disabled</Badge>;
     }
 
@@ -220,10 +220,10 @@ function TrackerSettings() {
     setEditSheetOpen(true);
   };
 
-  const handleToggleActive = (indexer: Indexer) => {
+  const handleToggleEnabled = (indexer: Indexer) => {
     updateIndexer({
       id: indexer.id,
-      active: !indexer.active,
+      enabled: !indexer.enabled,
     });
   };
 
@@ -328,10 +328,10 @@ function TrackerSettings() {
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleToggleActive(indexer);
+                            handleToggleEnabled(indexer);
                           }}
                         >
-                          {indexer.active ? (
+                          {indexer.enabled ? (
                             <>
                               <ToggleLeft className="mr-2 h-4 w-4" />
                               Disable
