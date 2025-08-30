@@ -48,7 +48,6 @@ export const indexerUpdateSchema = z.object({
 	name: z.string().min(1).optional().nullable(),
 	url: z.string().url().optional(),
 	apikey: z.string().min(1).optional(),
-	active: z.boolean().optional(),
 	enabled: z.boolean().optional(),
 });
 
@@ -186,7 +185,6 @@ export async function updateIndexer(
 		...(updates.name !== undefined && { name: updates.name }),
 		...(updates.url !== undefined && { url: updates.url }),
 		...(updates.apikey !== undefined && { apikey: updates.apikey }),
-		...(updates.active !== undefined && { active: updates.active }),
 		...(updates.enabled !== undefined && { enabled: updates.enabled }),
 	};
 
