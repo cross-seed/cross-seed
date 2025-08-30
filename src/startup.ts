@@ -1,7 +1,6 @@
 import { constants, mkdir, stat } from "fs/promises";
 import ms from "ms";
 import { spawn } from "node:child_process";
-import { sep } from "path";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { validateUArrLs } from "./arr.js";
