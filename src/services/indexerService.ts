@@ -55,11 +55,15 @@ export const indexerTestSchema = z.object({
 });
 
 // Service functions
-export type TestConnectionError =
-	| "CONNECTION_FAILED"
-	| "TIMEOUT"
-	| "AUTH_FAILED"
-	| "RATE_LIMITED";
+export type TestConnectionError = {
+	code: "CONNECTION_FAILED" | "TIMEOUT" | "AUTH_FAILED" | "RATE_LIMITED";
+	message: string;
+};
+
+export type IndexerNotFoundError = {
+	code: "INDEXER_NOT_FOUND";
+	message: string;
+};
 
 export async function testIndexerConnection(
 	url: string,
@@ -74,15 +78,24 @@ export async function testIndexerConnection(
 
 		if (!response.ok) {
 			if (response.status === 401) {
-				return resultOfErr("AUTH_FAILED");
+				return resultOfErr({
+					code: "AUTH_FAILED",
+					message: "Authentication failed - check API key",
+				});
 			} else if (response.status === 429) {
-				return resultOfErr("RATE_LIMITED");
+				return resultOfErr({
+					code: "RATE_LIMITED",
+					message: "Rate limited by indexer",
+				});
 			} else {
-				return resultOfErr("CONNECTION_FAILED");
+				return resultOfErr({
+					code: "CONNECTION_FAILED",
+					message: "Connection failed",
+				});
 			}
 		}
 
-		logger.info({
+		logger.verbose({
 			label: Label.TORZNAB,
 			message: `Test connection successful for: ${name}`,
 		});
@@ -101,10 +114,16 @@ export async function testIndexerConnection(
 
 		// Handle timeout specifically - AbortSignal.timeout() throws TimeoutError (DOMException)
 		if (error.name === "TimeoutError" || error.name === "AbortError") {
-			return resultOfErr("TIMEOUT");
+			return resultOfErr({
+				code: "TIMEOUT",
+				message: "Connection timed out",
+			});
 		}
 
-		return resultOfErr("CONNECTION_FAILED");
+		return resultOfErr({
+			code: "CONNECTION_FAILED",
+			message: "Connection failed",
+		});
 	}
 }
 
@@ -144,7 +163,7 @@ export async function createIndexer(
 
 	const indexer = deserializeRawRow(rawRow);
 
-	logger.info({
+	logger.verbose({
 		label: Label.TORZNAB,
 		message: `Created/updated indexer: ${input.name || input.url}`,
 	});
@@ -154,7 +173,7 @@ export async function createIndexer(
 
 export async function updateIndexer(
 	input: z.infer<typeof indexerUpdateSchema>,
-): Promise<Result<Indexer, "INDEXER_NOT_FOUND">> {
+): Promise<Result<Indexer, IndexerNotFoundError>> {
 	const { id, ...updates } = input;
 
 	// Prepare update object
@@ -169,14 +188,17 @@ export async function updateIndexer(
 	const updateCount = await db("indexer").where({ id }).update(updateData);
 
 	if (updateCount === 0) {
-		return resultOfErr("INDEXER_NOT_FOUND");
+		return resultOfErr({
+			code: "INDEXER_NOT_FOUND",
+			message: `Indexer with ID ${id} not found`,
+		});
 	}
 
 	// Query the updated record
 	const updatedRawRow = await db("indexer").where({ id }).first();
 
 	const updatedIndexer = deserializeRawRow(updatedRawRow);
-	logger.info({
+	logger.verbose({
 		label: Label.TORZNAB,
 		message: `Updated indexer: ${updatedIndexer.name || updatedIndexer.url}`,
 	});
@@ -186,7 +208,7 @@ export async function updateIndexer(
 
 export async function deactivateIndexer(
 	id: number,
-): Promise<Result<{ success: true; indexer: Indexer }, "INDEXER_NOT_FOUND">> {
+): Promise<Result<{ success: true; indexer: Indexer }, IndexerNotFoundError>> {
 	// Soft delete - set active to false instead of actually deleting
 	// This preserves cache data and download history
 	const updateCount = await db("indexer")
@@ -194,14 +216,17 @@ export async function deactivateIndexer(
 		.update({ active: false });
 
 	if (updateCount === 0) {
-		return resultOfErr("INDEXER_NOT_FOUND");
+		return resultOfErr({
+			code: "INDEXER_NOT_FOUND",
+			message: `Indexer with ID ${id} not found`,
+		});
 	}
 
 	// Query the updated record
 	const deactivatedRawRow = await db("indexer").where({ id }).first();
 
 	const deactivatedIndexer = deserializeRawRow(deactivatedRawRow);
-	logger.info({
+	logger.verbose({
 		label: Label.TORZNAB,
 		message: `Deactivated indexer (set active=false): ${deactivatedIndexer.name || deactivatedIndexer.url}`,
 	});
@@ -211,11 +236,14 @@ export async function deactivateIndexer(
 
 export async function getIndexerById(
 	id: number,
-): Promise<Result<Indexer, "INDEXER_NOT_FOUND">> {
+): Promise<Result<Indexer, IndexerNotFoundError>> {
 	const rawRow = await db("indexer").where({ id }).first();
 
 	if (!rawRow) {
-		return resultOfErr("INDEXER_NOT_FOUND");
+		return resultOfErr({
+			code: "INDEXER_NOT_FOUND",
+			message: `Indexer with ID ${id} not found`,
+		});
 	}
 
 	return resultOf(deserializeRawRow(rawRow));
@@ -234,7 +262,7 @@ export async function testExistingIndexer(
 ): Promise<
 	Result<
 		{ success: true; message: string },
-		"INDEXER_NOT_FOUND" | TestConnectionError
+		IndexerNotFoundError | TestConnectionError
 	>
 > {
 	const indexerResult = await getIndexerById(id);
