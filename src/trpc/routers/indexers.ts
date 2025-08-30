@@ -14,7 +14,7 @@ import {
 export const indexersRouter = router({
 	// Get all indexers
 	getAll: authedProcedure.query(async () => {
-		const indexers = await listAllIndexers({ includeInactive: true });
+		const indexers = await listAllIndexers();
 		return indexers.sort((a, b) =>
 			(a.name || "").localeCompare(b.name || ""),
 		);
@@ -22,9 +22,9 @@ export const indexersRouter = router({
 
 	// Create new indexer
 	create: authedProcedure
-		.input(indexerCreateSchema.omit({ active: true })) // tRPC version defaults to active=true
+		.input(indexerCreateSchema)
 		.mutation(async ({ input }) => {
-			return createIndexer({ ...input, active: true });
+			return createIndexer(input);
 		}),
 
 	// Update indexer

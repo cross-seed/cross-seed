@@ -18,9 +18,20 @@ export interface DbIndexer {
 	apikey: string;
 	trackers: string | null;
 	/**
-	 * Whether the indexer is currently specified in config
+	 * When false, the indexer has been soft deleted and should only be visible
+	 * to the part of the program that deals with soft deleted indexers
+	 * (to either rescue, hard delete, or merge them into another indexer).
+	 * Soft deleted indexers should be queried separately from active indexers.
+	 * A soft-deleted indexer corresponds to a deleted indexer in Prowlarr.
 	 */
 	active: boolean;
+	/**
+	 * When false, the indexer has been disabled by the user and should not be
+	 * used for searching or RSS, but can be used for fetching caps or
+	 * cross-seed restore.
+	 * Corresponds to indexer enabled bit in Prowlarr.
+	 */
+	enabled: boolean;
 	status: IndexerStatus;
 	retryAfter: number;
 	searchCap: boolean;
@@ -83,6 +94,7 @@ export interface Indexer {
 	 * Whether the indexer is currently specified in config
 	 */
 	active: boolean;
+	enabled: boolean;
 	status: IndexerStatus;
 	retryAfter: number;
 	searchCap: boolean;
@@ -104,6 +116,7 @@ const allFields = {
 	apikey: "apikey",
 	trackers: "trackers",
 	active: "active",
+	enabled: "enabled",
 	status: "status",
 	retryAfter: "retry_after",
 	searchCap: "search_cap",
@@ -158,6 +171,7 @@ export function deserialize(dbIndexer: DbIndexer): Indexer {
 	return {
 		...rest,
 		active: Boolean(rest.active),
+		enabled: Boolean(rest.enabled),
 		searchCap: Boolean(rest.searchCap),
 		tvSearchCap: Boolean(rest.tvSearchCap),
 		movieSearchCap: Boolean(rest.movieSearchCap),
@@ -173,23 +187,9 @@ export function deserialize(dbIndexer: DbIndexer): Indexer {
 }
 
 /**
- * All indexers in the database, regardless of whether they are currently configured or working.
- */
-export async function getAllIndexers({ includeInactive = false } = {}): Promise<
-	Indexer[]
-> {
-	let query = db("indexer").select(allFields);
-	if (!includeInactive) {
-		query = query.where({ active: true });
-	}
-	const rawIndexers = await query;
-	return rawIndexers.map(deserialize);
-}
-
-/**
  * All indexers that users currently have configured regardless of whether they are working.
  */
-export async function getActiveIndexers(): Promise<Indexer[]> {
+export async function getAllIndexers(): Promise<Indexer[]> {
 	return (await db("indexer").where({ active: true }).select(allFields)).map(
 		deserialize,
 	);

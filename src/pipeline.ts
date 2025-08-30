@@ -27,7 +27,7 @@ import {
 	ResultAssessment,
 } from "./decide.js";
 import {
-	getActiveIndexers,
+	getAllIndexers,
 	IndexerStatus,
 	updateIndexerStatus,
 	updateSearchTimestamps,
@@ -182,13 +182,13 @@ async function findOnOtherSites(
 		options,
 	);
 
-	const activeIndexers = await getActiveIndexers();
+	const allIndexers = await getAllIndexers();
 	const rateLimitedNames = new Set<string>();
 	const { rateLimited, notRateLimited } = assessments.reduce(
 		(acc, cur, idx) => {
 			const candidate = candidates[idx];
 			if (cur.assessment.decision === Decision.RATE_LIMITED) {
-				const indexer = activeIndexers.find(
+				const indexer = allIndexers.find(
 					(i) => i.id === candidate.indexerId,
 				)!;
 				rateLimitedNames.add(indexer.name ?? indexer.url);

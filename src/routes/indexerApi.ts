@@ -57,12 +57,11 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 	 * List all indexers
 	 */
 	app.get<{
-		Querystring: { apikey?: string; includeInactive?: string };
+		Querystring: { apikey?: string };
 	}>("/api/indexer/v1", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
-		const includeInactive = request.query.includeInactive === "true";
-		const indexers = await listAllIndexers({ includeInactive });
+		const indexers = await listAllIndexers();
 		return reply.code(200).send(indexers);
 	});
 
