@@ -12,6 +12,7 @@ import indexerNameAudioBookCaps from "./10-indexerNameAudioBookCaps.js";
 import userAuth from "./11-user-auth.js";
 import settings from "./12-settings.js";
 import indexerEnabledFlag from "./13-indexer-enabled-flag.js";
+import removeUrlUniqueConstraint from "./14-remove-url-unique-constraint.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -30,6 +31,7 @@ export const migrations = {
 			userAuth,
 			settings,
 			indexerEnabledFlag,
+			removeUrlUniqueConstraint,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,
