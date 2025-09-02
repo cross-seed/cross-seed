@@ -40,7 +40,7 @@ export const indexerCreateSchema = z.object({
 	url: z.string().url(),
 	apikey: z.string().min(1),
 	active: z.boolean().optional().default(true),
-	enabled: z.boolean(),
+	enabled: z.boolean().default(true),
 });
 
 export const indexerUpdateSchema = z.object({
@@ -132,13 +132,13 @@ export async function testIndexerConnection(
 export async function createIndexer(
 	input: z.infer<typeof indexerCreateSchema>,
 ): Promise<Indexer> {
-	// Use atomic upsert with .onConflict() clause
+	// Create new indexer only (no upsert)
 	const [result] = await db("indexer")
 		.insert({
 			name: input.name || null,
 			url: input.url,
 			apikey: input.apikey,
-			active: input.active ?? true,
+			active: true,
 			enabled: input.enabled,
 			status: null,
 			retry_after: null,
@@ -153,23 +153,16 @@ export async function createIndexer(
 			cat_caps: null,
 			limits_caps: null,
 		})
-		.onConflict("url")
-		.merge({
-			name: input.name || db.raw("indexer.name"),
-			apikey: input.apikey,
-			active: input.active ?? true,
-			enabled: input.enabled,
-		})
 		.returning("id");
 
-	// Query the created/updated record
+	// Query the created record
 	const rawRow = await db("indexer").where({ id: result.id }).first();
 
 	const indexer = deserializeRawRow(rawRow);
 
 	logger.verbose({
 		label: Label.TORZNAB,
-		message: `Created/updated indexer: ${input.name || input.url}`,
+		message: `Created indexer: ${input.name || input.url}`,
 	});
 
 	return indexer;
