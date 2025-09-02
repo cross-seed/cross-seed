@@ -8,13 +8,15 @@ import {
 	deactivateIndexer,
 	testExistingIndexer,
 	testNewIndexer,
-	listAllIndexers,
+	listAllIndexersInternal,
 } from "../../services/indexerService.js";
 
 export const indexersRouter = router({
 	// Get all indexers
 	getAll: authedProcedure.query(async () => {
-		const indexers = await listAllIndexers({ includeInactive: true });
+		const indexers = await listAllIndexersInternal({
+			includeInactive: true,
+		});
 		return indexers.sort((a, b) =>
 			(a.name || "").localeCompare(b.name || ""),
 		);
