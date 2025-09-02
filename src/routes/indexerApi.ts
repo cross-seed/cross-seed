@@ -9,6 +9,7 @@ import {
 	createIndexer,
 	updateIndexer,
 	deactivateIndexer,
+	getIndexerById,
 	listAllIndexers,
 	testNewIndexer,
 	testExistingIndexer,
@@ -54,7 +55,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 	});
 
 	/**
-	 * List all indexers
+	 * List all indexers (active only)
 	 */
 	app.get<{
 		Querystring: { apikey?: string };
@@ -66,6 +67,27 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 	});
 
 	/**
+	 * Get single indexer by ID
+	 */
+	app.get<{
+		Params: { id: string };
+		Querystring: { apikey?: string };
+	}>("/api/indexer/v1/:id", async (request, reply) => {
+		if (!(await authorize(request, reply))) return;
+
+		const id = await parseIdParam(request.params.id, reply);
+		if (!id) return;
+
+		const result = await getIndexerById(id);
+		if (result.isOk()) {
+			return reply.code(200).send(result.unwrap());
+		}
+
+		const err = result.unwrapErr();
+		return reply.code(404).send(err);
+	});
+
+	/**
 	 * Create new indexer (upsert)
 	 */
 	app.post<{
@@ -74,6 +96,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			url: string;
 			apikey: string;
 			active?: boolean;
+			enabled?: boolean;
 		};
 		Querystring: { apikey?: string };
 	}>("/api/indexer/v1", async (request, reply) => {
@@ -102,6 +125,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			url?: string;
 			apikey?: string;
 			active?: boolean;
+			enabled?: boolean;
 		};
 		Querystring: { apikey?: string };
 	}>("/api/indexer/v1/:id", async (request, reply) => {
