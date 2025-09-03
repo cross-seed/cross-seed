@@ -1,16 +1,12 @@
-import { Knex } from "knex";
+import knex from "knex";
 
-export async function up(knex: Knex): Promise<void> {
+export async function up(knex: knex.Knex): Promise<void> {
 	await knex.schema.alterTable("indexer", (table) => {
-		table.boolean("enabled");
-	});
-	await knex("indexer").update({ enabled: true });
-	await knex.schema.alterTable("indexer", (table) => {
-		table.boolean("enabled").notNullable().alter();
+		table.boolean("enabled").notNullable().defaultTo(true);
 	});
 }
 
-export async function down(knex: Knex): Promise<void> {
+export async function down(knex: knex.Knex): Promise<void> {
 	await knex.schema.alterTable("indexer", (table) => {
 		table.dropColumn("enabled");
 	});
