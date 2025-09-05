@@ -1,5 +1,6 @@
 import { constants, mkdir, stat } from "fs/promises";
 import ms from "ms";
+import { spawn } from "node:child_process";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { validateUArrLs } from "./arr.js";
@@ -8,8 +9,11 @@ import {
 	instantiateDownloadClients,
 } from "./clients/TorrentClient.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
+import { getFileConfig } from "./configuration.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
+import { getDbConfig, isDbConfigEnabled, setDbConfig } from "./dbConfig.js";
+import { createRequire } from "module";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { initializePushNotifier } from "./pushNotifier.js";
@@ -20,6 +24,8 @@ import {
 } from "./runtimeConfig.js";
 import { validateTorznabUrls } from "./torznab.js";
 import { Awaitable, mapAsync, notExists, verifyDir, wait } from "./utils.js";
+
+const require = createRequire(import.meta.url);
 
 export async function exitGracefully() {
 	await db.destroy();
@@ -111,6 +117,18 @@ async function checkConfigPaths(): Promise<void> {
 			} above for details.`,
 		);
 	}
+	if (linkDev.length) {
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each linkDir: ${inspect(linkDev)}`,
+		});
+	}
+	if (dataDev.length) {
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each dataDir: ${inspect(dataDev)}`,
+		});
+	}
 }
 
 async function retry<T>(
@@ -156,10 +174,13 @@ export async function doStartupValidation(): Promise<void> {
 		);
 	}
 	logger.verbose({
-		label: Label.CONFIGDUMP,
+		label: Label.CONFIG,
 		message: inspect(getRuntimeConfig()),
 	});
-	logger.info("Your configuration is valid!");
+	logger.info({
+		label: Label.CONFIG,
+		message: "Your configuration is valid!",
+	});
 }
 
 /**
@@ -178,7 +199,7 @@ export function parseRuntimeConfigAndLogErrors(
 		}) as RuntimeConfig;
 	} catch (error) {
 		logger.verbose({
-			label: Label.CONFIGDUMP,
+			label: Label.CONFIG,
 			message: inspect(options),
 		});
 		if ("errors" in error && Array.isArray(error.errors)) {
@@ -252,10 +273,76 @@ export function withFullRuntime(
 ): CommanderActionCb {
 	return withMinimalRuntime(async (options) => {
 		initializeLogger(options as Record<string, unknown>);
-		const runtimeConfig = parseRuntimeConfigAndLogErrors(options);
+
+		let runtimeConfig: RuntimeConfig;
+		if (isDbConfigEnabled()) {
+			try {
+				// Load config from database
+				runtimeConfig = await getDbConfig();
+			} catch {
+				// No complete config in database, migrate from file or template
+				try {
+					// Try to load and migrate from file config
+					const fileConfig = await getFileConfig();
+					runtimeConfig = parseRuntimeConfigAndLogErrors({
+						...fileConfig,
+						...(options as Record<string, unknown>),
+					});
+
+					// Preserve existing API key from apikey column
+					const existingApiKey = await db("settings")
+						.select("apikey")
+						.first();
+					if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
+						runtimeConfig.apiKey = existingApiKey.apikey;
+					}
+
+					await setDbConfig(runtimeConfig);
+					logger.info("Migrated file config to database");
+				} catch {
+					// No file config - use template directly
+					const templateConfig = require("./config.template.cjs")
+						.default as Record<string, unknown>;
+					runtimeConfig = parseRuntimeConfigAndLogErrors({
+						...templateConfig,
+						...(options as Record<string, unknown>),
+					});
+
+					// Preserve existing API key from apikey column
+					const existingApiKey = await db("settings")
+						.select("apikey")
+						.first();
+					if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
+						runtimeConfig.apiKey = existingApiKey.apikey;
+					}
+
+					await setDbConfig(runtimeConfig);
+					logger.info(
+						"Created initial database config from template",
+					);
+				}
+			}
+		} else {
+			// Load config from file + CLI options
+			runtimeConfig = parseRuntimeConfigAndLogErrors(options);
+		}
+
 		setRuntimeConfig(runtimeConfig);
 		initializePushNotifier();
 		await doStartupValidation();
 		await entrypoint(runtimeConfig);
 	});
+}
+
+export async function restartCrossSeed() {
+	logger.info("Restarting cross-seed");
+	process.on("exit", () => {
+		spawn(process.argv[0], process.argv.slice(1), {
+			cwd: process.cwd(),
+			stdio: "inherit",
+			detached: false,
+		});
+	});
+
+	await exitGracefully();
 }
