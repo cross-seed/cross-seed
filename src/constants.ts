@@ -249,6 +249,7 @@ export enum LinkType {
 	SYMLINK = "symlink",
 	HARDLINK = "hardlink",
 	REFLINK = "reflink",
+	REFLINK_OR_COPY = "reflinkOrCopy",
 }
 
 export enum BlocklistType {
