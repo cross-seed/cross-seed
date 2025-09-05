@@ -12,6 +12,8 @@ import {
 	VIDEO_EXTENSIONS,
 	TORRENT_TAG,
 	TORRENT_CATEGORY_SUFFIX,
+	BAD_EP_REGEX,
+	BAD_SEASON_REGEX,
 } from "./constants.js";
 import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
@@ -181,6 +183,19 @@ export async function filterByContent(
 		extractInt(searchee.title.match(SEASON_REGEX)!.groups!.season) === 0
 	) {
 		logReason("it is a Specials folder", searchee, mediaType);
+		return false;
+	}
+
+	if (
+		[Label.SEARCH, Label.WEBHOOK].includes(searchee.label) &&
+		(BAD_EP_REGEX.test(searchee.title) ||
+			BAD_SEASON_REGEX.test(searchee.title))
+	) {
+		logReason(
+			"it has a non-standard episode/season naming format",
+			searchee,
+			mediaType,
+		);
 		return false;
 	}
 
