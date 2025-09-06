@@ -839,7 +839,6 @@ export async function bulkSearch(options?: {
 export async function scanRssFeeds() {
 	const { dataDirs, torrentDir, torznab, useClientTorrents } =
 		getRuntimeConfig();
-	await indexTorrentsAndDataDirs();
 	if (
 		!torznab.length ||
 		(!useClientTorrents && !torrentDir && !dataDirs.length)
@@ -857,6 +856,7 @@ export async function scanRssFeeds() {
 	});
 
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
+	await indexTorrentsAndDataDirs();
 	let numCandidates = 0;
 	await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
 		for await (const candidate of candidates) {
