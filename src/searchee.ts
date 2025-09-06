@@ -664,11 +664,12 @@ export function getKeyMetaInfo(stem: string): string {
 
 const logEnsemble = (
 	reason: string,
+	searcheeLabel: SearcheeLabel,
 	options: { useFilters: boolean },
 ): void => {
 	if (!options.useFilters) return;
 	logger.verbose({
-		label: Label.PREFILTER,
+		label: `${searcheeLabel}/${Label.PREFILTER}`,
 		message: reason,
 	});
 };
@@ -815,6 +816,7 @@ async function createVirtualSeasonSearchee(
 	episodeSearchees: Map<string | number, SearcheeWithLabel[]>,
 	ensembleTitleMap: Map<string, string>,
 	torrentSavePaths: Map<string, string>,
+	searcheeLabel: SearcheeLabel,
 	options: { useFilters: boolean },
 ): Promise<SearcheeWithLabel | null> {
 	const seasonFromEpisodes = getRuntimeConfig().seasonFromEpisodes!;
@@ -830,6 +832,7 @@ async function createVirtualSeasonSearchee(
 		if (options.useFilters && availPct < seasonFromEpisodes) {
 			logEnsemble(
 				`Skipping virtual searchee for ${ensembleTitle} episodes as there's only ${episodes.length}/${highestEpisode} (${availPct.toFixed(2)} < ${seasonFromEpisodes.toFixed(2)})`,
+				searcheeLabel,
 				options,
 			);
 			return null;
@@ -840,7 +843,7 @@ async function createVirtualSeasonSearchee(
 		title: ensembleTitle,
 		files: [], // Can have multiple files per episode
 		length: 0, // Total length of episodes (uses average for multi-file episodes)
-		label: episodeSearchees.values().next().value[0].label,
+		label: searcheeLabel,
 	};
 	let newestFileAge = 0;
 	const hosts = new Map<string, number>();
@@ -874,6 +877,7 @@ async function createVirtualSeasonSearchee(
 	if (seasonSearchee.files.length < minEpisodes) {
 		logEnsemble(
 			`Skipping virtual searchee for ${ensembleTitle} episodes as only ${seasonSearchee.files.length} episode files were found (min: ${minEpisodes})`,
+			searcheeLabel,
 			options,
 		);
 		return null;
@@ -881,12 +885,14 @@ async function createVirtualSeasonSearchee(
 	if (options.useFilters && Date.now() - newestFileAge < ms("8 days")) {
 		logEnsemble(
 			`Skipping virtual searchee for ${ensembleTitle} episodes as some are below the minimum age of 8 days: ${humanReadableDate(newestFileAge)}`,
+			searcheeLabel,
 			options,
 		);
 		return null;
 	}
 	logEnsemble(
 		`Created virtual searchee for ${ensembleTitle}: ${episodeSearchees.size} episodes - ${seasonSearchee.files.length} files - ${humanReadableSize(seasonSearchee.length)}`,
+		searcheeLabel,
 		options,
 	);
 	return seasonSearchee;
@@ -904,9 +910,10 @@ export async function createEnsembleSearchees(
 				getRuntimeConfig();
 			if (!allSearchees.length) return [];
 			if (!seasonFromEpisodes) return [];
+			const searcheeLabel = allSearchees[0].label;
 			if (options.useFilters) {
 				logger.info({
-					label: allSearchees[0].label,
+					label: searcheeLabel,
 					message: `Creating virtual seasons from episode searchees...`,
 				});
 			}
@@ -931,12 +938,14 @@ export async function createEnsembleSearchees(
 					episodeSearchees,
 					ensembleTitleMap,
 					torrentSavePaths,
+					searcheeLabel,
 					options,
 				);
 				if (seasonSearchee) seasonSearchees.push(seasonSearchee);
 			}
 			logEnsemble(
 				`Created ${seasonSearchees.length} virtual season searchees...`,
+				searcheeLabel,
 				options,
 			);
 

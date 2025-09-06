@@ -58,6 +58,7 @@ import {
 	verifyDir,
 	withMutex,
 } from "./utils.js";
+import winston from "winston";
 
 const linkDirSrcName = "linkDirSrc.cross-seed";
 const linkDirDestName = "linkDirDest.cross-seed";
@@ -409,18 +410,14 @@ function logActionResult(
 	searchee: SearcheeWithLabel,
 	tracker: string,
 	decision: Decision,
+	infoOrVerbose: winston.LeveledLogMethod,
+	warnOrVerbose: winston.LeveledLogMethod,
 ) {
 	const metaLog = getLogString(newMeta, chalk.green.bold);
 	const searcheeLog = getLogString(searchee, chalk.magenta.bold);
 	const source = `${getSearcheeSource(searchee)} (${searcheeLog})`;
 	const foundBy = `Found ${metaLog} on ${chalk.bold(tracker)} by`;
 
-	let infoOrVerbose = logger.info;
-	let warnOrVerbose = logger.warn;
-	if (searchee.label === Label.INJECT) {
-		infoOrVerbose = logger.verbose;
-		warnOrVerbose = logger.verbose;
-	}
 	switch (result) {
 		case SaveResult.SAVED:
 			infoOrVerbose({
@@ -480,9 +477,21 @@ export async function performActionWithoutMutex(
 	options = { onlyCompleted: true },
 ): Promise<ActionReturn> {
 	const { action, linkDirs } = getRuntimeConfig();
+	const warnOrVerbose =
+		searchee.label !== Label.INJECT ? logger.warn : logger.verbose;
+	const infoOrVerbose =
+		searchee.label !== Label.INJECT ? logger.info : logger.verbose;
 
 	if (action === Action.SAVE) {
-		logActionResult(SaveResult.SAVED, newMeta, searchee, tracker, decision);
+		logActionResult(
+			SaveResult.SAVED,
+			newMeta,
+			searchee,
+			tracker,
+			decision,
+			infoOrVerbose,
+			warnOrVerbose,
+		);
 		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 		return { actionResult: SaveResult.SAVED };
 	}
@@ -492,10 +501,6 @@ export async function performActionWithoutMutex(
 	let destinationDirFromClient = false;
 	let unlinkOk = false;
 	let linkedNewFiles = false;
-	const warnOrVerbose =
-		searchee.label !== Label.INJECT ? logger.warn : logger.verbose;
-	const infoOrVerbose =
-		searchee.label !== Label.INJECT ? logger.info : logger.verbose;
 
 	const clients = getClients();
 	let client =
@@ -517,6 +522,8 @@ export async function performActionWithoutMutex(
 					searchee,
 					tracker,
 					decision,
+					infoOrVerbose,
+					warnOrVerbose,
 				);
 				await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 				return { client, actionResult, linkedNewFiles };
@@ -526,7 +533,15 @@ export async function performActionWithoutMutex(
 				label: searchee.label,
 				message: `Failed to link files for ${getLogString(newMeta)} from ${getLogString(searchee)}: ${result}`,
 			});
-			logActionResult(actionResult, newMeta, searchee, tracker, decision);
+			logActionResult(
+				actionResult,
+				newMeta,
+				searchee,
+				tracker,
+				decision,
+				infoOrVerbose,
+				warnOrVerbose,
+			);
 			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 			return { actionResult, linkedNewFiles };
 		}
@@ -553,7 +568,15 @@ export async function performActionWithoutMutex(
 			message: `Failed to find a torrent client for ${getLogString(searchee)}`,
 		});
 		const actionResult = InjectionResult.FAILURE;
-		logActionResult(actionResult, newMeta, searchee, tracker, decision);
+		logActionResult(
+			actionResult,
+			newMeta,
+			searchee,
+			tracker,
+			decision,
+			infoOrVerbose,
+			warnOrVerbose,
+		);
 		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 		return { actionResult, linkedNewFiles };
 	}
@@ -573,7 +596,15 @@ export async function performActionWithoutMutex(
 			});
 		}
 		const actionResult = InjectionResult.FAILURE;
-		logActionResult(actionResult, newMeta, searchee, tracker, decision);
+		logActionResult(
+			actionResult,
+			newMeta,
+			searchee,
+			tracker,
+			decision,
+			infoOrVerbose,
+			warnOrVerbose,
+		);
 		return { actionResult, linkedNewFiles };
 	}
 	if (injectClient && injectClient.clientHost !== client.clientHost) {
@@ -582,7 +613,15 @@ export async function performActionWithoutMutex(
 			message: `Skipping ${getLogString(newMeta)} injection into ${client.clientHost} - existing match is using ${injectClient.clientHost}`,
 		});
 		const actionResult = InjectionResult.FAILURE;
-		logActionResult(actionResult, newMeta, searchee, tracker, decision);
+		logActionResult(
+			actionResult,
+			newMeta,
+			searchee,
+			tracker,
+			decision,
+			infoOrVerbose,
+			warnOrVerbose,
+		);
 		return { actionResult, linkedNewFiles };
 	}
 
@@ -600,7 +639,15 @@ export async function performActionWithoutMutex(
 				message: `Failed to link files for ${getLogString(newMeta)} from ${getLogString(searchee)}: ${res.unwrapErr().message}`,
 			});
 			const actionResult = InjectionResult.FAILURE;
-			logActionResult(actionResult, newMeta, searchee, tracker, decision);
+			logActionResult(
+				actionResult,
+				newMeta,
+				searchee,
+				tracker,
+				decision,
+				infoOrVerbose,
+				warnOrVerbose,
+			);
 			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 			return { actionResult, linkedNewFiles };
 		}
@@ -618,7 +665,15 @@ export async function performActionWithoutMutex(
 				message: `Failed to find a save path for ${getLogString(searchee)}`,
 			});
 			const actionResult = InjectionResult.FAILURE;
-			logActionResult(actionResult, newMeta, searchee, tracker, decision);
+			logActionResult(
+				actionResult,
+				newMeta,
+				searchee,
+				tracker,
+				decision,
+				infoOrVerbose,
+				warnOrVerbose,
+			);
 			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
 			return { actionResult, linkedNewFiles };
 		}
@@ -639,7 +694,15 @@ export async function performActionWithoutMutex(
 				},
 			);
 
-	logActionResult(actionResult, newMeta, searchee, tracker, decision);
+	logActionResult(
+		actionResult,
+		newMeta,
+		searchee,
+		tracker,
+		decision,
+		infoOrVerbose,
+		warnOrVerbose,
+	);
 	if (actionResult === InjectionResult.SUCCESS) {
 		// cross-seed may need to process these with the inject job
 		if (shouldRecheck(newMeta, decision) || !searchee.infoHash) {

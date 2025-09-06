@@ -349,7 +349,6 @@ export async function searchForLocalTorrentByCriteria(
 					configOverride: options.configOverride,
 					allowSeasonPackEpisodes,
 					ignoreCrossSeeds: options.ignoreCrossSeeds,
-					blockListOnly: false,
 				}))
 			) {
 				filtered++;

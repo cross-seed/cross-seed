@@ -41,8 +41,9 @@ const MAX_INT = Number.MAX_SAFE_INTEGER;
 
 function logReason(
 	reason: string,
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	mediaType: MediaType,
+	options?: { logWithoutSearcheeLabel?: boolean },
 ): void {
 	const message = `${getLogString(searchee)} | MediaType: ${mediaType.toUpperCase()} - ${reason}`;
 	if (searchee.label === Label.WEBHOOK) {
@@ -52,7 +53,9 @@ function logReason(
 		});
 	} else {
 		logger.verbose({
-			label: Label.PREFILTER,
+			label: options?.logWithoutSearcheeLabel
+				? Label.PREFILTER
+				: `${searchee.label}/${Label.PREFILTER}`,
 			message,
 		});
 	}
@@ -90,7 +93,8 @@ export async function filterByContent(
 		configOverride: Partial<RuntimeConfig>;
 		allowSeasonPackEpisodes: boolean;
 		ignoreCrossSeeds: boolean;
-		blockListOnly: boolean;
+		blockListOnly?: boolean;
+		logWithoutSearcheeLabel?: boolean;
 	},
 ): Promise<boolean> {
 	const {
@@ -108,6 +112,7 @@ export async function filterByContent(
 			`it matches the blocklist: ${blockedNote}`,
 			searchee,
 			mediaType,
+			options,
 		);
 		return false;
 	}
@@ -121,7 +126,7 @@ export async function filterByContent(
 		(SEASON_REGEX.test(basename(dirname(searchee.path))) ||
 			SONARR_SUBFOLDERS_REGEX.test(basename(dirname(searchee.path))))
 	) {
-		logReason("it is a season pack episode", searchee, mediaType);
+		logReason("it is a season pack episode", searchee, mediaType, options);
 		return false;
 	}
 
@@ -130,7 +135,7 @@ export async function filterByContent(
 		searchee.label !== Label.ANNOUNCE &&
 		isSingleEpisode(searchee, mediaType)
 	) {
-		logReason("it is a single episode", searchee, mediaType);
+		logReason("it is a single episode", searchee, mediaType, options);
 		return false;
 	}
 
@@ -149,12 +154,13 @@ export async function filterByContent(
 			`nonVideoSizeRatio ${nonVideoSizeRatio.toFixed(3)} > ${fuzzySizeThreshold} fuzzySizeThreshold`,
 			searchee,
 			mediaType,
+			options,
 		);
 		return false;
 	}
 
 	if (options?.ignoreCrossSeeds && isCrossSeed(searchee)) {
-		logReason("it is a cross seed", searchee, mediaType);
+		logReason("it is a cross seed", searchee, mediaType, options);
 		return false;
 	}
 
@@ -173,6 +179,7 @@ export async function filterByContent(
 			"it looks like an arr movie/series directory",
 			searchee,
 			mediaType,
+			options,
 		);
 		return false;
 	}
@@ -182,7 +189,7 @@ export async function filterByContent(
 		mediaType === MediaType.SEASON &&
 		extractInt(searchee.title.match(SEASON_REGEX)!.groups!.season) === 0
 	) {
-		logReason("it is a Specials folder", searchee, mediaType);
+		logReason("it is a Specials folder", searchee, mediaType, options);
 		return false;
 	}
 
@@ -195,6 +202,7 @@ export async function filterByContent(
 			"it has a non-standard episode/season naming format",
 			searchee,
 			mediaType,
+			options,
 		);
 		return false;
 	}
@@ -293,7 +301,7 @@ type TimestampDataSql = {
 };
 
 export async function filterTimestamps(
-	searchee: Searchee,
+	searchee: SearcheeWithLabel,
 	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<boolean> {
 	const { excludeOlder, excludeRecentSearch, seasonFromEpisodes } =

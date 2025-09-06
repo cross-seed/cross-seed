@@ -521,7 +521,7 @@ export async function searchTorznab(
 	const { torznab } = getRuntimeConfig();
 	if (torznab.length === 0) {
 		logger.warn({
-			label: Label.SEARCH,
+			label: searchee.label,
 			message: "no indexers are available, skipping search",
 		});
 		return [];
