@@ -82,7 +82,6 @@ import {
 	stripExtension,
 	withMutex,
 	WithRequired,
-	yieldToEventLoop,
 } from "./utils.js";
 
 export interface Candidate {
@@ -525,6 +524,10 @@ async function getEnsembleForCandidate(
 	return { searchees, method };
 }
 
+const checkNewCandidateMatchSemaphore = new AsyncSemaphore({
+	permits: 1,
+	lifetimeMs: ms(`1 minute`),
+}); // Limit concurrent candidate processing to avoid bogarting the event loop
 export async function checkNewCandidateMatch(
 	candidate: Candidate,
 	searcheeLabel: SearcheeLabel,
@@ -534,17 +537,25 @@ export async function checkNewCandidateMatch(
 }> {
 	const searchees: SearcheeWithLabel[] = [];
 	const methods: string[] = [];
-	const lookup = await getSearcheesForCandidate(candidate, searcheeLabel);
-	if (lookup) {
-		searchees.push(...lookup.searchees);
-		methods.push(lookup.method);
+	const semaphoreId = await checkNewCandidateMatchSemaphore.acquire();
+	try {
+		const lookup = await getSearcheesForCandidate(candidate, searcheeLabel);
+		if (lookup) {
+			searchees.push(...lookup.searchees);
+			methods.push(lookup.method);
+		}
+		const ensemble = await getEnsembleForCandidate(
+			candidate,
+			searcheeLabel,
+		);
+		if (ensemble) {
+			searchees.push(...ensemble.searchees);
+			methods.push(ensemble.method);
+		}
+		if (!searchees.length) return { decision: null, actionResult: null };
+	} finally {
+		checkNewCandidateMatchSemaphore.release(semaphoreId);
 	}
-	const ensemble = await getEnsembleForCandidate(candidate, searcheeLabel);
-	if (ensemble) {
-		searchees.push(...ensemble.searchees);
-		methods.push(ensemble.method);
-	}
-	if (!searchees.length) return { decision: null, actionResult: null };
 
 	logger.verbose({
 		label: searcheeLabel,
@@ -845,20 +856,12 @@ export async function scanRssFeeds() {
 		message: "Querying RSS feeds...",
 	});
 
-	const semaphore = new AsyncSemaphore(1); // Limit concurrent candidate processing to avoid bogarting the event loop
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
 	let numCandidates = 0;
 	await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
 		for await (const candidate of candidates) {
-			await semaphore.acquire();
-			try {
-				await checkNewCandidateMatch(candidate, Label.RSS);
-				await yieldToEventLoop(10); // Allow other tasks to run between candidates
-			} finally {
-				semaphore.release();
-			}
+			await checkNewCandidateMatch(candidate, Label.RSS);
 			numCandidates++;
-			await yieldToEventLoop(); // Allow other trackers to acquire semaphore
 		}
 	});
 
