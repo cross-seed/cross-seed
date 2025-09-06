@@ -642,10 +642,7 @@ export async function checkNewCandidateMatch(
 		]);
 	}
 	if (actionResult === InjectionResult.SUCCESS) {
-		await indexTorrentsAndDataDirs({
-			startup: false,
-			indexDataDirs: false,
-		});
+		void indexTorrentsAndDataDirs();
 	}
 	return { decision, actionResult };
 }

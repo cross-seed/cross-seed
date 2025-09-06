@@ -541,7 +541,7 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 }
 
 export async function indexTorrentsAndDataDirs(
-	options = { startup: false, indexDataDirs: true },
+	options = { startup: false },
 ): Promise<void> {
 	if (options.startup) {
 		const { dataDirs, seasonFromEpisodes, torrentDir, useClientTorrents } =
@@ -602,7 +602,7 @@ export async function indexTorrentsAndDataDirs(
 			const maxRetries = 3;
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
-					if (options.indexDataDirs) await indexDataDirs(options); // Running together may increase failures
+					await indexDataDirs(options); // Running together may increase failures
 					await indexTorrents(options); // Run second so this data is more fresh
 					break;
 				} catch (e) {
