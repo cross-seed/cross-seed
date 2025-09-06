@@ -155,12 +155,6 @@ async function search(
 	req: IncomingMessage,
 	res: ServerResponse,
 ): Promise<void> {
-	const injectJob = getJobs().find((job) => job.name === JobName.INJECT);
-	if (injectJob) {
-		injectJob.runAheadOfSchedule = true;
-		void checkJobs({ isFirstRun: false, useQueue: true });
-	}
-	await indexTorrentsAndDataDirs();
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -207,6 +201,12 @@ async function search(
 	};
 
 	try {
+		const injectJob = getJobs().find((job) => job.name === JobName.INJECT);
+		if (injectJob) {
+			injectJob.runAheadOfSchedule = true;
+			void checkJobs({ isFirstRun: false, useQueue: true });
+		}
+		await indexTorrentsAndDataDirs();
 		let numFound: number | null = null;
 		if (data) {
 			numFound = await searchForLocalTorrentByCriteria(data, {
@@ -272,7 +272,6 @@ async function announce(
 	res: ServerResponse,
 ): Promise<void> {
 	const { dataDirs, torrentDir, useClientTorrents } = getRuntimeConfig();
-	await indexTorrentsAndDataDirs();
 	const dataStr = await getData(req);
 	let data;
 	try {
@@ -313,6 +312,7 @@ async function announce(
 				`Announce requires at least one of useClientTorrents, torrentDir, or dataDirs to be set`,
 			);
 		}
+		await indexTorrentsAndDataDirs();
 		const result = await checkNewCandidateMatch(candidate, Label.ANNOUNCE);
 		if (!result.decision) {
 			res.writeHead(204);
