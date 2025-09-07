@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { SettingsLayout } from '@/components/SettingsLayout';
 import { Page } from '@/components/Page';
 
 function DebugSettings() {
@@ -106,38 +105,41 @@ function DebugSettings() {
 
   if (isLoading) {
     return (
-      <Page>
-        <SettingsLayout>
-          <div className="flex items-center justify-center p-8">
-            <div>Loading settings...</div>
-          </div>
-        </SettingsLayout>
+      <Page breadcrumbs={['Settings', 'Debug']}>
+        <div className="flex items-center justify-center p-8">
+          <div>Loading settings...</div>
+        </div>
       </Page>
     );
   }
 
+  const actions = (
+    <div className="flex gap-2">
+      <Button
+        variant="outline"
+        onClick={handleReset}
+        disabled={saveMutation.isPending}
+      >
+        Reset
+      </Button>
+      <Button
+        onClick={handleSave}
+        disabled={!isValid || saveMutation.isPending}
+      >
+        {saveMutation.isPending ? 'Saving...' : 'Save'}
+      </Button>
+    </div>
+  );
+
   return (
-    <Page>
-      <SettingsLayout>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">Raw Settings JSON</h3>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleReset}
-                disabled={saveMutation.isPending}
-              >
-                Reset
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={!isValid || saveMutation.isPending}
-              >
-                {saveMutation.isPending ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-          </div>
+    <Page breadcrumbs={['Settings', 'Debug']} actions={actions}>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold">Debug Settings</h1>
+          <p className="text-muted-foreground">
+            Raw JSON editor for debugging configuration issues
+          </p>
+        </div>
 
           <div className="relative">
             <textarea
@@ -168,8 +170,7 @@ function DebugSettings() {
               changes.
             </p>
           </div>
-        </div>
-      </SettingsLayout>
+      </div>
     </Page>
   );
 }
