@@ -20,7 +20,7 @@ function DebugSettings() {
   );
 
   const saveMutation = useMutation(
-    trpc.settings.save.mutationOptions({
+    trpc.settings.replace.mutationOptions({
       onSuccess: () => {
         toast.success('Settings saved successfully!', {
           description: 'Your changes will take effect on the next restart.',

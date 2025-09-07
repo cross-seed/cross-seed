@@ -3,7 +3,8 @@ import { Label, logger } from "../../logger.js";
 import { getRuntimeConfig } from "../../runtimeConfig.js";
 import { getApiKey } from "../../auth.js";
 import { z } from "zod";
-import { updateDbConfig } from "../../dbConfig.js";
+import { setDbConfig, updateDbConfig } from "../../dbConfig.js";
+import { RuntimeConfig } from "../../runtimeConfig.js";
 
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
@@ -37,6 +38,26 @@ export const settingsRouter = router({
 			} catch (error) {
 				logger.error({ label: Label.SERVER, message: error.message });
 				throw new Error(`Failed to save config: ${error.message}`);
+			}
+		}),
+
+	// Full replacement for debug page
+	replace: authedProcedure
+		.input(z.object({}).passthrough())
+		.mutation(async ({ input }) => {
+			try {
+				logger.info({
+					label: Label.SERVER,
+					message: `Replacing full config...`,
+				});
+
+				// Full replacement instead of partial update
+				await setDbConfig(input as RuntimeConfig);
+
+				return { success: true };
+			} catch (error) {
+				logger.error({ label: Label.SERVER, message: error.message });
+				throw new Error(`Failed to replace config: ${error.message}`);
 			}
 		}),
 
