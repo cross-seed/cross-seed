@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ function DebugSettings() {
   const [jsonValue, setJsonValue] = useState('');
   const [isValid, setIsValid] = useState(true);
   const [parseError, setParseError] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -35,11 +36,23 @@ function DebugSettings() {
     }),
   );
 
+  const autoResizeTextarea = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  };
+
   useEffect(() => {
     if (settingsData?.config) {
       setJsonValue(JSON.stringify(settingsData.config, null, 2));
     }
   }, [settingsData]);
+
+  useEffect(() => {
+    autoResizeTextarea();
+  }, [jsonValue]);
 
   const validateJson = (value: string) => {
     try {
@@ -57,6 +70,7 @@ function DebugSettings() {
   const handleJsonChange = (value: string) => {
     setJsonValue(value);
     validateJson(value);
+    setTimeout(autoResizeTextarea, 0); // Defer to next tick
   };
 
   const handleSave = () => {
@@ -78,6 +92,7 @@ function DebugSettings() {
       setJsonValue(JSON.stringify(settingsData.config, null, 2));
       setIsValid(true);
       setParseError('');
+      setTimeout(autoResizeTextarea, 0);
     }
   };
 
@@ -124,9 +139,10 @@ function DebugSettings() {
 
           <div className="relative">
             <textarea
+              ref={textareaRef}
               value={jsonValue}
               onChange={(e) => handleJsonChange(e.target.value)}
-              className={`h-96 w-full resize-none rounded-md border p-3 font-mono text-sm ${
+              className={`min-h-96 w-full resize-none rounded-md border p-3 font-mono text-sm overflow-hidden ${
                 isValid
                   ? 'border-gray-300 dark:border-gray-600'
                   : 'border-red-500 dark:border-red-400'
