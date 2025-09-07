@@ -139,12 +139,6 @@ function DebugSettings() {
             </div>
           </div>
 
-          {!isValid && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-              <strong>JSON Error:</strong> {parseError}
-            </div>
-          )}
-
           <div className="relative">
             <textarea
               ref={textareaRef}
@@ -159,6 +153,12 @@ function DebugSettings() {
               placeholder="Loading settings..."
             />
           </div>
+
+          {!isValid && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+              <strong>JSON Error:</strong> {parseError}
+            </div>
+          )}
 
           <div className="text-sm text-gray-600 dark:text-gray-400">
             <p>
