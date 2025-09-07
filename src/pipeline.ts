@@ -67,6 +67,7 @@ import {
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
+import { getEnabledIndexers } from "./indexers.js";
 import {
 	AsyncSemaphore,
 	comparing,
@@ -824,17 +825,17 @@ export async function bulkSearch(options?: {
 }
 
 export async function scanRssFeeds() {
-	const { dataDirs, torrentDir, torznab, useClientTorrents } =
-		getRuntimeConfig();
+	const { dataDirs, torrentDir, useClientTorrents } = getRuntimeConfig();
 	await indexTorrentsAndDataDirs();
+	const enabledIndexers = await getEnabledIndexers();
 	if (
-		!torznab.length ||
+		!enabledIndexers.length ||
 		(!useClientTorrents && !torrentDir && !dataDirs.length)
 	) {
 		logger.error({
 			label: Label.RSS,
 			message:
-				"RSS requires torznab and at least one of useClientTorrents, torrentDir, or dataDirs to be set",
+				"RSS requires enabled indexers and at least one of useClientTorrents, torrentDir, or dataDirs to be set",
 		});
 		return;
 	}
@@ -846,19 +847,22 @@ export async function scanRssFeeds() {
 	const semaphore = new AsyncSemaphore(1); // Limit concurrent candidate processing to avoid bogarting the event loop
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
 	let numCandidates = 0;
-	await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
-		for await (const candidate of candidates) {
-			await semaphore.acquire();
-			try {
-				await checkNewCandidateMatch(candidate, Label.RSS);
-				await yieldToEventLoop(10); // Allow other tasks to run between candidates
-			} finally {
-				semaphore.release();
+	await mapAsync(
+		await queryRssFeeds(lastRun, enabledIndexers),
+		async (candidates) => {
+			for await (const candidate of candidates) {
+				await semaphore.acquire();
+				try {
+					await checkNewCandidateMatch(candidate, Label.RSS);
+					await yieldToEventLoop(10); // Allow other tasks to run between candidates
+				} finally {
+					semaphore.release();
+				}
+				numCandidates++;
+				await yieldToEventLoop(); // Allow other trackers to acquire semaphore
 			}
-			numCandidates++;
-			await yieldToEventLoop(); // Allow other trackers to acquire semaphore
-		}
-	});
+		},
+	);
 
 	logger.info({
 		label: Label.RSS,
