@@ -26,12 +26,17 @@ import { assessCandidate } from "./decide.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { findAllSearchees } from "./pipeline.js";
+import {
+	findBlockedStringInReleaseMaybe,
+	logFilterReason,
+} from "./preFilter.js";
 import { sendResultsNotification } from "./pushNotifier.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createEnsembleSearchees,
 	createSearcheeFromMetafile,
+	getMediaType,
 	SearcheeWithLabel,
 } from "./searchee.js";
 import {
@@ -143,10 +148,11 @@ async function deleteTorrentFileIfComplete(
 async function whichSearcheesMatchTorrent(
 	meta: Metafile,
 	searchees: SearcheeWithLabel[],
+	blockList: string[],
 	ignoreTitles: boolean,
 ): Promise<{
 	matches: AllMatches;
-	blockListedBy: SearcheeWithLabel[];
+	foundBlocked: boolean;
 	fuzzyFail: boolean;
 }> {
 	const isSimilar = (searchee: SearcheeWithLabel, meta: Metafile) =>
@@ -154,15 +160,29 @@ async function whichSearcheesMatchTorrent(
 		areMediaTitlesSimilar(searchee.title, meta.name) ||
 		areMediaTitlesSimilar(searchee.name, meta.name) ||
 		areMediaTitlesSimilar(searchee.name, meta.title);
-	const blockListedBy: SearcheeWithLabel[] = [];
+	let foundBlocked = false;
 	let fuzzyFail = false;
 	const matches: AllMatches = [];
 	for (const searchee of searchees) {
-		const { decision } = await assessCandidate(meta, searchee, new Set());
-		if (decision === Decision.BLOCKED_RELEASE) {
-			if (isSimilar(searchee, meta)) blockListedBy.push(searchee);
-			continue;
-		} else if (!isAnyMatchedDecision(decision)) {
+		const { decision } = await assessCandidate(
+			meta,
+			searchee,
+			new Set(),
+			[],
+		);
+		if (!isAnyMatchedDecision(decision)) continue;
+
+		const blockedNote = findBlockedStringInReleaseMaybe(
+			searchee,
+			blockList,
+		);
+		if (blockedNote) {
+			logFilterReason(
+				`it matches the blocklist: ${blockedNote}`,
+				searchee,
+				getMediaType(searchee),
+			);
+			foundBlocked = true;
 			continue;
 		}
 
@@ -204,7 +224,7 @@ async function whichSearcheesMatchTorrent(
 			(match) => -match.searchee.files.length,
 		),
 	);
-	return { matches, blockListedBy, fuzzyFail };
+	return { matches, foundBlocked, fuzzyFail };
 }
 
 async function injectInitialAction(
@@ -531,6 +551,7 @@ async function injectSavedTorrent(
 	searchees: SearcheeWithLabel[],
 	ignoreTitles: boolean,
 ) {
+	const { blockList } = getRuntimeConfig();
 	const metafileResult = await loadMetafile(
 		torrentFilePath,
 		progress,
@@ -538,34 +559,40 @@ async function injectSavedTorrent(
 	);
 	if (metafileResult.isErr()) return;
 	const { meta, tracker } = metafileResult.unwrap();
-
 	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 
-	const { matches, blockListedBy, fuzzyFail } =
-		await whichSearcheesMatchTorrent(meta, searchees, ignoreTitles);
-
-	if (!matches.length && blockListedBy.length) {
-		const blockListedBySlice = blockListedBy
-			.slice(0, 10)
-			.map((s) => getLogString(s, chalk.bold.white))
-			.join(" | ");
-		const blockListedByLog =
-			blockListedBy.length > 10
-				? `first 10 of ${blockListedBy.length} - ${blockListedBySlice}`
-				: blockListedBySlice;
+	const metaBlockedString = findBlockedStringInReleaseMaybe(meta, blockList);
+	if (metaBlockedString) {
 		logger.warn({
 			label: Label.INJECT,
-			message: `${progress} ${filePathLog} ${chalk.yellow("possibly blocklisted")}: ${blockListedByLog}`,
+			message: `${progress} ${filePathLog} ${chalk.yellow(`is in the blockList: ${metaBlockedString}`)}`,
 		});
 		summary.BLOCKED++;
-		if (!fuzzyFail) await deleteTorrentFileIfSafe(torrentFilePath);
 		return;
-	} else if (!matches.length) {
-		logger.error({
-			label: Label.INJECT,
-			message: `${progress} ${filePathLog} ${chalk.red("has no matches")}`,
-		});
-		summary.UNMATCHED++;
+	}
+
+	const { matches, foundBlocked, fuzzyFail } =
+		await whichSearcheesMatchTorrent(
+			meta,
+			searchees,
+			blockList,
+			ignoreTitles,
+		);
+
+	if (!matches.length) {
+		if (foundBlocked) {
+			logger.warn({
+				label: Label.INJECT,
+				message: `${progress} ${filePathLog} ${chalk.yellow(`has all matches in the blockList`)}`,
+			});
+			summary.BLOCKED++;
+		} else {
+			logger.error({
+				label: Label.INJECT,
+				message: `${progress} ${filePathLog} ${chalk.red("has no matches")}`,
+			});
+			summary.UNMATCHED++;
+		}
 		if (!fuzzyFail) await deleteTorrentFileIfSafe(torrentFilePath);
 		return;
 	}

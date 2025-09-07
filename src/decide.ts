@@ -322,9 +322,10 @@ export async function assessCandidate(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
 	infoHashesToExclude: Set<string>,
+	blockList: string[],
 	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<ResultAssessment> {
-	const { blockList, includeSingleEpisodes, matchMode } = getRuntimeConfig(
+	const { includeSingleEpisodes, matchMode } = getRuntimeConfig(
 		options?.configOverride,
 	);
 
@@ -557,10 +558,12 @@ async function assessAndSaveResults(
 	guidInfoHashMap: Map<string, string>,
 	options?: { configOverride: Partial<RuntimeConfig> },
 ) {
+	const { blockList } = getRuntimeConfig(options?.configOverride);
 	const assessment = await assessCandidate(
 		metaOrCandidate,
 		searchee,
 		infoHashesToExclude,
+		blockList,
 		options,
 	);
 

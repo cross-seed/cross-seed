@@ -39,7 +39,7 @@ import {
 
 const MAX_INT = Number.MAX_SAFE_INTEGER;
 
-function logReason(
+export function logFilterReason(
 	reason: string,
 	searchee: SearcheeWithLabel,
 	mediaType: MediaType,
@@ -108,7 +108,7 @@ export async function filterByContent(
 
 	const blockedNote = findBlockedStringInReleaseMaybe(searchee, blockList);
 	if (blockedNote) {
-		logReason(
+		logFilterReason(
 			`it matches the blocklist: ${blockedNote}`,
 			searchee,
 			mediaType,
@@ -126,7 +126,12 @@ export async function filterByContent(
 		(SEASON_REGEX.test(basename(dirname(searchee.path))) ||
 			SONARR_SUBFOLDERS_REGEX.test(basename(dirname(searchee.path))))
 	) {
-		logReason("it is a season pack episode", searchee, mediaType, options);
+		logFilterReason(
+			"it is a season pack episode",
+			searchee,
+			mediaType,
+			options,
+		);
 		return false;
 	}
 
@@ -135,7 +140,7 @@ export async function filterByContent(
 		searchee.label !== Label.ANNOUNCE &&
 		isSingleEpisode(searchee, mediaType)
 	) {
-		logReason("it is a single episode", searchee, mediaType, options);
+		logFilterReason("it is a single episode", searchee, mediaType, options);
 		return false;
 	}
 
@@ -150,7 +155,7 @@ export async function filterByContent(
 		}, 0) / searchee.length;
 
 	if (!includeNonVideos && nonVideoSizeRatio > fuzzySizeThreshold) {
-		logReason(
+		logFilterReason(
 			`nonVideoSizeRatio ${nonVideoSizeRatio.toFixed(3)} > ${fuzzySizeThreshold} fuzzySizeThreshold`,
 			searchee,
 			mediaType,
@@ -160,7 +165,7 @@ export async function filterByContent(
 	}
 
 	if (options?.ignoreCrossSeeds && isCrossSeed(searchee)) {
-		logReason("it is a cross seed", searchee, mediaType, options);
+		logFilterReason("it is a cross seed", searchee, mediaType, options);
 		return false;
 	}
 
@@ -175,7 +180,7 @@ export async function filterByContent(
 			SONARR_SUBFOLDERS_REGEX.test(basename(searchee.path))
 		)
 	) {
-		logReason(
+		logFilterReason(
 			"it looks like an arr movie/series directory",
 			searchee,
 			mediaType,
@@ -189,7 +194,12 @@ export async function filterByContent(
 		mediaType === MediaType.SEASON &&
 		extractInt(searchee.title.match(SEASON_REGEX)!.groups!.season) === 0
 	) {
-		logReason("it is a Specials folder", searchee, mediaType, options);
+		logFilterReason(
+			"it is a Specials folder",
+			searchee,
+			mediaType,
+			options,
+		);
 		return false;
 	}
 
@@ -198,7 +208,7 @@ export async function filterByContent(
 		(BAD_EP_REGEX.test(searchee.title) ||
 			BAD_SEASON_REGEX.test(searchee.title))
 	) {
-		logReason(
+		logFilterReason(
 			"it has a non-standard episode/season naming format",
 			searchee,
 			mediaType,
@@ -361,7 +371,7 @@ export async function filterTimestamps(
 	// Don't exclude if new indexer was added
 	if (latest_first_search !== MAX_INT) {
 		if (earliest_first_search && earliest_first_search < skipBefore) {
-			logReason(
+			logFilterReason(
 				`its first search timestamp ${humanReadableDate(
 					earliest_first_search,
 				)} is older than ${ms(excludeOlder!, { long: true })} ago`,
@@ -376,7 +386,7 @@ export async function filterTimestamps(
 		? nMsAgo(excludeRecentSearch)
 		: Number.POSITIVE_INFINITY;
 	if (earliest_last_search && earliest_last_search > skipAfter) {
-		logReason(
+		logFilterReason(
 			`its last search timestamp ${humanReadableDate(
 				earliest_last_search,
 			)} is newer than ${ms(excludeRecentSearch!, { long: true })} ago`,
