@@ -1,13 +1,8 @@
 import { constants, mkdir, stat } from "fs/promises";
-import ms from "ms";
 import { spawn } from "node:child_process";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
-import { validateUArrLs } from "./arr.js";
-import {
-	getClients,
-	instantiateDownloadClients,
-} from "./clients/TorrentClient.js";
+import { instantiateDownloadClients } from "./clients/TorrentClient.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
 import { getFileConfig } from "./configuration.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
@@ -22,8 +17,7 @@ import {
 	RuntimeConfig,
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
-import { validateTorznabUrls } from "./torznab.js";
-import { Awaitable, mapAsync, notExists, verifyDir, wait } from "./utils.js";
+import { Awaitable, notExists, verifyDir } from "./utils.js";
 
 const require = createRequire(import.meta.url);
 
@@ -131,56 +125,9 @@ async function checkConfigPaths(): Promise<void> {
 	}
 }
 
-async function retry<T>(
-	cb: () => Promise<T>,
-	numRetries: number,
-	delayMs: number,
-): Promise<T> {
-	const retries = Math.max(numRetries, 0);
-	let lastError = new Error("Retry failed");
-	for (let i = 0; i <= retries; i++) {
-		try {
-			return await cb();
-		} catch (e) {
-			const retryMsg =
-				i < retries ? `, retrying in ${delayMs / 1000}s` : "";
-			logger.error(
-				`Attempt ${i + 1}/${retries + 1} failed${retryMsg}: ${e.message}`,
-			);
-			logger.debug(e);
-			lastError = e;
-			if (i >= retries) break;
-			await wait(delayMs);
-		}
-	}
-	throw lastError;
-}
-
 export async function doStartupValidation(): Promise<void> {
 	await checkConfigPaths(); // ensure paths are valid first
 	instantiateDownloadClients();
-	const validateClientConfig = () =>
-		mapAsync(getClients(), (client) => client.validateConfig());
-	const errors = (
-		await Promise.allSettled([
-			retry(validateTorznabUrls, 5, ms("1 minute")),
-			retry(validateUArrLs, 5, ms("1 minute")),
-			retry(validateClientConfig, 5, ms("1 minute")),
-		])
-	).filter((p) => p.status === "rejected");
-	if (errors.length) {
-		throw new CrossSeedError(
-			`\tYour configuration is invalid, please see the ${errors.length > 1 ? "errors" : "error"} above for details.`,
-		);
-	}
-	logger.verbose({
-		label: Label.CONFIG,
-		message: inspect(getRuntimeConfig()),
-	});
-	logger.info({
-		label: Label.CONFIG,
-		message: "Your configuration is valid!",
-	});
 }
 
 /**
