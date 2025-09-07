@@ -37,16 +37,18 @@ export const trackerValidationSchema = z.object({
 });
 
 export const downloaderValidationSchema = z.object({
-  torrentClients: z.array(
-    z.object({
-      name: z.string().min(1, ZodErrorMessages.emptyString).nullish(),
-      client: z.string().min(1, ZodErrorMessages.emptyString),
-      url: z.string().url(),
-      user: z.string(),
-      password: z.string(),
-      readOnly: z.boolean().optional(),
-    })
-  ).nullish(),
+  torrentClients: z
+    .array(
+      z.object({
+        name: z.string().min(1, ZodErrorMessages.emptyString).nullish(),
+        client: z.string().min(1, ZodErrorMessages.emptyString),
+        url: z.string().url(),
+        user: z.string(),
+        password: z.string(),
+        readOnly: z.boolean().optional(),
+      }),
+    )
+    .nullish(),
   // torrentClients: z.array(z.string()).nullish(),
   // qbittorrentUrl: z.string().url().nullish(),
   // rtorrentRpcUrl: z.string().url().nullish(),
@@ -69,7 +71,7 @@ export const searchValidationSchema = z.object({
   delay: z
     .number()
     .nonnegative(ZodErrorMessages.delayNegative)
-    .gte(import.meta.env.DEV ? 0 : 30, ZodErrorMessages.delayUnsupported)
+    .gte(30, ZodErrorMessages.delayUnsupported)
     .lte(3600, ZodErrorMessages.delayUnsupported),
   matchMode: z.nativeEnum(MatchMode),
   rssCadence: z

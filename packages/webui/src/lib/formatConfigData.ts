@@ -21,7 +21,7 @@ export function formatConfigDataForForm(config: Config) {
     // fields show
     dataDirs: config.dataDirs?.length ? config.dataDirs : [''],
     linkDirs: config.linkDirs.length ? config.linkDirs : [''],
-    torznab: config.torznab.length ? config.torznab : [''],
+    torznab: config.torznab?.length ? config.torznab : [''],
     sonarr: config.sonarr?.length ? config.sonarr : [''],
     radarr: config.radarr?.length ? config.radarr : [''],
     notificationWebhookUrls: config.notificationWebhookUrls?.length
