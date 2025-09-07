@@ -161,15 +161,6 @@ function DebugSettings() {
               <strong>JSON Error:</strong> {parseError}
             </div>
           )}
-
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            <p>
-              <strong>Warning:</strong> This is a raw JSON editor for debugging
-              purposes. Invalid configuration may cause the application to
-              malfunction. Use the regular settings pages for safe configuration
-              changes.
-            </p>
-          </div>
       </div>
     </Page>
   );

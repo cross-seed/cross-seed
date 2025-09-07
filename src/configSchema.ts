@@ -345,7 +345,7 @@ export const VALIDATION_SCHEMA = z
 		delay: z
 			.number()
 			.nonnegative(ZodErrorMessages.delayNegative)
-			.gte(process.env.DEV ? 0 : 30, ZodErrorMessages.delayUnsupported)
+			.gte(30, ZodErrorMessages.delayUnsupported)
 			.lte(3600, ZodErrorMessages.delayUnsupported),
 		torznab: z.array(z.string().url()),
 		useClientTorrents: z.boolean().optional().default(false),
@@ -492,7 +492,6 @@ export const VALIDATION_SCHEMA = z
 			.nullish()
 			.refine(
 				(cadence) =>
-					process.env.DEV ||
 					!cadence ||
 					(cadence >= ms("10 minutes") && cadence <= ms("2 hours")),
 				ZodErrorMessages.rssCadenceUnsupported,
@@ -503,8 +502,7 @@ export const VALIDATION_SCHEMA = z
 			.transform(transformDurationString)
 			.nullish()
 			.refine(
-				(cadence) =>
-					process.env.DEV || !cadence || cadence >= ms("1 day"),
+				(cadence) => !cadence || cadence >= ms("1 day"),
 				ZodErrorMessages.searchCadenceUnsupported,
 			),
 		snatchTimeout: z
@@ -632,7 +630,6 @@ export const VALIDATION_SCHEMA = z
 	)
 	.refine(
 		(config) =>
-			process.env.DEV ||
 			!config.searchCadence ||
 			(config.excludeOlder &&
 				config.excludeRecentSearch &&
