@@ -1,9 +1,9 @@
 import { authedProcedure, router } from "../index.js";
 import { Label, logger } from "../../logger.js";
-import { getRuntimeConfig } from "../../runtimeConfig.js";
+import { getRuntimeConfig, setRuntimeConfig } from "../../runtimeConfig.js";
 import { getApiKey } from "../../auth.js";
 import { z } from "zod";
-import { setDbConfig, updateDbConfig } from "../../dbConfig.js";
+import { getDbConfig, setDbConfig, updateDbConfig } from "../../dbConfig.js";
 import { RuntimeConfig } from "../../runtimeConfig.js";
 
 export const settingsRouter = router({
@@ -34,6 +34,10 @@ export const settingsRouter = router({
 				// Save to database
 				await updateDbConfig(input);
 
+				// Update in-memory config with the merged result
+				const updatedConfig = await getDbConfig();
+				setRuntimeConfig(updatedConfig);
+
 				return { success: true };
 			} catch (error) {
 				logger.error({ label: Label.SERVER, message: error.message });
@@ -52,7 +56,10 @@ export const settingsRouter = router({
 				});
 
 				// Full replacement instead of partial update
-				await setDbConfig(input as RuntimeConfig);
+				await setDbConfig(input as unknown as RuntimeConfig);
+
+				// Update in-memory config so changes are visible immediately
+				setRuntimeConfig(input as unknown as RuntimeConfig);
 
 				return { success: true };
 			} catch (error) {
