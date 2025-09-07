@@ -3,12 +3,7 @@ import { Label, logger } from "../../logger.js";
 import { getRuntimeConfig } from "../../runtimeConfig.js";
 import { getApiKey } from "../../auth.js";
 import { z } from "zod";
-import {
-	getFileConfig,
-	mergeConfig,
-	writeConfig,
-} from "../../configuration.js";
-import { isDbConfigEnabled, updateDbConfig } from "../../dbConfig.js";
+import { updateDbConfig } from "../../dbConfig.js";
 
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
@@ -18,7 +13,7 @@ export const settingsRouter = router({
 			return {
 				config: runtimeConfig,
 				apikey,
-				isDbConfig: isDbConfigEnabled(),
+				isDbConfig: true,
 			};
 		} catch (error) {
 			logger.error({ label: Label.SERVER, message: error.message });
@@ -36,15 +31,8 @@ export const settingsRouter = router({
 					message: `Saving config updates...`,
 				});
 
-				if (isDbConfigEnabled()) {
-					// Save to database
-					await updateDbConfig(input);
-				} else {
-					// Save to file
-					const currentConfig = await getFileConfig();
-					const mergedConfig = mergeConfig(currentConfig, input);
-					await writeConfig(mergedConfig);
-				}
+				// Save to database
+				await updateDbConfig(input);
 
 				return { success: true };
 			} catch (error) {

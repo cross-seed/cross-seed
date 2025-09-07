@@ -12,7 +12,7 @@ import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
 import { getFileConfig } from "./configuration.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
-import { getDbConfig, isDbConfigEnabled, setDbConfig } from "./dbConfig.js";
+import { getDbConfig, setDbConfig } from "./dbConfig.js";
 import { createRequire } from "module";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
@@ -275,56 +275,49 @@ export function withFullRuntime(
 		initializeLogger(options as Record<string, unknown>);
 
 		let runtimeConfig: RuntimeConfig;
-		if (isDbConfigEnabled()) {
+		try {
+			// Load config from database
+			runtimeConfig = await getDbConfig();
+		} catch {
+			// No complete config in database, migrate from file or template
 			try {
-				// Load config from database
-				runtimeConfig = await getDbConfig();
-			} catch {
-				// No complete config in database, migrate from file or template
-				try {
-					// Try to load and migrate from file config
-					const fileConfig = await getFileConfig();
-					runtimeConfig = parseRuntimeConfigAndLogErrors({
-						...fileConfig,
-						...(options as Record<string, unknown>),
-					});
+				// Try to load and migrate from file config
+				const fileConfig = await getFileConfig();
+				runtimeConfig = parseRuntimeConfigAndLogErrors({
+					...fileConfig,
+					...(options as Record<string, unknown>),
+				});
 
-					// Preserve existing API key from apikey column
-					const existingApiKey = await db("settings")
-						.select("apikey")
-						.first();
-					if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
-						runtimeConfig.apiKey = existingApiKey.apikey;
-					}
-
-					await setDbConfig(runtimeConfig);
-					logger.info("Migrated file config to database");
-				} catch {
-					// No file config - use template directly
-					const templateConfig = require("./config.template.cjs")
-						.default as Record<string, unknown>;
-					runtimeConfig = parseRuntimeConfigAndLogErrors({
-						...templateConfig,
-						...(options as Record<string, unknown>),
-					});
-
-					// Preserve existing API key from apikey column
-					const existingApiKey = await db("settings")
-						.select("apikey")
-						.first();
-					if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
-						runtimeConfig.apiKey = existingApiKey.apikey;
-					}
-
-					await setDbConfig(runtimeConfig);
-					logger.info(
-						"Created initial database config from template",
-					);
+				// Preserve existing API key from apikey column
+				const existingApiKey = await db("settings")
+					.select("apikey")
+					.first();
+				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
+					runtimeConfig.apiKey = existingApiKey.apikey;
 				}
+
+				await setDbConfig(runtimeConfig);
+				logger.info("Migrated file config to database");
+			} catch {
+				// No file config - use template directly
+				const templateConfig = require("./config.template.cjs")
+					.default as Record<string, unknown>;
+				runtimeConfig = parseRuntimeConfigAndLogErrors({
+					...templateConfig,
+					...(options as Record<string, unknown>),
+				});
+
+				// Preserve existing API key from apikey column
+				const existingApiKey = await db("settings")
+					.select("apikey")
+					.first();
+				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
+					runtimeConfig.apiKey = existingApiKey.apikey;
+				}
+
+				await setDbConfig(runtimeConfig);
+				logger.info("Created initial database config from template");
 			}
-		} else {
-			// Load config from file + CLI options
-			runtimeConfig = parseRuntimeConfigAndLogErrors(options);
 		}
 
 		setRuntimeConfig(runtimeConfig);
