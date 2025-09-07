@@ -13,7 +13,6 @@ export const settingsRouter = router({
 			return {
 				config: runtimeConfig,
 				apikey,
-				isDbConfig: true,
 			};
 		} catch (error) {
 			logger.error({ label: Label.SERVER, message: error.message });
