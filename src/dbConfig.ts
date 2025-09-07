@@ -1,10 +1,6 @@
 import { db } from "./db.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
 
-export function isDbConfigEnabled(): boolean {
-	return process.env.DB_CONFIG === "true";
-}
-
 export async function getDbConfig(): Promise<RuntimeConfig> {
 	const row = await db("settings").select("settings_json").first();
 	if (!row || !row.settings_json) {
