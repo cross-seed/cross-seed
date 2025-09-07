@@ -67,6 +67,7 @@ import {
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
+import { getEnabledIndexers } from "./indexers.js";
 import {
 	AsyncSemaphore,
 	comparing,
@@ -836,16 +837,17 @@ export async function bulkSearch(options?: {
 }
 
 export async function scanRssFeeds() {
-	const { dataDirs, torrentDir, torznab, useClientTorrents } =
-		getRuntimeConfig();
+	const { dataDirs, torrentDir, useClientTorrents } = getRuntimeConfig();
+	await indexTorrentsAndDataDirs();
+	const enabledIndexers = await getEnabledIndexers();
 	if (
-		!torznab.length ||
+		!enabledIndexers.length ||
 		(!useClientTorrents && !torrentDir && !dataDirs.length)
 	) {
 		logger.error({
 			label: Label.RSS,
 			message:
-				"RSS requires torznab and at least one of useClientTorrents, torrentDir, or dataDirs to be set",
+				"RSS requires enabled indexers and at least one of useClientTorrents, torrentDir, or dataDirs to be set",
 		});
 		return;
 	}
@@ -857,7 +859,7 @@ export async function scanRssFeeds() {
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
 	await indexTorrentsAndDataDirs();
 	let numCandidates = 0;
-	await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
+	await mapAsync(await queryRssFeeds(lastRun, enabledIndexers), async (candidates) => {
 		for await (const candidate of candidates) {
 			await checkNewCandidateMatch(candidate, Label.RSS);
 			numCandidates++;
