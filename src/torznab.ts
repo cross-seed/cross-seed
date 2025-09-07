@@ -19,8 +19,6 @@ import {
 	USER_AGENT,
 } from "./constants.js";
 import { db } from "./db.js";
-import { isDbConfigEnabled } from "./dbConfig.js";
-import { CrossSeedError } from "./errors.js";
 import {
 	ALL_CAPS,
 	Caps,
@@ -48,14 +46,12 @@ import {
 	extractInt,
 	formatAsList,
 	getAnimeQueries,
-	getApikey,
 	getLogString,
 	getVideoQueries,
 	humanReadableDate,
 	isTruthy,
 	nMsAgo,
 	reformatTitleForSearching,
-	sanitizeUrl,
 	stripExtension,
 	wait,
 } from "./utils.js";
@@ -504,9 +500,9 @@ export async function* rssPager(
 
 export async function queryRssFeeds(
 	lastRun: number,
+	indexers: Indexer[],
 ): Promise<AsyncGenerator<Candidate>[]> {
 	const timeSinceLastRun = Date.now() - lastRun;
-	const indexers = await getEnabledIndexers();
 	return indexers.map((indexer) => rssPager(indexer, timeSinceLastRun));
 }
 
@@ -517,15 +513,6 @@ export async function searchTorznab(
 	progress: string,
 	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<IndexerCandidates[]> {
-	const { torznab } = getRuntimeConfig();
-	if (torznab.length === 0) {
-		logger.warn({
-			label: searchee.label,
-			message: "no indexers are available, skipping search",
-		});
-		return [];
-	}
-
 	const mediaType = getMediaType(searchee);
 	const { indexersToSearch, parsedMedia } = await getAndLogIndexers(
 		searchee,
@@ -560,93 +547,6 @@ export async function searchTorznab(
 		},
 	);
 	return [...cachedSearch.indexerCandidates, ...indexerCandidates];
-}
-
-export async function syncWithDb() {
-	const { torznab } = getRuntimeConfig();
-
-	const allIndexers = await getAllIndexers();
-
-	const inConfigButNotInDb = torznab.filter(
-		(configIndexer) =>
-			!allIndexers.some(
-				(dbIndexer) => dbIndexer.url === sanitizeUrl(configIndexer),
-			),
-	);
-
-	const inDbButNotInConfig = allIndexers.filter(
-		(dbIndexer) =>
-			!torznab.some(
-				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url,
-			),
-	);
-
-	const apikeyUpdates = allIndexers.reduce<{ id: number; apikey: string }[]>(
-		(acc, dbIndexer) => {
-			const configIndexer = torznab.find(
-				(configIndexer) => sanitizeUrl(configIndexer) === dbIndexer.url,
-			);
-			if (
-				configIndexer &&
-				dbIndexer.apikey !== getApikey(configIndexer)
-			) {
-				acc.push({
-					id: dbIndexer.id,
-					apikey: getApikey(configIndexer)!,
-				});
-			}
-			return acc;
-		},
-		[],
-	);
-
-	if (inDbButNotInConfig.length > 0) {
-		await db("indexer")
-			.whereIn(
-				"url",
-				inDbButNotInConfig.map((indexer) => indexer.url),
-			)
-			.update({ active: false });
-	}
-
-	if (inConfigButNotInDb.length > 0) {
-		await db("indexer")
-			.insert(
-				inConfigButNotInDb.map((url) => ({
-					url: sanitizeUrl(url),
-					apikey: getApikey(url)!,
-					active: true,
-					enabled: true,
-					name: null,
-					status: null,
-					retry_after: null,
-					search_cap: null,
-					tv_search_cap: null,
-					movie_search_cap: null,
-					music_search_cap: null,
-					audio_search_cap: null,
-					book_search_cap: null,
-					tv_id_caps: null,
-					movie_id_caps: null,
-					cat_caps: null,
-					limits_caps: null,
-				})),
-			)
-			.onConflict("url")
-			.merge(["active", "apikey"]);
-	}
-
-	await db.transaction(async (trx) => {
-		for (const apikeyUpdate of apikeyUpdates) {
-			await trx("indexer")
-				.where({ id: apikeyUpdate.id })
-				.update({ apikey: apikeyUpdate.apikey });
-		}
-		// drop cached UNKNOWN_ERRORs on startup
-		await trx("indexer")
-			.where({ status: IndexerStatus.UNKNOWN_ERROR })
-			.update({ status: IndexerStatus.OK });
-	});
 }
 
 export function assembleUrl(
@@ -758,18 +658,18 @@ function collateOutcomes<Correlator, SuccessReturnType>(
 }
 
 export async function updateCaps(): Promise<void> {
-	const allIndexers = await getAllIndexers();
+	const indexers = await getAllIndexers();
 	const outcomes = await Promise.allSettled<Caps>(
-		allIndexers.map((indexer) => fetchCaps(indexer)),
+		indexers.map((indexer) => fetchCaps(indexer)),
 	);
 	const { fulfilled } = collateOutcomes<number, Caps>(
-		allIndexers.map((i) => i.id),
+		indexers.map((i) => i.id),
 		outcomes,
 	);
 	for (const [indexerId, caps] of fulfilled) {
 		await updateIndexerCapsById(indexerId, caps);
 	}
-	for (const indexer of await getAllIndexers()) {
+	for (const indexer of indexers) {
 		if (!indexer.categories) {
 			logger.error({
 				label: Label.TORZNAB,
@@ -790,49 +690,6 @@ export async function updateCaps(): Promise<void> {
 			label: Label.TORZNAB,
 			message: `${indexer.name ?? indexer.url} MediaTypes: Supported [${supported.join(", ")}] | Unsupported [${unsupported.join(", ")}]`,
 		});
-	}
-}
-
-export async function validateTorznabUrls() {
-	const { torznab } = getRuntimeConfig();
-
-	// When DB_CONFIG is enabled, skip torznab array validation and sync
-	if (isDbConfigEnabled()) {
-		await updateCaps();
-	} else {
-		if (!torznab) return;
-
-		const urls: URL[] = torznab.map((str) => new URL(str));
-		for (const url of urls) {
-			if (!url.pathname.endsWith("/api")) {
-				throw new CrossSeedError(
-					`Torznab url ${url} must have a path ending in /api`,
-				);
-			}
-			if (!url.searchParams.has("apikey")) {
-				throw new CrossSeedError(
-					`Torznab url ${url} does not specify an apikey`,
-				);
-			}
-		}
-		await syncWithDb();
-		await updateCaps();
-	}
-
-	const indexersWithoutSearch = await db("indexer")
-		.where({ search_cap: false, active: true })
-		.select({ id: "id", url: "url", name: "name" });
-
-	for (const indexer of indexersWithoutSearch) {
-		logger.warn(
-			`Ignoring indexer that doesn't support searching: ${indexer.name ?? indexer.url}`,
-		);
-	}
-
-	const indexersWithSearch = await getEnabledIndexers();
-
-	if (indexersWithSearch.length === 0) {
-		logger.warn("no working indexers available");
 	}
 }
 
