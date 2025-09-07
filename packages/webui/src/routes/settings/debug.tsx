@@ -39,8 +39,16 @@ function DebugSettings() {
   const autoResizeTextarea = () => {
     const textarea = textareaRef.current;
     if (textarea) {
+      // Preserve the document scroll position
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      
       textarea.style.height = 'auto';
       textarea.style.height = `${textarea.scrollHeight}px`;
+      
+      // Restore the scroll position after layout recalculation
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollTop);
+      });
     }
   };
 
