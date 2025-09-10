@@ -39,8 +39,9 @@ export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
 export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
 export const CALIBRE_INDEXNUM_REGEX = /\s?\(\d+\)$/;
+export const INFOHASH_REGEX = /^[a-z0-9]{40}$/i;
 export const SAVED_TORRENTS_INFO_REGEX =
-	/^\[(?<mediaType>.+?)\]\[(?<tracker>.+?)\](?<name>.+?)(?:\[[^\]]*?\])?\.torrent$/i;
+	/^\[(?<mediaType>.+?)\]\[(?<tracker>.+?)\](?<name>.+?)(?:\[(?<infoHash>[a-z0-9]{40})\])?(?<cached>.cached)?\.torrent$/i;
 export const BAD_GROUP_PARSE_REGEX =
 	/^(?<badmatch>(?:dl|DDP?|aac|eac3|atmos|dts|ma|hd|[heav.c]{3.5}|[xh.]{1,2}[2456]|[0-9]+[ip]?|dxva|full|blu|ray|s(?:eason)?\W\d+|\W){3,})$/i;
 export const JSON_VALUES_REGEX = /".+?"\s*:\s*"(?<value>.+?)"\s*(?:,|})/g;
@@ -157,6 +158,7 @@ export const ALL_EXTENSIONS = [
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
 export const UNKNOWN_TRACKER = "UnknownTracker";
+export const MAX_PATH_BYTES = 255;
 export const LEVENSHTEIN_DIVISOR = 3;
 
 export enum MediaType {
@@ -200,7 +202,7 @@ export enum Decision {
 	MAGNET_LINK = "MAGNET_LINK",
 	RATE_LIMITED = "RATE_LIMITED",
 	/**
-	 * Searchee and Candidate info hash matches. Usually happens with public
+	 * Searchee and Candidate infoHash matches. Usually happens with public
 	 * torrents and torrents added by radarr/sonarr before cross-seed on announces.
 	 * Useful for the inject job as we ignore INFO_HASH_ALREADY_EXISTS and
 	 * for reporting a 204 announce status code instead of 200 from exists.
