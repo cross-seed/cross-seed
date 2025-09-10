@@ -2,6 +2,7 @@ import bencode from "bencode";
 import {
 	readdir,
 	readFile,
+	rename,
 	stat,
 	unlink,
 	utimes,
@@ -29,7 +30,6 @@ import {
 	findBlockedStringInReleaseMaybe,
 	isSingleEpisode,
 } from "./preFilter.js";
-import { Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
 	File,
@@ -38,9 +38,16 @@ import {
 	getMinSizeRatio,
 	getReleaseGroup,
 	Searchee,
+	SearcheeLabel,
 	SearcheeWithLabel,
 } from "./searchee.js";
-import { parseTorrentFromFilename, snatch, SnatchError } from "./torrent.js";
+import {
+	getTorrentSavePath,
+	parseMetadataFromFilename,
+	parseTorrentFromFilename,
+	snatch,
+	SnatchError,
+} from "./torrent.js";
 import {
 	extractInt,
 	getLogString,
@@ -112,10 +119,10 @@ function logDecision(
 			reason = `some files are missing or have different sizes${compareFileTreesPartial(metafile!, searchee) ? ` (will match in partial match mode)` : ""}`;
 			break;
 		case Decision.SAME_INFO_HASH:
-			reason = "the info hash is the same";
+			reason = "the infoHash is the same";
 			break;
 		case Decision.INFO_HASH_ALREADY_EXISTS:
-			reason = "the info hash matches a torrent you already have";
+			reason = "the infoHash matches a torrent you already have";
 			break;
 		case Decision.FILE_TREE_MISMATCH:
 			reason = `it has a different file tree${matchMode === MatchMode.STRICT ? " (will match in flexible or partial matchMode)" : ""}`;
@@ -321,6 +328,7 @@ function releaseVersionDoesMatch(searcheeName: string, candidateName: string) {
 export async function assessCandidate(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
+	tracker: string,
 	infoHashesToExclude: Set<string>,
 	blockList: string[],
 	options?: { configOverride: Partial<RuntimeConfig> },
@@ -383,7 +391,7 @@ export async function assessCandidate(
 					: { decision: Decision.DOWNLOAD_FAILED };
 		}
 		metafile = res.unwrap();
-		metaCached = await cacheTorrentFile(metafile);
+		metaCached = await cacheTorrentFile(metafile, tracker, searchee.label);
 		metaOrCandidate.size = metafile.length; // Trackers can be wrong
 	} else {
 		metafile = metaOrCandidate;
@@ -446,29 +454,46 @@ export async function assessCandidate(
 	return { decision: Decision.FILE_TREE_MISMATCH, metafile, metaCached };
 }
 
-async function existsInTorrentCache(infoHash: string): Promise<boolean> {
-	const torrentPath = path.join(
-		appDir(),
-		TORRENT_CACHE_FOLDER,
-		`${infoHash}.cached.torrent`,
+export async function existsInTorrentCache(
+	inputInfoHash: string,
+	dirEntries: string[] | null = null,
+): Promise<{ torrentPath: string; isLegacy: boolean } | null> {
+	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
+	let torrentPath: string | null = path.join(
+		torrentCacheDir,
+		`${inputInfoHash}.cached.torrent`,
 	);
-	if (await notExists(torrentPath)) return false;
+	let isLegacy = false;
+	if (await notExists(torrentPath)) {
+		torrentPath = null;
+		if (!dirEntries) dirEntries = await readdir(torrentCacheDir);
+		for (const file of dirEntries) {
+			const { infoHash } = parseMetadataFromFilename(file);
+			if (infoHash !== inputInfoHash) continue;
+			torrentPath = path.join(torrentCacheDir, file);
+			break;
+		}
+		if (!torrentPath) return null;
+	} else {
+		isLegacy = true;
+	}
 	await utimes(torrentPath, new Date(), (await stat(torrentPath)).mtime);
-	return true;
+	return { torrentPath, isLegacy };
 }
 
 async function getCachedTorrentFile(
-	infoHash: string,
-	searcheeLabel: string,
-	options: { deleteOnFail: boolean } = { deleteOnFail: true },
-): Promise<Result<Metafile, Error>> {
-	const torrentPath = path.join(
-		appDir(),
-		TORRENT_CACHE_FOLDER,
-		`${infoHash}.cached.torrent`,
-	);
+	infoHash: string | undefined,
+	tracker: string,
+	searcheeLabel: SearcheeLabel,
+	options = { deleteOnFail: true },
+): Promise<{ meta: Metafile; torrentPath: string } | null> {
+	if (!infoHash) return null;
+	const existsRes = await existsInTorrentCache(infoHash);
+	if (!existsRes) return null;
+	let { torrentPath } = existsRes;
+	let meta: Metafile;
 	try {
-		return resultOf(await parseTorrentFromFilename(torrentPath));
+		meta = await parseTorrentFromFilename(torrentPath);
 	} catch (e) {
 		logger.error({
 			label: `${searcheeLabel}/${Label.DECIDE}`,
@@ -476,19 +501,53 @@ async function getCachedTorrentFile(
 		});
 		logger.debug(e);
 		if (options.deleteOnFail) await unlink(torrentPath);
-		return resultOfErr(e);
+		return null;
 	}
+	if (existsRes.isLegacy) {
+		try {
+			const newPath = getTorrentSavePath(
+				meta,
+				getMediaType(meta),
+				tracker,
+				path.join(appDir(), TORRENT_CACHE_FOLDER),
+				{ cached: true },
+			);
+			await rename(torrentPath, newPath);
+			torrentPath = newPath;
+		} catch (e) {
+			logger.error({
+				label: `${searcheeLabel}/${Label.DECIDE}`,
+				message: `Failed to rename cached torrent ${getLogString(meta)}: ${e.message}`,
+			});
+			logger.debug(e);
+		}
+	}
+	return { meta, torrentPath };
 }
 
-async function cacheTorrentFile(meta: Metafile): Promise<boolean> {
-	if (await existsInTorrentCache(meta.infoHash)) return false;
-	const torrentPath = path.join(
-		appDir(),
-		TORRENT_CACHE_FOLDER,
-		`${meta.infoHash}.cached.torrent`,
-	);
-	await writeFile(torrentPath, new Uint8Array(meta.encode()));
-	return true;
+async function cacheTorrentFile(
+	meta: Metafile,
+	tracker: string,
+	searcheeLabel: SearcheeLabel,
+): Promise<boolean> {
+	try {
+		const torrentPath = getTorrentSavePath(
+			meta,
+			getMediaType(meta),
+			tracker,
+			path.join(appDir(), TORRENT_CACHE_FOLDER),
+			{ cached: true },
+		);
+		await writeFile(torrentPath, new Uint8Array(meta.encode()));
+		return true;
+	} catch (e) {
+		logger.error({
+			label: `${searcheeLabel}/${Label.DECIDE}`,
+			message: `Failed to cache torrent ${getLogString(meta)}: ${e.message}`,
+		});
+		logger.debug(e);
+		return false;
+	}
 }
 
 export async function updateTorrentCache(
@@ -553,6 +612,7 @@ async function assessAndSaveResults(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
 	guid: string,
+	tracker: string,
 	infoHashesToExclude: Set<string>,
 	firstSeen: number,
 	guidInfoHashMap: Map<string, string>,
@@ -562,6 +622,7 @@ async function assessAndSaveResults(
 	const assessment = await assessCandidate(
 		metaOrCandidate,
 		searchee,
+		tracker,
 		infoHashesToExclude,
 		blockList,
 		options,
@@ -615,8 +676,8 @@ export async function getGuidInfoHashMap(): Promise<Map<string, string>> {
  * Some trackers have alt titles which get their own guid but resolve to same torrent
  * @param guid The guid of the candidate
  * @param link The link of the candidate
- * @param guidInfoHashMap The map of guids to info hashes. Necessary for optimal fuzzy lookups.
- * @returns The info hash of the torrent if found
+ * @param guidInfoHashMap The map of guids to infoHashes. Necessary for optimal fuzzy lookups.
+ * @returns The infoHash of the torrent if found
  */
 function guidLookup(
 	guid: string,
@@ -656,18 +717,13 @@ export async function assessCandidateCaching(
 		.join("searchee", "decision.searchee_id", "searchee.id")
 		.where({ name: searchee.title, guid })
 		.first();
-	const metaInfoHash = guidLookup(guid, link, guidInfoHashMap);
-	const metaOrCandidate = metaInfoHash
-		? (await existsInTorrentCache(metaInfoHash))
-			? (await getCachedTorrentFile(metaInfoHash, searchee.label)).orElse(
-					candidate,
-				)
-			: candidate
-		: candidate;
+	const infoHash = guidLookup(guid, link, guidInfoHashMap);
+	const res = await getCachedTorrentFile(infoHash, tracker, searchee.label);
+	const metaOrCandidate = res?.meta ?? candidate;
 	if (metaOrCandidate instanceof Metafile) {
 		logger.verbose({
 			label: `${searchee.label}/${Label.DECIDE}`,
-			message: `Using cached torrent ${sanitizeInfoHash(metaInfoHash!)} for ${tracker} assessment ${name}`,
+			message: `Using cached torrent for ${tracker} assessment ${name}: ${res!.torrentPath.replace(metaOrCandidate.infoHash, sanitizeInfoHash(metaOrCandidate.infoHash))}`,
 		});
 		candidate.size = metaOrCandidate.length; // Trackers can be wrong
 	}
@@ -689,6 +745,7 @@ export async function assessCandidateCaching(
 			metaOrCandidate,
 			searchee,
 			guid,
+			tracker,
 			infoHashesToExclude,
 			cacheEntry?.firstSeen ?? Date.now(),
 			guidInfoHashMap,

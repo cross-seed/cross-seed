@@ -481,6 +481,7 @@ export async function performActionWithoutMutex(
 		searchee.label !== Label.INJECT ? logger.warn : logger.verbose;
 	const infoOrVerbose =
 		searchee.label !== Label.INJECT ? logger.info : logger.verbose;
+	const mediaType = getMediaType(newMeta);
 
 	if (action === Action.SAVE) {
 		logActionResult(
@@ -492,7 +493,7 @@ export async function performActionWithoutMutex(
 			infoOrVerbose,
 			warnOrVerbose,
 		);
-		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+		await saveTorrentFile(newMeta, mediaType, tracker);
 		return { actionResult: SaveResult.SAVED };
 	}
 
@@ -525,7 +526,7 @@ export async function performActionWithoutMutex(
 					infoOrVerbose,
 					warnOrVerbose,
 				);
-				await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+				await saveTorrentFile(newMeta, mediaType, tracker);
 				return { client, actionResult, linkedNewFiles };
 			}
 			const actionResult = InjectionResult.FAILURE;
@@ -542,7 +543,7 @@ export async function performActionWithoutMutex(
 				infoOrVerbose,
 				warnOrVerbose,
 			);
-			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+			await saveTorrentFile(newMeta, mediaType, tracker);
 			return { actionResult, linkedNewFiles };
 		}
 		savePath = savePathRes.unwrap();
@@ -577,7 +578,7 @@ export async function performActionWithoutMutex(
 			infoOrVerbose,
 			warnOrVerbose,
 		);
-		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+		await saveTorrentFile(newMeta, mediaType, tracker);
 		return { actionResult, linkedNewFiles };
 	}
 	for (const otherClient of clients) {
@@ -648,7 +649,7 @@ export async function performActionWithoutMutex(
 				infoOrVerbose,
 				warnOrVerbose,
 			);
-			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+			await saveTorrentFile(newMeta, mediaType, tracker);
 			return { actionResult, linkedNewFiles };
 		}
 		const linkResult = res.unwrap();
@@ -674,7 +675,7 @@ export async function performActionWithoutMutex(
 				infoOrVerbose,
 				warnOrVerbose,
 			);
-			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+			await saveTorrentFile(newMeta, mediaType, tracker);
 			return { actionResult, linkedNewFiles };
 		}
 		destinationDir = savePath;
@@ -706,7 +707,7 @@ export async function performActionWithoutMutex(
 	if (actionResult === InjectionResult.SUCCESS) {
 		// cross-seed may need to process these with the inject job
 		if (shouldRecheck(newMeta, decision) || !searchee.infoHash) {
-			await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+			await saveTorrentFile(newMeta, mediaType, tracker);
 		}
 	} else if (actionResult === InjectionResult.ALREADY_EXISTS) {
 		if (linkedNewFiles) {
@@ -720,7 +721,7 @@ export async function performActionWithoutMutex(
 			});
 		}
 	} else {
-		await saveTorrentFile(tracker, getMediaType(newMeta), newMeta);
+		await saveTorrentFile(newMeta, mediaType, tracker);
 		if (unlinkOk && destinationDir) {
 			await unlinkMetafile(newMeta, destinationDir, searchee.label);
 			linkedNewFiles = false;

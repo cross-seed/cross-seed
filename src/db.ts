@@ -9,7 +9,11 @@ import { TORRENT_CACHE_FOLDER } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { migrations } from "./migrations/migrations.js";
-import { cacheEnsembleTorrentEntry, snatchHistory } from "./torrent.js";
+import {
+	cacheEnsembleTorrentEntry,
+	parseMetadataFromFilename,
+	snatchHistory,
+} from "./torrent.js";
 import {
 	filterAsync,
 	flatMapAsync,
@@ -17,8 +21,9 @@ import {
 	Mutex,
 	notExists,
 	withMutex,
+	yieldToEventLoop,
 } from "./utils.js";
-import { rawGuidInfoHashMap } from "./decide.js";
+import { existsInTorrentCache, rawGuidInfoHashMap } from "./decide.js";
 
 const filename = join(appDir(), "cross-seed.db");
 const rawSqliteHandle = new Sqlite(filename);
@@ -32,14 +37,14 @@ export const db = knex({
 	useNullAsDefault: true,
 });
 
-export async function cleanupDB(): Promise<void> {
+export async function cleanupDB(options?: { runAll: boolean }): Promise<void> {
 	const { dataDirs, seasonFromEpisodes, useClientTorrents } =
 		getRuntimeConfig();
 	await (async () => {
 		if (!useClientTorrents) return;
 		logger.verbose({
 			label: Label.CLEANUP,
-			message: "Refreshing all client torrents",
+			message: "Refreshing all client torrents...",
 		});
 		const searchees = await flatMapAsync(
 			getClients(),
@@ -55,7 +60,7 @@ export async function cleanupDB(): Promise<void> {
 		if (!seasonFromEpisodes) return;
 		logger.verbose({
 			label: Label.CLEANUP,
-			message: "Refreshing all ensemble torrents",
+			message: "Refreshing all ensemble torrents...",
 		});
 		const ensembleRows = await flatMapAsync(
 			searchees,
@@ -73,7 +78,7 @@ export async function cleanupDB(): Promise<void> {
 		if (!dataDirs.length) return;
 		logger.verbose({
 			label: Label.CLEANUP,
-			message: "Pruning deleted dataDirs entries",
+			message: "Pruning deleted dataDirs entries...",
 		});
 		const deletedPaths = await filterAsync(
 			(await db("data").select("path")).map((e) => e.path),
@@ -88,7 +93,7 @@ export async function cleanupDB(): Promise<void> {
 		if (!seasonFromEpisodes) return;
 		logger.verbose({
 			label: Label.CLEANUP,
-			message: "Pruning deleted ensemble entries",
+			message: "Pruning deleted ensemble entries...",
 		});
 		const deletedPaths = await filterAsync(
 			(await db("ensemble").select("path")).map((e) => e.path),
@@ -102,7 +107,7 @@ export async function cleanupDB(): Promise<void> {
 	await (async () => {
 		logger.verbose({
 			label: Label.CLEANUP,
-			message: "Pruning failed snatch history entries",
+			message: "Pruning failed snatch history entries...",
 		});
 		for (const [
 			str,
@@ -120,24 +125,62 @@ export async function cleanupDB(): Promise<void> {
 	await (async () => {
 		logger.verbose({
 			label: Label.CLEANUP,
-			message: "Pruning old torrent cache entries",
+			message: "Pruning old torrent cache entries...",
 		});
 		const torrentCacheDir = join(appDir(), TORRENT_CACHE_FOLDER);
-		const files = await readdir(torrentCacheDir);
+		const dirEntries = await readdir(torrentCacheDir);
 		const now = Date.now();
-		for (const file of files) {
+		for (const file of dirEntries) {
 			const filePath = join(torrentCacheDir, file);
 			if (now - (await stat(filePath)).atimeMs > ms("1 year")) {
 				logger.verbose({
 					label: Label.CLEANUP,
 					message: `Deleting torrent cache entry for ${filePath}`,
 				});
-				await db("decision")
-					.where("info_hash", file.split(".")[0])
-					.del();
+				let { infoHash } = parseMetadataFromFilename(file);
+				if (!infoHash) infoHash = file.split(".")[0];
+				await db("decision").where("info_hash", infoHash).del();
 				await unlink(filePath);
 			}
 		}
+	})();
+	await (async () => {
+		if (!options?.runAll) {
+			const run_percentage = 0.03; // Roughly once a month if cleanupDB() is called daily. Override with /api/job.
+			if (Math.random() > run_percentage) {
+				logger.verbose({
+					label: Label.CLEANUP,
+					message: `Skipping pruning of invalid decision entries, will run roughly once per month`,
+				});
+				return; // This should rarely be needed, and likely only a few entries. It's slow with with lots of I/O.
+			}
+		}
+		logger.verbose({
+			label: Label.CLEANUP,
+			message: "Pruning invalid decision entries...",
+		});
+		await db("decision").whereNull("info_hash").del();
+		const dbRows: { name: string | null; info_hash: string | null }[] =
+			await db("decision")
+				.leftJoin("searchee", "decision.searchee_id", "searchee.id")
+				.select("searchee.name", "decision.info_hash");
+		const invalidInfoHashes = new Set<string>();
+		const dirEntries = await readdir(join(appDir(), TORRENT_CACHE_FOLDER));
+		for (const dbRow of dbRows) {
+			if (!dbRow.info_hash) continue;
+			if (await existsInTorrentCache(dbRow.info_hash, dirEntries)) {
+				continue;
+			}
+			logger.verbose({
+				label: Label.CLEANUP,
+				message: `Deleting invalid decision entries for ${dbRow.info_hash} (related to ${dbRow.name}) - missing .torrent file in cache`,
+			});
+			invalidInfoHashes.add(dbRow.info_hash);
+			await yieldToEventLoop();
+		}
+		await inBatches(Array.from(invalidInfoHashes), async (batch) => {
+			await db("decision").whereIn("info_hash", batch).del();
+		});
 	})();
 	await withMutex(
 		Mutex.CREATE_GUID_INFO_HASH_MAP,
@@ -145,7 +188,7 @@ export async function cleanupDB(): Promise<void> {
 		async () => {
 			logger.verbose({
 				label: Label.CLEANUP,
-				message: "Rebuilding guidInfoHashMap",
+				message: "Rebuilding guidInfoHashMap...",
 			});
 			const res = await db("decision")
 				.select("guid", "info_hash")

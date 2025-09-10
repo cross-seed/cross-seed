@@ -41,6 +41,7 @@ import {
 } from "./searchee.js";
 import {
 	findAllTorrentFilesInDir,
+	getTorrentSavePath,
 	parseMetadataFromFilename,
 	parseTorrentFromFilename,
 } from "./torrent.js";
@@ -96,11 +97,12 @@ type InjectionAftermath = {
 };
 
 function getTorrentFilePathLog(torrentFilePath: string): string {
-	return chalk.bold.magenta(
-		torrentFilePath.replace(/\[([a-z0-9]{40})].torrent$/i, (match, hash) =>
-			match.replace(hash, sanitizeInfoHash(hash)),
-		),
-	);
+	const { infoHash } = parseMetadataFromFilename(basename(torrentFilePath));
+	return infoHash
+		? chalk.bold.magenta(
+				torrentFilePath.replace(infoHash, sanitizeInfoHash(infoHash)),
+			)
+		: chalk.bold.magenta(torrentFilePath);
 }
 
 async function deleteTorrentFileIfSafe(torrentFilePath: string): Promise<void> {
@@ -148,6 +150,7 @@ async function deleteTorrentFileIfComplete(
 async function whichSearcheesMatchTorrent(
 	meta: Metafile,
 	searchees: SearcheeWithLabel[],
+	tracker: string,
 	blockList: string[],
 	ignoreTitles: boolean,
 ): Promise<{
@@ -167,6 +170,7 @@ async function whichSearcheesMatchTorrent(
 		const { decision } = await assessCandidate(
 			meta,
 			searchee,
+			tracker,
 			new Set(),
 			[],
 		);
@@ -575,6 +579,7 @@ async function injectSavedTorrent(
 		await whichSearcheesMatchTorrent(
 			meta,
 			searchees,
+			tracker,
 			blockList,
 			ignoreTitles,
 		);
@@ -765,30 +770,131 @@ export async function restoreFromTorrentCache(): Promise<void> {
 		path.join(appDir(), TORRENT_CACHE_FOLDER),
 	);
 	if (torrentFilePaths.length === 0) {
-		console.log("No torrent files found to restore from cache");
+		logger.info("No torrent files found to restore from cache");
 		return;
 	}
-	console.log(
-		`Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to restore from cache, copying to outputDir...`,
+	logger.info(
+		`Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to restore from cache`,
 	);
-	let existed = 0;
-	for (const [i, torrentFilePath] of torrentFilePaths.entries()) {
-		const dest = path.join(
-			outputDir,
-			`[${MediaType.OTHER}][${UNKNOWN_TRACKER}]${basename(torrentFilePath)}`,
-		);
-		if (await exists(dest)) {
-			existed++;
-			continue;
-		}
-		await copyFile(torrentFilePath, dest);
-		if ((i + 1) % 100 === 0) {
-			console.log(
-				`${chalk.blue(`(${i + 1}/${torrentFilePaths.length})`)} ${chalk.bold.magenta(dest)}`,
+
+	let copied = 0;
+	const copyFromTorrentCache = async (
+		torrentFilePath: string,
+		destPath: string,
+		infoHash?: string,
+	): Promise<boolean> => {
+		try {
+			if (await exists(destPath)) return true;
+			await copyFile(torrentFilePath, destPath);
+			copied++;
+			if (copied % 1000 === 0) {
+				const destPathLog = infoHash
+					? destPath.replace(infoHash, sanitizeInfoHash(infoHash))
+					: destPath;
+				logger.info(
+					`${chalk.blue(`(${copied}/${torrentFilePaths.length})`)} ${chalk.bold.magenta(destPathLog)}`,
+				);
+			}
+			return true;
+		} catch (e) {
+			logger.error(
+				chalk.bold.red(
+					`Failure when copying ${torrentFilePath}: ${e.message}`,
+				),
 			);
+			logger.error(e);
+			return false;
+		}
+	};
+
+	const hostToName = new Map<string, string>();
+	const legacyEntries: string[] = [];
+	for (const torrentFilePath of torrentFilePaths) {
+		try {
+			const torrentFileName = basename(torrentFilePath);
+			const { tracker, infoHash } =
+				parseMetadataFromFilename(torrentFileName);
+			if (!tracker) {
+				legacyEntries.push(torrentFilePath);
+				continue;
+			}
+			const destPath = path.join(outputDir, torrentFileName);
+			await copyFromTorrentCache(torrentFilePath, destPath, infoHash);
+			const meta = await parseTorrentFromFilename(torrentFilePath);
+			for (const trackerHost of meta.trackers) {
+				if (hostToName.has(trackerHost)) continue;
+				hostToName.set(trackerHost, tracker);
+			}
+		} catch (e) {
+			logger.error(
+				chalk.bold.red(
+					`Failure when processing ${torrentFilePath}: ${e.message}`,
+				),
+			);
+			logger.error(e);
 		}
 	}
-	console.log(
-		`Copied ${chalk.bold.green(torrentFilePaths.length - existed)}/${chalk.bold.white(torrentFilePaths.length)} torrent file(s) from cache to outputDir, run "${chalk.bold.white("cross-seed inject")}" to inject into client using your dataDirs`,
+
+	let numLegacyFixed = 0;
+	for (const torrentFilePath of legacyEntries) {
+		try {
+			const meta = await parseTorrentFromFilename(torrentFilePath);
+			let found = false;
+			for (const trackerHost of meta.trackers) {
+				if (!hostToName.has(trackerHost)) continue;
+				const tracker = hostToName.get(trackerHost)!;
+				const destPath = getTorrentSavePath(
+					meta,
+					getMediaType(meta),
+					tracker,
+					outputDir,
+					{ cached: true },
+				);
+				if (
+					await copyFromTorrentCache(
+						torrentFilePath,
+						destPath,
+						meta.infoHash,
+					)
+				) {
+					found = true;
+					numLegacyFixed++;
+					break;
+				}
+			}
+			if (found) continue;
+		} catch (e) {
+			logger.error(
+				chalk.bold.red(
+					`Failure when processing ${torrentFilePath}, filename metadata will be unknown: ${e.message}`,
+				),
+			);
+			logger.error(e);
+		}
+		const baseName = basename(torrentFilePath);
+		const infoHash = baseName.split(".")[0];
+		const destFileName = `[${MediaType.OTHER}][${UNKNOWN_TRACKER}]${baseName}`;
+		const destPath = path.join(outputDir, destFileName);
+		await copyFromTorrentCache(torrentFilePath, destPath, infoHash);
+	}
+
+	logger.info(
+		`Copied ${chalk.bold.green(copied)}/${chalk.bold.white(torrentFilePaths.length)} torrent file(s) from cache to outputDir, run "${chalk.bold.white("cross-seed inject")}" to inject into client using your dataDirs`,
+	);
+	if (numLegacyFixed) {
+		logger.info(
+			`Copied ${chalk.bold.green(numLegacyFixed)} legacy cache entries with parsed filename metadata from other entries`,
+		);
+	}
+	const numLegacyNotFixed = legacyEntries.length - numLegacyFixed;
+	if (numLegacyNotFixed) {
+		logger.info(
+			`Copied ${chalk.bold.yellow(numLegacyNotFixed)} legacy cache entries without filename metadata`,
+		);
+	}
+	logger.info(
+		chalk.bold.yellow(
+			"Some of the restored torrents may be unregistered, you will need to remove them from your client after injecting",
+		),
 	);
 }

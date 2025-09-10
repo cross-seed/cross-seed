@@ -11,6 +11,7 @@ import {
 import { isChildPath } from "./configSchema.js";
 import {
 	LEVENSHTEIN_DIVISOR,
+	MAX_PATH_BYTES,
 	MediaType,
 	SAVED_TORRENTS_INFO_REGEX,
 	USER_AGENT,
@@ -62,9 +63,11 @@ export interface TorrentLocator {
 }
 
 export interface FilenameMetadata {
-	name: string;
 	mediaType: string;
 	tracker: string;
+	name: string;
+	infoHash?: string;
+	cached: boolean;
 }
 
 export enum SnatchError {
@@ -311,26 +314,54 @@ export async function snatch(
 	return resultOfErr(snatchError!);
 }
 
-export async function saveTorrentFile(
+function buildTorrentSaveName(
+	mediaType: MediaType,
 	tracker: string,
-	tag: string,
-	meta: Metafile,
-): Promise<void> {
-	const { outputDir } = getRuntimeConfig();
-	// Be sure to update parseInfoFromSavedTorrent if changing the format
-	const filePath = join(
-		outputDir,
-		`[${tag}][${tracker}]${stripExtension(
-			meta.getFileSystemSafeName(),
-		)}[${meta.infoHash}].torrent`,
-	);
-	if (await exists(filePath)) {
-		await utimes(filePath, new Date(), (await stat(filePath)).mtime);
-		return;
-	}
-	await writeFile(filePath, new Uint8Array(meta.encode()));
+	name: string,
+	infoHash: string,
+	ext: string,
+): string {
+	return `[${mediaType}][${tracker}]${name}[${infoHash}]${ext}`;
 }
 
+/**
+ * Besure to update parseMetadataFromFilename if changing the format
+ */
+export function getTorrentSavePath(
+	meta: Metafile,
+	mediaType: MediaType,
+	tracker: string,
+	dir: string,
+	options: { cached: boolean },
+): string {
+	const fullName = stripExtension(meta.getFileSystemSafeName());
+	const ext = options.cached ? ".cached.torrent" : ".torrent";
+	const fullPath = join(
+		dir,
+		buildTorrentSaveName(mediaType, tracker, fullName, meta.infoHash, ext),
+	);
+	if (Buffer.byteLength(fullPath, "utf8") <= MAX_PATH_BYTES) return fullPath;
+
+	const codePoints = Array.from(fullName);
+	let currBytes = Buffer.byteLength(`${fullPath}...`, "utf8");
+	let codePointsToRemove = 0;
+	for (let i = codePoints.length - 1; i >= 0; i--) {
+		codePointsToRemove++;
+		currBytes -= Buffer.byteLength(codePoints[i], "utf8");
+		if (currBytes <= MAX_PATH_BYTES) break;
+	}
+	const safeName = `${codePoints.slice(0, -codePointsToRemove).join("")}...`;
+	const safePath = join(
+		dir,
+		buildTorrentSaveName(mediaType, tracker, safeName, meta.infoHash, ext),
+	);
+	if (Buffer.byteLength(safePath, "utf8") <= MAX_PATH_BYTES) return safePath;
+	return fullPath; // Handle the error on save if it exists
+}
+
+/**
+ * Depends on getTorrentSavePath format
+ */
 export function parseMetadataFromFilename(
 	filename: string,
 ): Partial<FilenameMetadata> {
@@ -342,9 +373,24 @@ export function parseMetadataFromFilename(
 	if (!Object.values(MediaType).includes(mediaType as MediaType)) {
 		return {};
 	}
-	const tracker = match.groups!.tracker;
-	const name = match.groups!.name;
-	return { name, mediaType, tracker };
+	const { tracker, name, infoHash, cached } = match.groups!;
+	return { mediaType, tracker, name, infoHash, cached: !!cached };
+}
+
+export async function saveTorrentFile(
+	meta: Metafile,
+	mediaType: MediaType,
+	tracker: string,
+): Promise<void> {
+	const { outputDir } = getRuntimeConfig();
+	const filePath = getTorrentSavePath(meta, mediaType, tracker, outputDir, {
+		cached: false,
+	});
+	if (await exists(filePath)) {
+		await utimes(filePath, new Date(), (await stat(filePath)).mtime);
+		return;
+	}
+	await writeFile(filePath, new Uint8Array(meta.encode()));
 }
 
 export async function findAllTorrentFilesInDir(

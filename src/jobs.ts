@@ -48,6 +48,11 @@ class Job {
 			});
 			if (this.runAheadOfSchedule && this.name === JobName.SEARCH) {
 				await bulkSearch({ configOverride: this.configOverride });
+			} else if (
+				this.runAheadOfSchedule &&
+				this.name === JobName.CLEANUP
+			) {
+				await cleanupDB({ runAll: true });
 			} else {
 				await this.exec();
 			}
@@ -130,11 +135,6 @@ export async function checkJobs(
 
 				if (!job.runAheadOfSchedule) {
 					if (jobs.find((j) => j.name === JobName.RSS)?.isActive) {
-						continue;
-					}
-					if (
-						jobs.find((j) => j.name === JobName.CLEANUP)?.isActive
-					) {
 						continue;
 					}
 					if (job.name === JobName.CLEANUP) {
