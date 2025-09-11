@@ -529,11 +529,6 @@ async function getCachedTorrentFile(
 				if (await notExists(newPath)) throw e;
 			}
 			torrentPath = newPath;
-			try {
-				await unlink(torrentPath);
-			} catch (e) {
-				if (await exists(torrentPath)) throw e;
-			}
 		} catch (e) {
 			logger.error({
 				label: `${searcheeLabel}/${Label.DECIDE}`,

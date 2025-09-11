@@ -33,6 +33,7 @@ export let logger: winston.Logger;
 
 const REDACTED_MSG = "[REDACTED]";
 const ERROR_PREFIX_REGEX = /^\s*error:\s*/i;
+const SUB_SECOND_TS_REGEX = /\.\d{3,}$/;
 
 function redactUrlPassword(message: string, urlStr: string) {
 	let url: URL;
@@ -120,7 +121,7 @@ export function initializeLogger(options: Record<string, unknown>): void {
 		level: "info",
 		format: winston.format.combine(
 			winston.format.timestamp({
-				format: "YYYY-MM-DD HH:mm:ss",
+				format: "YYYY-MM-DD HH:mm:ss.SSS",
 			}),
 			winston.format.errors({ stack: true }),
 			winston.format.splat(),
@@ -177,6 +178,10 @@ export function initializeLogger(options: Record<string, unknown>): void {
 							stack,
 							cause,
 						}) => {
+							timestamp = timestamp.replace(
+								SUB_SECOND_TS_REGEX,
+								"",
+							);
 							const msg = !stack
 								? `${message}${cause ? `\n${cause}` : ""}`
 								: `${stack}${cause ? `\n${cause}` : ""}`.replace(
