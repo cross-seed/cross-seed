@@ -598,7 +598,14 @@ async function injectSavedTorrent(
 			});
 			summary.UNMATCHED++;
 		}
-		if (!fuzzyFail) await deleteTorrentFileIfSafe(torrentFilePath);
+		if (fuzzyFail) {
+			logger.warn({
+				label: Label.INJECT,
+				message: `Will not delete ${filePathLog}: is has no matches due to title mismatch`,
+			});
+		} else {
+			await deleteTorrentFileIfSafe(torrentFilePath);
+		}
 		return;
 	}
 
