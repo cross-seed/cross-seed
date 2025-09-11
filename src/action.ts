@@ -9,6 +9,7 @@ import {
 	rm,
 	stat,
 	symlink,
+	utimes,
 	writeFile,
 } from "fs/promises";
 import { dirname, join, resolve } from "path";
@@ -44,7 +45,7 @@ import {
 	SearcheeWithInfoHash,
 	SearcheeWithLabel,
 } from "./searchee.js";
-import { saveTorrentFile } from "./torrent.js";
+import { getTorrentSavePath } from "./torrent.js";
 import {
 	exists,
 	filterAsync,
@@ -404,12 +405,12 @@ async function getClientAndDestinationDir(
 	return { client, destinationDir, destinationDirFromClient };
 }
 
-function logActionResult(
+function logActionResultImpl(
 	result: ActionResult,
 	newMeta: Metafile,
+	decision: Decision,
 	searchee: SearcheeWithLabel,
 	tracker: string,
-	decision: Decision,
 	infoOrVerbose: winston.LeveledLogMethod,
 	warnOrVerbose: winston.LeveledLogMethod,
 ) {
@@ -457,6 +458,37 @@ function logActionResult(
 	}
 }
 
+async function saveToOutputDir(
+	newMeta: Metafile,
+	decision: DecisionAnyMatch,
+	searchee: SearcheeWithLabel,
+	tracker: string,
+): Promise<void> {
+	const { outputDir } = getRuntimeConfig();
+	try {
+		const filePath = getTorrentSavePath(
+			newMeta,
+			getMediaType(newMeta),
+			tracker,
+			outputDir,
+			{
+				cached: false,
+			},
+		);
+		if (await exists(filePath)) {
+			await utimes(filePath, new Date(), (await stat(filePath)).mtime);
+			return;
+		}
+		await writeFile(filePath, new Uint8Array(newMeta.encode()));
+	} catch (e) {
+		logger.error({
+			label: searchee.label,
+			message: `Failed to save ${getLogString(newMeta, chalk.green.bold)} on ${chalk.bold(tracker)} to outputDir while processing ${chalk.bold(decision)} with ${getLogString(searchee, chalk.magenta.bold)}: ${e.message}`,
+		});
+		logger.debug(e);
+	}
+}
+
 export async function performAction(
 	newMeta: Metafile,
 	decision: DecisionAnyMatch,
@@ -481,20 +513,24 @@ export async function performActionWithoutMutex(
 		searchee.label !== Label.INJECT ? logger.warn : logger.verbose;
 	const infoOrVerbose =
 		searchee.label !== Label.INJECT ? logger.info : logger.verbose;
-	const mediaType = getMediaType(newMeta);
-
-	if (action === Action.SAVE) {
-		logActionResult(
-			SaveResult.SAVED,
+	const logActionResult = (r: ActionResult) =>
+		logActionResultImpl(
+			r,
 			newMeta,
+			decision,
 			searchee,
 			tracker,
-			decision,
 			infoOrVerbose,
 			warnOrVerbose,
 		);
-		await saveTorrentFile(newMeta, mediaType, tracker);
-		return { actionResult: SaveResult.SAVED };
+	const saveTorrent = () =>
+		saveToOutputDir(newMeta, decision, searchee, tracker);
+
+	if (action === Action.SAVE) {
+		const actionResult = SaveResult.SAVED;
+		logActionResult(actionResult);
+		await saveTorrent();
+		return { actionResult };
 	}
 
 	let savePath: string | undefined;
@@ -503,234 +539,184 @@ export async function performActionWithoutMutex(
 	let unlinkOk = false;
 	let linkedNewFiles = false;
 
-	const clients = getClients();
-	let client =
-		clients.length === 1
-			? clients[0]
-			: clients.find(
-					(c) => c.clientHost === searchee.clientHost && !c.readonly,
-				);
-	const readonlySource = !client && !!searchee.clientHost;
-	if (linkDirs.length) {
-		const savePathRes = await getSavePath(searchee, options);
-		if (savePathRes.isErr()) {
-			const result = savePathRes.unwrapErr();
-			if (result === "TORRENT_NOT_COMPLETE") {
-				const actionResult = InjectionResult.TORRENT_NOT_COMPLETE;
-				logActionResult(
-					actionResult,
-					newMeta,
-					searchee,
-					tracker,
-					decision,
-					infoOrVerbose,
-					warnOrVerbose,
-				);
-				await saveTorrentFile(newMeta, mediaType, tracker);
-				return { client, actionResult, linkedNewFiles };
+	try {
+		const clients = getClients();
+		let client =
+			clients.length === 1
+				? clients[0]
+				: clients.find(
+						(c) =>
+							c.clientHost === searchee.clientHost && !c.readonly,
+					);
+		const readonlySource = !client && !!searchee.clientHost;
+		if (linkDirs.length) {
+			const savePathRes = await getSavePath(searchee, options);
+			if (savePathRes.isErr()) {
+				const result = savePathRes.unwrapErr();
+				if (result === "TORRENT_NOT_COMPLETE") {
+					const actionResult = InjectionResult.TORRENT_NOT_COMPLETE;
+					logActionResult(actionResult);
+					await saveTorrent();
+					return { client, actionResult, linkedNewFiles };
+				}
+				const actionResult = InjectionResult.FAILURE;
+				logger.error({
+					label: searchee.label,
+					message: `Failed to link files for ${getLogString(newMeta)} from ${getLogString(searchee)}: ${result}`,
+				});
+				logActionResult(actionResult);
+				await saveTorrent();
+				return { actionResult, linkedNewFiles };
+			}
+			savePath = savePathRes.unwrap();
+			const res = await getClientAndDestinationDir(
+				client,
+				searchee,
+				savePath,
+				newMeta,
+				tracker,
+			);
+			if (res) {
+				client = res.client;
+				destinationDir = res.destinationDir;
+				destinationDirFromClient = res.destinationDirFromClient;
+			} else {
+				client = undefined;
+			}
+		}
+
+		if (!client) {
+			logger.error({
+				label: searchee.label,
+				message: `Failed to find a torrent client for ${getLogString(searchee)}`,
+			});
+			const actionResult = InjectionResult.FAILURE;
+			logActionResult(actionResult);
+			await saveTorrent();
+			return { actionResult, linkedNewFiles };
+		}
+		for (const otherClient of clients) {
+			if (otherClient.clientHost === client.clientHost) continue;
+			const existsRes = await otherClient.isTorrentInClient(
+				newMeta.infoHash,
+			);
+			if (existsRes.isOk()) {
+				if (!existsRes.unwrap()) continue;
+				warnOrVerbose({
+					label: searchee.label,
+					message: `Skipping ${getLogString(newMeta)} injection into ${client.clientHost} - already exists in ${otherClient.clientHost}`,
+				});
+			} else {
+				logger.error({
+					label: searchee.label,
+					message: `Failed to check if ${getLogString(newMeta)} exists in ${otherClient.clientHost}: ${existsRes.unwrapErr()}`,
+				});
 			}
 			const actionResult = InjectionResult.FAILURE;
-			logger.error({
-				label: searchee.label,
-				message: `Failed to link files for ${getLogString(newMeta)} from ${getLogString(searchee)}: ${result}`,
-			});
-			logActionResult(
-				actionResult,
-				newMeta,
-				searchee,
-				tracker,
-				decision,
-				infoOrVerbose,
-				warnOrVerbose,
-			);
-			await saveTorrentFile(newMeta, mediaType, tracker);
+			logActionResult(actionResult);
 			return { actionResult, linkedNewFiles };
 		}
-		savePath = savePathRes.unwrap();
-		const res = await getClientAndDestinationDir(
-			client,
-			searchee,
-			savePath,
-			newMeta,
-			tracker,
-		);
-		if (res) {
-			client = res.client;
-			destinationDir = res.destinationDir;
-			destinationDirFromClient = res.destinationDirFromClient;
-		} else {
-			client = undefined;
-		}
-	}
-
-	if (!client) {
-		logger.error({
-			label: searchee.label,
-			message: `Failed to find a torrent client for ${getLogString(searchee)}`,
-		});
-		const actionResult = InjectionResult.FAILURE;
-		logActionResult(
-			actionResult,
-			newMeta,
-			searchee,
-			tracker,
-			decision,
-			infoOrVerbose,
-			warnOrVerbose,
-		);
-		await saveTorrentFile(newMeta, mediaType, tracker);
-		return { actionResult, linkedNewFiles };
-	}
-	for (const otherClient of clients) {
-		if (otherClient.clientHost === client.clientHost) continue;
-		const existsRes = await otherClient.isTorrentInClient(newMeta.infoHash);
-		if (existsRes.isOk()) {
-			if (!existsRes.unwrap()) continue;
+		if (injectClient && injectClient.clientHost !== client.clientHost) {
 			warnOrVerbose({
 				label: searchee.label,
-				message: `Skipping ${getLogString(newMeta)} injection into ${client.clientHost} - already exists in ${otherClient.clientHost}`,
+				message: `Skipping ${getLogString(newMeta)} injection into ${client.clientHost} - existing match is using ${injectClient.clientHost}`,
 			});
-		} else {
-			logger.error({
-				label: searchee.label,
-				message: `Failed to check if ${getLogString(newMeta)} exists in ${otherClient.clientHost}: ${existsRes.unwrapErr()}`,
-			});
+			const actionResult = InjectionResult.FAILURE;
+			logActionResult(actionResult);
+			return { actionResult, linkedNewFiles };
 		}
-		const actionResult = InjectionResult.FAILURE;
-		logActionResult(
-			actionResult,
-			newMeta,
-			searchee,
-			tracker,
-			decision,
-			infoOrVerbose,
-			warnOrVerbose,
-		);
-		return { actionResult, linkedNewFiles };
-	}
-	if (injectClient && injectClient.clientHost !== client.clientHost) {
-		warnOrVerbose({
+
+		if (linkDirs.length) {
+			const res = await linkAllFilesInMetafile(
+				searchee,
+				newMeta,
+				decision,
+				destinationDir!,
+				{ savePath, ignoreMissing: !options.onlyCompleted },
+			);
+			if (res.isErr()) {
+				logger.error({
+					label: searchee.label,
+					message: `Failed to link files for ${getLogString(newMeta)} from ${getLogString(searchee)}: ${res.unwrapErr().message}`,
+				});
+				const actionResult = InjectionResult.FAILURE;
+				logActionResult(actionResult);
+				await saveTorrent();
+				return { actionResult, linkedNewFiles };
+			}
+			const linkResult = res.unwrap();
+			unlinkOk = !linkResult.alreadyExisted;
+			linkedNewFiles = linkResult.linkedNewFiles;
+		} else if (searchee.path) {
+			destinationDir = dirname(searchee.path);
+		} else if (readonlySource) {
+			const savePathRes = await getSavePath(searchee, options);
+			savePath = savePathRes.orElse(undefined);
+			if (!savePath) {
+				logger.error({
+					label: searchee.label,
+					message: `Failed to find a save path for ${getLogString(searchee)}`,
+				});
+				const actionResult = InjectionResult.FAILURE;
+				logActionResult(actionResult);
+				await saveTorrent();
+				return { actionResult, linkedNewFiles };
+			}
+			destinationDir = savePath;
+		}
+
+		const actionResult = destinationDirFromClient
+			? InjectionResult.ALREADY_EXISTS
+			: await client.inject(
+					newMeta,
+					readonlySource
+						? { ...searchee, infoHash: undefined } // treat as data-based
+						: searchee,
+					decision,
+					{
+						onlyCompleted: options.onlyCompleted,
+						destinationDir,
+					},
+				);
+
+		logActionResult(actionResult);
+		if (actionResult === InjectionResult.SUCCESS) {
+			// cross-seed may need to process these with the inject job
+			if (shouldRecheck(newMeta, decision) || !searchee.infoHash) {
+				await saveTorrent();
+			}
+		} else if (actionResult === InjectionResult.ALREADY_EXISTS) {
+			if (linkedNewFiles) {
+				infoOrVerbose({
+					label: client.label,
+					message: `Rechecking ${getLogString(newMeta)} as new files were linked from ${getLogString(searchee)}`,
+				});
+				await client.recheckTorrent(newMeta.infoHash);
+				void client.resumeInjection(newMeta, decision, {
+					checkOnce: false,
+				});
+			}
+		} else {
+			await saveTorrent();
+			if (unlinkOk && destinationDir) {
+				await unlinkMetafile(newMeta, destinationDir, searchee.label);
+				linkedNewFiles = false;
+			}
+		}
+		if (actionResult === InjectionResult.FAILURE) {
+			return { actionResult, linkedNewFiles };
+		}
+		return { client, actionResult, linkedNewFiles };
+	} catch (e) {
+		logger.error({
 			label: searchee.label,
-			message: `Skipping ${getLogString(newMeta)} injection into ${client.clientHost} - existing match is using ${injectClient.clientHost}`,
+			message: e,
 		});
 		const actionResult = InjectionResult.FAILURE;
-		logActionResult(
-			actionResult,
-			newMeta,
-			searchee,
-			tracker,
-			decision,
-			infoOrVerbose,
-			warnOrVerbose,
-		);
+		logActionResult(actionResult);
+		await saveTorrent();
 		return { actionResult, linkedNewFiles };
 	}
-
-	if (linkDirs.length) {
-		const res = await linkAllFilesInMetafile(
-			searchee,
-			newMeta,
-			decision,
-			destinationDir!,
-			{ savePath, ignoreMissing: !options.onlyCompleted },
-		);
-		if (res.isErr()) {
-			logger.error({
-				label: searchee.label,
-				message: `Failed to link files for ${getLogString(newMeta)} from ${getLogString(searchee)}: ${res.unwrapErr().message}`,
-			});
-			const actionResult = InjectionResult.FAILURE;
-			logActionResult(
-				actionResult,
-				newMeta,
-				searchee,
-				tracker,
-				decision,
-				infoOrVerbose,
-				warnOrVerbose,
-			);
-			await saveTorrentFile(newMeta, mediaType, tracker);
-			return { actionResult, linkedNewFiles };
-		}
-		const linkResult = res.unwrap();
-		unlinkOk = !linkResult.alreadyExisted;
-		linkedNewFiles = linkResult.linkedNewFiles;
-	} else if (searchee.path) {
-		destinationDir = dirname(searchee.path);
-	} else if (readonlySource) {
-		const savePathRes = await getSavePath(searchee, options);
-		savePath = savePathRes.orElse(undefined);
-		if (!savePath) {
-			logger.error({
-				label: searchee.label,
-				message: `Failed to find a save path for ${getLogString(searchee)}`,
-			});
-			const actionResult = InjectionResult.FAILURE;
-			logActionResult(
-				actionResult,
-				newMeta,
-				searchee,
-				tracker,
-				decision,
-				infoOrVerbose,
-				warnOrVerbose,
-			);
-			await saveTorrentFile(newMeta, mediaType, tracker);
-			return { actionResult, linkedNewFiles };
-		}
-		destinationDir = savePath;
-	}
-
-	const actionResult = destinationDirFromClient
-		? InjectionResult.ALREADY_EXISTS
-		: await client.inject(
-				newMeta,
-				readonlySource
-					? { ...searchee, infoHash: undefined } // treat as data-based
-					: searchee,
-				decision,
-				{
-					onlyCompleted: options.onlyCompleted,
-					destinationDir,
-				},
-			);
-
-	logActionResult(
-		actionResult,
-		newMeta,
-		searchee,
-		tracker,
-		decision,
-		infoOrVerbose,
-		warnOrVerbose,
-	);
-	if (actionResult === InjectionResult.SUCCESS) {
-		// cross-seed may need to process these with the inject job
-		if (shouldRecheck(newMeta, decision) || !searchee.infoHash) {
-			await saveTorrentFile(newMeta, mediaType, tracker);
-		}
-	} else if (actionResult === InjectionResult.ALREADY_EXISTS) {
-		if (linkedNewFiles) {
-			infoOrVerbose({
-				label: client.label,
-				message: `Rechecking ${getLogString(newMeta)} as new files were linked from ${getLogString(searchee)}`,
-			});
-			await client.recheckTorrent(newMeta.infoHash);
-			void client.resumeInjection(newMeta, decision, {
-				checkOnce: false,
-			});
-		}
-	} else {
-		await saveTorrentFile(newMeta, mediaType, tracker);
-		if (unlinkOk && destinationDir) {
-			await unlinkMetafile(newMeta, destinationDir, searchee.label);
-			linkedNewFiles = false;
-		}
-	}
-	if (actionResult === InjectionResult.FAILURE) {
-		return { actionResult, linkedNewFiles };
-	}
-	return { client, actionResult, linkedNewFiles };
 }
 
 export async function performActions(

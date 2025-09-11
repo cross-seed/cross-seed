@@ -1,6 +1,6 @@
 import { distance } from "fastest-levenshtein";
 import bencode from "bencode";
-import { readdir, readFile, stat, utimes, writeFile } from "fs/promises";
+import { readdir, readFile, stat } from "fs/promises";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
 import {
@@ -375,22 +375,6 @@ export function parseMetadataFromFilename(
 	}
 	const { tracker, name, infoHash, cached } = match.groups!;
 	return { mediaType, tracker, name, infoHash, cached: !!cached };
-}
-
-export async function saveTorrentFile(
-	meta: Metafile,
-	mediaType: MediaType,
-	tracker: string,
-): Promise<void> {
-	const { outputDir } = getRuntimeConfig();
-	const filePath = getTorrentSavePath(meta, mediaType, tracker, outputDir, {
-		cached: false,
-	});
-	if (await exists(filePath)) {
-		await utimes(filePath, new Date(), (await stat(filePath)).mtime);
-		return;
-	}
-	await writeFile(filePath, new Uint8Array(meta.encode()));
 }
 
 export async function findAllTorrentFilesInDir(

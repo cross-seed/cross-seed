@@ -49,6 +49,7 @@ import {
 	SnatchError,
 } from "./torrent.js";
 import {
+	exists,
 	extractInt,
 	getLogString,
 	Mutex,
@@ -497,10 +498,20 @@ async function getCachedTorrentFile(
 	} catch (e) {
 		logger.error({
 			label: `${searcheeLabel}/${Label.DECIDE}`,
-			message: `Failed to parse cached torrent ${sanitizeInfoHash(infoHash)}${options.deleteOnFail ? " - deleting" : ""}: ${e.message}`,
+			message: `Failed to parse cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))}${options.deleteOnFail ? " - deleting" : ""}: ${e.message}`,
 		});
 		logger.debug(e);
-		if (options.deleteOnFail) await unlink(torrentPath);
+		try {
+			if (options.deleteOnFail) await unlink(torrentPath);
+		} catch (e) {
+			if (await exists(torrentPath)) {
+				logger.error({
+					label: `${searcheeLabel}/${Label.DECIDE}`,
+					message: `Failed to delete corrupted cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))}: ${e.message}`,
+				});
+				logger.debug(e);
+			}
+		}
 		return null;
 	}
 	if (existsRes.isLegacy) {
@@ -512,12 +523,21 @@ async function getCachedTorrentFile(
 				path.join(appDir(), TORRENT_CACHE_FOLDER),
 				{ cached: true },
 			);
-			await rename(torrentPath, newPath);
+			try {
+				await rename(torrentPath, newPath);
+			} catch (e) {
+				if (await notExists(newPath)) throw e;
+			}
 			torrentPath = newPath;
+			try {
+				await unlink(torrentPath);
+			} catch (e) {
+				if (await exists(torrentPath)) throw e;
+			}
 		} catch (e) {
 			logger.error({
 				label: `${searcheeLabel}/${Label.DECIDE}`,
-				message: `Failed to rename cached torrent ${getLogString(meta)}: ${e.message}`,
+				message: `Error while renaming cached torrent ${getLogString(meta)}: ${e.message}`,
 			});
 			logger.debug(e);
 		}
