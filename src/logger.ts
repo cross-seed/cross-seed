@@ -179,7 +179,7 @@ export function initializeLogger(options: Record<string, unknown>): void {
 							stack,
 							cause,
 						}) => {
-							timestamp = timestamp.replace(
+							timestamp = (timestamp as string).replace(
 								SUB_SECOND_TS_REGEX,
 								"",
 							);
