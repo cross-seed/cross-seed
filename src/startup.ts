@@ -1,15 +1,14 @@
 import { constants, mkdir, stat } from "fs/promises";
-import ms from "ms";
+import { spawn } from "node:child_process";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
-import { validateUArrLs } from "./arr.js";
-import {
-	getClients,
-	instantiateDownloadClients,
-} from "./clients/TorrentClient.js";
+import { instantiateDownloadClients } from "./clients/TorrentClient.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
+import { getFileConfig } from "./configuration.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
+import { getDbConfig, setDbConfig } from "./dbConfig.js";
+import { createRequire } from "module";
 import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
 import { initializeLogger, Label, logger } from "./logger.js";
 import { initializePushNotifier } from "./pushNotifier.js";
@@ -18,8 +17,10 @@ import {
 	RuntimeConfig,
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
-import { validateTorznabUrls } from "./torznab.js";
-import { Awaitable, mapAsync, notExists, verifyDir, wait } from "./utils.js";
+import { Awaitable, notExists, verifyDir } from "./utils.js";
+import { getLogWatcher } from "./utils/logWatcher.js";
+
+const require = createRequire(import.meta.url);
 
 export async function exitGracefully() {
 	await db.destroy();
@@ -111,55 +112,23 @@ async function checkConfigPaths(): Promise<void> {
 			} above for details.`,
 		);
 	}
-}
-
-async function retry<T>(
-	cb: () => Promise<T>,
-	numRetries: number,
-	delayMs: number,
-): Promise<T> {
-	const retries = Math.max(numRetries, 0);
-	let lastError = new Error("Retry failed");
-	for (let i = 0; i <= retries; i++) {
-		try {
-			return await cb();
-		} catch (e) {
-			const retryMsg =
-				i < retries ? `, retrying in ${delayMs / 1000}s` : "";
-			logger.error(
-				`Attempt ${i + 1}/${retries + 1} failed${retryMsg}: ${e.message}`,
-			);
-			logger.debug(e);
-			lastError = e;
-			if (i >= retries) break;
-			await wait(delayMs);
-		}
+	if (linkDev.length) {
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each linkDir: ${inspect(linkDev)}`,
+		});
 	}
-	throw lastError;
+	if (dataDev.length) {
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each dataDir: ${inspect(dataDev)}`,
+		});
+	}
 }
 
 export async function doStartupValidation(): Promise<void> {
 	await checkConfigPaths(); // ensure paths are valid first
 	instantiateDownloadClients();
-	const validateClientConfig = () =>
-		mapAsync(getClients(), (client) => client.validateConfig());
-	const errors = (
-		await Promise.allSettled([
-			retry(validateTorznabUrls, 5, ms("1 minute")),
-			retry(validateUArrLs, 5, ms("1 minute")),
-			retry(validateClientConfig, 5, ms("1 minute")),
-		])
-	).filter((p) => p.status === "rejected");
-	if (errors.length) {
-		throw new CrossSeedError(
-			`\tYour configuration is invalid, please see the ${errors.length > 1 ? "errors" : "error"} above for details.`,
-		);
-	}
-	logger.verbose({
-		label: Label.CONFIGDUMP,
-		message: inspect(getRuntimeConfig()),
-	});
-	logger.info("Your configuration is valid!");
 }
 
 /**
@@ -178,7 +147,7 @@ export function parseRuntimeConfigAndLogErrors(
 		}) as RuntimeConfig;
 	} catch (error) {
 		logger.verbose({
-			label: Label.CONFIGDUMP,
+			label: Label.CONFIG,
 			message: inspect(options),
 		});
 		if ("errors" in error && Array.isArray(error.errors)) {
@@ -252,10 +221,73 @@ export function withFullRuntime(
 ): CommanderActionCb {
 	return withMinimalRuntime(async (options) => {
 		initializeLogger(options as Record<string, unknown>);
-		const runtimeConfig = parseRuntimeConfigAndLogErrors(options);
+
+		let runtimeConfig: RuntimeConfig;
+		try {
+			// Load config from database
+			runtimeConfig = {
+				...(await getDbConfig()),
+				...(options as Record<string, unknown>),
+			};
+		} catch {
+			// No complete config in database, migrate from file or template
+			try {
+				// Try to load and migrate from file config
+				const fileConfig = await getFileConfig();
+				runtimeConfig = parseRuntimeConfigAndLogErrors({
+					...fileConfig,
+					...(options as Record<string, unknown>),
+				});
+
+				// Preserve existing API key from apikey column
+				const existingApiKey = await db("settings")
+					.select("apikey")
+					.first();
+				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
+					runtimeConfig.apiKey = existingApiKey.apikey;
+				}
+
+				await setDbConfig(runtimeConfig);
+				logger.info("Migrated file config to database");
+			} catch {
+				// No file config - use template directly
+				const templateConfig = require("./config.template.cjs")
+					.default as Record<string, unknown>;
+				runtimeConfig = parseRuntimeConfigAndLogErrors({
+					...templateConfig,
+					...(options as Record<string, unknown>),
+				});
+
+				// Preserve existing API key from apikey column
+				const existingApiKey = await db("settings")
+					.select("apikey")
+					.first();
+				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
+					runtimeConfig.apiKey = existingApiKey.apikey;
+				}
+
+				await setDbConfig(runtimeConfig);
+				logger.info("Created initial database config from template");
+			}
+		}
+
 		setRuntimeConfig(runtimeConfig);
 		initializePushNotifier();
+		getLogWatcher();
 		await doStartupValidation();
 		await entrypoint(runtimeConfig);
 	});
+}
+
+export async function restartCrossSeed() {
+	logger.info("Restarting cross-seed");
+	process.on("exit", () => {
+		spawn(process.argv[0], process.argv.slice(1), {
+			cwd: process.cwd(),
+			stdio: "inherit",
+			detached: false,
+		});
+	});
+
+	await exitGracefully();
 }

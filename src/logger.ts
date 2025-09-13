@@ -12,10 +12,9 @@ export enum Label {
 	DELUGE = "deluge",
 	DECIDE = "decide",
 	PREFILTER = "prefilter",
-	CONFIGDUMP = "configdump",
+	CONFIG = "config",
 	TORZNAB = "torznab",
 	SERVER = "server",
-	STARTUP = "startup",
 	SCHEDULER = "scheduler",
 	SEARCH = "search",
 	RSS = "rss",
@@ -27,6 +26,8 @@ export enum Label {
 	ARRS = "arrs",
 	RADARR = "radarr",
 	SONARR = "sonarr",
+	AUTH = "auth",
+	INDEX = "index",
 }
 
 export let logger: winston.Logger;
@@ -178,7 +179,7 @@ export function initializeLogger(options: Record<string, unknown>): void {
 							stack,
 							cause,
 						}) => {
-							timestamp = timestamp.replace(
+							timestamp = (timestamp as string).replace(
 								SUB_SECOND_TS_REGEX,
 								"",
 							);
