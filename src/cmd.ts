@@ -21,10 +21,7 @@ import { bulkSearch, scanRssFeeds } from "./pipeline.js";
 import { sendTestNotification } from "./pushNotifier.js";
 import { serve } from "./server.js";
 import { withFullRuntime, withMinimalRuntime } from "./startup.js";
-import {
-	indexTorrentsAndDataDirs,
-	parseTorrentFromFilename,
-} from "./torrent.js";
+import { indexTorrentsAndDataDirs, parseTorrentFromPath } from "./torrent.js";
 import { fallback } from "./utils.js";
 
 let fileConfig: FileConfig;
@@ -326,7 +323,7 @@ program
 				);
 				// eslint-disable-next-line @typescript-eslint/no-unused-vars
 				const { category, isSingleFileTorrent, raw, tags, ...meta } =
-					await parseTorrentFromFilename(torrentPath);
+					await parseTorrentFromPath(torrentPath);
 				console.log(meta);
 			},
 			{ migrate: false },

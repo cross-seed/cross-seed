@@ -3,7 +3,12 @@ import { accessSync, constants, copyFileSync, existsSync, mkdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
-import { Action, MatchMode } from "./constants.js";
+import {
+	Action,
+	LOGS_FOLDER,
+	MatchMode,
+	TORRENT_CACHE_FOLDER,
+} from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 
 const require = createRequire(import.meta.url);
@@ -99,8 +104,8 @@ export function appDir(): string {
 
 export function createAppDirHierarchy(): void {
 	const appDirPath = appDir();
-	mkdirSync(path.join(appDirPath, "torrent_cache"), { recursive: true });
-	mkdirSync(path.join(appDirPath, "logs"), { recursive: true });
+	mkdirSync(path.join(appDirPath, TORRENT_CACHE_FOLDER), { recursive: true });
+	mkdirSync(path.join(appDirPath, LOGS_FOLDER), { recursive: true });
 }
 
 export function generateConfig(): void {

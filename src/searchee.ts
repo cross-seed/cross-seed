@@ -462,14 +462,14 @@ export function createSearcheeFromMetafile(
 }
 
 export async function createSearcheeFromTorrentFile(
-	filepath: string,
+	filePath: string,
 	torrentInfos: TorrentMetadataInClient[],
 ): Promise<Result<SearcheeWithInfoHash, Error>> {
 	try {
-		const meta = await parseTorrentWithMetadata(filepath, torrentInfos);
+		const meta = await parseTorrentWithMetadata(filePath, torrentInfos);
 		return createSearcheeFromMetafile(meta);
 	} catch (e) {
-		logger.error(`Failed to parse ${basename(filepath)}: ${e.message}`);
+		logger.error(`Failed to parse ${basename(filePath)}: ${e.message}`);
 		logger.debug(e);
 		return resultOfErr(e);
 	}

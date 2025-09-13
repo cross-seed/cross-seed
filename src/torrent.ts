@@ -92,21 +92,21 @@ export interface EnsembleEntry {
 	element: string | number;
 }
 
-export async function parseTorrentFromFilename(
-	filename: string,
+export async function parseTorrentFromPath(
+	filePath: string,
 ): Promise<Metafile> {
-	return Metafile.decode(await readFile(filename));
+	return Metafile.decode(await readFile(filePath));
 }
 
 export async function parseTorrentWithMetadata(
-	filename: string,
+	filePath: string,
 	torrentInfos: TorrentMetadataInClient[],
 ): Promise<Metafile> {
-	const meta = await parseTorrentFromFilename(filename);
+	const meta = await parseTorrentFromPath(filePath);
 	const clients = getClients();
 	if (clients[0]?.clientType === Label.QBITTORRENT) {
-		const fastResumePath = filename.replace(
-			extname(filename),
+		const fastResumePath = filePath.replace(
+			extname(filePath),
 			".fastresume",
 		);
 		if (await exists(fastResumePath)) {
@@ -117,7 +117,7 @@ export async function parseTorrentWithMetadata(
 			return meta;
 		} else {
 			logger.verbose(
-				`No .fastresume found at ${fastResumePath} from ${filename}, using client to get metadata without trackers`,
+				`No .fastresume found at ${fastResumePath} from ${filePath}, using client to get metadata without trackers`,
 			);
 		}
 	}
@@ -133,7 +133,7 @@ export async function parseTorrentWithMetadata(
 		}
 	} else if (clients.length) {
 		logger.verbose(
-			`No torrent info found for ${meta.infoHash} from ${filename}`,
+			`No torrent info found for ${meta.infoHash} from ${filePath}`,
 		);
 	}
 	return meta;
@@ -325,7 +325,7 @@ function buildTorrentSaveName(
 }
 
 /**
- * Besure to update parseMetadataFromFilename if changing the format
+ * Be sure to update parseMetadataFromFilename if changing the format
  */
 export function getTorrentSavePath(
 	meta: Metafile,
@@ -355,8 +355,7 @@ export function getTorrentSavePath(
 		dir,
 		buildTorrentSaveName(mediaType, tracker, safeName, meta.infoHash, ext),
 	);
-	if (Buffer.byteLength(safePath, "utf8") <= MAX_PATH_BYTES) return safePath;
-	return fullPath; // Handle the error on save if it exists
+	return safePath; // Handle the error on save if it exists
 }
 
 /**
@@ -521,32 +520,32 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 	const dirContents = new Set(await findAllTorrentFilesInDir(dir));
 
 	const newSearchees: SearcheeWithInfoHash[] = [];
-	for (const filepath of dirContents) {
+	for (const filePath of dirContents) {
 		const doesAlreadyExist = await db("torrent")
 			.select("id")
-			.where({ file_path: filepath })
+			.where({ file_path: filePath })
 			.first();
 		if (doesAlreadyExist) continue;
 
 		let meta: Metafile;
 		try {
-			meta = await parseTorrentFromFilename(filepath);
+			meta = await parseTorrentFromPath(filePath);
 		} catch (e) {
-			logOnce(`Failed to parse ${filepath}`, () => {
-				logger.error(`Failed to parse ${filepath}`);
+			logOnce(`Failed to parse ${filePath}`, () => {
+				logger.error(`Failed to parse ${filePath}`);
 				logger.debug(e);
 			});
 			continue;
 		}
 		await db("torrent")
 			.insert({
-				file_path: filepath,
+				file_path: filePath,
 				info_hash: meta.infoHash,
 				name: meta.name,
 			})
 			.onConflict("file_path")
 			.ignore();
-		const res = await createSearcheeFromTorrentFile(filepath, []);
+		const res = await createSearcheeFromTorrentFile(filePath, []);
 		if (res.isOk()) newSearchees.push(res.unwrap());
 	}
 

@@ -39,7 +39,7 @@ export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
 export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
 export const CALIBRE_INDEXNUM_REGEX = /\s?\(\d+\)$/;
-export const INFOHASH_REGEX = /^[a-z0-9]{40}$/i;
+export const INFO_HASH_REGEX = /^[a-z0-9]{40}$/i;
 export const SAVED_TORRENTS_INFO_REGEX =
 	/^\[(?<mediaType>.+?)\]\[(?<tracker>.+?)\](?<name>.+?)(?:\[(?<infoHash>[a-z0-9]{40})\])?(?<cached>.cached)?\.torrent$/i;
 export const BAD_GROUP_PARSE_REGEX =
@@ -157,6 +157,7 @@ export const ALL_EXTENSIONS = [
 ];
 
 export const TORRENT_CACHE_FOLDER = "torrent_cache";
+export const LOGS_FOLDER = "logs";
 export const UNKNOWN_TRACKER = "UnknownTracker";
 export const MAX_PATH_BYTES = 255;
 export const LEVENSHTEIN_DIVISOR = 3;
