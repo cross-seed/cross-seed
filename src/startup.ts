@@ -18,6 +18,7 @@ import {
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
 import { Awaitable, notExists, verifyDir } from "./utils.js";
+import { getLogWatcher } from "./utils/logWatcher.js";
 
 const require = createRequire(import.meta.url);
 
@@ -224,7 +225,10 @@ export function withFullRuntime(
 		let runtimeConfig: RuntimeConfig;
 		try {
 			// Load config from database
-			runtimeConfig = await getDbConfig();
+			runtimeConfig = {
+				...(await getDbConfig()),
+				...(options as Record<string, unknown>),
+			};
 		} catch {
 			// No complete config in database, migrate from file or template
 			try {
@@ -269,6 +273,7 @@ export function withFullRuntime(
 
 		setRuntimeConfig(runtimeConfig);
 		initializePushNotifier();
+		getLogWatcher();
 		await doStartupValidation();
 		await entrypoint(runtimeConfig);
 	});
