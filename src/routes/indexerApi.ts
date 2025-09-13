@@ -1,19 +1,19 @@
-import { FastifyInstance, FastifyPluginAsync, FastifyReply } from "fastify";
-import { Label, logger } from "../logger.js";
+import { FastifyInstance, FastifyReply } from "fastify";
 import { PROGRAM_VERSION } from "../constants.js";
-import { authorize } from "../utils/authUtils.js";
+import { Label, logger } from "../logger.js";
 import {
-	indexerCreateSchema,
-	indexerUpdateSchema,
-	indexerTestSchema,
 	createIndexer,
-	updateIndexer,
 	deactivateIndexer,
 	getIndexerById,
+	indexerCreateSchema,
+	indexerTestSchema,
+	indexerUpdateSchema,
 	listAllIndexers,
-	testNewIndexer,
 	testExistingIndexer,
+	testNewIndexer,
+	updateIndexer,
 } from "../services/indexerService.js";
+import { authorize } from "../utils/authUtils.js";
 
 // Helper function to parse and validate ID from route params
 async function parseIdParam(
@@ -35,15 +35,13 @@ async function parseIdParam(
  * Prowlarr Integration API Routes
  * Base path: /api/indexer/v1
  */
-export const indexerApiPlugin: FastifyPluginAsync = async (
-	app: FastifyInstance,
-) => {
+export async function indexerApiPlugin(app: FastifyInstance) {
 	/**
 	 * Indexer management status for Prowlarr integration
 	 */
 	app.get<{
 		Querystring: { apikey?: string };
-	}>("/api/indexer/v1/status", async (request, reply) => {
+	}>("/status", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
 		const statusResponse = {
@@ -59,7 +57,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 	 */
 	app.get<{
 		Querystring: { apikey?: string };
-	}>("/api/indexer/v1", async (request, reply) => {
+	}>("", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
 		const indexers = await listAllIndexers();
@@ -72,7 +70,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 	app.get<{
 		Params: { id: string };
 		Querystring: { apikey?: string };
-	}>("/api/indexer/v1/:id", async (request, reply) => {
+	}>("/:id", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
 		const id = await parseIdParam(request.params.id, reply);
@@ -99,7 +97,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			enabled?: boolean;
 		};
 		Querystring: { apikey?: string };
-	}>("/api/indexer/v1", async (request, reply) => {
+	}>("", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
 		const validation = indexerCreateSchema.safeParse(request.body);
@@ -128,7 +126,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			enabled?: boolean;
 		};
 		Querystring: { apikey?: string };
-	}>("/api/indexer/v1/:id", async (request, reply) => {
+	}>("/:id", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
 		const id = await parseIdParam(request.params.id, reply);
@@ -165,7 +163,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 	app.delete<{
 		Params: { id: string };
 		Querystring: { apikey?: string };
-	}>("/api/indexer/v1/:id", async (request, reply) => {
+	}>("/:id", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
 		const id = await parseIdParam(request.params.id, reply);
@@ -190,7 +188,7 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			id?: number;
 		};
 		Querystring: { apikey?: string };
-	}>("/api/indexer/v1/test", async (request, reply) => {
+	}>("/test", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
 		let result;
@@ -234,4 +232,4 @@ export const indexerApiPlugin: FastifyPluginAsync = async (
 			message: err.message,
 		});
 	});
-};
+}
