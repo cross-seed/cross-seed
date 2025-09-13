@@ -43,7 +43,7 @@ import {
 	findAllTorrentFilesInDir,
 	getTorrentSavePath,
 	parseMetadataFromFilename,
-	parseTorrentFromFilename,
+	parseTorrentFromPath,
 } from "./torrent.js";
 import {
 	areMediaTitlesSimilar,
@@ -530,7 +530,7 @@ async function loadMetafile(
 	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 	let meta: Metafile;
 	try {
-		meta = await parseTorrentFromFilename(torrentFilePath);
+		meta = await parseTorrentFromPath(torrentFilePath);
 	} catch (e) {
 		logger.error({
 			label: Label.INJECT,
@@ -827,7 +827,7 @@ export async function restoreFromTorrentCache(): Promise<void> {
 			}
 			const destPath = path.join(outputDir, torrentFileName);
 			await copyFromTorrentCache(torrentFilePath, destPath, infoHash);
-			const meta = await parseTorrentFromFilename(torrentFilePath);
+			const meta = await parseTorrentFromPath(torrentFilePath);
 			for (const trackerHost of meta.trackers) {
 				if (hostToName.has(trackerHost)) continue;
 				hostToName.set(trackerHost, tracker);
@@ -845,7 +845,7 @@ export async function restoreFromTorrentCache(): Promise<void> {
 	let numLegacyFixed = 0;
 	for (const torrentFilePath of legacyEntries) {
 		try {
-			const meta = await parseTorrentFromFilename(torrentFilePath);
+			const meta = await parseTorrentFromPath(torrentFilePath);
 			let found = false;
 			for (const trackerHost of meta.trackers) {
 				if (!hostToName.has(trackerHost)) continue;
