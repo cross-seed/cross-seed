@@ -9,6 +9,10 @@ import limits from "./07-limits.js";
 import rss from "./08-rss.js";
 import clientAndDataSearchees from "./09-clientAndDataSearchees.js";
 import indexerNameAudioBookCaps from "./10-indexerNameAudioBookCaps.js";
+import userAuth from "./11-user-auth.js";
+import settings from "./12-settings.js";
+import indexerEnabledFlag from "./13-indexer-enabled-flag.js";
+import removeUrlUniqueConstraint from "./14-remove-url-unique-constraint.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -24,6 +28,10 @@ export const migrations = {
 			rss,
 			clientAndDataSearchees,
 			indexerNameAudioBookCaps,
+			userAuth,
+			settings,
+			indexerEnabledFlag,
+			removeUrlUniqueConstraint,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,
