@@ -148,13 +148,17 @@ program
 		"Bind to a specific IP address",
 		fallback(fileConfig.host, "0.0.0.0"),
 	)
+	.option("--base-path <path>", "Serve cross-seed behind this base path", "")
 	.option("--no-port", "Do not listen on any port")
 	.addOption(verboseOption)
 	.action(
 		withFullRuntime(async (options) => {
 			await indexTorrentsAndDataDirs({ startup: true });
 			// technically this will never resolve, but it's necessary to keep the process running
-			await Promise.all([serve(options.port, options.host), jobsLoop()]);
+			await Promise.all([
+				serve(options.port, options.host, options.basePath),
+				jobsLoop(),
+			]);
 		}),
 	);
 
