@@ -13,6 +13,7 @@ import userAuth from "./11-user-auth.js";
 import settings from "./12-settings.js";
 import indexerEnabledFlag from "./13-indexer-enabled-flag.js";
 import removeUrlUniqueConstraint from "./14-remove-url-unique-constraint.js";
+import guidIndices from "./15-guid-indices.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -32,6 +33,7 @@ export const migrations = {
 			settings,
 			indexerEnabledFlag,
 			removeUrlUniqueConstraint,
+			guidIndices,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,
