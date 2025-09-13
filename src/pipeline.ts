@@ -859,12 +859,15 @@ export async function scanRssFeeds() {
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
 	await indexTorrentsAndDataDirs();
 	let numCandidates = 0;
-	await mapAsync(await queryRssFeeds(lastRun, enabledIndexers), async (candidates) => {
-		for await (const candidate of candidates) {
-			await checkNewCandidateMatch(candidate, Label.RSS);
-			numCandidates++;
-		}
-	});
+	await mapAsync(
+		await queryRssFeeds(lastRun, enabledIndexers),
+		async (candidates) => {
+			for await (const candidate of candidates) {
+				await checkNewCandidateMatch(candidate, Label.RSS);
+				numCandidates++;
+			}
+		},
+	);
 
 	logger.info({
 		label: Label.RSS,
