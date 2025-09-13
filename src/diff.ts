@@ -1,5 +1,5 @@
 import { deepStrictEqual } from "assert";
-import { parseTorrentFromFilename } from "./torrent.js";
+import { parseTorrentFromPath } from "./torrent.js";
 
 function diff(thing1, thing2) {
 	console.log(
@@ -15,8 +15,8 @@ function diff(thing1, thing2) {
 }
 
 export async function diffCmd(first: string, second: string): Promise<void> {
-	const f1 = (await parseTorrentFromFilename(first)).files;
-	const f2 = (await parseTorrentFromFilename(second)).files;
+	const f1 = (await parseTorrentFromPath(first)).files;
+	const f2 = (await parseTorrentFromPath(second)).files;
 	const sortBy =
 		f1.length === 1
 			? (a, b) => b.length - a.length

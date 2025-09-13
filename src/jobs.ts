@@ -48,11 +48,6 @@ class Job {
 			});
 			if (this.runAheadOfSchedule && this.name === JobName.SEARCH) {
 				await bulkSearch({ configOverride: this.configOverride });
-			} else if (
-				this.runAheadOfSchedule &&
-				this.name === JobName.CLEANUP
-			) {
-				await cleanupDB({ runAll: true });
 			} else {
 				await this.exec();
 			}
