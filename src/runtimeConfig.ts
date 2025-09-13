@@ -32,6 +32,7 @@ export interface RuntimeConfig {
 	torrents: string[];
 	port?: number;
 	host?: string;
+	basePath?: string;
 	searchCadence?: number;
 	rssCadence?: number;
 	snatchTimeout?: number;
