@@ -471,9 +471,7 @@ async function saveToOutputDir(
 			getMediaType(newMeta),
 			tracker,
 			outputDir,
-			{
-				cached: false,
-			},
+			{ cached: false },
 		);
 		if (await exists(filePath)) {
 			await utimes(filePath, new Date(), (await stat(filePath)).mtime);

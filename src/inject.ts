@@ -23,6 +23,7 @@ import {
 	VIDEO_DISC_EXTENSIONS,
 } from "./constants.js";
 import { assessCandidate } from "./decide.js";
+import { getHostToNameMap } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { findAllSearchees } from "./pipeline.js";
@@ -43,7 +44,7 @@ import {
 	findAllTorrentFilesInDir,
 	getTorrentSavePath,
 	parseMetadataFromFilename,
-	parseTorrentFromFilename,
+	parseTorrentFromPath,
 } from "./torrent.js";
 import {
 	areMediaTitlesSimilar,
@@ -106,6 +107,7 @@ function getTorrentFilePathLog(torrentFilePath: string): string {
 }
 
 async function deleteTorrentFileIfSafe(torrentFilePath: string): Promise<void> {
+	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 	const { tracker, name, mediaType } = parseMetadataFromFilename(
 		basename(torrentFilePath),
 	);
@@ -113,8 +115,13 @@ async function deleteTorrentFileIfSafe(torrentFilePath: string): Promise<void> {
 	// we are confident cross-seed created the torrent,
 	// or it is intended for use with cross-seed
 	const isSafeToDelete = tracker && name && mediaType;
-	if (!isSafeToDelete) return;
-	const filePathLog = getTorrentFilePathLog(torrentFilePath);
+	if (!isSafeToDelete) {
+		logger.warn({
+			label: Label.INJECT,
+			message: `Will not delete ${filePathLog}: missing metadata from filename`,
+		});
+		return;
+	}
 	logger.verbose({
 		label: Label.INJECT,
 		message: `Deleting ${filePathLog}`,
@@ -150,7 +157,6 @@ async function deleteTorrentFileIfComplete(
 async function whichSearcheesMatchTorrent(
 	meta: Metafile,
 	searchees: SearcheeWithLabel[],
-	tracker: string,
 	blockList: string[],
 	ignoreTitles: boolean,
 ): Promise<{
@@ -170,7 +176,6 @@ async function whichSearcheesMatchTorrent(
 		const { decision } = await assessCandidate(
 			meta,
 			searchee,
-			tracker,
 			new Set(),
 			[],
 		);
@@ -530,7 +535,7 @@ async function loadMetafile(
 	const filePathLog = getTorrentFilePathLog(torrentFilePath);
 	let meta: Metafile;
 	try {
-		meta = await parseTorrentFromFilename(torrentFilePath);
+		meta = await parseTorrentFromPath(torrentFilePath);
 	} catch (e) {
 		logger.error({
 			label: Label.INJECT,
@@ -543,9 +548,16 @@ async function loadMetafile(
 	const { tracker: trackerFromFilename } = parseMetadataFromFilename(
 		basename(torrentFilePath),
 	);
-	summary.FOUND_BAD_FORMAT ||= !trackerFromFilename;
-	const tracker = trackerFromFilename ?? UNKNOWN_TRACKER;
-	return resultOf({ meta, tracker });
+	if (trackerFromFilename) {
+		return resultOf({ meta, tracker: trackerFromFilename });
+	}
+	summary.FOUND_BAD_FORMAT = true;
+	const hostToName = await getHostToNameMap();
+	const trackerHost = meta.trackers.find((h) => hostToName.has(h));
+	if (trackerHost) {
+		return resultOf({ meta, tracker: hostToName.get(trackerHost)! });
+	}
+	return resultOf({ meta, tracker: UNKNOWN_TRACKER });
 }
 
 async function injectSavedTorrent(
@@ -579,7 +591,6 @@ async function injectSavedTorrent(
 		await whichSearcheesMatchTorrent(
 			meta,
 			searchees,
-			tracker,
 			blockList,
 			ignoreTitles,
 		);
@@ -731,7 +742,7 @@ export async function injectSavedTorrents(): Promise<void> {
 	if (torrentFilePaths.length === 0) {
 		logger.info({
 			label: Label.INJECT,
-			message: `No torrent files found to inject in ${targetDirLog}`,
+			message: `No torrent files are awaiting injection in ${targetDirLog}`,
 		});
 		return;
 	}
@@ -777,11 +788,11 @@ export async function restoreFromTorrentCache(): Promise<void> {
 		path.join(appDir(), TORRENT_CACHE_FOLDER),
 	);
 	if (torrentFilePaths.length === 0) {
-		logger.info("No torrent files found to restore from cache");
+		logger.info("No .torrent files found to restore from cache");
 		return;
 	}
 	logger.info(
-		`Found ${chalk.bold.white(torrentFilePaths.length)} torrent file(s) to restore from cache`,
+		`Found ${chalk.bold.white(torrentFilePaths.length)} .torrent files to restore from cache`,
 	);
 
 	let copied = 0;
@@ -789,114 +800,70 @@ export async function restoreFromTorrentCache(): Promise<void> {
 		torrentFilePath: string,
 		destPath: string,
 		infoHash?: string,
-	): Promise<boolean> => {
-		try {
-			if (await exists(destPath)) return true;
-			await copyFile(torrentFilePath, destPath);
-			copied++;
-			if (copied % 1000 === 0) {
-				const destPathLog = infoHash
-					? destPath.replace(infoHash, sanitizeInfoHash(infoHash))
-					: destPath;
-				logger.info(
-					`${chalk.blue(`(${copied}/${torrentFilePaths.length})`)} ${chalk.bold.magenta(destPathLog)}`,
-				);
-			}
-			return true;
-		} catch (e) {
-			logger.error(
-				chalk.bold.red(
-					`Failure when copying ${torrentFilePath}: ${e.message}`,
-				),
+	): Promise<void> => {
+		if (await exists(destPath)) return;
+		await copyFile(torrentFilePath, destPath);
+		copied++;
+		if (copied % 1000 === 0) {
+			const destPathLog = infoHash
+				? destPath.replace(infoHash, sanitizeInfoHash(infoHash))
+				: destPath;
+			logger.info(
+				`${chalk.blue(`(${copied}/${torrentFilePaths.length})`)} ${chalk.bold.magenta(destPathLog)}`,
 			);
-			logger.error(e);
-			return false;
 		}
 	};
 
-	const hostToName = new Map<string, string>();
-	const legacyEntries: string[] = [];
+	const hostToName = await getHostToNameMap();
+	let numMissingMetadata = 0;
 	for (const torrentFilePath of torrentFilePaths) {
 		try {
-			const torrentFileName = basename(torrentFilePath);
-			const { tracker, infoHash } =
-				parseMetadataFromFilename(torrentFileName);
-			if (!tracker) {
-				legacyEntries.push(torrentFilePath);
-				continue;
-			}
-			const destPath = path.join(outputDir, torrentFileName);
-			await copyFromTorrentCache(torrentFilePath, destPath, infoHash);
-			const meta = await parseTorrentFromFilename(torrentFilePath);
-			for (const trackerHost of meta.trackers) {
-				if (hostToName.has(trackerHost)) continue;
-				hostToName.set(trackerHost, tracker);
-			}
-		} catch (e) {
-			logger.error(
-				chalk.bold.red(
-					`Failure when processing ${torrentFilePath}: ${e.message}`,
-				),
-			);
-			logger.error(e);
-		}
-	}
-
-	let numLegacyFixed = 0;
-	for (const torrentFilePath of legacyEntries) {
-		try {
-			const meta = await parseTorrentFromFilename(torrentFilePath);
-			let found = false;
-			for (const trackerHost of meta.trackers) {
-				if (!hostToName.has(trackerHost)) continue;
-				const tracker = hostToName.get(trackerHost)!;
+			try {
+				const meta = await parseTorrentFromPath(torrentFilePath);
+				const infoHash = meta.infoHash;
+				const trackerHost = meta.trackers.find((h) =>
+					hostToName.has(h),
+				);
 				const destPath = getTorrentSavePath(
 					meta,
 					getMediaType(meta),
-					tracker,
+					trackerHost
+						? hostToName.get(trackerHost)!
+						: UNKNOWN_TRACKER,
 					outputDir,
 					{ cached: true },
 				);
-				if (
-					await copyFromTorrentCache(
-						torrentFilePath,
-						destPath,
-						meta.infoHash,
-					)
-				) {
-					found = true;
-					numLegacyFixed++;
-					break;
-				}
+				await copyFromTorrentCache(torrentFilePath, destPath, infoHash);
+				if (!trackerHost) numMissingMetadata++;
+			} catch (e) {
+				logger.error(
+					chalk.bold.red(
+						`Failure when processing ${torrentFilePath}, filename metadata will be unknown: ${e.message}`,
+					),
+				);
+				logger.error(e);
+				const baseName = basename(torrentFilePath);
+				const infoHash = baseName.split(".")[0];
+				const destFileName = `[${MediaType.OTHER}][${UNKNOWN_TRACKER}]${baseName}`;
+				const destPath = path.join(outputDir, destFileName);
+				await copyFromTorrentCache(torrentFilePath, destPath, infoHash);
+				numMissingMetadata++;
 			}
-			if (found) continue;
 		} catch (e) {
 			logger.error(
 				chalk.bold.red(
-					`Failure when processing ${torrentFilePath}, filename metadata will be unknown: ${e.message}`,
+					`Failed to copy ${torrentFilePath}: ${e.message}`,
 				),
 			);
 			logger.error(e);
 		}
-		const baseName = basename(torrentFilePath);
-		const infoHash = baseName.split(".")[0];
-		const destFileName = `[${MediaType.OTHER}][${UNKNOWN_TRACKER}]${baseName}`;
-		const destPath = path.join(outputDir, destFileName);
-		await copyFromTorrentCache(torrentFilePath, destPath, infoHash);
 	}
-
 	logger.info(
-		`Copied ${chalk.bold.green(copied)}/${chalk.bold.white(torrentFilePaths.length)} torrent file(s) from cache to outputDir, run "${chalk.bold.white("cross-seed inject")}" to inject into client using your dataDirs`,
+		`Copied ${chalk.bold.green(copied)}/${chalk.bold.white(torrentFilePaths.length)} .torrent files from cache to outputDir, run "${chalk.bold.white("cross-seed inject")}" to inject into client using your dataDirs`,
 	);
-	if (numLegacyFixed) {
+	if (numMissingMetadata) {
 		logger.info(
-			`Copied ${chalk.bold.green(numLegacyFixed)} legacy cache entries with parsed filename metadata from other entries`,
-		);
-	}
-	const numLegacyNotFixed = legacyEntries.length - numLegacyFixed;
-	if (numLegacyNotFixed) {
-		logger.info(
-			`Copied ${chalk.bold.yellow(numLegacyNotFixed)} legacy cache entries without filename metadata`,
+			`Copied ${chalk.bold.yellow(numMissingMetadata)} .torrent files without filename metadata`,
 		);
 	}
 	logger.info(

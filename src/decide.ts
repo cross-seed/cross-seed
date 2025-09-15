@@ -1,13 +1,5 @@
 import bencode from "bencode";
-import {
-	readdir,
-	readFile,
-	rename,
-	stat,
-	unlink,
-	utimes,
-	writeFile,
-} from "fs/promises";
+import { readFile, stat, unlink, utimes, writeFile } from "fs/promises";
 import ms from "ms";
 import path from "path";
 import { appDir } from "./configuration.js";
@@ -42,9 +34,8 @@ import {
 	SearcheeWithLabel,
 } from "./searchee.js";
 import {
-	getTorrentSavePath,
-	parseMetadataFromFilename,
-	parseTorrentFromFilename,
+	findAllTorrentFilesInDir,
+	parseTorrentFromPath,
 	snatch,
 	SnatchError,
 } from "./torrent.js";
@@ -53,7 +44,6 @@ import {
 	extractInt,
 	getLogString,
 	Mutex,
-	notExists,
 	sanitizeInfoHash,
 	stripExtension,
 	withMutex,
@@ -329,7 +319,6 @@ function releaseVersionDoesMatch(searcheeName: string, candidateName: string) {
 export async function assessCandidate(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
-	tracker: string,
 	infoHashesToExclude: Set<string>,
 	blockList: string[],
 	options?: { configOverride: Partial<RuntimeConfig> },
@@ -392,7 +381,11 @@ export async function assessCandidate(
 					: { decision: Decision.DOWNLOAD_FAILED };
 		}
 		metafile = res.unwrap();
-		metaCached = await cacheTorrentFile(metafile, tracker, searchee.label);
+		metaCached = await cacheTorrentFile(
+			metafile,
+			metaOrCandidate,
+			searchee.label,
+		);
 		metaOrCandidate.size = metafile.length; // Trackers can be wrong
 	} else {
 		metafile = metaOrCandidate;
@@ -455,54 +448,38 @@ export async function assessCandidate(
 	return { decision: Decision.FILE_TREE_MISMATCH, metafile, metaCached };
 }
 
-export async function existsInTorrentCache(
-	inputInfoHash: string,
-	dirEntries: string[] | null = null,
-): Promise<{ torrentPath: string; isLegacy: boolean } | null> {
-	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
-	let torrentPath: string | null = path.join(
-		torrentCacheDir,
-		`${inputInfoHash}.cached.torrent`,
-	);
-	let isLegacy = false;
-	if (await notExists(torrentPath)) {
-		torrentPath = null;
-		if (!dirEntries) dirEntries = await readdir(torrentCacheDir);
-		for (const file of dirEntries) {
-			const { infoHash } = parseMetadataFromFilename(file);
-			if (infoHash !== inputInfoHash) continue;
-			torrentPath = path.join(torrentCacheDir, file);
-			break;
-		}
-		if (!torrentPath) return null;
-	} else {
-		isLegacy = true;
-	}
-	await utimes(torrentPath, new Date(), (await stat(torrentPath)).mtime);
-	return { torrentPath, isLegacy };
+export function getCachedTorrentName(infoHash: string): string {
+	return `${infoHash}.cached.torrent`;
 }
 
-async function getCachedTorrentFile(
+async function existsInTorrentCache(infoHash: string): Promise<string | null> {
+	const torrentPath = path.join(
+		appDir(),
+		TORRENT_CACHE_FOLDER,
+		getCachedTorrentName(infoHash),
+	);
+	if (await exists(torrentPath)) return torrentPath;
+	return null;
+}
+
+async function getCachedTorrent(
 	infoHash: string | undefined,
-	tracker: string,
 	searcheeLabel: SearcheeLabel,
-	options = { deleteOnFail: true },
 ): Promise<{ meta: Metafile; torrentPath: string } | null> {
 	if (!infoHash) return null;
-	const existsRes = await existsInTorrentCache(infoHash);
-	if (!existsRes) return null;
-	let { torrentPath } = existsRes;
+	const torrentPath = await existsInTorrentCache(infoHash);
+	if (!torrentPath) return null;
 	let meta: Metafile;
 	try {
-		meta = await parseTorrentFromFilename(torrentPath);
+		meta = await parseTorrentFromPath(torrentPath);
 	} catch (e) {
 		logger.error({
 			label: `${searcheeLabel}/${Label.DECIDE}`,
-			message: `Failed to parse cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))}${options.deleteOnFail ? " - deleting" : ""}: ${e.message}`,
+			message: `Failed to parse cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))} - deleting: ${e.message}`,
 		});
 		logger.debug(e);
 		try {
-			if (options.deleteOnFail) await unlink(torrentPath);
+			await unlink(torrentPath); // cleanup job handles db entries
 		} catch (e) {
 			if (await exists(torrentPath)) {
 				logger.error({
@@ -514,46 +491,27 @@ async function getCachedTorrentFile(
 		}
 		return null;
 	}
-	if (existsRes.isLegacy) {
-		try {
-			const newPath = getTorrentSavePath(
-				meta,
-				getMediaType(meta),
-				tracker,
-				path.join(appDir(), TORRENT_CACHE_FOLDER),
-				{ cached: true },
-			);
-			try {
-				await rename(torrentPath, newPath);
-			} catch (e) {
-				if (await notExists(newPath)) throw e;
-			}
-			torrentPath = newPath;
-		} catch (e) {
-			logger.error({
-				label: `${searcheeLabel}/${Label.DECIDE}`,
-				message: `Error while renaming cached torrent ${getLogString(meta)}: ${e.message}`,
-			});
-			logger.debug(e);
-		}
-	}
+	await utimes(torrentPath, new Date(), (await stat(torrentPath)).mtime);
 	return { meta, torrentPath };
 }
 
 async function cacheTorrentFile(
 	meta: Metafile,
-	tracker: string,
+	candidate: Candidate,
 	searcheeLabel: SearcheeLabel,
 ): Promise<boolean> {
 	try {
-		const torrentPath = getTorrentSavePath(
-			meta,
-			getMediaType(meta),
-			tracker,
-			path.join(appDir(), TORRENT_CACHE_FOLDER),
-			{ cached: true },
+		const torrentPath = path.join(
+			appDir(),
+			TORRENT_CACHE_FOLDER,
+			getCachedTorrentName(meta.infoHash),
 		);
 		await writeFile(torrentPath, new Uint8Array(meta.encode()));
+		if (candidate.indexerId && meta.trackers.length) {
+			await db("indexer")
+				.where({ id: candidate.indexerId })
+				.update({ trackers: JSON.stringify(meta.trackers) });
+		}
 		return true;
 	} catch (e) {
 		logger.error({
@@ -570,13 +528,14 @@ export async function updateTorrentCache(
 	newStr: string,
 ): Promise<void> {
 	const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
-	const files = await readdir(torrentCacheDir);
-	console.log(`Found ${files.length} files in cache, processing...`);
+	const torrentPaths = await findAllTorrentFilesInDir(torrentCacheDir);
+	console.log(`Found ${torrentPaths.length} files in cache, processing...`);
 	let count = 0;
-	for (const file of files) {
-		const filePath = path.join(torrentCacheDir, file);
+	for (const torrentPath of torrentPaths) {
 		try {
-			const torrent: Torrent = bencode.decode(await readFile(filePath));
+			const torrent: Torrent = bencode.decode(
+				await readFile(torrentPath),
+			);
 			const announce = torrent.announce?.toString();
 			const announceList = torrent["announce-list"]?.map((tier) =>
 				tier.map((url) => url.toString()),
@@ -590,7 +549,7 @@ export async function updateTorrentCache(
 				continue;
 			}
 			count++;
-			console.log(`#${count}: ${filePath}`);
+			console.log(`#${count}: ${torrentPath}`);
 			let updated = false;
 			if (announce) {
 				const newAnnounce = announce.replace(oldStr, newStr);
@@ -613,12 +572,12 @@ export async function updateTorrentCache(
 			}
 			if (updated) {
 				await writeFile(
-					filePath,
+					torrentPath,
 					new Uint8Array(bencode.encode(torrent)),
 				);
 			}
 		} catch (e) {
-			console.error(`Error reading ${filePath}: ${e}`);
+			console.error(`Error reading ${torrentPath}: ${e}`);
 		}
 	}
 }
@@ -627,7 +586,6 @@ async function assessAndSaveResults(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
 	guid: string,
-	tracker: string,
 	infoHashesToExclude: Set<string>,
 	firstSeen: number,
 	guidInfoHashMap: Map<string, string>,
@@ -637,53 +595,56 @@ async function assessAndSaveResults(
 	const assessment = await assessCandidate(
 		metaOrCandidate,
 		searchee,
-		tracker,
 		infoHashesToExclude,
 		blockList,
 		options,
 	);
 
-	if (assessment.metaCached && assessment.metafile) {
-		guidInfoHashMap.set(guid, assessment.metafile.infoHash);
-		await db.transaction(async (trx) => {
-			const { id } = await trx("searchee")
-				.select("id")
-				.where({ name: searchee.title })
-				.first();
-			await trx("decision")
-				.insert({
-					searchee_id: id,
-					guid: guid,
-					info_hash: assessment.metafile!.infoHash,
-					decision: assessment.decision,
-					first_seen: firstSeen,
-					last_seen: Date.now(),
-					fuzzy_size_factor: getFuzzySizeFactor(searchee),
-				})
-				.onConflict(["searchee_id", "guid"])
-				.merge();
-		});
+	if (assessment.metaCached) {
+		await withMutex(
+			Mutex.GUID_INFO_HASH_MAP,
+			{ useQueue: true },
+			async () => {
+				guidInfoHashMap.set(guid, assessment.metafile!.infoHash);
+				await db.transaction(async (trx) => {
+					const { id } = await trx("searchee")
+						.select("id")
+						.where({ name: searchee.title })
+						.first();
+					await trx("decision")
+						.insert({
+							searchee_id: id,
+							guid: guid,
+							info_hash: assessment.metafile!.infoHash,
+							decision: assessment.decision,
+							first_seen: firstSeen,
+							last_seen: Date.now(),
+							fuzzy_size_factor: getFuzzySizeFactor(searchee),
+						})
+						.onConflict(["searchee_id", "guid"])
+						.merge();
+				});
+			},
+		);
 	}
 
 	return assessment;
 }
 
 export const rawGuidInfoHashMap: Map<string, string> = new Map();
+export async function rebuildGuidInfoHashMap(): Promise<void> {
+	return withMutex(Mutex.GUID_INFO_HASH_MAP, { useQueue: true }, async () => {
+		const res = await db("decision")
+			.select("guid", "info_hash")
+			.whereNotNull("info_hash");
+		rawGuidInfoHashMap.clear(); // Needs to be async atomic for clearing and setting
+		for (const { guid, info_hash } of res) {
+			rawGuidInfoHashMap.set(guid, info_hash);
+		}
+	});
+}
 export async function getGuidInfoHashMap(): Promise<Map<string, string>> {
-	if (rawGuidInfoHashMap.size) return rawGuidInfoHashMap;
-	await withMutex(
-		Mutex.CREATE_GUID_INFO_HASH_MAP,
-		{ useQueue: false },
-		async () => {
-			const res = await db("decision")
-				.select("guid", "info_hash")
-				.whereNotNull("info_hash");
-			rawGuidInfoHashMap.clear();
-			for (const { guid, info_hash } of res) {
-				rawGuidInfoHashMap.set(guid, info_hash);
-			}
-		},
-	);
+	if (!rawGuidInfoHashMap.size) await rebuildGuidInfoHashMap();
 	return rawGuidInfoHashMap;
 }
 
@@ -733,12 +694,12 @@ export async function assessCandidateCaching(
 		.where({ name: searchee.title, guid })
 		.first();
 	const infoHash = guidLookup(guid, link, guidInfoHashMap);
-	const res = await getCachedTorrentFile(infoHash, tracker, searchee.label);
+	const res = await getCachedTorrent(infoHash, searchee.label);
 	const metaOrCandidate = res?.meta ?? candidate;
 	if (metaOrCandidate instanceof Metafile) {
 		logger.verbose({
 			label: `${searchee.label}/${Label.DECIDE}`,
-			message: `Using cached torrent for ${tracker} assessment ${name}: ${res!.torrentPath.replace(metaOrCandidate.infoHash, sanitizeInfoHash(metaOrCandidate.infoHash))}`,
+			message: `Using cached torrent for ${tracker} assessment ${name}: ${getLogString(metaOrCandidate)}`,
 		});
 		candidate.size = metaOrCandidate.length; // Trackers can be wrong
 	}
@@ -760,7 +721,6 @@ export async function assessCandidateCaching(
 			metaOrCandidate,
 			searchee,
 			guid,
-			tracker,
 			infoHashesToExclude,
 			cacheEntry?.firstSeen ?? Date.now(),
 			guidInfoHashMap,

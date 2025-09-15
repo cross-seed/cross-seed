@@ -7,7 +7,7 @@ import { appDir } from "./configuration.js";
 import {
 	Action,
 	BlocklistType,
-	INFOHASH_REGEX,
+	INFO_HASH_REGEX,
 	LinkType,
 	MatchMode,
 	NEWLINE_INDENT,
@@ -280,7 +280,7 @@ function transformBlocklist(blockList: string[], ctx: RefinementCtx) {
 				}
 				break;
 			case BlocklistType.INFOHASH:
-				if (!INFOHASH_REGEX.test(blocklistValue)) {
+				if (!INFO_HASH_REGEX.test(blocklistValue)) {
 					addZodIssue(blockRaw, ZodErrorMessages.blocklistHash, ctx);
 				}
 				blockList[index] =

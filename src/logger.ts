@@ -4,6 +4,7 @@ import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import { parseClientEntry } from "./clients/TorrentClient.js";
 import { appDir, createAppDirHierarchy } from "./configuration.js";
+import { LOGS_FOLDER } from "./constants.js";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -144,7 +145,7 @@ export function initializeLogger(options: Record<string, unknown>): void {
 				filename: "error.%DATE%.log",
 				createSymlink: true,
 				symlinkName: "error.current.log",
-				dirname: join(appDir(), "logs"),
+				dirname: join(appDir(), LOGS_FOLDER),
 				maxFiles: "14d",
 				level: "error",
 			}),
@@ -152,14 +153,14 @@ export function initializeLogger(options: Record<string, unknown>): void {
 				filename: "info.%DATE%.log",
 				createSymlink: true,
 				symlinkName: "info.current.log",
-				dirname: join(appDir(), "logs"),
+				dirname: join(appDir(), LOGS_FOLDER),
 				maxFiles: "14d",
 			}),
 			new DailyRotateFile({
 				filename: "verbose.%DATE%.log",
 				createSymlink: true,
 				symlinkName: "verbose.current.log",
-				dirname: join(appDir(), "logs"),
+				dirname: join(appDir(), LOGS_FOLDER),
 				maxFiles: "14d",
 				level: "silly",
 			}),

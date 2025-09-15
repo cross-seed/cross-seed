@@ -16,6 +16,7 @@ export interface DbIndexer {
 	name: string | null;
 	url: string;
 	apikey: string;
+	trackers: string | null;
 	/**
 	 * Whether the indexer is currently specified in config
 	 */
@@ -28,10 +29,10 @@ export interface DbIndexer {
 	musicSearchCap: boolean;
 	audioSearchCap: boolean;
 	bookSearchCap: boolean;
-	tvIdCaps: string;
-	movieIdCaps: string;
-	catCaps: string;
-	limitsCaps: string;
+	tvIdCaps: string | null;
+	movieIdCaps: string | null;
+	catCaps: string | null;
+	limitsCaps: string | null;
 }
 
 export interface IndexerCategories {
@@ -77,6 +78,7 @@ export interface Indexer {
 	name: string | null;
 	url: string;
 	apikey: string;
+	trackers: string[] | null;
 	/**
 	 * Whether the indexer is currently specified in config
 	 */
@@ -98,8 +100,9 @@ export interface Indexer {
 const allFields = {
 	id: "id",
 	url: "url",
-	apikey: "apikey",
 	name: "name",
+	apikey: "apikey",
+	trackers: "trackers",
 	active: "active",
 	status: "status",
 	retryAfter: "retry_after",
@@ -150,47 +153,61 @@ export const ALL_CAPS: Caps = {
 };
 
 function deserialize(dbIndexer: DbIndexer): Indexer {
-	const { tvIdCaps, movieIdCaps, catCaps, limitsCaps, ...rest } = dbIndexer;
+	const { trackers, tvIdCaps, movieIdCaps, catCaps, limitsCaps, ...rest } =
+		dbIndexer;
 	return {
 		...rest,
-		tvIdCaps: JSON.parse(tvIdCaps),
-		movieIdCaps: JSON.parse(movieIdCaps),
-		categories: JSON.parse(catCaps),
-		limits: JSON.parse(limitsCaps),
+		trackers: JSON.parse(trackers ?? "null"),
+		tvIdCaps: JSON.parse(tvIdCaps ?? "null"),
+		movieIdCaps: JSON.parse(movieIdCaps ?? "null"),
+		categories: JSON.parse(catCaps ?? "null"),
+		limits: JSON.parse(limitsCaps ?? "null"),
 	};
 }
 
+/**
+ * All indexers in the database, regardless of whether they are currently configured or working.
+ */
 export async function getAllIndexers(): Promise<Indexer[]> {
-	const rawIndexers = await db("indexer")
-		.where({ active: true })
-		.select(allFields);
-	return rawIndexers.map(deserialize);
+	return (await db("indexer").select(allFields)).map(deserialize);
 }
 
-export async function getEnabledIndexers(): Promise<Indexer[]> {
-	const rawIndexers = await db("indexer")
-		.whereNot({
-			search_cap: null,
-			tv_search_cap: null,
-			movie_search_cap: null,
-			music_search_cap: null,
-			audio_search_cap: null,
-			book_search_cap: null,
-			tv_id_caps: null,
-			movie_id_caps: null,
-			cat_caps: null,
-			limits_caps: null,
-		})
-		.where({ active: true, search_cap: true })
-		.where((i) =>
-			i
-				.where({ status: null })
-				.orWhere({ status: IndexerStatus.OK })
-				.orWhere("retry_after", "<", Date.now()),
-		)
-		.select(allFields);
+/**
+ * All indexers that users currently have configured regardless of whether they are working.
+ */
+export async function getActiveIndexers(): Promise<Indexer[]> {
+	return (await db("indexer").where({ active: true }).select(allFields)).map(
+		deserialize,
+	);
+}
 
-	return rawIndexers.map(deserialize);
+/**
+ * Indexers that are currently working.
+ */
+export async function getEnabledIndexers(): Promise<Indexer[]> {
+	return (
+		await db("indexer")
+			.whereNot({
+				search_cap: null,
+				tv_search_cap: null,
+				movie_search_cap: null,
+				music_search_cap: null,
+				audio_search_cap: null,
+				book_search_cap: null,
+				tv_id_caps: null,
+				movie_id_caps: null,
+				cat_caps: null,
+				limits_caps: null,
+			})
+			.where({ active: true, search_cap: true })
+			.where((i) =>
+				i
+					.where({ status: null })
+					.orWhere({ status: IndexerStatus.OK })
+					.orWhere("retry_after", "<", Date.now()),
+			)
+			.select(allFields)
+	).map(deserialize);
 }
 
 export async function updateIndexerStatus(
@@ -261,4 +278,16 @@ export async function clearIndexerFailures() {
 		status: null,
 		retry_after: null,
 	});
+}
+
+export async function getHostToNameMap(): Promise<Map<string, string>> {
+	const hostToName = new Map<string, string>();
+	for (const indexer of await getAllIndexers()) {
+		if (!indexer.name || !indexer.trackers) continue;
+		for (const trackerHost of indexer.trackers) {
+			if (hostToName.has(trackerHost)) continue;
+			hostToName.set(trackerHost, indexer.name);
+		}
+	}
+	return hostToName;
 }
