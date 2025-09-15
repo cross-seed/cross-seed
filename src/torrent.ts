@@ -376,13 +376,11 @@ export function parseMetadataFromFilename(
 	return { mediaType, tracker, name, infoHash, cached: !!cached };
 }
 
-export async function findAllTorrentFilesInDir(
-	torrentDir: string,
-): Promise<string[]> {
-	return (await readdir(torrentDir))
+export async function findAllTorrentFilesInDir(dir: string): Promise<string[]> {
+	return (await readdir(dir))
 		.filter((fn) => extname(fn) === ".torrent")
 		.sort()
-		.map((fn) => resolve(join(torrentDir, fn)));
+		.map((fn) => resolve(join(dir, fn)));
 }
 
 export function createEnsemblePieces(

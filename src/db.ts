@@ -2,20 +2,18 @@ import Sqlite from "better-sqlite3";
 import { unlink } from "fs/promises";
 import knex from "knex";
 import ms from "ms";
-import { join } from "path";
+import { basename, join } from "path";
 import { getClients } from "./clients/TorrentClient.js";
 import { appDir } from "./configuration.js";
-import {
-	rawTorrentCacheMap,
-	rebuildGuidInfoHashMap,
-	rebuildTorrentCacheMap,
-} from "./decide.js";
+import { TORRENT_CACHE_FOLDER } from "./constants.js";
+import { getCachedTorrentName, rebuildGuidInfoHashMap } from "./decide.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { migrations } from "./migrations/migrations.js";
 import { Metafile } from "./parseTorrent.js";
 import {
 	cacheEnsembleTorrentEntry,
+	findAllTorrentFilesInDir,
 	parseTorrentFromPath,
 	snatchHistory,
 } from "./torrent.js";
@@ -26,6 +24,7 @@ import {
 	humanReadableDate,
 	inBatches,
 	notExists,
+	yieldToEventLoop,
 } from "./utils.js";
 
 const filename = join(appDir(), "cross-seed.db");
@@ -134,7 +133,6 @@ export async function cleanupDB(): Promise<void> {
 			label: Label.CLEANUP,
 			message: "Pruning unused torrent cache entries...",
 		});
-		if (!rawTorrentCacheMap.size) await rebuildTorrentCacheMap();
 		const excludeCutoff = (excludeRecentSearch ?? 0) + ms("1 month");
 		let cutoffMs = ms("1 year");
 		let logCutoff = "1 year";
@@ -142,6 +140,10 @@ export async function cleanupDB(): Promise<void> {
 			cutoffMs = excludeCutoff;
 			logCutoff = `your excludeRecentSearch of ${(excludeRecentSearch! / 1000 / 60 / 60 / 24).toFixed(2)} days`;
 		}
+		const torrentPaths = await findAllTorrentFilesInDir(
+			join(appDir(), TORRENT_CACHE_FOLDER),
+		);
+		if (!torrentPaths.length) return;
 		const infoHashLastSeenMap = (
 			await db("decision").select("info_hash", "last_seen")
 		).reduce<Map<string, number>>((acc, cur) => {
@@ -153,9 +155,12 @@ export async function cleanupDB(): Promise<void> {
 			}
 			return acc;
 		}, new Map<string, number>());
+		if (!infoHashLastSeenMap.size) return;
 		const hashesToDelete: string[] = [];
 		const now = Date.now();
-		for (const [infoHash, torrentPath] of rawTorrentCacheMap) {
+		for (const [index, torrentPath] of torrentPaths.entries()) {
+			if (index % 1000 === 0) await yieldToEventLoop();
+			const infoHash = basename(torrentPath).split(".")[0];
 			const lastSeen = infoHashLastSeenMap.get(infoHash);
 			if (lastSeen && now - lastSeen <= cutoffMs) continue;
 			let meta: Metafile | null = null;
@@ -177,7 +182,6 @@ export async function cleanupDB(): Promise<void> {
 			});
 			try {
 				await unlink(torrentPath);
-				rawTorrentCacheMap.delete(infoHash); // Update map immediately since file no longer exists
 				hashesToDelete.push(infoHash); // Pruning invalid decision entries will catch any interruptions or race conditions
 			} catch (e) {
 				logger.error({
@@ -197,31 +201,44 @@ export async function cleanupDB(): Promise<void> {
 			message: "Pruning invalid decision entries...",
 		});
 		await db("decision").whereNull("info_hash").del();
-		if (!rawTorrentCacheMap.size) await rebuildTorrentCacheMap();
 		const dbRows: { name: string | null; info_hash: string | null }[] =
 			await db("decision")
 				.leftJoin("searchee", "decision.searchee_id", "searchee.id")
 				.select("searchee.name", "decision.info_hash");
+		if (!dbRows.length) return;
+		const torrentCacheDir = join(appDir(), TORRENT_CACHE_FOLDER);
+		const torrentPaths = new Set(
+			await findAllTorrentFilesInDir(torrentCacheDir),
+		);
+		if (!torrentPaths.size) return;
+		let validRows = 0;
 		const hashesToDelete = new Set<string>();
 		for (const dbRow of dbRows) {
+			if (validRows % 1000 === 0) await yieldToEventLoop();
 			if (!dbRow.info_hash) continue;
-			if (rawTorrentCacheMap.has(dbRow.info_hash)) continue;
+			validRows++;
+			const torrentPath = join(
+				torrentCacheDir,
+				getCachedTorrentName(dbRow.info_hash),
+			);
+			if (torrentPaths.has(torrentPath)) continue;
 			logger.verbose({
 				label: Label.CLEANUP,
 				message: `Deleting invalid decision entries for ${dbRow.info_hash} (related to ${dbRow.name}) - missing .torrent file in cache`,
 			});
 			hashesToDelete.add(dbRow.info_hash);
 		}
+		if (validRows && hashesToDelete.size === validRows) {
+			logger.verbose({
+				label: Label.CLEANUP,
+				message:
+					"All decision entries are invalid - skipping deletion to avoid catastrophic data loss",
+			});
+			return;
+		}
 		await inBatches(Array.from(hashesToDelete), async (batch) => {
 			await db("decision").whereIn("info_hash", batch).del();
 		});
-	})();
-	await (async () => {
-		logger.verbose({
-			label: Label.CLEANUP,
-			message: "Rebuilding torrent cache map...",
-		});
-		await rebuildTorrentCacheMap();
 	})();
 	await (async () => {
 		logger.verbose({

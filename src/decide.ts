@@ -1,12 +1,11 @@
 import bencode from "bencode";
-import { readFile, rename, stat, unlink, utimes, writeFile } from "fs/promises";
+import { readFile, stat, unlink, utimes, writeFile } from "fs/promises";
 import ms from "ms";
 import path from "path";
 import { appDir } from "./configuration.js";
 import {
 	ANIME_GROUP_REGEX,
 	Decision,
-	INFO_HASH_REGEX,
 	isAnyMatchedDecision,
 	MatchMode,
 	parseSource,
@@ -36,8 +35,6 @@ import {
 } from "./searchee.js";
 import {
 	findAllTorrentFilesInDir,
-	getTorrentSavePath,
-	parseMetadataFromFilename,
 	parseTorrentFromPath,
 	snatch,
 	SnatchError,
@@ -322,7 +319,6 @@ function releaseVersionDoesMatch(searcheeName: string, candidateName: string) {
 export async function assessCandidate(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
-	tracker: string,
 	infoHashesToExclude: Set<string>,
 	blockList: string[],
 	options?: { configOverride: Partial<RuntimeConfig> },
@@ -385,7 +381,11 @@ export async function assessCandidate(
 					: { decision: Decision.DOWNLOAD_FAILED };
 		}
 		metafile = res.unwrap();
-		metaCached = await cacheTorrentFile(metafile, tracker, searchee.label);
+		metaCached = await cacheTorrentFile(
+			metafile,
+			metaOrCandidate,
+			searchee.label,
+		);
 		metaOrCandidate.size = metafile.length; // Trackers can be wrong
 	} else {
 		metafile = metaOrCandidate;
@@ -448,102 +448,70 @@ export async function assessCandidate(
 	return { decision: Decision.FILE_TREE_MISMATCH, metafile, metaCached };
 }
 
-export const rawTorrentCacheMap: Map<string, string> = new Map();
-export async function rebuildTorrentCacheMap(): Promise<void> {
-	return withMutex(Mutex.TORRENT_CACHE_MAP, { useQueue: true }, async () => {
-		const torrentCacheDir = path.join(appDir(), TORRENT_CACHE_FOLDER);
-		const torrentPaths = await findAllTorrentFilesInDir(torrentCacheDir);
-		rawTorrentCacheMap.clear(); // Needs to be async atomic for clearing and setting
-		for (const torrentPath of torrentPaths) {
-			const torrentFileName = path.basename(torrentPath);
-			let { infoHash } = parseMetadataFromFilename(torrentFileName);
-			if (!infoHash) {
-				infoHash = torrentFileName.split(".")[0];
-				if (!INFO_HASH_REGEX.test(infoHash)) continue;
-			}
-			rawTorrentCacheMap.set(infoHash, torrentPath);
-		}
-	});
+export function getCachedTorrentName(infoHash: string): string {
+	return `${infoHash}.cached.torrent`;
+}
+
+async function existsInTorrentCache(infoHash: string): Promise<string | null> {
+	const torrentPath = path.join(
+		appDir(),
+		TORRENT_CACHE_FOLDER,
+		getCachedTorrentName(infoHash),
+	);
+	if (await exists(torrentPath)) return torrentPath;
+	return null;
 }
 
 async function getCachedTorrent(
 	infoHash: string | undefined,
-	tracker: string,
 	searcheeLabel: SearcheeLabel,
 ): Promise<{ meta: Metafile; torrentPath: string } | null> {
 	if (!infoHash) return null;
-	if (!rawTorrentCacheMap.size) await rebuildTorrentCacheMap();
-	return withMutex(Mutex.TORRENT_CACHE_MAP, { useQueue: true }, async () => {
-		if (!rawTorrentCacheMap.has(infoHash)) return null;
-		let torrentPath = rawTorrentCacheMap.get(infoHash)!;
-		let meta: Metafile;
+	const torrentPath = await existsInTorrentCache(infoHash);
+	if (!torrentPath) return null;
+	let meta: Metafile;
+	try {
+		meta = await parseTorrentFromPath(torrentPath);
+	} catch (e) {
+		logger.error({
+			label: `${searcheeLabel}/${Label.DECIDE}`,
+			message: `Failed to parse cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))} - deleting: ${e.message}`,
+		});
+		logger.debug(e);
 		try {
-			meta = await parseTorrentFromPath(torrentPath);
+			await unlink(torrentPath); // cleanup job handles db entries
 		} catch (e) {
-			logger.error({
-				label: `${searcheeLabel}/${Label.DECIDE}`,
-				message: `Failed to parse cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))} - deleting: ${e.message}`,
-			});
-			logger.debug(e);
-			try {
-				await unlink(torrentPath); // cleanup job handles db entries
-				rawTorrentCacheMap.delete(infoHash);
-			} catch (e) {
-				if (await exists(torrentPath)) {
-					logger.error({
-						label: `${searcheeLabel}/${Label.DECIDE}`,
-						message: `Failed to delete corrupted cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))}: ${e.message}`,
-					});
-					logger.debug(e);
-				}
-			}
-			return null;
-		}
-
-		if (!parseMetadataFromFilename(path.basename(torrentPath)).infoHash) {
-			try {
-				const newPath = getTorrentSavePath(
-					meta,
-					getMediaType(meta),
-					tracker,
-					path.join(appDir(), TORRENT_CACHE_FOLDER),
-					{ cached: true },
-				);
-				await rename(torrentPath, newPath);
-				logger.verbose({
-					label: `${searcheeLabel}/${Label.DECIDE}`,
-					message: `Renamed cached torrent ${path.basename(torrentPath).replace(infoHash, sanitizeInfoHash(infoHash))} -> ${path.basename(newPath).replace(infoHash, sanitizeInfoHash(infoHash))}`,
-				});
-				torrentPath = newPath;
-				rawTorrentCacheMap.set(infoHash, torrentPath);
-			} catch (e) {
+			if (await exists(torrentPath)) {
 				logger.error({
 					label: `${searcheeLabel}/${Label.DECIDE}`,
-					message: `Error while renaming cached torrent ${getLogString(meta)}: ${e.message}`,
+					message: `Failed to delete corrupted cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))}: ${e.message}`,
 				});
 				logger.debug(e);
 			}
 		}
-		await utimes(torrentPath, new Date(), (await stat(torrentPath)).mtime);
-		return { meta, torrentPath };
-	});
+		return null;
+	}
+	await utimes(torrentPath, new Date(), (await stat(torrentPath)).mtime);
+	return { meta, torrentPath };
 }
 
 async function cacheTorrentFile(
 	meta: Metafile,
-	tracker: string,
+	candidate: Candidate,
 	searcheeLabel: SearcheeLabel,
 ): Promise<boolean> {
 	try {
-		const torrentPath = getTorrentSavePath(
-			meta,
-			getMediaType(meta),
-			tracker,
-			path.join(appDir(), TORRENT_CACHE_FOLDER),
-			{ cached: true },
+		const torrentPath = path.join(
+			appDir(),
+			TORRENT_CACHE_FOLDER,
+			getCachedTorrentName(meta.infoHash),
 		);
 		await writeFile(torrentPath, new Uint8Array(meta.encode()));
-		rawTorrentCacheMap.set(meta.infoHash, torrentPath);
+		if (candidate.indexerId && meta.trackers.length) {
+			await db("indexer")
+				.where({ id: candidate.indexerId })
+				.update({ trackers: JSON.stringify(meta.trackers) });
+		}
 		return true;
 	} catch (e) {
 		logger.error({
@@ -618,7 +586,6 @@ async function assessAndSaveResults(
 	metaOrCandidate: Metafile | Candidate,
 	searchee: SearcheeWithLabel,
 	guid: string,
-	tracker: string,
 	infoHashesToExclude: Set<string>,
 	firstSeen: number,
 	guidInfoHashMap: Map<string, string>,
@@ -628,7 +595,6 @@ async function assessAndSaveResults(
 	const assessment = await assessCandidate(
 		metaOrCandidate,
 		searchee,
-		tracker,
 		infoHashesToExclude,
 		blockList,
 		options,
@@ -728,12 +694,12 @@ export async function assessCandidateCaching(
 		.where({ name: searchee.title, guid })
 		.first();
 	const infoHash = guidLookup(guid, link, guidInfoHashMap);
-	const res = await getCachedTorrent(infoHash, tracker, searchee.label);
+	const res = await getCachedTorrent(infoHash, searchee.label);
 	const metaOrCandidate = res?.meta ?? candidate;
 	if (metaOrCandidate instanceof Metafile) {
 		logger.verbose({
 			label: `${searchee.label}/${Label.DECIDE}`,
-			message: `Using cached torrent for ${tracker} assessment ${name}: ${res!.torrentPath.replace(metaOrCandidate.infoHash, sanitizeInfoHash(metaOrCandidate.infoHash))}`,
+			message: `Using cached torrent for ${tracker} assessment ${name}: ${getLogString(metaOrCandidate)}`,
 		});
 		candidate.size = metaOrCandidate.length; // Trackers can be wrong
 	}
@@ -755,7 +721,6 @@ export async function assessCandidateCaching(
 			metaOrCandidate,
 			searchee,
 			guid,
-			tracker,
 			infoHashesToExclude,
 			cacheEntry?.firstSeen ?? Date.now(),
 			guidInfoHashMap,
