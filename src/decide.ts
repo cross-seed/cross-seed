@@ -500,6 +500,7 @@ async function cacheTorrentFile(
 	candidate: Candidate,
 	searcheeLabel: SearcheeLabel,
 ): Promise<boolean> {
+	let cached = false;
 	try {
 		const torrentPath = path.join(
 			appDir(),
@@ -507,19 +508,34 @@ async function cacheTorrentFile(
 			getCachedTorrentName(meta.infoHash),
 		);
 		await writeFile(torrentPath, new Uint8Array(meta.encode()));
+		cached = true;
 		if (candidate.indexerId && meta.trackers.length) {
-			await db("indexer")
+			const dbIndexer = await db("indexer")
 				.where({ id: candidate.indexerId })
-				.update({ trackers: JSON.stringify(meta.trackers) });
+				.first();
+			const dbTrackers: string[] = dbIndexer?.trackers
+				? JSON.parse(dbIndexer.trackers)
+				: [];
+			let added = false;
+			for (const tracker of meta.trackers) {
+				if (dbTrackers.includes(tracker)) continue;
+				dbTrackers.push(tracker);
+				added = true;
+			}
+			if (added) {
+				await db("indexer")
+					.where({ id: candidate.indexerId })
+					.update({ trackers: JSON.stringify(dbTrackers) });
+			}
 		}
-		return true;
+		return cached;
 	} catch (e) {
 		logger.error({
 			label: `${searcheeLabel}/${Label.DECIDE}`,
-			message: `Failed to cache torrent ${getLogString(meta)}: ${e.message}`,
+			message: `Error while caching torrent ${getLogString(meta)}: ${e.message}`,
 		});
 		logger.debug(e);
-		return false;
+		return cached;
 	}
 }
 
