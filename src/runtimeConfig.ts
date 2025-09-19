@@ -18,6 +18,7 @@ export interface RuntimeConfig {
 	outputDir: string;
 	injectDir?: string;
 	ignoreTitles?: boolean;
+	ignoreReleaseGroup?: boolean;
 	includeSingleEpisodes: boolean;
 	verbose: boolean;
 	includeNonVideos: boolean;

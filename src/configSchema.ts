@@ -417,6 +417,7 @@ export const VALIDATION_SCHEMA = z
 			}),
 		injectDir: z.string().nullish(),
 		ignoreTitles: z.boolean().optional(),
+		ignoreReleaseGroup: z.boolean().optional(),
 		includeSingleEpisodes: z.boolean(),
 		includeNonVideos: z.boolean(),
 		fuzzySizeThreshold: z

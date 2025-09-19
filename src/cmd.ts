@@ -84,6 +84,11 @@ function createCommandWithSharedOptions(name: string, description: string) {
 				.makeOptionMandatory(),
 		)
 		.option(
+			"--ignore-release-group",
+			"Don't consider the release group during matching",
+			fallback(fileConfig.ignoreReleaseGroup, false)
+		)
+		.option(
 			"--skip-recheck",
 			"Skip rechecking torrents before resuming, unless necessary.",
 			fallback(fileConfig.skipRecheck, true),

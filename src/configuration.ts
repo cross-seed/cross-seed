@@ -22,6 +22,7 @@ export interface FileConfig {
 	outputDir?: string;
 	injectDir?: string;
 	ignoreTitles?: boolean;
+	ignoreReleaseGroup?: boolean;
 	includeNonVideos?: boolean;
 	seasonFromEpisodes?: number;
 	fuzzySizeThreshold?: number;
