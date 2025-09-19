@@ -387,4 +387,10 @@ module.exports = {
 	 * https://www.cross-seed.org/docs/basics/options#blocklist
 	 */
 	blockList: [],
+
+	/**
+	 * Remove these words/substrings from titles before searching.
+	 * Text in brackets is always removed
+	 */
+	titleFilterList: []
 };
