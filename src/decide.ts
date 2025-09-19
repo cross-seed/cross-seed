@@ -323,7 +323,7 @@ export async function assessCandidate(
 	blockList: string[],
 	options?: { configOverride: Partial<RuntimeConfig> },
 ): Promise<ResultAssessment> {
-	const { includeSingleEpisodes, matchMode } = getRuntimeConfig(
+	const { includeSingleEpisodes, matchMode, ignoreReleaseGroup } = getRuntimeConfig(
 		options?.configOverride,
 	);
 
@@ -332,7 +332,7 @@ export async function assessCandidate(
 	const isCandidate = !(metaOrCandidate instanceof Metafile);
 	if (isCandidate) {
 		const name = metaOrCandidate.name;
-		if (!releaseGroupDoesMatch(searchee.title, name)) {
+		if (!ignoreReleaseGroup && !releaseGroupDoesMatch(searchee.title, name)) {
 			return { decision: Decision.RELEASE_GROUP_MISMATCH };
 		}
 		if (!resolutionDoesMatch(searchee.title, name)) {
