@@ -38,6 +38,7 @@ export interface RuntimeConfig {
 	searchTimeout?: number;
 	searchLimit?: number;
 	blockList: string[];
+	titleFilterList: string[];
 	apiKey?: string;
 	sonarr: string[];
 	radarr: string[];
