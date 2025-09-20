@@ -38,6 +38,8 @@ export interface FileConfig {
 	linkType?: string;
 	flatLinking?: boolean;
 	maxDataDepth?: number;
+	categoryTemplate?: string;
+	tagsTemplate?: string[] | string;
 	linkCategory?: string;
 	torrentDir?: string;
 	torznab?: string[];
