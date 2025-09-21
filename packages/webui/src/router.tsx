@@ -7,6 +7,7 @@ import { routeTree } from './routeTree.gen';
 export const router = createRouter({
   context: () => ({}),
   routeTree,
+  basepath: import.meta.env.BASE_URL,
   defaultPreloadStaleTime: 0,
 });
 
