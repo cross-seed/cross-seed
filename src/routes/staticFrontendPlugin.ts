@@ -1,16 +1,11 @@
 import { FastifyInstance } from "fastify";
 import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { dirname, extname, join } from "path";
+import { extname, join } from "path";
 import { isTruthy } from "../utils.js";
 import ErrnoException = NodeJS.ErrnoException;
 
-// Get the directory of the current module
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 const SENTINEL_BASE_PATH = "/__CROSS_SEED_BASE_PATH__";
-const STATIC_ROOT = join(dirname(dirname(__dirname)), "dist", "webui");
+const STATIC_ROOT = join(import.meta.dirname, "..", "..", "dist", "webui");
 const INDEX_HTML_PATH = join(STATIC_ROOT, "index.html");
 const UTF8 = { encoding: "utf-8" } as const;
 const MIME_TYPES: Record<string, string> = {
