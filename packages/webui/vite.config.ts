@@ -6,7 +6,8 @@ import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import viteTsconfigPaths from 'vite-tsconfig-paths';
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/__CROSS_SEED_BASE_PATH__/' : '/',
   plugins: [
     viteTsconfigPaths(),
     TanStackRouterVite({ target: 'react', autoCodeSplitting: true }),
@@ -33,4 +34,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

@@ -12,16 +12,19 @@ async function apiPlugin(app: FastifyInstance) {
 	await app.register(baseApiPlugin);
 }
 
-async function rootPlugin(app: FastifyInstance) {
+async function rootPlugin(
+	app: FastifyInstance,
+	{ basePath }: { basePath: string },
+) {
 	await app.register(fastifyCookie);
 	await app.register(apiPlugin, { prefix: "/api" });
-	await app.register(staticFrontendPlugin);
+	await app.register(staticFrontendPlugin, { basePath });
 }
 
 async function createServer(basePath: string): Promise<FastifyInstance> {
-	const app = fastify({ logger: false });
+	const app = fastify({ logger: true });
 	if (basePath) {
-		await app.register(rootPlugin, { prefix: basePath });
+		await app.register(rootPlugin, { prefix: basePath, basePath });
 		app.get("*", async (request, reply) => {
 			return reply.redirect(`${basePath}/`);
 		});
