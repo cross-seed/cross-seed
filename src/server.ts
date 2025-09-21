@@ -29,8 +29,9 @@ async function createServer(basePath: string): Promise<FastifyInstance> {
 			return reply.redirect(`${basePath}/`);
 		});
 	} else {
-		await app.register(rootPlugin);
+		await app.register(rootPlugin, { basePath: "" });
 	}
+
 	return app;
 }
 
