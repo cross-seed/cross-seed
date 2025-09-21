@@ -9,9 +9,11 @@ import type { AppRouter } from '../../../../src/trpc/routers';
 
 // Helper to get the base URL for the API
 export function getBaseUrl() {
-  // In the browser, use the current window location
+  // In the browser, use the current window location with base path
   if (typeof window !== 'undefined') {
-    return window.location.origin;
+    const root = window.location.origin + import.meta.env.BASE_URL;
+    console.log(root);
+    return root.replace(/\/$/, ''); // Remove trailing slash if present
   }
 
   // In development, use localhost
