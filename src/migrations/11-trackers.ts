@@ -1,5 +1,6 @@
 import Knex from "knex";
 import { basename, join } from "path";
+import { existsSync } from "fs";
 import { rename } from "fs/promises";
 import { appDir } from "../configuration.js";
 import { TORRENT_CACHE_FOLDER } from "../constants.js";
@@ -11,14 +12,18 @@ import {
 
 async function up(knex: Knex.Knex): Promise<void> {
 	const torrentCacheDir = join(appDir(), TORRENT_CACHE_FOLDER);
-	const torrentPaths = await findAllTorrentFilesInDir(torrentCacheDir);
-	for (const torrentPath of torrentPaths) {
-		const { infoHash } = parseMetadataFromFilename(basename(torrentPath));
-		if (!infoHash) continue;
-		await rename(
-			torrentPath,
-			join(torrentCacheDir, getCachedTorrentName(infoHash)),
-		);
+	if (existsSync(torrentCacheDir)) {
+		const torrentPaths = await findAllTorrentFilesInDir(torrentCacheDir);
+		for (const torrentPath of torrentPaths) {
+			const { infoHash } = parseMetadataFromFilename(
+				basename(torrentPath),
+			);
+			if (!infoHash) continue;
+			await rename(
+				torrentPath,
+				join(torrentCacheDir, getCachedTorrentName(infoHash)),
+			);
+		}
 	}
 
 	await knex.schema.alterTable("indexer", (table) => {
