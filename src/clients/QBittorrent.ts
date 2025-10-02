@@ -292,6 +292,7 @@ export default class QBittorrent implements TorrentClient {
 		body: BodyInit,
 		headers: Record<string, string> = {},
 		retries = 3,
+		numRetries = 0,
 	): Promise<string | undefined> {
 		const bodyStr =
 			body instanceof URLSearchParams || body instanceof FormData
@@ -325,7 +326,17 @@ export default class QBittorrent implements TorrentClient {
 						"Received 403 from API. Logging in again and retrying",
 				});
 				await this.login();
-				return await this.request(path, body, headers, retries - 1);
+				return await this.request(path, body, headers, retries - 1, ++numRetries);
+			}
+
+			// Retry on 5xx errors with exponential backoff
+			if (response.status >= 500 && response.status < 600 && retries > 0) {
+				logger.verbose({
+					label: this.label,
+					message: `Received ${response.status} from API, ${retries} retries remaining`,
+				});
+				await wait(ms("1 second") * 2 ** numRetries);
+				return await this.request(path, body, headers, retries - 1, ++numRetries);
 			}
 		} catch (e) {
 			if (retries > 0) {
@@ -333,7 +344,7 @@ export default class QBittorrent implements TorrentClient {
 					label: this.label,
 					message: `Request failed, ${retries} retries remaining: ${e.message}`,
 				});
-				return await this.request(path, body, headers, retries - 1);
+				return await this.request(path, body, headers, retries - 1, ++numRetries);
 			}
 			logger.verbose({
 				label: this.label,
