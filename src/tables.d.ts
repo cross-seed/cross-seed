@@ -19,6 +19,7 @@ declare module "knex/types/tables.js" {
 		url: string;
 		apikey: string;
 		name: string | null;
+		trackers: string | null;
 		active: boolean;
 		enabled: boolean;
 		status: IndexerStatus | null;
