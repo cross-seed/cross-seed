@@ -759,9 +759,7 @@ async function makeRequest(
 	if (candidates.length && candidates[0].tracker !== UNKNOWN_TRACKER) {
 		await db("indexer")
 			.where({ id: request.indexerId })
-			.update({ name: candidates[0].tracker } as Partial<
-				Omit<Indexer, "id">
-			>);
+			.update({ name: candidates[0].tracker });
 	}
 	return candidates;
 }

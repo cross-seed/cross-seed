@@ -138,6 +138,7 @@ export async function createIndexer(
 			name: input.name || null,
 			url: input.url,
 			apikey: input.apikey,
+			trackers: null,
 			active: true,
 			enabled: input.enabled,
 			status: null,
