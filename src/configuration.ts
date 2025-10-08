@@ -1,5 +1,13 @@
 import chalk from "chalk";
-import { accessSync, constants, copyFileSync, existsSync, mkdirSync } from "fs";
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	statSync,
+	unlinkSync,
+	writeFileSync,
+} from "fs";
 import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
@@ -85,21 +93,48 @@ export function appDir(): string {
 			? path.resolve(process.env.LOCALAPPDATA!, packageDotJson.name)
 			: path.resolve(process.env.HOME!, `.${packageDotJson.name}`));
 	try {
-		accessSync(appDir, constants.R_OK | constants.W_OK);
-	} catch (e) {
-		if (e.code === "ENOENT") {
-			mkdirSync(appDir, { recursive: true });
-			return appDir;
+		if (!existsSync(appDir)) mkdirSync(appDir, { recursive: true });
+		if (!statSync(appDir).isDirectory()) {
+			throw new Error(
+				`The cross-seed config path (${appDir}) is not a directory.`,
+			);
 		}
+		try {
+			readdirSync(appDir);
+		} catch (e) {
+			throw new Error(
+				`The cross-seed config directory (${appDir}) does not have read permissions.`,
+			);
+		}
+		const testSrcName = `appDir.test`;
+		const tempFile = path.join(appDir, testSrcName);
+		try {
+			writeFileSync(tempFile, testSrcName);
+		} catch (e) {
+			throw new Error(
+				`The cross-seed config directory (${appDir}) does not have write permissions.`,
+			);
+		}
+		if (!existsSync(tempFile)) {
+			throw new Error(
+				`The cross-seed config directory (${appDir}) does not have write permissions - could not verify test file.`,
+			);
+		}
+		try {
+			unlinkSync(tempFile);
+		} catch (e) {
+			throw new Error(
+				`The cross-seed config directory (${appDir}) does not have write permissions - could not remove test file.`,
+			);
+		}
+		return appDir;
+	} catch (e) {
 		const dockerMessage =
 			process.env.DOCKER_ENV === "true"
 				? ` Use chown to set the owner to ${process.getuid!()}:${process.getgid!()}`
 				: "";
-		throw new CrossSeedError(
-			`cross-seed does not have R/W permissions on your config directory.${dockerMessage}`,
-		);
+		throw new CrossSeedError(`${e.message}${dockerMessage}`);
 	}
-	return appDir;
 }
 
 export function createAppDirHierarchy(): void {
