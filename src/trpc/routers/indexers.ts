@@ -9,12 +9,21 @@ import {
 	testExistingIndexer,
 	testNewIndexer,
 	listAllIndexers,
+	listArchivedIndexers,
 } from "../../services/indexerService.js";
 
 export const indexersRouter = router({
 	// Get all indexers
 	getAll: authedProcedure.query(async () => {
 		const indexers = await listAllIndexers();
+		return indexers.sort((a, b) =>
+			(a.name || "").localeCompare(b.name || ""),
+		);
+	}),
+
+	// Get archived (soft-deleted) indexers
+	getArchived: authedProcedure.query(async () => {
+		const indexers = await listArchivedIndexers();
 		return indexers.sort((a, b) =>
 			(a.name || "").localeCompare(b.name || ""),
 		);
