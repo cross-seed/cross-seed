@@ -6,14 +6,17 @@ export const statsRouter = router({
 	getOverview: authedProcedure.query(async () => {
 		const [
 			searcheeResult,
-			indexerResult,
-			activeIndexerResult,
+			totalActiveIndexerResult,
+			enabledIndexerResult,
 			decisionsByType,
 			recentMatches,
 		] = await Promise.all([
 			db("searchee").count({ count: "*" }).first(),
-			db("indexer").count({ count: "*" }).first(),
 			db("indexer").where("active", true).count({ count: "*" }).first(),
+			db("indexer")
+				.where({ active: true, enabled: true })
+				.count({ count: "*" })
+				.first(),
 			db("decision")
 				.select("decision")
 				.count({ count: "*" })
@@ -65,8 +68,8 @@ export const statsRouter = router({
 		return {
 			totalSearchees,
 			totalMatches,
-			totalIndexers: indexerResult?.count || 0,
-			activeIndexers: activeIndexerResult?.count || 0,
+			totalIndexers: Number(totalActiveIndexerResult?.count || 0),
+			enabledIndexers: Number(enabledIndexerResult?.count || 0),
 			recentMatches: recentMatches?.count || 0,
 			matchRate: parseFloat(matchRate),
 			matchesPerSnatch: parseFloat(matchesPerSnatch),
@@ -76,13 +79,15 @@ export const statsRouter = router({
 
 	getIndexerStats: authedProcedure.query(async () => {
 		const indexers = await db("indexer")
-			.select("id", "name", "active", "status")
+			.where("active", true)
+			.select("id", "name", "active", "enabled", "status")
 			.orderBy("name");
 
 		return indexers.map((indexer) => ({
 			id: indexer.id,
 			name: indexer.name || `Indexer ${indexer.id}`,
 			active: indexer.active,
+			enabled: indexer.enabled,
 			status: indexer.status || "unknown",
 		}));
 	}),

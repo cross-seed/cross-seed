@@ -3,7 +3,11 @@ import { db } from "../db.js";
 import { Label, logger } from "../logger.js";
 import { assembleUrl } from "../torznab.js";
 import { USER_AGENT } from "../constants.js";
-import { getAllIndexers, type Indexer } from "../indexers.js";
+import {
+	getAllIndexers,
+	getArchivedIndexers,
+	type Indexer,
+} from "../indexers.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import ms from "ms";
 
@@ -183,7 +187,9 @@ export async function updateIndexer(
 	};
 
 	// Atomic update with existence check
-	const updateCount = await db("indexer").where({ id }).update(updateData);
+	const updateCount = await db("indexer")
+		.where({ id, active: true })
+		.update(updateData);
 
 	if (updateCount === 0) {
 		return resultOfErr({
@@ -210,7 +216,7 @@ export async function deactivateIndexer(
 	// Soft delete - set active to false instead of actually deleting
 	// This preserves cache data and download history
 	const updateCount = await db("indexer")
-		.where({ id })
+		.where({ id, active: true })
 		.update({ active: false });
 
 	if (updateCount === 0) {
@@ -235,7 +241,7 @@ export async function deactivateIndexer(
 export async function getIndexerById(
 	id: number,
 ): Promise<Result<Indexer, IndexerNotFoundError>> {
-	const rawRow = await db("indexer").where({ id }).first();
+	const rawRow = await db("indexer").where({ id, active: true }).first();
 
 	if (!rawRow) {
 		return resultOfErr({
@@ -251,6 +257,10 @@ export async function getIndexerById(
 // Consider consolidating duplicate functionality between indexerService and indexers modules
 export async function listAllIndexers(): Promise<Indexer[]> {
 	return getAllIndexers();
+}
+
+export async function listArchivedIndexers(): Promise<Indexer[]> {
+	return getArchivedIndexers();
 }
 
 export async function testExistingIndexer(
