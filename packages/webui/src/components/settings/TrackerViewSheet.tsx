@@ -23,6 +23,7 @@ type Indexer = {
   name: string | null;
   url: string;
   active: boolean;
+  enabled: boolean;
   status: string | null;
   retryAfter: number | null;
   searchCap: boolean | null;
@@ -153,6 +154,13 @@ export default function TrackerViewSheet({
           </div>
 
           <div className="grid gap-3">
+            <Label>Status</Label>
+            <Badge variant={tracker.enabled ? 'default' : 'secondary'}>
+              {tracker.enabled ? 'Enabled' : 'Disabled'}
+            </Badge>
+          </div>
+
+          <div className="grid gap-3">
             <Label>URL</Label>
             <div className="bg-muted/50 rounded-md border px-3 py-2 font-mono text-sm break-all">
               {tracker.url}
@@ -257,4 +265,3 @@ export default function TrackerViewSheet({
     </Sheet>
   );
 }
-
