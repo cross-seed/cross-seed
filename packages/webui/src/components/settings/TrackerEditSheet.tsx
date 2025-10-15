@@ -21,6 +21,7 @@ type Indexer = {
   name: string | null;
   url: string;
   active: boolean;
+  enabled: boolean;
   status: string | null;
   retryAfter: number | null;
   searchCap: boolean | null;

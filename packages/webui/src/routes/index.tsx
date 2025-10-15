@@ -42,8 +42,8 @@ function Home() {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <StatCard
-              title="Active Indexers"
-              value={`${statsData.activeIndexers}/${statsData.totalIndexers}`}
+              title="Enabled Indexers"
+              value={`${statsData.enabledIndexers}/${statsData.totalIndexers}`}
               description="Indexers currently enabled"
             />
             <StatCard
@@ -65,12 +65,12 @@ function Home() {
                 <span className="font-medium">{indexer.name}</span>
                 <div className="flex items-center gap-2">
                   <Badge
-                    variant={indexer.active ? 'default' : 'secondary'}
+                    variant={indexer.enabled ? 'default' : 'secondary'}
                     className={
-                      indexer.active ? 'bg-green-500 hover:bg-green-600' : ''
+                      indexer.enabled ? 'bg-green-500 hover:bg-green-600' : ''
                     }
                   >
-                    {indexer.active ? 'Active' : 'Inactive'}
+                    {indexer.enabled ? 'Enabled' : 'Disabled'}
                   </Badge>
                   {indexer.status && indexer.status !== 'unknown' && (
                     <Badge variant="outline" className="text-xs">
