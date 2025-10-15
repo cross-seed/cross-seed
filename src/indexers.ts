@@ -196,7 +196,16 @@ export async function getAllIndexers(): Promise<Indexer[]> {
 }
 
 /**
- * Indexers that are currently working.
+ * Soft-deleted indexers that are hidden from normal operations.
+ */
+export async function getArchivedIndexers(): Promise<Indexer[]> {
+	return (await db("indexer").where({ active: false }).select(allFields)).map(
+		deserialize,
+	);
+}
+
+/**
+ * Indexers that are currently working and enabled.
  */
 export async function getEnabledIndexers(): Promise<Indexer[]> {
 	return (
@@ -213,7 +222,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 				cat_caps: null,
 				limits_caps: null,
 			})
-			.where({ active: true, search_cap: true })
+			.where({ active: true, enabled: true, search_cap: true })
 			.where((i) =>
 				i
 					.where({ status: null })
