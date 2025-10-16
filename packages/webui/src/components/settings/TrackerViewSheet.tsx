@@ -155,9 +155,14 @@ export default function TrackerViewSheet({
 
           <div className="grid gap-3">
             <Label>Status</Label>
-            <Badge variant={tracker.enabled ? 'default' : 'secondary'}>
-              {tracker.enabled ? 'Enabled' : 'Disabled'}
-            </Badge>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant={tracker.enabled ? 'default' : 'secondary'}>
+                {tracker.enabled ? 'Enabled' : 'Disabled'}
+              </Badge>
+              {!tracker.active && (
+                <Badge variant="destructive">Archived</Badge>
+              )}
+            </div>
           </div>
 
           <div className="grid gap-3">
