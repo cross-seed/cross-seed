@@ -452,7 +452,7 @@ function TrackerSettings() {
         </div>
 
         {!!archivedIndexers?.length && (
-          <div className="rounded-lg border bg-background">
+          <div className="bg-background rounded-lg border">
             <button
               type="button"
               className="flex w-full items-center justify-between px-4 py-3 text-left font-medium"
@@ -468,85 +468,90 @@ function TrackerSettings() {
             {showArchived && (
               <div className="overflow-x-auto border-t">
                 <Table>
-                <TableHeader className="bg-muted sticky top-0 z-10">
-                  <TableRow className="border-b">
-                    <TableHead>Name</TableHead>
-                    <TableHead>URL</TableHead>
-                    <TableHead>Enabled</TableHead>
-                    <TableHead>Capabilities</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {archivedIndexers?.map((indexer) => (
-                    <TableRow
-                      key={indexer.id}
-                      className="hover:bg-muted/50 cursor-pointer"
-                      onClick={() => handleViewTracker(indexer)}
-                    >
-                      <TableCell className="font-medium">
-                        {indexer.name || 'Unnamed'}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {indexer.url}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={indexer.enabled ? 'secondary' : 'outline'}>
-                          {indexer.enabled ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getCapsBadges(indexer)}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            className="h-8 px-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewTracker(indexer);
-                            }}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            View
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            className="h-8 px-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMergeTracker(indexer);
-                            }}
-                            disabled={!indexers?.length}
-                          >
-                            <GitMerge className="mr-2 h-4 w-4" />
-                            Merge
-                          </Button>
-                        </div>
-                      </TableCell>
+                  <TableHeader className="bg-muted sticky top-0 z-10">
+                    <TableRow className="border-b">
+                      <TableHead>Name</TableHead>
+                      <TableHead>URL</TableHead>
+                      <TableHead>Enabled</TableHead>
+                      <TableHead>Capabilities</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                  {archivedIndexers?.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-6 text-center">
-                        <span className="text-muted-foreground text-sm">
-                          No archived trackers.
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-      )}
+                  </TableHeader>
+                  <TableBody>
+                    {archivedIndexers?.map((indexer) => (
+                      <TableRow
+                        key={indexer.id}
+                        className="hover:bg-muted/50 cursor-pointer"
+                        onClick={() => handleViewTracker(indexer)}
+                      >
+                        <TableCell className="font-medium">
+                          {indexer.name || 'Unnamed'}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {indexer.url}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={indexer.enabled ? 'secondary' : 'outline'}
+                          >
+                            {indexer.enabled ? 'Enabled' : 'Disabled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{getCapsBadges(indexer)}</TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              className="h-8 px-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewTracker(indexer);
+                              }}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              View
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="h-8 px-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMergeTracker(indexer);
+                              }}
+                              disabled={!indexers?.length}
+                            >
+                              <GitMerge className="mr-2 h-4 w-4" />
+                              Merge
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {archivedIndexers?.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-6 text-center">
+                          <span className="text-muted-foreground text-sm">
+                            No archived trackers.
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <TrackerViewSheet
         open={viewSheetOpen}
         onOpenChange={handleViewSheetOpenChange}
         tracker={selectedTracker}
         onEdit={
-          selectedTracker && selectedTracker.active ? handleEditTracker : undefined
+          selectedTracker && selectedTracker.active
+            ? handleEditTracker
+            : undefined
         }
       />
 
@@ -589,7 +594,9 @@ function TrackerSettings() {
                     <SelectItem key={idx.id} value={idx.id.toString()}>
                       <div className="flex flex-wrap items-center gap-2">
                         <span>{idx.name || idx.url}</span>
-                        <span className="text-xs text-muted-foreground break-all">{idx.url}</span>
+                        <span className="text-muted-foreground text-xs break-all">
+                          {idx.url}
+                        </span>
                       </div>
                     </SelectItem>
                   ))}
@@ -599,9 +606,7 @@ function TrackerSettings() {
           </div>
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isMerging}>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={isMerging}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmMerge}
               disabled={isMerging || !mergeTargetId}
