@@ -6,25 +6,13 @@ import {
 } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTRPC } from '@/lib/trpc';
+import {
+  ArchivedTrackersSection,
+  type ArchivedTracker,
+} from '@/components/settings/ArchivedTrackersSection';
+import { MergeArchivedDialog } from '@/components/settings/MergeArchivedDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -42,10 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  ChevronDown,
-  ChevronRight,
   Eye,
-  GitMerge,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -62,7 +47,7 @@ export const Route = createFileRoute('/settings/trackers')({
   component: TrackerSettings,
 });
 
-type Indexer = {
+type Tracker = {
   id: number;
   name: string | null;
   url: string;
@@ -88,14 +73,12 @@ function TrackerSettings() {
   const [viewSheetOpen, setViewSheetOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [editMode, setEditMode] = useState<'edit' | 'create'>('create');
-  const [selectedTracker, setSelectedTracker] = useState<Indexer | null>(null);
+  const [selectedTracker, setSelectedTracker] = useState<Tracker | null>(null);
   const [testingTracker, setTestingTracker] = useState<number | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
-  const [mergeSourceTracker, setMergeSourceTracker] = useState<Indexer | null>(
-    null,
-  );
+  const [mergeSourceTracker, setMergeSourceTracker] =
+    useState<ArchivedTracker | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
 
   const { data: indexers } = useSuspenseQuery(
@@ -167,7 +150,7 @@ function TrackerSettings() {
     return date.toLocaleString();
   };
 
-  const getStatusBadge = (indexer: Indexer) => {
+  const getStatusBadge = (indexer: Tracker) => {
     if (!indexer.enabled) {
       return <Badge variant="secondary">Disabled</Badge>;
     }
@@ -218,7 +201,17 @@ function TrackerSettings() {
     return <Badge variant="outline">{indexer.status}</Badge>;
   };
 
-  const getCapsBadges = (indexer: Indexer) => {
+  type TrackerWithCaps = Pick<
+    Tracker,
+    | 'searchCap'
+    | 'tvSearchCap'
+    | 'movieSearchCap'
+    | 'musicSearchCap'
+    | 'audioSearchCap'
+    | 'bookSearchCap'
+  > | ArchivedTracker;
+
+  const getCapsBadges = (indexer: TrackerWithCaps) => {
     const caps = [];
     if (indexer.searchCap) caps.push('Search');
     if (indexer.tvSearchCap) caps.push('TV');
@@ -262,13 +255,13 @@ function TrackerSettings() {
     }
   };
 
-  const handleViewTracker = (indexer: Indexer) => {
+  const handleViewTracker = (indexer: Tracker) => {
     setOpenDropdown(null); // Close any open dropdown
     setSelectedTracker(indexer);
     setViewSheetOpen(true);
   };
 
-  const handleEditTracker = (indexer: Indexer) => {
+  const handleEditTracker = (indexer: Tracker) => {
     if (!indexer.active) {
       toast.error('Archived trackers cannot be edited.');
       return;
@@ -280,19 +273,19 @@ function TrackerSettings() {
     setEditSheetOpen(true);
   };
 
-  const handleToggleEnabled = (indexer: Indexer) => {
+  const handleToggleEnabled = (indexer: Tracker) => {
     updateIndexer({
       id: indexer.id,
       enabled: !indexer.enabled,
     });
   };
 
-  const handleTestTracker = (indexer: Indexer) => {
+  const handleTestTracker = (indexer: Tracker) => {
     setTestingTracker(indexer.id);
     testIndexer({ id: indexer.id });
   };
 
-  const handleMergeTracker = (indexer: Indexer) => {
+  const handleMergeTracker = (indexer: ArchivedTracker) => {
     if (!indexers?.length) {
       toast.error('No active trackers available to merge into.');
       return;
@@ -451,97 +444,13 @@ function TrackerSettings() {
           </Table>
         </div>
 
-        {!!archivedIndexers?.length && (
-          <div className="bg-background rounded-lg border">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-4 py-3 text-left font-medium"
-              onClick={() => setShowArchived((prev) => !prev)}
-            >
-              <span>Archived Trackers ({archivedIndexers.length})</span>
-              {showArchived ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </button>
-            {showArchived && (
-              <div className="overflow-x-auto border-t">
-                <Table>
-                  <TableHeader className="bg-muted sticky top-0 z-10">
-                    <TableRow className="border-b">
-                      <TableHead>Name</TableHead>
-                      <TableHead>URL</TableHead>
-                      <TableHead>Enabled</TableHead>
-                      <TableHead>Capabilities</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {archivedIndexers?.map((indexer) => (
-                      <TableRow
-                        key={indexer.id}
-                        className="hover:bg-muted/50 cursor-pointer"
-                        onClick={() => handleViewTracker(indexer)}
-                      >
-                        <TableCell className="font-medium">
-                          {indexer.name || 'Unnamed'}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {indexer.url}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={indexer.enabled ? 'secondary' : 'outline'}
-                          >
-                            {indexer.enabled ? 'Enabled' : 'Disabled'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{getCapsBadges(indexer)}</TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              className="h-8 px-2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewTracker(indexer);
-                              }}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              View
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              className="h-8 px-2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMergeTracker(indexer);
-                              }}
-                              disabled={!indexers?.length}
-                            >
-                              <GitMerge className="mr-2 h-4 w-4" />
-                              Merge
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {archivedIndexers?.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="py-6 text-center">
-                          <span className="text-muted-foreground text-sm">
-                            No archived trackers.
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
-        )}
+        <ArchivedTrackersSection
+          trackers={archivedIndexers}
+          onView={handleViewTracker}
+          onMerge={handleMergeTracker}
+          disableMerge={!indexers?.length}
+          renderCaps={getCapsBadges}
+        />
       </div>
 
       <TrackerViewSheet
@@ -562,60 +471,20 @@ function TrackerSettings() {
         tracker={selectedTracker}
       />
 
-      <AlertDialog
+      <MergeArchivedDialog
         open={mergeDialogOpen}
         onOpenChange={handleMergeDialogOpenChange}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Merge Archived Tracker</AlertDialogTitle>
-            <AlertDialogDescription>
-              Move timestamp history from{' '}
-              <span className="font-medium">
-                {mergeSourceTracker?.name || mergeSourceTracker?.url || ''}
-              </span>{' '}
-              into another tracker before permanently deleting it.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="space-y-3">
-            <div>
-              <span className="text-sm font-medium">Merge into</span>
-              <Select
-                value={mergeTargetId?.toString()}
-                onValueChange={(value) => setMergeTargetId(Number(value))}
-                disabled={isMerging}
-              >
-                <SelectTrigger className="mt-1 min-h-[3rem] items-center justify-between">
-                  <SelectValue placeholder="Select a tracker" />
-                </SelectTrigger>
-                <SelectContent>
-                  {indexers?.map((idx) => (
-                    <SelectItem key={idx.id} value={idx.id.toString()}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span>{idx.name || idx.url}</span>
-                        <span className="text-muted-foreground text-xs break-all">
-                          {idx.url}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isMerging}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmMerge}
-              disabled={isMerging || !mergeTargetId}
-            >
-              {isMerging ? 'Merging…' : 'Merge'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        sourceTracker={mergeSourceTracker}
+        targetId={mergeTargetId}
+        onTargetChange={setMergeTargetId}
+        onConfirm={handleConfirmMerge}
+        isMerging={isMerging}
+        availableTargets={(indexers ?? []).map((idx) => ({
+          id: idx.id,
+          name: idx.name,
+          url: idx.url,
+        }))}
+      />
     </Page>
   );
 }
