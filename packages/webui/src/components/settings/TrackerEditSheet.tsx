@@ -4,6 +4,7 @@ import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Sheet,
   SheetClose,
@@ -50,6 +51,7 @@ export default function TrackerEditSheet({
   const [name, setName] = useState(tracker?.name || '');
   const [url, setUrl] = useState(tracker?.url || '');
   const [apikey, setApikey] = useState('');
+  const [enabled, setEnabled] = useState(tracker?.enabled ?? true);
   const [isTesting, setIsTesting] = useState(false);
 
   // Sync form state when tracker changes
@@ -58,6 +60,7 @@ export default function TrackerEditSheet({
       setName(tracker?.name || '');
       setUrl(tracker?.url || '');
       setApikey(''); // Always reset API key for security
+      setEnabled(tracker?.enabled ?? true);
     }
   }, [open, tracker]);
 
@@ -147,12 +150,14 @@ export default function TrackerEditSheet({
         name: name.trim() || null,
         url: url.trim(),
         apikey: apikey.trim(),
+        enabled,
       });
     } else if (mode === 'create') {
       createIndexer({
         name: name.trim() || undefined,
         url: url.trim(),
         apikey: apikey.trim(),
+        enabled,
       });
     }
   };
@@ -196,6 +201,20 @@ export default function TrackerEditSheet({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="My Indexer"
                 autoComplete="off"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label
+                htmlFor="tracker-enabled"
+                className="text-sm font-medium"
+              >
+                Enable Search and RSS
+              </Label>
+              <Switch
+                id="tracker-enabled"
+                checked={enabled}
+                onCheckedChange={setEnabled}
               />
             </div>
 
