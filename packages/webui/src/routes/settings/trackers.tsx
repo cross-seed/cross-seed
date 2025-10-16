@@ -451,22 +451,23 @@ function TrackerSettings() {
           </Table>
         </div>
 
-        <div className="rounded-lg border bg-background">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between px-4 py-3 text-left font-medium"
-            onClick={() => setShowArchived((prev) => !prev)}
-          >
-            <span>Archived Trackers</span>
-            {showArchived ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </button>
-          {showArchived && (
-            <div className="overflow-x-auto border-t">
-              <Table>
+        {!!archivedIndexers?.length && (
+          <div className="rounded-lg border bg-background">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-4 py-3 text-left font-medium"
+              onClick={() => setShowArchived((prev) => !prev)}
+            >
+              <span>Archived Trackers ({archivedIndexers.length})</span>
+              {showArchived ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+            {showArchived && (
+              <div className="overflow-x-auto border-t">
+                <Table>
                 <TableHeader className="bg-muted sticky top-0 z-10">
                   <TableRow className="border-b">
                     <TableHead>Name</TableHead>
@@ -538,7 +539,7 @@ function TrackerSettings() {
             </div>
           )}
         </div>
-      </div>
+      )}
 
       <TrackerViewSheet
         open={viewSheetOpen}
