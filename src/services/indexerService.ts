@@ -71,6 +71,28 @@ export type IndexerNotFoundError = {
 	message: string;
 };
 
+export type MergeIndexersError =
+	| {
+			code: "SOURCE_NOT_FOUND";
+			message: string;
+	  }
+	| {
+			code: "TARGET_NOT_FOUND";
+			message: string;
+	  }
+	| {
+			code: "INVALID_SOURCE_STATE";
+			message: string;
+	  }
+	| {
+			code: "INVALID_TARGET_STATE";
+			message: string;
+	  }
+	| {
+			code: "SAME_INDEXER";
+			message: string;
+	  };
+
 export async function testIndexerConnection(
 	url: string,
 	apikey: string,
@@ -261,6 +283,94 @@ export async function listAllIndexers(): Promise<Indexer[]> {
 
 export async function listArchivedIndexers(): Promise<Indexer[]> {
 	return getArchivedIndexers();
+}
+
+export async function mergeArchivedIndexer(
+	sourceId: number,
+	targetId: number,
+): Promise<Result<{ mergedCount: number }, MergeIndexersError>> {
+	if (sourceId === targetId) {
+		return resultOfErr({
+			code: "SAME_INDEXER",
+			message: "Source and target indexers must be different",
+		});
+	}
+
+	return db.transaction(async (trx) => {
+		const sourceIndexer = await trx("indexer")
+			.select("id", "active")
+			.where({ id: sourceId })
+			.first();
+		if (!sourceIndexer) {
+			return resultOfErr({
+				code: "SOURCE_NOT_FOUND",
+				message: `Archived indexer with ID ${sourceId} not found`,
+			});
+		}
+		if (sourceIndexer.active) {
+			return resultOfErr({
+				code: "INVALID_SOURCE_STATE",
+				message: "Source indexer must be archived before merging",
+			});
+		}
+
+		const targetIndexer = await trx("indexer")
+			.select("id", "active")
+			.where({ id: targetId })
+			.first();
+		if (!targetIndexer) {
+			return resultOfErr({
+				code: "TARGET_NOT_FOUND",
+				message: `Target indexer with ID ${targetId} not found`,
+			});
+		}
+		if (!targetIndexer.active) {
+			return resultOfErr({
+				code: "INVALID_TARGET_STATE",
+				message: "Target indexer must be active",
+			});
+		}
+
+		const sourceTimestamps = await trx("timestamp")
+			.where({ indexer_id: sourceId })
+			.select(
+				"searchee_id as searcheeId",
+				"first_searched as firstSearched",
+				"last_searched as lastSearched",
+			);
+
+		if (sourceTimestamps.length > 0) {
+			const rows = sourceTimestamps.map((row) => ({
+				indexer_id: targetId,
+				searchee_id: row.searcheeId,
+				first_searched: row.firstSearched,
+				last_searched: row.lastSearched,
+			}));
+
+			await trx("timestamp")
+				.insert(rows)
+				.onConflict(["searchee_id", "indexer_id"])
+				.merge({
+					first_searched: trx.raw(
+						"MIN(timestamp.first_searched, excluded.first_searched)",
+					),
+					last_searched: trx.raw(
+						"MAX(timestamp.last_searched, excluded.last_searched)",
+					),
+				});
+
+			await trx("timestamp").where({ indexer_id: sourceId }).del();
+
+			logger.verbose({
+				label: Label.TORZNAB,
+				message: `Merged ${sourceTimestamps.length} timestamp rows from indexer ${sourceId} into ${targetId}`,
+			});
+		}
+
+		return resultOf({
+			mergedCount: sourceTimestamps.length,
+		});
+	});
 }
 
 export async function testExistingIndexer(

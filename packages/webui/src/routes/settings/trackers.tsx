@@ -9,6 +9,23 @@ import { useTRPC } from '@/lib/trpc';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -25,13 +42,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  GitMerge,
+  MoreHorizontal,
+  Pencil,
   Plus,
   TestTube,
   ToggleLeft,
   ToggleRight,
-  MoreHorizontal,
-  Eye,
-  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import TrackerViewSheet from '@/components/settings/TrackerViewSheet';
@@ -47,6 +67,7 @@ type Indexer = {
   name: string | null;
   url: string;
   enabled: boolean;
+  active: boolean;
   status: string | null;
   retryAfter: number | null;
   searchCap: boolean | null;
@@ -70,9 +91,18 @@ function TrackerSettings() {
   const [selectedTracker, setSelectedTracker] = useState<Indexer | null>(null);
   const [testingTracker, setTestingTracker] = useState<number | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [mergeSourceTracker, setMergeSourceTracker] = useState<Indexer | null>(
+    null,
+  );
+  const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
 
   const { data: indexers } = useSuspenseQuery(
     trpc.indexers.getAll.queryOptions(),
+  );
+  const { data: archivedIndexers } = useSuspenseQuery(
+    trpc.indexers.getArchived.queryOptions(),
   );
 
   const { mutate: updateIndexer } = useMutation(
@@ -102,6 +132,32 @@ function TrackerSettings() {
       onError: (error) => {
         setTestingTracker(null);
         toast.error(`Test failed: ${error.message}`);
+      },
+    }),
+  );
+
+  const { mutate: mergeArchivedTracker, isPending: isMerging } = useMutation(
+    trpc.indexers.mergeArchived.mutationOptions({
+      onSuccess: async (result) => {
+        toast.success(
+          result.mergedCount
+            ? `Merged ${result.mergedCount.toLocaleString()} timestamp entries`
+            : 'No timestamps needed merging.',
+        );
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: trpc.indexers.getAll.queryKey(),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: trpc.indexers.getArchived.queryKey(),
+          }),
+        ]);
+        setMergeDialogOpen(false);
+        setMergeSourceTracker(null);
+        setMergeTargetId(null);
+      },
+      onError: (error) => {
+        toast.error(`Failed to merge tracker data: ${error.message}`);
       },
     }),
   );
@@ -176,7 +232,7 @@ function TrackerSettings() {
     }
 
     return (
-      <div className="flex flex-wrap gap-1">
+      <div className="grid auto-cols-max grid-flow-col gap-1">
         {caps.map((cap) => (
           <Badge key={cap} variant="outline" className="text-xs">
             {cap}
@@ -230,6 +286,35 @@ function TrackerSettings() {
   const handleTestTracker = (indexer: Indexer) => {
     setTestingTracker(indexer.id);
     testIndexer({ id: indexer.id });
+  };
+
+  const handleMergeTracker = (indexer: Indexer) => {
+    if (!indexers?.length) {
+      toast.error('No active trackers available to merge into.');
+      return;
+    }
+    setMergeSourceTracker(indexer);
+    setMergeTargetId(indexers[0]?.id ?? null);
+    setMergeDialogOpen(true);
+  };
+
+  const handleMergeDialogOpenChange = (open: boolean) => {
+    setMergeDialogOpen(open);
+    if (!open) {
+      setMergeSourceTracker(null);
+      setMergeTargetId(null);
+    }
+  };
+
+  const handleConfirmMerge = () => {
+    if (!mergeSourceTracker || !mergeTargetId) {
+      toast.error('Select a destination tracker to merge into.');
+      return;
+    }
+    mergeArchivedTracker({
+      sourceId: mergeSourceTracker.id,
+      targetId: mergeTargetId,
+    });
   };
 
   const addTrackerButton = (
@@ -350,7 +435,7 @@ function TrackerSettings() {
               ))}
               {indexers?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center">
+                  <TableCell colSpan={5} className="py-8 text-center">
                     <div className="text-muted-foreground">
                       No trackers configured. Add your first tracker to get
                       started.
@@ -360,6 +445,94 @@ function TrackerSettings() {
               )}
             </TableBody>
           </Table>
+        </div>
+
+        <div className="rounded-lg border bg-background">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-4 py-3 text-left font-medium"
+            onClick={() => setShowArchived((prev) => !prev)}
+          >
+            <span>Archived Trackers</span>
+            {showArchived ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+          {showArchived && (
+            <div className="overflow-x-auto border-t">
+              <Table>
+                <TableHeader className="bg-muted sticky top-0 z-10">
+                  <TableRow className="border-b">
+                    <TableHead>Name</TableHead>
+                    <TableHead>URL</TableHead>
+                    <TableHead>Enabled</TableHead>
+                    <TableHead>Capabilities</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {archivedIndexers?.map((indexer) => (
+                    <TableRow
+                      key={indexer.id}
+                      className="hover:bg-muted/50 cursor-pointer"
+                      onClick={() => handleViewTracker(indexer)}
+                    >
+                      <TableCell className="font-medium">
+                        {indexer.name || 'Unnamed'}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {indexer.url}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={indexer.enabled ? 'secondary' : 'outline'}>
+                          {indexer.enabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{getCapsBadges(indexer)}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            className="h-8 px-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewTracker(indexer);
+                            }}
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="h-8 px-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMergeTracker(indexer);
+                            }}
+                            disabled={!indexers?.length}
+                          >
+                            <GitMerge className="mr-2 h-4 w-4" />
+                            Merge
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {archivedIndexers?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-6 text-center">
+                        <span className="text-muted-foreground text-sm">
+                          No archived trackers.
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -376,6 +549,58 @@ function TrackerSettings() {
         mode={editMode}
         tracker={selectedTracker}
       />
+
+      <AlertDialog
+        open={mergeDialogOpen}
+        onOpenChange={handleMergeDialogOpenChange}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Merge Archived Tracker</AlertDialogTitle>
+            <AlertDialogDescription>
+              Move timestamp history from{' '}
+              <span className="font-medium">
+                {mergeSourceTracker?.name || mergeSourceTracker?.url || ''}
+              </span>{' '}
+              into another tracker before permanently deleting it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <div>
+              <span className="text-sm font-medium">Merge into</span>
+              <Select
+                value={mergeTargetId?.toString()}
+                onValueChange={(value) => setMergeTargetId(Number(value))}
+                disabled={isMerging}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a tracker" />
+                </SelectTrigger>
+                <SelectContent>
+                  {indexers?.map((idx) => (
+                    <SelectItem key={idx.id} value={idx.id.toString()}>
+                      {idx.name || idx.url}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isMerging}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmMerge}
+              disabled={isMerging || !mergeTargetId}
+            >
+              {isMerging ? 'Merging…' : 'Merge'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Page>
   );
 }
