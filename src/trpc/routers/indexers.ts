@@ -10,7 +10,9 @@ import {
 	testNewIndexer,
 	listAllIndexers,
 	listArchivedIndexers,
+	mergeArchivedIndexer,
 } from "../../services/indexerService.js";
+import { TRPCError } from "@trpc/server";
 
 export const indexersRouter = router({
 	// Get all indexers
@@ -20,6 +22,28 @@ export const indexersRouter = router({
 			(a.name || "").localeCompare(b.name || ""),
 		);
 	}),
+
+	mergeArchived: authedProcedure
+		.input(
+			z.object({
+				sourceId: z.number().int().positive(),
+				targetId: z.number().int().positive(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			const result = await mergeArchivedIndexer(
+				input.sourceId,
+				input.targetId,
+			);
+			if (result.isErr()) {
+				const err = result.unwrapErr();
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: err.message,
+				});
+			}
+			return result.unwrap();
+		}),
 
 	// Get archived (soft-deleted) indexers
 	getArchived: authedProcedure.query(async () => {
