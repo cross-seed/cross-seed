@@ -288,7 +288,9 @@ export async function listArchivedIndexers(): Promise<Indexer[]> {
 export async function mergeArchivedIndexer(
 	sourceId: number,
 	targetId: number,
-): Promise<Result<{ mergedCount: number }, MergeIndexersError>> {
+): Promise<
+	Result<{ mergedCount: number; deleted: boolean }, MergeIndexersError>
+> {
 	if (sourceId === targetId) {
 		return resultOfErr({
 			code: "SAME_INDEXER",
@@ -367,8 +369,19 @@ export async function mergeArchivedIndexer(
 			});
 		}
 
+		await trx("rss").where({ indexer_id: sourceId }).del();
+		const deleted = await trx("indexer").where({ id: sourceId }).del();
+
+		if (deleted) {
+			logger.verbose({
+				label: Label.TORZNAB,
+				message: `Deleted archived indexer ${sourceId} after merge into ${targetId}`,
+			});
+		}
+
 		return resultOf({
 			mergedCount: sourceTimestamps.length,
+			deleted: Boolean(deleted),
 		});
 	});
 }
