@@ -580,13 +580,16 @@ function TrackerSettings() {
                 onValueChange={(value) => setMergeTargetId(Number(value))}
                 disabled={isMerging}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-1 min-h-[3rem] items-center justify-between">
                   <SelectValue placeholder="Select a tracker" />
                 </SelectTrigger>
                 <SelectContent>
                   {indexers?.map((idx) => (
                     <SelectItem key={idx.id} value={idx.id.toString()}>
-                      {idx.name || idx.url}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>{idx.name || idx.url}</span>
+                        <span className="text-xs text-muted-foreground break-all">{idx.url}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
