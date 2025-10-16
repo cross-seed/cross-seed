@@ -179,14 +179,6 @@ program
 			"torrent files separated by spaces",
 		).hideHelp(),
 	)
-	.option(
-		"--no-exclude-older",
-		"Don't Exclude torrents based on when they were first seen.",
-	)
-	.option(
-		"--no-exclude-recent-search",
-		"Don't Exclude torrents based on when they were last searched.",
-	)
 	.addOption(verboseOption)
 	.action(withFullRuntime(() => bulkSearch()));
 
