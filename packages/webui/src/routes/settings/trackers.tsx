@@ -269,6 +269,10 @@ function TrackerSettings() {
   };
 
   const handleEditTracker = (indexer: Indexer) => {
+    if (!indexer.active) {
+      toast.error('Archived trackers cannot be edited.');
+      return;
+    }
     setOpenDropdown(null); // Close any open dropdown
     setSelectedTracker(indexer);
     setEditMode('edit');
@@ -540,7 +544,9 @@ function TrackerSettings() {
         open={viewSheetOpen}
         onOpenChange={handleViewSheetOpenChange}
         tracker={selectedTracker}
-        onEdit={handleEditTracker}
+        onEdit={
+          selectedTracker && selectedTracker.active ? handleEditTracker : undefined
+        }
       />
 
       <TrackerEditSheet
