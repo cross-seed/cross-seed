@@ -8,13 +8,12 @@ import {
 	Action,
 	BlocklistType,
 	INFO_HASH_REGEX,
-	Label,
 	LinkType,
 	MatchMode,
 	NEWLINE_INDENT,
 	parseBlocklistEntry,
 } from "./constants.js";
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { formatAsList } from "./utils.js";
 
 /**

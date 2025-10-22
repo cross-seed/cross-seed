@@ -48,31 +48,6 @@ export const JSON_VALUES_REGEX = /".+?"\s*:\s*"(?<value>.+?)"\s*(?:,|})/g;
 export const ABS_WIN_PATH_REGEX = /^[a-z]:|^\\/i;
 export const AKA_REGEX = /(?:[_.\s-]+|\b)a[_.\s-]?k[_.\s-]?a(?:[_.\s-]+|\b)/i;
 
-export enum Label {
-	QBITTORRENT = "qbittorrent",
-	RTORRENT = "rtorrent",
-	TRANSMISSION = "transmission",
-	DELUGE = "deluge",
-	DECIDE = "decide",
-	PREFILTER = "prefilter",
-	CONFIG = "config",
-	TORZNAB = "torznab",
-	SERVER = "server",
-	SCHEDULER = "scheduler",
-	SEARCH = "search",
-	RSS = "rss",
-	ANNOUNCE = "announce",
-	WEBHOOK = "webhook",
-	INJECT = "inject",
-	PERF = "perf",
-	CLEANUP = "cleanup",
-	ARRS = "arrs",
-	RADARR = "radarr",
-	SONARR = "sonarr",
-	AUTH = "auth",
-	INDEX = "index",
-}
-
 // Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {
 	AMZN: /\b(amzn|amazon(hd)?)\b[ ._-]web[ ._-]?(dl|rip)?\b/i,
