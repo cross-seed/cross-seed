@@ -1,5 +1,14 @@
+import { applyDefaults, stripDefaults } from "./configuration.js";
 import { db } from "./db.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
+
+function sanitizePartialConfig(
+	partialConfig: Partial<RuntimeConfig>,
+): Partial<RuntimeConfig> {
+	return Object.fromEntries(
+		Object.entries(partialConfig).filter(([, value]) => value !== undefined),
+	) as Partial<RuntimeConfig>;
+}
 
 export async function getDbConfig(): Promise<RuntimeConfig> {
 	const row = await db("settings").select("settings_json").first();
@@ -8,20 +17,22 @@ export async function getDbConfig(): Promise<RuntimeConfig> {
 			"No configuration found in database. Please save a configuration first.",
 		);
 	}
-	return JSON.parse(row.settings_json);
+	const overrides = JSON.parse(row.settings_json);
+	return applyDefaults(overrides);
 }
 
 export async function setDbConfig(config: RuntimeConfig): Promise<void> {
+	const overrides = stripDefaults(config);
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
 			await trx("settings").update({
-				settings_json: JSON.stringify(config),
+				settings_json: JSON.stringify(overrides),
 			});
 		} else {
 			await trx("settings").insert({
 				apikey: null,
-				settings_json: JSON.stringify(config),
+				settings_json: JSON.stringify(overrides),
 			});
 		}
 	});
@@ -30,20 +41,24 @@ export async function setDbConfig(config: RuntimeConfig): Promise<void> {
 export async function updateDbConfig(
 	partialConfig: Partial<RuntimeConfig>,
 ): Promise<void> {
+	const sanitizedPartial = sanitizePartialConfig(partialConfig);
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
 			const currentConfig = existingRow.settings_json
-				? JSON.parse(existingRow.settings_json)
-				: {};
-			const updatedConfig = { ...currentConfig, ...partialConfig };
+				? applyDefaults(JSON.parse(existingRow.settings_json))
+				: applyDefaults();
+			const updatedConfig = applyDefaults({
+				...currentConfig,
+				...sanitizedPartial,
+			});
 			await trx("settings").update({
-				settings_json: JSON.stringify(updatedConfig),
+				settings_json: JSON.stringify(stripDefaults(updatedConfig)),
 			});
 		} else {
 			await trx("settings").insert({
 				apikey: null,
-				settings_json: JSON.stringify(partialConfig),
+				settings_json: JSON.stringify(stripDefaults(sanitizedPartial)),
 			});
 		}
 	});

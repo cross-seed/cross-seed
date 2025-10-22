@@ -17,7 +17,8 @@ import {
 } from "./constants.js";
 import { db } from "./db.js";
 import { getEnabledIndexers } from "./indexers.js";
-import { Label, logger } from "./logger.js";
+import { Label } from "./constants.js";
+import { logger } from "./logger.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import {
 	getMediaType,
