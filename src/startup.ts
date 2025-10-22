@@ -26,7 +26,7 @@ import {
 	RuntimeConfig,
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
-import { Awaitable, notExists, verifyDir } from "./utils.js";
+import { Awaitable, notExists, omitUndefined, verifyDir } from "./utils.js";
 import { getLogWatcher } from "./utils/logWatcher.js";
 
 const require = createRequire(import.meta.url);
@@ -231,10 +231,8 @@ export function withFullRuntime(
 	return withMinimalRuntime(async (options) => {
 		initializeLogger(options as Record<string, unknown>);
 
-		const definedCliOptions = Object.fromEntries(
-			Object.entries(options as Record<string, unknown>).filter(
-				([, value]) => value !== undefined,
-			),
+		const definedCliOptions = omitUndefined(
+			options as Record<string, unknown>,
 		);
 
 		let runtimeConfig: RuntimeConfig;

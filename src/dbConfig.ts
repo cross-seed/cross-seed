@@ -1,13 +1,12 @@
 import { applyDefaults, stripDefaults } from "./configuration.js";
 import { db } from "./db.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
+import { omitUndefined } from "./utils.js";
 
 function sanitizePartialConfig(
 	partialConfig: Partial<RuntimeConfig>,
 ): Partial<RuntimeConfig> {
-	return Object.fromEntries(
-		Object.entries(partialConfig).filter(([, value]) => value !== undefined),
-	) as Partial<RuntimeConfig>;
+	return omitUndefined(partialConfig) as Partial<RuntimeConfig>;
 }
 
 export async function getDbConfig(): Promise<RuntimeConfig> {
