@@ -4,10 +4,33 @@ import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import { parseClientEntry } from "./clients/TorrentClient.js";
 import { appDir, createAppDirHierarchy } from "./configuration.js";
-import { Label, LOGS_FOLDER } from "./constants.js";
+import { LOGS_FOLDER } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 
-export { Label } from "./constants.js";
+export enum Label {
+	QBITTORRENT = "qbittorrent",
+	RTORRENT = "rtorrent",
+	TRANSMISSION = "transmission",
+	DELUGE = "deluge",
+	DECIDE = "decide",
+	PREFILTER = "prefilter",
+	CONFIG = "config",
+	TORZNAB = "torznab",
+	SERVER = "server",
+	SCHEDULER = "scheduler",
+	SEARCH = "search",
+	RSS = "rss",
+	ANNOUNCE = "announce",
+	WEBHOOK = "webhook",
+	INJECT = "inject",
+	PERF = "perf",
+	CLEANUP = "cleanup",
+	ARRS = "arrs",
+	RADARR = "radarr",
+	SONARR = "sonarr",
+	AUTH = "auth",
+	INDEX = "index",
+}
 
 export let logger: winston.Logger;
 
