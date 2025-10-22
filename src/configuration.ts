@@ -112,57 +112,47 @@ export function createAppDirHierarchy(): void {
 	mkdirSync(path.join(appDirPath, LOGS_FOLDER), { recursive: true });
 }
 
-const DEFAULT_RUNTIME_CONFIG: Readonly<
-	Omit<RuntimeConfig, "outputDir"> & {
-		outputDir?: string;
-	}
-> = Object.freeze({
-	delay: 30,
-	torznab: [],
-	useClientTorrents: true,
-	dataDirs: [],
-	matchMode: MatchMode.FLEXIBLE,
-	skipRecheck: true,
-	autoResumeMaxDownload: 52_428_800,
-	ignoreNonRelevantFilesToResume: false,
-	linkDirs: [],
-	linkType: LinkType.HARDLINK,
-	flatLinking: false,
-	maxDataDepth: 2,
-	linkCategory: "cross-seed-link",
-	torrentDir: undefined,
-	outputDir: undefined,
-	injectDir: undefined,
-	ignoreTitles: false,
-	includeSingleEpisodes: false,
-	verbose: false,
-	includeNonVideos: false,
-	seasonFromEpisodes: 1,
-	fuzzySizeThreshold: 0.02,
-	excludeOlder: ms("2 weeks"),
-	excludeRecentSearch: ms("3 days"),
-	action: Action.INJECT,
-	torrentClients: [],
-	duplicateCategories: false,
-	notificationWebhookUrls: [],
-	torrents: [],
-	port: 2468,
-	host: "0.0.0.0",
-	basePath: "",
-	searchCadence: ms("1 day"),
-	rssCadence: ms("30 minutes"),
-	snatchTimeout: ms("30 seconds"),
-	searchTimeout: ms("2 minutes"),
-	searchLimit: 400,
-	blockList: [],
-	sonarr: [],
-	radarr: [],
-});
-
 export function getDefaultRuntimeConfig(): RuntimeConfig {
-	const defaults = structuredClone(DEFAULT_RUNTIME_CONFIG) as RuntimeConfig;
-	defaults.outputDir = path.join(appDir(), "cross-seeds");
-	return defaults;
+	return {
+		delay: 30,
+		torznab: [],
+		useClientTorrents: true,
+		dataDirs: [],
+		matchMode: MatchMode.FLEXIBLE,
+		skipRecheck: true,
+		autoResumeMaxDownload: 52_428_800,
+		ignoreNonRelevantFilesToResume: false,
+		linkDirs: [],
+		linkType: LinkType.HARDLINK,
+		flatLinking: false,
+		maxDataDepth: 2,
+		linkCategory: "cross-seed-link",
+		outputDir: path.join(appDir(), "cross-seeds"),
+		ignoreTitles: false,
+		includeSingleEpisodes: false,
+		verbose: false,
+		includeNonVideos: false,
+		seasonFromEpisodes: 1,
+		fuzzySizeThreshold: 0.02,
+		excludeOlder: ms("2 weeks"),
+		excludeRecentSearch: ms("3 days"),
+		action: Action.INJECT,
+		torrentClients: [],
+		duplicateCategories: false,
+		notificationWebhookUrls: [],
+		torrents: [],
+		port: 2468,
+		host: "0.0.0.0",
+		basePath: "",
+		searchCadence: ms("1 day"),
+		rssCadence: ms("30 minutes"),
+		snatchTimeout: ms("30 seconds"),
+		searchTimeout: ms("2 minutes"),
+		searchLimit: 400,
+		blockList: [],
+		sonarr: [],
+		radarr: [],
+	};
 }
 
 export function applyDefaults(
