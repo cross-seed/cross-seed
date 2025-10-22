@@ -1,9 +1,8 @@
 import ms from "ms";
 import { Action } from "./constants.js";
 import { cleanupDB, db } from "./db.js";
-import { exitOnCrossSeedErrors } from "./errors.js";
 import { injectSavedTorrents } from "./inject.js";
-import { Label, logger } from "./logger.js";
+import { Label, logger, exitOnCrossSeedErrors } from "./logger.js";
 import { bulkSearch, scanRssFeeds } from "./pipeline.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import { updateCaps } from "./torznab.js";

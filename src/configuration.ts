@@ -1,15 +1,19 @@
 import chalk from "chalk";
-import { accessSync, constants, copyFileSync, existsSync, mkdirSync } from "fs";
+import { accessSync, constants, mkdirSync } from "fs";
 import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
+import ms from "ms";
+import { isDeepStrictEqual } from "node:util";
 import {
 	Action,
+	LinkType,
 	LOGS_FOLDER,
 	MatchMode,
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
+import { RuntimeConfig } from "./runtimeConfig.js";
 
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
@@ -108,23 +112,102 @@ export function createAppDirHierarchy(): void {
 	mkdirSync(path.join(appDirPath, LOGS_FOLDER), { recursive: true });
 }
 
-export function generateConfig(): void {
-	createAppDirHierarchy();
-	const dest = path.join(appDir(), "config.js");
-	const templatePath = path.join("./config.template.cjs");
-	if (existsSync(dest)) {
-		console.log("Configuration file already exists.");
-		return;
+const DEFAULT_RUNTIME_CONFIG: Readonly<
+	Omit<RuntimeConfig, "outputDir"> & {
+		outputDir?: string;
 	}
-	copyFileSync(new URL(templatePath, import.meta.url), dest);
-	console.log("Configuration file created at", chalk.yellow.bold(dest));
+> = Object.freeze({
+	delay: 30,
+	torznab: [],
+	useClientTorrents: true,
+	dataDirs: [],
+	matchMode: MatchMode.FLEXIBLE,
+	skipRecheck: true,
+	autoResumeMaxDownload: 52_428_800,
+	ignoreNonRelevantFilesToResume: false,
+	linkDirs: [],
+	linkType: LinkType.HARDLINK,
+	flatLinking: false,
+	maxDataDepth: 2,
+	linkCategory: "cross-seed-link",
+	torrentDir: undefined,
+	outputDir: undefined,
+	injectDir: undefined,
+	ignoreTitles: false,
+	includeSingleEpisodes: false,
+	verbose: false,
+	includeNonVideos: false,
+	seasonFromEpisodes: 1,
+	fuzzySizeThreshold: 0.02,
+	excludeOlder: ms("2 weeks"),
+	excludeRecentSearch: ms("3 days"),
+	action: Action.INJECT,
+	torrentClients: [],
+	duplicateCategories: false,
+	notificationWebhookUrls: [],
+	torrents: [],
+	port: 2468,
+	host: "0.0.0.0",
+	basePath: "",
+	searchCadence: ms("1 day"),
+	rssCadence: ms("30 minutes"),
+	snatchTimeout: ms("30 seconds"),
+	searchTimeout: ms("2 minutes"),
+	searchLimit: 400,
+	blockList: [],
+	sonarr: [],
+	radarr: [],
+});
+
+export function getDefaultRuntimeConfig(): RuntimeConfig {
+	const defaults = structuredClone(DEFAULT_RUNTIME_CONFIG) as RuntimeConfig;
+	defaults.outputDir = path.join(appDir(), "cross-seeds");
+	return defaults;
+}
+
+export function applyDefaults(
+	overrides: Partial<RuntimeConfig> = {},
+): RuntimeConfig {
+	const merged = getDefaultRuntimeConfig();
+	for (const key of Object.keys(overrides) as (keyof RuntimeConfig)[]) {
+		const value = overrides[key];
+		if (value === undefined) continue;
+		(merged as unknown as Record<string, unknown>)[key as string] =
+			structuredClone(value);
+	}
+
+	return merged;
+}
+
+export function stripDefaults(
+	config: Partial<RuntimeConfig> | RuntimeConfig,
+): Partial<RuntimeConfig> {
+	const defaults = getDefaultRuntimeConfig();
+	const overrides: Partial<RuntimeConfig> = {};
+	for (const key of Object.keys(config) as (keyof RuntimeConfig)[]) {
+		const value = config[key];
+		if (value === undefined) continue;
+		if (
+			!(key in defaults) ||
+			!isDeepStrictEqual(value, defaults[key as keyof RuntimeConfig])
+		) {
+			(overrides as unknown as Record<string, unknown>)[key as string] =
+				structuredClone(value);
+		}
+	}
+
+	return overrides;
+}
+
+export function prepareLegacyFileConfig(fileConfig: FileConfig): FileConfig {
+	const normalized = { ...fileConfig };
+	if (normalized.linkType === undefined) {
+		normalized.linkType = LinkType.SYMLINK;
+	}
+	return normalized;
 }
 
 export async function getFileConfig(): Promise<FileConfig> {
-	if (process.env.DOCKER_ENV === "true") {
-		generateConfig();
-	}
-
 	const configPath = path.join(appDir(), "config.js");
 
 	try {

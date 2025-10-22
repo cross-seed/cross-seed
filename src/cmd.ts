@@ -2,7 +2,7 @@
 import chalk from "chalk";
 import { Option, program } from "commander";
 import { getApiKey, resetApiKey } from "./auth.js";
-import { FileConfig, generateConfig, getFileConfig } from "./configuration.js";
+import { FileConfig, getFileConfig } from "./configuration.js";
 import { PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
 import { updateTorrentCache } from "./decide.js";
@@ -36,11 +36,6 @@ const verboseOption = new Option("-v, --verbose", "Log verbose output").default(
 program.name(PROGRAM_NAME);
 program.description(chalk.yellow.bold(`${PROGRAM_NAME} v${PROGRAM_VERSION}`));
 program.version(PROGRAM_VERSION, "-V, --version", "output the current version");
-
-program
-	.command("gen-config")
-	.description("Generate a config file")
-	.action(withMinimalRuntime(generateConfig));
 
 program
 	.command("update-torrent-cache-trackers")
