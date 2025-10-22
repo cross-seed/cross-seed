@@ -7,6 +7,7 @@ import {
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
+	Label,
 	MatchMode,
 	RESUME_EXCLUDED_EXTS,
 	RESUME_EXCLUDED_KEYWORDS,
@@ -14,7 +15,7 @@ import {
 } from "../constants.js";
 import { getPartialSizeRatio } from "../decide.js";
 import { CrossSeedError } from "../errors.js";
-import { Label, logger } from "../logger.js";
+import { logger } from "../logger.js";
 import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
 import { filterByContent } from "../preFilter.js";
 import { Result } from "../Result.js";
