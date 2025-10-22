@@ -4,13 +4,22 @@ import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { instantiateDownloadClients } from "./clients/TorrentClient.js";
 import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
-import { getFileConfig } from "./configuration.js";
+import {
+	getDefaultRuntimeConfig,
+	getFileConfig,
+	prepareLegacyFileConfig,
+} from "./configuration.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
 import { getDbConfig, setDbConfig } from "./dbConfig.js";
 import { createRequire } from "module";
-import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
-import { initializeLogger, Label, logger } from "./logger.js";
+import { CrossSeedError } from "./errors.js";
+import {
+	initializeLogger,
+	Label,
+	logger,
+	exitOnCrossSeedErrors,
+} from "./logger.js";
 import { initializePushNotifier } from "./pushNotifier.js";
 import {
 	getRuntimeConfig,
@@ -222,21 +231,29 @@ export function withFullRuntime(
 	return withMinimalRuntime(async (options) => {
 		initializeLogger(options as Record<string, unknown>);
 
+		const definedCliOptions = Object.fromEntries(
+			Object.entries(options as Record<string, unknown>).filter(
+				([, value]) => value !== undefined,
+			),
+		);
+
 		let runtimeConfig: RuntimeConfig;
 		try {
 			// Load config from database
 			runtimeConfig = {
 				...(await getDbConfig()),
-				...(options as Record<string, unknown>),
+				...definedCliOptions,
 			};
 		} catch {
 			// No complete config in database, migrate from file or template
 			try {
 				// Try to load and migrate from file config
-				const fileConfig = await getFileConfig();
+				const fileConfig = prepareLegacyFileConfig(
+					await getFileConfig(),
+				);
 				runtimeConfig = parseRuntimeConfigAndLogErrors({
 					...fileConfig,
-					...(options as Record<string, unknown>),
+					...definedCliOptions,
 				});
 
 				// Preserve existing API key from apikey column
@@ -245,18 +262,17 @@ export function withFullRuntime(
 					.first();
 				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
 					runtimeConfig.apiKey = existingApiKey.apikey;
-				}
+					}
 
-				await setDbConfig(runtimeConfig);
-				logger.info("Migrated file config to database");
+					await setDbConfig(runtimeConfig);
+					logger.info("Migrated file config to database");
 			} catch {
 				// No file config - use template directly
-				const templateConfig = require("./config.template.cjs")
-					.default as Record<string, unknown>;
-				runtimeConfig = parseRuntimeConfigAndLogErrors({
-					...templateConfig,
-					...(options as Record<string, unknown>),
-				});
+				const defaultConfig = getDefaultRuntimeConfig();
+				runtimeConfig = {
+					...defaultConfig,
+					...definedCliOptions,
+				} as RuntimeConfig;
 
 				// Preserve existing API key from apikey column
 				const existingApiKey = await db("settings")
@@ -267,7 +283,7 @@ export function withFullRuntime(
 				}
 
 				await setDbConfig(runtimeConfig);
-				logger.info("Created initial database config from template");
+				logger.info("Created initial database config from defaults");
 			}
 		}
 
