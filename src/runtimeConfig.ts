@@ -1,4 +1,5 @@
 import { Action, LinkType, MatchMode } from "./constants.js";
+import { omitUndefined } from "./utils.js";
 
 export interface RuntimeConfig {
 	delay: number;
@@ -55,8 +56,6 @@ export function getRuntimeConfig(
 ): RuntimeConfig {
 	return {
 		...runtimeConfig,
-		...Object.fromEntries(
-			Object.entries(configOverride).filter(([, v]) => v !== undefined),
-		),
+		...omitUndefined(configOverride),
 	};
 }

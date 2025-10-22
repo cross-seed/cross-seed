@@ -43,6 +43,14 @@ export function isTruthy<T>(value: T): value is Truthy<T> {
 	return Boolean(value);
 }
 
+export function omitUndefined<T extends Record<string, unknown>>(
+	obj: T,
+): Partial<T> {
+	return Object.fromEntries(
+		Object.entries(obj).filter(([, value]) => value !== undefined),
+	) as Partial<T>;
+}
+
 // ==================================== OS ====================================
 
 export async function exists(srcPath: string): Promise<boolean> {
