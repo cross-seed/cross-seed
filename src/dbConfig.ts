@@ -3,12 +3,6 @@ import { db } from "./db.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
 import { omitUndefined } from "./utils.js";
 
-function sanitizePartialConfig(
-	partialConfig: Partial<RuntimeConfig>,
-): Partial<RuntimeConfig> {
-	return omitUndefined(partialConfig) as Partial<RuntimeConfig>;
-}
-
 export async function getDbConfig(): Promise<RuntimeConfig> {
 	const row = await db("settings").select("settings_json").first();
 	if (!row || !row.settings_json) {
@@ -40,7 +34,7 @@ export async function setDbConfig(config: RuntimeConfig): Promise<void> {
 export async function updateDbConfig(
 	partialConfig: Partial<RuntimeConfig>,
 ): Promise<void> {
-	const sanitizedPartial = sanitizePartialConfig(partialConfig);
+	const sanitizedPartial = omitUndefined(partialConfig) as Partial<RuntimeConfig>;
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
