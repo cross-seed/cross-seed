@@ -51,6 +51,31 @@ export const ALL_SPACES_REGEX = /\s+/g;
 export const ALL_SQUARE_BRACKETS_REGEX = /\[.*?\]|「.*?」|｢.*?｣|【.*?】/g;
 export const ALL_PARENTHESES_REGEX = /\(.*?\)/g;
 
+export enum Label {
+	QBITTORRENT = "qbittorrent",
+	RTORRENT = "rtorrent",
+	TRANSMISSION = "transmission",
+	DELUGE = "deluge",
+	DECIDE = "decide",
+	PREFILTER = "prefilter",
+	CONFIG = "config",
+	TORZNAB = "torznab",
+	SERVER = "server",
+	SCHEDULER = "scheduler",
+	SEARCH = "search",
+	RSS = "rss",
+	ANNOUNCE = "announce",
+	WEBHOOK = "webhook",
+	INJECT = "inject",
+	PERF = "perf",
+	CLEANUP = "cleanup",
+	ARRS = "arrs",
+	RADARR = "radarr",
+	SONARR = "sonarr",
+	AUTH = "auth",
+	INDEX = "index",
+}
+
 // Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {
 	AMZN: /\b(amzn|amazon(hd)?)\b[ ._-]web[ ._-]?(dl|rip)?\b/i,

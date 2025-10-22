@@ -4,32 +4,10 @@ import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import { parseClientEntry } from "./clients/TorrentClient.js";
 import { appDir, createAppDirHierarchy } from "./configuration.js";
-import { LOGS_FOLDER } from "./constants.js";
+import { Label, LOGS_FOLDER } from "./constants.js";
+import { CrossSeedError } from "./errors.js";
 
-export enum Label {
-	QBITTORRENT = "qbittorrent",
-	RTORRENT = "rtorrent",
-	TRANSMISSION = "transmission",
-	DELUGE = "deluge",
-	DECIDE = "decide",
-	PREFILTER = "prefilter",
-	CONFIG = "config",
-	TORZNAB = "torznab",
-	SERVER = "server",
-	SCHEDULER = "scheduler",
-	SEARCH = "search",
-	RSS = "rss",
-	ANNOUNCE = "announce",
-	WEBHOOK = "webhook",
-	INJECT = "inject",
-	PERF = "perf",
-	CLEANUP = "cleanup",
-	ARRS = "arrs",
-	RADARR = "radarr",
-	SONARR = "sonarr",
-	AUTH = "auth",
-	INDEX = "index",
-}
+export { Label } from "./constants.js";
 
 export let logger: winston.Logger;
 
@@ -199,4 +177,17 @@ export function initializeLogger(options: Record<string, unknown>): void {
 			}),
 		],
 	});
+}
+
+export function exitOnCrossSeedErrors(error: unknown): void {
+	if (logger) {
+		logger.error(error);
+	} else {
+		console.error(error);
+	}
+	if (error instanceof CrossSeedError) {
+		process.exitCode = 1;
+		return;
+	}
+	throw error;
 }
