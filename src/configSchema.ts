@@ -522,6 +522,7 @@ export const VALIDATION_SCHEMA = z
 		verbose: z.boolean(),
 		torrents: z.array(z.string()).optional(),
 		blockList: z.array(z.string()).nullish().transform(transformBlocklist),
+		titleFilterList: z.array(z.string()),
 		apiKey: z.string().min(24).nullish(),
 		radarr: z
 			.array(z.string().url())
