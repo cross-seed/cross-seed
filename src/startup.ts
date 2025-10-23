@@ -12,7 +12,6 @@ import {
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
 import { getDbConfig, setDbConfig } from "./dbConfig.js";
-import { createRequire } from "module";
 import { CrossSeedError } from "./errors.js";
 import {
 	initializeLogger,
@@ -28,8 +27,6 @@ import {
 } from "./runtimeConfig.js";
 import { Awaitable, notExists, omitUndefined, verifyDir } from "./utils.js";
 import { getLogWatcher } from "./utils/logWatcher.js";
-
-const require = createRequire(import.meta.url);
 
 export async function exitGracefully() {
 	await db.destroy();
