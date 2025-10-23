@@ -28,7 +28,123 @@ jobs:
             - run: npm run typecheck
             - run: npm run test
 
-    docker:
+    docker-meta:
+        runs-on: ubuntu-latest
+        outputs:
+            tags: ${{ steps.meta.outputs.tags }}
+            labels: ${{ steps.meta.outputs.labels }}
+        steps:
+            - name: Docker meta
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: |
+                      ghcr.io/${{ github.repository_owner }}/cross-seed
+                      crossseed/cross-seed
+                  tags: |
+                      type=semver,pattern=version-{{version}}
+                      type=semver,pattern={{version}}
+                      type=semver,pattern={{major}}.{{minor}}
+                      type=semver,pattern={{major}}
+                      type=ref,event=branch
+                      type=ref,event=pr
+
+    docker-amd64:
+        needs: docker-meta
+        environment: Docker Hub
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Docker meta (amd64)
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: |
+                      ghcr.io/${{ github.repository_owner }}/cross-seed
+                      crossseed/cross-seed
+                  tags: |
+                      type=semver,pattern=version-{{version}}
+                      type=semver,pattern={{version}}
+                      type=semver,pattern={{major}}.{{minor}}
+                      type=semver,pattern={{major}}
+                      type=ref,event=branch
+                      type=ref,event=pr
+                  flavor: |
+                      suffix=-amd64
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+            - name: Login to GHCR
+              if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.repository_owner }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+            - name: Login to DockerHub
+              if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKERHUB_USERNAME }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+            - name: Build and push (amd64)
+              uses: docker/build-push-action@v5
+              with:
+                  push: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+                  platforms: linux/amd64
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ needs.docker-meta.outputs.labels }}
+
+    docker-arm64:
+        needs: docker-meta
+        environment: Docker Hub
+        runs-on: ubuntu-24.04-arm
+        steps:
+            - uses: actions/checkout@v4
+            - name: Docker meta (arm64)
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: |
+                      ghcr.io/${{ github.repository_owner }}/cross-seed
+                      crossseed/cross-seed
+                  tags: |
+                      type=semver,pattern=version-{{version}}
+                      type=semver,pattern={{version}}
+                      type=semver,pattern={{major}}.{{minor}}
+                      type=semver,pattern={{major}}
+                      type=ref,event=branch
+                      type=ref,event=pr
+                  flavor: |
+                      suffix=-arm64
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+            - name: Login to GHCR
+              if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.repository_owner }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+            - name: Login to DockerHub
+              if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKERHUB_USERNAME }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+            - name: Build and push (arm64)
+              uses: docker/build-push-action@v5
+              with:
+                  push: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+                  platforms: linux/arm64
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ needs.docker-meta.outputs.labels }}
+
+    docker-manifest:
+        needs:
+            - docker-meta
+            - docker-amd64
+            - docker-arm64
+        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
         environment: Docker Hub
         runs-on: ubuntu-latest
         steps:
@@ -46,28 +162,24 @@ jobs:
                       type=semver,pattern={{major}}
                       type=ref,event=branch
                       type=ref,event=pr
-            - name: Set up QEMU dependency
-              uses: docker/setup-qemu-action@v3
             - name: Set up Docker Buildx
-              id: buildx
               uses: docker/setup-buildx-action@v3
             - name: Login to GHCR
-              if: ${{ !github.event.pull_request.head.repo.fork }}
               uses: docker/login-action@v3
               with:
                   registry: ghcr.io
                   username: ${{ github.repository_owner }}
                   password: ${{ secrets.GITHUB_TOKEN }}
             - name: Login to DockerHub
-              if: ${{ !github.event.pull_request.head.repo.fork }}
               uses: docker/login-action@v3
               with:
                   username: ${{ secrets.DOCKERHUB_USERNAME }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
-            - name: Build and push
-              uses: docker/build-push-action@v5
-              with:
-                  push: ${{ !github.event.pull_request.head.repo.fork }}
-                  platforms: linux/amd64,linux/arm64
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
+            - name: Create multi-architecture manifests
+              env:
+                  TAGS: ${{ steps.meta.outputs.tags }}
+              run: |
+                  set -euo pipefail
+                  for tag in $TAGS; do
+                      docker buildx imagetools create --tag "${tag}" "${tag}-amd64" "${tag}-arm64"
+                  done
