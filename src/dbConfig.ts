@@ -34,7 +34,9 @@ export async function setDbConfig(config: RuntimeConfig): Promise<void> {
 export async function updateDbConfig(
 	partialConfig: Partial<RuntimeConfig>,
 ): Promise<void> {
-	const sanitizedPartial = omitUndefined(partialConfig) as Partial<RuntimeConfig>;
+	const sanitizedPartial = omitUndefined(
+		partialConfig,
+	) as Partial<RuntimeConfig>;
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
