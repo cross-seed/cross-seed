@@ -260,10 +260,10 @@ export function withFullRuntime(
 					.first();
 				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
 					runtimeConfig.apiKey = existingApiKey.apikey;
-					}
+				}
 
-					await setDbConfig(runtimeConfig);
-					logger.info("Migrated file config to database");
+				await setDbConfig(runtimeConfig);
+				logger.info("Migrated file config to database");
 			} catch {
 				// No file config - use template directly
 				const defaultConfig = getDefaultRuntimeConfig();
