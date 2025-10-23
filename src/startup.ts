@@ -261,7 +261,12 @@ export function withFullRuntime(
 
 				await setDbConfig(runtimeConfig);
 				logger.info("Migrated file config to database");
-			} catch {
+			} catch (e) {
+				console.error(
+					new Error("Failed to load file config for migration", {
+						cause: e,
+					}),
+				);
 				// No file config - use template directly
 				const defaultConfig = getDefaultRuntimeConfig();
 				runtimeConfig = {
