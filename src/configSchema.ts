@@ -10,11 +10,7 @@ export const RUNTIME_CONFIG_SCHEMA = z
 		dataDirs: z.array(z.string()),
 		matchMode: z.nativeEnum(MatchMode),
 		skipRecheck: z.boolean(),
-		autoResumeMaxDownload: z
-			.number()
-			.int()
-			.min(0)
-			.max(52_428_800),
+		autoResumeMaxDownload: z.number().int().min(0).max(52_428_800),
 		ignoreNonRelevantFilesToResume: z.boolean(),
 		linkDirs: z.array(z.string()),
 		linkType: z.nativeEnum(LinkType),
@@ -53,7 +49,9 @@ export const RUNTIME_CONFIG_SCHEMA = z
 	.superRefine((config, ctx) => {
 		if (
 			config.action === Action.INJECT &&
-			!config.torrentClients.some((client) => !client.includes(":readonly:"))
+			!config.torrentClients.some(
+				(client) => !client.includes(":readonly:"),
+			)
 		) {
 			ctx.addIssue({
 				code: z.ZodIssueCode.custom,

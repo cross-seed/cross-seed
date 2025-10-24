@@ -195,201 +195,209 @@ export function transformFileConfig(
 ): Partial<RuntimeConfig> {
 	const result: Partial<RuntimeConfig> = {};
 
-	const delay = coerceNumber(fileConfig.delay);
-	if (delay !== undefined) result.delay = delay;
-
-	const torznab = toStringArray(fileConfig.torznab);
-	if (torznab) result.torznab = torznab;
-
-	const useClientTorrents = coerceBoolean(fileConfig.useClientTorrents);
-	if (useClientTorrents !== undefined) result.useClientTorrents = useClientTorrents;
-
-	const dataDirs = toStringArray(fileConfig.dataDirs);
-	if (dataDirs) result.dataDirs = dataDirs;
-
-	const matchMode = coerceMatchMode(fileConfig.matchMode);
-	if (matchMode) result.matchMode = matchMode;
-
-	const skipRecheck = coerceBoolean(fileConfig.skipRecheck);
-	if (skipRecheck !== undefined) result.skipRecheck = skipRecheck;
-
-	const autoResumeMaxDownload = coerceInt(fileConfig.autoResumeMaxDownload);
-	if (autoResumeMaxDownload !== undefined)
-		result.autoResumeMaxDownload = Math.max(0, autoResumeMaxDownload);
-
-	const ignoreNonRelevantFilesToResume = coerceBoolean(
-		fileConfig.ignoreNonRelevantFilesToResume,
-	);
-	if (ignoreNonRelevantFilesToResume !== undefined)
-		result.ignoreNonRelevantFilesToResume = ignoreNonRelevantFilesToResume;
-
-	const linkDirList = toStringArray(fileConfig.linkDirs) ??
-		(fileConfig.linkDir ? [fileConfig.linkDir] : undefined);
-	if (linkDirList) result.linkDirs = linkDirList;
-
-	const linkType = coerceLinkType(fileConfig.linkType);
-	if (linkType) result.linkType = linkType;
-	else if (fileConfig.linkType === undefined && fileConfig.linkDir)
-		result.linkType = LinkType.SYMLINK;
-
-	const flatLinking = coerceBoolean(fileConfig.flatLinking);
-	if (flatLinking !== undefined) result.flatLinking = flatLinking;
-
-	const maxDataDepth = coerceInt(fileConfig.maxDataDepth);
-	if (maxDataDepth !== undefined) result.maxDataDepth = maxDataDepth;
-
-	const linkCategory = coerceString(fileConfig.linkCategory);
-	if (linkCategory) result.linkCategory = linkCategory;
-
-	const torrentDir = coerceString(fileConfig.torrentDir);
-	if (torrentDir) result.torrentDir = torrentDir;
-
-	const outputDir = coerceString(fileConfig.outputDir);
-	if (outputDir) result.outputDir = outputDir;
-
-	const injectDir = coerceString(fileConfig.injectDir);
-	if (injectDir) result.injectDir = injectDir;
-
-	const ignoreTitles = coerceBoolean(fileConfig.ignoreTitles);
-	if (ignoreTitles !== undefined) result.ignoreTitles = ignoreTitles;
-
-	const includeSingleEpisodes = coerceBoolean(
-		fileConfig.includeSingleEpisodes,
-	);
-	if (includeSingleEpisodes !== undefined)
-		result.includeSingleEpisodes = includeSingleEpisodes;
-
-	const includeNonVideos = coerceBoolean(fileConfig.includeNonVideos);
-	if (includeNonVideos !== undefined) result.includeNonVideos = includeNonVideos;
-
-	const seasonFromEpisodes = coerceSeasonFromEpisodes(
-		fileConfig.seasonFromEpisodes,
-	);
-	if (seasonFromEpisodes !== undefined)
-		result.seasonFromEpisodes = seasonFromEpisodes;
-
-	const fuzzySizeThreshold = coerceNumber(fileConfig.fuzzySizeThreshold);
-	if (fuzzySizeThreshold !== undefined)
-		result.fuzzySizeThreshold = fuzzySizeThreshold;
-
-	const excludeOlder = coerceDuration(fileConfig.excludeOlder);
-	if (excludeOlder !== undefined) result.excludeOlder = excludeOlder;
-
-	const excludeRecentSearch = coerceDuration(
-		fileConfig.excludeRecentSearch,
-	);
-	if (excludeRecentSearch !== undefined)
-		result.excludeRecentSearch = excludeRecentSearch;
-
-	const action = coerceAction(fileConfig.action);
-	if (action) result.action = action;
-
-	const torrentClients = new Set<string>();
-	const configuredClients = toStringArray(fileConfig.torrentClients);
-	if (configuredClients)
-		configuredClients.forEach((client) => torrentClients.add(client));
-
-	const qbittorrentUrl = coerceString(fileConfig.qbittorrentUrl);
-	if (qbittorrentUrl)
-		torrentClients.add(`qbittorrent:${qbittorrentUrl}`);
-	const rtorrentRpcUrl = coerceString(fileConfig.rtorrentRpcUrl);
-	if (rtorrentRpcUrl)
-		torrentClients.add(`rtorrent:${rtorrentRpcUrl}`);
-	const transmissionRpcUrl = coerceString(fileConfig.transmissionRpcUrl);
-	if (transmissionRpcUrl)
-		torrentClients.add(`transmission:${transmissionRpcUrl}`);
-	const delugeRpcUrl = coerceString(fileConfig.delugeRpcUrl);
-	if (delugeRpcUrl)
-		torrentClients.add(`deluge:${delugeRpcUrl}`);
-
-	if (torrentClients.size) {
-		result.torrentClients = Array.from(torrentClients);
+	if (typeof fileConfig.delay === "number") {
+		result.delay = fileConfig.delay;
 	}
 
-	const duplicateCategories = coerceBoolean(fileConfig.duplicateCategories);
-	if (duplicateCategories !== undefined)
-		result.duplicateCategories = duplicateCategories;
+	if (isStringArray(fileConfig.torznab)) {
+		result.torznab = fileConfig.torznab;
+	}
 
-	const webhookUrls = mergeUniqueStrings([
-		toStringArray(fileConfig.notificationWebhookUrls),
-		fileConfig.notificationWebhookUrl
-			? [fileConfig.notificationWebhookUrl]
-			: undefined,
-	]);
-	if (webhookUrls) result.notificationWebhookUrls = webhookUrls;
+	if (typeof fileConfig.useClientTorrents === "boolean") {
+		result.useClientTorrents = fileConfig.useClientTorrents;
+	}
 
-	const port = coerceInt(fileConfig.port);
-	if (port !== undefined) result.port = port;
+	if (isStringArray(fileConfig.dataDirs)) {
+		result.dataDirs = fileConfig.dataDirs;
+	}
 
-	const host = coerceString(fileConfig.host);
-	if (host) result.host = host;
+	if (
+		fileConfig.matchMode === MatchMode.STRICT ||
+		fileConfig.matchMode === MatchMode.FLEXIBLE ||
+		fileConfig.matchMode === MatchMode.PARTIAL
+	) {
+		result.matchMode = fileConfig.matchMode;
+	} else if (fileConfig.matchMode === "risky") {
+		result.matchMode = MatchMode.FLEXIBLE;
+	}
 
-	const searchCadence = coerceDuration(fileConfig.searchCadence);
-	if (searchCadence !== undefined) result.searchCadence = searchCadence;
+	if (typeof fileConfig.skipRecheck === "boolean") {
+		result.skipRecheck = fileConfig.skipRecheck;
+	}
 
-	const rssCadence = coerceDuration(fileConfig.rssCadence);
-	if (rssCadence !== undefined) result.rssCadence = rssCadence;
+	if (typeof fileConfig.autoResumeMaxDownload === "number") {
+		result.autoResumeMaxDownload = fileConfig.autoResumeMaxDownload;
+	}
 
-	const snatchTimeout = coerceDuration(fileConfig.snatchTimeout);
-	if (snatchTimeout !== undefined) result.snatchTimeout = snatchTimeout;
+	if (typeof fileConfig.ignoreNonRelevantFilesToResume === "boolean") {
+		result.ignoreNonRelevantFilesToResume =
+			fileConfig.ignoreNonRelevantFilesToResume;
+	}
 
-	const searchTimeout = coerceDuration(fileConfig.searchTimeout);
-	if (searchTimeout !== undefined) result.searchTimeout = searchTimeout;
+	const linkDirs = resolveLinkDirs(fileConfig);
+	if (linkDirs) {
+		result.linkDirs = linkDirs;
+	}
 
-	const searchLimit = coerceInt(fileConfig.searchLimit);
-	if (searchLimit !== undefined) result.searchLimit = Math.max(0, searchLimit);
+	if (
+		fileConfig.linkType === LinkType.SYMLINK ||
+		fileConfig.linkType === LinkType.HARDLINK ||
+		fileConfig.linkType === LinkType.REFLINK ||
+		fileConfig.linkType === LinkType.REFLINK_OR_COPY
+	) {
+		result.linkType = fileConfig.linkType;
+	} else if (fileConfig.linkType === undefined && linkDirs?.length) {
+		result.linkType = LinkType.SYMLINK;
+	}
 
-	const blockList = toStringArray(fileConfig.blockList);
-	if (blockList) result.blockList = blockList;
+	if (typeof fileConfig.flatLinking === "boolean") {
+		result.flatLinking = fileConfig.flatLinking;
+	}
 
-	const apiKey = coerceString(fileConfig.apiKey);
-	if (apiKey) result.apiKey = apiKey;
+	if (typeof fileConfig.maxDataDepth === "number") {
+		result.maxDataDepth = fileConfig.maxDataDepth;
+	}
 
-	const sonarr = toStringArray(fileConfig.sonarr);
-	if (sonarr) result.sonarr = sonarr;
+	if (typeof fileConfig.linkCategory === "string") {
+		result.linkCategory = fileConfig.linkCategory;
+	}
 
-	const radarr = toStringArray(fileConfig.radarr);
-	if (radarr) result.radarr = radarr;
+	if (typeof fileConfig.torrentDir === "string") {
+		result.torrentDir = fileConfig.torrentDir;
+	}
+
+	if (typeof fileConfig.outputDir === "string") {
+		result.outputDir = fileConfig.outputDir;
+	}
+
+	if (typeof fileConfig.injectDir === "string") {
+		result.injectDir = fileConfig.injectDir;
+	}
+
+	if (typeof fileConfig.ignoreTitles === "boolean") {
+		result.ignoreTitles = fileConfig.ignoreTitles;
+	}
+
+	if (typeof fileConfig.includeSingleEpisodes === "boolean") {
+		result.includeSingleEpisodes = fileConfig.includeSingleEpisodes;
+	}
+
+	if (typeof fileConfig.includeNonVideos === "boolean") {
+		result.includeNonVideos = fileConfig.includeNonVideos;
+	}
+
+	const seasonFromEpisodes = normalizeSeasonFromEpisodes(
+		fileConfig.seasonFromEpisodes,
+	);
+	if (seasonFromEpisodes !== undefined) {
+		result.seasonFromEpisodes = seasonFromEpisodes;
+	}
+
+	if (typeof fileConfig.fuzzySizeThreshold === "number") {
+		result.fuzzySizeThreshold = fileConfig.fuzzySizeThreshold;
+	}
+
+	const excludeOlder = parseDurationValue(fileConfig.excludeOlder);
+	if (excludeOlder !== undefined) {
+		result.excludeOlder = excludeOlder;
+	}
+
+	const excludeRecentSearch = parseDurationValue(
+		fileConfig.excludeRecentSearch,
+	);
+	if (excludeRecentSearch !== undefined) {
+		result.excludeRecentSearch = excludeRecentSearch;
+	}
+
+	if (
+		fileConfig.action === Action.SAVE ||
+		fileConfig.action === Action.INJECT
+	) {
+		result.action = fileConfig.action;
+	}
+
+	const torrentClients = collectTorrentClients(fileConfig);
+	if (torrentClients) {
+		result.torrentClients = torrentClients;
+	}
+
+	if (typeof fileConfig.duplicateCategories === "boolean") {
+		result.duplicateCategories = fileConfig.duplicateCategories;
+	}
+
+	const webhookUrls = collectWebhookUrls(fileConfig);
+	if (webhookUrls) {
+		result.notificationWebhookUrls = webhookUrls;
+	}
+
+	if (typeof fileConfig.port === "number") {
+		result.port = fileConfig.port;
+	}
+
+	if (typeof fileConfig.host === "string") {
+		result.host = fileConfig.host;
+	}
+
+	const searchCadence = parseDurationValue(fileConfig.searchCadence);
+	if (searchCadence !== undefined) {
+		result.searchCadence = searchCadence;
+	}
+
+	const rssCadence = parseDurationValue(fileConfig.rssCadence);
+	if (rssCadence !== undefined) {
+		result.rssCadence = rssCadence;
+	}
+
+	const snatchTimeout = parseDurationValue(fileConfig.snatchTimeout);
+	if (snatchTimeout !== undefined) {
+		result.snatchTimeout = snatchTimeout;
+	}
+
+	const searchTimeout = parseDurationValue(fileConfig.searchTimeout);
+	if (searchTimeout !== undefined) {
+		result.searchTimeout = searchTimeout;
+	}
+
+	if (typeof fileConfig.searchLimit === "number") {
+		result.searchLimit = fileConfig.searchLimit;
+	}
+
+	if (isStringArray(fileConfig.blockList)) {
+		result.blockList = fileConfig.blockList;
+	}
+
+	if (typeof fileConfig.apiKey === "string") {
+		result.apiKey = fileConfig.apiKey;
+	}
+
+	if (isStringArray(fileConfig.sonarr)) {
+		result.sonarr = fileConfig.sonarr;
+	}
+
+	if (isStringArray(fileConfig.radarr)) {
+		result.radarr = fileConfig.radarr;
+	}
 
 	return omitUndefined(result) as Partial<RuntimeConfig>;
 }
 
-function coerceBoolean(value: unknown): boolean | undefined {
-	if (typeof value === "boolean") return value;
-	if (typeof value === "string") {
-		const normalized = value.trim().toLowerCase();
-		if (normalized === "true") return true;
-		if (normalized === "false") return false;
-	}
-	if (typeof value === "number") {
-		if (value === 1) return true;
-		if (value === 0) return false;
-	}
-	return undefined;
+function isStringArray(value: unknown): value is string[] {
+	return (
+		Array.isArray(value) && value.every((item) => typeof item === "string")
+	);
 }
 
-function coerceNumber(value: unknown): number | undefined {
+function normalizeSeasonFromEpisodes(value: unknown): number | undefined {
+	if (value === null || value === false) return 0;
 	if (typeof value === "number" && Number.isFinite(value)) return value;
-	if (typeof value === "string" && value.trim().length) {
-		const parsed = Number(value);
-		if (!Number.isNaN(parsed)) return parsed;
-	}
 	return undefined;
 }
 
-function coerceInt(value: unknown): number | undefined {
-	const num = coerceNumber(value);
-	if (num === undefined) return undefined;
-	const int = Math.trunc(num);
-	return Number.isFinite(int) ? int : undefined;
-}
-
-function coerceDuration(value: unknown): number | undefined {
+function parseDurationValue(value: unknown): number | undefined {
 	if (value === null) return 0;
-	if (value === undefined) return undefined;
 	if (typeof value === "number" && Number.isFinite(value)) return value;
-	if (typeof value === "string" && value.trim().length) {
-		const parsed = ms(value.trim());
+	if (typeof value === "string") {
+		const parsed = ms(value);
 		if (typeof parsed === "number" && Number.isFinite(parsed)) {
 			return parsed;
 		}
@@ -397,105 +405,45 @@ function coerceDuration(value: unknown): number | undefined {
 	return undefined;
 }
 
-function coerceString(value: unknown): string | undefined {
-	if (typeof value === "string") {
-		const trimmed = value.trim();
-		return trimmed.length ? trimmed : undefined;
+function resolveLinkDirs(fileConfig: FileConfig): string[] | undefined {
+	if (isStringArray(fileConfig.linkDirs) && fileConfig.linkDirs.length) {
+		return fileConfig.linkDirs;
+	}
+	if (typeof fileConfig.linkDir === "string") {
+		return [fileConfig.linkDir];
 	}
 	return undefined;
 }
 
-function toStringArray(value: unknown): string[] | undefined {
-	if (value === undefined || value === null) return undefined;
-	if (Array.isArray(value)) {
-		const arr = value
-			.map((item) => coerceString(item))
-			.filter((item): item is string => Boolean(item));
-		return arr.length ? arr : [];
+function collectTorrentClients(fileConfig: FileConfig): string[] | undefined {
+	const clients = new Set<string>();
+	if (isStringArray(fileConfig.torrentClients)) {
+		fileConfig.torrentClients.forEach((client) => clients.add(client));
 	}
-	const single = coerceString(value);
-	if (single) return [single];
-	return undefined;
+	addClient(clients, "qbittorrent", fileConfig.qbittorrentUrl);
+	addClient(clients, "rtorrent", fileConfig.rtorrentRpcUrl);
+	addClient(clients, "transmission", fileConfig.transmissionRpcUrl);
+	addClient(clients, "deluge", fileConfig.delugeRpcUrl);
+	return clients.size ? Array.from(clients) : undefined;
 }
 
-function coerceMatchMode(value: unknown): MatchMode | undefined {
-	if (typeof value === "string") {
-		const normalized = value.trim().toLowerCase();
-		if (normalized === "strict" || normalized === MatchMode.STRICT)
-			return MatchMode.STRICT;
-		if (
-			normalized === "flexible" ||
-			normalized === MatchMode.FLEXIBLE ||
-			normalized === "risky"
-		)
-			return MatchMode.FLEXIBLE;
-		if (normalized === "partial" || normalized === MatchMode.PARTIAL)
-			return MatchMode.PARTIAL;
-		if (normalized === "safe") return MatchMode.STRICT;
+function addClient(clients: Set<string>, prefix: string, url: unknown): void {
+	if (typeof url === "string") {
+		clients.add(`${prefix}:${url}`);
 	}
-	if (Object.values(MatchMode).includes(value as MatchMode)) {
-		return value as MatchMode;
-	}
-	return undefined;
 }
 
-function coerceAction(value: unknown): Action | undefined {
-	if (typeof value === "string") {
-		switch (value.trim().toLowerCase()) {
-			case Action.SAVE:
-			case "save":
-				return Action.SAVE;
-			case Action.INJECT:
-			case "inject":
-				return Action.INJECT;
-			default:
-				return undefined;
-		}
+function collectWebhookUrls(fileConfig: FileConfig): string[] | undefined {
+	const urls = new Set<string>();
+	if (isStringArray(fileConfig.notificationWebhookUrls)) {
+		fileConfig.notificationWebhookUrls.forEach((url) => {
+			if (typeof url === "string") urls.add(url);
+		});
 	}
-	if (Object.values(Action).includes(value as Action)) {
-		return value as Action;
+	if (typeof fileConfig.notificationWebhookUrl === "string") {
+		urls.add(fileConfig.notificationWebhookUrl);
 	}
-	return undefined;
-}
-
-function coerceLinkType(value: unknown): LinkType | undefined {
-	if (typeof value === "string") {
-		switch (value.trim().toLowerCase()) {
-			case LinkType.SYMLINK:
-			case "symlink":
-				return LinkType.SYMLINK;
-			case LinkType.HARDLINK:
-			case "hardlink":
-				return LinkType.HARDLINK;
-			case LinkType.REFLINK:
-			case "reflink":
-				return LinkType.REFLINK;
-			case LinkType.REFLINK_OR_COPY:
-			case "reflinkorcopy":
-			case "reflink_or_copy":
-				return LinkType.REFLINK_OR_COPY;
-			default:
-				return undefined;
-		}
-	}
-	if (Object.values(LinkType).includes(value as LinkType)) {
-		return value as LinkType;
-	}
-	return undefined;
-}
-
-function coerceSeasonFromEpisodes(value: unknown): number | undefined {
-	if (value === null || value === false) return 0;
-	if (value === undefined) return undefined;
-	const num = coerceNumber(value);
-	if (num === undefined) return undefined;
-	return num;
-}
-
-function mergeUniqueStrings(values: (string[] | undefined)[]): string[] | undefined {
-	const combined = values.flatMap((arr) => (arr ? arr : []));
-	const unique = Array.from(new Set(combined));
-	return unique.length ? unique : undefined;
+	return urls.size ? Array.from(urls) : undefined;
 }
 
 export async function getFileConfig(): Promise<FileConfig> {
