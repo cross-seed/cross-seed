@@ -45,22 +45,7 @@ export const RUNTIME_CONFIG_SCHEMA = z
 		apiKey: z.string().min(24).optional(),
 		sonarr: z.array(z.string()),
 		radarr: z.array(z.string()),
-	})
-	.superRefine((config, ctx) => {
-		if (
-			config.action === Action.INJECT &&
-			!config.torrentClients.some(
-				(client) => !client.includes(":readonly:"),
-			)
-		) {
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				path: ["torrentClients"],
-				message:
-					"At least one writable torrent client is required for action 'inject'",
-			});
-		}
-	});
+		});
 
 export function parseRuntimeConfig(config: unknown): RuntimeConfig {
 	return RUNTIME_CONFIG_SCHEMA.parse(config);
