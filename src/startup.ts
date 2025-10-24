@@ -3,14 +3,7 @@ import { spawn } from "node:child_process";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { instantiateDownloadClients } from "./clients/TorrentClient.js";
-import { ZodError } from "zod";
-import { parseRuntimeConfig } from "./configSchema.js";
-import {
-	getDefaultRuntimeConfig,
-	getFileConfig,
-	transformFileConfig,
-} from "./configuration.js";
-import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
+import { applyDefaults, getFileConfig, transformFileConfig } from "./configuration.js";
 import { db } from "./db.js";
 import { getDbConfig, setDbConfig } from "./dbConfig.js";
 import { CrossSeedError } from "./errors.js";
@@ -142,37 +135,6 @@ export async function doStartupValidation(): Promise<void> {
  * validates and sets RuntimeConfig
  * @return (the number of errors Zod encountered in the configuration)
  */
-export function parseRuntimeConfigAndLogErrors(
-	options: unknown,
-): RuntimeConfig {
-	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
-	logger.info("Validating your configuration...");
-	try {
-		return parseRuntimeConfig(options);
-	} catch (error) {
-		logger.verbose({
-			label: Label.CONFIG,
-			message: inspect(options),
-		});
-		if (error instanceof ZodError) {
-			error.issues.forEach(({ path, message }) => {
-				const optionPath = path.length ? path.join(".") : "(root)";
-				logger.error(
-					`Option: ${optionPath}${NEWLINE_INDENT}${message}${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options${
-						path[0] ? `#${String(path[0]).toLowerCase()}` : ""
-					})\n`,
-				);
-			});
-			throw new CrossSeedError(
-				`Your configuration is invalid, please see the ${
-					error.issues.length > 1 ? "errors" : "error"
-				} above for details.`,
-			);
-		}
-		throw error;
-	}
-}
-
 /**
  * starts singletons, then runs the callback, then cleans up
  * @param entrypoint
@@ -204,6 +166,20 @@ export function withMinimalRuntime<
 	};
 }
 
+async function applyExistingApiKey(
+	config: RuntimeConfig,
+	contextMessage: string,
+): Promise<void> {
+	try {
+		const existingApiKey = await db("settings").select("apikey").first();
+		if (existingApiKey?.apikey && !config.apiKey) {
+			config.apiKey = existingApiKey.apikey;
+		}
+	} catch (error) {
+		logger.debug(contextMessage, error);
+	}
+}
+
 /**
  * Initializes the full runtime, runs the callback, then cleans up
  * @param entrypoint
@@ -218,62 +194,57 @@ export function withFullRuntime(
 			options as Partial<RuntimeConfig>,
 		) as Partial<RuntimeConfig>;
 
-		let runtimeConfig: RuntimeConfig;
+		let runtimeConfig: RuntimeConfig | undefined;
 		try {
-			// Load config from database
 			const dbConfig = await getDbConfig();
-			runtimeConfig = parseRuntimeConfigAndLogErrors({
+			runtimeConfig = {
 				...dbConfig,
 				...definedCliOptions,
-			});
-		} catch {
-			// No complete config in database, migrate from file or template
+			};
+		} catch (dbError) {
+			logger.debug("Unable to load configuration from database", dbError);
 			try {
-				// Try to load and migrate from file config
 				const transformedFileConfig = transformFileConfig(
 					await getFileConfig(),
 				);
-				const mergedConfig = {
-					...getDefaultRuntimeConfig(),
+				const overrides = {
 					...transformedFileConfig,
 					...definedCliOptions,
 				};
-				runtimeConfig = parseRuntimeConfigAndLogErrors(mergedConfig);
+				const mergedConfig = applyDefaults(overrides);
 
-				// Preserve existing API key from apikey column
-				const existingApiKey = await db("settings")
-					.select("apikey")
-					.first();
-				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
-					runtimeConfig.apiKey = existingApiKey.apikey;
-				}
-
-				await setDbConfig(runtimeConfig);
-				logger.info("Migrated file config to database");
-			} catch (e) {
-				console.error(
-					new Error("Failed to load file config for migration", {
-						cause: e,
-					}),
+				await applyExistingApiKey(
+					mergedConfig,
+					"Unable to read existing API key during file config migration",
 				);
-				// No file config - use defaults directly
-				const mergedDefaults = {
-					...getDefaultRuntimeConfig(),
-					...definedCliOptions,
-				};
-				runtimeConfig = parseRuntimeConfigAndLogErrors(mergedDefaults);
 
-				// Preserve existing API key from apikey column
-				const existingApiKey = await db("settings")
-					.select("apikey")
-					.first();
-				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
-					runtimeConfig.apiKey = existingApiKey.apikey;
+				await setDbConfig(mergedConfig);
+				logger.info("Migrated file config to database");
+				runtimeConfig = mergedConfig;
+			} catch (migrationError) {
+				logger.warn(
+					"Failed to migrate file config, falling back to defaults",
+					migrationError,
+				);
+
+				const mergedDefaults = applyDefaults(definedCliOptions);
+
+				try {
+					await setDbConfig(mergedDefaults);
+					logger.info("Created initial database config from defaults");
+				} catch (persistError) {
+					logger.warn(
+						"Failed to persist default configuration to database",
+						persistError,
+					);
 				}
 
-				await setDbConfig(runtimeConfig);
-				logger.info("Created initial database config from defaults");
+				runtimeConfig = mergedDefaults;
 			}
+		}
+
+		if (!runtimeConfig) {
+			runtimeConfig = applyDefaults(definedCliOptions);
 		}
 
 		setRuntimeConfig(runtimeConfig);
