@@ -14,6 +14,7 @@ import {
 } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
+import { omitUndefined } from "./utils.js";
 
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
@@ -189,12 +190,312 @@ export function stripDefaults(
 	return overrides;
 }
 
-export function prepareLegacyFileConfig(fileConfig: FileConfig): FileConfig {
-	const normalized = { ...fileConfig };
-	if (normalized.linkType === undefined) {
-		normalized.linkType = LinkType.SYMLINK;
+export function transformFileConfig(
+	fileConfig: FileConfig,
+): Partial<RuntimeConfig> {
+	const result: Partial<RuntimeConfig> = {};
+
+	const delay = coerceNumber(fileConfig.delay);
+	if (delay !== undefined) result.delay = delay;
+
+	const torznab = toStringArray(fileConfig.torznab);
+	if (torznab) result.torznab = torznab;
+
+	const useClientTorrents = coerceBoolean(fileConfig.useClientTorrents);
+	if (useClientTorrents !== undefined) result.useClientTorrents = useClientTorrents;
+
+	const dataDirs = toStringArray(fileConfig.dataDirs);
+	if (dataDirs) result.dataDirs = dataDirs;
+
+	const matchMode = coerceMatchMode(fileConfig.matchMode);
+	if (matchMode) result.matchMode = matchMode;
+
+	const skipRecheck = coerceBoolean(fileConfig.skipRecheck);
+	if (skipRecheck !== undefined) result.skipRecheck = skipRecheck;
+
+	const autoResumeMaxDownload = coerceInt(fileConfig.autoResumeMaxDownload);
+	if (autoResumeMaxDownload !== undefined)
+		result.autoResumeMaxDownload = Math.max(0, autoResumeMaxDownload);
+
+	const ignoreNonRelevantFilesToResume = coerceBoolean(
+		fileConfig.ignoreNonRelevantFilesToResume,
+	);
+	if (ignoreNonRelevantFilesToResume !== undefined)
+		result.ignoreNonRelevantFilesToResume = ignoreNonRelevantFilesToResume;
+
+	const linkDirList = toStringArray(fileConfig.linkDirs) ??
+		(fileConfig.linkDir ? [fileConfig.linkDir] : undefined);
+	if (linkDirList) result.linkDirs = linkDirList;
+
+	const linkType = coerceLinkType(fileConfig.linkType);
+	if (linkType) result.linkType = linkType;
+	else if (fileConfig.linkType === undefined && fileConfig.linkDir)
+		result.linkType = LinkType.SYMLINK;
+
+	const flatLinking = coerceBoolean(fileConfig.flatLinking);
+	if (flatLinking !== undefined) result.flatLinking = flatLinking;
+
+	const maxDataDepth = coerceInt(fileConfig.maxDataDepth);
+	if (maxDataDepth !== undefined) result.maxDataDepth = maxDataDepth;
+
+	const linkCategory = coerceString(fileConfig.linkCategory);
+	if (linkCategory) result.linkCategory = linkCategory;
+
+	const torrentDir = coerceString(fileConfig.torrentDir);
+	if (torrentDir) result.torrentDir = torrentDir;
+
+	const outputDir = coerceString(fileConfig.outputDir);
+	if (outputDir) result.outputDir = outputDir;
+
+	const injectDir = coerceString(fileConfig.injectDir);
+	if (injectDir) result.injectDir = injectDir;
+
+	const ignoreTitles = coerceBoolean(fileConfig.ignoreTitles);
+	if (ignoreTitles !== undefined) result.ignoreTitles = ignoreTitles;
+
+	const includeSingleEpisodes = coerceBoolean(
+		fileConfig.includeSingleEpisodes,
+	);
+	if (includeSingleEpisodes !== undefined)
+		result.includeSingleEpisodes = includeSingleEpisodes;
+
+	const includeNonVideos = coerceBoolean(fileConfig.includeNonVideos);
+	if (includeNonVideos !== undefined) result.includeNonVideos = includeNonVideos;
+
+	const seasonFromEpisodes = coerceSeasonFromEpisodes(
+		fileConfig.seasonFromEpisodes,
+	);
+	if (seasonFromEpisodes !== undefined)
+		result.seasonFromEpisodes = seasonFromEpisodes;
+
+	const fuzzySizeThreshold = coerceNumber(fileConfig.fuzzySizeThreshold);
+	if (fuzzySizeThreshold !== undefined)
+		result.fuzzySizeThreshold = fuzzySizeThreshold;
+
+	const excludeOlder = coerceDuration(fileConfig.excludeOlder);
+	if (excludeOlder !== undefined) result.excludeOlder = excludeOlder;
+
+	const excludeRecentSearch = coerceDuration(
+		fileConfig.excludeRecentSearch,
+	);
+	if (excludeRecentSearch !== undefined)
+		result.excludeRecentSearch = excludeRecentSearch;
+
+	const action = coerceAction(fileConfig.action);
+	if (action) result.action = action;
+
+	const torrentClients = new Set<string>();
+	const configuredClients = toStringArray(fileConfig.torrentClients);
+	if (configuredClients)
+		configuredClients.forEach((client) => torrentClients.add(client));
+
+	const qbittorrentUrl = coerceString(fileConfig.qbittorrentUrl);
+	if (qbittorrentUrl)
+		torrentClients.add(`qbittorrent:${qbittorrentUrl}`);
+	const rtorrentRpcUrl = coerceString(fileConfig.rtorrentRpcUrl);
+	if (rtorrentRpcUrl)
+		torrentClients.add(`rtorrent:${rtorrentRpcUrl}`);
+	const transmissionRpcUrl = coerceString(fileConfig.transmissionRpcUrl);
+	if (transmissionRpcUrl)
+		torrentClients.add(`transmission:${transmissionRpcUrl}`);
+	const delugeRpcUrl = coerceString(fileConfig.delugeRpcUrl);
+	if (delugeRpcUrl)
+		torrentClients.add(`deluge:${delugeRpcUrl}`);
+
+	if (torrentClients.size) {
+		result.torrentClients = Array.from(torrentClients);
 	}
-	return normalized;
+
+	const duplicateCategories = coerceBoolean(fileConfig.duplicateCategories);
+	if (duplicateCategories !== undefined)
+		result.duplicateCategories = duplicateCategories;
+
+	const webhookUrls = mergeUniqueStrings([
+		toStringArray(fileConfig.notificationWebhookUrls),
+		fileConfig.notificationWebhookUrl
+			? [fileConfig.notificationWebhookUrl]
+			: undefined,
+	]);
+	if (webhookUrls) result.notificationWebhookUrls = webhookUrls;
+
+	const port = coerceInt(fileConfig.port);
+	if (port !== undefined) result.port = port;
+
+	const host = coerceString(fileConfig.host);
+	if (host) result.host = host;
+
+	const searchCadence = coerceDuration(fileConfig.searchCadence);
+	if (searchCadence !== undefined) result.searchCadence = searchCadence;
+
+	const rssCadence = coerceDuration(fileConfig.rssCadence);
+	if (rssCadence !== undefined) result.rssCadence = rssCadence;
+
+	const snatchTimeout = coerceDuration(fileConfig.snatchTimeout);
+	if (snatchTimeout !== undefined) result.snatchTimeout = snatchTimeout;
+
+	const searchTimeout = coerceDuration(fileConfig.searchTimeout);
+	if (searchTimeout !== undefined) result.searchTimeout = searchTimeout;
+
+	const searchLimit = coerceInt(fileConfig.searchLimit);
+	if (searchLimit !== undefined) result.searchLimit = Math.max(0, searchLimit);
+
+	const blockList = toStringArray(fileConfig.blockList);
+	if (blockList) result.blockList = blockList;
+
+	const apiKey = coerceString(fileConfig.apiKey);
+	if (apiKey) result.apiKey = apiKey;
+
+	const sonarr = toStringArray(fileConfig.sonarr);
+	if (sonarr) result.sonarr = sonarr;
+
+	const radarr = toStringArray(fileConfig.radarr);
+	if (radarr) result.radarr = radarr;
+
+	return omitUndefined(result) as Partial<RuntimeConfig>;
+}
+
+function coerceBoolean(value: unknown): boolean | undefined {
+	if (typeof value === "boolean") return value;
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (normalized === "true") return true;
+		if (normalized === "false") return false;
+	}
+	if (typeof value === "number") {
+		if (value === 1) return true;
+		if (value === 0) return false;
+	}
+	return undefined;
+}
+
+function coerceNumber(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value)) return value;
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = Number(value);
+		if (!Number.isNaN(parsed)) return parsed;
+	}
+	return undefined;
+}
+
+function coerceInt(value: unknown): number | undefined {
+	const num = coerceNumber(value);
+	if (num === undefined) return undefined;
+	const int = Math.trunc(num);
+	return Number.isFinite(int) ? int : undefined;
+}
+
+function coerceDuration(value: unknown): number | undefined {
+	if (value === null) return 0;
+	if (value === undefined) return undefined;
+	if (typeof value === "number" && Number.isFinite(value)) return value;
+	if (typeof value === "string" && value.trim().length) {
+		const parsed = ms(value.trim());
+		if (typeof parsed === "number" && Number.isFinite(parsed)) {
+			return parsed;
+		}
+	}
+	return undefined;
+}
+
+function coerceString(value: unknown): string | undefined {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		return trimmed.length ? trimmed : undefined;
+	}
+	return undefined;
+}
+
+function toStringArray(value: unknown): string[] | undefined {
+	if (value === undefined || value === null) return undefined;
+	if (Array.isArray(value)) {
+		const arr = value
+			.map((item) => coerceString(item))
+			.filter((item): item is string => Boolean(item));
+		return arr.length ? arr : [];
+	}
+	const single = coerceString(value);
+	if (single) return [single];
+	return undefined;
+}
+
+function coerceMatchMode(value: unknown): MatchMode | undefined {
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		if (normalized === "strict" || normalized === MatchMode.STRICT)
+			return MatchMode.STRICT;
+		if (
+			normalized === "flexible" ||
+			normalized === MatchMode.FLEXIBLE ||
+			normalized === "risky"
+		)
+			return MatchMode.FLEXIBLE;
+		if (normalized === "partial" || normalized === MatchMode.PARTIAL)
+			return MatchMode.PARTIAL;
+		if (normalized === "safe") return MatchMode.STRICT;
+	}
+	if (Object.values(MatchMode).includes(value as MatchMode)) {
+		return value as MatchMode;
+	}
+	return undefined;
+}
+
+function coerceAction(value: unknown): Action | undefined {
+	if (typeof value === "string") {
+		switch (value.trim().toLowerCase()) {
+			case Action.SAVE:
+			case "save":
+				return Action.SAVE;
+			case Action.INJECT:
+			case "inject":
+				return Action.INJECT;
+			default:
+				return undefined;
+		}
+	}
+	if (Object.values(Action).includes(value as Action)) {
+		return value as Action;
+	}
+	return undefined;
+}
+
+function coerceLinkType(value: unknown): LinkType | undefined {
+	if (typeof value === "string") {
+		switch (value.trim().toLowerCase()) {
+			case LinkType.SYMLINK:
+			case "symlink":
+				return LinkType.SYMLINK;
+			case LinkType.HARDLINK:
+			case "hardlink":
+				return LinkType.HARDLINK;
+			case LinkType.REFLINK:
+			case "reflink":
+				return LinkType.REFLINK;
+			case LinkType.REFLINK_OR_COPY:
+			case "reflinkorcopy":
+			case "reflink_or_copy":
+				return LinkType.REFLINK_OR_COPY;
+			default:
+				return undefined;
+		}
+	}
+	if (Object.values(LinkType).includes(value as LinkType)) {
+		return value as LinkType;
+	}
+	return undefined;
+}
+
+function coerceSeasonFromEpisodes(value: unknown): number | undefined {
+	if (value === null || value === false) return 0;
+	if (value === undefined) return undefined;
+	const num = coerceNumber(value);
+	if (num === undefined) return undefined;
+	return num;
+}
+
+function mergeUniqueStrings(values: (string[] | undefined)[]): string[] | undefined {
+	const combined = values.flatMap((arr) => (arr ? arr : []));
+	const unique = Array.from(new Set(combined));
+	return unique.length ? unique : undefined;
 }
 
 export async function getFileConfig(): Promise<FileConfig> {

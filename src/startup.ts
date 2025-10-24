@@ -3,11 +3,12 @@ import { spawn } from "node:child_process";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { instantiateDownloadClients } from "./clients/TorrentClient.js";
-import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
+import { ZodError } from "zod";
+import { parseRuntimeConfig } from "./configSchema.js";
 import {
 	getDefaultRuntimeConfig,
 	getFileConfig,
-	prepareLegacyFileConfig,
+	transformFileConfig,
 } from "./configuration.js";
 import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
@@ -146,45 +147,30 @@ export function parseRuntimeConfigAndLogErrors(
 ): RuntimeConfig {
 	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
 	logger.info("Validating your configuration...");
-	let parsedOptions: RuntimeConfig;
 	try {
-		parsedOptions = VALIDATION_SCHEMA.parse(options, {
-			errorMap: customizeErrorMessage,
-		}) as RuntimeConfig;
+		return parseRuntimeConfig(options);
 	} catch (error) {
 		logger.verbose({
 			label: Label.CONFIG,
 			message: inspect(options),
 		});
-		if ("errors" in error && Array.isArray(error.errors)) {
-			error.errors.forEach(({ path, message }) => {
-				const urlPath = path[0];
-				const optionLine =
-					path.length === 2
-						? `${path[0]} (position #${path[1] + 1})`
-						: path;
+		if (error instanceof ZodError) {
+			error.issues.forEach(({ path, message }) => {
+				const optionPath = path.length ? path.join(".") : "(root)";
 				logger.error(
-					`${
-						path.length > 0
-							? `Option: ${optionLine}`
-							: "Configuration:"
-					}${NEWLINE_INDENT}${message}${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options${
-						urlPath ? `#${urlPath.toLowerCase()}` : ""
+					`Option: ${optionPath}${NEWLINE_INDENT}${message}${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options${
+						path[0] ? `#${String(path[0]).toLowerCase()}` : ""
 					})\n`,
 				);
 			});
-			if (error.errors.length > 0) {
-				throw new CrossSeedError(
-					`Your configuration is invalid, please see the ${
-						error.errors.length > 1 ? "errors" : "error"
-					} above for details.`,
-				);
-			}
+			throw new CrossSeedError(
+				`Your configuration is invalid, please see the ${
+					error.issues.length > 1 ? "errors" : "error"
+				} above for details.`,
+			);
 		}
 		throw error;
 	}
-
-	return parsedOptions;
 }
 
 /**
@@ -229,27 +215,30 @@ export function withFullRuntime(
 		initializeLogger(options as Record<string, unknown>);
 
 		const definedCliOptions = omitUndefined(
-			options as Record<string, unknown>,
-		);
+			options as Partial<RuntimeConfig>,
+		) as Partial<RuntimeConfig>;
 
 		let runtimeConfig: RuntimeConfig;
 		try {
 			// Load config from database
-			runtimeConfig = {
-				...(await getDbConfig()),
+			const dbConfig = await getDbConfig();
+			runtimeConfig = parseRuntimeConfigAndLogErrors({
+				...dbConfig,
 				...definedCliOptions,
-			};
+			});
 		} catch {
 			// No complete config in database, migrate from file or template
 			try {
 				// Try to load and migrate from file config
-				const fileConfig = prepareLegacyFileConfig(
+				const transformedFileConfig = transformFileConfig(
 					await getFileConfig(),
 				);
-				runtimeConfig = parseRuntimeConfigAndLogErrors({
-					...fileConfig,
+				const mergedConfig = {
+					...getDefaultRuntimeConfig(),
+					...transformedFileConfig,
 					...definedCliOptions,
-				});
+				};
+				runtimeConfig = parseRuntimeConfigAndLogErrors(mergedConfig);
 
 				// Preserve existing API key from apikey column
 				const existingApiKey = await db("settings")
@@ -267,12 +256,12 @@ export function withFullRuntime(
 						cause: e,
 					}),
 				);
-				// No file config - use template directly
-				const defaultConfig = getDefaultRuntimeConfig();
-				runtimeConfig = {
-					...defaultConfig,
+				// No file config - use defaults directly
+				const mergedDefaults = {
+					...getDefaultRuntimeConfig(),
 					...definedCliOptions,
-				} as RuntimeConfig;
+				};
+				runtimeConfig = parseRuntimeConfigAndLogErrors(mergedDefaults);
 
 				// Preserve existing API key from apikey column
 				const existingApiKey = await db("settings")

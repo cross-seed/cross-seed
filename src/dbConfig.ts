@@ -2,6 +2,7 @@ import { applyDefaults, stripDefaults } from "./configuration.js";
 import { db } from "./db.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
 import { omitUndefined } from "./utils.js";
+import { parseRuntimeConfig } from "./configSchema.js";
 
 export async function getDbConfig(): Promise<RuntimeConfig> {
 	const row = await db("settings").select("settings_json").first();
@@ -11,11 +12,12 @@ export async function getDbConfig(): Promise<RuntimeConfig> {
 		);
 	}
 	const overrides = JSON.parse(row.settings_json);
-	return applyDefaults(overrides);
+	return parseRuntimeConfig(applyDefaults(overrides));
 }
 
 export async function setDbConfig(config: RuntimeConfig): Promise<void> {
-	const overrides = stripDefaults(config);
+	const validatedConfig = parseRuntimeConfig(config);
+	const overrides = stripDefaults(validatedConfig);
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
@@ -47,13 +49,17 @@ export async function updateDbConfig(
 				...currentConfig,
 				...sanitizedPartial,
 			});
+			const validatedConfig = parseRuntimeConfig(updatedConfig);
 			await trx("settings").update({
-				settings_json: JSON.stringify(stripDefaults(updatedConfig)),
+				settings_json: JSON.stringify(stripDefaults(validatedConfig)),
 			});
 		} else {
+			const validatedConfig = parseRuntimeConfig(
+				applyDefaults(sanitizedPartial),
+			);
 			await trx("settings").insert({
 				apikey: null,
-				settings_json: JSON.stringify(stripDefaults(sanitizedPartial)),
+				settings_json: JSON.stringify(stripDefaults(validatedConfig)),
 			});
 		}
 	});
