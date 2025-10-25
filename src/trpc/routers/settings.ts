@@ -5,6 +5,8 @@ import { getApiKey } from "../../auth.js";
 import { z } from "zod";
 import { getDbConfig, setDbConfig, updateDbConfig } from "../../dbConfig.js";
 import { RuntimeConfig } from "../../runtimeConfig.js";
+import { getDefaultRuntimeConfig } from "../../configuration.js";
+import { omitUndefined } from "../../utils.js";
 
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
@@ -35,8 +37,11 @@ export const settingsRouter = router({
 				await updateDbConfig(input);
 
 				// Update in-memory config with the merged result
-				const updatedConfig = await getDbConfig();
-				setRuntimeConfig(updatedConfig);
+				const updatedOverrides = await getDbConfig();
+				setRuntimeConfig({
+					...getDefaultRuntimeConfig(),
+					...(updatedOverrides ?? {}),
+				});
 
 				return { success: true };
 			} catch (error) {
@@ -59,7 +64,13 @@ export const settingsRouter = router({
 				await setDbConfig(input as unknown as RuntimeConfig);
 
 				// Update in-memory config so changes are visible immediately
-				setRuntimeConfig(input as unknown as RuntimeConfig);
+				const sanitizedInput = omitUndefined(
+					input as unknown as Partial<RuntimeConfig>,
+				) as Partial<RuntimeConfig>;
+				setRuntimeConfig({
+					...getDefaultRuntimeConfig(),
+					...sanitizedInput,
+				});
 
 				return { success: true };
 			} catch (error) {
