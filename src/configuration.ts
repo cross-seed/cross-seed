@@ -1,10 +1,9 @@
-import chalk from "chalk";
 import { accessSync, constants, mkdirSync } from "fs";
 import { createRequire } from "module";
-import path from "path";
-import { pathToFileURL } from "url";
 import ms from "ms";
 import { isDeepStrictEqual } from "node:util";
+import path from "path";
+import { pathToFileURL } from "url";
 import {
 	Action,
 	LinkType,
