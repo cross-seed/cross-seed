@@ -135,6 +135,19 @@ export async function verifyDir(
 	return false;
 }
 
+export function isChildPath(childPath: string, parentDirs: string[]): boolean {
+	return parentDirs.some((parentDir) => {
+		const resolvedParent = path.resolve(parentDir);
+		const resolvedChild = path.resolve(childPath);
+		const relativePath = path.relative(resolvedParent, resolvedChild);
+		return (
+			relativePath.length > 0 &&
+			!relativePath.startsWith("..") &&
+			!path.isAbsolute(relativePath)
+		);
+	});
+}
+
 export async function countDirEntriesRec(
 	dirs: string[],
 	maxDataDepth: number,

@@ -8,7 +8,7 @@ import {
 	TorrentMetadataInClient,
 	validateClientSavePaths,
 } from "./clients/TorrentClient.js";
-import { isChildPath } from "./configSchema.js";
+import { isChildPath } from "./utils.js";
 import {
 	ALL_PARENTHESES_REGEX,
 	ALL_SPACES_REGEX,
