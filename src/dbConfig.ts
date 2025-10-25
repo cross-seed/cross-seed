@@ -12,13 +12,9 @@ export async function getDbConfig(): Promise<
 > {
 	const row = await db("settings").select("settings_json").first();
 	if (!row) return undefined;
-	if (row.settings_json === null || row.settings_json === undefined)
-		return undefined;
-	const overrides =
-		typeof row.settings_json === "string"
-			? JSON.parse(row.settings_json)
-			: row.settings_json;
-	return parseRuntimeConfigOverrides(overrides);
+	if (row.settings_json == null) return undefined;
+
+	return parseRuntimeConfigOverrides(JSON.parse(row.settings_json));
 }
 
 export async function setDbConfig(
@@ -51,13 +47,10 @@ export async function updateDbConfig(
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
 			const currentOverrides =
-				existingRow.settings_json === null ||
-				existingRow.settings_json === undefined
+				existingRow.settings_json == null
 					? {}
 					: parseRuntimeConfigOverrides(
-							typeof existingRow.settings_json === "string"
-								? JSON.parse(existingRow.settings_json)
-								: existingRow.settings_json,
+							JSON.parse(existingRow.settings_json),
 						);
 			const mergedConfig = applyDefaults({
 				...currentOverrides,
