@@ -8,7 +8,7 @@ import {
 	TorrentMetadataInClient,
 	validateClientSavePaths,
 } from "./clients/TorrentClient.js";
-import { isChildPath } from "./configSchema.js";
+import { isChildPath } from "./utils.js";
 import {
 	LEVENSHTEIN_DIVISOR,
 	MAX_PATH_BYTES,

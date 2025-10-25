@@ -2,14 +2,15 @@ import { constants, mkdir, stat } from "fs/promises";
 import { spawn } from "node:child_process";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
+import { resetApiKey } from "./auth.js";
 import { instantiateDownloadClients } from "./clients/TorrentClient.js";
-import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
 import {
+	createAppDirHierarchy,
 	getDefaultRuntimeConfig,
 	getFileConfig,
-	prepareLegacyFileConfig,
+	stripDefaults,
+	transformFileConfig,
 } from "./configuration.js";
-import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
 import { db } from "./db.js";
 import { getDbConfig, setDbConfig } from "./dbConfig.js";
 import { CrossSeedError } from "./errors.js";
@@ -130,6 +131,9 @@ async function checkConfigPaths(): Promise<void> {
 			message: `Storage device for each dataDir: ${inspect(dataDev)}`,
 		});
 	}
+	if (injectDir) {
+		// The presence of injectDir is already logged elsewhere.
+	}
 }
 
 export async function doStartupValidation(): Promise<void> {
@@ -141,52 +145,6 @@ export async function doStartupValidation(): Promise<void> {
  * validates and sets RuntimeConfig
  * @return (the number of errors Zod encountered in the configuration)
  */
-export function parseRuntimeConfigAndLogErrors(
-	options: unknown,
-): RuntimeConfig {
-	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
-	logger.info("Validating your configuration...");
-	let parsedOptions: RuntimeConfig;
-	try {
-		parsedOptions = VALIDATION_SCHEMA.parse(options, {
-			errorMap: customizeErrorMessage,
-		}) as RuntimeConfig;
-	} catch (error) {
-		logger.verbose({
-			label: Label.CONFIG,
-			message: inspect(options),
-		});
-		if ("errors" in error && Array.isArray(error.errors)) {
-			error.errors.forEach(({ path, message }) => {
-				const urlPath = path[0];
-				const optionLine =
-					path.length === 2
-						? `${path[0]} (position #${path[1] + 1})`
-						: path;
-				logger.error(
-					`${
-						path.length > 0
-							? `Option: ${optionLine}`
-							: "Configuration:"
-					}${NEWLINE_INDENT}${message}${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options${
-						urlPath ? `#${urlPath.toLowerCase()}` : ""
-					})\n`,
-				);
-			});
-			if (error.errors.length > 0) {
-				throw new CrossSeedError(
-					`Your configuration is invalid, please see the ${
-						error.errors.length > 1 ? "errors" : "error"
-					} above for details.`,
-				);
-			}
-		}
-		throw error;
-	}
-
-	return parsedOptions;
-}
-
 /**
  * starts singletons, then runs the callback, then cleans up
  * @param entrypoint
@@ -218,6 +176,78 @@ export function withMinimalRuntime<
 	};
 }
 
+async function applyExistingApiKey(config: RuntimeConfig): Promise<void> {
+	try {
+		const existingApiKey = await db("settings").select("apikey").first();
+		if (existingApiKey?.apikey && !config.apiKey) {
+			config.apiKey = existingApiKey.apikey;
+		}
+	} catch (error) {
+		// best-effort only
+	}
+}
+
+async function determineRuntimeConfig(rawOptions: Record<string, unknown>) {
+	const cliOptions = omitUndefined(rawOptions) as Partial<RuntimeConfig>;
+
+	// first, try to load from database (existing user happy path)
+	let dbOverrides: Partial<RuntimeConfig> | undefined;
+	try {
+		dbOverrides = await getDbConfig();
+	} catch (dbError) {
+		logger.debug("Unable to load configuration from database", dbError);
+	}
+
+	if (dbOverrides !== undefined) {
+		return {
+			...getDefaultRuntimeConfig(),
+			...dbOverrides,
+			...cliOptions,
+		};
+	}
+
+	// then, try to migrate from file config (v6 to v7 upgrade path)
+	try {
+		const fileConfig = await getFileConfig();
+		if (fileConfig) {
+			const transformedFileConfig = transformFileConfig(fileConfig);
+			const runtimeFromFile = {
+				...getDefaultRuntimeConfig(),
+				...transformedFileConfig,
+			} as RuntimeConfig;
+			await applyExistingApiKey(runtimeFromFile);
+			await setDbConfig(runtimeFromFile);
+			const resolvedOverrides = stripDefaults(runtimeFromFile);
+			logger.info("Migrated file config to database");
+			return {
+				...getDefaultRuntimeConfig(),
+				...resolvedOverrides,
+				...cliOptions,
+			};
+		}
+	} catch (migrationError) {
+		logger.error(
+			new Error(
+				"Failed to import configuration file, falling back to defaults",
+				{ cause: migrationError },
+			),
+		);
+	}
+
+	// finally, fall back to defaults (new user happy path or migration failure)
+	const defaultRuntime = getDefaultRuntimeConfig();
+	await setDbConfig(defaultRuntime);
+	await resetApiKey();
+	logger.info("Created initial database config from defaults");
+	const resolvedOverrides = stripDefaults(defaultRuntime);
+
+	return {
+		...getDefaultRuntimeConfig(),
+		...resolvedOverrides,
+		...cliOptions,
+	};
+}
+
 /**
  * Initializes the full runtime, runs the callback, then cleans up
  * @param entrypoint
@@ -225,68 +255,10 @@ export function withMinimalRuntime<
 export function withFullRuntime(
 	entrypoint: (runtimeConfig: RuntimeConfig) => Promise<void>,
 ): CommanderActionCb {
-	return withMinimalRuntime(async (options) => {
-		initializeLogger(options as Record<string, unknown>);
-
-		const definedCliOptions = omitUndefined(
-			options as Record<string, unknown>,
-		);
-
-		let runtimeConfig: RuntimeConfig;
-		try {
-			// Load config from database
-			runtimeConfig = {
-				...(await getDbConfig()),
-				...definedCliOptions,
-			};
-		} catch {
-			// No complete config in database, migrate from file or template
-			try {
-				// Try to load and migrate from file config
-				const fileConfig = prepareLegacyFileConfig(
-					await getFileConfig(),
-				);
-				runtimeConfig = parseRuntimeConfigAndLogErrors({
-					...fileConfig,
-					...definedCliOptions,
-				});
-
-				// Preserve existing API key from apikey column
-				const existingApiKey = await db("settings")
-					.select("apikey")
-					.first();
-				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
-					runtimeConfig.apiKey = existingApiKey.apikey;
-				}
-
-				await setDbConfig(runtimeConfig);
-				logger.info("Migrated file config to database");
-			} catch (e) {
-				console.error(
-					new Error("Failed to load file config for migration", {
-						cause: e,
-					}),
-				);
-				// No file config - use template directly
-				const defaultConfig = getDefaultRuntimeConfig();
-				runtimeConfig = {
-					...defaultConfig,
-					...definedCliOptions,
-				} as RuntimeConfig;
-
-				// Preserve existing API key from apikey column
-				const existingApiKey = await db("settings")
-					.select("apikey")
-					.first();
-				if (existingApiKey?.apikey && !runtimeConfig.apiKey) {
-					runtimeConfig.apiKey = existingApiKey.apikey;
-				}
-
-				await setDbConfig(runtimeConfig);
-				logger.info("Created initial database config from defaults");
-			}
-		}
-
+	return withMinimalRuntime(async (options: Record<string, unknown>) => {
+		createAppDirHierarchy();
+		initializeLogger(options);
+		const runtimeConfig = await determineRuntimeConfig(options);
 		setRuntimeConfig(runtimeConfig);
 		initializePushNotifier();
 		getLogWatcher();
