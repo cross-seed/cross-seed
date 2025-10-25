@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getDbConfig, setDbConfig, updateDbConfig } from "../../dbConfig.js";
 import { RuntimeConfig } from "../../runtimeConfig.js";
 import { getDefaultRuntimeConfig } from "../../configuration.js";
-import { omitUndefined } from "../../utils.js";
+import { omitUndefined } from "../../utils/object.js";
 
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {

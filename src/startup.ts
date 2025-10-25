@@ -26,7 +26,8 @@ import {
 	RuntimeConfig,
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
-import { Awaitable, notExists, omitUndefined, verifyDir } from "./utils.js";
+import { Awaitable, notExists, verifyDir } from "./utils.js";
+import { omitUndefined } from "./utils/object.js";
 import { getLogWatcher } from "./utils/logWatcher.js";
 
 export async function exitGracefully() {
