@@ -26,6 +26,7 @@ import {
 	inBatches,
 	isTruthy,
 	mapAsync,
+	stripExtension,
 } from "./utils.js";
 import { isOk } from "./Result.js";
 import { distance } from "fastest-levenshtein";
@@ -180,10 +181,10 @@ function indexEnsembleDataEntry(
 }
 
 export async function getDataByFuzzyName(
-	name: string,
+	stem: string,
 ): Promise<SearcheeWithoutInfoHash[]> {
 	const allDataEntries: DataEntry[] = await db("data");
-	const fullMatch = createKeyTitle(name);
+	const fullMatch = createKeyTitle(stem);
 
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
 	let filteredNames: DataEntry[] = [];
@@ -191,7 +192,7 @@ export async function getDataByFuzzyName(
 		filteredNames = await filterAsyncYield(
 			allDataEntries,
 			async (dbData) => {
-				const dbMatch = createKeyTitle(dbData.title);
+				const dbMatch = createKeyTitle(stripExtension(dbData.title));
 				return fullMatch === dbMatch;
 			},
 		);
@@ -202,16 +203,16 @@ export async function getDataByFuzzyName(
 
 	const entriesToDelete: string[] = [];
 
-	const candidateMaxDistance = Math.floor(name.length / LEVENSHTEIN_DIVISOR);
+	const candidateMaxDistance = Math.floor(stem.length / LEVENSHTEIN_DIVISOR);
 	const potentialMatches = await filterAsyncYield(
 		filteredNames,
 		async (dbEntry) => {
-			const dbTitle = dbEntry.title;
+			const dbTitle = stripExtension(dbEntry.title);
 			const maxDistance = Math.min(
 				candidateMaxDistance,
 				Math.floor(dbTitle.length / LEVENSHTEIN_DIVISOR),
 			);
-			if (distance(name, dbTitle) > maxDistance) return false;
+			if (distance(stem, dbTitle) > maxDistance) return false;
 			if (await exists(dbEntry.path)) return true;
 			entriesToDelete.push(dbEntry.path);
 			return false;

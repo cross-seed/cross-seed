@@ -47,6 +47,9 @@ export const BAD_GROUP_PARSE_REGEX =
 export const JSON_VALUES_REGEX = /".+?"\s*:\s*"(?<value>.+?)"\s*(?:,|})/g;
 export const ABS_WIN_PATH_REGEX = /^[a-z]:|^\\/i;
 export const AKA_REGEX = /(?:[_.\s-]+|\b)a[_.\s-]?k[_.\s-]?a(?:[_.\s-]+|\b)/i;
+export const ALL_SPACES_REGEX = /\s+/g;
+export const ALL_SQUARE_BRACKETS_REGEX = /\[.*?\]|「.*?」|｢.*?｣|【.*?】/g;
+export const ALL_PARENTHESES_REGEX = /\(.*?\)/g;
 
 // Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {
@@ -161,6 +164,7 @@ export const LOGS_FOLDER = "logs";
 export const UNKNOWN_TRACKER = "UnknownTracker";
 export const MAX_PATH_BYTES = 255;
 export const LEVENSHTEIN_DIVISOR = 3;
+export const MIN_VIDEO_QUERY_LENGTH = 3;
 
 export enum MediaType {
 	EPISODE = "episode",

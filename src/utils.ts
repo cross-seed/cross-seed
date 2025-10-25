@@ -11,10 +11,14 @@ import {
 import path from "path";
 import {
 	ALL_EXTENSIONS,
+	ALL_PARENTHESES_REGEX,
+	ALL_SPACES_REGEX,
+	ALL_SQUARE_BRACKETS_REGEX,
 	ANIME_REGEX,
 	EP_REGEX,
 	JSON_VALUES_REGEX,
 	LEVENSHTEIN_DIVISOR,
+	MIN_VIDEO_QUERY_LENGTH,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
 	RELEASE_GROUP_REGEX,
@@ -322,9 +326,9 @@ export function areMediaTitlesSimilar(a: string, b: string): boolean {
 
 export function cleanseSeparators(str: string): string {
 	return str
-		.replace(/\[.*?\]|「.*?」|｢.*?｣|【.*?】/g, "") // bracketed text
+		.replace(ALL_SQUARE_BRACKETS_REGEX, "") // bracketed text
 		.replace(/[._()[\]]/g, " ") // release delimiters (except '-')
-		.replace(/\s+/g, " ") // successive spaces
+		.replace(ALL_SPACES_REGEX, " ") // normalize spaces
 		.replace(/^\s*-+|-+\s*$/g, "") // "trim()" hyphens
 		.trim();
 }
@@ -341,7 +345,7 @@ export function reformatTitleForSearching(name: string): string {
 		const title = cleanTitle(seriesTitle);
 		return title.length > 4
 			? replaceLastOccurrence(title, YEARS_REGEX, "")
-					.replace(/\s+/g, " ")
+					.replace(ALL_SPACES_REGEX, " ")
 					.trim()
 			: title;
 	}
@@ -363,10 +367,15 @@ export function isBadTitle(title: string): boolean {
 	return ["season", "ep"].includes(title.toLowerCase());
 }
 
-export function getAnimeQueries(name: string): string[] {
-	// Only use if getMediaType returns anime as it's conditional on a few factors
+/**
+ * Generates possible anime search queries from a given name.
+ * Only use if getMediaType returns anime as it's conditional on a few factors.
+ * @param stem The name without extension to generate queries from.
+ * @returns An array of possible search queries.
+ */
+export function getAnimeQueries(stem: string): string[] {
 	const animeQueries: string[] = [];
-	const { title, altTitle, release } = name.match(ANIME_REGEX)?.groups ?? {};
+	const { title, altTitle, release } = stem.match(ANIME_REGEX)?.groups ?? {};
 	if (title) {
 		animeQueries.push(cleanTitle(`${title} ${release}`));
 	}
@@ -375,6 +384,31 @@ export function getAnimeQueries(name: string): string[] {
 		animeQueries.push(cleanTitle(`${altTitle} ${release}`));
 	}
 	return animeQueries;
+}
+
+/**
+ * Generates possible video search queries from a given name.
+ * Only use if getMediaType returns video as it's conditional on a few factors.
+ * @param stem The name without extension to generate queries from.
+ * @returns An array of possible search queries.
+ */
+export function getVideoQueries(stem: string): string[] {
+	const videoQueries: string[] = [cleanTitle(stripMetaFromName(stem))];
+	const noParentheses = cleanTitle(
+		stripMetaFromName(
+			stem
+				.replace(ALL_PARENTHESES_REGEX, "")
+				.replace(ALL_SPACES_REGEX, " ")
+				.trim(),
+		),
+	); // Anime that fails MediaType.ANIME often has `[group] Title (Extra Info)`
+	if (
+		noParentheses.length >= MIN_VIDEO_QUERY_LENGTH &&
+		noParentheses !== videoQueries[0]
+	) {
+		videoQueries.push(noParentheses);
+	}
+	return videoQueries;
 }
 
 export function stripMetaFromName(name: string): string {
