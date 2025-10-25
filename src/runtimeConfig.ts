@@ -1,4 +1,5 @@
 import { Action, LinkType, MatchMode } from "./constants.js";
+import { omitUndefined } from "./utils/object.js";
 
 export interface RuntimeConfig {
 	delay: number;
@@ -32,6 +33,7 @@ export interface RuntimeConfig {
 	torrents: string[];
 	port?: number;
 	host?: string;
+	basePath?: string;
 	searchCadence?: number;
 	rssCadence?: number;
 	snatchTimeout?: number;
@@ -54,8 +56,6 @@ export function getRuntimeConfig(
 ): RuntimeConfig {
 	return {
 		...runtimeConfig,
-		...Object.fromEntries(
-			Object.entries(configOverride).filter(([, v]) => v !== undefined),
-		),
+		...omitUndefined(configOverride),
 	};
 }

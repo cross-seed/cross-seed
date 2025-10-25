@@ -3,8 +3,9 @@ import stripAnsi from "strip-ansi";
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import { parseClientEntry } from "./clients/TorrentClient.js";
-import { appDir, createAppDirHierarchy } from "./configuration.js";
+import { appDir } from "./configuration.js";
 import { LOGS_FOLDER } from "./constants.js";
+import { CrossSeedError } from "./errors.js";
 
 export enum Label {
 	QBITTORRENT = "qbittorrent",
@@ -13,10 +14,9 @@ export enum Label {
 	DELUGE = "deluge",
 	DECIDE = "decide",
 	PREFILTER = "prefilter",
-	CONFIGDUMP = "configdump",
+	CONFIG = "config",
 	TORZNAB = "torznab",
 	SERVER = "server",
-	STARTUP = "startup",
 	SCHEDULER = "scheduler",
 	SEARCH = "search",
 	RSS = "rss",
@@ -28,6 +28,8 @@ export enum Label {
 	ARRS = "arrs",
 	RADARR = "radarr",
 	SONARR = "sonarr",
+	AUTH = "auth",
+	INDEX = "index",
 }
 
 export let logger: winston.Logger;
@@ -117,7 +119,6 @@ export function logOnce(cacheKey: string, cb: () => void, ttl?: number) {
 }
 
 export function initializeLogger(options: Record<string, unknown>): void {
-	createAppDirHierarchy();
 	logger = winston.createLogger({
 		level: "info",
 		format: winston.format.combine(
@@ -179,7 +180,7 @@ export function initializeLogger(options: Record<string, unknown>): void {
 							stack,
 							cause,
 						}) => {
-							timestamp = timestamp.replace(
+							timestamp = (timestamp as string).replace(
 								SUB_SECOND_TS_REGEX,
 								"",
 							);
@@ -198,4 +199,17 @@ export function initializeLogger(options: Record<string, unknown>): void {
 			}),
 		],
 	});
+}
+
+export function exitOnCrossSeedErrors(error: unknown): void {
+	if (logger) {
+		logger.error(error);
+	} else {
+		console.error(error);
+	}
+	if (error instanceof CrossSeedError) {
+		process.exitCode = 1;
+		return;
+	}
+	throw error;
 }

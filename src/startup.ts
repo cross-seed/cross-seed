@@ -1,25 +1,34 @@
 import { constants, mkdir, stat } from "fs/promises";
-import ms from "ms";
+import { spawn } from "node:child_process";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
-import { validateUArrLs } from "./arr.js";
+import { resetApiKey } from "./auth.js";
+import { instantiateDownloadClients } from "./clients/TorrentClient.js";
 import {
-	getClients,
-	instantiateDownloadClients,
-} from "./clients/TorrentClient.js";
-import { customizeErrorMessage, VALIDATION_SCHEMA } from "./configSchema.js";
-import { NEWLINE_INDENT, PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
+	createAppDirHierarchy,
+	getDefaultRuntimeConfig,
+	getFileConfig,
+	stripDefaults,
+	transformFileConfig,
+} from "./configuration.js";
 import { db } from "./db.js";
-import { CrossSeedError, exitOnCrossSeedErrors } from "./errors.js";
-import { initializeLogger, Label, logger } from "./logger.js";
+import { getDbConfig, setDbConfig } from "./dbConfig.js";
+import { CrossSeedError } from "./errors.js";
+import {
+	initializeLogger,
+	Label,
+	logger,
+	exitOnCrossSeedErrors,
+} from "./logger.js";
 import { initializePushNotifier } from "./pushNotifier.js";
 import {
 	getRuntimeConfig,
 	RuntimeConfig,
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
-import { validateTorznabUrls } from "./torznab.js";
-import { Awaitable, mapAsync, notExists, verifyDir, wait } from "./utils.js";
+import { Awaitable, notExists, verifyDir } from "./utils.js";
+import { omitUndefined } from "./utils/object.js";
+import { getLogWatcher } from "./utils/logWatcher.js";
 
 export async function exitGracefully() {
 	await db.destroy();
@@ -111,107 +120,32 @@ async function checkConfigPaths(): Promise<void> {
 			} above for details.`,
 		);
 	}
-}
-
-async function retry<T>(
-	cb: () => Promise<T>,
-	numRetries: number,
-	delayMs: number,
-): Promise<T> {
-	const retries = Math.max(numRetries, 0);
-	let lastError = new Error("Retry failed");
-	for (let i = 0; i <= retries; i++) {
-		try {
-			return await cb();
-		} catch (e) {
-			const retryMsg =
-				i < retries ? `, retrying in ${delayMs / 1000}s` : "";
-			logger.error(
-				`Attempt ${i + 1}/${retries + 1} failed${retryMsg}: ${e.message}`,
-			);
-			logger.debug(e);
-			lastError = e;
-			if (i >= retries) break;
-			await wait(delayMs);
-		}
+	if (linkDev.length) {
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each linkDir: ${inspect(linkDev)}`,
+		});
 	}
-	throw lastError;
+	if (dataDev.length) {
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for each dataDir: ${inspect(dataDev)}`,
+		});
+	}
+	if (injectDir) {
+		// The presence of injectDir is already logged elsewhere.
+	}
 }
 
 export async function doStartupValidation(): Promise<void> {
 	await checkConfigPaths(); // ensure paths are valid first
 	instantiateDownloadClients();
-	const validateClientConfig = () =>
-		mapAsync(getClients(), (client) => client.validateConfig());
-	const errors = (
-		await Promise.allSettled([
-			retry(validateTorznabUrls, 5, ms("1 minute")),
-			retry(validateUArrLs, 5, ms("1 minute")),
-			retry(validateClientConfig, 5, ms("1 minute")),
-		])
-	).filter((p) => p.status === "rejected");
-	if (errors.length) {
-		throw new CrossSeedError(
-			`\tYour configuration is invalid, please see the ${errors.length > 1 ? "errors" : "error"} above for details.`,
-		);
-	}
-	logger.verbose({
-		label: Label.CONFIGDUMP,
-		message: inspect(getRuntimeConfig()),
-	});
-	logger.info("Your configuration is valid!");
 }
 
 /**
  * validates and sets RuntimeConfig
  * @return (the number of errors Zod encountered in the configuration)
  */
-export function parseRuntimeConfigAndLogErrors(
-	options: unknown,
-): RuntimeConfig {
-	logger.info(`${PROGRAM_NAME} v${PROGRAM_VERSION}`);
-	logger.info("Validating your configuration...");
-	let parsedOptions: RuntimeConfig;
-	try {
-		parsedOptions = VALIDATION_SCHEMA.parse(options, {
-			errorMap: customizeErrorMessage,
-		}) as RuntimeConfig;
-	} catch (error) {
-		logger.verbose({
-			label: Label.CONFIGDUMP,
-			message: inspect(options),
-		});
-		if ("errors" in error && Array.isArray(error.errors)) {
-			error.errors.forEach(({ path, message }) => {
-				const urlPath = path[0];
-				const optionLine =
-					path.length === 2
-						? `${path[0]} (position #${path[1] + 1})`
-						: path;
-				logger.error(
-					`${
-						path.length > 0
-							? `Option: ${optionLine}`
-							: "Configuration:"
-					}${NEWLINE_INDENT}${message}${NEWLINE_INDENT}(https://www.cross-seed.org/docs/basics/options${
-						urlPath ? `#${urlPath.toLowerCase()}` : ""
-					})\n`,
-				);
-			});
-			if (error.errors.length > 0) {
-				throw new CrossSeedError(
-					`Your configuration is invalid, please see the ${
-						error.errors.length > 1 ? "errors" : "error"
-					} above for details.`,
-				);
-			}
-		}
-		throw error;
-	}
-
-	return parsedOptions;
-}
-
 /**
  * starts singletons, then runs the callback, then cleans up
  * @param entrypoint
@@ -243,6 +177,78 @@ export function withMinimalRuntime<
 	};
 }
 
+async function applyExistingApiKey(config: RuntimeConfig): Promise<void> {
+	try {
+		const existingApiKey = await db("settings").select("apikey").first();
+		if (existingApiKey?.apikey && !config.apiKey) {
+			config.apiKey = existingApiKey.apikey;
+		}
+	} catch (error) {
+		// best-effort only
+	}
+}
+
+async function determineRuntimeConfig(rawOptions: Record<string, unknown>) {
+	const cliOptions = omitUndefined(rawOptions) as Partial<RuntimeConfig>;
+
+	// first, try to load from database (existing user happy path)
+	let dbOverrides: Partial<RuntimeConfig> | undefined;
+	try {
+		dbOverrides = await getDbConfig();
+	} catch (dbError) {
+		logger.debug("Unable to load configuration from database", dbError);
+	}
+
+	if (dbOverrides !== undefined) {
+		return {
+			...getDefaultRuntimeConfig(),
+			...dbOverrides,
+			...cliOptions,
+		};
+	}
+
+	// then, try to migrate from file config (v6 to v7 upgrade path)
+	try {
+		const fileConfig = await getFileConfig();
+		if (fileConfig) {
+			const transformedFileConfig = transformFileConfig(fileConfig);
+			const runtimeFromFile = {
+				...getDefaultRuntimeConfig(),
+				...transformedFileConfig,
+			} as RuntimeConfig;
+			await applyExistingApiKey(runtimeFromFile);
+			await setDbConfig(runtimeFromFile);
+			const resolvedOverrides = stripDefaults(runtimeFromFile);
+			logger.info("Migrated file config to database");
+			return {
+				...getDefaultRuntimeConfig(),
+				...resolvedOverrides,
+				...cliOptions,
+			};
+		}
+	} catch (migrationError) {
+		logger.error(
+			new Error(
+				"Failed to import configuration file, falling back to defaults",
+				{ cause: migrationError },
+			),
+		);
+	}
+
+	// finally, fall back to defaults (new user happy path or migration failure)
+	const defaultRuntime = getDefaultRuntimeConfig();
+	await setDbConfig(defaultRuntime);
+	await resetApiKey();
+	logger.info("Created initial database config from defaults");
+	const resolvedOverrides = stripDefaults(defaultRuntime);
+
+	return {
+		...getDefaultRuntimeConfig(),
+		...resolvedOverrides,
+		...cliOptions,
+	};
+}
+
 /**
  * Initializes the full runtime, runs the callback, then cleans up
  * @param entrypoint
@@ -250,12 +256,27 @@ export function withMinimalRuntime<
 export function withFullRuntime(
 	entrypoint: (runtimeConfig: RuntimeConfig) => Promise<void>,
 ): CommanderActionCb {
-	return withMinimalRuntime(async (options) => {
-		initializeLogger(options as Record<string, unknown>);
-		const runtimeConfig = parseRuntimeConfigAndLogErrors(options);
+	return withMinimalRuntime(async (options: Record<string, unknown>) => {
+		createAppDirHierarchy();
+		initializeLogger(options);
+		const runtimeConfig = await determineRuntimeConfig(options);
 		setRuntimeConfig(runtimeConfig);
 		initializePushNotifier();
+		getLogWatcher();
 		await doStartupValidation();
 		await entrypoint(runtimeConfig);
 	});
+}
+
+export async function restartCrossSeed() {
+	logger.info("Restarting cross-seed");
+	process.on("exit", () => {
+		spawn(process.argv[0], process.argv.slice(1), {
+			cwd: process.cwd(),
+			stdio: "inherit",
+			detached: false,
+		});
+	});
+
+	await exitGracefully();
 }
