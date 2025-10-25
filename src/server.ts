@@ -22,7 +22,7 @@ async function rootPlugin(
 }
 
 async function createServer(basePath: string): Promise<FastifyInstance> {
-	const app = fastify();
+	const app = fastify({ logger: true });
 	if (basePath) {
 		await app.register(rootPlugin, { prefix: basePath, basePath });
 		app.get("*", async (request, reply) => {
