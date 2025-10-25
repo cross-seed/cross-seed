@@ -62,9 +62,15 @@ export async function staticFrontendPlugin(
 			fileContents = await readFile(desiredFilePath, UTF8);
 			fileExtension = extname(desiredFilePath);
 		} catch (e) {
-			if ((e as ErrnoException).code !== "ENOENT") throw e;
-			fileContents = await readFile(INDEX_HTML_PATH, UTF8);
-			fileExtension = ".html";
+			if (
+				(e as ErrnoException).code == "ENOENT" ||
+				(e as ErrnoException).code == "EISDIR"
+			) {
+				fileContents = await readFile(INDEX_HTML_PATH, UTF8);
+				fileExtension = ".html";
+			} else {
+				throw e;
+			}
 		}
 
 		return reply
