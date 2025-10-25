@@ -1,5 +1,5 @@
 import { Action, LinkType, MatchMode } from "./constants.js";
-import { omitUndefined } from "./utils.js";
+import { omitUndefined } from "./utils/object.js";
 
 export interface RuntimeConfig {
 	delay: number;

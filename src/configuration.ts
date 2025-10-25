@@ -13,11 +13,10 @@ import {
 } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
-import { omitUndefined } from "./utils.js";
+import { omitUndefined } from "./utils/object.js";
 
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
-
 export interface FileConfig {
 	action?: Action;
 	pconfigVersion?: number;
