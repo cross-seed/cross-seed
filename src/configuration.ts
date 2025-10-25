@@ -156,20 +156,6 @@ export function getDefaultRuntimeConfig(): RuntimeConfig {
 	};
 }
 
-export function applyDefaults(
-	overrides: Partial<RuntimeConfig> = {},
-): RuntimeConfig {
-	const merged = getDefaultRuntimeConfig();
-	for (const key of Object.keys(overrides) as (keyof RuntimeConfig)[]) {
-		const value = overrides[key];
-		if (value === undefined) continue;
-		(merged as unknown as Record<string, unknown>)[key as string] =
-			structuredClone(value);
-	}
-
-	return merged;
-}
-
 export function stripDefaults(
 	config: Partial<RuntimeConfig> | RuntimeConfig,
 ): Partial<RuntimeConfig> {
