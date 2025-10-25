@@ -446,21 +446,15 @@ function collectWebhookUrls(fileConfig: FileConfig): string[] | undefined {
 	return urls.size ? Array.from(urls) : undefined;
 }
 
-export async function getFileConfig(): Promise<FileConfig> {
+export async function getFileConfig(): Promise<FileConfig | undefined> {
 	const configPath = path.join(appDir(), "config.js");
 
 	try {
 		return (await import(pathToFileURL(configPath).toString())).default;
 	} catch (e) {
 		if (e.code === "ERR_MODULE_NOT_FOUND") {
-			return {};
-		} else if (e instanceof SyntaxError) {
-			const location = e.stack!.split("\n").slice(0, 3).join("\n");
-			throw new CrossSeedError(
-				`\n${chalk.red(location)}\n\n${UNPARSABLE_CONFIG_MESSAGE}`,
-			);
-		} else {
-			throw e;
+			return undefined;
 		}
+		throw e;
 	}
 }

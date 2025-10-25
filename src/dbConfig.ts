@@ -2,21 +2,29 @@ import { applyDefaults, stripDefaults } from "./configuration.js";
 import { db } from "./db.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
 import { omitUndefined } from "./utils.js";
-import { parseRuntimeConfig } from "./configSchema.js";
+import {
+	parseRuntimeConfig,
+	parseRuntimeConfigOverrides,
+} from "./configSchema.js";
 
-export async function getDbConfig(): Promise<RuntimeConfig> {
+export async function getDbConfig(): Promise<
+	Partial<RuntimeConfig> | undefined
+> {
 	const row = await db("settings").select("settings_json").first();
-	if (!row || !row.settings_json) {
-		throw new Error(
-			"No configuration found in database. Please save a configuration first.",
-		);
-	}
-	const overrides = JSON.parse(row.settings_json);
-	return parseRuntimeConfig(applyDefaults(overrides));
+	if (!row) return undefined;
+	if (row.settings_json === null || row.settings_json === undefined)
+		return undefined;
+	const overrides =
+		typeof row.settings_json === "string"
+			? JSON.parse(row.settings_json)
+			: row.settings_json;
+	return parseRuntimeConfigOverrides(overrides);
 }
 
-export async function setDbConfig(config: RuntimeConfig): Promise<void> {
-	const validatedConfig = parseRuntimeConfig(config);
+export async function setDbConfig(
+	config: Partial<RuntimeConfig> | RuntimeConfig,
+): Promise<void> {
+	const validatedConfig = parseRuntimeConfig(applyDefaults(config));
 	const overrides = stripDefaults(validatedConfig);
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
@@ -42,14 +50,20 @@ export async function updateDbConfig(
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
-			const currentConfig = existingRow.settings_json
-				? applyDefaults(JSON.parse(existingRow.settings_json))
-				: applyDefaults();
-			const updatedConfig = applyDefaults({
-				...currentConfig,
+			const currentOverrides =
+				existingRow.settings_json === null ||
+				existingRow.settings_json === undefined
+					? {}
+					: parseRuntimeConfigOverrides(
+							typeof existingRow.settings_json === "string"
+								? JSON.parse(existingRow.settings_json)
+								: existingRow.settings_json,
+						);
+			const mergedConfig = applyDefaults({
+				...currentOverrides,
 				...sanitizedPartial,
 			});
-			const validatedConfig = parseRuntimeConfig(updatedConfig);
+			const validatedConfig = parseRuntimeConfig(mergedConfig);
 			await trx("settings").update({
 				settings_json: JSON.stringify(stripDefaults(validatedConfig)),
 			});

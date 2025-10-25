@@ -119,7 +119,6 @@ export function logOnce(cacheKey: string, cb: () => void, ttl?: number) {
 }
 
 export function initializeLogger(options: Record<string, unknown>): void {
-	createAppDirHierarchy();
 	logger = winston.createLogger({
 		level: "info",
 		format: winston.format.combine(

@@ -3,7 +3,13 @@ import { spawn } from "node:child_process";
 import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { instantiateDownloadClients } from "./clients/TorrentClient.js";
-import { applyDefaults, getFileConfig, transformFileConfig } from "./configuration.js";
+import {
+	applyDefaults,
+	createAppDirHierarchy,
+	getFileConfig,
+	stripDefaults,
+	transformFileConfig,
+} from "./configuration.js";
 import { db } from "./db.js";
 import { getDbConfig, setDbConfig } from "./dbConfig.js";
 import { CrossSeedError } from "./errors.js";
@@ -117,11 +123,26 @@ async function checkConfigPaths(): Promise<void> {
 			label: Label.INJECT,
 			message: `Storage device for each linkDir: ${inspect(linkDev)}`,
 		});
+
+		for (const linkDir of linkDev) {
+			logger.verbose({
+				label: Label.INJECT,
+				message: `Storage device ${linkDir.path}: ${linkDir.dev}`,
+			});
+		}
 	}
 	if (dataDev.length) {
 		logger.verbose({
 			label: Label.INJECT,
 			message: `Storage device for each dataDir: ${inspect(dataDev)}`,
+		});
+	}
+	if (injectDir) {
+		logger.verbose({
+			label: Label.INJECT,
+			message: `Storage device for injectDir: ${
+				injectDir ? (await stat(injectDir)).dev : "N/A"
+			}`,
 		});
 	}
 }
@@ -180,6 +201,87 @@ async function applyExistingApiKey(
 	}
 }
 
+async function determineRuntimeConfig(rawOptions: Record<string, unknown>) {
+	const cliOptions = omitUndefined(rawOptions) as Partial<RuntimeConfig>;
+
+	let dbOverrides: Partial<RuntimeConfig> | undefined;
+	try {
+		dbOverrides = await getDbConfig();
+	} catch (dbError) {
+		logger.debug("Unable to load configuration from database", dbError);
+	}
+
+	let resolvedOverrides = dbOverrides;
+
+	if (dbOverrides === undefined) {
+		try {
+			const fileConfig = await getFileConfig();
+			if (fileConfig) {
+				const transformedFileConfig = transformFileConfig(fileConfig);
+				const runtimeFromFile = applyDefaults(transformedFileConfig);
+
+				await applyExistingApiKey(
+					runtimeFromFile,
+					"Unable to read existing API key during file config migration",
+				);
+
+				await setDbConfig(runtimeFromFile);
+				resolvedOverrides = stripDefaults(runtimeFromFile);
+				logger.info("Migrated file config to database");
+			} else {
+				const defaultRuntime = applyDefaults();
+
+				await applyExistingApiKey(
+					defaultRuntime,
+					"Unable to read existing API key during default config initialization",
+				);
+
+				try {
+					await setDbConfig(defaultRuntime);
+					logger.info(
+						"Created initial database config from defaults",
+					);
+				} catch (persistError) {
+					logger.warn(
+						"Failed to persist default configuration to database",
+						persistError,
+					);
+				}
+
+				resolvedOverrides = stripDefaults(defaultRuntime);
+			}
+		} catch (migrationError) {
+			logger.warn(
+				"Failed to import configuration file, falling back to defaults",
+				migrationError,
+			);
+
+			const defaultRuntime = applyDefaults();
+
+			await applyExistingApiKey(
+				defaultRuntime,
+				"Unable to read existing API key during default config initialization",
+			);
+
+			try {
+				await setDbConfig(defaultRuntime);
+			} catch (persistError) {
+				logger.warn(
+					"Failed to persist default configuration to database",
+					persistError,
+				);
+			}
+
+			resolvedOverrides = stripDefaults(defaultRuntime);
+		}
+	}
+
+	return applyDefaults({
+		...(resolvedOverrides ?? {}),
+		...cliOptions,
+	});
+}
+
 /**
  * Initializes the full runtime, runs the callback, then cleans up
  * @param entrypoint
@@ -188,65 +290,9 @@ export function withFullRuntime(
 	entrypoint: (runtimeConfig: RuntimeConfig) => Promise<void>,
 ): CommanderActionCb {
 	return withMinimalRuntime(async (options) => {
+		createAppDirHierarchy();
 		initializeLogger(options as Record<string, unknown>);
-
-		const definedCliOptions = omitUndefined(
-			options as Partial<RuntimeConfig>,
-		) as Partial<RuntimeConfig>;
-
-		let runtimeConfig: RuntimeConfig | undefined;
-		try {
-			const dbConfig = await getDbConfig();
-			runtimeConfig = {
-				...dbConfig,
-				...definedCliOptions,
-			};
-		} catch (dbError) {
-			logger.debug("Unable to load configuration from database", dbError);
-			try {
-				const transformedFileConfig = transformFileConfig(
-					await getFileConfig(),
-				);
-				const overrides = {
-					...transformedFileConfig,
-					...definedCliOptions,
-				};
-				const mergedConfig = applyDefaults(overrides);
-
-				await applyExistingApiKey(
-					mergedConfig,
-					"Unable to read existing API key during file config migration",
-				);
-
-				await setDbConfig(mergedConfig);
-				logger.info("Migrated file config to database");
-				runtimeConfig = mergedConfig;
-			} catch (migrationError) {
-				logger.warn(
-					"Failed to migrate file config, falling back to defaults",
-					migrationError,
-				);
-
-				const mergedDefaults = applyDefaults(definedCliOptions);
-
-				try {
-					await setDbConfig(mergedDefaults);
-					logger.info("Created initial database config from defaults");
-				} catch (persistError) {
-					logger.warn(
-						"Failed to persist default configuration to database",
-						persistError,
-					);
-				}
-
-				runtimeConfig = mergedDefaults;
-			}
-		}
-
-		if (!runtimeConfig) {
-			runtimeConfig = applyDefaults(definedCliOptions);
-		}
-
+		const runtimeConfig = await determineRuntimeConfig(options);
 		setRuntimeConfig(runtimeConfig);
 		initializePushNotifier();
 		getLogWatcher();
