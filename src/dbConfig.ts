@@ -1,7 +1,7 @@
 import { getDefaultRuntimeConfig, stripDefaults } from "./configuration.js";
 import { db } from "./db.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
-import { omitUndefined } from "./utils.js";
+import { omitUndefined } from "./utils/object.js";
 import {
 	parseRuntimeConfig,
 	parseRuntimeConfigOverrides,
