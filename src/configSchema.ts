@@ -805,7 +805,7 @@ export const VALIDATION_SCHEMA = z
 		);
 		return true;
 	})
-	.refine((config) => {
+	/*refine((config) => {
 		for (const linkDir of config.linkDirs) {
 			if (isChildPath(linkDir, [config.outputDir])) return false;
 			if (isChildPath(linkDir, config.dataDirs)) {
@@ -834,7 +834,7 @@ export const VALIDATION_SCHEMA = z
 			}
 		}
 		return true;
-	}, ZodErrorMessages.dataDirsInOtherDirs)
+	}, ZodErrorMessages.dataDirsInOtherDirs)*/
 	.refine((config) => {
 		if (!config.torrentDir) return true;
 		if (isChildPath(config.torrentDir, [config.outputDir])) return false;
