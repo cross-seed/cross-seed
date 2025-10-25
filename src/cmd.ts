@@ -122,12 +122,14 @@ program
 	.addOption(verboseOption)
 	.action(
 		withFullRuntime(async (options) => {
+			const serverPromise = serve(
+				options.port,
+				options.host,
+				options.basePath,
+			);
 			await indexTorrentsAndDataDirs({ startup: true });
 			// technically this will never resolve, but it's necessary to keep the process running
-			await Promise.all([
-				serve(options.port, options.host, options.basePath),
-				jobsLoop(),
-			]);
+			await Promise.all([serverPromise, jobsLoop()]);
 		}),
 	);
 
