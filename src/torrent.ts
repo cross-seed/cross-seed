@@ -10,9 +10,13 @@ import {
 } from "./clients/TorrentClient.js";
 import { isChildPath } from "./configSchema.js";
 import {
+	ALL_PARENTHESES_REGEX,
+	ALL_SPACES_REGEX,
+	ALL_SQUARE_BRACKETS_REGEX,
 	LEVENSHTEIN_DIVISOR,
 	MAX_PATH_BYTES,
 	MediaType,
+	MIN_VIDEO_QUERY_LENGTH,
 	SAVED_TORRENTS_INFO_REGEX,
 	USER_AGENT,
 } from "./constants.js";
@@ -680,12 +684,11 @@ export async function loadTorrentDirLight(
 	return searchees;
 }
 
-function getKeysFromName(name: string): {
+function getKeysFromName(stem: string): {
 	keyTitles: string[];
 	element?: string | number;
 	useFallback: boolean;
 } {
-	const stem = stripExtension(name);
 	const episodeKeys = getEpisodeKeys(stem);
 	if (episodeKeys) {
 		const keyTitles = episodeKeys.keyTitles;
@@ -718,12 +721,27 @@ export async function getSimilarByName(name: string): Promise<{
 	dataSearchees: SearcheeWithoutInfoHash[];
 }> {
 	const { torrentDir, useClientTorrents } = getRuntimeConfig();
-	const { keyTitles, element, useFallback } = getKeysFromName(name);
+	const stem = stripExtension(name);
+	const { keyTitles, element, useFallback } = getKeysFromName(stem);
 	const clientSearchees = useFallback
-		? await getTorrentByFuzzyName(name)
+		? await getTorrentByFuzzyName(stem)
 		: [];
-	const dataSearchees = useFallback ? await getDataByFuzzyName(name) : [];
+	const dataSearchees = useFallback ? await getDataByFuzzyName(stem) : [];
 	if (!keyTitles.length) {
+		const noParentheses = stem
+			.replace(ALL_SQUARE_BRACKETS_REGEX, "")
+			.replace(ALL_PARENTHESES_REGEX, "")
+			.replace(ALL_SPACES_REGEX, " ")
+			.trim(); // Anime that fails MediaType.ANIME often has `[group] Title (Extra Info)`
+		if (
+			noParentheses.length >= MIN_VIDEO_QUERY_LENGTH &&
+			noParentheses !== stem
+		) {
+			clientSearchees.push(
+				...(await getTorrentByFuzzyName(noParentheses)),
+			);
+			dataSearchees.push(...(await getDataByFuzzyName(noParentheses)));
+		}
 		return { keys: [], clientSearchees, dataSearchees };
 	}
 	const candidateMaxDistance = Math.floor(
@@ -823,20 +841,22 @@ export async function getSimilarByName(name: string): Promise<{
 }
 
 async function getTorrentByFuzzyName(
-	name: string,
+	stem: string,
 ): Promise<SearcheeWithInfoHash[]> {
 	const { useClientTorrents } = getRuntimeConfig();
 
 	const database: TorrentEntry[] = useClientTorrents
 		? await db("client_searchee")
 		: await db("torrent");
-	const fullMatch = createKeyTitle(name);
+	const fullMatch = createKeyTitle(stem);
 
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
 	let filteredNames: TorrentEntry[] = [];
 	if (fullMatch) {
 		filteredNames = await filterAsyncYield(database, async (dbEntry) => {
-			const dbMatch = createKeyTitle(dbEntry.title ?? dbEntry.name!);
+			const dbMatch = createKeyTitle(
+				stripExtension(dbEntry.title ?? dbEntry.name!),
+			);
 			return fullMatch === dbMatch;
 		});
 	}
@@ -844,16 +864,16 @@ async function getTorrentByFuzzyName(
 	// If none match, proceed with fuzzy name check on all names.
 	filteredNames = filteredNames.length > 0 ? filteredNames : database;
 
-	const candidateMaxDistance = Math.floor(name.length / LEVENSHTEIN_DIVISOR);
+	const candidateMaxDistance = Math.floor(stem.length / LEVENSHTEIN_DIVISOR);
 	const potentialMatches = await filterAsyncYield(
 		filteredNames,
 		async (dbEntry) => {
-			const dbTitle = dbEntry.title ?? dbEntry.name!;
+			const dbTitle = stripExtension(dbEntry.title ?? dbEntry.name!);
 			const maxDistance = Math.min(
 				candidateMaxDistance,
 				Math.floor(dbTitle.length / LEVENSHTEIN_DIVISOR),
 			);
-			return distance(name, dbTitle) <= maxDistance;
+			return distance(stem, dbTitle) <= maxDistance;
 		},
 	);
 

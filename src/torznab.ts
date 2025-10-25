@@ -49,13 +49,13 @@ import {
 	getAnimeQueries,
 	getApikey,
 	getLogString,
+	getVideoQueries,
 	humanReadableDate,
 	isTruthy,
 	nMsAgo,
 	reformatTitleForSearching,
 	sanitizeUrl,
 	stripExtension,
-	stripMetaFromName,
 	wait,
 } from "./utils.js";
 
@@ -289,12 +289,10 @@ async function createTorznabSearchQueries(
 			q: animeQuery,
 		}));
 	} else if (mediaType === MediaType.VIDEO) {
-		return [
-			{
-				t: "search",
-				q: cleanTitle(stripMetaFromName(stem)),
-			},
-		] as const;
+		return getVideoQueries(stem).map((videoQuery) => ({
+			t: "search",
+			q: videoQuery,
+		}));
 	} else if (mediaType === MediaType.BOOK && searchee.path) {
 		return [
 			{
