@@ -3,7 +3,7 @@ import stripAnsi from "strip-ansi";
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import { parseClientEntry } from "./clients/TorrentClient.js";
-import { appDir, createAppDirHierarchy } from "./configuration.js";
+import { appDir } from "./configuration.js";
 import { LOGS_FOLDER } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 
@@ -119,7 +119,6 @@ export function logOnce(cacheKey: string, cb: () => void, ttl?: number) {
 }
 
 export function initializeLogger(options: Record<string, unknown>): void {
-	createAppDirHierarchy();
 	logger = winston.createLogger({
 		level: "info",
 		format: winston.format.combine(
