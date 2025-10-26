@@ -18,6 +18,8 @@ import {
   Folders,
   Webhook,
   Popcorn,
+  Library,
+  AlertTriangle,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -45,6 +47,11 @@ const navItems = [
         title: 'Dashboard',
         icon: <Home className="size-4" />,
         url: '/',
+      },
+      {
+        title: 'Library',
+        icon: <Library className="size-4" />,
+        url: '/library',
       },
       {
         title: 'Jobs',
@@ -90,6 +97,11 @@ const navItems = [
         title: 'Logs',
         icon: <FileText className="size-4" />,
         url: '/logs',
+      },
+      {
+        title: 'Problems',
+        icon: <AlertTriangle className="size-4" />,
+        url: '/settings/problems',
       },
     ],
   },
