@@ -377,11 +377,17 @@ export function getAnimeQueries(stem: string): string[] {
 	const animeQueries: string[] = [];
 	const { title, altTitle, release } = stem.match(ANIME_REGEX)?.groups ?? {};
 	if (title) {
-		animeQueries.push(cleanTitle(`${title} ${release}`));
+		const strippedTitle = cleanTitle(title);
+		animeQueries.push(
+			`${strippedTitle.length ? strippedTitle : title} ${release}`,
+		);
 	}
 	if (altTitle) {
 		if (isBadTitle(altTitle)) return animeQueries;
-		animeQueries.push(cleanTitle(`${altTitle} ${release}`));
+		const strippedAltTitle = cleanTitle(altTitle);
+		animeQueries.push(
+			`${strippedAltTitle.length ? strippedAltTitle : altTitle} ${release}`,
+		);
 	}
 	return animeQueries;
 }
@@ -394,6 +400,10 @@ export function getAnimeQueries(stem: string): string[] {
  */
 export function getVideoQueries(stem: string): string[] {
 	const videoQueries: string[] = [cleanTitle(stripMetaFromName(stem))];
+	if (!videoQueries[0].length) {
+		videoQueries[0] = stripMetaFromName(stem);
+		if (!videoQueries[0].length) videoQueries[0] = stem;
+	}
 	const noParentheses = cleanTitle(
 		stripMetaFromName(
 			stem

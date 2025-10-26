@@ -243,10 +243,15 @@ async function createTorznabSearchQueries(
 	if (mediaType === MediaType.EPISODE && caps.tvSearch) {
 		const match = stem.match(EP_REGEX);
 		const groups = match!.groups!;
+		let query: string | undefined;
+		if (!useIds) {
+			query = reformatTitleForSearching(stem);
+			if (!query.length) query = stem;
+		}
 		return [
 			{
 				t: "tvsearch",
-				q: useIds ? undefined : reformatTitleForSearching(stem),
+				q: query,
 				season: groups.season ? extractInt(groups.season) : groups.year,
 				ep: groups.episode
 					? extractInt(groups.episode)
@@ -257,19 +262,29 @@ async function createTorznabSearchQueries(
 	} else if (mediaType === MediaType.SEASON && caps.tvSearch) {
 		const match = stem.match(SEASON_REGEX);
 		const groups = match!.groups!;
+		let query: string | undefined;
+		if (!useIds) {
+			query = reformatTitleForSearching(stem);
+			if (!query.length) query = stem;
+		}
 		return [
 			{
 				t: "tvsearch",
-				q: useIds ? undefined : reformatTitleForSearching(stem),
+				q: query,
 				season: extractInt(groups.season),
 				...relevantIds,
 			},
 		] as const;
 	} else if (mediaType === MediaType.MOVIE && caps.movieSearch) {
+		let query: string | undefined;
+		if (!useIds) {
+			query = reformatTitleForSearching(stem);
+			if (!query.length) query = stem;
+		}
 		return [
 			{
 				t: "movie",
-				q: useIds ? undefined : reformatTitleForSearching(stem),
+				q: query,
 				...relevantIds,
 			},
 		] as const;
@@ -294,17 +309,19 @@ async function createTorznabSearchQueries(
 			q: videoQuery,
 		}));
 	} else if (mediaType === MediaType.BOOK && searchee.path) {
+		const query = cleanTitle(stem.replace(CALIBRE_INDEXNUM_REGEX, ""));
 		return [
 			{
 				t: "search",
-				q: cleanTitle(stem.replace(CALIBRE_INDEXNUM_REGEX, "")),
+				q: query.length ? query : stem,
 			},
 		] as const;
 	}
+	const query = cleanTitle(stem);
 	return [
 		{
 			t: "search",
-			q: cleanTitle(stem),
+			q: query.length ? query : stem,
 		},
 	] as const;
 }
