@@ -1,9 +1,9 @@
-import { collectIndexerProblems } from "./problems/indexers.js";
-import { collectClientProblems } from "./problems/clients.js";
-import { collectArrProblems } from "./problems/arr.js";
-import { collectPathProblems } from "./problems/paths.js";
-import { collectRecommendationProblems } from "./problems/recommendations.js";
-import { collectSearcheeProblems } from "./problems/searchees.js";
+import { collectArrProblems } from "./arr.js";
+import { collectClientProblems } from "./clients/TorrentClient.js";
+import { collectIndexerProblems } from "./indexers.js";
+import { collectPathProblems } from "./startup.js";
+import { collectRecommendationProblems } from "./runtimeConfig.js";
+import { collectSearcheeProblems } from "./searchee.js";
 
 export type ProblemSeverity = "error" | "warning" | "info";
 
@@ -27,15 +27,18 @@ interface RegisteredProblemProvider {
 }
 
 const registeredProblemProviders: RegisteredProblemProvider[] = [
-    { id: "indexers", provider: collectIndexerProblems },
-    { id: "clients", provider: collectClientProblems },
-    { id: "arr", provider: collectArrProblems },
-    { id: "paths", provider: collectPathProblems },
-    { id: "searchees", provider: collectSearcheeProblems },
-    { id: "recommendations", provider: collectRecommendationProblems },
+	{ id: "indexers", provider: collectIndexerProblems },
+	{ id: "clients", provider: collectClientProblems },
+	{ id: "arr", provider: collectArrProblems },
+	{ id: "paths", provider: collectPathProblems },
+	{ id: "searchees", provider: collectSearcheeProblems },
+	{ id: "recommendations", provider: collectRecommendationProblems },
 ];
 
-function providerName(registration: RegisteredProblemProvider, index: number) {
+function getProviderName(
+	registration: RegisteredProblemProvider,
+	index: number,
+): string {
 	return registration.id || registration.provider.name || `provider-${index}`;
 }
 
@@ -61,13 +64,14 @@ export async function collectProblems(): Promise<Problem[]> {
 		const message =
 			error instanceof Error ? error.message : String(error ?? "unknown");
 
+		const providerName = getProviderName(registration, index);
 		problems.push({
-			id: `problem-provider-error:${providerName(registration, index)}`,
+			id: `problem-provider-error:${providerName}`,
 			severity: "error",
 			summary: "Problem provider failed to collect problems.",
 			details: message,
 			metadata: {
-				provider: providerName(registration, index),
+				provider: providerName,
 			},
 		});
 	});
