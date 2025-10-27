@@ -146,7 +146,12 @@ type PathIssue =
 	| "linking-failed";
 
 interface PathProblemDescriptor {
-	category: "torrentDir" | "outputDir" | "injectDir" | "linkDirs" | "dataDirs";
+	category:
+		| "torrentDir"
+		| "outputDir"
+		| "injectDir"
+		| "linkDirs"
+		| "dataDirs";
 	name: string;
 	path: string;
 	issue: PathIssue;

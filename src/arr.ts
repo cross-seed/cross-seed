@@ -305,11 +305,7 @@ function sanitizeDisplayUrl(url: URL): string {
 	return `${url.origin}${url.pathname}`;
 }
 
-function arrProblemId(
-	kind: ArrKind,
-	category: string,
-	index: number,
-): string {
+function arrProblemId(kind: ArrKind, category: string, index: number): string {
 	return `arr:${kind.toLowerCase()}:${category}:${index}`;
 }
 
@@ -325,7 +321,9 @@ async function checkArrUrl(
 		parsedUrl = new URL(rawUrl);
 	} catch (error) {
 		const message =
-			error instanceof Error ? error.message : String(error ?? "Unknown error");
+			error instanceof Error
+				? error.message
+				: String(error ?? "Unknown error");
 		problems.push({
 			id: arrProblemId(kind, "invalid-url", index),
 			severity: "error",
@@ -375,7 +373,10 @@ async function checkArrUrl(
 
 		try {
 			const body = (await response.json()) as { current?: unknown };
-			if (typeof body?.current !== "string" || body.current.length === 0) {
+			if (
+				typeof body?.current !== "string" ||
+				body.current.length === 0
+			) {
 				problems.push({
 					id: arrProblemId(kind, "unexpected-response", index),
 					severity: "warning",
@@ -398,7 +399,9 @@ async function checkArrUrl(
 		}
 	} catch (error) {
 		const message =
-			error instanceof Error ? error.message : String(error ?? "Unknown error");
+			error instanceof Error
+				? error.message
+				: String(error ?? "Unknown error");
 		const isAbort =
 			typeof error === "object" &&
 			error !== null &&
