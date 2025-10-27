@@ -470,7 +470,8 @@ export async function collectClientProblems(): Promise<Problem[]> {
 		problems.push({
 			id: "client:inject-without-clients",
 			severity: "error",
-			summary: "Injection requires at least one configured torrent client.",
+			summary:
+				"Injection requires at least one configured torrent client.",
 			details:
 				"Add a torrent client in Settings → Download Clients or switch the action away from Inject.",
 		});
@@ -495,7 +496,8 @@ export async function collectClientProblems(): Promise<Problem[]> {
 		problems.push({
 			id: "client:inject-readonly",
 			severity: "error",
-			summary: "Injection is not possible when all clients are read-only.",
+			summary:
+				"Injection is not possible when all clients are read-only.",
 			details: "Mark at least one client as writable to allow injection.",
 		});
 	}

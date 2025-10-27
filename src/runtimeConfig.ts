@@ -53,26 +53,26 @@ export function setRuntimeConfig(configObj: RuntimeConfig): void {
 }
 
 export function getRuntimeConfig(
- configOverride: Partial<RuntimeConfig> = {},
+	configOverride: Partial<RuntimeConfig> = {},
 ): RuntimeConfig {
- return {
-  ...runtimeConfig,
-  ...omitUndefined(configOverride),
- };
+	return {
+		...runtimeConfig,
+		...omitUndefined(configOverride),
+	};
 }
 
 export function collectRecommendationProblems(): Problem[] {
-  const { matchMode } = getRuntimeConfig();
-  if (matchMode === MatchMode.PARTIAL) return [];
+	const { matchMode } = getRuntimeConfig();
+	if (matchMode === MatchMode.PARTIAL) return [];
 
-  return [
-    {
-      id: "recommendation:partial-matching",
-      severity: "info",
-      summary: "Enable partial matching for better results",
-      details:
-        "Partial matching skips tiny files and improves match success. Enable it under Settings → Search & RSS when linking is available.",
-      metadata: { recommendation: true },
-    },
-  ];
+	return [
+		{
+			id: "recommendation:partial-matching",
+			severity: "info",
+			summary: "Enable partial matching for better results",
+			details:
+				"Partial matching skips tiny files and improves match success. Enable it under Settings → Search & RSS when linking is available.",
+			metadata: { recommendation: true },
+		},
+	];
 }
