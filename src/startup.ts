@@ -15,21 +15,21 @@ import { db } from "./db.js";
 import { getDbConfig, setDbConfig } from "./dbConfig.js";
 import { CrossSeedError } from "./errors.js";
 import {
+	exitOnCrossSeedErrors,
 	initializeLogger,
 	Label,
 	logger,
-	exitOnCrossSeedErrors,
 } from "./logger.js";
+import type { Problem } from "./problems.js";
 import { initializePushNotifier } from "./pushNotifier.js";
 import {
 	getRuntimeConfig,
 	RuntimeConfig,
 	setRuntimeConfig,
 } from "./runtimeConfig.js";
-import type { Problem } from "./problems.js";
 import { Awaitable, notExists, verifyDir } from "./utils.js";
-import { omitUndefined } from "./utils/object.js";
 import { getLogWatcher } from "./utils/logWatcher.js";
+import { omitUndefined } from "./utils/object.js";
 
 export async function exitGracefully() {
 	await db.destroy();
