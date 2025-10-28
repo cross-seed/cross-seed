@@ -1,6 +1,5 @@
 import { constants, mkdir, stat } from "fs/promises";
 import { spawn } from "node:child_process";
-import { inspect } from "util";
 import { testLinking } from "./action.js";
 import { resetApiKey } from "./auth.js";
 import { instantiateDownloadClients } from "./clients/TorrentClient.js";
@@ -13,7 +12,6 @@ import {
 } from "./configuration.js";
 import { db } from "./db.js";
 import { getDbConfig, setDbConfig } from "./dbConfig.js";
-import { CrossSeedError } from "./errors.js";
 import {
 	exitOnCrossSeedErrors,
 	initializeLogger,
@@ -39,102 +37,32 @@ export async function exitGracefully() {
 process.on("SIGINT", exitGracefully);
 process.on("SIGTERM", exitGracefully);
 
-/**
- * verifies the config paths provided against the filesystem
- * @returns true (if paths are valid)
- */
-async function checkConfigPaths(): Promise<void> {
-	const { dataDirs, injectDir, linkDirs, outputDir, torrentDir } =
-		getRuntimeConfig();
-	const READ_ONLY = constants.R_OK;
-	const READ_AND_WRITE = constants.R_OK | constants.W_OK;
-	let pathFailure: number = 0;
-	const linkDev: { path: string; dev: number }[] = [];
-	const dataDev: { path: string; dev: number }[] = [];
+async function ensureConfiguredDirectories(): Promise<void> {
+	const { outputDir, linkDirs = [] } = getRuntimeConfig();
+	const directories: { path: string; label: string }[] = [];
 
-	if (torrentDir && !(await verifyDir(torrentDir, "torrentDir", READ_ONLY))) {
-		pathFailure++;
-	}
-
-	if (await notExists(outputDir)) {
-		logger.info(`Creating outputDir: ${outputDir}`);
-		await mkdir(outputDir, { recursive: true });
-	}
-	if (!(await verifyDir(outputDir, "outputDir", READ_AND_WRITE))) {
-		pathFailure++;
+	if (outputDir) {
+		directories.push({ path: outputDir, label: "outputDir" });
 	}
 
 	for (const [index, linkDir] of linkDirs.entries()) {
-		const linkDirName = `linkDir${index}`;
-		if (await notExists(linkDir)) {
-			logger.info(`Creating ${linkDirName}: ${linkDir}`);
-			await mkdir(linkDir, { recursive: true });
+		directories.push({ path: linkDir, label: `linkDir${index}` });
+	}
+
+	for (const { path, label } of directories) {
+		if (!(await notExists(path))) continue;
+
+		try {
+			logger.info(`Creating ${label}: ${path}`);
+			await mkdir(path, { recursive: true });
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : String(error ?? "");
+			logger.error({
+				label: Label.SERVER,
+				message: `Failed to create ${label} at ${path}: ${message}`,
+			});
 		}
-		if (await verifyDir(linkDir, linkDirName, READ_AND_WRITE)) {
-			linkDev.push({ path: linkDir, dev: (await stat(linkDir)).dev });
-		} else {
-			pathFailure++;
-		}
-	}
-	if (linkDev.length) {
-		logger.verbose(`Storage device for each linkDir: ${inspect(linkDev)}`);
-	}
-	for (const [index, dataDir] of dataDirs.entries()) {
-		const dataDirName = `dataDir${index}`;
-		if (await verifyDir(dataDir, dataDirName, READ_ONLY)) {
-			dataDev.push({ path: dataDir, dev: (await stat(dataDir)).dev });
-		} else {
-			pathFailure++;
-		}
-	}
-	if (dataDev.length) {
-		logger.verbose(`Storage device for each dataDir: ${inspect(dataDev)}`);
-	}
-	if (injectDir) {
-		if (!(await verifyDir(injectDir, "injectDir", READ_AND_WRITE))) {
-			pathFailure++;
-		}
-	}
-	if (linkDirs.length) {
-		for (const [index, dataDir] of dataDirs.entries()) {
-			const dataDirName = `dataDir${index}`;
-			try {
-				const res = await testLinking(
-					dataDir,
-					`${dataDirName}Src.cross-seed`,
-					`${dataDirName}Dest.cross-seed`,
-				);
-				if (!res) {
-					logger.error("Failed to link from dataDirs to linkDirs.");
-				}
-			} catch (e) {
-				logger.error(e);
-				logger.error("Failed to link from dataDirs to linkDirs.");
-				pathFailure++;
-			}
-		}
-	}
-	if (pathFailure) {
-		throw new CrossSeedError(
-			`\tYour configuration is invalid, please see the ${
-				pathFailure > 1 ? "errors" : "error"
-			} above for details.`,
-		);
-	}
-	if (linkDev.length) {
-		logger.verbose({
-			label: Label.INJECT,
-			message: `Storage device for each linkDir: ${inspect(linkDev)}`,
-		});
-	}
-	if (dataDev.length) {
-		logger.verbose({
-			label: Label.INJECT,
-			message: `Storage device for each dataDir: ${inspect(dataDev)}`,
-		});
-	}
-	if (injectDir) {
-		// The presence of injectDir is already logged elsewhere.
 	}
 }
 
@@ -352,7 +280,7 @@ export async function collectPathProblems(): Promise<Problem[]> {
 }
 
 export async function doStartupValidation(): Promise<void> {
-	await checkConfigPaths(); // ensure paths are valid first
+	await ensureConfiguredDirectories();
 	instantiateDownloadClients();
 }
 
