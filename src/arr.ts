@@ -4,7 +4,6 @@ import { join as posixJoin } from "node:path/posix";
 import { URLSearchParams } from "node:url";
 import type { Problem } from "./problems.js";
 import { MediaType, SCENE_TITLE_REGEX, USER_AGENT } from "./constants.js";
-import { CrossSeedError } from "./errors.js";
 import { Caps } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -53,59 +52,6 @@ interface ParsedSeries {
 }
 
 export type ParsedMedia = ParsedMovie | ParsedSeries;
-
-export async function validateUArrLs() {
-	const { sonarr, radarr } = getRuntimeConfig();
-
-	if (sonarr) {
-		const urls: URL[] = sonarr.map((str) => new URL(str));
-		for (const url of urls) {
-			if (!url.searchParams.has("apikey")) {
-				throw new CrossSeedError(
-					`Sonarr url ${url} does not specify an apikey`,
-				);
-			}
-			await checkArrIsActive(url.href, "Sonarr");
-		}
-	}
-	if (radarr) {
-		const urls: URL[] = radarr.map((str) => new URL(str));
-		for (const url of urls) {
-			if (!url.searchParams.has("apikey")) {
-				throw new CrossSeedError(
-					`Radarr url ${url} does not specify an apikey`,
-				);
-			}
-			await checkArrIsActive(url.href, "Radarr");
-		}
-	}
-}
-
-async function checkArrIsActive(uArrL: string, arrInstance: string) {
-	const arrPingCheck = await makeArrApiCall<{
-		current: string;
-	}>(uArrL, "/api");
-
-	if (arrPingCheck.isOk()) {
-		const arrPingResponse = arrPingCheck.unwrap();
-		if (!arrPingResponse?.current) {
-			throw new CrossSeedError(
-				`Failed to establish a connection to ${arrInstance} URL: ${uArrL}`,
-			);
-		}
-	} else {
-		const error = arrPingCheck.unwrapErr();
-		throw new CrossSeedError(
-			`Could not contact ${arrInstance} at ${uArrL}`,
-			{
-				cause:
-					error.message.includes("fetch failed") && error.cause
-						? error.cause
-						: error,
-			},
-		);
-	}
-}
 
 function getBodySampleMessage(text: string): string {
 	const first1000Chars = text.substring(0, 1000);

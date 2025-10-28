@@ -3,11 +3,7 @@ import bencode from "bencode";
 import { readdir, readFile, stat } from "fs/promises";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
-import {
-	getClients,
-	TorrentMetadataInClient,
-	validateClientSavePaths,
-} from "./clients/TorrentClient.js";
+import { getClients, TorrentMetadataInClient } from "./clients/TorrentClient.js";
 import { isChildPath } from "./utils.js";
 import {
 	ALL_PARENTHESES_REGEX,
@@ -457,36 +453,21 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 				message: "Indexing torrentDir for reverse lookup...",
 			});
 			searchees = await loadTorrentDirLight(torrentDir);
-			if (clients.length) {
-				infoHashPathMap = await clients[0].getAllDownloadDirs({
-					metas: searchees,
-					onlyCompleted: false,
-					v1HashOnly: true,
-				});
-				await validateClientSavePaths(
-					searchees,
-					infoHashPathMap,
-					clients[0].label,
-					clients[0].clientPriority,
-				);
-			}
+				if (clients.length) {
+					infoHashPathMap = await clients[0].getAllDownloadDirs({
+						metas: searchees,
+						onlyCompleted: false,
+						v1HashOnly: true,
+					});
+				}
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
 			searchees = await flatMapAsync(clients, async (client) => {
-				const { searchees } = await client.getClientSearchees({
-					includeFiles: true,
-					includeTrackers: true,
-				});
-				await validateClientSavePaths(
-					searchees,
-					searchees.reduce((map, searchee) => {
-						map.set(searchee.infoHash, searchee.savePath);
-						return map;
-					}, new Map<string, string>()),
-					client.label,
-					client.clientPriority,
-				);
-				return searchees;
+					const { searchees } = await client.getClientSearchees({
+						includeFiles: true,
+						includeTrackers: true,
+					});
+					return searchees;
 			});
 		}
 	} else {
