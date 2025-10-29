@@ -15,7 +15,6 @@ import {
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
 import { getPartialSizeRatio } from "../decide.js";
-import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
 import { Result } from "../Result.js";
