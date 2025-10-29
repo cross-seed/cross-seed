@@ -66,11 +66,6 @@ async function ensureConfiguredDirectories(): Promise<void> {
 	}
 }
 
-export async function doStartupValidation(): Promise<void> {
-	await ensureConfiguredDirectories();
-	instantiateDownloadClients();
-}
-
 /**
  * validates and sets RuntimeConfig
  * @return (the number of errors Zod encountered in the configuration)
@@ -192,7 +187,8 @@ export function withFullRuntime(
 		setRuntimeConfig(runtimeConfig);
 		initializePushNotifier();
 		getLogWatcher();
-		await doStartupValidation();
+		await ensureConfiguredDirectories();
+		instantiateDownloadClients();
 		await entrypoint(runtimeConfig);
 	});
 }

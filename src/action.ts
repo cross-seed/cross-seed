@@ -887,13 +887,12 @@ export async function testLinking(
 	try {
 		let srcFile = await findAFileWithExt(srcDir, ALL_EXTENSIONS);
 		if (!srcFile) {
-			if (
-				!(await verifyDir(
-					srcDir,
-					testSrcName,
-					fs.constants.R_OK | fs.constants.W_OK,
-				))
-			) {
+			const verification = await verifyDir(
+				srcDir,
+				testSrcName,
+				fs.constants.R_OK | fs.constants.W_OK,
+			);
+			if (!verification.ok) {
 				logger.error(
 					`cross-seed is unable to verify linking for ${srcDir} (likely due to incorrect/insufficient volume mounts https://www.cross-seed.org/docs/tutorials/linking#configuring-linkdirs).`,
 				);

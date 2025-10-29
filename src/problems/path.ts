@@ -6,6 +6,7 @@ import { verifyDir } from "../utils.js";
 
 export type PathIssue =
 	| "missing"
+	| "not-directory"
 	| "unreadable"
 	| "unwritable"
 	| "cross-platform-linking"
@@ -47,14 +48,12 @@ export async function diagnoseDirForProblems(
 	const mode =
 		(options.read ? constants.R_OK : 0) |
 		(options.write ? constants.W_OK : 0);
-	const exists = await verifyDir(path, name, mode);
+	const verification = await verifyDir(path, name, mode);
 
-	if (exists) return null;
+	if (verification.ok) return null;
 
-	try {
-		await stat(path);
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+	switch (verification.reason) {
+		case "missing":
 			return {
 				category,
 				name,
@@ -63,19 +62,43 @@ export async function diagnoseDirForProblems(
 				message: "Directory does not exist.",
 				severity: "error",
 			};
-		}
+		case "not-directory":
+			return {
+				category,
+				name,
+				path,
+				issue: "not-directory",
+				message: "Path is not a directory.",
+				severity: "error",
+			};
+		case "unreadable":
+			return {
+				category,
+				name,
+				path,
+				issue: "unreadable",
+				message: "cross-seed cannot read from this directory.",
+				severity: "error",
+			};
+		case "unwritable":
+			return {
+				category,
+				name,
+				path,
+				issue: "unwritable",
+				message: "cross-seed cannot write to this directory.",
+				severity: "error",
+			};
+		default:
+			return {
+				category,
+				name,
+				path,
+				issue: "unreadable",
+				message: "cross-seed cannot access this directory.",
+				severity: "error",
+			};
 	}
-
-	return {
-		category,
-		name,
-		path,
-		issue: options.write ? "unwritable" : "unreadable",
-		message: options.write
-			? "cross-seed cannot write to this directory."
-			: "cross-seed cannot read from this directory.",
-		severity: "error",
-	};
 }
 
 export async function collectPathProblems(): Promise<Problem[]> {
