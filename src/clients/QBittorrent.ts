@@ -291,7 +291,7 @@ export default class QBittorrent implements TorrentClient {
 		path: string,
 		body: BodyInit,
 		headers: Record<string, string> = {},
-		retries = 3,
+		numRetries = 3,
 	): Promise<string | undefined> {
 		const bodyStr =
 			body instanceof URLSearchParams || body instanceof FormData
@@ -301,45 +301,77 @@ export default class QBittorrent implements TorrentClient {
 						(match, hash) =>
 							match.replace(hash, sanitizeInfoHash(hash)),
 					);
-		logger.verbose({
-			label: this.label,
-			message: `Making request (${retries}) to ${path} with body ${bodyStr}`,
-		});
 
 		let response: Response | undefined;
-		try {
-			response = await fetch(`${this.url.href}${path}`, {
-				method: "post",
-				headers: {
-					Cookie: this.cookie,
-					"User-Agent": USER_AGENT,
-					...headers,
-				},
-				body,
-				signal: AbortSignal.timeout(ms("10 minutes")),
-			});
-			if (response.status === 403 && retries > 0) {
+		const retries = Math.max(numRetries, 0);
+		for (let i = 0; i <= retries; i++) {
+			try {
 				logger.verbose({
 					label: this.label,
-					message:
-						"Received 403 from API. Logging in again and retrying",
+					message: `Making request (${retries - i}) to ${path} with body ${bodyStr}`,
 				});
-				await this.login();
-				return await this.request(path, body, headers, retries - 1);
-			}
-		} catch (e) {
-			if (retries > 0) {
+				response = await fetch(`${this.url.href}${path}`, {
+					method: "POST",
+					headers: {
+						Cookie: this.cookie,
+						"User-Agent": USER_AGENT,
+						...headers,
+					},
+					body,
+					signal: AbortSignal.timeout(ms("10 minutes")),
+				});
+				if (response.status === 403) {
+					if (i >= retries) {
+						logger.error({
+							label: this.label,
+							message: `Received 403 from API after ${retries} retries`,
+						});
+						break;
+					}
+					logger.verbose({
+						label: this.label,
+						message: `Received 403 from API, re-authenticating and retrying (${retries - i} retries left)`,
+					});
+					await this.login();
+					await wait(
+						Math.min(ms("1 second") * 2 ** i, ms("10 seconds")),
+					);
+					continue;
+				}
+				if (response.status >= 500 && response.status < 600) {
+					if (i >= retries) {
+						logger.error({
+							label: this.label,
+							message: `Received ${response.status} from API after ${retries} retries`,
+						});
+						break;
+					}
+					logger.verbose({
+						label: this.label,
+						message: `Received ${response.status} from API, ${retries - i} retries remaining`,
+					});
+					await wait(
+						Math.min(ms("1 second") * 2 ** i, ms("10 seconds")),
+					);
+					continue;
+				}
+				break;
+			} catch (e) {
+				if (i >= retries) {
+					logger.error({
+						label: this.label,
+						message: `Request failed after ${retries} retries: ${e.message}`,
+					});
+					logger.debug(e);
+					break;
+				}
 				logger.verbose({
 					label: this.label,
-					message: `Request failed, ${retries} retries remaining: ${e.message}`,
+					message: `Request failed, ${retries - i} retries remaining: ${e.message}`,
 				});
-				return await this.request(path, body, headers, retries - 1);
+				await wait(Math.min(ms("1 second") * 2 ** i, ms("10 seconds")));
+				continue;
 			}
-			logger.verbose({
-				label: this.label,
-				message: `Request failed after ${retries} retries: ${e.message}`,
-			});
-			logger.debug(e);
 		}
 		return response?.text();
 	}
@@ -683,7 +715,7 @@ export default class QBittorrent implements TorrentClient {
 				return torrentInfo;
 			}
 			if (i < retries) {
-				await wait(ms("1 second") * 2 ** i);
+				await wait(Math.min(ms("1 second") * 2 ** i, ms("10 seconds")));
 			}
 		}
 		return undefined;
