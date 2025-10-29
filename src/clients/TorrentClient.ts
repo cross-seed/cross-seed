@@ -21,12 +21,7 @@ import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
 import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
-import {
-	hasExt,
-	humanReadableSize,
-	isTruthy,
-	wait,
-} from "../utils.js";
+import { hasExt, humanReadableSize, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
@@ -197,10 +192,10 @@ export function byClientHostPriority(clientHost: string | undefined): number {
 	);
 }
 
-	export function clientSearcheeModified(
-		label: string,
-		dbTorrent,
-		name: string,
+export function clientSearcheeModified(
+	label: string,
+	dbTorrent,
+	name: string,
 	savePath: string,
 	options: { category?: string; tags?: string[] } = {},
 ): boolean {
@@ -436,8 +431,8 @@ export async function collectClientProblems(): Promise<Problem[]> {
 				clientHost: client.clientHost,
 				readonly: client.readonly,
 			},
-			});
 		});
+	});
 
 	return problems;
 }
@@ -472,7 +467,9 @@ export async function collectClientLinkingProblems(): Promise<Problem[]> {
 			new Set(
 				searchees
 					.map((searchee) => searchee.savePath)
-					.filter((savePath): savePath is string => Boolean(savePath)),
+					.filter((savePath): savePath is string =>
+						Boolean(savePath),
+					),
 			),
 		);
 		if (!uniqueSavePaths.length) continue;
@@ -518,7 +515,9 @@ export async function collectClientLinkingProblems(): Promise<Problem[]> {
 				}
 			} catch (error) {
 				const message =
-					error instanceof Error ? error.message : String(error ?? "");
+					error instanceof Error
+						? error.message
+						: String(error ?? "");
 				problems.push({
 					id: clientProblemId(
 						"linking-error",

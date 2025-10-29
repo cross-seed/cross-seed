@@ -19,9 +19,9 @@ import {
 } from "./logger.js";
 import { initializePushNotifier } from "./pushNotifier.js";
 import {
-        getRuntimeConfig,
-        RuntimeConfig,
-        setRuntimeConfig,
+	getRuntimeConfig,
+	RuntimeConfig,
+	setRuntimeConfig,
 } from "./runtimeConfig.js";
 import { Awaitable, notExists } from "./utils.js";
 import { getLogWatcher } from "./utils/logWatcher.js";
@@ -36,8 +36,8 @@ process.on("SIGINT", exitGracefully);
 process.on("SIGTERM", exitGracefully);
 
 async function ensureConfiguredDirectories(): Promise<void> {
-        const { outputDir, linkDirs = [] } = getRuntimeConfig();
-        const directories: { path: string; label: string }[] = [];
+	const { outputDir, linkDirs = [] } = getRuntimeConfig();
+	const directories: { path: string; label: string }[] = [];
 
 	if (outputDir) {
 		directories.push({ path: outputDir, label: "outputDir" });
@@ -48,7 +48,9 @@ async function ensureConfiguredDirectories(): Promise<void> {
 	}
 
 	for (const { path, label } of directories) {
-		if (!(await notExists(path))) continue;
+		if (!(await notExists(path))) {
+			continue;
+		}
 
 		try {
 			logger.info(`Creating ${label}: ${path}`);
@@ -60,12 +62,13 @@ async function ensureConfiguredDirectories(): Promise<void> {
 				label: Label.SERVER,
 				message: `Failed to create ${label} at ${path}: ${message}`,
 			});
-}
+		}
+	}
 }
 
 export async function doStartupValidation(): Promise<void> {
-        await ensureConfiguredDirectories();
-        instantiateDownloadClients();
+	await ensureConfiguredDirectories();
+	instantiateDownloadClients();
 }
 
 /**

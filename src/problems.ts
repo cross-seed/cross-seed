@@ -35,8 +35,8 @@ const registeredProblemProviders: RegisteredProblemProvider[] = [
 	{ id: "clients", provider: collectClientProblems },
 	{ id: "client-linking", provider: collectClientLinkingProblems },
 	{ id: "arr", provider: collectArrProblems },
-        { id: "paths", provider: collectPathProblems },
-        { id: "linking", provider: collectLinkingProblems },
+	{ id: "paths", provider: collectPathProblems },
+	{ id: "linking", provider: collectLinkingProblems },
 	{ id: "searchees", provider: collectSearcheeProblems },
 	{ id: "recommendations", provider: collectRecommendationProblems },
 ];
