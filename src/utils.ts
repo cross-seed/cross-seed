@@ -399,11 +399,7 @@ export function getAnimeQueries(stem: string): string[] {
  * @returns An array of possible search queries.
  */
 export function getVideoQueries(stem: string): string[] {
-	const videoQueries: string[] = [cleanTitle(stripMetaFromName(stem))];
-	if (!videoQueries[0].length) {
-		videoQueries[0] = stripMetaFromName(stem);
-		if (!videoQueries[0].length) videoQueries[0] = stem;
-	}
+	// Anime that fails MediaType.ANIME often has `[group] Title (Extra Info)`
 	const noParentheses = cleanTitle(
 		stripMetaFromName(
 			stem
@@ -411,14 +407,14 @@ export function getVideoQueries(stem: string): string[] {
 				.replace(ALL_SPACES_REGEX, " ")
 				.trim(),
 		),
-	); // Anime that fails MediaType.ANIME often has `[group] Title (Extra Info)`
-	if (
-		noParentheses.length >= MIN_VIDEO_QUERY_LENGTH &&
-		noParentheses !== videoQueries[0]
-	) {
-		videoQueries.push(noParentheses);
-	}
-	return videoQueries;
+	);
+	if (noParentheses.length >= MIN_VIDEO_QUERY_LENGTH) return [noParentheses];
+
+	let videoQuery = cleanTitle(stripMetaFromName(stem));
+	if (videoQuery.length) return [videoQuery];
+	videoQuery = stripMetaFromName(stem);
+	if (videoQuery.length) return [videoQuery];
+	return [stem];
 }
 
 export function stripMetaFromName(name: string): string {
