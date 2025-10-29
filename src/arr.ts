@@ -303,7 +303,7 @@ async function checkArrUrl(
 
 	try {
 		const response = await fetch(parsedUrl, {
-			signal: AbortSignal.timeout(30_000),
+			signal: AbortSignal.timeout(5_000),
 			headers: { "User-Agent": USER_AGENT },
 		});
 

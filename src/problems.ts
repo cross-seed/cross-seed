@@ -4,7 +4,7 @@ import {
 	collectClientProblems,
 } from "./clients/TorrentClient.js";
 import { collectIndexerProblems } from "./indexers.js";
-import { collectLinkingProblems } from "./problems/linking.js";
+import { collectDataLinkingProblems } from "./problems/linking.js";
 import { collectPathProblems } from "./problems/path.js";
 import { collectRecommendationProblems } from "./runtimeConfig.js";
 import { collectSearcheeProblems } from "./searchee.js";
@@ -36,7 +36,7 @@ const registeredProblemProviders: RegisteredProblemProvider[] = [
 	{ id: "client-linking", provider: collectClientLinkingProblems },
 	{ id: "arr", provider: collectArrProblems },
 	{ id: "paths", provider: collectPathProblems },
-	{ id: "linking", provider: collectLinkingProblems },
+	{ id: "linking", provider: collectDataLinkingProblems },
 	{ id: "searchees", provider: collectSearcheeProblems },
 	{ id: "recommendations", provider: collectRecommendationProblems },
 ];

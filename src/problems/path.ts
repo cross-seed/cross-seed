@@ -1,8 +1,8 @@
-import { constants, stat } from "fs/promises";
+import { constants } from "fs/promises";
 
 import type { Problem } from "../problems.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { verifyDir } from "../utils.js";
+import { DirVerificationResult, verifyDir } from "../utils.js";
 
 export type PathIssue =
 	| "missing"
@@ -28,6 +28,11 @@ export interface PathProblemDescriptor {
 	severity: Problem["severity"];
 }
 
+export interface DirectoryAssessment {
+	descriptor: PathProblemDescriptor | null;
+	verification: DirVerificationResult;
+}
+
 export function buildPathProblem(descriptor: PathProblemDescriptor): Problem {
 	const { category, name, path, issue, message, severity } = descriptor;
 	return {
@@ -44,17 +49,20 @@ export async function diagnoseDirForProblems(
 	name: string,
 	category: PathProblemCategory,
 	options: { read?: boolean; write?: boolean },
-): Promise<PathProblemDescriptor | null> {
+): Promise<DirectoryAssessment> {
 	const mode =
 		(options.read ? constants.R_OK : 0) |
 		(options.write ? constants.W_OK : 0);
 	const verification = await verifyDir(path, name, mode);
 
-	if (verification.ok) return null;
+	if (verification.ok) {
+		return { descriptor: null, verification };
+	}
 
+	let descriptor: PathProblemDescriptor;
 	switch (verification.reason) {
 		case "missing":
-			return {
+			descriptor = {
 				category,
 				name,
 				path,
@@ -62,8 +70,9 @@ export async function diagnoseDirForProblems(
 				message: "Directory does not exist.",
 				severity: "error",
 			};
+			break;
 		case "not-directory":
-			return {
+			descriptor = {
 				category,
 				name,
 				path,
@@ -71,8 +80,9 @@ export async function diagnoseDirForProblems(
 				message: "Path is not a directory.",
 				severity: "error",
 			};
+			break;
 		case "unreadable":
-			return {
+			descriptor = {
 				category,
 				name,
 				path,
@@ -80,8 +90,9 @@ export async function diagnoseDirForProblems(
 				message: "cross-seed cannot read from this directory.",
 				severity: "error",
 			};
+			break;
 		case "unwritable":
-			return {
+			descriptor = {
 				category,
 				name,
 				path,
@@ -89,8 +100,9 @@ export async function diagnoseDirForProblems(
 				message: "cross-seed cannot write to this directory.",
 				severity: "error",
 			};
+			break;
 		default:
-			return {
+			descriptor = {
 				category,
 				name,
 				path,
@@ -98,7 +110,10 @@ export async function diagnoseDirForProblems(
 				message: "cross-seed cannot access this directory.",
 				severity: "error",
 			};
+			break;
 	}
+
+	return { descriptor, verification };
 }
 
 export async function collectPathProblems(): Promise<Problem[]> {
@@ -106,7 +121,7 @@ export async function collectPathProblems(): Promise<Problem[]> {
 	const descriptors: PathProblemDescriptor[] = [];
 
 	if (torrentDir) {
-		const descriptor = await diagnoseDirForProblems(
+		const { descriptor } = await diagnoseDirForProblems(
 			torrentDir,
 			"torrentDir",
 			"torrentDir",
@@ -116,7 +131,7 @@ export async function collectPathProblems(): Promise<Problem[]> {
 	}
 
 	if (outputDir) {
-		const descriptor = await diagnoseDirForProblems(
+		const { descriptor } = await diagnoseDirForProblems(
 			outputDir,
 			"outputDir",
 			"outputDir",
@@ -126,7 +141,7 @@ export async function collectPathProblems(): Promise<Problem[]> {
 	}
 
 	if (injectDir) {
-		const descriptor = await diagnoseDirForProblems(
+		const { descriptor } = await diagnoseDirForProblems(
 			injectDir,
 			"injectDir",
 			"injectDir",

@@ -1,4 +1,5 @@
 import chalk, { ChalkInstance } from "chalk";
+import type { Stats } from "fs";
 import { distance } from "fastest-levenshtein";
 import {
 	access,
@@ -74,7 +75,7 @@ export type DirVerificationFailureReason =
 	| "unwritable";
 
 export type DirVerificationResult =
-	| { ok: true }
+	| { ok: true; stats: Stats }
 	| { ok: false; reason: DirVerificationFailureReason; error?: unknown };
 
 export async function verifyDir(
@@ -109,7 +110,7 @@ export async function verifyDir(
 		return { ok: false, reason: "missing" };
 	}
 
-	let stats;
+	let stats: Stats;
 	try {
 		stats = await stat(srcDir);
 	} catch (error) {
@@ -157,7 +158,7 @@ export async function verifyDir(
 		}
 	}
 
-	return { ok: true };
+	return { ok: true, stats };
 }
 
 export function isChildPath(childPath: string, parentDirs: string[]): boolean {

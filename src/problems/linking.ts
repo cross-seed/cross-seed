@@ -1,5 +1,3 @@
-import { stat } from "fs/promises";
-
 import { testLinking } from "../action.js";
 import { Label, logger } from "../logger.js";
 import type { Problem } from "../problems.js";
@@ -10,7 +8,7 @@ import {
 	PathProblemDescriptor,
 } from "./path.js";
 
-async function collectLinkingProblemDescriptors(
+async function collectDataLinkingProblemDescriptors(
 	linkDirs: string[],
 	dataDirs: string[],
 ): Promise<PathProblemDescriptor[]> {
@@ -19,7 +17,7 @@ async function collectLinkingProblemDescriptors(
 
 	const linkDirStats = await Promise.all(
 		linkDirs.map(async (dir, index) => {
-			const descriptor = await diagnoseDirForProblems(
+			const { descriptor, verification } = await diagnoseDirForProblems(
 				dir,
 				`linkDir${index}`,
 				"linkDirs",
@@ -28,7 +26,8 @@ async function collectLinkingProblemDescriptors(
 			return {
 				path: dir,
 				problem: descriptor,
-				dev: descriptor ? null : (await stat(dir)).dev,
+				ok: verification.ok,
+				dev: verification.ok ? verification.stats.dev : null,
 			};
 		}),
 	);
@@ -38,25 +37,27 @@ async function collectLinkingProblemDescriptors(
 	}
 
 	const validLinkDirs = linkDirStats
-		.filter(({ problem }) => problem === null)
-		.map(({ path, dev }) => ({ path, dev }));
+		.filter(({ ok, dev }) => ok && typeof dev === "number")
+		.map(({ path, dev }) => ({ path, dev: dev! }));
 
 	if (!validLinkDirs.length) return problems;
 
 	for (const [index, dataDir] of dataDirs.entries()) {
-		const descriptor = await diagnoseDirForProblems(
+		const { descriptor, verification } = await diagnoseDirForProblems(
 			dataDir,
 			`dataDir${index}`,
 			"dataDirs",
 			{ read: true },
 		);
-		if (descriptor) {
-			problems.push(descriptor);
+		if (!verification.ok) {
+			if (descriptor) {
+				problems.push(descriptor);
+			}
 			continue;
 		}
 
 		try {
-			const dataDev = (await stat(dataDir)).dev;
+			const dataDev = verification.stats.dev;
 			const matchingLinkDir = validLinkDirs.find(
 				(linkDir) => linkDir.dev === dataDev,
 			);
@@ -105,9 +106,9 @@ async function collectLinkingProblemDescriptors(
 	return problems;
 }
 
-export async function collectLinkingProblems(): Promise<Problem[]> {
+export async function collectDataLinkingProblems(): Promise<Problem[]> {
 	const { linkDirs, dataDirs } = getRuntimeConfig();
-	const descriptors = await collectLinkingProblemDescriptors(
+	const descriptors = await collectDataLinkingProblemDescriptors(
 		linkDirs ?? [],
 		dataDirs ?? [],
 	);
