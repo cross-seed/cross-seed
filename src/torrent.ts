@@ -6,7 +6,6 @@ import { inspect } from "util";
 import {
 	getClients,
 	TorrentMetadataInClient,
-	validateClientSavePaths,
 } from "./clients/TorrentClient.js";
 import { isChildPath } from "./utils.js";
 import {
@@ -463,12 +462,6 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 					onlyCompleted: false,
 					v1HashOnly: true,
 				});
-				await validateClientSavePaths(
-					searchees,
-					infoHashPathMap,
-					clients[0].label,
-					clients[0].clientPriority,
-				);
 			}
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
@@ -477,15 +470,6 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 					includeFiles: true,
 					includeTrackers: true,
 				});
-				await validateClientSavePaths(
-					searchees,
-					searchees.reduce((map, searchee) => {
-						map.set(searchee.infoHash, searchee.savePath);
-						return map;
-					}, new Map<string, string>()),
-					client.label,
-					client.clientPriority,
-				);
 				return searchees;
 			});
 		}
