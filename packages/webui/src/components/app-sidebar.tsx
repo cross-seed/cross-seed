@@ -69,6 +69,11 @@ const navItems = [
         url: '/settings/general',
       },
       {
+        title: 'Health',
+        icon: <AlertTriangle className="size-4" />,
+        url: '/settings/health',
+      },
+      {
         title: 'Trackers',
         icon: <Popcorn className="size-4" />,
         url: '/settings/trackers',
@@ -97,11 +102,6 @@ const navItems = [
         title: 'Logs',
         icon: <FileText className="size-4" />,
         url: '/logs',
-      },
-      {
-        title: 'Problems',
-        icon: <AlertTriangle className="size-4" />,
-        url: '/settings/problems',
       },
     ],
   },

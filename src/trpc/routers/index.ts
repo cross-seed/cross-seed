@@ -5,6 +5,7 @@ import { logsRouter } from "./logs.js";
 import { jobsRouter } from "./jobs.js";
 import { statsRouter } from "./stats.js";
 import { indexersRouter } from "./indexers.js";
+import { healthRouter } from "./health.js";
 
 // Main app router
 export const appRouter = router({
@@ -14,6 +15,7 @@ export const appRouter = router({
 	jobs: jobsRouter,
 	stats: statsRouter,
 	indexers: indexersRouter,
+	health: healthRouter,
 });
 
 // Export type definition of API

@@ -1,3 +1,4 @@
+import type { Problem } from "./problems.js";
 import { Action, LinkType, MatchMode } from "./constants.js";
 import { omitUndefined } from "./utils/object.js";
 
@@ -58,4 +59,20 @@ export function getRuntimeConfig(
 		...runtimeConfig,
 		...omitUndefined(configOverride),
 	};
+}
+
+export function collectRecommendationProblems(): Problem[] {
+	const { matchMode } = getRuntimeConfig();
+	if (matchMode === MatchMode.PARTIAL) return [];
+
+	return [
+		{
+			id: "recommendation:partial-matching",
+			severity: "info",
+			summary: "Enable partial matching for better results",
+			details:
+				"Partial matching skips tiny files and improves match success. Enable it under Settings → Search & RSS when linking is available.",
+			metadata: { recommendation: true },
+		},
+	];
 }
