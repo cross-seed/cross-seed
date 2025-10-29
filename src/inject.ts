@@ -94,6 +94,7 @@ type InjectionAftermath = {
 	injectionResult: InjectionResult;
 	matchedSearchee?: SearcheeWithLabel;
 	filePathLog: string;
+	destinationDir?: string;
 	linkedNewFiles: boolean;
 };
 
@@ -246,6 +247,7 @@ async function injectInitialAction(
 	injectionResult: InjectionResult;
 	matchedSearchee?: SearcheeWithLabel;
 	matchedDecision?: DecisionAnyMatch;
+	destinationDir?: string;
 	linkedNewFiles: boolean;
 }> {
 	let client: TorrentClient | undefined;
@@ -253,6 +255,7 @@ async function injectInitialAction(
 	let injectionResult = InjectionResult.FAILURE;
 	let matchedSearchee: SearcheeWithLabel | undefined;
 	let matchedDecision: DecisionAnyMatch | undefined;
+	let destinationDir: string | undefined;
 	let linkedNewFiles = false;
 	for (const { searchee, decision } of matches) {
 		const res = await performActionWithoutMutex(
@@ -273,6 +276,7 @@ async function injectInitialAction(
 		if (injectionResult === InjectionResult.SUCCESS) continue;
 		if (actionResult === InjectionResult.ALREADY_EXISTS) {
 			client = res.client;
+			destinationDir = res.destinationDir;
 			injectionResult = actionResult;
 			continue;
 		}
@@ -283,6 +287,7 @@ async function injectInitialAction(
 			continue;
 		}
 		client = res.client;
+		destinationDir = res.destinationDir;
 		injectionResult = InjectionResult.SUCCESS;
 		matchedSearchee = searchee;
 		matchedDecision = decision;
@@ -293,6 +298,7 @@ async function injectInitialAction(
 		injectionResult,
 		matchedSearchee,
 		matchedDecision,
+		destinationDir,
 		linkedNewFiles,
 	};
 }
@@ -500,9 +506,11 @@ function injectionSuccess(
 		meta,
 		tracker,
 		filePathLog,
+		destinationDir,
 	}: InjectionAftermath,
 	searchees: SearcheeWithLabel[],
 ) {
+	const { useClientTorrents } = getRuntimeConfig();
 	logger.info({
 		label: Label.INJECT,
 		message: `${progress} Injected ${filePathLog} - ${chalk.green(injectionResult)}`,
@@ -524,7 +532,18 @@ function injectionSuccess(
 		deleteTorrentFileIfComplete(torrentFilePath, client!, meta.infoHash),
 	);
 	const res = createSearcheeFromMetafile(meta);
-	if (res.isOk()) searchees.push({ ...res.unwrap(), label: Label.INJECT });
+	if (res.isOk()) {
+		searchees.push(
+			useClientTorrents
+				? {
+						...res.unwrap(),
+						label: Label.INJECT,
+						clientHost: client!.clientHost,
+						savePath: destinationDir!,
+					}
+				: { ...res.unwrap(), label: Label.INJECT },
+		);
+	}
 }
 
 async function loadMetafile(
@@ -626,6 +645,7 @@ async function injectSavedTorrent(
 		injectionResult,
 		matchedSearchee,
 		matchedDecision,
+		destinationDir,
 		linkedNewFiles,
 	} = await injectInitialAction(meta, matches, tracker);
 
@@ -640,6 +660,7 @@ async function injectSavedTorrent(
 		clientMatches,
 		matchedSearchee,
 		matchedDecision,
+		destinationDir,
 		linkedNewFiles,
 		filePathLog,
 	};
