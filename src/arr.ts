@@ -377,8 +377,7 @@ export async function collectArrProblems(): Promise<Problem[]> {
 			id: "arr:not-configured",
 			severity: "info",
 			summary: "Sonarr/Radarr integrations are not configured.",
-			details:
-				"Configure Arr URLs if you want cross-seed to sync release history or send notifications.",
+			details: "Configure Arr URLs for more accurate tracker searches.",
 		});
 		return problems;
 	}
