@@ -71,6 +71,7 @@ type ActionReturn =
 			actionResult:
 				| InjectionResult.SUCCESS
 				| InjectionResult.ALREADY_EXISTS;
+			destinationDir?: string;
 			linkedNewFiles: boolean;
 	  }
 	| {
@@ -704,7 +705,12 @@ export async function performActionWithoutMutex(
 		if (actionResult === InjectionResult.FAILURE) {
 			return { actionResult, linkedNewFiles };
 		}
-		return { client, actionResult, linkedNewFiles };
+		return {
+			client,
+			actionResult,
+			destinationDir: destinationDir ?? searchee.savePath,
+			linkedNewFiles,
+		};
 	} catch (e) {
 		logger.error({
 			label: searchee.label,
