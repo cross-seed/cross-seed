@@ -815,8 +815,11 @@ async function findSearchableTorrents(options?: {
 export async function bulkSearch(options?: {
 	configOverride: Partial<RuntimeConfig>;
 }): Promise<void> {
+	const searchOptions = options?.configOverride
+		? { configOverride: options.configOverride }
+		: undefined;
 	const { searchees, infoHashesToExclude } =
-		await findSearchableTorrents(options);
+		await findSearchableTorrents(searchOptions);
 
 	const totalFound = await findMatchesBatch(
 		searchees,
@@ -834,6 +837,64 @@ export async function bulkSearch(options?: {
 			)} original torrents`,
 		),
 	});
+}
+
+export async function bulkSearchByNames(
+	names: string[],
+	options?: { configOverride?: Partial<RuntimeConfig> },
+): Promise<{ attempted: number; totalFound: number; requested: number }> {
+	const normalizedNames = Array.from(
+		new Set(
+			names
+				.map((name) => name.trim())
+				.filter((name) => name.length > 0 && name.length <= 500),
+		),
+	);
+
+	if (!normalizedNames.length) {
+		return { attempted: 0, totalFound: 0, requested: 0 };
+	}
+
+	const nameSet = new Set(normalizedNames);
+	const searchOptions = options?.configOverride
+		? { configOverride: options.configOverride }
+		: undefined;
+	const { searchees, infoHashesToExclude } =
+		await findSearchableTorrents(searchOptions);
+
+	const selectedSearchees = searchees.filter((searchee) => {
+		const titleOrName = searchee.title ?? searchee.name;
+		return titleOrName ? nameSet.has(titleOrName) : false;
+	});
+
+	if (!selectedSearchees.length) {
+		logger.warn({
+			label: Label.SEARCH,
+			message: `Manual bulk search requested for ${normalizedNames.length} items, but none were eligible after filtering`,
+		});
+		return {
+			attempted: 0,
+			totalFound: 0,
+			requested: normalizedNames.length,
+		};
+	}
+
+	logger.info({
+		label: Label.SEARCH,
+		message: `Starting manual bulk search for ${selectedSearchees.length}/${normalizedNames.length} selected items`,
+	});
+
+	const totalFound = await findMatchesBatch(
+		selectedSearchees,
+		infoHashesToExclude,
+		searchOptions,
+	);
+
+	return {
+		attempted: selectedSearchees.length,
+		totalFound,
+		requested: normalizedNames.length,
+	};
 }
 
 export async function scanRssFeeds() {

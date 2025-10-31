@@ -18,7 +18,7 @@ function SubmitButton() {
         ]}
       >
         {([canSubmit, isSubmitting, errors, fieldMeta]) => (
-          <div className="form__submit bg-background sticky right-0 bottom-0 w-full left-0 py-4">
+          <div className="form__submit bg-background sticky right-0 bottom-0 left-0 w-full py-4">
             <Button
               type="submit"
               className={cn(

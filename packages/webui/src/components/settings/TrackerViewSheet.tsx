@@ -159,9 +159,7 @@ export default function TrackerViewSheet({
               <Badge variant={tracker.enabled ? 'default' : 'secondary'}>
                 {tracker.enabled ? 'Enabled' : 'Disabled'}
               </Badge>
-              {!tracker.active && (
-                <Badge variant="destructive">Archived</Badge>
-              )}
+              {!tracker.active && <Badge variant="destructive">Archived</Badge>}
             </div>
           </div>
 
