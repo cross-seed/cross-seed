@@ -39,11 +39,12 @@ function DebugSettings() {
     const textarea = textareaRef.current;
     if (textarea) {
       // Preserve the document scroll position
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      
+      const scrollTop =
+        window.pageYOffset || document.documentElement.scrollTop;
+
       textarea.style.height = 'auto';
       textarea.style.height = `${textarea.scrollHeight}px`;
-      
+
       // Restore the scroll position after layout recalculation
       requestAnimationFrame(() => {
         window.scrollTo(0, scrollTop);
@@ -141,26 +142,26 @@ function DebugSettings() {
           </p>
         </div>
 
-          <div className="relative">
-            <textarea
-              ref={textareaRef}
-              value={jsonValue}
-              onChange={(e) => handleJsonChange(e.target.value)}
-              className={`min-h-96 w-full resize-none rounded-md border p-3 font-mono text-sm overflow-hidden ${
-                isValid
-                  ? 'border-gray-300 dark:border-gray-600'
-                  : 'border-red-500 dark:border-red-400'
-              } bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100`}
-              spellCheck={false}
-              placeholder="Loading settings..."
-            />
-          </div>
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={jsonValue}
+            onChange={(e) => handleJsonChange(e.target.value)}
+            className={`min-h-96 w-full resize-none overflow-hidden rounded-md border p-3 font-mono text-sm ${
+              isValid
+                ? 'border-gray-300 dark:border-gray-600'
+                : 'border-red-500 dark:border-red-400'
+            } bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100`}
+            spellCheck={false}
+            placeholder="Loading settings..."
+          />
+        </div>
 
-          {!isValid && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-              <strong>JSON Error:</strong> {parseError}
-            </div>
-          )}
+        {!isValid && (
+          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+            <strong>JSON Error:</strong> {parseError}
+          </div>
+        )}
       </div>
     </Page>
   );

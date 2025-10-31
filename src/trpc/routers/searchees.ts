@@ -1,12 +1,14 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, authedProcedure } from "../index.js";
 import { db } from "../../db.js";
-import { findAllSearchees } from "../../pipeline.js";
+import { findAllSearchees, bulkSearchByNames } from "../../pipeline.js";
 import { Label } from "../../logger.js";
 import { getSearcheeSource } from "../../searchee.js";
 import { getAllIndexers, getEnabledIndexers } from "../../indexers.js";
 
 const DEFAULT_LIMIT = 50;
+const MAX_BULK_SEARCH = 20;
 
 export const searcheesRouter = router({
 	list: authedProcedure
@@ -62,17 +64,18 @@ export const searcheesRouter = router({
 				.limit(limit)
 				.offset(offset);
 
-			const [allSearchees, allIndexers, enabledIndexers] =
-				await Promise.all([
-					findAllSearchees(Label.SEARCH),
-					getAllIndexers(),
-					getEnabledIndexers(),
-				]);
+				const [allSearchees, allIndexers, enabledIndexers] =
+					await Promise.all([
+						findAllSearchees(Label.SEARCH),
+						getAllIndexers(),
+						getEnabledIndexers(),
+					]);
 
-			const searcheeMeta = new Map<
-				string,
-				(typeof allSearchees)[number]
-			>();
+				// TODO: drop the in-memory metadata lookup when searchee rows expose persistent IDs directly via TRPC.
+				const searcheeMeta = new Map<
+					string,
+					(typeof allSearchees)[number]
+				>();
 			for (const searchee of allSearchees) {
 				const keyCandidates = [searchee.title, searchee.name].filter(
 					(candidate): candidate is string =>
@@ -131,11 +134,62 @@ export const searcheesRouter = router({
 
 			return {
 				total: Number(count ?? 0),
+				pagination: {
+					limit,
+					offset,
+				},
 				indexerTotals: {
 					configured: allIndexers.length,
 					enabled: enabledIndexers.length,
 				},
 				items,
+			};
+			}),
+	bulkSearch: authedProcedure
+		.input(
+			z.object({
+				names: z
+					.array(z.string().trim().min(1).max(500))
+					.min(1, "Select at least one item")
+					.max(
+						MAX_BULK_SEARCH,
+						`You can only bulk search up to ${MAX_BULK_SEARCH} items at a time`,
+					),
+				force: z.boolean().optional().default(false),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			const uniqueNames = Array.from(
+				new Set(
+					input.names
+						.map((name) => name.trim())
+						.filter((name) => name.length > 0),
+					),
+				);
+
+			if (!uniqueNames.length) {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "No valid item names provided for bulk search",
+				});
+			}
+
+			const configOverride = input.force
+				? {
+					excludeRecentSearch: 1,
+					excludeOlder: Number.MAX_SAFE_INTEGER,
+				}
+				: undefined;
+			const { attempted, totalFound, requested } = await bulkSearchByNames(
+				uniqueNames,
+				configOverride ? { configOverride } : undefined,
+			);
+
+			return {
+				requested,
+				attempted,
+				totalFound,
+				skipped: Math.max(requested - attempted, 0),
 			};
 		}),
 });
