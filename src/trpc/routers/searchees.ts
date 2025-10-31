@@ -64,18 +64,18 @@ export const searcheesRouter = router({
 				.limit(limit)
 				.offset(offset);
 
-				const [allSearchees, allIndexers, enabledIndexers] =
-					await Promise.all([
-						findAllSearchees(Label.SEARCH),
-						getAllIndexers(),
-						getEnabledIndexers(),
-					]);
+			const [allSearchees, allIndexers, enabledIndexers] =
+				await Promise.all([
+					findAllSearchees(Label.SEARCH),
+					getAllIndexers(),
+					getEnabledIndexers(),
+				]);
 
-				// TODO: drop the in-memory metadata lookup when searchee rows expose persistent IDs directly via TRPC.
-				const searcheeMeta = new Map<
-					string,
-					(typeof allSearchees)[number]
-				>();
+			// TODO: drop the in-memory metadata lookup when searchee rows expose persistent IDs directly via TRPC.
+			const searcheeMeta = new Map<
+				string,
+				(typeof allSearchees)[number]
+			>();
 			for (const searchee of allSearchees) {
 				const keyCandidates = [searchee.title, searchee.name].filter(
 					(candidate): candidate is string =>
@@ -144,7 +144,7 @@ export const searcheesRouter = router({
 				},
 				items,
 			};
-			}),
+		}),
 	bulkSearch: authedProcedure
 		.input(
 			z.object({
@@ -164,8 +164,8 @@ export const searcheesRouter = router({
 					input.names
 						.map((name) => name.trim())
 						.filter((name) => name.length > 0),
-					),
-				);
+				),
+			);
 
 			if (!uniqueNames.length) {
 				throw new TRPCError({
@@ -176,14 +176,15 @@ export const searcheesRouter = router({
 
 			const configOverride = input.force
 				? {
-					excludeRecentSearch: 1,
-					excludeOlder: Number.MAX_SAFE_INTEGER,
-				}
+						excludeRecentSearch: 1,
+						excludeOlder: Number.MAX_SAFE_INTEGER,
+					}
 				: undefined;
-			const { attempted, totalFound, requested } = await bulkSearchByNames(
-				uniqueNames,
-				configOverride ? { configOverride } : undefined,
-			);
+			const { attempted, totalFound, requested } =
+				await bulkSearchByNames(
+					uniqueNames,
+					configOverride ? { configOverride } : undefined,
+				);
 
 			return {
 				requested,
