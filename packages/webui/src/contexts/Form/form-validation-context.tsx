@@ -4,4 +4,5 @@ interface FormValidationContextValue {
   isFieldRequired: (fieldName: string) => boolean;
 }
 
-export const FormValidationContext = createContext<FormValidationContextValue | null>(null);
+export const FormValidationContext =
+  createContext<FormValidationContextValue | null>(null);

@@ -18,7 +18,7 @@ export function LoadingSpinner({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center gap-2 min-h-screen">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-2">
       <svg
         className={cn(
           'text-primary animate-spin [animation-duration:1.5s]',

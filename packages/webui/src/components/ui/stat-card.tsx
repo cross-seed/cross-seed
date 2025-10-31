@@ -21,7 +21,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'rounded-lg border bg-card p-6 text-card-foreground shadow-sm',
+        'bg-card text-card-foreground rounded-lg border p-6 shadow-sm',
         className,
       )}
     >
@@ -31,7 +31,7 @@ export function StatCard({
       <div className="flex items-center space-x-2">
         <div className="text-2xl font-bold">{value}</div>
         {trend && (
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             <span
               className={cn(
                 'font-medium',
@@ -46,7 +46,7 @@ export function StatCard({
         )}
       </div>
       {description && (
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="text-muted-foreground text-xs">{description}</p>
       )}
     </div>
   );

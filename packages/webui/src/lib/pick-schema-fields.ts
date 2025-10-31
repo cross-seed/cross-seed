@@ -16,20 +16,20 @@ interface PickOptions {
  */
 export function pickSchemaFields<
   TSchema extends z.ZodRawShape,
-  TData extends StringKeyRecord
+  TData extends StringKeyRecord,
 >(
   schema: z.ZodObject<TSchema>,
   data: TData,
-  options: PickOptions = {}
+  options: PickOptions = {},
 ): Partial<z.infer<z.ZodObject<TSchema>>> {
   const { includeUndefined = false, preserveArrays = true } = options;
   const schemaKeys = Object.keys(schema.shape) as SchemaKeys<TSchema>[];
-  
+
   const result: StringKeyRecord = {};
-  
+
   for (const key of schemaKeys) {
     const value = data[key];
-    
+
     if (includeUndefined || key in data) {
       // Handle arrays
       if (preserveArrays && Array.isArray(value)) {
@@ -40,9 +40,9 @@ export function pickSchemaFields<
         const schemaField = schema.shape[key];
         if (schemaField instanceof z.ZodObject) {
           result[key] = pickSchemaFields(
-            schemaField, 
-            value as StringKeyRecord, 
-            options
+            schemaField,
+            value as StringKeyRecord,
+            options,
           );
         } else {
           result[key] = value;
@@ -54,7 +54,6 @@ export function pickSchemaFields<
       }
     }
   }
-  
+
   return result as Partial<z.infer<z.ZodObject<TSchema>>>;
 }
-

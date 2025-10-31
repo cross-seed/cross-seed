@@ -201,15 +201,17 @@ function TrackerSettings() {
     return <Badge variant="outline">{indexer.status}</Badge>;
   };
 
-  type TrackerWithCaps = Pick<
-    Tracker,
-    | 'searchCap'
-    | 'tvSearchCap'
-    | 'movieSearchCap'
-    | 'musicSearchCap'
-    | 'audioSearchCap'
-    | 'bookSearchCap'
-  > | ArchivedTracker;
+  type TrackerWithCaps =
+    | Pick<
+        Tracker,
+        | 'searchCap'
+        | 'tvSearchCap'
+        | 'movieSearchCap'
+        | 'musicSearchCap'
+        | 'audioSearchCap'
+        | 'bookSearchCap'
+      >
+    | ArchivedTracker;
 
   const getCapsBadges = (indexer: TrackerWithCaps) => {
     const caps = [];

@@ -111,7 +111,6 @@ export default function TrackerEditSheet({
     }),
   );
 
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -131,7 +130,9 @@ export default function TrackerEditSheet({
     try {
       const urlObj = new URL(trimmedUrl);
       if (!urlObj.searchParams.has('apikey')) {
-        toast.error('URL must include apikey parameter (e.g., ?apikey=YOUR_KEY)');
+        toast.error(
+          'URL must include apikey parameter (e.g., ?apikey=YOUR_KEY)',
+        );
         return;
       }
     } catch {
@@ -167,7 +168,7 @@ export default function TrackerEditSheet({
       toast.error('URL and API key are required for testing');
       return;
     }
-    
+
     setIsTesting(true);
     testNewIndexer({
       url: url.trim(),
@@ -205,10 +206,7 @@ export default function TrackerEditSheet({
             </div>
 
             <div className="flex items-center justify-between">
-              <Label
-                htmlFor="tracker-enabled"
-                className="text-sm font-medium"
-              >
+              <Label htmlFor="tracker-enabled" className="text-sm font-medium">
                 Enable Search and RSS
               </Label>
               <Switch
