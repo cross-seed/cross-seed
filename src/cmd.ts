@@ -268,6 +268,12 @@ function createCommandWithSharedOptions(name: string, description: string) {
 			fallback(fileConfig.blockList, []),
 		)
 		.option(
+			"--title-filter-list <strings...>",
+			"Text which should be ignored if it appears in the torrent title (eg, tracker names)",
+			// @ts-expect-error commander supports non-string defaults
+			fallback(fileConfig.titleFilterList, []),
+		)
+		.option(
 			"--sonarr <urls...>",
 			"Sonarr API URL(s)",
 			// @ts-expect-error commander supports non-string defaults

@@ -32,6 +32,7 @@ import {
 import { logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { File, getAllTitles, Searchee } from "./searchee.js";
+import { getRuntimeConfig } from "./runtimeConfig.js";
 
 // ================================== TYPES ==================================
 
@@ -334,6 +335,10 @@ export function cleanseSeparators(str: string): string {
 }
 
 export function cleanTitle(title: string): string {
+	const { titleFilterList } = getRuntimeConfig();
+	for(const toRemove of titleFilterList){
+		title = title.replace(toRemove,"");
+	}
 	return cleanseSeparators(title).match(SCENE_TITLE_REGEX)!.groups!.title;
 }
 
