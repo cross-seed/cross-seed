@@ -13,6 +13,8 @@ export interface RuntimeConfig {
 	linkType: LinkType;
 	flatLinking: boolean;
 	maxDataDepth: number;
+	categoryTemplate: string;
+	tagsTemplate: string[];
 	linkCategory?: string;
 	torrentDir?: string;
 	outputDir: string;
