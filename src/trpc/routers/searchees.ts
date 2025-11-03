@@ -32,16 +32,16 @@ export const searcheesRouter = router({
 		.query(async ({ input }) => {
 			const { search, limit, offset } = input;
 
-			const baseQuery = db("searchee").modify((qb) => {
-				if (!search) return;
-				qb.where("searchee.name", "like", `%${search}%`);
-			});
+			let query = db("searchee");
+			if (search) {
+				query = query.where("searchee.name", "like", `%${search}%`);
+			}
 
-			const [{ count }] = await baseQuery
+			const [{ count }] = await query
 				.clone()
 				.count<{ count: string | number }>({ count: "*" });
 
-			const rows = await baseQuery
+			const rows = await query
 				.clone()
 				.leftJoin("timestamp", "searchee.id", "timestamp.searchee_id")
 				.select({
