@@ -1035,12 +1035,9 @@ async function getAndLogIndexers(
 	const indexersToUse = timeFilteredIndexers.filter((indexer) =>
 		indexerDoesSupportMediaType(mediaType, indexer),
 	);
-	if (disabledIndexers.length) {
-		logger.verbose({
-			label: searchee.label,
-			message: `Skipping searching for ${searcheeLog} on temporarily disabled indexers [${disabledIndexers.map((i) => i.name ?? i.url).join(", ")}]`,
-		});
-	}
+	const disabledMsg = disabledIndexers.length
+		? `Skipping searching for ${searcheeLog} on temporarily disabled indexers [${disabledIndexers.map((i) => i.name ?? i.url).join(", ")}]`
+		: null;
 
 	// Invalidate cache if searchStr or ids is different
 	let shouldScanArr = true;
@@ -1084,12 +1081,9 @@ async function getAndLogIndexers(
 		);
 		return true;
 	});
-	if (searchLimitedIndexers.length) {
-		logger.verbose({
-			label: searchee.label,
-			message: `Skipping searching for ${searcheeLog} due to search limit on [${searchLimitedIndexers.map((i) => i.name ?? i.url).join(", ")}]`,
-		});
-	}
+	const searchLimitedMsg = searchLimitedIndexers.length
+		? `Skipping searching for ${searcheeLog} due to search limit on [${searchLimitedIndexers.map((i) => i.name ?? i.url).join(", ")}]`
+		: null;
 
 	if (!indexersToSearch.length && !cachedSearch.indexerCandidates.length) {
 		cachedSearch.q = null; // Won't scan arrs for multiple skips in a row
@@ -1107,6 +1101,15 @@ async function getAndLogIndexers(
 			label: searchee.label,
 			message: `${progress}Skipped searching on indexers for ${searcheeLog}${reasonStr} | MediaType: ${mediaTypeLog} | IDs: N/A`,
 		});
+		if (searchLimitedMsg) {
+			logger.verbose({
+				label: searchee.label,
+				message: searchLimitedMsg,
+			});
+		}
+		if (disabledMsg) {
+			logger.verbose({ label: searchee.label, message: disabledMsg });
+		}
 		return { indexersToSearch };
 	}
 
@@ -1127,6 +1130,12 @@ async function getAndLogIndexers(
 		label: searchee.label,
 		message: `${progress}Searching for ${searcheeLog} | MediaType: ${mediaTypeLog} | IDs: ${idsStr}`,
 	});
+	if (searchLimitedMsg) {
+		logger.verbose({ label: searchee.label, message: searchLimitedMsg });
+	}
+	if (disabledMsg) {
+		logger.verbose({ label: searchee.label, message: disabledMsg });
+	}
 
 	return { indexersToSearch, parsedMedia };
 }
