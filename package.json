@@ -14,8 +14,7 @@
 		"dev:backend": "node --watch dist/cmd.js daemon",
 		"dev:frontend": "cd packages/webui && npm run dev",
 		"prepublishOnly": "rimraf dist && npm run build:all && husky install",
-		"lint": "prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' && eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'",
-		"typecheck": "tsc --noEmit",
+		"lint": "concurrently --names \"Prettier,ESLint,TypeScript\" \"prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"tsc --noEmit\"",
 		"format": "prettier --write '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' package.json"
 	},
 	"bin": {

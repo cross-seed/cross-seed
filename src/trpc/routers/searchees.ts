@@ -90,6 +90,7 @@ export const searcheesRouter = router({
 
 			const items = rows.map((row) => {
 				const displayName =
+					// @ts-expect-error something funky going on with knex types
 					typeof row.name === "string" && row.name.length
 						? row.name
 						: "(unknown)";
