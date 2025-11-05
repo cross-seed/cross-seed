@@ -16,6 +16,7 @@ class LogWatcher {
 	private watchers = new Map<string, ReturnType<typeof watch>>();
 	private subscribers = new Set<LogCallback>();
 	private lastPositions = new Map<string, number>();
+	private retryTimers = new Map<string, NodeJS.Timeout>();
 
 	constructor() {
 		this.startWatching();
@@ -38,20 +39,58 @@ class LogWatcher {
 		// Initialize position to end of file (only watch new entries)
 		void this.initializePosition(filePath);
 
+		const clearRetryTimer = () => {
+			const existingTimer = this.retryTimers.get(filePath);
+			if (existingTimer) {
+				clearTimeout(existingTimer);
+				this.retryTimers.delete(filePath);
+			}
+		};
+
+		const scheduleRetry = () => {
+			if (this.retryTimers.has(filePath)) {
+				return;
+			}
+			const timeout = setTimeout(() => {
+				this.retryTimers.delete(filePath);
+				this.watchLogFile(filePath);
+			}, 1000);
+			if (typeof timeout.unref === "function") {
+				timeout.unref();
+			}
+			this.retryTimers.set(filePath, timeout);
+		};
+
 		try {
 			const watcher = watch(filePath, (eventType) => {
 				if (eventType === "change") {
 					void this.handleFileChange(filePath);
+				} else if (eventType === "rename") {
+					// File was rotated or replaced - reset position and retry watching
+					this.lastPositions.set(filePath, 0);
+					this.watchers.get(filePath)?.close();
+					this.watchers.delete(filePath);
+					scheduleRetry();
 				}
 			});
 
-			watcher.on("error", (error) => {
+			watcher.on("error", (error: NodeJS.ErrnoException) => {
 				console.error(`Error watching ${filePath}:`, error);
+				this.watchers.delete(filePath);
+				if (error.code === "ENOENT") {
+					scheduleRetry();
+				}
 			});
 
+			clearRetryTimer();
 			this.watchers.set(filePath, watcher);
 		} catch (error) {
-			console.error(`Failed to watch ${filePath}:`, error);
+			const err = error as NodeJS.ErrnoException;
+			if (err.code === "ENOENT") {
+				scheduleRetry();
+			} else {
+				console.error(`Failed to watch ${filePath}:`, error);
+			}
 		}
 	}
 
@@ -191,6 +230,10 @@ class LogWatcher {
 		}
 		this.watchers.clear();
 		this.subscribers.clear();
+		for (const timer of this.retryTimers.values()) {
+			clearTimeout(timer);
+		}
+		this.retryTimers.clear();
 	}
 }
 
