@@ -20,7 +20,7 @@ export function formatConfigDataForForm(config: Config) {
     // Update empty array fields to have an empty string so the form
     // fields show
     dataDirs: config.dataDirs?.length ? config.dataDirs : [''],
-    linkDirs: config.linkDirs.length ? config.linkDirs : [''],
+    linkDirs: config.linkDirs?.length ? config.linkDirs : [''],
     torznab: config.torznab?.length ? config.torznab : [''],
     sonarr: config.sonarr?.length ? config.sonarr : [''],
     radarr: config.radarr?.length ? config.radarr : [''],
@@ -28,14 +28,12 @@ export function formatConfigDataForForm(config: Config) {
       ? config.notificationWebhookUrls
       : [''],
     blockList: config.blockList?.length ? config.blockList : [''],
-    excludeOlder: convertNumberToRelativeTime(Number(config.excludeOlder)),
-    excludeRecentSearch: convertNumberToRelativeTime(
-      Number(config.excludeRecentSearch),
-    ),
-    rssCadence: convertNumberToRelativeTime(Number(config.rssCadence)),
-    searchCadence: convertNumberToRelativeTime(Number(config.searchCadence)),
-    snatchTimeout: convertNumberToRelativeTime(Number(config.snatchTimeout)),
-    searchTimeout: convertNumberToRelativeTime(Number(config.searchTimeout)),
+    excludeOlder: formatDuration(config.excludeOlder),
+    excludeRecentSearch: formatDuration(config.excludeRecentSearch),
+    rssCadence: formatDuration(config.rssCadence),
+    searchCadence: formatDuration(config.searchCadence),
+    snatchTimeout: formatDuration(config.snatchTimeout),
+    searchTimeout: formatDuration(config.searchTimeout),
   };
 }
 
@@ -45,6 +43,14 @@ export function formatConfigDataForForm(config: Config) {
  * @param value - The number of milliseconds to convert.
  * @returns A human-readable relative time string (e.g. "1 minute", "2 hours", "3 days").
  */
-export function convertNumberToRelativeTime(value: number) {
+export function formatDuration(value: number | null | undefined): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  if (!Number.isFinite(value)) {
+    return '';
+  }
+
   return ms(value, { long: true });
 }

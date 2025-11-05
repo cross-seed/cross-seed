@@ -6,13 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
-import { removeEmptyArrayValues } from '@/lib/transformers';
 import { searchValidationSchema } from '@/types/config';
 import useConfigForm from '@/hooks/use-config-form';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
-import { useEffect } from 'react';
-import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
 import { SettingsLayout } from '@/components/SettingsLayout';
 import { Page } from '@/components/Page';
@@ -30,68 +27,50 @@ const SearchRssSettings = withForm({
       trpc.settings.get.queryOptions(undefined, {
         select: (data) => {
           const fullDataset = formatConfigDataForForm(data.config);
-          const filteredData = pickSchemaFields(
+          const defaults = pickSchemaFields(
             searchValidationSchema,
             fullDataset,
             { includeUndefined: true },
           );
 
-          return filteredData;
+          const original = pickSchemaFields(
+            searchValidationSchema,
+            data.config,
+            { includeUndefined: true },
+          );
+
+          return {
+            defaults,
+            original,
+          };
         },
       }),
     );
 
     const {
       saveConfig,
-      isSuccess,
       // isLoading: isSaving,
       // isError: isSaveError,
     } = useSaveConfigHook();
 
     const form = useAppForm({
       ...formOpts,
-      defaultValues: configData ?? formOpts.defaultValues,
+      defaultValues: configData?.defaults ?? formOpts.defaultValues,
       onSubmit: async ({ value }) => {
         // Full schema validation
         // Fake a long response delay
         // setTimeout(() => {
-        try {
-          const result = searchValidationSchema.safeParse(value);
-          if (!result.success) {
-            console.error('FULL VALIDATION FAILED:', result.error.format());
-          } else {
-            // remove empty values from array fields
-            Object.keys(value).forEach((attr) => {
-              const val = value[attr as keyof typeof configData];
-              if (val && Array.isArray(val)) {
-                value[attr as keyof typeof configData] =
-                  removeEmptyArrayValues(val);
-              }
-            });
-
-            saveConfig(value);
-          }
-        } catch (err) {
-          console.error('Exception during full validation:', err);
-          return {
-            status: 'error',
-            error: { _form: 'An unexpected error occurred during validation' },
-          };
-        }
+        saveConfig({
+          value,
+          schema: searchValidationSchema,
+          originalValues: configData?.original ?? {},
+        });
         // }, 2000);
       },
       validators: {
         onSubmit: searchValidationSchema,
       },
     });
-
-    useEffect(() => {
-      if (isSuccess) {
-        toast.success('Configuration saved successfully!', {
-          description: 'Your changes will take effect on the next restart.',
-        });
-      }
-    }, [isSuccess]);
 
     return (
       <Page>

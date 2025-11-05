@@ -1,3 +1,4 @@
+import ms from 'ms';
 import { z } from 'zod';
 import {
   Action,
@@ -6,16 +7,38 @@ import {
   ZodErrorMessages,
 } from '../../../shared/constants';
 
+const durationInput = z
+  .preprocess((value) => {
+    if (value === null || value === undefined || value === '') {
+      return undefined;
+    }
+
+    if (typeof value === 'number') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      try {
+        return ms(value);
+      } catch {
+        return Number.NaN;
+      }
+    }
+
+    return value;
+  }, z.number({ invalid_type_error: ZodErrorMessages.vercel }))
+  .refine(
+    (value) => value === undefined || Number.isFinite(value),
+    ZodErrorMessages.vercel,
+  )
+  .optional();
+
 export const generalValidationSchema = z.object({
   includeSingleEpisodes: z.boolean(),
   includeNonVideos: z.boolean(),
   blockList: z.array(z.string()).nullish(),
   // .transform(transformBlocklist),
-  snatchTimeout: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullish(),
+  snatchTimeout: durationInput,
   autoResumeMaxDownload: z
     .number()
     .int()
@@ -74,11 +97,7 @@ export const searchValidationSchema = z.object({
     .gte(30, ZodErrorMessages.delayUnsupported)
     .lte(3600, ZodErrorMessages.delayUnsupported),
   matchMode: z.nativeEnum(MatchMode),
-  rssCadence: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullish(),
+  rssCadence: durationInput,
   // .refine(
   // 	(cadence) =>
   // 		process.env.DEV ||
@@ -86,32 +105,16 @@ export const searchValidationSchema = z.object({
   // 		(cadence >= ms("10 minutes") && cadence <= ms("2 hours")),
   // 	ZodErrorMessages.rssCadenceUnsupported,
   // ),
-  searchCadence: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullish(),
+  searchCadence: durationInput,
   // .refine(
   // 	(cadence) =>
   // 		process.env.DEV || !cadence || cadence >= ms("1 day"),
   // 	ZodErrorMessages.searchCadenceUnsupported,
   // ),
-  searchTimeout: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullish(),
+  searchTimeout: durationInput,
   searchLimit: z.number().nonnegative().nullish(),
-  excludeOlder: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullable(),
-  excludeRecentSearch: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullable(),
+  excludeOlder: durationInput,
+  excludeRecentSearch: durationInput,
 });
 
 export const connectValidationSchema = z.object({

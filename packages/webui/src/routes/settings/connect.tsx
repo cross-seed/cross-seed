@@ -12,11 +12,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
-import { removeEmptyArrayValues } from '@/lib/transformers';
 import { connectValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
-import { toast } from 'sonner';
 import { SettingsLayout } from '@/components/SettingsLayout';
 import { Page } from '@/components/Page';
 
@@ -30,45 +28,37 @@ const ConnectSettings = withForm({
       trpc.settings.get.queryOptions(undefined, {
         select: (data) => {
           const fullDataset = formatConfigDataForForm(data.config);
-          const filteredData = pickSchemaFields(
+          const defaults = pickSchemaFields(
             connectValidationSchema,
             fullDataset,
             { includeUndefined: true },
           );
 
-          return filteredData;
+          const original = pickSchemaFields(
+            connectValidationSchema,
+            data.config,
+            { includeUndefined: true },
+          );
+
+          return {
+            defaults,
+            original,
+          };
         },
       }),
     );
 
-    const { saveConfig, isSuccess } = useSaveConfigHook();
+    const { saveConfig } = useSaveConfigHook();
 
     const form = useAppForm({
       ...formOpts,
-      defaultValues: configData ?? formOpts.defaultValues,
+      defaultValues: configData?.defaults ?? formOpts.defaultValues,
       onSubmit: async ({ value }) => {
-        try {
-          const result = connectValidationSchema.safeParse(value);
-          if (!result.success) {
-            console.error('FULL VALIDATION FAILED:', result.error.format());
-          } else {
-            Object.keys(value).forEach((attr) => {
-              const val = value[attr as keyof typeof configData];
-              if (val && Array.isArray(val)) {
-                value[attr as keyof typeof configData] =
-                  removeEmptyArrayValues(val);
-              }
-            });
-
-            saveConfig(value);
-          }
-        } catch (err) {
-          console.error('Exception during full validation:', err);
-          return {
-            status: 'error',
-            error: { _form: 'An unexpected error occurred during validation' },
-          };
-        }
+        saveConfig({
+          value,
+          schema: connectValidationSchema,
+          originalValues: configData?.original ?? {},
+        });
       },
       validators: {
         onSubmit: connectValidationSchema,
@@ -83,14 +73,6 @@ const ConnectSettings = withForm({
         setLastFieldAdded(null);
       }
     }, [lastFieldAdded]);
-
-    useEffect(() => {
-      if (isSuccess) {
-        toast.success('Configuration saved successfully!', {
-          description: 'Your changes will take effect on the next restart.',
-        });
-      }
-    }, [isSuccess]);
 
     return (
       <Page>

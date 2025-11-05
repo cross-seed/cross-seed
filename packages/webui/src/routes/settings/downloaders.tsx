@@ -8,11 +8,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
-import { removeEmptyArrayValues } from '@/lib/transformers';
 import { downloaderValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
-import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
 import { SettingsLayout } from '@/components/SettingsLayout';
 import { Page } from '@/components/Page';
@@ -80,52 +78,41 @@ const DownloadersFields = withForm({
       trpc.settings.get.queryOptions(undefined, {
         select: (data) => {
           const fullDataset = formatConfigDataForForm(data.config);
-          const filteredData = pickSchemaFields(
+          const defaults = pickSchemaFields(
             downloaderValidationSchema,
             fullDataset,
             { includeUndefined: true },
           );
 
-          return filteredData;
+          const original = pickSchemaFields(
+            downloaderValidationSchema,
+            data.config,
+            { includeUndefined: true },
+          );
+
+          return {
+            defaults,
+            original,
+          };
         },
       }),
     );
 
     const {
       saveConfig,
-      isSuccess,
       // isLoading: isSaving,
       // isError: isSaveError,
     } = useSaveConfigHook();
 
     const form = useAppForm({
       ...formOpts,
-      defaultValues: configData ?? formOpts.defaultValues,
+      defaultValues: configData?.defaults ?? formOpts.defaultValues,
       onSubmit: async ({ value }) => {
-        // Full schema validation
-        try {
-          const result = downloaderValidationSchema.safeParse(value);
-          if (!result.success) {
-            console.error('FULL VALIDATION FAILED:', result.error.format());
-          } else {
-            // remove empty values from array fields
-            Object.keys(value).forEach((attr) => {
-              const val = value[attr as keyof typeof configData];
-              if (val && Array.isArray(val)) {
-                value[attr as keyof typeof configData] =
-                  removeEmptyArrayValues(val);
-              }
-            });
-
-            saveConfig(value);
-          }
-        } catch (err) {
-          console.error('Exception during full validation:', err);
-          return {
-            status: 'error',
-            error: { _form: 'An unexpected error occurred during validation' },
-          };
-        }
+        saveConfig({
+          value,
+          schema: downloaderValidationSchema,
+          originalValues: configData?.original ?? {},
+        });
       },
       validators: {
         onSubmit: downloaderValidationSchema,
@@ -145,23 +132,16 @@ const DownloadersFields = withForm({
     }, [lastFieldAdded]);
 
     useEffect(() => {
-      if (isSuccess) {
-        toast.success('Configuration saved successfully!', {
-          description: 'Your changes will take effect on the next restart.',
-        });
-      }
-    }, [isSuccess]);
-
-    useEffect(() => {
       // Set clients when configData is available
-      if (configData?.torrentClients && configData.torrentClients.length > 0) {
+      const torrentClients = configData?.defaults.torrentClients;
+      if (torrentClients && torrentClients.length > 0) {
         console.log(
           'Config data loaded:',
-          configData.torrentClients.length,
-          configData.torrentClients,
+          torrentClients.length,
+          torrentClients,
         );
         setClients(
-          configData.torrentClients.map((client) => {
+          torrentClients.map((client) => {
             let clientApp = '';
             let url = '';
             let readOnly = false;
@@ -183,9 +163,12 @@ const DownloadersFields = withForm({
             }
 
             return {
-              name: client.name || 'Unnamed',
+              name:
+                typeof client === 'object' && client.name
+                  ? client.name
+                  : 'Unnamed',
               client: clientApp,
-              url: url,
+              url,
               user: '',
               password: '',
               readOnly,
