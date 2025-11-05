@@ -42,7 +42,6 @@
     "react-dom": "^19.0.0",
     "shadcn": "^2.4.0-canary.6",
     "sonner": "^2.0.5",
-    "superjson": "^2.2.2",
     "tailwind-merge": "^3.3.0",
     "tailwindcss": "^4.0.8",
     "tailwindcss-animate": "^1.0.7",
