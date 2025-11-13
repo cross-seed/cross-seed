@@ -57,6 +57,7 @@ export interface FileConfig {
 	searchTimeout?: string;
 	searchLimit?: number;
 	blockList?: string[];
+	titleFilterList?: string[];
 	apiKey?: string;
 	sonarr?: string[];
 	radarr?: string[];
