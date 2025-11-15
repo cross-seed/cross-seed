@@ -123,6 +123,42 @@ module.exports = {
 	dataDirs: [],
 
 	/**
+	 * Category to use for injected cross-seeds.
+	 * Only supported by qBittorrent client.
+	 *
+	 * This is a template, so you can use the following variables:
+	 * - {searcheeCategory} - the category of the torrent being cross-seeded
+	 *
+	 * Example: "cross-seed-{searcheeCategory}"
+	 *
+	 * If set to undefined, the category will be set as follows:
+	 * - Linking is enabled (linkDirs is not empty): linkCategory
+	 * - Linking is not enabled (linkDirs is empty):
+	 *   - duplicateCategories is true: "{searcheeCategory}.cross-seed"
+	 *   - duplicateCategories is false: "cross-seed"
+	 */
+	categoryTemplate: undefined,
+
+	/**
+	 * Template for the tags to use when injecting cross-seeds.
+	 * Only supported by qBittorrent client.
+	 *
+	 * This option accepts a comma-separated string of tags or a list of tags.
+	 *
+	 * This is a template, so you can use the following variables:
+	 * - {searcheeCategory} - the category of the torrent being cross-seeded
+	 *
+	 * Examples:
+	 * - "cross-seed-{searcheeCategory},cross-seed"
+	 * - ["cross-seed", "{searcheeCategory}"]
+	 *
+	 * If set to undefined, the tags will be set as follows:
+	 * - duplicateCategories is true: ["cross-seed", "{searcheeCategory}.cross-seed"]
+	 * - duplicateCategories is false: ["cross-seed"]
+	 */
+	tagsTemplate: undefined,
+
+	/**
 	 * Defines what qBittorrent or Deluge category to set on linked torrents
 	 *
 	 * qBittorrent: If you have linking enabled, all torrents will be injected

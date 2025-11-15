@@ -12,6 +12,7 @@ import {
 	MatchMode,
 	NEWLINE_INDENT,
 	parseBlocklistEntry,
+	TORRENT_CATEGORY_SUFFIX,
 } from "./constants.js";
 import { Label, logger } from "./logger.js";
 import { formatAsList } from "./utils.js";
@@ -375,6 +376,14 @@ export const VALIDATION_SCHEMA = z
 			.boolean()
 			.nullish()
 			.transform((v) => (typeof v === "boolean" ? v : false)),
+		// Template defaults depend on whether linking is enabled so
+		// we set them in refine below
+		categoryTemplate: z.string().nullish(),
+		tagsTemplate: z
+			.string()
+			.transform((s) => s.split(",").map((t) => t.trim()))
+			.or(z.array(z.string()))
+			.nullish(),
 		linkCategory: z.string().nullish(),
 		linkDir: z.string().nullish(),
 		linkDirs: z.array(z.string()).optional().default([]),
@@ -869,6 +878,46 @@ export const VALIDATION_SCHEMA = z
 			!config.dataDirs.every(isAbsolute)
 		) {
 			logger.warn(ZodErrorMessages.relativePaths);
+		}
+		return true;
+	})
+	.refine((config) => {
+		// categoryTemplate and tagsTemplate are only supported for qBittorrent client yet
+		if (
+			(config.categoryTemplate || config.tagsTemplate) &&
+			!config.torrentClients.some((c) => c.startsWith(Label.QBITTORRENT))
+		) {
+			logger.warn(
+				"categoryTemplate and tagsTemplate are only supported for qBittorrent client, ignoring these options for other clients.",
+			);
+		}
+		return true;
+	})
+	.refine((config) => {
+		// Retro-compatibility with linkCategory and duplicateCategories configuration options
+		// Only set defaults if the new options are not already defined
+
+		const isLinkingEnabled = config.linkDirs.length > 0;
+
+		if (config.categoryTemplate == null) {
+			if (isLinkingEnabled) {
+				config.categoryTemplate = config.linkCategory;
+			} else {
+				config.categoryTemplate = "{searcheeCategory}";
+			}
+		}
+
+		if (config.tagsTemplate == null) {
+			if (isLinkingEnabled) {
+				config.tagsTemplate = ["cross-seed"];
+				if (config.duplicateCategories) {
+					config.tagsTemplate.push(
+						`{searcheeCategory}.${TORRENT_CATEGORY_SUFFIX}`,
+					);
+				}
+			} else {
+				config.tagsTemplate = ["cross-seed"];
+			}
 		}
 		return true;
 	});
