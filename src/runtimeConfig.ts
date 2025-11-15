@@ -1,4 +1,6 @@
+import type { Problem } from "./problems.js";
 import { Action, LinkType, MatchMode } from "./constants.js";
+import { omitUndefined } from "./utils/object.js";
 
 export interface RuntimeConfig {
 	delay: number;
@@ -32,6 +34,7 @@ export interface RuntimeConfig {
 	torrents: string[];
 	port?: number;
 	host?: string;
+	basePath?: string;
 	searchCadence?: number;
 	rssCadence?: number;
 	snatchTimeout?: number;
@@ -54,8 +57,22 @@ export function getRuntimeConfig(
 ): RuntimeConfig {
 	return {
 		...runtimeConfig,
-		...Object.fromEntries(
-			Object.entries(configOverride).filter(([, v]) => v !== undefined),
-		),
+		...omitUndefined(configOverride),
 	};
+}
+
+export function collectRecommendationProblems(): Problem[] {
+	const { matchMode } = getRuntimeConfig();
+	if (matchMode === MatchMode.PARTIAL) return [];
+
+	return [
+		{
+			id: "recommendation:partial-matching",
+			severity: "info",
+			summary: "Enable partial matching for better results",
+			details:
+				"Partial matching skips tiny files and improves match success. Enable it under Settings → Search & RSS when linking is available.",
+			metadata: { recommendation: true },
+		},
+	];
 }
