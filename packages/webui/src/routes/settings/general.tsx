@@ -120,7 +120,9 @@ const GeneralSettings = withForm({
                   </form.AppField>
                   <div className="">
                     <form.AppField name="snatchTimeout" validators={{}}>
-                      {(field) => <field.TextField label="Snatch Timeout" />}
+                      {(field) => (
+                        <field.DurationField label="Snatch Timeout" />
+                      )}
                     </form.AppField>
                   </div>
                   <div className="">

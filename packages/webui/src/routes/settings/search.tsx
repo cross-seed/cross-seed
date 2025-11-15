@@ -146,7 +146,9 @@ const SearchRssSettings = withForm({
                         }
                       }
                     >
-                      {(field) => <field.TextField label="RSS Cadence" />}
+                      {(field) => (
+                        <field.DurationField label="RSS Cadence" />
+                      )}
                     </form.AppField>
                   </div>
                   <div className="">
@@ -158,7 +160,9 @@ const SearchRssSettings = withForm({
                         }
                       }
                     >
-                      {(field) => <field.TextField label="Search Cadence" />}
+                      {(field) => (
+                        <field.DurationField label="Search Cadence" />
+                      )}
                     </form.AppField>
                   </div>
                   <div className="">
@@ -170,7 +174,9 @@ const SearchRssSettings = withForm({
                         }
                       }
                     >
-                      {(field) => <field.TextField label="Search Timeout" />}
+                      {(field) => (
+                        <field.DurationField label="Search Timeout" />
+                      )}
                     </form.AppField>
                   </div>
                   <div className="">
@@ -196,7 +202,9 @@ const SearchRssSettings = withForm({
                         }
                       }
                     >
-                      {(field) => <field.TextField label="Exclude Older" />}
+                      {(field) => (
+                        <field.DurationField label="Exclude Older" />
+                      )}
                     </form.AppField>
                   </div>
                   <div className="">
@@ -209,7 +217,7 @@ const SearchRssSettings = withForm({
                       }
                     >
                       {(field) => (
-                        <field.TextField label="Exclude Recent Search" />
+                        <field.DurationField label="Exclude Recent Search" />
                       )}
                     </form.AppField>
                   </div>
