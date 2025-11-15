@@ -11,11 +11,7 @@ export const generalValidationSchema = z.object({
   includeNonVideos: z.boolean(),
   blockList: z.array(z.string()).nullish(),
   // .transform(transformBlocklist),
-  snatchTimeout: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullish(),
+  snatchTimeout: z.number().nonnegative().nullish(),
   autoResumeMaxDownload: z
     .number()
     .int()
@@ -74,11 +70,7 @@ export const searchValidationSchema = z.object({
     .gte(30, ZodErrorMessages.delayUnsupported)
     .lte(3600, ZodErrorMessages.delayUnsupported),
   matchMode: z.nativeEnum(MatchMode),
-  rssCadence: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullish(),
+  rssCadence: z.number().nonnegative().nullish(),
   // .refine(
   // 	(cadence) =>
   // 		process.env.DEV ||
@@ -86,32 +78,16 @@ export const searchValidationSchema = z.object({
   // 		(cadence >= ms("10 minutes") && cadence <= ms("2 hours")),
   // 	ZodErrorMessages.rssCadenceUnsupported,
   // ),
-  searchCadence: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullish(),
+  searchCadence: z.number().nonnegative().nullish(),
   // .refine(
   // 	(cadence) =>
   // 		process.env.DEV || !cadence || cadence >= ms("1 day"),
   // 	ZodErrorMessages.searchCadenceUnsupported,
   // ),
-  searchTimeout: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullish(),
+  searchTimeout: z.number().nonnegative().nullish(),
   searchLimit: z.number().nonnegative().nullish(),
-  excludeOlder: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullable(),
-  excludeRecentSearch: z
-    .string()
-    .min(1, ZodErrorMessages.emptyString)
-    // .transform(transformDurationString)
-    .nullable(),
+  excludeOlder: z.number().nonnegative().nullable(),
+  excludeRecentSearch: z.number().nonnegative().nullable(),
 });
 
 export const connectValidationSchema = z.object({

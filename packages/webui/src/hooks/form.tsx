@@ -10,6 +10,7 @@ export const { useAppForm, withForm } = createFormHook({
     SwitchField: lazy(() => import('@/components/Form/switch-field')),
     SelectField: lazy(() => import('@/components/Form/select-field')),
     ArrayField: lazy(() => import('@/components/Form/array-field')),
+    DurationField: lazy(() => import('@/components/Form/duration-field')),
   },
   formComponents: {
     SubmitButton: lazy(() => import('@/components/Form/submit-button')),
