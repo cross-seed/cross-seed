@@ -4,7 +4,12 @@ import { LoaderCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 // import { baseValidationSchema } from '@/types/config';
 
-function SubmitButton() {
+interface SubmitButtonProps {
+  label?: string;
+  actionLabel?: string;
+}
+
+function SubmitButton({ label, actionLabel }: SubmitButtonProps) {
   const form = useFormContext();
 
   return (
@@ -29,10 +34,11 @@ function SubmitButton() {
             >
               {isSubmitting ? (
                 <>
-                  <LoaderCircle className="animate-spin" /> Saving...
+                  <LoaderCircle className="animate-spin" />{' '}
+                  {actionLabel ?? 'Saving...'}
                 </>
               ) : (
-                'Save'
+                <>{label ?? 'Save'}</>
               )}{' '}
               "{canSubmit && 'can submit'}"
             </Button>

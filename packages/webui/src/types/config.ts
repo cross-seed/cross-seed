@@ -22,19 +22,22 @@ export const trackerValidationSchema = z.object({
   torznab: z.array(z.string().url()),
 });
 
+export const clientValidationSchema = z.object({
+  // name: z.string().min(1, ZodErrorMessages.emptyString).nullish(),
+  client: z.string().min(1, ZodErrorMessages.emptyString),
+  url: z.string().url(),
+  user: z.string().nullish(),
+  password: z.string(),
+  readOnly: z
+    .boolean()
+    .optional()
+    .default(false)
+    .or(z.null().transform(() => false)),
+  plugin: z.boolean().nullish().default(false),
+});
+
 export const downloaderValidationSchema = z.object({
-  torrentClients: z
-    .array(
-      z.object({
-        name: z.string().min(1, ZodErrorMessages.emptyString).nullish(),
-        client: z.string().min(1, ZodErrorMessages.emptyString),
-        url: z.string().url(),
-        user: z.string(),
-        password: z.string(),
-        readOnly: z.boolean().optional(),
-      }),
-    )
-    .nullish(),
+  torrentClients: z.array(clientValidationSchema).nullish(),
   // torrentClients: z.array(z.string()).nullish(),
   // qbittorrentUrl: z.string().url().nullish(),
   // rtorrentRpcUrl: z.string().url().nullish(),

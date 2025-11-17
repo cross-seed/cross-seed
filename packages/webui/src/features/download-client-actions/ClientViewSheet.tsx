@@ -17,7 +17,7 @@ type DownloadClient = {
   name?: string;
   client: string;
   url: string;
-  user: string;
+  user?: string;
   password: string;
   readOnly?: boolean;
 };
@@ -44,13 +44,6 @@ export default function ClientViewSheet({
         </SheetHeader>
 
         <div className="grid flex-1 auto-rows-min gap-6 px-4">
-          <div className="grid gap-3">
-            <Label>Download Client Name</Label>
-            <div className="bg-muted/50 rounded-md border px-3 py-2 text-sm">
-              {client?.name || 'N/A'}
-            </div>
-          </div>
-
           <div className="grid gap-3">
             <Label>URL</Label>
             <div className="bg-muted/50 rounded-md border px-3 py-2 font-mono text-sm break-all">

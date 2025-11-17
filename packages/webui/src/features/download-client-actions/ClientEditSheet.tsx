@@ -1,9 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Sheet,
   SheetClose,
@@ -13,15 +10,27 @@ import {
   SheetFooter,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { toast } from 'sonner';
-import { TestTube, Loader2 } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+// import { TestTube, Loader2 } from 'lucide-react';
+import { useAppForm } from '@/hooks/form';
+import { formOpts } from '@/components/Form/shared-form';
+import { clientValidationSchema } from '@/types/config';
+import { useSaveConfigHook } from '@/hooks/saveFormHook';
+import useConfigForm from '@/hooks/use-config-form';
+import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
+import {
+  getHostFromClientUrl,
+  getProtocolFromClientUrl,
+  buildClientUrl,
+} from './lib/urls';
+// import { Label as Labels } from '../../../../../src/logger';
 
+// Same as in downloaders.tsx
 type DownloadClient = {
+  index: number;
   name?: string;
   client: string;
   url: string;
-  user: string;
+  user?: string;
   password: string;
   readOnly?: boolean;
 };
@@ -33,190 +42,204 @@ interface ClientEditSheetProps {
   client: DownloadClient | null;
 }
 
+const CLIENTS = {
+  qbittorrent: 'qBittorrent',
+  rtorrent: 'rTorrent',
+  transmission: 'Transmission',
+  deluge: 'Deluge',
+};
+
 export default function ClientEditSheet({
   open,
   onOpenChange,
   mode,
   client,
 }: ClientEditSheetProps) {
+  const { isFieldRequired } = useConfigForm(clientValidationSchema);
+
+  // Get existing clients to compare against when saving
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const [name, setName] = useState(client?.name || '');
-  const [url, setUrl] = useState(client?.url || '');
-  const [user, setUser] = useState(client?.user || '');
-  const [password, setPassword] = useState(client?.password || '');
-  const [readOnly, setReadOnly] = useState(client?.readOnly || false);
-  const [isTesting, setIsTesting] = useState(false);
-
-  // Sync form state when client changes
-  useEffect(() => {
-    if (open) {
-      setName(client?.name || '');
-      setUrl(client?.url || '');
-      setUser(client?.user || '');
-      setPassword(client?.password || '');
-    }
-  }, [open, client]);
-
-  const { mutate: createClient, isPending: isCreating } = useMutation(
-    trpc.clients.create.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Download client created successfully');
-        await queryClient.invalidateQueries({
-          queryKey: trpc.clients.getAll.queryKey(),
-        });
-        onOpenChange(false);
-      },
-      onError: (error: { message: string }) => {
-        toast.error(`Failed to create tracker: ${error.message}`);
-      },
+  const { data: existingClients } = useQuery(
+    trpc.settings.get.queryOptions(undefined, {
+      select: (data) => data.config.torrentClients || [],
     }),
   );
+  console.log('create?', client);
 
-  const { mutate: updateClient, isPending: isUpdating } = useMutation(
-    trpc.clients.update.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Download client updated successfully');
-        await queryClient.invalidateQueries({
-          queryKey: trpc.clients.getAll.queryKey(),
-        });
-        onOpenChange(false);
-      },
-      onError: (error: { message: string }) => {
-        toast.error(`Failed to update tracker: ${error.message}`);
-      },
-    }),
-  );
+  const {
+    saveConfig,
+    // isLoading: isSaving,
+  } = useSaveConfigHook();
 
-  const handleSubmit = () => {
-    console.log('Submitting client:', { name, url, user, password });
-  };
+  const form = useAppForm({
+    ...formOpts,
+    defaultValues: client ?? {},
+    onSubmit: async ({ value }) => {
+      // Full schema validation
+      try {
+        const sanitizedValue = {
+          ...value,
+          readOnly: value?.readOnly ?? false,
+        };
+        const result = clientValidationSchema.safeParse(sanitizedValue);
+        if (!result.success) {
+          console.error('FULL VALIDATION FAILED:', result.error.format());
+          throw new Error('Validation failed');
+        } else {
+          // build url first
+          const validatedData = result.data;
+          const protocol = getProtocolFromClientUrl(validatedData.url);
+          const host = getHostFromClientUrl(validatedData.url);
+          const clientString = buildClientUrl({
+            client: validatedData.client,
+            protocol,
+            host,
+            username: validatedData.user ?? '',
+            password: validatedData.password,
+            readonly: validatedData.readOnly,
+            // * TODO: add usePlugin for rtorrent clients
+          });
 
-  const handleTest = () => {
-    if (!url.trim() || !user.trim() || !password.trim()) {
-      toast.error('Please fill in all fields before testing.');
-      return;
-    }
+          let updatedClients: string[];
+          if (mode === 'edit' && client && client.index !== undefined) {
+            updatedClients = [...(existingClients || [])];
+            updatedClients[client.index] = clientString;
+          } else {
+            updatedClients = [...(existingClients || []), clientString];
+          }
 
-    setIsTesting(true);
-    // testClientConnection(url, user, password);
-  };
+          saveConfig({ torrentClients: updatedClients });
+          onOpenChange(false);
+        }
+      } catch (err) {
+        console.error('Exception during full validation:', err);
+        return {
+          status: 'error',
+          error: { _form: 'An unexpected error occurred during validation' },
+        };
+      }
+    },
+    validators: {
+      onSubmit: clientValidationSchema,
+    },
+  });
+
+  // const handleTest = () => {
+  //   if (!url.trim() || !user.trim() || !password.trim()) {
+  //     toast.error('Please fill in all fields before testing.');
+  //     return;
+  //   }
+  //
+  //   setIsTesting(true);
+  //   // testClientConnection(url, user, password);
+  // };
 
   const isLoading = false; //isCreating || isUpdating;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-md">
-        <form onSubmit={handleSubmit}>
-          <SheetHeader>
-            <SheetTitle>
-              {mode === 'edit' ? 'Edit Client' : 'Create Client'}
-            </SheetTitle>
-            <SheetDescription>
-              {mode === 'edit'
-                ? 'Edit the details of the download client.'
-                : 'Create a new download client.'}
-            </SheetDescription>
-          </SheetHeader>
+        <FormValidationProvider isFieldRequired={isFieldRequired}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit();
+            }}
+          >
+            <SheetHeader>
+              <SheetTitle>
+                {mode === 'edit' ? 'Edit Client' : 'Create Client'}
+              </SheetTitle>
+              <SheetDescription>
+                {mode === 'edit'
+                  ? 'Edit the details of the download client.'
+                  : 'Create a new download client.'}
+              </SheetDescription>
+            </SheetHeader>
 
-          <div className="grid flex-1 auto-rows-min gap-6 px-4">
-            <div className="grid gap-3">
-              <Label htmlFor="clientName">Client Name</Label>
-              <Input
-                id="clientName"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter client name"
-                autoComplete="off"
-              />
+            <div className="grid flex-1 auto-rows-min gap-6 px-4">
+              <div className="grid gap-3">
+                <form.AppField name="client">
+                  {(field) => (
+                    <>
+                      <field.SelectField label="Client" options={CLIENTS} />
+                      {field.state.value === CLIENTS.rtorrent.toLowerCase() && (
+                        <form.AppField name="plugin">
+                          {(field) => (
+                            <field.SwitchField label="Use Plugin URL" />
+                          )}
+                        </form.AppField>
+                      )}
+                    </>
+                  )}
+                </form.AppField>
+              </div>
+
+              <div className="grid gap-3">
+                <form.AppField name="url">
+                  {(field) => <field.TextField label="Client URL" />}
+                </form.AppField>
+              </div>
+
+              <div className="grid gap-3">
+                <form.AppField name="user">
+                  {(field) => <field.TextField label="User" />}
+                </form.AppField>
+              </div>
+
+              <div className="grid gap-3">
+                <form.AppField name="password">
+                  {(field) => (
+                    <field.TextField label="Password" type="password" />
+                  )}
+                </form.AppField>
+              </div>
+
+              <div className="grid gap-3">
+                <form.AppField name="readOnly">
+                  {(field) => <field.SwitchField label="Read only" />}
+                </form.AppField>
+              </div>
+
+              {/* <Button */}
+              {/*   type="button" */}
+              {/*   variant="outline" */}
+              {/*   onClick={handleTest} */}
+              {/*   disabled={ */}
+              {/*     isTesting || !url.trim() || !user.trim() || !password.trim() */}
+              {/*   } */}
+              {/*   className="w-full" */}
+              {/* > */}
+              {/*   {isTesting ? ( */}
+              {/*     <> */}
+              {/*       <Loader2 className="animate-spin" /> */}
+              {/*       Testing connection... */}
+              {/*     </> */}
+              {/*   ) : ( */}
+              {/*     <> */}
+              {/*       <TestTube className="mr-2" /> */}
+              {/*       Test Connection */}
+              {/*     </> */}
+              {/*   )} */}
+              {/* </Button> */}
             </div>
 
-            <div className="grid gap-3">
-              <Label htmlFor="clientUrl">Client URL</Label>
-              <Input
-                id="clientUrl"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="Enter client URL"
-                autoComplete="off"
-              />
-            </div>
-
-            <div className="grid gap-3">
-              <Label htmlFor="clientUser">Username</Label>
-              <Input
-                id="clientUser"
-                value={user}
-                onChange={(e) => setUser(e.target.value)}
-                placeholder="Enter username"
-                autoComplete="off"
-              />
-            </div>
-
-            <div className="grid gap-3">
-              <Label htmlFor="clientPassword">Password</Label>
-              <Input
-                id="clientPassword"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                placeholder="Enter password"
-                autoComplete="off"
-              />
-            </div>
-
-            <div className="grid gap-3">
-              <Label htmlFor="readOnly">Read only</Label>
-              <Switch
-                id="readOnly"
-                checked={readOnly}
-                onCheckedChange={(checked) => setReadOnly(checked)}
-              />
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleTest}
-              disabled={
-                isTesting || !url.trim() || !user.trim() || !password.trim()
-              }
-              className="w-full"
-            >
-              {isTesting ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Testing connection...
-                </>
-              ) : (
-                <>
-                  <TestTube className="mr-2" />
-                  Test Connection
-                </>
-              )}
-            </Button>
-          </div>
-
-          <SheetFooter className="mt-6">
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {mode === 'edit' ? 'Updating...' : 'Creating...'}
-                </>
-              ) : mode === 'edit' ? (
-                'Update'
-              ) : (
-                'Create'
-              )}
-            </Button>
-            <SheetClose asChild>
-              <Button type="button" variant="outline" disabled={isLoading}>
-                Cancel
-              </Button>
-            </SheetClose>
-          </SheetFooter>
-        </form>
+            <SheetFooter className="mt-6">
+              <form.AppForm>
+                <form.SubmitButton
+                  label={mode === 'edit' ? 'Update' : 'Create'}
+                  actionLabel={mode === 'edit' ? 'Updating...' : 'Creating...'}
+                />
+              </form.AppForm>
+              <SheetClose asChild>
+                <Button type="button" variant="outline" disabled={isLoading}>
+                  Cancel
+                </Button>
+              </SheetClose>
+            </SheetFooter>
+          </form>
+        </FormValidationProvider>
       </SheetContent>
     </Sheet>
   );
