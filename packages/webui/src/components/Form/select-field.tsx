@@ -58,7 +58,11 @@ function SelectField<T extends Record<string, string>>({
         </SelectTrigger>
         <SelectContent>
           {Object.values(options).map((option) => (
-            <SelectItem key={option.toLowerCase()} value={option.toLowerCase()}>
+            <SelectItem
+              key={option.toLowerCase()}
+              value={option.toLowerCase()}
+              className="hover:bg-accent/50"
+            >
               {option.toLowerCase()}
             </SelectItem>
           ))}

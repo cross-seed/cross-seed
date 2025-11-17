@@ -12,9 +12,8 @@ import { removeEmptyArrayValues } from '@/lib/transformers';
 import { downloaderValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
-import { toast } from 'sonner';
+// import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
-import { SettingsLayout } from '@/components/SettingsLayout';
 import { Page } from '@/components/Page';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,8 +22,7 @@ import {
   Pencil,
   Plus,
   TestTube,
-  ToggleLeft,
-  ToggleRight,
+  Trash,
 } from 'lucide-react';
 import {
   Table,
@@ -43,14 +41,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import ClientViewSheet from '@/features/download-client-actions/ClientViewSheet';
 import ClientEditSheet from '@/features/download-client-actions/ClientEditSheet';
+import {
+  getProtocolFromClientUrl,
+  getHostFromClientUrl,
+} from '@/features/download-client-actions/lib/urls';
 
 // ! FIXME: consolidate this type in a types.ts file and import it
-// Same as the one in downloaders.tsx
+// Same as the one in ClientEditSheet.tsx
 type DownloadClient = {
   name?: string;
   client: string;
   url: string;
-  user: string;
+  user?: string;
   password: string;
   readOnly?: boolean;
 };
@@ -60,9 +62,9 @@ const DownloadersFields = withForm({
   render: function Render() {
     const trpc = useTRPC();
 
-    const [clients, setClients] = useState<
-      DownloadClient[] | string | undefined
-    >(undefined);
+    const [clients, setClients] = useState<DownloadClient[] | undefined>(
+      undefined,
+    );
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [testingClient, setTestingClient] = useState<string | null>(null);
     const [selectedClient, setSelectedClient] = useState<DownloadClient | null>(
@@ -144,32 +146,31 @@ const DownloadersFields = withForm({
       }
     }, [lastFieldAdded]);
 
-    useEffect(() => {
-      if (isSuccess) {
-        toast.success('Configuration saved successfully!', {
-          description: 'Your changes will take effect on the next restart.',
-        });
-      }
-    }, [isSuccess]);
+    // useEffect(() => {
+    //   if (isSuccess) {
+    //     toast.success('Configuration saved successfully!', {
+    //       description: 'Your changes will take effect on the next restart.',
+    //     });
+    //   }
+    // }, [isSuccess]);
 
     useEffect(() => {
       // Set clients when configData is available
       if (configData?.torrentClients && configData.torrentClients.length > 0) {
-        console.log(
-          'Config data loaded:',
-          configData.torrentClients.length,
-          configData.torrentClients,
-        );
         setClients(
-          configData.torrentClients.map((client) => {
+          configData.torrentClients.map((client, index) => {
             let clientApp = '';
             let url = '';
             let readOnly = false;
+            let user = '';
+            let password = '';
 
             if (typeof client === 'object') {
               clientApp = client.client;
               readOnly = client.readOnly || false;
               url = client.url;
+              user = client.user || '';
+              password = client.password || '';
             } else if (typeof client === 'string') {
               clientApp = String(client).split(':')[0];
               readOnly = String(client).includes('readonly');
@@ -180,14 +181,16 @@ const DownloadersFields = withForm({
                   )
                 : String(client).substring(String(client).indexOf(':') + 1);
               url = removeUserAndPassFromClientUrl(fullUrl);
+              user = getUserFromClientUrl(fullUrl);
+              password = getPassFromClientUrl(fullUrl);
             }
 
             return {
-              name: client.name || 'Unnamed',
+              index,
               client: clientApp,
               url: url,
-              user: '',
-              password: '',
+              user,
+              password,
               readOnly,
             };
           }),
@@ -197,16 +200,35 @@ const DownloadersFields = withForm({
 
     // * TODO: move to lib
     const removeUserAndPassFromClientUrl = (url: string) => {
-      if (url.includes('@')) {
-        const protocol = url.split('://')[0];
-        const clientUrl = url.split('@')[1];
-
-        return `${protocol}://${clientUrl}`;
-      }
-      return url;
+      const protocol = getProtocolFromClientUrl(url);
+      const host = getHostFromClientUrl(url);
+      return `${protocol}//${host}`;
     };
 
-    const handleAddDownloader = () => {
+    const getUserFromClientUrl = (url: string) => {
+      if (url.includes('@')) {
+        const user = url.split('://')[1].split('@')[0];
+        if (user.includes(':')) {
+          return user.split(':')[0];
+        }
+        return user.replace(':', '');
+      }
+      return '';
+    };
+
+    const getPassFromClientUrl = (url: string) => {
+      if (url.includes('@')) {
+        const pass = url.split('://')[1].split('@')[0];
+        if (pass.includes(':')) {
+          return pass.split(':')[1];
+        }
+      }
+      return '';
+    };
+
+    const handleAddDownloader = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
       setSelectedClient(null);
       setEditMode('create');
       setEditSheetOpen(true);
@@ -219,7 +241,9 @@ const DownloadersFields = withForm({
       }
     };
 
-    const handleViewClient = (client: DownloadClient) => {
+    const handleViewClient = (e: React.MouseEvent, client: DownloadClient) => {
+      e.preventDefault();
+      e.stopPropagation();
       setOpenDropdown(null);
       setSelectedClient(client);
       setViewSheetOpen(true);
@@ -233,6 +257,15 @@ const DownloadersFields = withForm({
       setEditSheetOpen(true);
     };
 
+    const handleDeleteClient = (client: DownloadClient) => {
+      setOpenDropdown(null);
+      const updatedClients = clients?.filter((c) => c.url !== client.url);
+      setClients(updatedClients);
+      console.log('Deleting client:', client, updatedClients);
+      // Delete from the db
+      // saveConfig({ torrentClients: [] });
+    };
+
     const handleEditSheetOpenChange = (open: boolean) => {
       setEditSheetOpen(open);
       if (!open) {
@@ -241,7 +274,7 @@ const DownloadersFields = withForm({
     };
 
     const addDownloaderButton = (
-      <Button onClick={handleAddDownloader} size="sm">
+      <Button onClick={handleAddDownloader} type="button" size="sm">
         <Plus className="mr-2 h-4 w-4" />
         Add Downloader
       </Button>
@@ -249,138 +282,128 @@ const DownloadersFields = withForm({
 
     return (
       <Page
-        breadcrumbs={['Settings', 'Downloaders']}
+        breadcrumbs={['Settings', 'Download Clients']}
         actions={addDownloaderButton}
       >
-        <SettingsLayout>
-          <h1 className="text-2xl font-bold">Downloaders</h1>
-          <p className="text-muted-foreground">Manage your download clients</p>
-          <div className="mt-4 mb-7 overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader className="bg-muted sticky top-0 z-10">
-                <TableRow className="border-b">
-                  <TableHead>Name</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>RPC URL</TableHead>
-                  <TableHead>Read only</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {clients?.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center">
-                      <p className="text-muted-foreground">
-                        No download clients configured. Add a client to start
-                        downloading.
-                      </p>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {clients?.map((client) => (
-                  <TableRow
-                    key={client}
-                    className="hover:bg-muted/50 cursor-pointer"
-                    onClick={() => handleViewClient(client)}
-                  >
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell className="font-medium">
-                      {client.client}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {client.url}
-                    </TableCell>
-                    <TableCell>{client.readOnly ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>status</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu
-                        open={openDropdown === client.url}
-                        onOpenChange={(open) =>
-                          setOpenDropdown(open ? client.url : null)
-                        }
-                      >
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <span className="sr-only">Actions</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewClient(client);
-                            }}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditClient(client);
-                            }}
-                          >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleTestClient(client);
-                            }}
-                            disabled={testingClient === client.url}
-                          >
-                            <TestTube className="mr-2 h-4 w-4" />
-                            {testingClient === client.url
-                              ? 'Testing...'
-                              : 'Test Connection'}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleClient(client);
-                            }}
-                          >
-                            {client.active ? (
-                              <>
-                                <ToggleLeft className="mr-2 h-4 w-4" />
-                                Disable
-                              </>
-                            ) : (
-                              <>
-                                <ToggleRight className="mr-2 h-4 w-4" />
-                                Enable
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold">Download Clients</h1>
+            <p className="text-muted-foreground">
+              Manage your download clients
+            </p>
           </div>
-          {/* Various sheets for viewing/editing clients */}
-          <ClientViewSheet
-            open={viewSheetOpen}
-            onOpenChange={handleViewSheetOpenChange}
-            client={selectedClient}
-            onEdit={handleEditClient}
-          />
-          <ClientEditSheet
-            open={editSheetOpen}
-            onOpenChange={handleEditSheetOpenChange}
-            client={selectedClient}
-            mode={editMode}
-          />
+          {clients ? (
+            <div className="mt-4 mb-7 overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader className="bg-muted sticky top-0 z-10">
+                  <TableRow className="border-b">
+                    <TableHead>Client</TableHead>
+                    <TableHead>RPC URL</TableHead>
+                    <TableHead>Read only</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clients?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center">
+                        <p className="text-muted-foreground">
+                          No download clients configured. Add a client to start
+                          downloading.
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {clients?.map((client) => (
+                    <TableRow
+                      key={client.url}
+                      className="hover:bg-muted/50 cursor-pointer"
+                      onClick={(e) => handleViewClient(e, client)}
+                    >
+                      <TableCell className="font-medium">
+                        {client.client}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {client.url}
+                      </TableCell>
+                      <TableCell>{client.readOnly ? 'Yes' : 'No'}</TableCell>
+                      <TableCell>status</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu
+                          open={openDropdown === client.url}
+                          onOpenChange={(open) =>
+                            setOpenDropdown(open ? client.url : null)
+                          }
+                        >
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                            >
+                              <span className="sr-only">Actions</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                handleViewClient(e, client);
+                              }}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClient(client);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // handleTestClient(client);
+                              }}
+                              disabled={testingClient === client.url}
+                            >
+                              <TestTube className="mr-2 h-4 w-4" />
+                              {testingClient === client.url
+                                ? 'Testing...'
+                                : 'Test Connection'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClient(client);
+                              }}
+                            >
+                              <Trash className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="mb-4 text-lg">
+              No download clients configured. Add a client
+            </p>
+          )}
           {/* Form for adding/editing downloaders */}
           <FormValidationProvider isFieldRequired={isFieldRequired}>
             <form
@@ -393,87 +416,9 @@ const DownloadersFields = withForm({
               noValidate
             >
               {/* form fields */}
-              <div className="flex flex-wrap gap-6">
-                <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-                  <legend>Download Client Options</legend>
-                  {/* <div> */}
-                  {/*   <form.AppField */}
-                  {/*     name="rtorrentRpcUrl" */}
-                  {/*     validators={ */}
-                  {/*       { */}
-                  {/*         // onBlur: baseValidationSchema.shape.rtorrentRpcUrl, */}
-                  {/*       } */}
-                  {/*     } */}
-                  {/*   > */}
-                  {/*     {(field) => ( */}
-                  {/*       <> */}
-                  {/*         <field.TextField */}
-                  {/*           label="rTorrent RPC URL" */}
-                  {/*           type="url" */}
-                  {/*           placeholder="http://username:password@localhost:1234/RPC2" */}
-                  {/*           required={false} */}
-                  {/*         /> */}
-                  {/*       </> */}
-                  {/*     )} */}
-                  {/*   </form.AppField> */}
-                  {/* </div> */}
-                  {/* <div> */}
-                  {/*   <form.AppField */}
-                  {/*     name="qbittorrentUrl" */}
-                  {/*     validators={ */}
-                  {/*       { */}
-                  {/*         // onBlur: baseValidationSchema.shape.qbittorrentUrl, */}
-                  {/*       } */}
-                  {/*     } */}
-                  {/*   > */}
-                  {/*     {(field) => ( */}
-                  {/*       <field.TextField */}
-                  {/*         label="qBittorrent URL" */}
-                  {/*         type="url" */}
-                  {/*         placeholder="http://username:password@localhost:8080" */}
-                  {/*         required={false} */}
-                  {/*       /> */}
-                  {/*     )} */}
-                  {/*   </form.AppField> */}
-                  {/* </div> */}
-                  {/* <div> */}
-                  {/*   <form.AppField */}
-                  {/*     name="transmissionRpcUrl" */}
-                  {/*     validators={ */}
-                  {/*       { */}
-                  {/*         // onBlur: baseValidationSchema.shape.transmissionRpcUrl, */}
-                  {/*       } */}
-                  {/*     } */}
-                  {/*   > */}
-                  {/*     {(field) => ( */}
-                  {/*       <field.TextField */}
-                  {/*         label="Transmission RPC URL" */}
-                  {/*         type="url" */}
-                  {/*         placeholder="http://username:password@localhost:9091/transmission/rpc" */}
-                  {/*         required={false} */}
-                  {/*       /> */}
-                  {/*     )} */}
-                  {/*   </form.AppField> */}
-                  {/* </div> */}
-                  {/* <div> */}
-                  {/*   <form.AppField */}
-                  {/*     name="delugeRpcUrl" */}
-                  {/*     validators={ */}
-                  {/*       { */}
-                  {/*         // onBlur: baseValidationSchema.shape.delugeRpcUrl, */}
-                  {/*       } */}
-                  {/*     } */}
-                  {/*   > */}
-                  {/*     {(field) => ( */}
-                  {/*       <field.TextField */}
-                  {/*         label="Deluge RPC URL" */}
-                  {/*         type="url" */}
-                  {/*         placeholder="http://:password@localhost:8112/json" */}
-                  {/*         required={false} */}
-                  {/*       /> */}
-                  {/*     )} */}
-                  {/*   </form.AppField> */}
-                  {/* </div> */}
+              <div className="flex flex-wrap gap-2">
+                <h2 className="text-xl font-bold">Download Client Options</h2>
+                <fieldset className="form-fieldset w-full gap-6 rounded-md">
                   <div className="">
                     <form.AppField name="action">
                       {(field) => (
@@ -554,7 +499,21 @@ const DownloadersFields = withForm({
               </div>
             </form>
           </FormValidationProvider>
-        </SettingsLayout>
+        </div>
+
+        {/* sheets for viewing/editing clients */}
+        <ClientViewSheet
+          open={viewSheetOpen}
+          onOpenChange={handleViewSheetOpenChange}
+          client={selectedClient}
+          onEdit={handleEditClient}
+        />
+        <ClientEditSheet
+          open={editSheetOpen}
+          onOpenChange={handleEditSheetOpenChange}
+          client={selectedClient}
+          mode={editMode}
+        />
       </Page>
     );
   },

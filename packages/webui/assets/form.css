@@ -2,7 +2,7 @@
   display: grid;
   grid-template-areas: 'col1 col2';
   grid-template-columns: repeat(2, 1fr);
-  padding: theme('spacing.4');
+  padding-block: theme('spacing.4');
   margin-block-end: theme('spacing.5');
 
   legend {
@@ -34,10 +34,6 @@
   padding-block: theme('spacing.1');
   padding-inline: theme('spacing.2');
   box-shadow: none;
-
-  &:focus,
-  &:focus-visible {
-  }
 
   &[aria-invalid='true'] {
     border-color: var(--color-destructive);

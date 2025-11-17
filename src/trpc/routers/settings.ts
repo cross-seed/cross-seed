@@ -3,19 +3,32 @@ import { Label, logger } from "../../logger.js";
 import { getRuntimeConfig, setRuntimeConfig } from "../../runtimeConfig.js";
 import { getApiKey } from "../../auth.js";
 import { z } from "zod";
-import { getDbConfig, setDbConfig, updateDbConfig } from "../../dbConfig.js";
-import { RuntimeConfig } from "../../runtimeConfig.js";
-import { getDefaultRuntimeConfig } from "../../configuration.js";
-import { omitUndefined } from "../../utils/object.js";
+import {
+	getFileConfig,
+	mergeConfig,
+	writeConfig,
+} from "../../configuration.js";
+import {
+	getDbConfig,
+	isDbConfigEnabled,
+	updateDbConfig,
+} from "../../dbConfig.js";
 
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
 		try {
-			const runtimeConfig = getRuntimeConfig();
+			const dbConfigEnabled = isDbConfigEnabled();
+			let runtimeConfig;
+			if (dbConfigEnabled) {
+				runtimeConfig = await getDbConfig();
+			} else {
+				runtimeConfig = getRuntimeConfig();
+			}
 			const apikey = await getApiKey();
 			return {
 				config: runtimeConfig,
 				apikey,
+				isDbConfig: dbConfigEnabled,
 			};
 		} catch (error) {
 			logger.error({ label: Label.SERVER, message: error.message });
