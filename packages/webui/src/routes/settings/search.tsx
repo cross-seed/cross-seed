@@ -52,25 +52,16 @@ const SearchRssSettings = withForm({
       ...formOpts,
       defaultValues: configData ?? formOpts.defaultValues,
       onSubmit: async ({ value }) => {
-        // Full schema validation
-        // Fake a long response delay
-        // setTimeout(() => {
         try {
-          const result = searchValidationSchema.safeParse(value);
-          if (!result.success) {
-            console.error('FULL VALIDATION FAILED:', result.error.format());
-          } else {
-            // remove empty values from array fields
-            Object.keys(value).forEach((attr) => {
-              const val = value[attr as keyof typeof configData];
-              if (val && Array.isArray(val)) {
-                value[attr as keyof typeof configData] =
-                  removeEmptyArrayValues(val);
-              }
-            });
+          Object.keys(value).forEach((attr) => {
+            const val = value[attr as keyof typeof configData];
+            if (val && Array.isArray(val)) {
+              value[attr as keyof typeof configData] =
+                removeEmptyArrayValues(val);
+            }
+          });
 
-            saveConfig(value);
-          }
+          saveConfig(value);
         } catch (err) {
           console.error('Exception during full validation:', err);
           return {
@@ -78,7 +69,6 @@ const SearchRssSettings = withForm({
             error: { _form: 'An unexpected error occurred during validation' },
           };
         }
-        // }, 2000);
       },
       validators: {
         onSubmit: searchValidationSchema,
