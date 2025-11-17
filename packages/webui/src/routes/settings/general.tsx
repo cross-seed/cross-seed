@@ -48,20 +48,15 @@ const GeneralSettings = withForm({
       defaultValues: configData ?? formOpts.defaultValues,
       onSubmit: async ({ value }) => {
         try {
-          const result = generalValidationSchema.safeParse(value);
-          if (!result.success) {
-            console.error('FULL VALIDATION FAILED:', result.error.format());
-          } else {
-            Object.keys(value).forEach((attr) => {
-              const val = value[attr as keyof typeof configData];
-              if (val && Array.isArray(val)) {
-                value[attr as keyof typeof configData] =
-                  removeEmptyArrayValues(val);
-              }
-            });
+          Object.keys(value).forEach((attr) => {
+            const val = value[attr as keyof typeof configData];
+            if (val && Array.isArray(val)) {
+              value[attr as keyof typeof configData] =
+                removeEmptyArrayValues(val);
+            }
+          });
 
-            saveConfig(value);
-          }
+          saveConfig(value);
         } catch (err) {
           console.error('Exception during full validation:', err);
           return {
