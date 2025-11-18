@@ -110,20 +110,6 @@ export function Logs() {
     return ret;
   }, [logs, isReversed, levelFilters, labelFilters]);
 
-  // Auto-scroll to bottom when new logs arrive
-  useEffect(() => {
-    if (autoScroll && tableContainerRef.current) {
-      // Find the ScrollArea's viewport
-      const viewport = tableContainerRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight;
-      }
-    }
-  }, [logs, autoScroll]);
-
-		return () => window.removeEventListener("scroll", handleScroll);
-	}, []);
-
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-stretch justify-between gap-4">

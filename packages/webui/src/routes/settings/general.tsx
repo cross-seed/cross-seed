@@ -103,7 +103,7 @@ const GeneralSettings = withForm({
               noValidate
             >
               <div className="flex flex-wrap gap-6">
-                <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
+                <fieldset className="form-fieldset w-full gap-6 rounded-md">
                   <legend>Misc. Settings</legend>
                   <form.AppField name="includeNonVideos">
                     {(field) => (

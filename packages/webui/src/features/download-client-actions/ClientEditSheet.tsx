@@ -64,7 +64,6 @@ export default function ClientEditSheet({
       select: (data) => data.config.torrentClients || [],
     }),
   );
-  console.log('create?', client);
 
   const {
     saveConfig,
