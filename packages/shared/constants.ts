@@ -1,4 +1,4 @@
-import { formatAsList } from "./utils";
+import { formatAsList } from "./utils.js";
 
 export enum Action {
 	SAVE = "save",
@@ -14,7 +14,8 @@ export enum MatchMode {
 export enum LinkType {
 	SYMLINK = "symlink",
 	HARDLINK = "hardlink",
-	// REFLINK = "reflink",
+	REFLINK = "reflink",
+	REFLINK_OR_COPY = "reflinkOrCopy",
 }
 
 export enum BlocklistType {

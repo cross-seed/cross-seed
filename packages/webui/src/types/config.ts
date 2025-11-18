@@ -2,30 +2,20 @@ import { z } from 'zod';
 import {
   Action,
   LinkType,
-  MatchMode,
   ZodErrorMessages,
 } from '../../../shared/constants';
+import { RUNTIME_CONFIG_SCHEMA } from '../../../shared/configSchema';
+
+const runtimeShape = RUNTIME_CONFIG_SCHEMA.shape;
 
 export const generalValidationSchema = z.object({
-  includeSingleEpisodes: z.boolean(),
-  includeNonVideos: z.boolean(),
-  blockList: z.array(z.string()).nullish(),
-  // .transform(transformBlocklist),
-  snatchTimeout: z.number().nonnegative().nullish(),
-  autoResumeMaxDownload: z
-    .number()
-    .int()
-    .gte(0, ZodErrorMessages.autoResumeMaxDownloadUnsupported)
-    .lte(52428800, ZodErrorMessages.autoResumeMaxDownloadUnsupported),
-  fuzzySizeThreshold: z
-    .number()
-    .positive()
-    .lte(1, ZodErrorMessages.numberMustBeRatio),
-  seasonFromEpisodes: z
-    .number()
-    .positive()
-    .lte(1, ZodErrorMessages.numberMustBeRatio)
-    .nullish(),
+  includeSingleEpisodes: runtimeShape.includeSingleEpisodes,
+  includeNonVideos: runtimeShape.includeNonVideos,
+  blockList: runtimeShape.blockList.nullish(),
+  snatchTimeout: runtimeShape.snatchTimeout.nullish(),
+  autoResumeMaxDownload: runtimeShape.autoResumeMaxDownload,
+  fuzzySizeThreshold: runtimeShape.fuzzySizeThreshold,
+  seasonFromEpisodes: runtimeShape.seasonFromEpisodes.nullish(),
 });
 
 export const trackerValidationSchema = z.object({
@@ -64,37 +54,20 @@ export const downloaderValidationSchema = z.object({
 });
 
 export const searchValidationSchema = z.object({
-  delay: z
-    .number()
-    .nonnegative(ZodErrorMessages.delayNegative)
-    .gte(30, ZodErrorMessages.delayUnsupported)
-    .lte(3600, ZodErrorMessages.delayUnsupported),
-  matchMode: z.nativeEnum(MatchMode),
-  rssCadence: z.number().nonnegative().nullish(),
-  // .refine(
-  // 	(cadence) =>
-  // 		process.env.DEV ||
-  // 		!cadence ||
-  // 		(cadence >= ms("10 minutes") && cadence <= ms("2 hours")),
-  // 	ZodErrorMessages.rssCadenceUnsupported,
-  // ),
-  searchCadence: z.number().nonnegative().nullish(),
-  // .refine(
-  // 	(cadence) =>
-  // 		process.env.DEV || !cadence || cadence >= ms("1 day"),
-  // 	ZodErrorMessages.searchCadenceUnsupported,
-  // ),
-  searchTimeout: z.number().nonnegative().nullish(),
-  searchLimit: z.number().nonnegative().nullish(),
-  excludeOlder: z.number().nonnegative().nullable(),
-  excludeRecentSearch: z.number().nonnegative().nullable(),
+  delay: runtimeShape.delay,
+  matchMode: runtimeShape.matchMode,
+  rssCadence: runtimeShape.rssCadence.nullish(),
+  searchCadence: runtimeShape.searchCadence.nullish(),
+  searchTimeout: runtimeShape.searchTimeout.nullish(),
+  searchLimit: runtimeShape.searchLimit.nullish(),
+  excludeOlder: runtimeShape.excludeOlder.nullish(),
+  excludeRecentSearch: runtimeShape.excludeRecentSearch.nullish(),
 });
 
 export const connectValidationSchema = z.object({
-  host: z.string().ip().nullish(),
-  port: z.number().positive().lte(65535).nullish(),
-  // .nullish(),
-  apiKey: z.string().min(24).nullish(),
+  host: runtimeShape.host.nullish(),
+  port: runtimeShape.port.nullish(),
+  apiKey: runtimeShape.apiKey.nullish(),
   radarr: z
     .array(z.string().url().or(z.literal('')))
     .transform((v) => v ?? [])
@@ -133,8 +106,8 @@ export const directoryValidationSchema = z.object({
 });
 
 export const baseValidationSchema = z.object({
-  verbose: z.boolean(),
-  torrents: z.array(z.string()).optional(),
+  verbose: runtimeShape.verbose,
+  torrents: runtimeShape.torrents.optional(),
 });
 
 export type Config = z.infer<typeof baseValidationSchema>;
