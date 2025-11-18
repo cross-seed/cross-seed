@@ -11,5 +11,5 @@
 		"sourceMap": true,
 		"strictNullChecks": true,
 	},
-	"include": ["./src/**/*"]
+	"include": ["./src/**/*", "./packages/shared/**/*"]
 }

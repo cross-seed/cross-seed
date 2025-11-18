@@ -1,4 +1,12 @@
 import { createRequire } from "module";
+import {
+	Action,
+	BlocklistType,
+	LinkType,
+	MatchMode,
+} from "../packages/shared/constants.js";
+
+export { Action, BlocklistType, LinkType, MatchMode };
 
 const require = createRequire(import.meta.url);
 const packageDotJson = require("../package.json");
@@ -177,11 +185,6 @@ export enum MediaType {
 	OTHER = "unknown",
 }
 
-export enum Action {
-	SAVE = "save",
-	INJECT = "inject",
-}
-
 export enum InjectionResult {
 	SUCCESS = "INJECTED",
 	FAILURE = "FAILURE",
@@ -250,32 +253,6 @@ export function isStaticDecision(decision: Decision): boolean {
 	);
 }
 
-export enum MatchMode {
-	STRICT = "strict",
-	FLEXIBLE = "flexible",
-	PARTIAL = "partial",
-}
-
-export enum LinkType {
-	SYMLINK = "symlink",
-	HARDLINK = "hardlink",
-	REFLINK = "reflink",
-	REFLINK_OR_COPY = "reflinkOrCopy",
-}
-
-export enum BlocklistType {
-	NAME = "name",
-	NAME_REGEX = "nameRegex",
-	FOLDER = "folder",
-	FOLDER_REGEX = "folderRegex",
-	CATEGORY = "category",
-	TAG = "tag",
-	TRACKER = "tracker",
-	INFOHASH = "infoHash",
-	SIZE_BELOW = "sizeBelow",
-	SIZE_ABOVE = "sizeAbove",
-	LEGACY = "legacy",
-}
 const PARSE_BLOCKLIST_REGEX = /^(?<blocklistType>.+?):(?<blocklistValue>.*)$/;
 export function parseBlocklistEntry(blocklistEntry: string): {
 	blocklistType: BlocklistType;

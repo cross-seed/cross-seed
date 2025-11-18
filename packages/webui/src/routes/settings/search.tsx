@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
-import { removeEmptyArrayValues } from '@/lib/transformers';
+import { removeEmptyArrayValues, removeNullFields } from '@/lib/transformers';
 import { searchValidationSchema } from '@/types/config';
 import useConfigForm from '@/hooks/use-config-form';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
@@ -54,12 +54,14 @@ const SearchRssSettings = withForm({
       onSubmit: async ({ value }) => {
         try {
           Object.keys(value).forEach((attr) => {
-            const val = value[attr as keyof typeof configData];
+            const key = attr as keyof typeof configData;
+            const val = value[key];
             if (val && Array.isArray(val)) {
-              value[attr as keyof typeof configData] =
-                removeEmptyArrayValues(val);
+              value[key] = removeEmptyArrayValues(val);
             }
           });
+
+          removeNullFields(value as Record<string, unknown>);
 
           saveConfig(value);
         } catch (err) {
