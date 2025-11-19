@@ -22,11 +22,7 @@ const SearchRssSettings = withForm({
   render: function Render() {
     const trpc = useTRPC();
     const { isFieldRequired } = useConfigForm(searchValidationSchema);
-    const {
-      data: configData,
-      // isLoading,
-      // isError,
-    } = useQuery(
+    const { data: configData } = useQuery(
       trpc.settings.get.queryOptions(undefined, {
         select: (data) => {
           const fullDataset = formatConfigDataForForm(data.config);
@@ -41,12 +37,7 @@ const SearchRssSettings = withForm({
       }),
     );
 
-    const {
-      saveConfig,
-      isSuccess,
-      // isLoading: isSaving,
-      // isError: isSaveError,
-    } = useSaveConfigHook();
+    const { saveConfig, isSuccess } = useSaveConfigHook();
 
     const form = useAppForm({
       ...formOpts,
@@ -87,7 +78,13 @@ const SearchRssSettings = withForm({
 
     return (
       <Page>
-        <SettingsLayout>
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold">Searching and RSS</h1>
+            <p className="text-muted-foreground">
+              Set search, RSS, and related options.
+            </p>
+          </div>
           <FormValidationProvider isFieldRequired={isFieldRequired}>
             <form
               className="form flex flex-col gap-4"
@@ -100,9 +97,7 @@ const SearchRssSettings = withForm({
             >
               {/* form fields */}
               <div className="flex flex-wrap gap-6">
-                <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-                  <legend>Searching and RSS</legend>
-
+                <fieldset className="form-fieldset w-full gap-6">
                   {/* TODO: Error states or validations don't seem to work for these fields */}
 
                   <div className="">
@@ -138,9 +133,7 @@ const SearchRssSettings = withForm({
                         }
                       }
                     >
-                      {(field) => (
-                        <field.DurationField label="RSS Cadence" />
-                      )}
+                      {(field) => <field.DurationField label="RSS Cadence" />}
                     </form.AppField>
                   </div>
                   <div className="">
@@ -194,9 +187,7 @@ const SearchRssSettings = withForm({
                         }
                       }
                     >
-                      {(field) => (
-                        <field.DurationField label="Exclude Older" />
-                      )}
+                      {(field) => <field.DurationField label="Exclude Older" />}
                     </form.AppField>
                   </div>
                   <div className="">
@@ -220,7 +211,7 @@ const SearchRssSettings = withForm({
               </div>
             </form>
           </FormValidationProvider>
-        </SettingsLayout>
+        </div>
       </Page>
     );
   },

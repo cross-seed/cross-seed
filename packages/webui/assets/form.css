@@ -8,7 +8,6 @@
   legend {
     font-size: theme('fontSize.lg');
     font-weight: theme('fontWeight.semibold');
-    padding-inline: theme('spacing.3');
   }
 }
 

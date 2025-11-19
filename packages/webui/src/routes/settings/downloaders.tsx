@@ -9,10 +9,12 @@ import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues } from '@/lib/transformers';
-import { downloaderValidationSchema } from '@/types/config';
+import {
+  downloadClientOptionsValidationSchema,
+  downloaderValidationSchema,
+} from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
-// import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
 import { Page } from '@/components/Page';
 import { Button } from '@/components/ui/button';
@@ -106,7 +108,7 @@ const DownloadersFields = withForm({
       onSubmit: async ({ value }) => {
         // Full schema validation
         try {
-          const result = downloaderValidationSchema.safeParse(value);
+          const result = downloadClientOptionsValidationSchema.safeParse(value);
           if (!result.success) {
             console.error('FULL VALIDATION FAILED:', result.error.format());
           } else {
@@ -130,7 +132,7 @@ const DownloadersFields = withForm({
         }
       },
       validators: {
-        onSubmit: downloaderValidationSchema,
+        onSubmit: downloadClientOptionsValidationSchema,
       },
     });
 

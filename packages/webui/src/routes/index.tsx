@@ -30,11 +30,11 @@ function Home() {
     ? 'Indexer Health'
     : 'Unhealthy Indexers';
   const indexerHealthValue = statsData.allIndexersHealthy
-    ? `All ${statsData.totalIndexers.toLocaleString()}`
-    : statsData.unhealthyIndexers.toLocaleString();
+    ? `All ${statsData.totalIndexers?.toLocaleString()}`
+    : statsData.unhealthyIndexers?.toLocaleString();
   const indexerHealthDescription = statsData.allIndexersHealthy
     ? 'Indexers are all reporting healthy'
-    : `${statsData.unhealthyIndexers.toLocaleString()} of ${statsData.totalIndexers.toLocaleString()} indexers need attention`;
+    : `${statsData.unhealthyIndexers?.toLocaleString()} of ${statsData.totalIndexers?.toLocaleString()} indexers need attention`;
 
   return (
     <Page breadcrumbs={['Dashboard']}>
@@ -49,23 +49,23 @@ function Home() {
             {showDistinctQueryCount && (
               <StatCard
                 title="Total Search Queries"
-                value={statsData.queryCount.toLocaleString()}
+                value={statsData.queryCount?.toLocaleString()}
                 description="Distinct estimated searches"
               />
             )}
             <StatCard
               title="Total Query-Indexer Pairs"
-              value={statsData.queryIndexerCount.toLocaleString()}
+              value={statsData.queryIndexerCount?.toLocaleString()}
               description="Unique indexer searches"
             />
             <StatCard
               title="Total Snatches"
-              value={statsData.snatchCount.toLocaleString()}
+              value={statsData.snatchCount?.toLocaleString()}
               description="Unique infohash attempts"
             />
             <StatCard
               title="Total Matches"
-              value={statsData.totalMatches.toLocaleString()}
+              value={statsData.totalMatches?.toLocaleString()}
               description="Unique cross-seeds found"
             />
           </div>
@@ -78,19 +78,19 @@ function Home() {
             {showMatchesPerQuery && (
               <StatCard
                 title="Matches per Query"
-                value={statsData.matchesPerQuery.toFixed(2)}
+                value={statsData.matchesPerQuery?.toFixed(2)}
                 description="Matches per search estimate"
               />
             )}
             <StatCard
               title="Match Rate"
-              value={`${(statsData.matchesPerQueryIndexer * 100).toFixed(1)}%`}
+              value={`${(statsData.matchesPerQueryIndexer ?? 0 * 100).toFixed(1)}%`}
               description="of indexer searches find a match"
             />
             <StatCard
               title="Wasted Snatches"
-              value={`${(statsData.wastedSnatchRate * 100).toFixed(1)}%`}
-              description={`${statsData.wastedSnatchCount.toLocaleString()} snatched but mismatched`}
+              value={`${(statsData.wastedSnatchRate ?? 0 * 100).toFixed(1)}%`}
+              description={`${statsData.wastedSnatchCount?.toLocaleString()} snatched but mismatched`}
             />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -101,7 +101,7 @@ function Home() {
             />
             <StatCard
               title="Recent Activity"
-              value={statsData.recentMatches.toLocaleString()}
+              value={statsData.recentMatches?.toLocaleString()}
               description="Matches in last 24h"
             />
           </div>

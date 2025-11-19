@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  Action,
-  LinkType,
-  ZodErrorMessages,
-} from '../../../shared/constants';
+import { Action, LinkType, ZodErrorMessages } from '../../../shared/constants';
 import { RUNTIME_CONFIG_SCHEMA } from '../../../shared/configSchema';
 
 const runtimeShape = RUNTIME_CONFIG_SCHEMA.shape;
@@ -34,6 +30,19 @@ export const clientValidationSchema = z.object({
     .default(false)
     .or(z.null().transform(() => false)),
   plugin: z.boolean().nullish().default(false),
+});
+
+export const downloadClientOptionsValidationSchema = z.object({
+  action: z.nativeEnum(Action),
+  duplicateCategories: z.boolean(),
+  useClientTorrents: z.boolean(),
+  linkCategory: z.string().nullish(),
+  skipRecheck: z.boolean(),
+  torrentDir: z
+    .string()
+    .nullable()
+    .transform((v) => v ?? null),
+  outputDir: z.string().min(1, ZodErrorMessages.emptyString),
 });
 
 export const downloaderValidationSchema = z.object({

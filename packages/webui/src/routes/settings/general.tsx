@@ -17,7 +17,6 @@ import { generalValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { toast } from 'sonner';
-import { SettingsLayout } from '@/components/SettingsLayout';
 import { Page } from '@/components/Page';
 
 const GeneralSettings = withForm({
@@ -91,7 +90,13 @@ const GeneralSettings = withForm({
 
     return (
       <Page>
-        <SettingsLayout>
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold">General Settings</h1>
+            <p className="text-muted-foreground">
+              Configure general application settings below.
+            </p>
+          </div>
           <FormValidationProvider isFieldRequired={isFieldRequired}>
             <form
               className="form flex flex-col gap-4"
@@ -104,17 +109,18 @@ const GeneralSettings = withForm({
             >
               <div className="flex flex-wrap gap-6">
                 <fieldset className="form-fieldset w-full gap-6 rounded-md">
-                  <legend>Misc. Settings</legend>
-                  <form.AppField name="includeNonVideos">
-                    {(field) => (
-                      <field.SwitchField label="Include Non-Videos" />
-                    )}
-                  </form.AppField>
-                  <form.AppField name="includeSingleEpisodes">
-                    {(field) => (
-                      <field.SwitchField label="Include Single Episodes" />
-                    )}
-                  </form.AppField>
+                  <div className="form-field-switches col-span-2 gap-x-12">
+                    <form.AppField name="includeNonVideos">
+                      {(field) => (
+                        <field.SwitchField label="Include Non-Videos" />
+                      )}
+                    </form.AppField>
+                    <form.AppField name="includeSingleEpisodes">
+                      {(field) => (
+                        <field.SwitchField label="Include Single Episodes" />
+                      )}
+                    </form.AppField>
+                  </div>
                   <div className="">
                     <form.AppField name="snatchTimeout" validators={{}}>
                       {(field) => (
@@ -233,7 +239,7 @@ const GeneralSettings = withForm({
               </div>
             </form>
           </FormValidationProvider>
-        </SettingsLayout>
+        </div>
       </Page>
     );
   },

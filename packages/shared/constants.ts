@@ -109,7 +109,7 @@ export const defaultConfig = {
 	delay: 30,
 	torznab: [""],
 	useClientTorrents: false,
-	torrentClients: [],
+	torrentClients: [""],
 	dataDirs: [""],
 	matchMode: MatchMode.STRICT,
 	skipRecheck: true,

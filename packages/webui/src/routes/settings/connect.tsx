@@ -94,7 +94,13 @@ const ConnectSettings = withForm({
 
     return (
       <Page>
-        <SettingsLayout>
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold">Connection Settings</h1>
+            <p className="text-muted-foreground">
+              Connect Cross Seed to other applications and services.
+            </p>
+          </div>
           <FormValidationProvider isFieldRequired={isFieldRequired}>
             <form
               className="form flex flex-col gap-4"
@@ -106,8 +112,7 @@ const ConnectSettings = withForm({
               noValidate
             >
               <div className="flex flex-wrap gap-6">
-                <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-                  <legend>Connect to Cross Seed</legend>
+                <fieldset className="form-fieldset w-full gap-6">
                   <div>
                     <form.AppField name="host" validators={{}}>
                       {(field) => <field.TextField label="Host" />}
@@ -126,7 +131,7 @@ const ConnectSettings = withForm({
                     </form.AppField>
                   </div>
                 </fieldset>
-                <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
+                <fieldset className="form-fieldset w-full gap-6">
                   <legend>Connect to Other Apps</legend>
                   <div className="">
                     <form.Field name="sonarr" mode="array" validators={{}}>
@@ -367,7 +372,7 @@ const ConnectSettings = withForm({
               </div>
             </form>
           </FormValidationProvider>
-        </SettingsLayout>
+        </div>
       </Page>
     );
   },

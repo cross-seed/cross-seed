@@ -109,7 +109,13 @@ const DirectoriesPathsFields = withForm({
 
     return (
       <Page>
-        <SettingsLayout>
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold">Directories and Paths</h1>
+            <p className="text-muted-foreground">
+              Manage directories and link style.
+            </p>
+          </div>
           <FormValidationProvider isFieldRequired={isFieldRequired}>
             <form
               className="form flex flex-col gap-4"
@@ -122,8 +128,7 @@ const DirectoriesPathsFields = withForm({
             >
               {/* form fields */}
               <div className="flex flex-wrap gap-6">
-                <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-                  <legend>Directories and Paths</legend>
+                <fieldset className="form-fieldset w-full gap-6">
                   <div className="">
                     <form.Field
                       name="dataDirs"
@@ -337,7 +342,7 @@ const DirectoriesPathsFields = withForm({
               </div>
             </form>
           </FormValidationProvider>
-        </SettingsLayout>
+        </div>
       </Page>
     );
   },
