@@ -5,7 +5,7 @@ import {
   splitLink,
 } from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
-import type { AppRouter } from '../../../../src/trpc/routers';
+import type { AppRouter } from '@cross-seed/api-types';
 
 const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
 
