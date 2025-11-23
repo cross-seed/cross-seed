@@ -15,7 +15,6 @@ import { FormValidationProvider } from '@/contexts/Form/form-validation-provider
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { createFileRoute } from '@tanstack/react-router';
 import { Page } from '@/components/Page';
-import { SettingsLayout } from '@/components/Settings/SettingsLayout';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 
 function DirectorySettings() {
@@ -62,7 +61,13 @@ function DirectorySettings() {
 
   return (
     <Page>
-      <SettingsLayout>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold">Directory & Path Settings</h1>
+          <p className="text-muted-foreground">
+            Manage the directories and paths used by cross-seed.
+          </p>
+        </div>
         <FormValidationProvider isFieldRequired={isFieldRequired}>
           <form
             className="form flex flex-col gap-4"
@@ -75,8 +80,7 @@ function DirectorySettings() {
           >
             {/* form fields */}
             <div className="flex flex-wrap gap-6">
-              <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-                <legend>Directories and Paths</legend>
+              <fieldset className="form-fieldset w-full gap-6">
                 <div className="">
                   <form.Field
                     name="dataDirs"
@@ -281,7 +285,7 @@ function DirectorySettings() {
             </div>
           </form>
         </FormValidationProvider>
-      </SettingsLayout>
+      </div>
     </Page>
   );
 }

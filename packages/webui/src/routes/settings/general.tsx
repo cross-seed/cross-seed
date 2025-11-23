@@ -72,8 +72,7 @@ function GeneralSettings() {
             noValidate
           >
             <div className="flex flex-wrap gap-6">
-              <fieldset className="form-fieldset w-full gap-6 rounded-md">
-                <legend>Misc. Settings</legend>
+              <fieldset className="form-fieldset w-full gap-6">
                 <form.AppField name="includeNonVideos">
                   {(field) => <field.SwitchField label="Include Non-Videos" />}
                 </form.AppField>

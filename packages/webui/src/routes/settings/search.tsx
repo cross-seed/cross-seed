@@ -62,9 +62,7 @@ function SearchRssSettings() {
           >
             {/* form fields */}
             <div className="flex flex-wrap gap-6">
-              <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-                <legend>Searching and RSS</legend>
-
+              <fieldset className="form-fieldset w-full gap-6">
                 {/* TODO: Error states or validations don't seem to work for these fields */}
 
                 <div className="">

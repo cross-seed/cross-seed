@@ -1,15 +1,15 @@
 import { useFormContext } from '@/contexts/Form/form-context';
 import { Button } from '@/components/ui/button';
-import { LoaderCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// import { baseValidationSchema } from '@/types/config';
 
 interface SubmitButtonProps {
   label?: string;
   actionLabel?: string;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-function SubmitButton({ label, actionLabel }: SubmitButtonProps) {
+function SubmitButton({ label, actionLabel, size = 'md' }: SubmitButtonProps) {
   const form = useFormContext();
 
   return (
@@ -23,18 +23,23 @@ function SubmitButton({ label, actionLabel }: SubmitButtonProps) {
         ]}
       >
         {([canSubmit, isSubmitting, errors, fieldMeta]) => (
-          <div className="form__submit bg-background sticky right-0 bottom-0 left-0 w-full py-4">
+          <div className="form__submit bg-background sticky right-0 bottom-0 left-0 w-full pt-4">
             <Button
               type="submit"
               className={cn(
-                'w-full rounded-md px-4 py-6 transition-colors duration-150',
-                { isSubmitting: 'opacity-70' },
+                'w-full rounded-md transition-colors duration-150',
+                {
+                  'opacity-70': isSubmitting,
+                  'px-4 py-6': size === 'lg',
+                  'px-4 py-2': size === 'md',
+                  'px-2 py-1': size === 'sm',
+                },
               )}
-              disabled={!canSubmit}
+              disabled={!canSubmit || isSubmitting}
             >
               {isSubmitting ? (
                 <>
-                  <LoaderCircle className="animate-spin" />{' '}
+                  <Loader2 className="size-4 animate-spin" />{' '}
                   {actionLabel ?? 'Saving...'}
                 </>
               ) : (

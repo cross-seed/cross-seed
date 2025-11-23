@@ -14,7 +14,6 @@ import { connectValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { Page } from '@/components/Page';
-import { SettingsLayout } from '@/components/Settings/SettingsLayout';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 
 function ConnectSettings() {
@@ -58,7 +57,13 @@ function ConnectSettings() {
 
   return (
     <Page>
-      <SettingsLayout>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold">Connected App Settings</h1>
+          <p className="text-muted-foreground">
+            Manage apps connected to Cross-seed.
+          </p>
+        </div>
         <FormValidationProvider isFieldRequired={isFieldRequired}>
           <form
             className="form flex flex-col gap-4"
@@ -70,8 +75,7 @@ function ConnectSettings() {
             noValidate
           >
             <div className="flex flex-wrap gap-6">
-              <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-                <legend>Connect to Cross Seed</legend>
+              <fieldset className="form-fieldset w-full gap-6">
                 <div>
                   <form.AppField name="host" validators={{}}>
                     {(field) => <field.TextField label="Host" />}
@@ -320,7 +324,7 @@ function ConnectSettings() {
             </div>
           </form>
         </FormValidationProvider>
-      </SettingsLayout>
+      </div>
     </Page>
   );
 }
