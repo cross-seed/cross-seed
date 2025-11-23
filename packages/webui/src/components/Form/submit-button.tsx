@@ -39,8 +39,7 @@ function SubmitButton({ label, actionLabel }: SubmitButtonProps) {
                 </>
               ) : (
                 <>{label ?? 'Save'}</>
-              )}{' '}
-              "{canSubmit && 'can submit'}"
+              )}
             </Button>
             {Object.keys(errors).length > 0 && (
               <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
