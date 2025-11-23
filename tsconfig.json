@@ -1,6 +1,7 @@
 {
 	"compilerOptions": {
 		"outDir": "./dist",
+		"rootDir": "./src",
 		"allowJs": true,
 		"target": "es2022",
 		"lib": ["es2023"],
@@ -9,7 +10,10 @@
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
 		"sourceMap": true,
-		"strictNullChecks": true
+		"strictNullChecks": true,
+		"types": [],
+		"composite": true
 	},
-	"include": ["./src/**/*"]
+	"include": ["./src/**/*"],
+	"references": [{ "path": "packages/shared/tsconfig.json" }]
 }

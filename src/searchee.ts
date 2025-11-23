@@ -114,7 +114,7 @@ export function hasInfoHash(
 	return searchee.infoHash != null;
 }
 
-enum SearcheeSource {
+export enum SearcheeSource {
 	CLIENT = "torrentClient",
 	TORRENT = "torrentFile",
 	DATA = "dataDir",

@@ -11,7 +11,9 @@
 		"sourceMap": true,
 		"declaration": true,
 		"declarationMap": true,
-		"strictNullChecks": true
+		"strictNullChecks": true,
+		"types": [],
+		"composite": true
 	},
 	"include": ["./**/*.ts"]
 }
