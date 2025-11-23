@@ -9,11 +9,12 @@ export const useSaveConfigHook = () => {
   const options = trpc.settings.save.mutationOptions({
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        // ! TODO: Create queryKey factories for all queries?
         queryKey: trpc.settings.get.queryKey(),
         exact: false,
       });
-      toast.success('Settings saved successfully!');
+      toast.success('Settings saved successfully!', {
+        description: 'Your changes will take effect on the next restart.',
+      });
     },
     onError: (error) => {
       toast.error('Failed to save settings', {

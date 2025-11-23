@@ -4,16 +4,13 @@ import { useAppForm } from '@/hooks/form';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
-import { useSaveConfigHook } from '@/hooks/saveFormHook';
-import { removeEmptyArrayValues, removeNullFields } from '@/lib/transformers';
 import { searchValidationSchema } from '@/types/config';
 import useConfigForm from '@/hooks/use-config-form';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
-import { useEffect } from 'react';
-import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
 import { Page } from '@/components/Page';
+import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 
 function SearchRssSettings() {
   const trpc = useTRPC();
@@ -33,48 +30,26 @@ function SearchRssSettings() {
     }),
   );
 
-  const { saveConfig, isSuccess } = useSaveConfigHook();
+  const handleSubmit = useSettingsFormSubmit();
 
   const form = useAppForm({
     ...formOpts,
     defaultValues: configData ?? formOpts.defaultValues,
-    onSubmit: async ({ value }) => {
-      try {
-        Object.keys(value).forEach((attr) => {
-          const key = attr as keyof typeof configData;
-          const val = value[key];
-          if (val && Array.isArray(val)) {
-            value[key] = removeEmptyArrayValues(val);
-          }
-        });
-
-        removeNullFields(value as Record<string, unknown>);
-
-        saveConfig(value);
-      } catch (err) {
-        console.error('Exception during full validation:', err);
-        return {
-          status: 'error',
-          error: { _form: 'An unexpected error occurred during validation' },
-        };
-      }
-    },
+    onSubmit: handleSubmit,
     validators: {
       onSubmit: searchValidationSchema,
     },
   });
 
-  useEffect(() => {
-    if (isSuccess) {
-      toast.success('Configuration saved successfully!', {
-        description: 'Your changes will take effect on the next restart.',
-      });
-    }
-  }, [isSuccess]);
-
   return (
     <Page>
-      <SettingsLayout>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold">Search & RSS Settings</h1>
+          <p className="text-muted-foreground">
+            Manage search and RSS options.
+          </p>
+        </div>
         <FormValidationProvider isFieldRequired={isFieldRequired}>
           <form
             className="form flex flex-col gap-4"
@@ -197,7 +172,7 @@ function SearchRssSettings() {
             </div>
           </form>
         </FormValidationProvider>
-      </SettingsLayout>
+      </div>
     </Page>
   );
 }

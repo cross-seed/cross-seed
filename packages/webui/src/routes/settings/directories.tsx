@@ -10,14 +10,13 @@ import { useAppForm } from '@/hooks/form';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
-import { useSaveConfigHook } from '@/hooks/saveFormHook';
-import { removeEmptyArrayValues } from '@/lib/transformers';
 import { directoryValidationSchema } from '@/types/config';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
-import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
 import { Page } from '@/components/Page';
+import { SettingsLayout } from '@/components/Settings/SettingsLayout';
+import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 
 function DirectorySettings() {
   const { isFieldRequired } = useConfigForm(directoryValidationSchema);
@@ -38,37 +37,12 @@ function DirectorySettings() {
     }),
   );
 
-  const { saveConfig, isSuccess } = useSaveConfigHook();
+  const handleSubmit = useSettingsFormSubmit();
 
   const form = useAppForm({
     ...formOpts,
     defaultValues: configData ?? formOpts.defaultValues,
-    onSubmit: async ({ value }) => {
-      // Full schema validation
-      try {
-        const result = directoryValidationSchema.safeParse(value);
-        if (!result.success) {
-          console.error('FULL VALIDATION FAILED:', result.error.format());
-        } else {
-          // remove empty values from array fields
-          Object.keys(value).forEach((attr) => {
-            const val = value[attr as keyof typeof configData];
-            if (val && Array.isArray(val)) {
-              value[attr as keyof typeof configData] =
-                removeEmptyArrayValues(val);
-            }
-          });
-
-          saveConfig(value);
-        }
-      } catch (err) {
-        console.error('Exception during full validation:', err);
-        return {
-          status: 'error',
-          error: { _form: 'An unexpected error occurred during validation' },
-        };
-      }
-    },
+    onSubmit: handleSubmit,
     validators: {
       onSubmit: directoryValidationSchema,
     },
@@ -85,14 +59,6 @@ function DirectorySettings() {
       setLastFieldAdded(null);
     }
   }, [lastFieldAdded]);
-
-  useEffect(() => {
-    if (isSuccess) {
-      toast.success('Configuration saved successfully!', {
-        description: 'Your changes will take effect on the next restart.',
-      });
-    }
-  }, [isSuccess]);
 
   return (
     <Page>
