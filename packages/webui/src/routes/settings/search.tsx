@@ -1,4 +1,3 @@
-import { withForm } from '@/hooks/form';
 import { MatchMode } from '../../../../shared/constants';
 import { formOpts } from '../../components/Form/shared-form';
 import { useAppForm } from '@/hooks/form';
@@ -14,217 +13,194 @@ import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { createFileRoute } from '@tanstack/react-router';
-import { SettingsLayout } from '@/components/SettingsLayout';
 import { Page } from '@/components/Page';
 
-const SearchRssSettings = withForm({
-  ...formOpts,
-  render: function Render() {
-    const trpc = useTRPC();
-    const { isFieldRequired } = useConfigForm(searchValidationSchema);
-    const {
-      data: configData,
-      // isLoading,
-      // isError,
-    } = useQuery(
-      trpc.settings.get.queryOptions(undefined, {
-        select: (data) => {
-          const fullDataset = formatConfigDataForForm(data.config);
-          const filteredData = pickSchemaFields(
-            searchValidationSchema,
-            fullDataset,
-            { includeUndefined: true },
-          );
+function SearchRssSettings() {
+  const trpc = useTRPC();
+  const { isFieldRequired } = useConfigForm(searchValidationSchema);
+  const { data: configData } = useQuery(
+    trpc.settings.get.queryOptions(undefined, {
+      select: (data) => {
+        const fullDataset = formatConfigDataForForm(data.config);
+        const filteredData = pickSchemaFields(
+          searchValidationSchema,
+          fullDataset,
+          { includeUndefined: true },
+        );
 
-          return filteredData;
-        },
-      }),
-    );
-
-    const {
-      saveConfig,
-      isSuccess,
-      // isLoading: isSaving,
-      // isError: isSaveError,
-    } = useSaveConfigHook();
-
-    const form = useAppForm({
-      ...formOpts,
-      defaultValues: configData ?? formOpts.defaultValues,
-      onSubmit: async ({ value }) => {
-        try {
-          Object.keys(value).forEach((attr) => {
-            const key = attr as keyof typeof configData;
-            const val = value[key];
-            if (val && Array.isArray(val)) {
-              value[key] = removeEmptyArrayValues(val);
-            }
-          });
-
-          removeNullFields(value as Record<string, unknown>);
-
-          saveConfig(value);
-        } catch (err) {
-          console.error('Exception during full validation:', err);
-          return {
-            status: 'error',
-            error: { _form: 'An unexpected error occurred during validation' },
-          };
-        }
+        return filteredData;
       },
-      validators: {
-        onSubmit: searchValidationSchema,
-      },
-    });
+    }),
+  );
 
-    useEffect(() => {
-      if (isSuccess) {
-        toast.success('Configuration saved successfully!', {
-          description: 'Your changes will take effect on the next restart.',
+  const { saveConfig, isSuccess } = useSaveConfigHook();
+
+  const form = useAppForm({
+    ...formOpts,
+    defaultValues: configData ?? formOpts.defaultValues,
+    onSubmit: async ({ value }) => {
+      try {
+        Object.keys(value).forEach((attr) => {
+          const key = attr as keyof typeof configData;
+          const val = value[key];
+          if (val && Array.isArray(val)) {
+            value[key] = removeEmptyArrayValues(val);
+          }
         });
+
+        removeNullFields(value as Record<string, unknown>);
+
+        saveConfig(value);
+      } catch (err) {
+        console.error('Exception during full validation:', err);
+        return {
+          status: 'error',
+          error: { _form: 'An unexpected error occurred during validation' },
+        };
       }
-    }, [isSuccess]);
+    },
+    validators: {
+      onSubmit: searchValidationSchema,
+    },
+  });
 
-    return (
-      <Page>
-        <SettingsLayout>
-          <FormValidationProvider isFieldRequired={isFieldRequired}>
-            <form
-              className="form flex flex-col gap-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                form.handleSubmit();
-              }}
-              noValidate
-            >
-              {/* form fields */}
-              <div className="flex flex-wrap gap-6">
-                <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
-                  <legend>Searching and RSS</legend>
+  useEffect(() => {
+    if (isSuccess) {
+      toast.success('Configuration saved successfully!', {
+        description: 'Your changes will take effect on the next restart.',
+      });
+    }
+  }, [isSuccess]);
 
-                  {/* TODO: Error states or validations don't seem to work for these fields */}
+  return (
+    <Page>
+      <SettingsLayout>
+        <FormValidationProvider isFieldRequired={isFieldRequired}>
+          <form
+            className="form flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit();
+            }}
+            noValidate
+          >
+            {/* form fields */}
+            <div className="flex flex-wrap gap-6">
+              <fieldset className="form-fieldset border-border w-full gap-6 rounded-md border">
+                <legend>Searching and RSS</legend>
 
-                  <div className="">
-                    <form.AppField
-                      name="delay"
-                      validators={
-                        {
-                          // onBlur: baseValidationSchema.shape.delay,
-                        }
+                {/* TODO: Error states or validations don't seem to work for these fields */}
+
+                <div className="">
+                  <form.AppField
+                    name="delay"
+                    validators={
+                      {
+                        // onBlur: baseValidationSchema.shape.delay,
                       }
-                    >
-                      {(field) => (
-                        <field.TextField label="Delay" type="number" />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField name="matchMode">
-                      {(field) => (
-                        <field.SelectField
-                          label="Match Mode"
-                          options={MatchMode}
-                        />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField
-                      name="rssCadence"
-                      validators={
-                        {
-                          // onBlur: baseValidationSchema.shape.rssCadence,
-                        }
+                    }
+                  >
+                    {(field) => <field.TextField label="Delay" type="number" />}
+                  </form.AppField>
+                </div>
+                <div className="">
+                  <form.AppField name="matchMode">
+                    {(field) => (
+                      <field.SelectField
+                        label="Match Mode"
+                        options={MatchMode}
+                      />
+                    )}
+                  </form.AppField>
+                </div>
+                <div className="">
+                  <form.AppField
+                    name="rssCadence"
+                    validators={
+                      {
+                        // onBlur: baseValidationSchema.shape.rssCadence,
                       }
-                    >
-                      {(field) => (
-                        <field.DurationField label="RSS Cadence" />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField
-                      name="searchCadence"
-                      validators={
-                        {
-                          // onBlur: baseValidationSchema.shape.searchCadence,
-                        }
+                    }
+                  >
+                    {(field) => <field.DurationField label="RSS Cadence" />}
+                  </form.AppField>
+                </div>
+                <div className="">
+                  <form.AppField
+                    name="searchCadence"
+                    validators={
+                      {
+                        // onBlur: baseValidationSchema.shape.searchCadence,
                       }
-                    >
-                      {(field) => (
-                        <field.DurationField label="Search Cadence" />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField
-                      name="searchTimeout"
-                      validators={
-                        {
-                          // onBlur: baseValidationSchema.shape.searchTimeout,
-                        }
+                    }
+                  >
+                    {(field) => <field.DurationField label="Search Cadence" />}
+                  </form.AppField>
+                </div>
+                <div className="">
+                  <form.AppField
+                    name="searchTimeout"
+                    validators={
+                      {
+                        // onBlur: baseValidationSchema.shape.searchTimeout,
                       }
-                    >
-                      {(field) => (
-                        <field.DurationField label="Search Timeout" />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField
-                      name="searchLimit"
-                      validators={
-                        {
-                          // onBlur: baseValidationSchema.shape.searchLimit,
-                        }
+                    }
+                  >
+                    {(field) => <field.DurationField label="Search Timeout" />}
+                  </form.AppField>
+                </div>
+                <div className="">
+                  <form.AppField
+                    name="searchLimit"
+                    validators={
+                      {
+                        // onBlur: baseValidationSchema.shape.searchLimit,
                       }
-                    >
-                      {(field) => (
-                        <field.TextField label="Search Limit" type="number" />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField
-                      name="excludeOlder"
-                      validators={
-                        {
-                          // onBlur: baseValidationSchema.shape.excludeOlder,
-                        }
+                    }
+                  >
+                    {(field) => (
+                      <field.TextField label="Search Limit" type="number" />
+                    )}
+                  </form.AppField>
+                </div>
+                <div className="">
+                  <form.AppField
+                    name="excludeOlder"
+                    validators={
+                      {
+                        // onBlur: baseValidationSchema.shape.excludeOlder,
                       }
-                    >
-                      {(field) => (
-                        <field.DurationField label="Exclude Older" />
-                      )}
-                    </form.AppField>
-                  </div>
-                  <div className="">
-                    <form.AppField
-                      name="excludeRecentSearch"
-                      validators={
-                        {
-                          // onBlur: baseValidationSchema.shape.excludeRecentSearch,
-                        }
+                    }
+                  >
+                    {(field) => <field.DurationField label="Exclude Older" />}
+                  </form.AppField>
+                </div>
+                <div className="">
+                  <form.AppField
+                    name="excludeRecentSearch"
+                    validators={
+                      {
+                        // onBlur: baseValidationSchema.shape.excludeRecentSearch,
                       }
-                    >
-                      {(field) => (
-                        <field.DurationField label="Exclude Recent Search" />
-                      )}
-                    </form.AppField>
-                  </div>
-                </fieldset>
-                <form.AppForm>
-                  <form.SubmitButton />
-                </form.AppForm>
-              </div>
-            </form>
-          </FormValidationProvider>
-        </SettingsLayout>
-      </Page>
-    );
-  },
-});
+                    }
+                  >
+                    {(field) => (
+                      <field.DurationField label="Exclude Recent Search" />
+                    )}
+                  </form.AppField>
+                </div>
+              </fieldset>
+              <form.AppForm>
+                <form.SubmitButton />
+              </form.AppForm>
+            </div>
+          </form>
+        </FormValidationProvider>
+      </SettingsLayout>
+    </Page>
+  );
+}
 
 export const Route = createFileRoute('/settings/search')({
   component: SearchRssSettings,

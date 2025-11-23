@@ -18,6 +18,12 @@ export function getPasswordFromClientUrl(clientUrl: string) {
   console.log('getpassword fn', url);
 }
 
+export const removeUserAndPassFromClientUrl = (url: string) => {
+  const protocol = getProtocolFromClientUrl(url);
+  const host = getHostFromClientUrl(url);
+  return `${protocol}//${host}`;
+};
+
 export function buildClientUrl({
   client,
   protocol,

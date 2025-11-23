@@ -22,24 +22,14 @@ import {
   getProtocolFromClientUrl,
   buildClientUrl,
 } from './lib/urls';
+import { TDownloadClient } from '@/types/download-clients';
 // import { Label as Labels } from '../../../../../src/logger';
-
-// Same as in downloaders.tsx
-type DownloadClient = {
-  index: number;
-  name?: string;
-  client: string;
-  url: string;
-  user?: string;
-  password: string;
-  readOnly?: boolean;
-};
 
 interface ClientEditSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: 'edit' | 'create';
-  client: DownloadClient | null;
+  client: TDownloadClient | null;
 }
 
 const CLIENTS = {
