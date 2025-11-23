@@ -2,6 +2,7 @@
 FROM node:22-alpine AS frontend-build
 WORKDIR /usr/src/frontend
 COPY packages/webui/package*.json ./
+COPY packages/shared/package*.json packages/shared/tsconfig.json ../shared/
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 RUN npm ci --no-fund
 COPY packages/webui ./
@@ -12,9 +13,11 @@ RUN npm run build
 FROM node:22-alpine AS backend-build
 WORKDIR /usr/src/backend
 COPY package*.json tsconfig*.json ./
+COPY packages/shared/package*.json packages/shared/tsconfig.json ./packages/shared/
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 RUN npm ci --no-fund
 COPY src src
+COPY packages/shared packages/shared
 RUN npm run build && npm prune --omit=dev
 
 # Production Assembly Stage

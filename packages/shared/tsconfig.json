@@ -1,7 +1,7 @@
 {
 	"compilerOptions": {
 		"outDir": "./dist",
-		"allowJs": true,
+		"rootDir": "./",
 		"target": "es2022",
 		"lib": ["es2023"],
 		"module": "nodenext",
@@ -9,7 +9,9 @@
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
 		"sourceMap": true,
+		"declaration": true,
+		"declarationMap": true,
 		"strictNullChecks": true
 	},
-	"include": ["./src/**/*"]
+	"include": ["./**/*.ts"]
 }

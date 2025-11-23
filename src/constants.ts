@@ -4,7 +4,7 @@ import {
 	BlocklistType,
 	LinkType,
 	MatchMode,
-} from "../packages/shared/constants.js";
+} from "@cross-seed/shared/constants";
 
 export { Action, BlocklistType, LinkType, MatchMode };
 

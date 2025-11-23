@@ -1,7 +1,7 @@
 import type { Problem } from "./problems.js";
 import { MatchMode } from "./constants.js";
 import { omitUndefined } from "./utils/object.js";
-import type { RuntimeConfig } from "../packages/shared/configSchema.js";
+import type { RuntimeConfig } from "@cross-seed/shared/configSchema";
 export type { RuntimeConfig };
 
 let runtimeConfig: RuntimeConfig;

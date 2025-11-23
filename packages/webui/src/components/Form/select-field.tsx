@@ -22,7 +22,7 @@ type SelectFieldProps<T extends Record<string, string>> = {
  * Implementation example:
  * ```tsx
  * // For MatchMode
- *  import { MatchMode } from 'packages/shared/constants';
+ *  import { MatchMode } from '@cross-seed/shared/constants';
  *
  *  <SelectField
  *    label="Match Mode"

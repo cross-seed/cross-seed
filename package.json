@@ -5,7 +5,8 @@
 	"scripts": {
 		"test": "vitest",
 		"coverage": "vitest run --coverage",
-		"build": "tsc",
+		"build": "npm run build:shared && tsc",
+		"build:shared": "tsc -p packages/shared/tsconfig.json",
 		"build:webui": "cd packages/webui && npm run build",
 		"copy:webui": "rimraf dist/webui && cp -r packages/webui/dist dist/webui",
 		"build:all": "npm run build:webui && npm run build && npm run copy:webui",
@@ -50,7 +51,8 @@
 		"winston-daily-rotate-file": "^4.5.5",
 		"xml2js": "^0.5.0",
 		"xmlrpc": "^1.3.2",
-		"zod": "^3.22.4"
+		"zod": "^3.22.4",
+		"@cross-seed/shared": "file:packages/shared"
 	},
 	"devDependencies": {
 		"@types/bcryptjs": "^2.4.6",
