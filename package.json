@@ -8,7 +8,6 @@
 		"coverage": "vitest run --coverage",
 		"build": "npm run build:backend",
 		"build:backend": "tsc -b tsconfig.json",
-		"build:shared": "tsc -b packages/shared/tsconfig.json",
 		"build:webui": "cd packages/webui && npm run build",
 		"copy:webui": "rimraf dist/webui && cp -r packages/webui/dist dist/webui",
 		"build:all": "npm run build:backend && npm run build:webui && npm run copy:webui",
