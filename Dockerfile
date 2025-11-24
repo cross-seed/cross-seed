@@ -13,6 +13,9 @@ FROM node:22-alpine AS build
 WORKDIR /usr/src/app
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 COPY --from=deps /usr/src/app/node_modules ./node_modules
+COPY --from=deps /usr/src/app/packages/webui/node_modules ./packages/webui/node_modules
+COPY --from=deps /usr/src/app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=deps /usr/src/app/packages/api-types/node_modules ./packages/api-types/node_modules
 COPY package*.json tsconfig*.json ./
 COPY packages/shared packages/shared
 COPY packages/api-types packages/api-types
