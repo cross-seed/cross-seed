@@ -5,15 +5,12 @@
 	"type": "module",
 	"exports": {
 		"./constants": {
-			"types": "./dist/constants.d.ts",
 			"default": "./dist/constants.js"
 		},
 		"./configSchema": {
-			"types": "./dist/configSchema.d.ts",
 			"default": "./dist/configSchema.js"
 		},
 		"./utils": {
-			"types": "./dist/utils.d.ts",
 			"default": "./dist/utils.js"
 		},
 		"./package.json": "./package.json"

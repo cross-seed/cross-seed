@@ -20,7 +20,7 @@ export async function getDbConfig(): Promise<
 export async function setDbConfig(
 	config: Partial<RuntimeConfig>,
 ): Promise<void> {
-	const sanitizedConfig = omitUndefined(config) as Partial<RuntimeConfig>;
+	const sanitizedConfig = omitUndefined(config);
 	const mergedConfig = {
 		...getDefaultRuntimeConfig(),
 		...sanitizedConfig,
@@ -45,9 +45,7 @@ export async function setDbConfig(
 export async function updateDbConfig(
 	partialConfig: Partial<RuntimeConfig>,
 ): Promise<void> {
-	const sanitizedPartial = omitUndefined(
-		partialConfig,
-	) as Partial<RuntimeConfig>;
+	const sanitizedPartial = omitUndefined(partialConfig);
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {

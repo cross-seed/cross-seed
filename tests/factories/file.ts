@@ -1,4 +1,4 @@
-import { File } from "../../src/searchee";
+import { File } from "../../src/searchee.js";
 
 export const fileFactory = (overrides: Partial<File> = {}): File => {
 	return {

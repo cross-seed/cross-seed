@@ -159,15 +159,14 @@ export function stripDefaults(
 ): Partial<RuntimeConfig> {
 	const defaults = getDefaultRuntimeConfig();
 	const overrides: Partial<RuntimeConfig> = {};
-	for (const key of Object.keys(config) as (keyof RuntimeConfig)[]) {
-		const value = config[key];
+	const overridesWritable = overrides as Record<keyof RuntimeConfig, unknown>;
+	for (const [key, value] of Object.entries(config) as [
+		keyof RuntimeConfig,
+		RuntimeConfig[keyof RuntimeConfig],
+	][]) {
 		if (value === undefined) continue;
-		if (
-			!(key in defaults) ||
-			!isDeepStrictEqual(value, defaults[key as keyof RuntimeConfig])
-		) {
-			(overrides as unknown as Record<string, unknown>)[key as string] =
-				structuredClone(value);
+		if (!(key in defaults) || !isDeepStrictEqual(value, defaults[key])) {
+			overridesWritable[key] = structuredClone(value);
 		}
 	}
 
@@ -362,7 +361,7 @@ export function transformFileConfig(
 		result.radarr = fileConfig.radarr;
 	}
 
-	return omitUndefined(result) as Partial<RuntimeConfig>;
+	return omitUndefined(result);
 }
 
 function isStringArray(value: unknown): value is string[] {

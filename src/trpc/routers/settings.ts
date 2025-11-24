@@ -4,9 +4,9 @@ import { setRuntimeConfig } from "../../runtimeConfig.js";
 import { getApiKey } from "../../auth.js";
 import { z } from "zod";
 import { getDbConfig, setDbConfig, updateDbConfig } from "../../dbConfig.js";
-import { RuntimeConfig } from "../../runtimeConfig.js";
 import { getDefaultRuntimeConfig } from "../../configuration.js";
 import { omitUndefined } from "../../utils/object.js";
+import { parseRuntimeConfig } from "../../configSchema.js";
 
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
@@ -60,13 +60,13 @@ export const settingsRouter = router({
 					message: `Replacing full config...`,
 				});
 
-				// Full replacement instead of partial update
-				await setDbConfig(input as unknown as RuntimeConfig);
+				const parsedConfig = parseRuntimeConfig(
+					input satisfies Record<string, unknown>,
+				);
+				await setDbConfig(parsedConfig);
 
 				// Update in-memory config so changes are visible immediately
-				const sanitizedInput = omitUndefined(
-					input as unknown as Partial<RuntimeConfig>,
-				) as Partial<RuntimeConfig>;
+				const sanitizedInput = omitUndefined(parsedConfig);
 				setRuntimeConfig({
 					...getDefaultRuntimeConfig(),
 					...sanitizedInput,

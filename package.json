@@ -2,7 +2,12 @@
 	"name": "cross-seed",
 	"version": "6.13.6",
 	"description": "Fully-automatic cross-seeding with Torznab",
-	"workspaces": [".", "packages/shared", "packages/webui", "packages/api-types"],
+	"workspaces": [
+		".",
+		"packages/shared",
+		"packages/webui",
+		"packages/api-types"
+	],
 	"scripts": {
 		"test": "vitest",
 		"coverage": "vitest run --coverage",
@@ -17,7 +22,8 @@
 		"dev:backend": "node --watch dist/cmd.js daemon",
 		"dev:frontend": "cd packages/webui && npm run dev",
 		"prepublishOnly": "rimraf dist && npm run build:all && husky install",
-		"lint": "concurrently --names \"Prettier,ESLint,TypeScript\" \"prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"tsc --noEmit\"",
+		"lint": "concurrently --names \"Prettier,ESLint\" \"prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\"",
+		"typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.tests.json",
 		"format": "prettier --write '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' package.json"
 	},
 	"bin": {

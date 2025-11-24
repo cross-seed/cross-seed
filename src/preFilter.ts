@@ -365,35 +365,35 @@ export async function filterTimestamps(
 		return true;
 	}
 
-	const skipBefore = excludeOlder
-		? nMsAgo(excludeOlder)
-		: Number.NEGATIVE_INFINITY;
-	// Don't exclude if new indexer was added
-	if (latest_first_search !== MAX_INT) {
-		if (earliest_first_search && earliest_first_search < skipBefore) {
+	if (excludeOlder) {
+		const skipBefore = nMsAgo(excludeOlder);
+		// Don't exclude if new indexer was added
+		if (latest_first_search !== MAX_INT) {
+			if (earliest_first_search && earliest_first_search < skipBefore) {
+				logFilterReason(
+					`its first search timestamp ${humanReadableDate(
+						earliest_first_search,
+					)} is older than ${ms(excludeOlder, { long: true })} ago`,
+					searchee,
+					mediaType,
+				);
+				return false;
+			}
+		}
+	}
+
+	if (excludeRecentSearch) {
+		const skipAfter = nMsAgo(excludeRecentSearch);
+		if (earliest_last_search && earliest_last_search > skipAfter) {
 			logFilterReason(
-				`its first search timestamp ${humanReadableDate(
-					earliest_first_search,
-				)} is older than ${ms(excludeOlder!, { long: true })} ago`,
+				`its last search timestamp ${humanReadableDate(
+					earliest_last_search,
+				)} is newer than ${ms(excludeRecentSearch, { long: true })} ago`,
 				searchee,
 				mediaType,
 			);
 			return false;
 		}
-	}
-
-	const skipAfter = excludeRecentSearch
-		? nMsAgo(excludeRecentSearch)
-		: Number.POSITIVE_INFINITY;
-	if (earliest_last_search && earliest_last_search > skipAfter) {
-		logFilterReason(
-			`its last search timestamp ${humanReadableDate(
-				earliest_last_search,
-			)} is newer than ${ms(excludeRecentSearch!, { long: true })} ago`,
-			searchee,
-			mediaType,
-		);
-		return false;
 	}
 
 	return true;

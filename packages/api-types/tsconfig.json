@@ -1,24 +1,26 @@
 {
 	"compilerOptions": {
+		"composite": true,
+		"declaration": true,
+		"declarationMap": true,
+		"emitDeclarationOnly": true,
 		"outDir": "./dist",
 		"rootDir": "./src",
-		"allowJs": true,
+		"types": [],
 		"target": "es2022",
 		"lib": ["es2023"],
 		"module": "nodenext",
 		"moduleResolution": "nodenext",
+		"allowImportingTsExtensions": true,
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
 		"sourceMap": true,
 		"strictNullChecks": true,
-		"types": [],
-		"composite": true,
-		"baseUrl": ".",
+		"baseUrl": "../..",
 		"paths": {
-			"@cross-seed/shared/*": ["packages/shared/src/*"],
-			"@cross-seed/api-types": ["packages/api-types/dist/index.d.ts"]
+			"@cross-seed/backend/*": ["dist/*"]
 		}
 	},
-	"include": ["./src/**/*"],
-	"references": [{ "path": "packages/shared/tsconfig.json" }]
+	"references": [{ "path": "../../tsconfig.json" }],
+	"include": ["./src/**/*"]
 }
