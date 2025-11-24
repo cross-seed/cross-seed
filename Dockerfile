@@ -1,39 +1,31 @@
-# Frontend Build Stage
-FROM node:22-alpine AS frontend-build
-WORKDIR /usr/src/frontend
-COPY packages/webui/package*.json ./
-COPY packages/shared/package*.json packages/shared/tsconfig.json ../shared/
-ENV NPM_CONFIG_UPDATE_NOTIFIER=false
-RUN npm ci --no-fund
-COPY packages/webui ./
-COPY packages/shared ../shared
-RUN npm run build
-
-# Backend Build Stage  
-FROM node:22-alpine AS backend-build
-WORKDIR /usr/src/backend
+# Dependencies layer: install all workspace deps with maximum cache reuse
+FROM node:22-alpine AS deps
+WORKDIR /usr/src/app
 COPY package*.json tsconfig*.json ./
 COPY packages/shared/package*.json packages/shared/tsconfig.json ./packages/shared/
+COPY packages/api-types/package*.json packages/api-types/tsconfig.json ./packages/api-types/
+COPY packages/webui/package*.json packages/webui/tsconfig*.json ./packages/webui/
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
-RUN npm ci --no-fund
-COPY src src
+RUN npm ci --workspaces --include-workspace-root --no-fund
+
+# Build layer: use cached node_modules, build everything, drop dev deps
+FROM node:22-alpine AS build
+WORKDIR /usr/src/app
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+COPY package*.json tsconfig*.json ./
 COPY packages/shared packages/shared
-RUN npm run build && npm prune --omit=dev
+COPY packages/api-types packages/api-types
+COPY packages/webui packages/webui
+COPY src src
+RUN npm run build:all && npm prune --omit=dev
 
-# Production Assembly Stage
-FROM node:22-alpine AS production-stage
-WORKDIR /usr/src/cross-seed
-# Copy backend build and dependencies
-COPY --from=backend-build /usr/src/backend/dist ./dist
-COPY --from=backend-build /usr/src/backend/node_modules ./node_modules
-COPY --from=backend-build /usr/src/backend/package*.json ./
-# Copy frontend build to correct location
-COPY --from=frontend-build /usr/src/frontend/dist ./dist/webui
-
-# Final Production Stage
+# Runtime layer
 FROM node:22-alpine
 WORKDIR /usr/src/cross-seed
-COPY --from=production-stage /usr/src/cross-seed ./
+COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/node_modules ./node_modules
+COPY --from=build /usr/src/app/package*.json ./
 RUN apk add --no-cache catatonit curl tzdata && \
     npm link
 ENV CONFIG_DIR=/config
