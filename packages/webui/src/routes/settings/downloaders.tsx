@@ -40,9 +40,11 @@ import ClientEditSheet from '@/features/download-client-actions/ClientEditSheet'
 import { removeUserAndPassFromClientUrl } from '@/features/download-client-actions/lib/urls';
 import { TDownloadClient } from '@/types/download-clients';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
+import { useSaveConfigHook } from '@/hooks/saveFormHook';
 
 function DownloaderSettings() {
   const trpc = useTRPC();
+  const { saveConfig } = useSaveConfigHook();
 
   const [clients, setClients] = useState<TDownloadClient[] | undefined>(
     undefined,
@@ -194,9 +196,8 @@ function DownloaderSettings() {
     setOpenDropdown(null);
     const updatedClients = clients?.filter((c) => c.url !== client.url);
     setClients(updatedClients);
-    console.log('Deleting client:', client, updatedClients);
     // Delete from the db
-    // saveConfig({ torrentClients: [] });
+    saveConfig({ torrentClients: updatedClients || [] });
   };
 
   const handleEditSheetOpenChange = (open: boolean) => {
