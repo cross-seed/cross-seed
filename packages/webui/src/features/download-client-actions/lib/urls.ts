@@ -24,6 +24,32 @@ export const removeUserAndPassFromClientUrl = (url: string) => {
   return `${protocol}//${host}`;
 };
 
+export function buildClientTestUrl({
+  client,
+  protocol,
+  host,
+  username = '',
+  password,
+}: {
+  client: string;
+  protocol: string;
+  host: string;
+  username?: string;
+  password?: string;
+}) {
+  let auth = '';
+  if (client !== 'deluge' && username) {
+    auth += username;
+  }
+  if (password) {
+    auth += `:${password}`;
+  }
+  auth += '@';
+  const path = assignClientPath(client, false);
+  const url = `${protocol}//${auth}${host}${path}`;
+  return url;
+}
+
 export function buildClientUrl({
   client,
   protocol,
