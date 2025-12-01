@@ -40,7 +40,7 @@ export const settingsRouter = router({
 				const updatedOverrides = await getDbConfig();
 				setRuntimeConfig({
 					...getDefaultRuntimeConfig(),
-					...(updatedOverrides ?? {}),
+					...updatedOverrides,
 				});
 
 				return { success: true };

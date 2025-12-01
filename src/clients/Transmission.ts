@@ -223,7 +223,7 @@ export default class Transmission implements TorrentClient {
 					ids: [data.infoHash],
 				},
 			);
-		} catch (e) {
+		} catch {
 			return resultOfErr(InjectionResult.FAILURE);
 		}
 		if (queryResponse.torrents.length === 0) {
@@ -574,7 +574,7 @@ export default class Transmission implements TorrentClient {
 					checkOnce: false,
 				});
 			}
-		} catch (e) {
+		} catch {
 			return InjectionResult.FAILURE;
 		}
 

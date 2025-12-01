@@ -301,7 +301,7 @@ function DownloaderSettings() {
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem
+                          {/* <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
                               // handleTestClient(client);
@@ -312,7 +312,7 @@ function DownloaderSettings() {
                             {testingClient === client.url
                               ? 'Testing...'
                               : 'Test Connection'}
-                          </DropdownMenuItem>
+                          </DropdownMenuItem> */}
                           <DropdownMenuItem
                             variant="destructive"
                             onClick={(e) => {

@@ -363,7 +363,7 @@ export default class Deluge implements TorrentClient {
 						return;
 					}
 				}
-			} catch (e) {
+			} catch {
 				sleepTime = resumeErrSleepTime; // Dropping connections or restart
 				continue;
 			}
@@ -597,7 +597,7 @@ export default class Deluge implements TorrentClient {
 		const params = [["save_path", "progress"], { hash: meta.infoHash }];
 		try {
 			response = await this.call<TorrentStatus>("web.update_ui", params);
-		} catch (e) {
+		} catch {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
 		if (!response.isOk()) {
@@ -631,7 +631,7 @@ export default class Deluge implements TorrentClient {
 		const params = [["save_path", "progress"], {}];
 		try {
 			response = await this.call<TorrentStatus>("web.update_ui", params);
-		} catch (e) {
+		} catch {
 			return dirs;
 		}
 		if (!response.isOk()) {
@@ -692,7 +692,7 @@ export default class Deluge implements TorrentClient {
 				useVerbose: true,
 			});
 			return torrentInfo.complete ? resultOf(true) : resultOf(false);
-		} catch (e) {
+		} catch {
 			return resultOfErr("NOT_FOUND");
 		}
 	}
@@ -710,7 +710,7 @@ export default class Deluge implements TorrentClient {
 				useVerbose: true,
 			});
 			return resultOf(torrentInfo.state === "Checking");
-		} catch (e) {
+		} catch {
 			return resultOfErr("NOT_FOUND");
 		}
 	}

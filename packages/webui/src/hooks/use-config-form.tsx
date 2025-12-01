@@ -4,8 +4,6 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { Config } from '@/types/config';
 import { ZodObject, ZodRawShape } from 'zod';
-// import { defaultConfig } from '../../../shared/constants';
-// import { formOptions } from '@tanstack/react-form';
 
 export const useConfigForm = (schema: ZodObject<ZodRawShape>) => {
   const trpc = useTRPC();
@@ -33,9 +31,3 @@ export const useConfigForm = (schema: ZodObject<ZodRawShape>) => {
 };
 
 export default useConfigForm;
-
-// export const defaultValues = formOptions({
-//   defaultValues: defaultConfig,
-// });
-
-// export const validationSchema = baseValidationSchema;

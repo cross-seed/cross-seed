@@ -86,7 +86,7 @@ export default function ClientEditSheet({
             protocol,
             host,
             username: validatedData.user ?? '',
-            password: validatedData.password,
+            password: validatedData.password ?? '',
             readonly: validatedData.readOnly,
             // * TODO: add usePlugin for rtorrent clients
           });
@@ -120,7 +120,7 @@ export default function ClientEditSheet({
     const client = String(form.getFieldValue('client'));
     const url = String(form.getFieldValue('url'));
     const username = String(form.getFieldValue('user') || '');
-    const password = String(form.getFieldValue('password'));
+    const password = String(form.getFieldValue('password') || '');
 
     const testUrl = buildClientTestUrl({
       client,
@@ -240,9 +240,12 @@ export default function ClientEditSheet({
                   // Determine if test button should be enabled
                   const urlValid = urlValue && !urlMeta?.errors?.length;
                   const passwordValid =
-                    passwordValue && !passwordMeta?.errors?.length;
+                    clientValue === 'transmission' &&
+                    passwordValue === undefined
+                      ? true
+                      : passwordValue && !passwordMeta?.errors?.length;
                   const userValid =
-                    clientValue === 'deluge'
+                    clientValue === 'deluge' || clientValue === 'transmission'
                       ? true
                       : userValue && !userMeta?.errors?.length;
 
@@ -268,13 +271,16 @@ export default function ClientEditSheet({
                           </>
                         )}
                       </Button>
-                      <p className="text-muted-foreground -mt-4 px-2 text-sm">
-                        Note: Testing connections can return false positives if{' '}
-                        <code className="bg-yellow-100 px-1">
-                          Bypass auth on localhost
-                        </code>{' '}
-                        is enabled in qBittorrent.
-                      </p>
+                      {clientValue === 'qbittorrent' && (
+                        <p className="text-muted-foreground -mt-4 px-2 text-sm italic">
+                          Note: Testing connections can return false positives
+                          if{' '}
+                          <code className="bg-yellow-100 px-1">
+                            Bypass auth on localhost
+                          </code>{' '}
+                          is enabled in qBittorrent.
+                        </p>
+                      )}
                     </>
                   );
                 }}

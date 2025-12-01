@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  Action,
-  LinkType,
-  ZodErrorMessages,
-} from '../../../shared/constants';
+import { Action, LinkType, ZodErrorMessages } from '../../../shared/constants';
 import { RUNTIME_CONFIG_SCHEMA } from '../../../shared/configSchema';
 
 const runtimeShape = RUNTIME_CONFIG_SCHEMA.shape;
@@ -23,11 +19,10 @@ export const trackerValidationSchema = z.object({
 });
 
 export const clientValidationSchema = z.object({
-  // name: z.string().min(1, ZodErrorMessages.emptyString).nullish(),
   client: z.string().min(1, ZodErrorMessages.emptyString),
   url: z.string().url(),
   user: z.string().nullish(),
-  password: z.string(),
+  password: z.string().nullish(),
   readOnly: z
     .boolean()
     .optional()
@@ -38,11 +33,6 @@ export const clientValidationSchema = z.object({
 
 export const downloaderValidationSchema = z.object({
   torrentClients: z.array(clientValidationSchema).nullish(),
-  // torrentClients: z.array(z.string()).nullish(),
-  // qbittorrentUrl: z.string().url().nullish(),
-  // rtorrentRpcUrl: z.string().url().nullish(),
-  // transmissionRpcUrl: z.string().url().nullish(),
-  // delugeRpcUrl: z.string().url().nullish(),
   action: z.nativeEnum(Action),
   duplicateCategories: z.boolean(),
   useClientTorrents: z.boolean(),

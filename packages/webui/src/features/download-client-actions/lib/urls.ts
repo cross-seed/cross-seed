@@ -39,7 +39,7 @@ export function buildClientTestUrl({
 }) {
   let auth = '';
   if (client !== 'deluge' && username) {
-    auth += username;
+    auth = username;
   }
   if (password) {
     auth += `:${password}`;

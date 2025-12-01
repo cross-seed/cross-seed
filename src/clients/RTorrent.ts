@@ -477,7 +477,7 @@ export default class RTorrent implements TorrentClient {
 				return resultOfErr("NOT_FOUND");
 			}
 			return resultOf(Boolean(Number(response[0])));
-		} catch (e) {
+		} catch {
 			return resultOfErr("NOT_FOUND");
 		}
 	}
@@ -493,7 +493,7 @@ export default class RTorrent implements TorrentClient {
 				return resultOfErr("NOT_FOUND");
 			}
 			return resultOf(Boolean(Number(response[0])));
-		} catch (e) {
+		} catch {
 			return resultOfErr("NOT_FOUND");
 		}
 	}
