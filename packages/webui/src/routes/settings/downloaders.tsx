@@ -12,14 +12,7 @@ import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { createFileRoute } from '@tanstack/react-router';
 import { Page } from '@/components/Page';
 import { Button } from '@/components/ui/button';
-import {
-  Eye,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  TestTube,
-  Trash,
-} from 'lucide-react';
+import { Eye, MoreHorizontal, Pencil, Plus, Trash } from 'lucide-react';
 import {
   Table,
   TableRow,
@@ -50,7 +43,7 @@ function DownloaderSettings() {
     undefined,
   );
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [testingClient, setTestingClient] = useState<string | null>(null);
+  // const [testingClient, setTestingClient] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<TDownloadClient | null>(
     null,
   );
@@ -232,7 +225,6 @@ function DownloaderSettings() {
                   <TableHead>Client</TableHead>
                   <TableHead>RPC URL</TableHead>
                   <TableHead>Read only</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -260,7 +252,6 @@ function DownloaderSettings() {
                       {client.url}
                     </TableCell>
                     <TableCell>{client.readOnly ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>status</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu
                         open={openDropdown === client.url}
