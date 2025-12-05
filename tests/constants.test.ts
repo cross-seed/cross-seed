@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EP_REGEX } from "../src/constants";
+import { EP_REGEX } from "../src/constants.js";
 
 describe("EP_REGEX", () => {
 	it("matches episode titles", () => {
