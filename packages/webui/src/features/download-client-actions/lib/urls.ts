@@ -19,9 +19,15 @@ export function getPasswordFromClientUrl(clientUrl: string) {
 }
 
 export const removeUserAndPassFromClientUrl = (url: string) => {
-  const protocol = getProtocolFromClientUrl(url);
-  const host = getHostFromClientUrl(url);
-  return `${protocol}//${host}`;
+  try {
+    const protocol = getProtocolFromClientUrl(url);
+    const host = getHostFromClientUrl(url);
+    return `${protocol}//${host}`;
+  } catch (error) {
+    // Gracefully degrade if an invalid URL sneaks in so the UI doesn't crash
+    console.warn('Unable to strip credentials from client URL', error);
+    return url;
+  }
 };
 
 export function buildClientTestUrl({

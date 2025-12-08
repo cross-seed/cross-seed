@@ -91,46 +91,63 @@ function DownloaderSettings() {
 
   useEffect(() => {
     // Set clients when configData is available
-    if (configData?.torrentClients && configData.torrentClients.length > 0) {
-      setClients(
-        configData.torrentClients.map((client, index) => {
-          let clientApp = '';
-          let url = '';
-          let readOnly = false;
-          let user = '';
-          let password = '';
+    const torrentClients = configData?.torrentClients ?? [];
 
-          if (typeof client === 'object') {
-            clientApp = client.client;
-            readOnly = client.readOnly || false;
-            url = client.url;
-            user = client.user || '';
-            password = client.password || '';
-          } else if (typeof client === 'string') {
-            clientApp = String(client).split(':')[0];
-            readOnly = String(client).includes('readonly');
-            const firstIndex = String(client).indexOf(':');
-            const fullUrl = readOnly
-              ? String(client).substring(
-                  String(client).indexOf(':', firstIndex + 1) + 1,
-                )
-              : String(client).substring(String(client).indexOf(':') + 1);
-            url = removeUserAndPassFromClientUrl(fullUrl);
-            user = getUserFromClientUrl(fullUrl);
-            password = getPassFromClientUrl(fullUrl);
-          }
-
-          return {
-            index,
-            client: clientApp,
-            url: url,
-            user,
-            password,
-            readOnly,
-          };
-        }),
-      );
+    if (!torrentClients.length) {
+      setClients([]);
+      return;
     }
+
+    const mappedClients = torrentClients
+      .map((client, index) => {
+        if (!client) return null;
+
+        let clientApp = '';
+        let url = '';
+        let readOnly = false;
+        let user = '';
+        let password = '';
+
+        if (typeof client === 'object') {
+          clientApp = client.client;
+          readOnly = client.readOnly || false;
+          url = client.url;
+          user = client.user || '';
+          password = client.password || '';
+        } else if (typeof client === 'string') {
+          clientApp = String(client).split(':')[0];
+          readOnly = String(client).includes('readonly');
+          const firstIndex = String(client).indexOf(':');
+          const fullUrl = readOnly
+            ? String(client).substring(
+                String(client).indexOf(':', firstIndex + 1) + 1,
+              )
+            : String(client).substring(String(client).indexOf(':') + 1);
+
+          if (!fullUrl) return null;
+
+          const sanitizedUrl = removeUserAndPassFromClientUrl(fullUrl);
+          if (!sanitizedUrl) return null;
+
+          url = sanitizedUrl;
+          user = getUserFromClientUrl(fullUrl);
+          password = getPassFromClientUrl(fullUrl);
+        }
+
+        if (!clientApp || !url) return null;
+
+        return {
+          index,
+          client: clientApp,
+          url,
+          user,
+          password,
+          readOnly,
+        };
+      })
+      .filter(Boolean) as TDownloadClient[];
+
+    setClients(mappedClients);
   }, [configData]);
 
   const getUserFromClientUrl = (url: string) => {
