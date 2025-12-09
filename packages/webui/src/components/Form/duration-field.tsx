@@ -4,6 +4,7 @@ import { useFormValidation } from '@/contexts/Form/use-form-validation-context';
 import { Label } from '@/components/ui/label';
 import { FieldInfo } from './FieldInfo';
 import RequiredIndicator from './required-indicator';
+import { cn } from '@/lib/utils';
 
 type DurationFieldProps = {
   label: string;
@@ -20,15 +21,11 @@ const DurationField = ({
   const { isFieldRequired } = useFormValidation();
 
   return (
-    <div className={className}>
+    <div className={cn('space-y-3', className)}>
       {!hideLabel && (
-        <Label htmlFor={field.name} className="mb-2 block">
+        <Label htmlFor={field.name} className="block w-full">
           {label}
-          {isFieldRequired(field.name) && (
-            <span className="pl-1">
-              <RequiredIndicator />
-            </span>
-          )}
+          {isFieldRequired(field.name) && <RequiredIndicator />}
         </Label>
       )}
       <DurationInput

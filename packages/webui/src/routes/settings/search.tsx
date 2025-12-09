@@ -65,104 +65,36 @@ function SearchRssSettings() {
               <fieldset className="form-fieldset w-full gap-6">
                 {/* TODO: Error states or validations don't seem to work for these fields */}
 
-                <div className="">
-                  <form.AppField
-                    name="delay"
-                    validators={
-                      {
-                        // onBlur: baseValidationSchema.shape.delay,
-                      }
-                    }
-                  >
-                    {(field) => <field.TextField label="Delay" type="number" />}
-                  </form.AppField>
-                </div>
-                <div className="">
-                  <form.AppField name="matchMode">
-                    {(field) => (
-                      <field.SelectField
-                        label="Match Mode"
-                        options={MatchMode}
-                      />
-                    )}
-                  </form.AppField>
-                </div>
-                <div className="">
-                  <form.AppField
-                    name="rssCadence"
-                    validators={
-                      {
-                        // onBlur: baseValidationSchema.shape.rssCadence,
-                      }
-                    }
-                  >
-                    {(field) => <field.DurationField label="RSS Cadence" />}
-                  </form.AppField>
-                </div>
-                <div className="">
-                  <form.AppField
-                    name="searchCadence"
-                    validators={
-                      {
-                        // onBlur: baseValidationSchema.shape.searchCadence,
-                      }
-                    }
-                  >
-                    {(field) => <field.DurationField label="Search Cadence" />}
-                  </form.AppField>
-                </div>
-                <div className="">
-                  <form.AppField
-                    name="searchTimeout"
-                    validators={
-                      {
-                        // onBlur: baseValidationSchema.shape.searchTimeout,
-                      }
-                    }
-                  >
-                    {(field) => <field.DurationField label="Search Timeout" />}
-                  </form.AppField>
-                </div>
-                <div className="">
-                  <form.AppField
-                    name="searchLimit"
-                    validators={
-                      {
-                        // onBlur: baseValidationSchema.shape.searchLimit,
-                      }
-                    }
-                  >
-                    {(field) => (
-                      <field.TextField label="Search Limit" type="number" />
-                    )}
-                  </form.AppField>
-                </div>
-                <div className="">
-                  <form.AppField
-                    name="excludeOlder"
-                    validators={
-                      {
-                        // onBlur: baseValidationSchema.shape.excludeOlder,
-                      }
-                    }
-                  >
-                    {(field) => <field.DurationField label="Exclude Older" />}
-                  </form.AppField>
-                </div>
-                <div className="">
-                  <form.AppField
-                    name="excludeRecentSearch"
-                    validators={
-                      {
-                        // onBlur: baseValidationSchema.shape.excludeRecentSearch,
-                      }
-                    }
-                  >
-                    {(field) => (
-                      <field.DurationField label="Exclude Recent Search" />
-                    )}
-                  </form.AppField>
-                </div>
+                <form.AppField name="delay">
+                  {(field) => <field.TextField label="Delay" type="number" />}
+                </form.AppField>
+                <form.AppField name="matchMode">
+                  {(field) => (
+                    <field.SelectField label="Match Mode" options={MatchMode} />
+                  )}
+                </form.AppField>
+                <form.AppField name="rssCadence">
+                  {(field) => <field.DurationField label="RSS Cadence" />}
+                </form.AppField>
+                <form.AppField name="searchCadence">
+                  {(field) => <field.DurationField label="Search Cadence" />}
+                </form.AppField>
+                <form.AppField name="searchTimeout">
+                  {(field) => <field.DurationField label="Search Timeout" />}
+                </form.AppField>
+                <form.AppField name="searchLimit">
+                  {(field) => (
+                    <field.TextField label="Search Limit" type="number" />
+                  )}
+                </form.AppField>
+                <form.AppField name="excludeOlder">
+                  {(field) => <field.DurationField label="Exclude Older" />}
+                </form.AppField>
+                <form.AppField name="excludeRecentSearch">
+                  {(field) => (
+                    <field.DurationField label="Exclude Recent Search" />
+                  )}
+                </form.AppField>
               </fieldset>
               <form.AppForm>
                 <form.SubmitButton />

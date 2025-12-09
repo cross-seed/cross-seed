@@ -64,10 +64,7 @@ export function DurationInput({
   const selectedUnitConfig =
     unitList.find((unit) => unit.value === selectedUnit) ?? unitList[0];
   const parsedInputValue = parseDurationInput(inputValue);
-  const selectedUnitLabel = getUnitLabel(
-    selectedUnitConfig,
-    parsedInputValue,
-  );
+  const selectedUnitLabel = getUnitLabel(selectedUnitConfig, parsedInputValue);
 
   useEffect(() => {
     if (!hasUserLockedUnit && normalizedValue != null) {
@@ -114,7 +111,7 @@ export function DurationInput({
         type="number"
         min={0}
         step="any"
-        className="flex-1"
+        className="flex-1 shadow-none"
         value={inputValue}
         onBlur={onBlur}
         inputMode="decimal"
@@ -126,7 +123,7 @@ export function DurationInput({
         onValueChange={handleUnitChange}
         disabled={disabled}
       >
-        <SelectTrigger className="w-32">
+        <SelectTrigger className="w-32 shadow-none">
           <SelectValue aria-label={selectedUnitLabel}>
             {selectedUnitLabel}
           </SelectValue>
