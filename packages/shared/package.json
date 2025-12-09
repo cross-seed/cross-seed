@@ -1,0 +1,22 @@
+{
+	"name": "@cross-seed/shared",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./constants": {
+			"default": "./dist/constants.js"
+		},
+		"./configSchema": {
+			"default": "./dist/configSchema.js"
+		},
+		"./utils": {
+			"default": "./dist/utils.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "tsc -p tsconfig.json"
+	}
+}
