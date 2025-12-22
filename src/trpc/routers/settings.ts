@@ -11,7 +11,11 @@ import { parseRuntimeConfig } from "../../configSchema.js";
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
 		try {
-			const runtimeConfig = await getDbConfig();
+			const runtimeOverrides = await getDbConfig();
+			const runtimeConfig = {
+				...getDefaultRuntimeConfig(),
+				...runtimeOverrides,
+			};
 			const apikey = await getApiKey();
 			return {
 				config: runtimeConfig,
