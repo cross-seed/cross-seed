@@ -251,6 +251,12 @@ function sanitizeDisplayUrl(url: URL): string {
 	return `${url.origin}${url.pathname}`;
 }
 
+function normalizeArrBaseUrl(rawUrl: string): string {
+	const parsedUrl = new URL(rawUrl);
+	parsedUrl.pathname = parsedUrl.pathname.replace(/\/api\/?$/, "") || "/";
+	return parsedUrl.toString();
+}
+
 function arrProblemId(kind: ArrKind, category: string, index: number): string {
 	return `arr:${kind.toLowerCase()}:${category}:${index}`;
 }
@@ -281,15 +287,6 @@ async function checkArrUrl(
 
 	const displayUrl = sanitizeDisplayUrl(parsedUrl);
 
-	if (!parsedUrl.pathname.endsWith("/api")) {
-		problems.push({
-			id: arrProblemId(kind, "missing-api-path", index),
-			severity: "error",
-			summary: `${kind} URL must end with "/api".`,
-			details: `Update ${displayUrl} so the path ends with /api.`,
-		});
-	}
-
 	const apiKey = parsedUrl.searchParams.get("apikey");
 	if (!apiKey) {
 		problems.push({
@@ -302,27 +299,14 @@ async function checkArrUrl(
 	}
 
 	try {
-		const response = await fetch(parsedUrl, {
-			signal: AbortSignal.timeout(5_000),
-			headers: { "User-Agent": USER_AGENT },
-		});
+		const result = await makeArrApiCall<{ current?: unknown }>(
+			normalizeArrBaseUrl(rawUrl),
+			"/api",
+		);
 
-		if (!response.ok) {
-			problems.push({
-				id: arrProblemId(kind, "http-error", index),
-				severity: "error",
-				summary: `${kind} at ${displayUrl} responded with ${response.status}.`,
-				details: `Status text: ${response.statusText || "Unknown status"}.`,
-			});
-			return problems;
-		}
-
-		try {
-			const body = (await response.json()) as { current?: unknown };
-			if (
-				typeof body?.current !== "string" ||
-				body.current.length === 0
-			) {
+		if (result.isOk()) {
+			const body = result.unwrap();
+			if (typeof body?.current !== "string" || body.current.length === 0) {
 				problems.push({
 					id: arrProblemId(kind, "unexpected-response", index),
 					severity: "warning",
@@ -331,16 +315,13 @@ async function checkArrUrl(
 						"cross-seed expected a version string from /api but received something else.",
 				});
 			}
-		} catch (error) {
-			const message =
-				error instanceof Error
-					? error.message
-					: "Unable to parse response from Arr instance.";
+		} else {
+			const error = result.unwrapErr();
 			problems.push({
-				id: arrProblemId(kind, "invalid-json", index),
-				severity: "warning",
-				summary: `${kind} at ${displayUrl} returned non-JSON data.`,
-				details: message,
+				id: arrProblemId(kind, "http-error", index),
+				severity: "error",
+				summary: `${kind} at ${displayUrl} could not be reached.`,
+				details: error.message,
 			});
 		}
 	} catch (error) {
