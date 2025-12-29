@@ -218,7 +218,7 @@ export default class QBittorrent implements TorrentClient {
 			throw new CrossSeedError(`qBittorrent login failed: ${e.message}`);
 		}
 
-		if (response.status !== 200) {
+		if (response.status < 200 || response.status > 299 ) {
 			throw new CrossSeedError(
 				`qBittorrent login failed with code ${response.status}`,
 			);
