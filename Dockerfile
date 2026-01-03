@@ -1,5 +1,5 @@
 # Build layer
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /usr/src/app
 COPY package*.json tsconfig.json ./
 COPY packages/shared/package*.json packages/shared/tsconfig.json ./packages/shared/
@@ -14,7 +14,7 @@ COPY src src
 RUN npm run build:all && npm prune --omit=dev
 
 # Runtime layer
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /usr/src/cross-seed
 RUN apk add catatonit curl tzdata
 COPY --from=build /usr/src/app/package*.json ./
@@ -23,6 +23,7 @@ COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/packages/shared ./packages/shared
 COPY --from=build /usr/src/app/packages/api-types ./packages/api-types
 COPY --from=build /usr/src/app/dist ./dist
+ENV HUSKY=0
 RUN npm link
 ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
