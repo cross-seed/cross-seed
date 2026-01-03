@@ -21,6 +21,7 @@
 		"dev": "concurrently --names \"TS,BE,FE\" --prefix-colors \"blue,green,magenta\" \"npm run watch\" \"npm run dev:backend\" \"npm run dev:frontend\"",
 		"dev:backend": "node --watch dist/cmd.js daemon",
 		"dev:frontend": "cd packages/webui && npm run dev",
+		"prepare": "husky install",
 		"prepublishOnly": "rimraf dist && npm run build:all && husky install",
 		"lint": "concurrently --names \"Prettier,ESLint\" \"prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\"",
 		"typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.tests.json",
