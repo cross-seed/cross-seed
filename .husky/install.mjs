@@ -1,5 +1,11 @@
 // .husky/install.mjs
-if (process.env.NODE_ENV === "production" || process.env.CI === "true") {
+import { existsSync } from "node:fs";
+
+if (
+	process.env.NODE_ENV === "production" ||
+	process.env.CI === "true" ||
+	existsSync("/.dockerenv")
+) {
 	process.exit(0);
 }
 
