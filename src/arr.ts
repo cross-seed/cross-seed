@@ -306,7 +306,10 @@ async function checkArrUrl(
 
 		if (result.isOk()) {
 			const body = result.unwrap();
-			if (typeof body?.current !== "string" || body.current.length === 0) {
+			if (
+				typeof body?.current !== "string" ||
+				body.current.length === 0
+			) {
 				problems.push({
 					id: arrProblemId(kind, "unexpected-response", index),
 					severity: "warning",
