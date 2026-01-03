@@ -26,6 +26,7 @@ import {
 	inBatches,
 	isTruthy,
 	mapAsync,
+	yieldToEventLoop,
 	stripExtension,
 } from "./utils.js";
 import { isOk } from "./Result.js";
@@ -147,7 +148,12 @@ async function indexDataPaths(paths: string[]): Promise<number> {
 	const memoizedLengths = new Map<string, number>();
 	const dataRows: DataEntry[] = [];
 	const ensembleRows: EnsembleEntry[] = [];
+	let processed = 0;
 	for (const path of paths) {
+		processed += 1;
+		if (processed % 500 === 0) {
+			await yieldToEventLoop();
+		}
 		const files = await getFilesFromDataRoot(
 			path,
 			memoizedPaths,
