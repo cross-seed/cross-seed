@@ -1,4 +1,4 @@
-import { Searchee } from "../../src/searchee";
+import { Searchee } from "../../src/searchee.js";
 
 export const searcheeFactory = (
 	overrides: Partial<Searchee> = {},
