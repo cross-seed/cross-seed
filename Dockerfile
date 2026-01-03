@@ -1,6 +1,7 @@
 # Build layer
 FROM node:24-alpine AS build
 WORKDIR /usr/src/app
+ENV HUSKY=0
 COPY package*.json tsconfig.json ./
 COPY packages/shared/package*.json packages/shared/tsconfig.json ./packages/shared/
 COPY packages/api-types/package*.json packages/api-types/tsconfig.json ./packages/api-types/
