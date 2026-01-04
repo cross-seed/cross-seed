@@ -378,7 +378,7 @@ export async function collectClientProblems(): Promise<Problem[]> {
 			summary:
 				"Injection requires at least one configured torrent client.",
 			details:
-				"Add a torrent client in Settings → Download Clients or switch the action away from Inject.",
+				"Add a torrent client in Settings → Torrent Clients or switch the action away from Inject.",
 		});
 		return problems;
 	}

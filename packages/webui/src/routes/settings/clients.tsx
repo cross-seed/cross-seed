@@ -35,7 +35,7 @@ import { TDownloadClient } from '@/types/download-clients';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
 
-function DownloaderSettings() {
+function TorrentClientsSettings() {
   const trpc = useTRPC();
   const { saveConfig } = useSaveConfigHook();
 
@@ -171,7 +171,7 @@ function DownloaderSettings() {
     return '';
   };
 
-  const handleAddDownloader = (e: React.MouseEvent) => {
+  const handleAddClient = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setSelectedClient(null);
@@ -217,22 +217,22 @@ function DownloaderSettings() {
     }
   };
 
-  const addDownloaderButton = (
-    <Button onClick={handleAddDownloader} type="button" size="sm">
+  const addClientButton = (
+    <Button onClick={handleAddClient} type="button" size="sm">
       <Plus className="mr-2 h-4 w-4" />
-      Add Downloader
+      Add Torrent Client
     </Button>
   );
 
   return (
     <Page
-      breadcrumbs={['Settings', 'Download Clients']}
-      actions={addDownloaderButton}
+      breadcrumbs={['Settings', 'Torrent Clients']}
+      actions={addClientButton}
     >
       <div className="space-y-4">
         <div>
-          <h1 className="text-2xl font-bold">Download Clients</h1>
-          <p className="text-muted-foreground">Manage your download clients</p>
+          <h1 className="text-2xl font-bold">Torrent Clients</h1>
+          <p className="text-muted-foreground">Manage your torrent clients</p>
         </div>
         {clients ? (
           <div className="mt-4 mb-7 overflow-x-auto rounded-lg border">
@@ -250,7 +250,7 @@ function DownloaderSettings() {
                   <TableRow>
                     <TableCell colSpan={6} className="text-center">
                       <p className="text-muted-foreground">
-                        No download clients configured. Add a client to start
+                        No torrent clients configured. Add a client to start
                         downloading.
                       </p>
                     </TableCell>
@@ -341,10 +341,10 @@ function DownloaderSettings() {
           </div>
         ) : (
           <p className="mb-4 text-lg">
-            No download clients configured. Add a client
+            No torrent clients configured. Add a client
           </p>
         )}
-        {/* Form for adding/editing downloaders */}
+        {/* Form for adding/editing clients */}
         <FormValidationProvider isFieldRequired={isFieldRequired}>
           <form
             className="form flex flex-col gap-4"
@@ -357,7 +357,7 @@ function DownloaderSettings() {
           >
             {/* form fields */}
             <div className="flex flex-wrap gap-2">
-              <h2 className="text-xl font-bold">Download Client Options</h2>
+              <h2 className="text-xl font-bold">Torrent Client Options</h2>
               <fieldset className="form-fieldset w-full gap-6 rounded-md">
                 <div className="">
                   <form.AppField name="action">
@@ -455,6 +455,6 @@ function DownloaderSettings() {
   );
 }
 
-export const Route = createFileRoute('/settings/downloaders')({
-  component: DownloaderSettings,
+export const Route = createFileRoute('/settings/clients')({
+  component: TorrentClientsSettings,
 });

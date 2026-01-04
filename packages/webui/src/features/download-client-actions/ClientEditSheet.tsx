@@ -138,12 +138,12 @@ export default function ClientEditSheet({
     });
     if (result.success) {
       toast.success('Connection successful!', {
-        description: 'The download client connection was successful.',
+        description: 'The torrent client connection was successful.',
       });
       setIsTesting(false);
     } else {
       toast.error('Connection failed', {
-        description: 'Failed to connect to the download client.',
+        description: 'Failed to connect to the torrent client.',
       });
       setIsTesting(false);
     }
@@ -168,8 +168,8 @@ export default function ClientEditSheet({
               </SheetTitle>
               <SheetDescription>
                 {mode === 'edit'
-                  ? 'Edit the details of the download client.'
-                  : 'Create a new download client.'}
+                  ? 'Edit the details of the torrent client.'
+                  : 'Create a new torrent client.'}
               </SheetDescription>
             </SheetHeader>
 

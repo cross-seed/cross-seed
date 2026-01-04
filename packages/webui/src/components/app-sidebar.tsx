@@ -74,9 +74,9 @@ const navItems = [
         url: '/settings/trackers',
       },
       {
-        title: 'Download Clients',
+        title: 'Torrent Clients',
         icon: <Download className="size-4" />,
-        url: '/settings/downloaders',
+        url: '/settings/clients',
       },
       {
         title: 'Search & RSS',

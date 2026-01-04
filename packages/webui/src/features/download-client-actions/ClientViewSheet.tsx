@@ -12,7 +12,7 @@ import {
 import { Pencil } from 'lucide-react';
 
 // ! FIXME: consolidate this type in a types.ts file and import it
-// Same as the one in downloaders.tsx
+// Same as the one in clients.tsx
 type DownloadClient = {
   name?: string;
   client: string;
@@ -39,8 +39,8 @@ export default function ClientViewSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>View Download Client</SheetTitle>
-          <SheetDescription>View download client details.</SheetDescription>
+          <SheetTitle>View Torrent Client</SheetTitle>
+          <SheetDescription>View torrent client details.</SheetDescription>
         </SheetHeader>
 
         <div className="grid flex-1 auto-rows-min gap-6 px-4">

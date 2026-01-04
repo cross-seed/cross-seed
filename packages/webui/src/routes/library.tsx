@@ -309,11 +309,11 @@ function LibraryPage() {
                       No items indexed yet.
                     </span>
                     <span className="text-muted-foreground text-xs">
-                      Add a download client to start building your library.
+                      Add a torrent client to start building your library.
                     </span>
                     <Button asChild size="sm">
-                      <Link to="/settings/downloaders">
-                        Add download client
+                      <Link to="/settings/clients">
+                        Add torrent client
                       </Link>
                     </Button>
                   </div>
