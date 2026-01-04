@@ -167,7 +167,7 @@ function LibraryPage() {
     <Page>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Items</h1>
+          <h1 className="text-2xl font-semibold">Library</h1>
           <p className="text-muted-foreground text-sm">
             Showing {rangeStart}-{rangeEnd} of {data.total} items
           </p>
