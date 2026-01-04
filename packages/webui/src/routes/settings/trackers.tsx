@@ -6,11 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTRPC } from '@/lib/trpc';
-import {
-  ArchivedTrackersSection,
-  type ArchivedTracker,
-} from '@/components/settings/ArchivedTrackersSection';
-import { MergeArchivedDialog } from '@/components/settings/MergeArchivedDialog';
+import { MergeTrackerDialog } from '@/components/settings/MergeTrackerDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -31,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   Eye,
+  GitMerge,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -52,7 +49,6 @@ type Tracker = {
   name: string | null;
   url: string;
   enabled: boolean;
-  active: boolean;
   status: string | null;
   retryAfter: number | null;
   searchCap: boolean | null;
@@ -78,16 +74,12 @@ function TrackerSettings() {
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [mergeSourceTracker, setMergeSourceTracker] =
-    useState<ArchivedTracker | null>(null);
+    useState<Tracker | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
 
   const { data: indexers } = useSuspenseQuery(
     trpc.indexers.getAll.queryOptions(),
   );
-  const { data: archivedIndexers } = useSuspenseQuery(
-    trpc.indexers.getArchived.queryOptions(),
-  );
-
   const { mutate: updateIndexer } = useMutation(
     trpc.indexers.update.mutationOptions({
       onSuccess: async () => {
@@ -119,22 +111,17 @@ function TrackerSettings() {
     }),
   );
 
-  const { mutate: mergeArchivedTracker, isPending: isMerging } = useMutation(
-    trpc.indexers.mergeArchived.mutationOptions({
+  const { mutate: mergeDisabledTracker, isPending: isMerging } = useMutation(
+    trpc.indexers.mergeDisabled.mutationOptions({
       onSuccess: async (result) => {
         toast.success(
           result.mergedCount
             ? `Merged ${result.mergedCount.toLocaleString()} timestamp entries`
             : 'No timestamps needed merging.',
         );
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: trpc.indexers.getAll.queryKey(),
-          }),
-          queryClient.invalidateQueries({
-            queryKey: trpc.indexers.getArchived.queryKey(),
-          }),
-        ]);
+        await queryClient.invalidateQueries({
+          queryKey: trpc.indexers.getAll.queryKey(),
+        });
         setMergeDialogOpen(false);
         setMergeSourceTracker(null);
         setMergeTargetId(null);
@@ -201,17 +188,15 @@ function TrackerSettings() {
     return <Badge variant="outline">{indexer.status}</Badge>;
   };
 
-  type TrackerWithCaps =
-    | Pick<
-        Tracker,
-        | 'searchCap'
-        | 'tvSearchCap'
-        | 'movieSearchCap'
-        | 'musicSearchCap'
-        | 'audioSearchCap'
-        | 'bookSearchCap'
-      >
-    | ArchivedTracker;
+  type TrackerWithCaps = Pick<
+    Tracker,
+    | 'searchCap'
+    | 'tvSearchCap'
+    | 'movieSearchCap'
+    | 'musicSearchCap'
+    | 'audioSearchCap'
+    | 'bookSearchCap'
+  >;
 
   const getCapsBadges = (indexer: TrackerWithCaps) => {
     const caps = [];
@@ -264,10 +249,6 @@ function TrackerSettings() {
   };
 
   const handleEditTracker = (indexer: Tracker) => {
-    if (!indexer.active) {
-      toast.error('Archived trackers cannot be edited.');
-      return;
-    }
     setOpenDropdown(null); // Close any open dropdown
     setSelectedTracker(indexer);
     setEditMode('edit');
@@ -287,13 +268,16 @@ function TrackerSettings() {
     testIndexer({ id: indexer.id });
   };
 
-  const handleMergeTracker = (indexer: ArchivedTracker) => {
-    if (!indexers?.length) {
-      toast.error('No active trackers available to merge into.');
+  const handleMergeTracker = (indexer: Tracker) => {
+    const enabledTargets =
+      indexers?.filter((target) => target.enabled && target.id !== indexer.id) ??
+      [];
+    if (!enabledTargets.length) {
+      toast.error('No enabled trackers available to merge into.');
       return;
     }
     setMergeSourceTracker(indexer);
-    setMergeTargetId(indexers[0]?.id ?? null);
+    setMergeTargetId(enabledTargets[0]?.id ?? null);
     setMergeDialogOpen(true);
   };
 
@@ -310,7 +294,7 @@ function TrackerSettings() {
       toast.error('Select a destination tracker to merge into.');
       return;
     }
-    mergeArchivedTracker({
+    mergeDisabledTracker({
       sourceId: mergeSourceTracker.id,
       targetId: mergeTargetId,
     });
@@ -427,6 +411,17 @@ function TrackerSettings() {
                             </>
                           )}
                         </DropdownMenuItem>
+                        {!indexer.enabled && (
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMergeTracker(indexer);
+                            }}
+                          >
+                            <GitMerge className="mr-2 h-4 w-4" />
+                            Merge
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -446,24 +441,13 @@ function TrackerSettings() {
           </Table>
         </div>
 
-        <ArchivedTrackersSection
-          trackers={archivedIndexers}
-          onView={handleViewTracker}
-          onMerge={handleMergeTracker}
-          disableMerge={!indexers?.length}
-          renderCaps={getCapsBadges}
-        />
       </div>
 
       <TrackerViewSheet
         open={viewSheetOpen}
         onOpenChange={handleViewSheetOpenChange}
         tracker={selectedTracker}
-        onEdit={
-          selectedTracker && selectedTracker.active
-            ? handleEditTracker
-            : undefined
-        }
+        onEdit={selectedTracker ? handleEditTracker : undefined}
       />
 
       <TrackerEditSheet
@@ -473,7 +457,7 @@ function TrackerSettings() {
         tracker={selectedTracker}
       />
 
-      <MergeArchivedDialog
+      <MergeTrackerDialog
         open={mergeDialogOpen}
         onOpenChange={handleMergeDialogOpenChange}
         sourceTracker={mergeSourceTracker}
@@ -481,11 +465,13 @@ function TrackerSettings() {
         onTargetChange={setMergeTargetId}
         onConfirm={handleConfirmMerge}
         isMerging={isMerging}
-        availableTargets={(indexers ?? []).map((idx) => ({
-          id: idx.id,
-          name: idx.name,
-          url: idx.url,
-        }))}
+        availableTargets={(indexers ?? [])
+          .filter((idx) => idx.enabled && idx.id !== mergeSourceTracker?.id)
+          .map((idx) => ({
+            id: idx.id,
+            name: idx.name,
+            url: idx.url,
+          }))}
       />
     </Page>
   );

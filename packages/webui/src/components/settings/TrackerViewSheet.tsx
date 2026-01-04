@@ -22,7 +22,6 @@ type Indexer = {
   id: number;
   name: string | null;
   url: string;
-  active: boolean;
   enabled: boolean;
   status: string | null;
   retryAfter: number | null;
@@ -159,7 +158,6 @@ export default function TrackerViewSheet({
               <Badge variant={tracker.enabled ? 'default' : 'secondary'}>
                 {tracker.enabled ? 'Enabled' : 'Disabled'}
               </Badge>
-              {!tracker.active && <Badge variant="destructive">Archived</Badge>}
             </div>
           </div>
 

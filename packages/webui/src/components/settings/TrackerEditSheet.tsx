@@ -21,7 +21,6 @@ type Indexer = {
   id: number;
   name: string | null;
   url: string;
-  active: boolean;
   enabled: boolean;
   status: string | null;
   retryAfter: number | null;

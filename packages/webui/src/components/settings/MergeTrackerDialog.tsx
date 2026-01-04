@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { ArchivedTracker } from '@/components/settings/ArchivedTrackersSection';
 
 export type TrackerSummary = {
   id: number;
@@ -23,10 +22,10 @@ export type TrackerSummary = {
   url: string;
 };
 
-interface MergeArchivedDialogProps {
+interface MergeTrackerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sourceTracker: ArchivedTracker | null;
+  sourceTracker: TrackerSummary | null;
   targetId: number | null;
   onTargetChange: (id: number | null) => void;
   onConfirm: () => void;
@@ -34,7 +33,7 @@ interface MergeArchivedDialogProps {
   availableTargets: TrackerSummary[];
 }
 
-export function MergeArchivedDialog({
+export function MergeTrackerDialog({
   open,
   onOpenChange,
   sourceTracker,
@@ -43,7 +42,7 @@ export function MergeArchivedDialog({
   onConfirm,
   isMerging,
   availableTargets,
-}: MergeArchivedDialogProps) {
+}: MergeTrackerDialogProps) {
   const handleChange = (value: string) => {
     onTargetChange(Number(value));
   };
@@ -52,7 +51,7 @@ export function MergeArchivedDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Merge Archived Tracker</AlertDialogTitle>
+          <AlertDialogTitle>Merge Disabled Tracker</AlertDialogTitle>
           <AlertDialogDescription>
             Move timestamp history from{' '}
             <span className="font-medium">

@@ -3,11 +3,7 @@ import { db } from "../db.js";
 import { Label, logger } from "../logger.js";
 import { assembleUrl } from "../torznab.js";
 import { USER_AGENT } from "../constants.js";
-import {
-	getAllIndexers,
-	getArchivedIndexers,
-	type Indexer,
-} from "../indexers.js";
+import { getAllIndexers, type Indexer } from "../indexers.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import ms from "ms";
 
@@ -19,7 +15,6 @@ function deserializeRawRow(rawRow: unknown): Indexer {
 		name: row.name,
 		url: row.url,
 		apikey: row.apikey,
-		active: Boolean(row.active),
 		enabled: Boolean(row.enabled),
 		status: row.status,
 		retryAfter: row.retry_after,
@@ -43,7 +38,6 @@ export const indexerCreateSchema = z.object({
 	name: z.string().min(1).optional(),
 	url: z.string().url(),
 	apikey: z.string().min(1),
-	active: z.boolean().optional().default(true),
 	enabled: z.boolean().default(true),
 });
 
@@ -165,7 +159,6 @@ export async function createIndexer(
 			url: input.url,
 			apikey: input.apikey,
 			trackers: null,
-			active: true,
 			enabled: input.enabled,
 			status: null,
 			retry_after: null,
@@ -209,9 +202,7 @@ export async function updateIndexer(
 	};
 
 	// Atomic update with existence check
-	const updateCount = await db("indexer")
-		.where({ id, active: true })
-		.update(updateData);
+	const updateCount = await db("indexer").where({ id }).update(updateData);
 
 	if (updateCount === 0) {
 		return resultOfErr({
@@ -232,38 +223,37 @@ export async function updateIndexer(
 	return resultOf(updatedIndexer);
 }
 
-export async function deactivateIndexer(
+export async function deleteIndexer(
 	id: number,
 ): Promise<Result<{ success: true; indexer: Indexer }, IndexerNotFoundError>> {
-	// Soft delete - set active to false instead of actually deleting
-	// This preserves cache data and download history
-	const updateCount = await db("indexer")
-		.where({ id, active: true })
-		.update({ active: false });
+	return db.transaction(async (trx) => {
+		const rawRow = await trx("indexer").where({ id }).first();
+		if (!rawRow) {
+			return resultOfErr({
+				code: "INDEXER_NOT_FOUND",
+				message: `Indexer with ID ${id} not found`,
+			});
+		}
 
-	if (updateCount === 0) {
-		return resultOfErr({
-			code: "INDEXER_NOT_FOUND",
-			message: `Indexer with ID ${id} not found`,
+		const indexer = deserializeRawRow(rawRow);
+
+		await trx("timestamp").where({ indexer_id: id }).del();
+		await trx("rss").where({ indexer_id: id }).del();
+		await trx("indexer").where({ id }).del();
+
+		logger.verbose({
+			label: Label.TORZNAB,
+			message: `Deleted indexer: ${indexer.name || indexer.url}`,
 		});
-	}
 
-	// Query the updated record
-	const deactivatedRawRow = await db("indexer").where({ id }).first();
-
-	const deactivatedIndexer = deserializeRawRow(deactivatedRawRow);
-	logger.verbose({
-		label: Label.TORZNAB,
-		message: `Deactivated indexer (set active=false): ${deactivatedIndexer.name || deactivatedIndexer.url}`,
+		return resultOf({ success: true, indexer });
 	});
-
-	return resultOf({ success: true, indexer: deactivatedIndexer });
 }
 
 export async function getIndexerById(
 	id: number,
 ): Promise<Result<Indexer, IndexerNotFoundError>> {
-	const rawRow = await db("indexer").where({ id, active: true }).first();
+	const rawRow = await db("indexer").where({ id }).first();
 
 	if (!rawRow) {
 		return resultOfErr({
@@ -281,11 +271,7 @@ export async function listAllIndexers(): Promise<Indexer[]> {
 	return getAllIndexers();
 }
 
-export async function listArchivedIndexers(): Promise<Indexer[]> {
-	return getArchivedIndexers();
-}
-
-export async function mergeArchivedIndexer(
+export async function mergeDisabledIndexer(
 	sourceId: number,
 	targetId: number,
 ): Promise<
@@ -300,24 +286,24 @@ export async function mergeArchivedIndexer(
 
 	return db.transaction(async (trx) => {
 		const sourceIndexer = await trx("indexer")
-			.select("id", "active")
+			.select("id", "enabled")
 			.where({ id: sourceId })
 			.first();
 		if (!sourceIndexer) {
 			return resultOfErr({
 				code: "SOURCE_NOT_FOUND",
-				message: `Archived indexer with ID ${sourceId} not found`,
+				message: `Disabled indexer with ID ${sourceId} not found`,
 			});
 		}
-		if (sourceIndexer.active) {
+		if (sourceIndexer.enabled) {
 			return resultOfErr({
 				code: "INVALID_SOURCE_STATE",
-				message: "Source indexer must be archived before merging",
+				message: "Source indexer must be disabled before merging",
 			});
 		}
 
 		const targetIndexer = await trx("indexer")
-			.select("id", "active")
+			.select("id", "enabled")
 			.where({ id: targetId })
 			.first();
 		if (!targetIndexer) {
@@ -326,10 +312,10 @@ export async function mergeArchivedIndexer(
 				message: `Target indexer with ID ${targetId} not found`,
 			});
 		}
-		if (!targetIndexer.active) {
+		if (!targetIndexer.enabled) {
 			return resultOfErr({
 				code: "INVALID_TARGET_STATE",
-				message: "Target indexer must be active",
+				message: "Target indexer must be enabled",
 			});
 		}
 
@@ -375,7 +361,7 @@ export async function mergeArchivedIndexer(
 		if (deleted) {
 			logger.verbose({
 				label: Label.TORZNAB,
-				message: `Deleted archived indexer ${sourceId} after merge into ${targetId}`,
+				message: `Deleted disabled indexer ${sourceId} after merge into ${targetId}`,
 			});
 		}
 

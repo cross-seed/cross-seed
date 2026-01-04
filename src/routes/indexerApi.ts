@@ -3,7 +3,7 @@ import { PROGRAM_VERSION } from "../constants.js";
 import { Label, logger } from "../logger.js";
 import {
 	createIndexer,
-	deactivateIndexer,
+	deleteIndexer,
 	getIndexerById,
 	indexerCreateSchema,
 	indexerTestSchema,
@@ -53,7 +53,7 @@ export async function indexerApiPlugin(app: FastifyInstance) {
 	});
 
 	/**
-	 * List all indexers (active only)
+	 * List all indexers
 	 */
 	app.get<{
 		Querystring: { apikey?: string };
@@ -86,14 +86,13 @@ export async function indexerApiPlugin(app: FastifyInstance) {
 	});
 
 	/**
-	 * Create new indexer (upsert)
+	 * Create new indexer
 	 */
 	app.post<{
 		Body: {
 			name?: string;
 			url: string;
 			apikey: string;
-			active?: boolean;
 			enabled?: boolean;
 		};
 		Querystring: { apikey?: string };
@@ -122,7 +121,6 @@ export async function indexerApiPlugin(app: FastifyInstance) {
 			name?: string | null;
 			url?: string;
 			apikey?: string;
-			active?: boolean;
 			enabled?: boolean;
 		};
 		Querystring: { apikey?: string };
@@ -158,7 +156,7 @@ export async function indexerApiPlugin(app: FastifyInstance) {
 	});
 
 	/**
-	 * Deactivate indexer (soft delete)
+	 * Delete indexer
 	 */
 	app.delete<{
 		Params: { id: string };
@@ -169,7 +167,7 @@ export async function indexerApiPlugin(app: FastifyInstance) {
 		const id = await parseIdParam(request.params.id, reply);
 		if (!id) return;
 
-		const result = await deactivateIndexer(id);
+		const result = await deleteIndexer(id);
 		if (result.isOk()) {
 			return reply.code(200).send(result.unwrap());
 		}

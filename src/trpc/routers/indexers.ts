@@ -5,12 +5,11 @@ import {
 	indexerUpdateSchema,
 	createIndexer,
 	updateIndexer,
-	deactivateIndexer,
+	deleteIndexer,
 	testExistingIndexer,
 	testNewIndexer,
 	listAllIndexers,
-	listArchivedIndexers,
-	mergeArchivedIndexer,
+	mergeDisabledIndexer,
 } from "../../services/indexerService.js";
 import { TRPCError } from "@trpc/server";
 
@@ -23,7 +22,7 @@ export const indexersRouter = router({
 		);
 	}),
 
-	mergeArchived: authedProcedure
+	mergeDisabled: authedProcedure
 		.input(
 			z.object({
 				sourceId: z.number().int().positive(),
@@ -31,7 +30,7 @@ export const indexersRouter = router({
 			}),
 		)
 		.mutation(async ({ input }) => {
-			const result = await mergeArchivedIndexer(
+			const result = await mergeDisabledIndexer(
 				input.sourceId,
 				input.targetId,
 			);
@@ -44,14 +43,6 @@ export const indexersRouter = router({
 			}
 			return result.unwrap();
 		}),
-
-	// Get archived (soft-deleted) indexers
-	getArchived: authedProcedure.query(async () => {
-		const indexers = await listArchivedIndexers();
-		return indexers.sort((a, b) =>
-			(a.name || "").localeCompare(b.name || ""),
-		);
-	}),
 
 	// Create new indexer
 	create: authedProcedure
@@ -71,11 +62,11 @@ export const indexersRouter = router({
 			return result.unwrap();
 		}),
 
-	// Deactivate indexer (soft delete)
+	// Delete indexer
 	delete: authedProcedure
 		.input(z.object({ id: z.number().int().positive() }))
 		.mutation(async ({ input }) => {
-			const result = await deactivateIndexer(input.id);
+			const result = await deleteIndexer(input.id);
 			if (result.isErr()) {
 				throw new Error(`Indexer with ID ${input.id} not found`);
 			}

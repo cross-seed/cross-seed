@@ -19,14 +19,6 @@ export interface DbIndexer {
 	apikey: string;
 	trackers: string | null;
 	/**
-	 * When false, the indexer has been soft deleted and should only be visible
-	 * to the part of the program that deals with soft deleted indexers
-	 * (to either rescue, hard delete, or merge them into another indexer).
-	 * Soft deleted indexers should be queried separately from active indexers.
-	 * A soft-deleted indexer corresponds to a deleted indexer in Prowlarr.
-	 */
-	active: boolean;
-	/**
 	 * When false, the indexer has been disabled by the user and should not be
 	 * used for searching or RSS, but can be used for fetching caps or
 	 * cross-seed restore.
@@ -91,10 +83,6 @@ export interface Indexer {
 	url: string;
 	apikey: string;
 	trackers: string[] | null;
-	/**
-	 * Whether the indexer is currently specified in config
-	 */
-	active: boolean;
 	enabled: boolean;
 	status: IndexerStatus;
 	retryAfter: number;
@@ -116,7 +104,6 @@ const allFields = {
 	name: "name",
 	apikey: "apikey",
 	trackers: "trackers",
-	active: "active",
 	enabled: "enabled",
 	status: "status",
 	retryAfter: "retry_after",
@@ -171,7 +158,6 @@ export function deserialize(dbIndexer: DbIndexer): Indexer {
 		dbIndexer;
 	return {
 		...rest,
-		active: Boolean(rest.active),
 		enabled: Boolean(rest.enabled),
 		searchCap: Boolean(rest.searchCap),
 		tvSearchCap: Boolean(rest.tvSearchCap),
@@ -191,18 +177,7 @@ export function deserialize(dbIndexer: DbIndexer): Indexer {
  * All indexers that users currently have configured regardless of whether they are working.
  */
 export async function getAllIndexers(): Promise<Indexer[]> {
-	return (await db("indexer").where({ active: true }).select(allFields)).map(
-		deserialize,
-	);
-}
-
-/**
- * Soft-deleted indexers that are hidden from normal operations.
- */
-export async function getArchivedIndexers(): Promise<Indexer[]> {
-	return (await db("indexer").where({ active: false }).select(allFields)).map(
-		deserialize,
-	);
+	return (await db("indexer").select(allFields)).map(deserialize);
 }
 
 /**
@@ -223,7 +198,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 				cat_caps: null,
 				limits_caps: null,
 			})
-			.where({ active: true, enabled: true, search_cap: true })
+			.where({ enabled: true, search_cap: true })
 			.where((i) =>
 				i
 					.where({ status: null })
