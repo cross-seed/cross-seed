@@ -1,0 +1,48 @@
+.form-fieldset {
+  display: grid;
+  grid-template-areas: 'col1 col2';
+  grid-template-columns: repeat(2, 1fr);
+  padding-block: theme('spacing.4');
+  margin-block-end: theme('spacing.5');
+
+  legend {
+    font-size: theme('fontSize.lg');
+    font-weight: theme('fontWeight.semibold');
+    padding-inline: theme('spacing.3');
+  }
+}
+
+.form-fieldset:nth-child(odd) {
+  grid-area: col1;
+}
+
+.form-fieldset:nth-child(even) {
+  grid-area: col2;
+}
+
+.form-field-switches {
+  display: flex;
+  flex-direction: row;
+  grid-column: span 2;
+
+  & .form-field__switch {
+    width: theme('width.1/6');
+  }
+}
+
+.form-input {
+  padding-block: theme('spacing.1');
+  padding-inline: theme('spacing.2');
+  box-shadow: none;
+
+  &[aria-invalid='true'] {
+    border-color: var(--color-destructive);
+    box-shadow: 0 0 0 2px
+      color-mix(in oklab, var(--color-destructive) 40%, transparent);
+  }
+}
+
+/* Add a subtle fade between the button and the form */
+.form__submit {
+  box-shadow: 0 -25px 25px var(--color-background);
+}

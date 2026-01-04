@@ -1,9 +1,8 @@
 import ms from "ms";
 import { Action } from "./constants.js";
 import { cleanupDB, db } from "./db.js";
-import { exitOnCrossSeedErrors } from "./errors.js";
 import { injectSavedTorrents } from "./inject.js";
-import { Label, logger } from "./logger.js";
+import { Label, logger, exitOnCrossSeedErrors } from "./logger.js";
 import { bulkSearch, scanRssFeeds } from "./pipeline.js";
 import { getRuntimeConfig, RuntimeConfig } from "./runtimeConfig.js";
 import { updateCaps } from "./torznab.js";
@@ -27,8 +26,14 @@ class Job {
 	runAheadOfSchedule: boolean;
 	delayNextRun: boolean;
 	configOverride: Partial<RuntimeConfig>;
+	shouldRunFn: () => boolean;
 
-	constructor(name: JobName, cadence: number, exec: () => Promise<void>) {
+	constructor(
+		name: JobName,
+		cadence: number,
+		exec: () => Promise<void>,
+		shouldRunFn: () => boolean = () => true,
+	) {
 		this.name = name;
 		this.cadence = cadence;
 		this.exec = exec;
@@ -36,6 +41,11 @@ class Job {
 		this.runAheadOfSchedule = false;
 		this.delayNextRun = false;
 		this.configOverride = {};
+		this.shouldRunFn = shouldRunFn;
+	}
+
+	shouldRun(): boolean {
+		return this.shouldRunFn();
 	}
 
 	async run(): Promise<boolean> {
@@ -61,18 +71,28 @@ class Job {
 }
 
 function createJobs(): void {
-	const { action, rssCadence, searchCadence, torznab } = getRuntimeConfig();
+	const { action, rssCadence, searchCadence } = getRuntimeConfig();
 	if (rssCadence) {
-		jobs.push(new Job(JobName.RSS, rssCadence, scanRssFeeds));
-	}
-	if (searchCadence) {
-		jobs.push(new Job(JobName.SEARCH, searchCadence, bulkSearch));
-	}
-	if (torznab.length > 0) {
 		jobs.push(
-			new Job(JobName.UPDATE_INDEXER_CAPS, ms("1 day"), updateCaps),
+			new Job(
+				JobName.RSS,
+				rssCadence,
+				scanRssFeeds,
+				() => !!getRuntimeConfig().rssCadence,
+			),
 		);
 	}
+	if (searchCadence) {
+		jobs.push(
+			new Job(
+				JobName.SEARCH,
+				searchCadence,
+				bulkSearch,
+				() => !!getRuntimeConfig().searchCadence,
+			),
+		);
+	}
+	jobs.push(new Job(JobName.UPDATE_INDEXER_CAPS, ms("1 day"), updateCaps));
 	if (action === Action.INJECT) {
 		jobs.push(new Job(JobName.INJECT, ms("1 hour"), injectSavedTorrents));
 	}
@@ -122,6 +142,10 @@ export async function checkJobs(
 		async () => {
 			const now = Date.now();
 			for (const job of jobs) {
+				if (!job.shouldRun()) {
+					continue;
+				}
+
 				const lastRun = await getJobLastRun(job.name);
 				const eligibilityTs = lastRun ? lastRun + job.cadence : now;
 				if (options.isFirstRun) {

@@ -2,8 +2,10 @@ import ms from "ms";
 import path from "path";
 import { isDeepStrictEqual } from "util";
 import { testLinking } from "../action.js";
+import type { Problem } from "../problems.js";
 import {
 	ABS_WIN_PATH_REGEX,
+	Action,
 	Decision,
 	DecisionAnyMatch,
 	InjectionResult,
@@ -13,20 +15,12 @@ import {
 	VIDEO_DISC_EXTENSIONS,
 } from "../constants.js";
 import { getPartialSizeRatio } from "../decide.js";
-import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
 import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
-import { filterByContent } from "../preFilter.js";
 import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
-import {
-	formatAsList,
-	hasExt,
-	humanReadableSize,
-	isTruthy,
-	wait,
-} from "../utils.js";
+import { hasExt, humanReadableSize, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
@@ -197,93 +191,6 @@ export function byClientHostPriority(clientHost: string | undefined): number {
 	);
 }
 
-export async function validateClientSavePaths(
-	searchees: SearcheeWithInfoHash[],
-	infoHashPathMapOrig: Map<string, string>,
-	label: string,
-	clientPriority: number,
-): Promise<void> {
-	const { linkDirs } = getRuntimeConfig();
-	logger.info({
-		label,
-		message: `Validating save paths for all ${searchees.length} torrents...`,
-	});
-	const infoHashPathMap = new Map(infoHashPathMapOrig);
-
-	const entryDir = searchees.find((s) => !infoHashPathMap.has(s.infoHash));
-	if (entryDir) {
-		logger.warn({
-			label,
-			message: `Not all torrents from torrentDir are in the torrent client (missing ${entryDir.name} [${entryDir.infoHash}]): https://www.cross-seed.org/docs/basics/options#torrentdir`,
-		});
-	}
-	const searcheeInfoHashes = new Set(searchees.map((s) => s.infoHash));
-	const entryClient = Array.from(infoHashPathMap.keys()).find(
-		(infoHash) => !searcheeInfoHashes.has(infoHash),
-	);
-	if (entryClient) {
-		logger.warn({
-			label,
-			message: `Could not ensure all torrents from the torrent client are in torrentDir (missing ${entryClient} with savePath ${infoHashPathMap.get(entryClient)}): https://www.cross-seed.org/docs/basics/options#torrentdir`,
-		});
-	}
-	if (!linkDirs.length) return;
-
-	const removedSavePaths = new Set<string>();
-	for (const searchee of searchees) {
-		if (
-			!(await filterByContent(
-				{ ...searchee, label: Label.RSS },
-				{
-					configOverride: {},
-					allowSeasonPackEpisodes: true,
-					ignoreCrossSeeds: false,
-					logWithoutSearcheeLabel: true,
-				},
-			))
-		) {
-			if (infoHashPathMap.has(searchee.infoHash)) {
-				removedSavePaths.add(infoHashPathMap.get(searchee.infoHash)!);
-				infoHashPathMap.delete(searchee.infoHash);
-			}
-		}
-	}
-	const uniqueSavePaths = new Set(infoHashPathMap.values());
-	const ignoredSavePaths = Array.from(removedSavePaths).filter(
-		(savePath) => !uniqueSavePaths.has(savePath),
-	);
-	logger.verbose({
-		label,
-		message: `Excluded ${ignoredSavePaths.length}/${uniqueSavePaths.size + ignoredSavePaths.length} save paths from linking test due to filters: ${formatAsList(
-			ignoredSavePaths,
-			{
-				sort: true,
-				type: "unit",
-			},
-		)}`,
-	});
-
-	const linkingErrorMsg = `Failed to link from ${label} save paths to a linkDir. If you have multiple drives, you will need to add extra linkDirs or blocklist the category, tag, or trackers that correspond to the drives (https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking)`;
-	for (const savePath of uniqueSavePaths) {
-		if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
-			throw new CrossSeedError(
-				`Cannot use linkDirs with cross platform cross-seed and ${label}, please run cross-seed in docker or natively to match your torrent client (https://www.cross-seed.org/docs/basics/managing-the-daemon): ${savePath}`,
-			);
-		}
-		try {
-			const res = await testLinking(
-				savePath,
-				`torrentClient${clientPriority}Src.cross-seed`,
-				`torrentClient${clientPriority}Dest.cross-seed`,
-			);
-			if (!res) logger.error(linkingErrorMsg);
-		} catch (e) {
-			logger.error(e);
-			throw new CrossSeedError(linkingErrorMsg);
-		}
-	}
-}
-
 export function clientSearcheeModified(
 	label: string,
 	dbTorrent,
@@ -449,4 +356,180 @@ export function estimatePausedStatus(
 	const remaining = (1 - getPartialSizeRatio(meta, searchee)) * meta.length;
 	if (remaining <= getMaxRemainingBytes(meta, decision)) return false;
 	return !shouldResumeFromNonRelevantFiles(meta, remaining, decision);
+}
+
+function clientProblemId(kind: string, identifier: string): string {
+	return `client:${kind}:${identifier}`;
+}
+
+export async function collectClientProblems(): Promise<Problem[]> {
+	const problems: Problem[] = [];
+	const runtimeConfig = getRuntimeConfig();
+	const configuredClients = runtimeConfig.torrentClients ?? [];
+	const clients = getClients();
+
+	if (
+		runtimeConfig.action === Action.INJECT &&
+		configuredClients.length === 0
+	) {
+		problems.push({
+			id: "client:inject-without-clients",
+			severity: "error",
+			summary:
+				"Injection requires at least one configured torrent client.",
+			details:
+				"Add a torrent client in Settings → Torrent Clients or switch the action away from Inject.",
+		});
+		return problems;
+	}
+
+	if (configuredClients.length && clients.length === 0) {
+		problems.push({
+			id: "client:initialization-failed",
+			severity: "error",
+			summary: "Torrent clients failed to initialize.",
+			details:
+				"Check the configuration for typos or authentication issues, then restart cross-seed.",
+		});
+		return problems;
+	}
+
+	if (
+		runtimeConfig.action === Action.INJECT &&
+		!clients.some((client) => !client.readonly)
+	) {
+		problems.push({
+			id: "client:inject-readonly",
+			severity: "error",
+			summary:
+				"Injection is not possible when all clients are read-only.",
+			details: "Mark at least one client as writable to allow injection.",
+		});
+	}
+
+	const validationResults = await Promise.allSettled(
+		clients.map((client) => client.validateConfig()),
+	);
+
+	validationResults.forEach((result, index) => {
+		if (result.status === "fulfilled") return;
+
+		const client = clients[index];
+		const message =
+			result.reason instanceof Error
+				? result.reason.message
+				: String(result.reason ?? "Unknown error");
+
+		problems.push({
+			id: clientProblemId("validation", client.label),
+			severity: "error",
+			summary: `${client.label} failed validation.`,
+			details: message,
+			metadata: {
+				clientType: client.clientType,
+				clientHost: client.clientHost,
+				readonly: client.readonly,
+			},
+		});
+	});
+
+	return problems;
+}
+
+export async function collectClientLinkingProblems(): Promise<Problem[]> {
+	const { linkDirs = [] } = getRuntimeConfig();
+	const clients = getClients();
+
+	if (!clients.length || linkDirs.length === 0) return [];
+
+	const problems: Problem[] = [];
+	const linkingHelp =
+		"If you have multiple drives, add extra linkDirs or blocklist categories, tags, or trackers for those drives. https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking";
+
+	for (const client of clients) {
+		let searchees: SearcheeWithInfoHash[];
+		try {
+			const result = await client.getClientSearchees({
+				includeFiles: false,
+				includeTrackers: false,
+			});
+			searchees = result.searchees;
+		} catch (error) {
+			logger.debug({
+				label: client.label,
+				message: `Failed to inspect save paths for linking health check: ${error instanceof Error ? error.message : String(error ?? "")}`,
+			});
+			continue;
+		}
+
+		const uniqueSavePaths = Array.from(
+			new Set(
+				searchees
+					.map((searchee) => searchee.savePath)
+					.filter((savePath): savePath is string =>
+						Boolean(savePath),
+					),
+			),
+		);
+		if (!uniqueSavePaths.length) continue;
+
+		for (const [index, savePath] of uniqueSavePaths.entries()) {
+			const metadata = {
+				client: client.label,
+				clientType: client.clientType,
+				clientHost: client.clientHost,
+				readonly: client.readonly,
+				path: savePath,
+			};
+
+			if (ABS_WIN_PATH_REGEX.test(savePath) === (path.sep === "/")) {
+				problems.push({
+					id: clientProblemId(
+						"linking-cross-platform",
+						`${client.label}:${savePath}`,
+					),
+					severity: "error",
+					summary: `${client.label} save paths are incompatible with this platform.`,
+					details: `Path ${savePath} indicates the torrent client runs on a different platform than cross-seed. Run cross-seed alongside the client or adjust your linkDirs.`,
+					metadata: { ...metadata, issue: "cross-platform" },
+				});
+				continue;
+			}
+
+			try {
+				const srcName = `healthClient${client.clientPriority}Src.cross-seed`;
+				const destName = `healthClient${client.clientPriority}Dest-${index}.cross-seed`;
+				const success = await testLinking(savePath, srcName, destName);
+				if (!success) {
+					problems.push({
+						id: clientProblemId(
+							"linking-test-failed",
+							`${client.label}:${savePath}`,
+						),
+						severity: "warning",
+						summary: `${client.label} could not link files from ${savePath}.`,
+						details: `cross-seed could not link from ${savePath} to any configured linkDir. ${linkingHelp}`,
+						metadata: { ...metadata, issue: "linking-failed" },
+					});
+				}
+			} catch (error) {
+				const message =
+					error instanceof Error
+						? error.message
+						: String(error ?? "");
+				problems.push({
+					id: clientProblemId(
+						"linking-error",
+						`${client.label}:${savePath}`,
+					),
+					severity: "error",
+					summary: `${client.label} linking test threw an error.`,
+					details: message,
+					metadata: { ...metadata, issue: "linking-error" },
+				});
+			}
+		}
+	}
+
+	return problems;
 }

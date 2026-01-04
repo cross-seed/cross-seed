@@ -7,7 +7,7 @@ import {
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { db } from "./db.js";
-import { logger } from "./logger.js";
+import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromPath,
@@ -26,6 +26,7 @@ import {
 	inBatches,
 	isTruthy,
 	mapAsync,
+	yieldToEventLoop,
 	stripExtension,
 } from "./utils.js";
 import { isOk } from "./Result.js";
@@ -38,6 +39,8 @@ interface DataEntry {
 
 const watchers: Map<string, FSWatcher> = new Map();
 const modifiedPaths: Map<string, Set<string>> = new Map();
+const modifiedPathTimes: Map<string, Map<string, number>> = new Map();
+const STABILITY_WINDOW_MS = 60_000;
 
 function createWatcher(dataDir: string): FSWatcher {
 	return watch(dataDir, { recursive: true, persistent: false }, (_, f) => {
@@ -45,6 +48,7 @@ function createWatcher(dataDir: string): FSWatcher {
 		const fullPath = resolve(join(dataDir, f));
 		if (fullPath === resolve(dataDir)) return;
 		modifiedPaths.get(dataDir)!.add(fullPath);
+		modifiedPathTimes.get(dataDir)!.set(fullPath, Date.now());
 	}).on("error", (e) => {
 		logger.error(`Restarting watcher for dataDir ${dataDir}: ${e.message}`);
 		logger.debug(e);
@@ -60,9 +64,13 @@ export async function indexDataDirs(options: {
 	if (!dataDirs.length) return;
 
 	if (options.startup) {
-		logger.info("Indexing dataDirs for reverse lookup...");
+		logger.info({
+			label: Label.INDEX,
+			message: "Indexing dataDirs for reverse lookup...",
+		});
 		for (const dataDir of dataDirs) {
 			modifiedPaths.set(dataDir, new Set());
+			modifiedPathTimes.set(dataDir, new Map());
 			watchers.set(dataDir, createWatcher(dataDir));
 		}
 		const searcheePaths = await findSearcheesFromAllDataDirs();
@@ -81,11 +89,14 @@ export async function indexDataDirs(options: {
 
 	await mapAsync(dataDirs, async (dataDir) => {
 		const modified = modifiedPaths.get(dataDir)!;
+		const modifiedTimes = modifiedPathTimes.get(dataDir)!;
 		const eventPaths: string[] = [];
-		while (modified.size) {
-			const path: string | undefined = modified.values().next().value;
-			if (!path) continue;
+		const now = Date.now();
+		for (const path of modified) {
+			const lastSeen = modifiedTimes.get(path) ?? 0;
+			if (now - lastSeen < STABILITY_WINDOW_MS) continue;
 			if (!modified.delete(path)) continue;
+			modifiedTimes.delete(path);
 			eventPaths.push(path);
 		}
 		if (!eventPaths.length) return;
@@ -137,7 +148,12 @@ async function indexDataPaths(paths: string[]): Promise<number> {
 	const memoizedLengths = new Map<string, number>();
 	const dataRows: DataEntry[] = [];
 	const ensembleRows: EnsembleEntry[] = [];
+	let processed = 0;
 	for (const path of paths) {
+		processed += 1;
+		if (processed % 500 === 0) {
+			await yieldToEventLoop();
+		}
 		const files = await getFilesFromDataRoot(
 			path,
 			memoizedPaths,

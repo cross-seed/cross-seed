@@ -15,7 +15,7 @@ integrate it into `cross-seed`,
 
 ## Requirements
 
--   [Node >= 20](https://nodejs.org/en/download)
+-   [Node >= 24](https://nodejs.org/en/download)
 -   Indexers that support Torznab or an tracker/indexer manager such as
     Prowlarr/Jackett (Prowlarr is preferred)
 

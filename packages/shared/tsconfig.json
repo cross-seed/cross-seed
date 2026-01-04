@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"outDir": "./dist",
+		"rootDir": "./",
+		"target": "es2022",
+		"lib": ["es2023"],
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
+		"sourceMap": true,
+		"declaration": true,
+		"declarationMap": true,
+		"strictNullChecks": true,
+		"types": [],
+		"composite": true
+	},
+	"include": ["./**/*.ts"]
+}

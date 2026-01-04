@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { fileFactory } from "./factories/file";
-import { searcheeFactory } from "./factories/searchee";
+import { fileFactory } from "./factories/file.js";
+import { searcheeFactory } from "./factories/searchee.js";
 
-import { MediaType, SEASON_REGEX } from "../src/constants";
-import { getMediaType } from "../src/searchee";
-import { extractInt, humanReadableSize, sanitizeUrl } from "../src/utils";
+import { MediaType, SEASON_REGEX } from "../src/constants.js";
+import { getMediaType } from "../src/searchee.js";
+import { extractInt, humanReadableSize, sanitizeUrl } from "../src/utils.js";
 
 describe("humanReadableSize", () => {
 	it("returns a human-readable size", () => {

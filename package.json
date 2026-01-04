@@ -2,21 +2,36 @@
 	"name": "cross-seed",
 	"version": "6.13.6",
 	"description": "Fully-automatic cross-seeding with Torznab",
+	"workspaces": [
+		".",
+		"packages/shared",
+		"packages/webui",
+		"packages/api-types"
+	],
 	"scripts": {
 		"test": "vitest",
 		"coverage": "vitest run --coverage",
-		"build": "tsc",
-		"watch": "tsc --watch",
-		"prepublishOnly": "rimraf dist && npm run build && husky install",
-		"lint": "prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' && eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'",
-		"typecheck": "tsc --noEmit",
+		"build": "npm run build:backend",
+		"build:backend": "tsc -b tsconfig.json",
+		"build:webui": "cd packages/webui && npm run build",
+		"copy:webui": "rimraf dist/webui && cp -r packages/webui/dist dist/webui",
+		"build:api-types": "tsc -b packages/api-types/tsconfig.json",
+		"build:all": "npm run build:backend && npm run build:api-types && npm run build:webui && npm run copy:webui",
+		"watch": "tsc -b --watch --preserveWatchOutput",
+		"dev": "concurrently --names \"TS,BE,FE\" --prefix-colors \"blue,green,magenta\" \"npm run watch\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+		"dev:backend": "node --watch dist/cmd.js daemon",
+		"dev:frontend": "cd packages/webui && npm run dev",
+		"prepare": "node -e \"const fs=require('fs'); if(!fs.existsSync('.git')) process.exit(0); require('child_process').execSync('husky install',{stdio:'inherit'})\"",
+		"prepublishOnly": "rimraf dist && npm run build:all && husky install",
+		"lint": "concurrently --names \"Prettier,ESLint\" \"prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\"",
+		"typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.tests.json",
 		"format": "prettier --write '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' package.json"
 	},
 	"bin": {
 		"cross-seed": "dist/cmd.js"
 	},
 	"engines": {
-		"node": ">=20"
+		"node": ">=24"
 	},
 	"files": [
 		"dist/"
@@ -29,13 +44,17 @@
 	"author": "Michael Goodnow",
 	"license": "Apache-2.0",
 	"dependencies": {
+		"@cross-seed/shared": "file:packages/shared",
+		"@fastify/cookie": "^11.0.2",
+		"@trpc/server": "^11.1.2",
+		"bcryptjs": "^3.0.2",
 		"bencode": "^2.0.1",
-		"better-sqlite3": "^11.5.0",
+		"better-sqlite3": "^12.5.0",
 		"chalk": "^5.0.0",
 		"commander": "^8.3.0",
 		"fastest-levenshtein": "^1.0.16",
+		"fastify": "^5.3.2",
 		"knex": "^3.1.0",
-		"lodash-es": "^4.17.21",
 		"ms": "^2.1.3",
 		"strip-ansi": "^7.1.0",
 		"winston": "^3.3.3",
@@ -45,19 +64,21 @@
 		"zod": "^3.22.4"
 	},
 	"devDependencies": {
+		"@types/bcryptjs": "^2.4.6",
 		"@types/bencode": "^2.0.1",
-		"@types/lowdb": "^1.0.9",
 		"@types/ms": "^0.7.34",
-		"@types/node": "^20.10.6",
+		"@types/node": "^24.10.1",
 		"@types/xml2js": "^0.4.9",
 		"@types/xmlrpc": "^1.3.6",
 		"@typescript-eslint/eslint-plugin": "^6.16.0",
 		"@typescript-eslint/parser": "^6.16.0",
 		"@vitest/coverage-v8": "^3.1.1",
+		"concurrently": "^9.1.2",
 		"eslint": "^8.56.0",
 		"husky": "^7.0.0",
 		"lint-staged": "^12.1.4",
 		"prettier": "^3.2.5",
+		"prettier-plugin-tailwindcss": "^0.6.11",
 		"rimraf": "^3.0.2",
 		"typescript": "^5.6.2",
 		"vitest": "^3.1.1"
