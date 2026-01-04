@@ -14,6 +14,7 @@ import { sendTestNotification } from "./pushNotifier.js";
 import { serve } from "./server.js";
 import { withFullRuntime, withMinimalRuntime } from "./startup.js";
 import { indexTorrentsAndDataDirs, parseTorrentFromPath } from "./torrent.js";
+import { resetUsers } from "./userAuth.js";
 
 const verboseOption = new Option("-v, --verbose", "Log verbose output").default(
 	false,
@@ -111,6 +112,11 @@ program
 	.command("reset-api-key")
 	.description("Reset the api key")
 	.action(withMinimalRuntime(resetApiKey));
+
+program
+	.command("reset-user")
+	.description("Delete all users and sessions")
+	.action(withMinimalRuntime(resetUsers));
 
 program
 	.command("daemon")

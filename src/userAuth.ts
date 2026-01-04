@@ -124,3 +124,11 @@ export async function createInitialUserIfNeeded(
 
 	return createUser(username, password);
 }
+
+export async function resetUsers(): Promise<string> {
+	const deletedSessions = await db("session").del();
+	const deletedUsers = await db("user").del();
+	const userLabel = deletedUsers === 1 ? "user" : "users";
+	const sessionLabel = deletedSessions === 1 ? "session" : "sessions";
+	return `Deleted ${deletedUsers} ${userLabel} and ${deletedSessions} ${sessionLabel}.`;
+}

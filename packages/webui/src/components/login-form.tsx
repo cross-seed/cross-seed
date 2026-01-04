@@ -124,6 +124,13 @@ export function LoginForm({
                     ? 'Create Account'
                     : 'Login'}
               </Button>
+              {!isSignUp && (
+                <p className="text-muted-foreground text-sm">
+                  Forgot password? Run <code>cross-seed reset-user</code> (or{' '}
+                  <code>docker exec -it &lt;container&gt; cross-seed reset-user</code>
+                  ).
+                </p>
+              )}
             </div>
           </form>
         </CardContent>
