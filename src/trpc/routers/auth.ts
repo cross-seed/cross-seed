@@ -13,12 +13,26 @@ import {
 } from "../../userAuth.js";
 import { Label, logger } from "../../logger.js";
 
+const SIGNUP_WINDOW_MS = 5 * 60 * 1000;
+const signupWindowStart = Date.now();
+
+function getSignupWindowMsRemaining(): number {
+	const elapsedMs = Date.now() - signupWindowStart;
+	return Math.max(0, SIGNUP_WINDOW_MS - elapsedMs);
+}
+
+function isSignupWindowOpen(): boolean {
+	return getSignupWindowMsRemaining() > 0;
+}
+
 export const authRouter = router({
 	// Check auth status - similar to rtgc's authStatus
 	authStatus: unauthedProcedure.query(async ({ ctx }) => {
 		const hasExistingUsers = await hasUsers();
 		return {
 			userExists: hasExistingUsers,
+			signupAllowed: !hasExistingUsers && isSignupWindowOpen(),
+			signupWindowMsRemaining: getSignupWindowMsRemaining(),
 			isLoggedIn: !!ctx.user,
 			user: ctx.user,
 		};
@@ -40,6 +54,14 @@ export const authRouter = router({
 				throw new TRPCError({
 					code: "BAD_REQUEST",
 					message: "Setup has already been completed",
+				});
+			}
+
+			if (!isSignupWindowOpen()) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message:
+						"Initial setup window has expired. Restart cross-seed to create the first user.",
 				});
 			}
 
@@ -70,6 +92,14 @@ export const authRouter = router({
 			// Check if there are any users - if not, create the first user
 			const hasExistingUsers = await hasUsers();
 			if (!hasExistingUsers) {
+				if (!isSignupWindowOpen()) {
+					throw new TRPCError({
+						code: "FORBIDDEN",
+						message:
+							"Initial setup window has expired. Restart cross-seed to create the first user.",
+					});
+				}
+
 				logger.info({
 					label: Label.AUTH,
 					message: `No users exist, creating initial user: ${username}`,

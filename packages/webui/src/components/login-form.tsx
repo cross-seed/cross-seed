@@ -38,8 +38,12 @@ export function LoginForm({
           queryKey: trpc.auth.authStatus.queryKey(),
         });
       },
-      onError: () => {
-        setError('Invalid username or password');
+      onError: (error) => {
+        const message =
+          error?.data?.code === 'UNAUTHORIZED'
+            ? 'Invalid username or password'
+            : error?.message ?? 'Login failed';
+        setError(message);
       },
     }),
   );
@@ -51,6 +55,7 @@ export function LoginForm({
   };
 
   const isSignUp = !authStatus?.userExists;
+  const signupAllowed = !!authStatus?.signupAllowed;
 
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
@@ -61,13 +66,25 @@ export function LoginForm({
           </CardTitle>
           <CardDescription>
             {isSignUp
-              ? 'Create the first user account'
+              ? 'Create a user'
               : 'Enter your username and password to access your account'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
+              {isSignUp && signupAllowed && (
+                <p className="text-muted-foreground text-sm">
+                  For security reasons, initial setup is only available for 5
+                  minutes after cross-seed starts.
+                </p>
+              )}
+              {isSignUp && !signupAllowed && (
+                <p className="text-destructive text-sm font-medium">
+                  Setup window closed for security reasons. Restart cross-seed
+                  to create the first user.
+                </p>
+              )}
               {error && (
                 <div className="text-destructive text-sm font-medium">
                   {error}
@@ -80,7 +97,7 @@ export function LoginForm({
                   placeholder="admin"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  disabled={isPending}
+                  disabled={isPending || (isSignUp && !signupAllowed)}
                   required
                 />
               </div>
@@ -92,11 +109,15 @@ export function LoginForm({
                   placeholder="••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={isPending}
+                  disabled={isPending || (isSignUp && !signupAllowed)}
                   required
                 />
               </div>
-              <Button type="submit" disabled={isPending} className="w-full">
+              <Button
+                type="submit"
+                disabled={isPending || (isSignUp && !signupAllowed)}
+                className="w-full"
+              >
                 {isPending
                   ? 'Processing...'
                   : isSignUp
