@@ -125,15 +125,8 @@ export default function TrackerEditSheet({
       return;
     }
 
-    // Check for apikey parameter in URL
     try {
-      const urlObj = new URL(trimmedUrl);
-      if (!urlObj.searchParams.has('apikey')) {
-        toast.error(
-          'URL must include apikey parameter (e.g., ?apikey=YOUR_KEY)',
-        );
-        return;
-      }
+      new URL(trimmedUrl);
     } catch {
       toast.error('Invalid URL format');
       return;
