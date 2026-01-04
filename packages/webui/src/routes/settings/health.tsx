@@ -44,7 +44,7 @@ function HealthPage() {
 
   return (
     <Page
-      breadcrumbs={['Settings', 'Health']}
+      breadcrumbs={['Diagnostics', 'Health']}
       actions={
         <Button
           variant="outline"

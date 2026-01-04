@@ -4,7 +4,7 @@ import { Page } from '@/components/Page';
 
 function LogsPage() {
   return (
-    <Page>
+    <Page breadcrumbs={['Diagnostics', 'Logs']}>
       <Logs />
     </Page>
   );

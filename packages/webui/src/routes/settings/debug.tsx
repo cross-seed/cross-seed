@@ -106,7 +106,7 @@ function DebugSettings() {
 
   if (isLoading) {
     return (
-      <Page breadcrumbs={['Settings', 'Debug']}>
+      <Page breadcrumbs={['Diagnostics', 'Debug']}>
         <div className="flex items-center justify-center p-8">
           <div>Loading settings...</div>
         </div>
@@ -133,7 +133,7 @@ function DebugSettings() {
   );
 
   return (
-    <Page breadcrumbs={['Settings', 'Debug']} actions={actions}>
+    <Page breadcrumbs={['Diagnostics', 'Debug']} actions={actions}>
       <div className="space-y-4">
         <div>
           <h1 className="text-2xl font-bold">Debug Settings</h1>
