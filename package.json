@@ -17,7 +17,7 @@
 		"copy:webui": "rimraf dist/webui && cp -r packages/webui/dist dist/webui",
 		"build:api-types": "tsc -b packages/api-types/tsconfig.json",
 		"build:all": "npm run build:backend && npm run build:api-types && npm run build:webui && npm run copy:webui",
-		"watch": "tsc -b --watch",
+		"watch": "tsc -b --watch --preserveWatchOutput",
 		"dev": "concurrently --names \"TS,BE,FE\" --prefix-colors \"blue,green,magenta\" \"npm run watch\" \"npm run dev:backend\" \"npm run dev:frontend\"",
 		"dev:backend": "node --watch dist/cmd.js daemon",
 		"dev:frontend": "cd packages/webui && npm run dev",
