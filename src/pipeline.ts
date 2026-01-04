@@ -905,7 +905,7 @@ export async function scanRssFeeds() {
 		!enabledIndexers.length ||
 		(!useClientTorrents && !torrentDir && !dataDirs.length)
 	) {
-		logger.error({
+		logger.warn({
 			label: Label.RSS,
 			message:
 				"RSS requires enabled indexers and at least one of useClientTorrents, torrentDir, or dataDirs to be set",
