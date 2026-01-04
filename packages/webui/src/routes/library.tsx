@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import {
@@ -302,9 +302,21 @@ function LibraryPage() {
               <TableRow>
                 <TableCell
                   colSpan={5}
-                  className="text-muted-foreground py-6 text-center"
+                  className="py-10 text-center"
                 >
-                  No items indexed yet.
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-muted-foreground text-sm">
+                      No items indexed yet.
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      Add a download client to start building your library.
+                    </span>
+                    <Button asChild size="sm">
+                      <Link to="/settings/downloaders">
+                        Add download client
+                      </Link>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
