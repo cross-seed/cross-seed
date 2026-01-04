@@ -23,11 +23,7 @@ class LogWatcher {
 	}
 
 	private startWatching() {
-		const logFiles = [
-			"error.current.log",
-			"info.current.log",
-			"verbose.current.log",
-		];
+		const logFiles = ["verbose.current.log"];
 
 		for (const fileName of logFiles) {
 			const filePath = join(appDir(), "logs", fileName);
@@ -171,9 +167,9 @@ class LogWatcher {
 	}
 
 	private tryParseLogLine(line: string): LogEntry | null {
-		// Parse winston text format: "2025-06-01 00:00:35 info: [scheduler] starting job: rss"
+		// Parse winston text format: "2025-06-01 00:00:35.123 info: [scheduler] starting job: rss"
 		const logRegex =
-			/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (\w+):\s*(?:\[([^\]]+)\])?\s*(.*)$/;
+			/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{3})?) (\w+):\s*(?:\[([^\]]+)\])?\s*(.*)$/;
 		const match = line.match(logRegex);
 
 		if (match) {
