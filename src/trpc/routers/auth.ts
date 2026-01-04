@@ -33,6 +33,7 @@ export const authRouter = router({
 			userExists: hasExistingUsers,
 			signupAllowed: !hasExistingUsers && isSignupWindowOpen(),
 			signupWindowMsRemaining: getSignupWindowMsRemaining(),
+			isDocker: process.env.DOCKER_ENV === "true",
 			isLoggedIn: !!ctx.user,
 			user: ctx.user,
 		};

@@ -54,8 +54,12 @@ export function LoginForm({
     login({ username, password });
   };
 
-  const isSignUp = !authStatus?.userExists;
-  const signupAllowed = !!authStatus?.signupAllowed;
+  const isSignUp = !authStatus.userExists;
+  const signupAllowed = authStatus.signupAllowed;
+  const isDocker = authStatus.isDocker;
+  const resetCommand = isDocker
+    ? 'docker exec -it <container> cross-seed reset-user'
+    : 'cross-seed reset-user';
 
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
@@ -126,9 +130,9 @@ export function LoginForm({
               </Button>
               {!isSignUp && (
                 <p className="text-muted-foreground text-sm">
-                  Forgot password? Run <code>cross-seed reset-user</code> (or{' '}
-                  <code>docker exec -it &lt;container&gt; cross-seed reset-user</code>
-                  ).
+                  Forgot password? Run{' '}
+                  <code>{resetCommand}</code>{' '}
+                  .
                 </p>
               )}
             </div>
