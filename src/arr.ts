@@ -2,8 +2,8 @@ import chalk from "chalk";
 import ms from "ms";
 import { join as posixJoin } from "node:path/posix";
 import { URLSearchParams } from "node:url";
+import type { Problem } from "./problems.js";
 import { MediaType, SCENE_TITLE_REGEX, USER_AGENT } from "./constants.js";
-import { CrossSeedError } from "./errors.js";
 import { Caps } from "./indexers.js";
 import { Label, logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -52,59 +52,6 @@ interface ParsedSeries {
 }
 
 export type ParsedMedia = ParsedMovie | ParsedSeries;
-
-export async function validateUArrLs() {
-	const { sonarr, radarr } = getRuntimeConfig();
-
-	if (sonarr) {
-		const urls: URL[] = sonarr.map((str) => new URL(str));
-		for (const url of urls) {
-			if (!url.searchParams.has("apikey")) {
-				throw new CrossSeedError(
-					`Sonarr url ${url} does not specify an apikey`,
-				);
-			}
-			await checkArrIsActive(url.href, "Sonarr");
-		}
-	}
-	if (radarr) {
-		const urls: URL[] = radarr.map((str) => new URL(str));
-		for (const url of urls) {
-			if (!url.searchParams.has("apikey")) {
-				throw new CrossSeedError(
-					`Radarr url ${url} does not specify an apikey`,
-				);
-			}
-			await checkArrIsActive(url.href, "Radarr");
-		}
-	}
-}
-
-async function checkArrIsActive(uArrL: string, arrInstance: string) {
-	const arrPingCheck = await makeArrApiCall<{
-		current: string;
-	}>(uArrL, "/api");
-
-	if (arrPingCheck.isOk()) {
-		const arrPingResponse = arrPingCheck.unwrap();
-		if (!arrPingResponse?.current) {
-			throw new CrossSeedError(
-				`Failed to establish a connection to ${arrInstance} URL: ${uArrL}`,
-			);
-		}
-	} else {
-		const error = arrPingCheck.unwrapErr();
-		throw new CrossSeedError(
-			`Could not contact ${arrInstance} at ${uArrL}`,
-			{
-				cause:
-					error.message.includes("fetch failed") && error.cause
-						? error.cause
-						: error,
-			},
-		);
-	}
-}
 
 function getBodySampleMessage(text: string): string {
 	const first1000Chars = text.substring(0, 1000);
@@ -296,4 +243,137 @@ export function getRelevantArrIds(
 		imdbid: idSearchCaps.imdbId ? ids.imdbId : undefined,
 		tvmazeid: idSearchCaps.tvMazeId ? ids.tvMazeId : undefined,
 	};
+}
+
+type ArrKind = "Sonarr" | "Radarr";
+
+function sanitizeDisplayUrl(url: URL): string {
+	return `${url.origin}${url.pathname}`;
+}
+
+function normalizeArrBaseUrl(rawUrl: string): string {
+	const parsedUrl = new URL(rawUrl);
+	parsedUrl.pathname = parsedUrl.pathname.replace(/\/api\/?$/, "") || "/";
+	return parsedUrl.toString();
+}
+
+function arrProblemId(kind: ArrKind, category: string, index: number): string {
+	return `arr:${kind.toLowerCase()}:${category}:${index}`;
+}
+
+async function checkArrUrl(
+	rawUrl: string,
+	index: number,
+	kind: ArrKind,
+): Promise<Problem[]> {
+	const problems: Problem[] = [];
+	let parsedUrl: URL;
+
+	try {
+		parsedUrl = new URL(rawUrl);
+	} catch (error) {
+		const message =
+			error instanceof Error
+				? error.message
+				: String(error ?? "Unknown error");
+		problems.push({
+			id: arrProblemId(kind, "invalid-url", index),
+			severity: "error",
+			summary: `${kind} URL ${index + 1} is invalid.`,
+			details: message,
+		});
+		return problems;
+	}
+
+	const displayUrl = sanitizeDisplayUrl(parsedUrl);
+
+	const apiKey = parsedUrl.searchParams.get("apikey");
+	if (!apiKey) {
+		problems.push({
+			id: arrProblemId(kind, "missing-apikey", index),
+			severity: "error",
+			summary: `${kind} URL is missing an apikey parameter.`,
+			details: `Add ?apikey=<KEY> (or &apikey when other parameters exist) to ${displayUrl}.`,
+		});
+		return problems;
+	}
+
+	try {
+		const result = await makeArrApiCall<{ current?: unknown }>(
+			normalizeArrBaseUrl(rawUrl),
+			"/api",
+		);
+
+		if (result.isOk()) {
+			const body = result.unwrap();
+			if (
+				typeof body?.current !== "string" ||
+				body.current.length === 0
+			) {
+				problems.push({
+					id: arrProblemId(kind, "unexpected-response", index),
+					severity: "warning",
+					summary: `${kind} at ${displayUrl} returned an unexpected response.`,
+					details:
+						"cross-seed expected a version string from /api but received something else.",
+				});
+			}
+		} else {
+			const error = result.unwrapErr();
+			problems.push({
+				id: arrProblemId(kind, "http-error", index),
+				severity: "error",
+				summary: `${kind} at ${displayUrl} could not be reached.`,
+				details: error.message,
+			});
+		}
+	} catch (error) {
+		const message =
+			error instanceof Error
+				? error.message
+				: String(error ?? "Unknown error");
+		const isAbort =
+			typeof error === "object" &&
+			error !== null &&
+			"name" in error &&
+			(error as { name?: string }).name === "TimeoutError";
+		problems.push({
+			id: arrProblemId(kind, "network-error", index),
+			severity: "error",
+			summary: `${kind} at ${displayUrl} could not be reached.`,
+			details: isAbort
+				? "The request timed out after 30 seconds."
+				: message,
+		});
+	}
+
+	return problems;
+}
+
+export async function collectArrProblems(): Promise<Problem[]> {
+	const { sonarr = [], radarr = [] } = getRuntimeConfig();
+	const problems: Problem[] = [];
+	const hasSonarr = Array.isArray(sonarr) && sonarr.length > 0;
+	const hasRadarr = Array.isArray(radarr) && radarr.length > 0;
+
+	if (!hasSonarr && !hasRadarr) {
+		problems.push({
+			id: "arr:not-configured",
+			severity: "info",
+			summary: "Sonarr/Radarr integrations are not configured.",
+			details: "Configure Arr URLs for more accurate tracker searches.",
+		});
+		return problems;
+	}
+
+	await Promise.all([
+		...sonarr.map((url, index) => checkArrUrl(url, index, "Sonarr")),
+		...radarr.map((url, index) => checkArrUrl(url, index, "Radarr")),
+	]).then((results) => {
+		for (const arrProblems of results) {
+			problems.push(...arrProblems);
+		}
+	});
+
+	return problems;
 }

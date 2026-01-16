@@ -1,4 +1,5 @@
 import chalk, { ChalkInstance } from "chalk";
+import type { Stats } from "fs";
 import { distance } from "fastest-levenshtein";
 import {
 	access,
@@ -67,64 +68,110 @@ export async function notExists(srcPath: string): Promise<boolean> {
 	}
 }
 
+export type DirVerificationFailureReason =
+	| "missing"
+	| "not-directory"
+	| "unreadable"
+	| "unwritable";
+
+export type DirVerificationResult =
+	| { ok: true; stats: Stats }
+	| { ok: false; reason: DirVerificationFailureReason; error?: unknown };
+
 export async function verifyDir(
 	srcDir: string,
 	testSrcName: string,
 	permissions: number,
-): Promise<boolean> {
+): Promise<DirVerificationResult> {
+	const logMissing = (message: string) => {
+		logger.error(
+			`\tYour ${testSrcName} "${srcDir}" is not a valid directory on the filesystem: ${message}.`,
+		);
+		if (
+			path.sep === "\\" &&
+			!srcDir.includes("\\") &&
+			!srcDir.includes("/")
+		) {
+			logger.error(
+				"\tIt may not be formatted properly for Windows.\n" +
+					'\t\t\t\tMake sure to use "\\\\" or "/" for directory separators.',
+			);
+		}
+	};
+
+	const logPermissions = (message: string) => {
+		logger.error(
+			`\tYour ${testSrcName} "${srcDir}" has invalid permissions: ${message}.`,
+		);
+	};
+
+	if (await notExists(srcDir)) {
+		logMissing("does not exist.");
+		return { ok: false, reason: "missing" };
+	}
+
+	let stats: Stats;
 	try {
-		if (await notExists(srcDir)) {
-			throw new Error("does not exist");
+		stats = await stat(srcDir);
+	} catch (error) {
+		const err = error as NodeJS.ErrnoException;
+		if (err?.code === "ENOENT") {
+			logMissing(err.message ?? "does not exist.");
+			return { ok: false, reason: "missing", error };
 		}
-		if (!(await stat(srcDir)).isDirectory()) {
-			throw new Error("not a directory");
-		}
-		if (permissions & constants.R_OK) {
-			try {
-				await readdir(srcDir);
-			} catch (e) {
-				logger.debug(e);
-				throw new Error("no read permissions");
-			}
-		}
-		if (permissions & constants.W_OK) {
-			const tempFile = path.join(srcDir, testSrcName);
-			try {
-				await writeFile(tempFile, testSrcName);
-				if (await notExists(tempFile)) {
-					throw new Error(
-						"no write permissions - could not verify test file",
-					);
-				}
-				await unlink(tempFile);
-			} catch (e) {
-				logger.debug(e);
-				throw new Error("no write permissions");
-			}
-		}
-		return true;
-	} catch (e) {
-		if (e.code === "ENOENT") {
-			logger.error(
-				`\tYour ${testSrcName} "${srcDir}" is not a valid directory on the filesystem: ${e.message}.`,
-			);
-			if (
-				path.sep === "\\" &&
-				!srcDir.includes("\\") &&
-				!srcDir.includes("/")
-			) {
-				logger.error(
-					"\tIt may not be formatted properly for Windows.\n" +
-						'\t\t\t\tMake sure to use "\\\\" or "/" for directory separators.',
-				);
-			}
-		} else {
-			logger.error(
-				`\tYour ${testSrcName} "${srcDir}" has invalid permissions: ${e.message}.`,
-			);
+		logPermissions(err?.message ?? "stat failed.");
+		return { ok: false, reason: "unreadable", error };
+	}
+
+	if (!stats.isDirectory()) {
+		logger.error(
+			`\tYour ${testSrcName} "${srcDir}" is not a directory on the filesystem.`,
+		);
+		return { ok: false, reason: "not-directory" };
+	}
+
+	if (permissions & constants.R_OK) {
+		try {
+			await readdir(srcDir);
+		} catch (error) {
+			logger.debug(error);
+			logPermissions("no read permissions.");
+			return { ok: false, reason: "unreadable", error };
 		}
 	}
-	return false;
+
+	if (permissions & constants.W_OK) {
+		const tempFile = path.join(srcDir, testSrcName);
+		try {
+			await writeFile(tempFile, testSrcName);
+			if (await notExists(tempFile)) {
+				logPermissions(
+					"no write permissions - could not verify test file.",
+				);
+				return { ok: false, reason: "unwritable" };
+			}
+			await unlink(tempFile);
+		} catch (error) {
+			logger.debug(error);
+			logPermissions("no write permissions.");
+			return { ok: false, reason: "unwritable", error };
+		}
+	}
+
+	return { ok: true, stats };
+}
+
+export function isChildPath(childPath: string, parentDirs: string[]): boolean {
+	return parentDirs.some((parentDir) => {
+		const resolvedParent = path.resolve(parentDir);
+		const resolvedChild = path.resolve(childPath);
+		const relativePath = path.relative(resolvedParent, resolvedChild);
+		return (
+			relativePath.length > 0 &&
+			!relativePath.startsWith("..") &&
+			!path.isAbsolute(relativePath)
+		);
+	});
 }
 
 export async function countDirEntriesRec(

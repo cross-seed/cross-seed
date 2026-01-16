@@ -10,6 +10,11 @@ import rss from "./08-rss.js";
 import clientAndDataSearchees from "./09-clientAndDataSearchees.js";
 import indexerNameAudioBookCaps from "./10-indexerNameAudioBookCaps.js";
 import trackers from "./11-trackers.js";
+import userAuth from "./12-user-auth.js";
+import settings from "./13-settings.js";
+import indexerEnabledFlag from "./14-indexer-enabled-flag.js";
+import removeUrlUniqueConstraint from "./15-remove-url-unique-constraint.js";
+import pruneInactiveIndexers from "./16-prune-inactive-indexers.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -26,6 +31,11 @@ export const migrations = {
 			clientAndDataSearchees,
 			indexerNameAudioBookCaps,
 			trackers,
+			userAuth,
+			settings,
+			indexerEnabledFlag,
+			removeUrlUniqueConstraint,
+			pruneInactiveIndexers,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,

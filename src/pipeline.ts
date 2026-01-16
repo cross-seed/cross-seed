@@ -1,6 +1,9 @@
 import chalk from "chalk";
 import { stat } from "fs/promises";
-import { zip } from "lodash-es";
+// Utility function to replace lodash zip
+function zip<T, U, V>(arr1: T[], arr2: U[], arr3: V[]): [T, U, V][] {
+	return arr1.map((item, index) => [item, arr2[index], arr3[index]]);
+}
 import ms from "ms";
 import { basename } from "path";
 import { performAction, performActions } from "./action.js";
@@ -24,7 +27,7 @@ import {
 	ResultAssessment,
 } from "./decide.js";
 import {
-	getActiveIndexers,
+	getAllIndexers,
 	IndexerStatus,
 	updateIndexerStatus,
 	updateSearchTimestamps,
@@ -64,6 +67,7 @@ import {
 	queryRssFeeds,
 	searchTorznab,
 } from "./torznab.js";
+import { getEnabledIndexers } from "./indexers.js";
 import {
 	AsyncSemaphore,
 	comparing,
@@ -179,13 +183,13 @@ async function findOnOtherSites(
 		options,
 	);
 
-	const activeIndexers = await getActiveIndexers();
+	const allIndexers = await getAllIndexers();
 	const rateLimitedNames = new Set<string>();
 	const { rateLimited, notRateLimited } = assessments.reduce(
 		(acc, cur, idx) => {
 			const candidate = candidates[idx];
 			if (cur.assessment.decision === Decision.RATE_LIMITED) {
-				const indexer = activeIndexers.find(
+				const indexer = allIndexers.find(
 					(i) => i.id === candidate.indexerId,
 				)!;
 				rateLimitedNames.add(indexer.name ?? indexer.url);
@@ -811,8 +815,11 @@ async function findSearchableTorrents(options?: {
 export async function bulkSearch(options?: {
 	configOverride: Partial<RuntimeConfig>;
 }): Promise<void> {
+	const searchOptions = options?.configOverride
+		? { configOverride: options.configOverride }
+		: undefined;
 	const { searchees, infoHashesToExclude } =
-		await findSearchableTorrents(options);
+		await findSearchableTorrents(searchOptions);
 
 	const totalFound = await findMatchesBatch(
 		searchees,
@@ -832,17 +839,76 @@ export async function bulkSearch(options?: {
 	});
 }
 
+export async function bulkSearchByNames(
+	names: string[],
+	options?: { configOverride?: Partial<RuntimeConfig> },
+): Promise<{ attempted: number; totalFound: number; requested: number }> {
+	const normalizedNames = Array.from(
+		new Set(
+			names
+				.map((name) => name.trim())
+				.filter((name) => name.length > 0 && name.length <= 500),
+		),
+	);
+
+	if (!normalizedNames.length) {
+		return { attempted: 0, totalFound: 0, requested: 0 };
+	}
+
+	const nameSet = new Set(normalizedNames);
+	const searchOptions = options?.configOverride
+		? { configOverride: options.configOverride }
+		: undefined;
+	const { searchees, infoHashesToExclude } =
+		await findSearchableTorrents(searchOptions);
+
+	const selectedSearchees = searchees.filter((searchee) => {
+		const titleOrName = searchee.title ?? searchee.name;
+		return titleOrName ? nameSet.has(titleOrName) : false;
+	});
+
+	if (!selectedSearchees.length) {
+		logger.warn({
+			label: Label.SEARCH,
+			message: `Manual bulk search requested for ${normalizedNames.length} items, but none were eligible after filtering`,
+		});
+		return {
+			attempted: 0,
+			totalFound: 0,
+			requested: normalizedNames.length,
+		};
+	}
+
+	logger.info({
+		label: Label.SEARCH,
+		message: `Starting manual bulk search for ${selectedSearchees.length}/${normalizedNames.length} selected items`,
+	});
+
+	const totalFound = await findMatchesBatch(
+		selectedSearchees,
+		infoHashesToExclude,
+		searchOptions,
+	);
+
+	return {
+		attempted: selectedSearchees.length,
+		totalFound,
+		requested: normalizedNames.length,
+	};
+}
+
 export async function scanRssFeeds() {
-	const { dataDirs, torrentDir, torznab, useClientTorrents } =
-		getRuntimeConfig();
+	const { dataDirs, torrentDir, useClientTorrents } = getRuntimeConfig();
+	await indexTorrentsAndDataDirs();
+	const enabledIndexers = await getEnabledIndexers();
 	if (
-		!torznab.length ||
+		!enabledIndexers.length ||
 		(!useClientTorrents && !torrentDir && !dataDirs.length)
 	) {
-		logger.error({
+		logger.warn({
 			label: Label.RSS,
 			message:
-				"RSS requires torznab and at least one of useClientTorrents, torrentDir, or dataDirs to be set",
+				"RSS requires enabled indexers and at least one of useClientTorrents, torrentDir, or dataDirs to be set",
 		});
 		return;
 	}
@@ -854,12 +920,15 @@ export async function scanRssFeeds() {
 	const lastRun = (await getJobLastRun(JobName.RSS)) ?? 0;
 	await indexTorrentsAndDataDirs();
 	let numCandidates = 0;
-	await mapAsync(await queryRssFeeds(lastRun), async (candidates) => {
-		for await (const candidate of candidates) {
-			await checkNewCandidateMatch(candidate, Label.RSS);
-			numCandidates++;
-		}
-	});
+	await mapAsync(
+		await queryRssFeeds(lastRun, enabledIndexers),
+		async (candidates) => {
+			for await (const candidate of candidates) {
+				await checkNewCandidateMatch(candidate, Label.RSS);
+				numCandidates++;
+			}
+		},
+	);
 
 	logger.info({
 		label: Label.RSS,

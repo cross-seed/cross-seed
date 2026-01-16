@@ -1,3 +1,4 @@
+import type { Problem } from "./problems.js";
 import { db } from "./db.js";
 import { Label, logger } from "./logger.js";
 import { humanReadableDate } from "./utils.js";
@@ -18,9 +19,12 @@ export interface DbIndexer {
 	apikey: string;
 	trackers: string | null;
 	/**
-	 * Whether the indexer is currently specified in config
+	 * When false, the indexer has been disabled by the user and should not be
+	 * used for searching or RSS, but can be used for fetching caps or
+	 * cross-seed restore.
+	 * Corresponds to indexer enabled bit in Prowlarr.
 	 */
-	active: boolean;
+	enabled: boolean;
 	status: IndexerStatus;
 	retryAfter: number;
 	searchCap: boolean;
@@ -79,10 +83,7 @@ export interface Indexer {
 	url: string;
 	apikey: string;
 	trackers: string[] | null;
-	/**
-	 * Whether the indexer is currently specified in config
-	 */
-	active: boolean;
+	enabled: boolean;
 	status: IndexerStatus;
 	retryAfter: number;
 	searchCap: boolean;
@@ -103,7 +104,7 @@ const allFields = {
 	name: "name",
 	apikey: "apikey",
 	trackers: "trackers",
-	active: "active",
+	enabled: "enabled",
 	status: "status",
 	retryAfter: "retry_after",
 	searchCap: "search_cap",
@@ -152,11 +153,18 @@ export const ALL_CAPS: Caps = {
 	},
 };
 
-function deserialize(dbIndexer: DbIndexer): Indexer {
+export function deserialize(dbIndexer: DbIndexer): Indexer {
 	const { trackers, tvIdCaps, movieIdCaps, catCaps, limitsCaps, ...rest } =
 		dbIndexer;
 	return {
 		...rest,
+		enabled: Boolean(rest.enabled),
+		searchCap: Boolean(rest.searchCap),
+		tvSearchCap: Boolean(rest.tvSearchCap),
+		movieSearchCap: Boolean(rest.movieSearchCap),
+		musicSearchCap: Boolean(rest.musicSearchCap),
+		audioSearchCap: Boolean(rest.audioSearchCap),
+		bookSearchCap: Boolean(rest.bookSearchCap),
 		trackers: JSON.parse(trackers ?? "null"),
 		tvIdCaps: JSON.parse(tvIdCaps ?? "null"),
 		movieIdCaps: JSON.parse(movieIdCaps ?? "null"),
@@ -166,23 +174,14 @@ function deserialize(dbIndexer: DbIndexer): Indexer {
 }
 
 /**
- * All indexers in the database, regardless of whether they are currently configured or working.
+ * All indexers that users currently have configured regardless of whether they are working.
  */
 export async function getAllIndexers(): Promise<Indexer[]> {
 	return (await db("indexer").select(allFields)).map(deserialize);
 }
 
 /**
- * All indexers that users currently have configured regardless of whether they are working.
- */
-export async function getActiveIndexers(): Promise<Indexer[]> {
-	return (await db("indexer").where({ active: true }).select(allFields)).map(
-		deserialize,
-	);
-}
-
-/**
- * Indexers that are currently working.
+ * Indexers that are currently working and enabled.
  */
 export async function getEnabledIndexers(): Promise<Indexer[]> {
 	return (
@@ -199,7 +198,7 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 				cat_caps: null,
 				limits_caps: null,
 			})
-			.where({ active: true, search_cap: true })
+			.where({ enabled: true, search_cap: true })
 			.where((i) =>
 				i
 					.where({ status: null })
@@ -238,10 +237,10 @@ export async function updateSearchTimestamps(
 	for (const indexerId of indexerIds) {
 		await db.transaction(async (trx) => {
 			const now = Date.now();
-			const { id: searchee_id } = await trx("searchee")
+			const { id: searchee_id } = (await trx("searchee")
 				.where({ name })
 				.select("id")
-				.first();
+				.first())!;
 
 			await trx("timestamp")
 				.insert({
@@ -251,7 +250,7 @@ export async function updateSearchTimestamps(
 					first_searched: now,
 				})
 				.onConflict(["searchee_id", "indexer_id"])
-				.merge(["searchee_id", "indexer_id", "last_searched"]);
+				.merge(["last_searched"] as const);
 		});
 	}
 }
@@ -290,4 +289,90 @@ export async function getHostToNameMap(): Promise<Map<string, string>> {
 		}
 	}
 	return hostToName;
+}
+
+function indexerProblemId(suffix: string, indexerId: number | string): string {
+	return `indexer:${suffix}:${indexerId}`;
+}
+
+function indexerDisplayName(url: string, name: string | null): string {
+	return name?.trim() || url;
+}
+
+export async function collectIndexerProblems(): Promise<Problem[]> {
+	const problems: Problem[] = [];
+	const indexers = await getAllIndexers();
+
+	if (!indexers.length) {
+		problems.push({
+			id: "indexer:none-configured",
+			severity: "error",
+			summary: "No indexers configured.",
+			details:
+				"Add at least one indexer so cross-seed can search for releases.",
+		});
+		return problems;
+	}
+
+	const enabledIndexers = await getEnabledIndexers();
+	if (!enabledIndexers.length) {
+		problems.push({
+			id: "indexer:none-enabled",
+			severity: "error",
+			summary: "All configured indexers are disabled.",
+			details:
+				"Enable at least one indexer so cross-seed can run searches.",
+		});
+	}
+
+	const now = Date.now();
+
+	for (const indexer of indexers) {
+		const name = indexerDisplayName(indexer.url, indexer.name);
+
+		if (!indexer.searchCap) {
+			problems.push({
+				id: indexerProblemId("no-search-cap", indexer.id),
+				severity: "warning",
+				summary: `Indexer "${name}" does not support searching.`,
+				details:
+					"Update the indexer's capabilities (caps) in Prowlarr/Jackett or disable it for searching.",
+			});
+		}
+
+		if (
+			indexer.status === IndexerStatus.RATE_LIMITED &&
+			typeof indexer.retryAfter === "number" &&
+			indexer.retryAfter > now
+		) {
+			problems.push({
+				id: indexerProblemId("rate-limited", indexer.id),
+				severity: "warning",
+				summary: `Indexer "${name}" is rate limited.`,
+				details: `Cross-seed will retry after ${humanReadableDate(indexer.retryAfter)}.`,
+			});
+		}
+
+		if (indexer.status === IndexerStatus.UNKNOWN_ERROR) {
+			problems.push({
+				id: indexerProblemId("unknown-error", indexer.id),
+				severity: "warning",
+				summary: `Indexer "${name}" recently failed.`,
+				details:
+					"Check logs for the underlying error and verify the indexer configuration.",
+			});
+		}
+
+		if (!indexer.enabled) {
+			problems.push({
+				id: indexerProblemId("disabled", indexer.id),
+				severity: "info",
+				summary: `Indexer "${name}" is disabled.`,
+				details:
+					"Re-enable the indexer if you want cross-seed to include it in searches.",
+			});
+		}
+	}
+
+	return problems;
 }

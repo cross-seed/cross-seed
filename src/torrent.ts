@@ -6,9 +6,8 @@ import { inspect } from "util";
 import {
 	getClients,
 	TorrentMetadataInClient,
-	validateClientSavePaths,
 } from "./clients/TorrentClient.js";
-import { isChildPath } from "./configSchema.js";
+import { isChildPath } from "./utils.js";
 import {
 	ALL_PARENTHESES_REGEX,
 	ALL_SPACES_REGEX,
@@ -452,7 +451,10 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 
 	if (options.startup) {
 		if (torrentDir) {
-			logger.info("Indexing torrentDir for reverse lookup...");
+			logger.info({
+				label: Label.INDEX,
+				message: "Indexing torrentDir for reverse lookup...",
+			});
 			searchees = await loadTorrentDirLight(torrentDir);
 			if (clients.length) {
 				infoHashPathMap = await clients[0].getAllDownloadDirs({
@@ -460,12 +462,6 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 					onlyCompleted: false,
 					v1HashOnly: true,
 				});
-				await validateClientSavePaths(
-					searchees,
-					infoHashPathMap,
-					clients[0].label,
-					clients[0].clientPriority,
-				);
 			}
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
@@ -474,15 +470,6 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 					includeFiles: true,
 					includeTrackers: true,
 				});
-				await validateClientSavePaths(
-					searchees,
-					searchees.reduce((map, searchee) => {
-						map.set(searchee.infoHash, searchee.savePath);
-						return map;
-					}, new Map<string, string>()),
-					client.label,
-					client.clientPriority,
-				);
 				return searchees;
 			});
 		}
@@ -534,7 +521,10 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 			meta = await parseTorrentFromPath(filePath);
 		} catch (e) {
 			logOnce(`Failed to parse ${filePath}`, () => {
-				logger.error(`Failed to parse ${filePath}`);
+				logger.error({
+					label: Label.INDEX,
+					message: `Failed to parse ${filePath}`,
+				});
 				logger.debug(e);
 			});
 			continue;
@@ -637,12 +627,15 @@ export async function indexTorrentsAndDataDirs(
 					await indexTorrents(options); // Run second so this data is more fresh
 					break;
 				} catch (e) {
-					const msg = `Indexing failed (${maxRetries - attempt}): ${e.message}`;
+					const log = {
+						label: Label.INDEX,
+						message: `Indexing failed (${maxRetries - attempt}): ${e.message}`,
+					};
 					logger.debug(e);
 					if (attempt < maxRetries) {
-						logger.verbose(msg);
+						logger.verbose(log);
 					} else {
-						logger.error(msg);
+						logger.error(log);
 						if (options.startup) throw e;
 					}
 				}
@@ -654,11 +647,7 @@ export async function indexTorrentsAndDataDirs(
 export async function getInfoHashesToExclude(): Promise<Set<string>> {
 	const { useClientTorrents } = getRuntimeConfig();
 	const database = useClientTorrents ? db("client_searchee") : db("torrent");
-	return new Set(
-		(await database.select({ infoHash: "info_hash" })).map(
-			(e) => e.infoHash,
-		),
-	);
+	return new Set((await database.select("*")).map((e) => e.info_hash));
 }
 
 export async function loadTorrentDirLight(
