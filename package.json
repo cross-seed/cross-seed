@@ -14,7 +14,7 @@
 		"build": "npm run build:backend",
 		"build:backend": "tsc -b tsconfig.json",
 		"build:webui": "cd packages/webui && npm run build",
-		"copy:webui": "rimraf dist/webui && cp -r packages/webui/dist dist/webui",
+		"copy:webui": "rimraf dist/webui && mkdir -p dist && cp -r packages/webui/dist dist/webui",
 		"build:api-types": "tsc -b packages/api-types/tsconfig.json",
 		"build:all": "npm run build:backend && npm run build:api-types && npm run build:webui && npm run copy:webui",
 		"watch": "tsc -b --watch --preserveWatchOutput",
