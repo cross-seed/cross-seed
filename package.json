@@ -22,7 +22,7 @@
 		"dev:backend": "node --watch dist/cmd.js daemon",
 		"dev:frontend": "cd packages/webui && npm run dev",
 		"prepare": "node -e \"const fs=require('fs'); if(!fs.existsSync('.git')) process.exit(0); require('child_process').execSync('husky install',{stdio:'inherit'})\"",
-		"prepublishOnly": "rimraf dist && npm run build:all && husky install",
+		"prepublishOnly": "rimraf dist tsconfig.tsbuildinfo packages/shared/tsconfig.tsbuildinfo packages/api-types/tsconfig.tsbuildinfo && npm run build:all",
 		"lint": "concurrently --names \"Prettier,ESLint\" \"prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\"",
 		"typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.tests.json",
 		"format": "prettier --write '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' package.json"
