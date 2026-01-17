@@ -36,6 +36,9 @@
 	"files": [
 		"dist/"
 	],
+	"bundledDependencies": [
+		"@cross-seed/shared"
+	],
 	"type": "module",
 	"repository": {
 		"type": "git",
