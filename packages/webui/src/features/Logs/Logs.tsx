@@ -29,7 +29,13 @@ export function Logs() {
   const [levelFilters, setLevelFilters] = useState<Set<string>>(
     new Set(['error', 'warn', 'info', 'verbose', 'debug']),
   );
-  const [isReversed, setIsReversed] = useState(false);
+  const [isReversed, setIsReversed] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    const storedValue = window.localStorage.getItem('logs:newest-first');
+    return storedValue === 'true';
+  });
   const [labelFilters, setLabelFilters] = useState<Set<string>>(new Set());
   const trpc = useTRPC();
   const tableRef = useRef<HTMLTableElement>(null);
@@ -76,6 +82,10 @@ export function Logs() {
       });
     }
   }, [logs, isAtBottom]);
+
+  useEffect(() => {
+    window.localStorage.setItem('logs:newest-first', String(isReversed));
+  }, [isReversed]);
 
   // Get unique labels from logs
   const uniqueLabels = useMemo(() => {
