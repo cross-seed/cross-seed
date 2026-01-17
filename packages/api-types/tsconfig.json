@@ -16,11 +16,11 @@
 		"resolveJsonModule": true,
 		"sourceMap": true,
 		"strictNullChecks": true,
-		"baseUrl": "../..",
+		"baseUrl": ".",
 		"paths": {
-			"@cross-seed/backend/*": ["dist/*"]
+			"@cross-seed/backend/*": ["../cross-seed/dist/*"]
 		}
 	},
-	"references": [{ "path": "../../tsconfig.json" }],
+	"references": [{ "path": "../cross-seed/tsconfig.json" }],
 	"include": ["./src/**/*"]
 }

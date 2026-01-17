@@ -15,10 +15,10 @@
 		"composite": true,
 		"baseUrl": ".",
 		"paths": {
-			"@cross-seed/shared/*": ["packages/shared/src/*"],
-			"@cross-seed/api-types": ["packages/api-types/dist/index.d.ts"]
+			"@cross-seed/shared/*": ["../shared/src/*"],
+			"@cross-seed/api-types": ["../api-types/dist/index.d.ts"]
 		}
 	},
 	"include": ["./src/**/*"],
-	"references": [{ "path": "packages/shared/tsconfig.json" }]
+	"references": [{ "path": "../shared/tsconfig.json" }]
 }

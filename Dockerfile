@@ -1,16 +1,17 @@
 # Build layer
 FROM node:24-alpine AS build
 WORKDIR /usr/src/app
-COPY package*.json tsconfig.json ./
+COPY package*.json ./
+COPY packages/cross-seed/package*.json packages/cross-seed/tsconfig*.json ./packages/cross-seed/
 COPY packages/shared/package*.json packages/shared/tsconfig.json ./packages/shared/
 COPY packages/api-types/package*.json packages/api-types/tsconfig.json ./packages/api-types/
 COPY packages/webui/package*.json packages/webui/tsconfig*.json ./packages/webui/
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
-RUN npm ci --workspaces --include-workspace-root --no-fund
+RUN npm ci --workspaces --no-fund
 COPY packages/shared packages/shared
 COPY packages/api-types packages/api-types
 COPY packages/webui packages/webui
-COPY src src
+COPY packages/cross-seed packages/cross-seed
 RUN npm run build:all && npm prune --omit=dev
 
 # Runtime layer
@@ -22,8 +23,8 @@ COPY --from=build /usr/src/app/package*.json ./
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/packages/shared ./packages/shared
 COPY --from=build /usr/src/app/packages/api-types ./packages/api-types
-COPY --from=build /usr/src/app/dist ./dist
-RUN npm link
+COPY --from=build /usr/src/app/packages/cross-seed ./packages/cross-seed
+RUN npm link ./packages/cross-seed
 ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
 EXPOSE 2468

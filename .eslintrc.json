@@ -13,7 +13,7 @@
 	],
 	"parserOptions": {
 		"ecmaVersion": 2022,
-		"project": "./tsconfig.eslint.json"
+		"project": "./packages/cross-seed/tsconfig.eslint.json"
 	},
 	"rules": {
 		"no-mixed-spaces-and-tabs": "off",

@@ -7,16 +7,17 @@
 4. run npm install
 5. start coding :)
 
-the code is in `/src`. `cmd.js` is the entrypoint, `pipeline.js` is the
-interesting high level functions (doRss, etc...)
+the code is in `/packages/cross-seed/src`. `cmd.js` is the entrypoint,
+`pipeline.js` is the interesting high level functions (doRss, etc...)
 
 # Build and Run
 
-`npm run build` will compile the typescript files into javascript files in /dist
-`npm run watch` will compile, then incrementally compile when files change the
-`cross-seed` command is an alias for `node dist/cmd.js`, as in
-`node dist/cmd.js daemon` but it's annoying to use the cross-seed alias while
-developing so i use a lot of ctrl-R with fzf
+`npm run build` will compile the typescript files into javascript files in
+`/packages/cross-seed/dist` `npm run watch` will compile, then incrementally
+compile when files change the `cross-seed` command is an alias for
+`node packages/cross-seed/dist/cmd.js`, as in
+`node packages/cross-seed/dist/cmd.js daemon` but it's annoying to use the
+cross-seed alias while developing so i use a lot of ctrl-R with fzf
 
 # Testing
 
@@ -46,8 +47,9 @@ npx np
 ```
 
 If there's a new typescript file, it'll tell you it won't be included. That's
-correct - the typescript files in `src` aren't included, but they compile down
-to javascript files in `dist` which _are_ included.
+correct - the typescript files in `packages/cross-seed/src` aren't included, but
+they compile down to javascript files in `packages/cross-seed/dist` which _are_
+included.
 
 It'll ask you if you want to increment patch, minor, or major version. I think
 I'd say _don't bump major_ unless we've talked about it in `#development`. Minor
