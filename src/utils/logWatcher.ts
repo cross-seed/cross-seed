@@ -175,7 +175,7 @@ class LogWatcher {
 		if (match) {
 			const [, timestamp, level, label, message] = match;
 			return {
-				timestamp,
+				timestamp: new Date(timestamp).toISOString(),
 				level,
 				label: label || undefined,
 				message: message.trim(),
