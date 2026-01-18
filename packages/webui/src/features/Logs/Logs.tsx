@@ -1,3 +1,4 @@
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label.tsx';
 import { Separator } from '@/components/ui/separator.tsx';
@@ -120,6 +121,10 @@ export function Logs() {
     return ret;
   }, [logs, isReversed, levelFilters, labelFilters]);
 
+  const { data: settings } = useSuspenseQuery(
+    trpc.settings.get.queryOptions(),
+  );
+
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-stretch justify-between gap-4">
@@ -129,29 +134,28 @@ export function Logs() {
               <Badge
                 key={level}
                 variant={levelFilters.has(level) ? 'default' : 'outline'}
-                className={`hover:bg-muted cursor-pointer select-none ${
-                  level === 'error'
+                className={`hover:bg-muted cursor-pointer select-none ${level === 'error'
+                  ? levelFilters.has(level)
+                    ? 'bg-red-500 hover:bg-red-600'
+                    : 'border-red-200 text-red-500'
+                  : level === 'warn'
                     ? levelFilters.has(level)
-                      ? 'bg-red-500 hover:bg-red-600'
-                      : 'border-red-200 text-red-500'
-                    : level === 'warn'
+                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                      : 'border-yellow-200 text-yellow-500'
+                    : level === 'info'
                       ? levelFilters.has(level)
-                        ? 'bg-yellow-500 hover:bg-yellow-600'
-                        : 'border-yellow-200 text-yellow-500'
-                      : level === 'info'
+                        ? 'bg-blue-500 hover:bg-blue-600'
+                        : 'border-blue-200 text-blue-500'
+                      : level === 'verbose'
                         ? levelFilters.has(level)
-                          ? 'bg-blue-500 hover:bg-blue-600'
-                          : 'border-blue-200 text-blue-500'
-                        : level === 'verbose'
+                          ? 'bg-gray-500 hover:bg-gray-600'
+                          : 'border-gray-200 text-gray-500'
+                        : level === 'debug'
                           ? levelFilters.has(level)
-                            ? 'bg-gray-500 hover:bg-gray-600'
-                            : 'border-gray-200 text-gray-500'
-                          : level === 'debug'
-                            ? levelFilters.has(level)
-                              ? 'bg-purple-500 hover:bg-purple-600'
-                              : 'border-purple-200 text-purple-500'
-                            : ''
-                }`}
+                            ? 'bg-purple-500 hover:bg-purple-600'
+                            : 'border-purple-200 text-purple-500'
+                          : ''
+                  }`}
                 onClick={() => {
                   setLevelFilters((prev) => {
                     const newFilters = new Set(prev);
@@ -219,9 +223,11 @@ export function Logs() {
                 >
                   <TableCell
                     className="font-mono text-xs"
-                    title={new Date(log.timestamp).toLocaleString()}
+                    title={new Date(log.timestamp).toLocaleString(undefined, {
+                      timeZone: settings.timeZone,
+                    })}
                   >
-                    {formatRelativeTime(log.timestamp)}
+                    {formatRelativeTime(log.timestamp, settings.timeZone)}
                   </TableCell>
                   <TableCell className="py-1">
                     <Badge

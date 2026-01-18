@@ -20,6 +20,9 @@ export const settingsRouter = router({
 			return {
 				config: runtimeConfig,
 				apikey,
+				timeZone:
+					process.env.TZ ||
+					Intl.DateTimeFormat().resolvedOptions().timeZone,
 			};
 		} catch (error) {
 			logger.error({ label: Label.SERVER, message: error.message });

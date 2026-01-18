@@ -132,9 +132,15 @@ function TrackerSettings() {
     }),
   );
 
+  const { data: settings } = useSuspenseQuery(
+    trpc.settings.get.queryOptions(),
+  );
+
   const formatRetryAfter = (retryAfter: number) => {
     const date = new Date(retryAfter);
-    return date.toLocaleString();
+    return date.toLocaleString(undefined, {
+      timeZone: settings.timeZone,
+    });
   };
 
   const getStatusBadge = (indexer: Tracker) => {
