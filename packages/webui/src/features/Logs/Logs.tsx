@@ -13,7 +13,6 @@ import {
 import { formatRelativeTime } from '@/lib/time';
 import { useTRPC } from '@/lib/trpc';
 import { useSubscription } from '@trpc/tanstack-react-query';
-import { SeparatorVertical, SeparatorVerticalIcon } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 interface LogEntry {

@@ -17,6 +17,11 @@ module.exports = {
 		// Ensure the path resolves from the repo root regardless of CWD.
 		tsconfigRootDir: __dirname,
 	},
+	ignorePatterns: [
+		"packages/api-types/**",
+		"packages/shared/**",
+		"packages/webui/**",
+	],
 	rules: {
 		"no-mixed-spaces-and-tabs": "off",
 		"@typescript-eslint/no-var-requires": "off",

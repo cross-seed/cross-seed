@@ -20,7 +20,7 @@ function getIsDevtoolsEnabled(): boolean {
       return false;
     }
     return true;
-  } catch (e) {
+  } catch {
     // localStorage not available, assume devtools are enabled
     return true;
   }

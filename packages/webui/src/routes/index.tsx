@@ -3,7 +3,6 @@ import { useMemo } from 'react';
 import { useTRPC } from '@/lib/trpc';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { StatCard } from '@/components/ui/stat-card';
-import { Badge } from '@/components/ui/badge';
 import { Page } from '@/components/Page';
 
 function Home() {
@@ -11,10 +10,6 @@ function Home() {
   const { data: statsData } = useSuspenseQuery(
     trpc.stats.getOverview.queryOptions(),
   );
-  const { data: indexerData } = useSuspenseQuery(
-    trpc.stats.getIndexerStats.queryOptions(),
-  );
-
   const showDistinctQueryCount = useMemo(
     () => statsData.queryCount !== statsData.totalSearchees,
     [statsData.queryCount, statsData.totalSearchees],

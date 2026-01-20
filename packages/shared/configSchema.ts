@@ -47,8 +47,7 @@ export const RUNTIME_CONFIG_SCHEMA = z.object({
 
 export type RuntimeConfig = z.infer<typeof RUNTIME_CONFIG_SCHEMA>;
 
-export const RUNTIME_CONFIG_OVERRIDES_SCHEMA =
-	RUNTIME_CONFIG_SCHEMA.partial();
+export const RUNTIME_CONFIG_OVERRIDES_SCHEMA = RUNTIME_CONFIG_SCHEMA.partial();
 
 export type RuntimeConfigOverrides = z.infer<
 	typeof RUNTIME_CONFIG_OVERRIDES_SCHEMA

@@ -27,9 +27,11 @@ function DebugSettings() {
         });
         queryClient.invalidateQueries({ queryKey: ['settings.get'] });
       },
-      onError: (error: any) => {
+      onError: (error: unknown) => {
+        const message =
+          error instanceof Error ? error.message : 'An unknown error occurred';
         toast.error('Failed to save settings', {
-          description: error.message || 'An unknown error occurred',
+          description: message,
         });
       },
     }),
@@ -90,7 +92,7 @@ function DebugSettings() {
     try {
       const parsedConfig = JSON.parse(jsonValue);
       saveMutation.mutate(parsedConfig);
-    } catch (error) {
+    } catch {
       toast.error('Failed to parse JSON');
     }
   };

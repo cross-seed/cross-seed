@@ -300,10 +300,7 @@ function LibraryPage() {
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="py-10 text-center"
-                >
+                <TableCell colSpan={5} className="py-10 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <span className="text-muted-foreground text-sm">
                       No items indexed yet.
@@ -312,9 +309,7 @@ function LibraryPage() {
                       Add a torrent client to start building your library.
                     </span>
                     <Button asChild size="sm">
-                      <Link to="/settings/clients">
-                        Add torrent client
-                      </Link>
+                      <Link to="/settings/clients">Add torrent client</Link>
                     </Button>
                   </div>
                 </TableCell>

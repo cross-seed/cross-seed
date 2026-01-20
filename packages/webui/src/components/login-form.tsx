@@ -42,7 +42,7 @@ export function LoginForm({
         const message =
           error?.data?.code === 'UNAUTHORIZED'
             ? 'Invalid username or password'
-            : error?.message ?? 'Login failed';
+            : (error?.message ?? 'Login failed');
         setError(message);
       },
     }),
@@ -130,9 +130,7 @@ export function LoginForm({
               </Button>
               {!isSignUp && (
                 <p className="text-muted-foreground text-sm">
-                  Forgot password? Run{' '}
-                  <code>{resetCommand}</code>{' '}
-                  .
+                  Forgot password? Run <code>{resetCommand}</code> .
                 </p>
               )}
             </div>

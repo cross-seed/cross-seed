@@ -73,8 +73,9 @@ function TrackerSettings() {
   const [testingTracker, setTestingTracker] = useState<number | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
-  const [mergeSourceTracker, setMergeSourceTracker] =
-    useState<Tracker | null>(null);
+  const [mergeSourceTracker, setMergeSourceTracker] = useState<Tracker | null>(
+    null,
+  );
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
 
   const { data: indexers } = useSuspenseQuery(
@@ -270,8 +271,9 @@ function TrackerSettings() {
 
   const handleMergeTracker = (indexer: Tracker) => {
     const enabledTargets =
-      indexers?.filter((target) => target.enabled && target.id !== indexer.id) ??
-      [];
+      indexers?.filter(
+        (target) => target.enabled && target.id !== indexer.id,
+      ) ?? [];
     if (!enabledTargets.length) {
       toast.error('No enabled trackers available to merge into.');
       return;
@@ -440,7 +442,6 @@ function TrackerSettings() {
             </TableBody>
           </Table>
         </div>
-
       </div>
 
       <TrackerViewSheet
