@@ -16,11 +16,9 @@
 		"test": "vitest",
 		"coverage": "vitest run --coverage",
 		"build": "tsc -b tsconfig.json",
-		"build:backend": "npm run build",
-		"build:all": "npm run build && npm -C ../.. run build:api-types && npm -C ../.. run build:webui",
 		"watch": "tsc -b --watch --preserveWatchOutput",
-		"dev:backend": "node --watch dist/cmd.js daemon",
-		"prepublishOnly": "rimraf dist tsconfig.tsbuildinfo ../shared/tsconfig.tsbuildinfo ../api-types/tsconfig.tsbuildinfo && npm run build:all",
+		"dev": "node --watch dist/cmd.js daemon",
+		"prepublishOnly": "rimraf dist tsconfig.tsbuildinfo && npm -C ../.. run build",
 		"lint": "concurrently --names \"Prettier,ESLint\" \"prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\"",
 		"typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.tests.json",
 		"format": "prettier --write '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' package.json"

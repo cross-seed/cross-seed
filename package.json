@@ -10,21 +10,19 @@
 		"packages/api-types"
 	],
 	"scripts": {
-		"test": "npm -w packages/cross-seed run test",
-		"coverage": "npm -w packages/cross-seed run coverage",
-		"build": "npm -w packages/cross-seed run build",
-		"build:backend": "npm -w packages/cross-seed run build",
-		"build:webui": "npm -w packages/webui run build",
-		"build:api-types": "npm -w packages/api-types run build",
-		"build:all": "npm -w packages/cross-seed run build:all",
+		"test": "npm --workspaces run test --if-present",
+		"coverage": "npm --workspaces run coverage --if-present",
+		"build": "npm -w packages/cross-seed run build && npm -w packages/api-types run build && npm -w packages/webui run build",
+		"build:all": "npm run build",
 		"watch": "npm -w packages/cross-seed run watch",
-		"dev": "concurrently --names \"TS,BE,FE\" --prefix-colors \"blue,green,magenta\" \"npm -w packages/cross-seed run watch\" \"npm -w packages/cross-seed run dev:backend\" \"npm -w packages/webui run dev\"",
-		"dev:backend": "npm -w packages/cross-seed run dev:backend",
+		"dev": "concurrently --names \"TS,BE,FE\" --prefix-colors \"blue,green,magenta\" \"npm -w packages/cross-seed run watch\" \"npm -w packages/cross-seed run dev\" \"npm -w packages/webui run dev\"",
+		"dev:backend": "npm -w packages/cross-seed run dev",
 		"dev:frontend": "npm -w packages/webui run dev",
 		"prepare": "node -e \"const fs=require('fs'); if(!fs.existsSync('.git')) process.exit(0); require('child_process').execSync('husky install',{stdio:'inherit'})\"",
-		"lint": "npm -w packages/cross-seed run lint",
-		"typecheck": "npm -w packages/cross-seed run typecheck",
-		"format": "npm -w packages/cross-seed run format"
+		"lint": "npm --workspaces run lint --if-present",
+		"typecheck": "npm --workspaces run typecheck --if-present",
+		"format": "prettier --write . --ignore-path .gitignore",
+		"format:check": "prettier --check . --ignore-path .gitignore"
 	},
 	"devDependencies": {
 		"@types/bcryptjs": "^2.4.6",
