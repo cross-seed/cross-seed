@@ -13,8 +13,8 @@ the code is in `/packages/cross-seed/src`. `cmd.js` is the entrypoint,
 # Build and Run
 
 `npm run build` will compile the typescript files into javascript files in
-`/packages/cross-seed/dist` `npm run watch` will compile, then incrementally
-compile when files change the `cross-seed` command is an alias for
+`/packages/cross-seed/dist`. `npm run watch` will compile, then incrementally
+compile when files change. The `cross-seed` command is an alias for
 `node packages/cross-seed/dist/cmd.js`, as in
 `node packages/cross-seed/dist/cmd.js daemon` but it's annoying to use the
 cross-seed alias while developing so i use a lot of ctrl-R with fzf
@@ -43,6 +43,7 @@ one at a time
 ```
 git checkout master
 git pull
+cd packages/cross-seed
 npx np
 ```
 
