@@ -16,7 +16,6 @@ export function removeNullFields<T extends Record<string, unknown>>(obj: T) {
   Object.keys(obj).forEach((key) => {
     const typedKey = key as keyof T;
     if (obj[typedKey] === null) {
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       delete obj[typedKey];
     }
   });
