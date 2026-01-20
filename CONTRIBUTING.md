@@ -74,3 +74,15 @@ npm dist-tag add cross-seed@x.x.x next
 
 If you ever fuck up (often due to forgetting the github release), just release
 again with a `patch` version bump. no big deal
+
+# Publishing without np
+
+If you want to publish directly with npm instead of `np`, do it from the repo
+root using workspaces (since the root is private):
+
+```
+npm run build
+npm publish -w packages/cross-seed --tag next
+```
+
+For stable releases, drop the `--tag next`.
