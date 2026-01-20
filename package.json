@@ -23,7 +23,7 @@
 		"typecheck": "npm --workspaces run typecheck --if-present",
 		"format": "prettier --write . --ignore-path .gitignore",
 		"format:check": "prettier --check . --ignore-path .gitignore",
-		"release": "node -e \"const {spawnSync}=require('child_process'); const rel=process.env.npm_config_release||process.argv[2]; if(!rel){console.error('Usage: npm run release -- --release=patch|minor|major [--tag=next]'); process.exit(1);} const tag=process.env.npm_config_tag||'next'; const run=(cmd,args)=>{const res=spawnSync(cmd,args,{stdio:'inherit'}); if(res.status!==0) process.exit(res.status||1);}; run('npm',['-C','packages/cross-seed','version',rel]); run('npm',['publish','-w','packages/cross-seed','--tag',tag]);\""
+		"release": "node -e \"const {spawnSync}=require('child_process'); const rel=process.env.npm_config_release||process.argv[2]; if(!rel){console.error('Usage: npm run release -- --release=patch|minor|major [--tag=next]'); process.exit(1);} const tag=process.env.npm_config_tag||'next'; const run=(cmd,args)=>{const res=spawnSync(cmd,args,{stdio:'inherit'}); if(res.status!==0) process.exit(res.status||1);}; run('npm',['-C','packages/cross-seed','version',rel]); run('npm',['publish','-w','packages/cross-seed','--tag',tag]);\" --"
 	},
 	"devDependencies": {
 		"@types/bcryptjs": "^2.4.6",
