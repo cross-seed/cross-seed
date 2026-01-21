@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 
 const args = process.argv.slice(2);
 const getArg = (name) => {
@@ -28,24 +30,18 @@ const isPrerelease = rel.startsWith("pre") || rel.includes("-");
 const tag = explicitTag ?? (isPrerelease ? "next" : undefined);
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+const rootDir = path.resolve(
+	path.dirname(fileURLToPath(import.meta.url)),
+	"..",
+);
+const pkgDir = path.join(rootDir, "packages", "cross-seed");
 const run = (cmd, argv) => {
-	const res = spawnSync(cmd, argv, { stdio: "inherit" });
+	const res = spawnSync(cmd, argv, { stdio: "inherit", cwd: pkgDir });
 	if (res.status !== 0) process.exit(res.status ?? 1);
 };
 
-run(npmCmd, [
-	"-C",
-	"packages/cross-seed",
-	"--workspaces=false",
-	"version",
-	rel,
-]);
+run(npmCmd, ["--workspaces=false", "version", rel]);
 
-const publishArgs = [
-	"-C",
-	"packages/cross-seed",
-	"--workspaces=false",
-	"publish",
-];
+const publishArgs = ["--workspaces=false", "publish"];
 if (tag) publishArgs.push("--tag", tag);
 run(npmCmd, publishArgs);
