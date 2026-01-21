@@ -3,6 +3,7 @@
 	"version": "0.0.0",
 	"description": "Cross-seed monorepo workspace",
 	"private": true,
+	"type": "module",
 	"workspaces": [
 		"packages/cross-seed",
 		"packages/shared",
@@ -23,7 +24,7 @@
 		"typecheck": "npm --workspaces run typecheck --if-present",
 		"format": "prettier --write . --ignore-path .gitignore",
 		"format:check": "prettier --check . --ignore-path .gitignore",
-		"release": "node scripts/release.cjs --"
+		"release": "node scripts/release.js --"
 	},
 	"devDependencies": {
 		"@types/bcryptjs": "^2.4.6",

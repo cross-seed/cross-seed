@@ -21,6 +21,7 @@ module.exports = {
 		"packages/api-types/**",
 		"packages/shared/**",
 		"packages/webui/**",
+		"scripts/**",
 	],
 	rules: {
 		"no-mixed-spaces-and-tabs": "off",
