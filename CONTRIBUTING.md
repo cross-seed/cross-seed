@@ -93,3 +93,9 @@ step:
 ```
 npm run release -- --release=patch --tag=next
 ```
+
+You can also pass the bump type as a positional arg:
+
+```
+npm run release -- patch --tag=next
+```
