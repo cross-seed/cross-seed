@@ -1,6 +1,6 @@
 {
 	"name": "cross-seed-workspace",
-	"version": "0.0.0",
+	"version": "0.0.1-0",
 	"description": "Cross-seed monorepo workspace",
 	"private": true,
 	"type": "module",
