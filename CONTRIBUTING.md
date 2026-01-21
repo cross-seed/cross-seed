@@ -88,7 +88,7 @@ npm publish -w packages/cross-seed --tag next
 For stable releases, drop the `--tag next`.
 
 You can also use the helper script, which bumps the version and publishes in one
-step:
+step (pass `--tag next` for pre-releases):
 
 ```
 npm run release -- --release=patch --tag=next
