@@ -33,8 +33,19 @@ const run = (cmd, argv) => {
 	if (res.status !== 0) process.exit(res.status ?? 1);
 };
 
-run(npmCmd, ["-C", "packages/cross-seed", "version", rel]);
+run(npmCmd, [
+	"-C",
+	"packages/cross-seed",
+	"--workspaces=false",
+	"version",
+	rel,
+]);
 
-const publishArgs = ["publish", "-w", "packages/cross-seed"];
+const publishArgs = [
+	"-C",
+	"packages/cross-seed",
+	"--workspaces=false",
+	"publish",
+];
 if (tag) publishArgs.push("--tag", tag);
 run(npmCmd, publishArgs);
