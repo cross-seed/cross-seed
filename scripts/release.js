@@ -15,7 +15,7 @@ const rel =
 	process.env.npm_config_release ||
 	getArg("release") ||
 	args.find((arg) => !arg.startsWith("-"));
-const tag = process.env.npm_config_tag || getArg("tag");
+const explicitTag = process.env.npm_config_tag || getArg("tag");
 
 if (!rel) {
 	console.error(
@@ -23,6 +23,9 @@ if (!rel) {
 	);
 	process.exit(1);
 }
+
+const isPrerelease = rel.startsWith("pre") || rel.includes("-");
+const tag = explicitTag ?? (isPrerelease ? "next" : undefined);
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
 const run = (cmd, argv) => {
