@@ -38,8 +38,8 @@ jobs:
                   npm -w packages/shared run build
                   pack_dir="$(mktemp -d)"
                   (cd packages/cross-seed && npm pack --workspaces=false --pack-destination "$pack_dir")
-                  tar -xzf "$pack_dir"/cross-seed-*.tgz -C "$pack_dir"
-                  node "$pack_dir/package/dist/cmd.js" --version
+                  npm -C "$pack_dir" install ./cross-seed-*.tgz --no-save --omit=dev
+                  node "$pack_dir/node_modules/cross-seed/dist/cmd.js" --version
 
     docker-meta:
         if: ${{ github.event_name != 'pull_request' }}
