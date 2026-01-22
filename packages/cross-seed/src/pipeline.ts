@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { stat } from "fs/promises";
+import { humanReadableSize } from "@cross-seed/shared/utils";
 // Utility function to replace lodash zip
 function zip<T, U, V>(arr1: T[], arr2: U[], arr3: V[]): [T, U, V][] {
 	return arr1.map((item, index) => [item, arr2[index], arr3[index]]);
@@ -76,7 +77,6 @@ import {
 	formatAsList,
 	getLogString,
 	humanReadableDate,
-	humanReadableSize,
 	inBatches,
 	isTruthy,
 	mapAsync,

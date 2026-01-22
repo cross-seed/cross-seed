@@ -3,6 +3,7 @@ import { readdir, stat } from "fs/promises";
 import { basename, dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
 import xmlrpc, { Client } from "xmlrpc";
+import { humanReadableSize } from "@cross-seed/shared/utils";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
@@ -27,7 +28,6 @@ import {
 import {
 	extractCredentialsFromUrl,
 	fromBatches,
-	humanReadableSize,
 	isTruthy,
 	mapAsync,
 	sanitizeInfoHash,

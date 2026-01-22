@@ -2,6 +2,7 @@ import { readdir } from "fs/promises";
 import ms from "ms";
 import { basename } from "path";
 import { inspect } from "util";
+import { humanReadableSize } from "@cross-seed/shared/utils";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
@@ -26,7 +27,6 @@ import {
 import {
 	extractCredentialsFromUrl,
 	getLogString,
-	humanReadableSize,
 	sanitizeInfoHash,
 	wait,
 } from "../utils.js";

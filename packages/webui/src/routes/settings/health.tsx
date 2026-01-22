@@ -7,7 +7,16 @@ import {
   OctagonAlert,
   RefreshCw,
 } from 'lucide-react';
+import { humanReadableSize } from '@cross-seed/shared/utils';
 import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Page } from '@/components/Page';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -33,7 +42,7 @@ const severityIcon = {
 function HealthPage() {
   const trpc = useTRPC();
   const {
-    data: { problems },
+    data: { problems, diagnostics },
     refetch,
     isFetching,
   } = useSuspenseQuery(trpc.health.get.queryOptions());
@@ -41,6 +50,15 @@ function HealthPage() {
   const sortedProblems = [...problems].sort(
     (a, b) => severityOrder[a.severity] - severityOrder[b.severity],
   );
+  const db = diagnostics?.db;
+  const formatCount = (value: number | null | undefined) =>
+    value === null || value === undefined ? 'Unknown' : value.toLocaleString();
+  const formatPercent = (value: number | null | undefined) =>
+    value === null || value === undefined ? 'Unknown' : `${value.toFixed(1)}%`;
+  const formatSizeValue = (value: number | null | undefined) =>
+    value === null || value === undefined
+      ? 'Unknown'
+      : humanReadableSize(value, { binary: true });
 
   return (
     <Page
@@ -105,6 +123,114 @@ function HealthPage() {
             })}
           </div>
         )}
+
+        <div className="space-y-3 pt-2">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">Database diagnostics</h2>
+            <p className="text-muted-foreground text-sm">
+              Disk usage and SQLite stats for your cross-seed database.
+            </p>
+          </div>
+
+          {!db ? (
+            <p className="text-sm text-muted-foreground">
+              No database diagnostics available.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {db.error && (
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-700">
+                  <p className="font-medium">Diagnostics error</p>
+                  <p className="text-muted-foreground">{db.error}</p>
+                </div>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="text-muted-foreground">Database file</p>
+                  <p className="text-base font-semibold">
+                    {formatSizeValue(db.sizes.db)}
+                  </p>
+                  <p className="text-muted-foreground mt-1 break-all font-mono text-xs">
+                    {db.path}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="text-muted-foreground">WAL file</p>
+                  <p className="text-base font-semibold">
+                    {formatSizeValue(db.sizes.wal)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="text-muted-foreground">SHM file</p>
+                  <p className="text-base font-semibold">
+                    {formatSizeValue(db.sizes.shm)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="text-muted-foreground">Page size</p>
+                  <p className="text-base font-semibold">
+                    {formatSizeValue(db.pageSize)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="text-muted-foreground">Page count</p>
+                  <p className="text-base font-semibold">
+                    {formatCount(db.pageCount)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="text-muted-foreground">Freelist pages</p>
+                  <p className="text-base font-semibold">
+                    {formatCount(db.freelistCount)}
+                  </p>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {formatSizeValue(db.freeBytes)} free (
+                    {formatPercent(db.freePercent)})
+                  </p>
+                </div>
+              </div>
+
+              {db.dbstatError && (
+                <p className="text-sm text-muted-foreground">
+                  Table size breakdown unavailable: {db.dbstatError}
+                </p>
+              )}
+
+              {db.dbstatTop && db.dbstatTop.length > 0 && (
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-b">
+                        <TableHead>Object</TableHead>
+                        <TableHead className="text-right">Size</TableHead>
+                        <TableHead className="text-right">Pages</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {db.dbstatTop.map((row) => (
+                        <TableRow key={row.name}>
+                          <TableCell className="font-medium">
+                            {row.name}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatSizeValue(row.bytes)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {row.pages.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </Page>
   );
