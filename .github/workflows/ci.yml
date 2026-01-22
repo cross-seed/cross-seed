@@ -38,7 +38,8 @@ jobs:
                   npm -w packages/shared run build
                   pack_dir="$(mktemp -d)"
                   (cd packages/cross-seed && npm pack --workspaces=false --pack-destination "$pack_dir")
-                  npm -C "$pack_dir" install ./cross-seed-*.tgz --no-save --omit=dev
+                  tarball="$(ls "$pack_dir"/cross-seed-*.tgz)"
+                  npm -C "$pack_dir" install "file:$tarball" --no-save --omit=dev
                   node "$pack_dir/node_modules/cross-seed/dist/cmd.js" --version
 
     docker-meta:
