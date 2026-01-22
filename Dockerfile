@@ -23,6 +23,7 @@ COPY --from=build /usr/src/app/package*.json ./
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/packages/shared ./packages/shared
 COPY --from=build /usr/src/app/packages/api-types ./packages/api-types
+COPY --from=build /usr/src/app/packages/webui ./packages/webui
 COPY --from=build /usr/src/app/packages/cross-seed ./packages/cross-seed
 RUN npm link ./packages/cross-seed
 ENV CONFIG_DIR=/config
