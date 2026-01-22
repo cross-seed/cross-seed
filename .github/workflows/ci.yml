@@ -113,21 +113,32 @@ jobs:
                       exit 1
                   fi
                   printf 'tags<<EOF\n%s\nEOF\n' "$tags" >> "$GITHUB_OUTPUT"
-            - name: Build smoke-test image (${{ matrix.arch }})
-              uses: docker/build-push-action@v5
-              with:
-                  load: true
-                  platforms: ${{ matrix.platform }}
-                  tags: cross-seed-smoke:${{ matrix.arch }}
-            - name: Smoke test image (${{ matrix.arch }})
-              run: docker run --rm cross-seed-smoke:${{ matrix.arch }} --version
-            - name: Build and push (${{ matrix.arch }})
+            - name: Build and push temp image (${{ matrix.arch }})
               uses: docker/build-push-action@v5
               with:
                   push: true
                   platforms: ${{ matrix.platform }}
-                  tags: ${{ steps.tags.outputs.tags }}
+                  tags: |
+                      ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
+                      crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
                   labels: ${{ needs.docker-meta.outputs.labels }}
+            - name: Smoke test image (${{ matrix.arch }})
+              run: docker run --rm ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }} --version
+            - name: Promote temp tags (${{ matrix.arch }})
+              env:
+                  TAGS: ${{ steps.tags.outputs.tags }}
+                  TEMP_GHCR: ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
+                  TEMP_DH: crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
+              run: |
+                  set -euo pipefail
+                  while IFS= read -r tag; do
+                      [ -z "$tag" ] && continue
+                      if [[ "$tag" == ghcr.io/* ]]; then
+                          docker buildx imagetools create --tag "$tag" "$TEMP_GHCR"
+                      else
+                          docker buildx imagetools create --tag "$tag" "$TEMP_DH"
+                      fi
+                  done <<< "$TAGS"
 
     docker-manifest:
         if: ${{ github.event_name != 'pull_request' }}
