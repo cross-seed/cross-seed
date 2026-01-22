@@ -30,8 +30,16 @@ jobs:
             - run: npm ci
             - run: npm run lint
             - run: npm run typecheck
-            - run: npm run build:backend
+            - run: npm run build
             - run: npm run test
+            - name: Smoke test npm tarball
+              run: |
+                  set -euo pipefail
+                  npm -w packages/shared run build
+                  pack_dir="$(mktemp -d)"
+                  npm -C packages/cross-seed pack --workspaces=false --pack-destination "$pack_dir"
+                  tar -xzf "$pack_dir"/cross-seed-*.tgz -C "$pack_dir"
+                  node "$pack_dir/package/dist/cmd.js" --version
 
     docker-meta:
         if: ${{ github.event_name != 'pull_request' }}
@@ -105,6 +113,14 @@ jobs:
                       exit 1
                   fi
                   printf 'tags<<EOF\n%s\nEOF\n' "$tags" >> "$GITHUB_OUTPUT"
+            - name: Build smoke-test image (${{ matrix.arch }})
+              uses: docker/build-push-action@v5
+              with:
+                  load: true
+                  platforms: ${{ matrix.platform }}
+                  tags: cross-seed-smoke:${{ matrix.arch }}
+            - name: Smoke test image (${{ matrix.arch }})
+              run: docker run --rm cross-seed-smoke:${{ matrix.arch }} --version
             - name: Build and push (${{ matrix.arch }})
               uses: docker/build-push-action@v5
               with:
