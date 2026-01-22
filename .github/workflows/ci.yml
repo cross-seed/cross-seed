@@ -37,7 +37,7 @@ jobs:
                   set -euo pipefail
                   npm -w packages/shared run build
                   pack_dir="$(mktemp -d)"
-                  npm -C packages/cross-seed pack --workspaces=false --pack-destination "$pack_dir"
+                  (cd packages/cross-seed && npm pack --workspaces=false --pack-destination "$pack_dir")
                   tar -xzf "$pack_dir"/cross-seed-*.tgz -C "$pack_dir"
                   node "$pack_dir/package/dist/cmd.js" --version
 
