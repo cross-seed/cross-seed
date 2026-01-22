@@ -19,6 +19,7 @@
 		"watch": "tsc -b --watch --preserveWatchOutput",
 		"dev": "node --watch dist/cmd.js daemon",
 		"prepublishOnly": "rimraf dist tsconfig.tsbuildinfo && npm -C ../.. run build",
+		"prepack": "node ../../scripts/prepare-bundled-deps.js",
 		"lint": "concurrently --names \"Prettier,ESLint\" \"prettier --check '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\" \"eslint '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}'\"",
 		"typecheck": "tsc -b tsconfig.json && tsc -p tsconfig.tests.json",
 		"format": "prettier --write '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' package.json"
