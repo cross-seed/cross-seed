@@ -54,6 +54,14 @@ const runGit = (argv) => {
 	const res = spawnSync(gitCmd, argv, { stdio: "inherit", cwd: rootDir });
 	if (res.status !== 0) process.exit(res.status ?? 1);
 };
+const gitOutput = (argv) => {
+	const res = spawnSync(gitCmd, argv, {
+		encoding: "utf8",
+		cwd: rootDir,
+	});
+	if (res.status !== 0) process.exit(res.status ?? 1);
+	return res.stdout.trim();
+};
 const gitStatus = () => {
 	const res = spawnSync(gitCmd, ["status", "--porcelain"], {
 		encoding: "utf8",
@@ -123,7 +131,7 @@ if (!skipRelease) {
 		tagName,
 		"--generate-notes",
 		"--target",
-		"HEAD",
+		gitOutput(["rev-parse", "HEAD"]),
 	];
 	if (draftRelease) releaseArgs.push("--draft");
 	if (isPrerelease) releaseArgs.push("--prerelease");
