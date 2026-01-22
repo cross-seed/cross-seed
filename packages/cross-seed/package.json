@@ -1,6 +1,6 @@
 {
 	"name": "cross-seed",
-	"version": "7.0.0-6",
+	"version": "7.0.0-7",
 	"description": "Fully-automatic cross-seeding with Torznab",
 	"type": "module",
 	"bin": {
