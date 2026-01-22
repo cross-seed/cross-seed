@@ -1,6 +1,7 @@
 import { readdir, stat } from "fs/promises";
 import { basename, dirname, isAbsolute, join, relative } from "path";
 import ms from "ms";
+import { humanReadableSize } from "@cross-seed/shared/utils";
 import {
 	byClientHostPriority,
 	getClients,
@@ -43,7 +44,6 @@ import {
 	getLogString,
 	hasExt,
 	humanReadableDate,
-	humanReadableSize,
 	inBatches,
 	isBadTitle,
 	isTruthy,

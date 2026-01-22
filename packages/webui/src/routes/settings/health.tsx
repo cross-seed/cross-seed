@@ -7,7 +7,7 @@ import {
   OctagonAlert,
   RefreshCw,
 } from 'lucide-react';
-import { formatBytes } from '@cross-seed/shared/utils';
+import { humanReadableSize } from '@cross-seed/shared/utils';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -55,6 +55,10 @@ function HealthPage() {
     value === null || value === undefined ? 'Unknown' : value.toLocaleString();
   const formatPercent = (value: number | null | undefined) =>
     value === null || value === undefined ? 'Unknown' : `${value.toFixed(1)}%`;
+  const formatBytesValue = (value: number | null | undefined) =>
+    value === null || value === undefined
+      ? 'Unknown'
+      : humanReadableSize(value, { binary: true });
 
   return (
     <Page
@@ -145,7 +149,7 @@ function HealthPage() {
                 <div className="rounded-lg border p-4 text-sm">
                   <p className="text-muted-foreground">Database file</p>
                   <p className="text-base font-semibold">
-                    {formatBytes(db.sizes.db, { binary: true })}
+                    {formatBytesValue(db.sizes.db)}
                   </p>
                   <p className="text-muted-foreground mt-1 break-all font-mono text-xs">
                     {db.path}
@@ -154,13 +158,13 @@ function HealthPage() {
                 <div className="rounded-lg border p-4 text-sm">
                   <p className="text-muted-foreground">WAL file</p>
                   <p className="text-base font-semibold">
-                    {formatBytes(db.sizes.wal, { binary: true })}
+                    {formatBytesValue(db.sizes.wal)}
                   </p>
                 </div>
                 <div className="rounded-lg border p-4 text-sm">
                   <p className="text-muted-foreground">SHM file</p>
                   <p className="text-base font-semibold">
-                    {formatBytes(db.sizes.shm, { binary: true })}
+                    {formatBytesValue(db.sizes.shm)}
                   </p>
                 </div>
               </div>
@@ -169,7 +173,7 @@ function HealthPage() {
                 <div className="rounded-lg border p-4 text-sm">
                   <p className="text-muted-foreground">Page size</p>
                   <p className="text-base font-semibold">
-                    {formatBytes(db.pageSize, { binary: true })}
+                    {formatBytesValue(db.pageSize)}
                   </p>
                 </div>
                 <div className="rounded-lg border p-4 text-sm">
@@ -184,7 +188,7 @@ function HealthPage() {
                     {formatCount(db.freelistCount)}
                   </p>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    {formatBytes(db.freeBytes, { binary: true })} free (
+                    {formatBytesValue(db.freeBytes)} free (
                     {formatPercent(db.freePercent)})
                   </p>
                 </div>
@@ -213,7 +217,7 @@ function HealthPage() {
                             {row.name}
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatBytes(row.bytes, { binary: true })}
+                            {formatBytesValue(row.bytes)}
                           </TableCell>
                           <TableCell className="text-right">
                             {row.pages.toLocaleString()}

@@ -2,6 +2,7 @@ import { readdir } from "fs/promises";
 import ms from "ms";
 import path from "path";
 import { BodyInit } from "undici-types";
+import { humanReadableSize } from "@cross-seed/shared/utils";
 import {
 	ABS_WIN_PATH_REGEX,
 	DecisionAnyMatch,
@@ -30,7 +31,6 @@ import {
 	extractInt,
 	getLogString,
 	getPathParts,
-	humanReadableSize,
 	sanitizeInfoHash,
 	wait,
 } from "../utils.js";

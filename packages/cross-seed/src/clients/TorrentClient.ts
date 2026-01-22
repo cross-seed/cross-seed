@@ -1,6 +1,7 @@
 import ms from "ms";
 import path from "path";
 import { isDeepStrictEqual } from "util";
+import { humanReadableSize } from "@cross-seed/shared/utils";
 import { testLinking } from "../action.js";
 import type { Problem } from "../problems.js";
 import {
@@ -20,7 +21,7 @@ import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
 import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
-import { hasExt, humanReadableSize, isTruthy, wait } from "../utils.js";
+import { hasExt, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";

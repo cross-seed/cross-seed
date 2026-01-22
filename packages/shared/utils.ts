@@ -13,11 +13,10 @@ export function formatAsList(
 	}).format(strings);
 }
 
-export function formatBytes(
-	bytes: number | null | undefined,
-	options?: { binary?: boolean },
+export function humanReadableSize(
+	bytes: number,
+	options?: { binary: boolean },
 ) {
-	if (bytes === null || bytes === undefined) return "Unknown";
 	if (bytes === 0) return "0 B";
 	const k = options?.binary ? 1024 : 1000;
 	const sizes = options?.binary
