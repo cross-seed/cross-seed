@@ -37,7 +37,7 @@
 	"dependencies": {
 		"@cross-seed/shared": "file:../shared",
 		"@fastify/cookie": "^11.0.2",
-		"@trpc/server": "^11.8.0",
+		"@trpc/server": "^11.8.1",
 		"bcryptjs": "^3.0.2",
 		"bencode": "^2.0.1",
 		"better-sqlite3": "^12.5.0",
