@@ -59,6 +59,7 @@ if (gitStatus()) {
 	process.exit(1);
 }
 
+run(npmCmd, ["--workspaces=false", "login"]);
 run(npmCmd, ["--workspaces=false", "version", rel]);
 
 const dirty = gitStatus();
