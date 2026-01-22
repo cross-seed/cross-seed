@@ -1,10 +1,10 @@
-import { createRequire } from "module";
 import {
 	Action,
 	BlocklistType,
 	LinkType,
 	MatchMode,
 } from "@cross-seed/shared/constants";
+import { createRequire } from "module";
 
 export { Action, BlocklistType, LinkType, MatchMode };
 
@@ -34,6 +34,8 @@ export const ANIME_REGEX =
 export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w .]+?)(?:\[.+\])?(?:\))?(?:\s\[.+\])?$/i;
 export const ANIME_GROUP_REGEX = /^\s*\[(?<group>.+?)\]/i;
+export const EBOOK_AND_MUSIC_RELEASE_REGEX =
+	/(\d+k?\b|['']s\b|\[.*?]|\(.*?\)|\{.*?}|[kbps]{2,4}\b|m4b\b|pdf\b|docx\b|epub\b|mobi\b|azw3\b|m4a\b|mp3\b|flac|\sWEB\b|audiobook\b|\bebook\b|\bNew\b|[a\W]+(novela?|saga|series)|(Read|Narrated)?\W?By\W\w+\W*\w*\b|[^a-zA-Z0-9])/i;
 export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[pix](?:\d{3,4}[pi]?)?)\b/i;
 export const RES_STRICT_REGEX = /(?<res>(?:2160|1080|720)[pi])/;
 export const YEARS_REGEX = /(?<year>(?:19|20)\d{2})(?![pix])/gi;
