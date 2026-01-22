@@ -41,6 +41,7 @@ import {
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
 import {
+	cleanBookAndAudioTitle,
 	cleanTitle,
 	comparing,
 	extractInt,
@@ -305,12 +306,20 @@ async function createTorznabSearchQueries(
 			t: "search",
 			q: videoQuery,
 		}));
-	} else if (mediaType === MediaType.BOOK && searchee.path) {
-		const query = cleanTitle(stem.replace(CALIBRE_INDEXNUM_REGEX, ""));
+	} else if (mediaType === MediaType.BOOK && caps.bookSearch) {
 		return [
 			{
 				t: "search",
-				q: query.length ? query : stem,
+				q: cleanBookAndAudioTitle(
+					stem.replace(CALIBRE_INDEXNUM_REGEX, ""),
+				),
+			},
+		] as const;
+	} else if (mediaType === MediaType.AUDIO && caps.audioSearch) {
+		return [
+			{
+				t: "search",
+				q: cleanBookAndAudioTitle(stem),
 			},
 		] as const;
 	}
