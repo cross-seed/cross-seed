@@ -7,6 +7,7 @@ import {
   OctagonAlert,
   RefreshCw,
 } from 'lucide-react';
+import { formatBytes } from '@cross-seed/shared/utils';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -18,7 +19,7 @@ import {
 } from '@/components/ui/table';
 import { Page } from '@/components/Page';
 import { useTRPC } from '@/lib/trpc';
-import { cn, formatBytes } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 const severityOrder = {
   error: 0,
