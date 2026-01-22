@@ -87,8 +87,9 @@ npm publish -w packages/cross-seed --tag next
 
 For stable releases, drop the `--tag next`.
 
-You can also use the helper script, which bumps the version and publishes in one
-step (pass `--tag next` for pre-releases):
+You can also use the helper script, which bumps the version, publishes, pushes,
+and creates the GitHub release (requires the `gh` CLI). Pass `--tag next` for
+pre-releases or `--no-release` to skip the GitHub release step:
 
 ```
 npm run release -- --release=patch --tag=next
@@ -98,4 +99,12 @@ You can also pass the bump type as a positional arg:
 
 ```
 npm run release -- patch --tag=next
+```
+
+Other options:
+
+```
+npm run release -- --release=patch --draft
+npm run release -- --release=patch --no-release
+npm run release -- --release=patch --no-push
 ```
