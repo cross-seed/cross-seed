@@ -1,4 +1,3 @@
-import { useSuspenseQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label.tsx';
 import { Separator } from '@/components/ui/separator.tsx';
@@ -121,10 +120,6 @@ export function Logs() {
     return ret;
   }, [logs, isReversed, levelFilters, labelFilters]);
 
-  const { data: settings } = useSuspenseQuery(
-    trpc.settings.get.queryOptions(),
-  );
-
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-stretch justify-between gap-4">
@@ -223,11 +218,9 @@ export function Logs() {
                 >
                   <TableCell
                     className="font-mono text-xs"
-                    title={new Date(log.timestamp).toLocaleString(undefined, {
-                      timeZone: settings.timeZone,
-                    })}
+                    title={new Date(log.timestamp).toLocaleString()}
                   >
-                    {formatRelativeTime(log.timestamp, settings.timeZone)}
+                    {formatRelativeTime(log.timestamp)}
                   </TableCell>
                   <TableCell className="py-1">
                     <Badge

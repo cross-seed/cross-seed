@@ -1,9 +1,6 @@
 import ms from 'ms';
 
-export function formatRelativeTime(
-  timestamp: string | number,
-  timeZone?: string,
-): string {
+export function formatRelativeTime(timestamp: string | number): string {
   const date =
     typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
   const now = new Date();
@@ -16,7 +13,6 @@ export function formatRelativeTime(
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      timeZone,
     });
   }
 
