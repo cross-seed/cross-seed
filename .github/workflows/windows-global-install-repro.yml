@@ -1,0 +1,56 @@
+name: windows-global-install-repro
+
+on:
+  workflow_dispatch:
+
+jobs:
+  repro:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          check-latest: true
+      - name: Show versions
+        run: |
+          node -v
+          npm -v
+          npm config get prefix
+          npm root -g
+      - name: Clean + install global cross-seed
+        run: |
+          npm uninstall -g cross-seed || echo "not installed"
+          npm cache clean --force
+          npm install -g cross-seed@7.0.0-9
+      - name: Locate global binary
+        run: |
+          Get-Command cross-seed
+          where.exe cross-seed
+      - name: Attempt to run cross-seed
+        run: |
+          cross-seed --version
+      - name: Dump global cross-seed tree
+        run: |
+          $globalModules = npm root -g
+          $csPath = Join-Path $globalModules "cross-seed"
+          Write-Host "cross-seed path: $csPath"
+          if (Test-Path $csPath) {
+            Get-ChildItem -Path $csPath -Depth 2
+          } else {
+            Write-Host "cross-seed not found"
+          }
+      - name: Check zod location
+        run: |
+          $globalModules = npm root -g
+          $zod = Join-Path $globalModules "cross-seed\\node_modules\\zod"
+          Write-Host "zod path: $zod"
+          if (Test-Path $zod) {
+            Get-ChildItem -Path $zod -Depth 2
+          } else {
+            Write-Host "zod not found under cross-seed/node_modules"
+          }
+      - name: Check global zod install
+        run: |
+          npm ls -g zod --all
+        continue-on-error: true
