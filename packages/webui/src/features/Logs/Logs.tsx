@@ -129,7 +129,8 @@ export function Logs() {
               <Badge
                 key={level}
                 variant={levelFilters.has(level) ? 'default' : 'outline'}
-                className={`hover:bg-muted cursor-pointer select-none ${level === 'error'
+                className={`hover:bg-muted cursor-pointer select-none ${
+                  level === 'error'
                   ? levelFilters.has(level)
                     ? 'bg-red-500 hover:bg-red-600'
                     : 'border-red-200 text-red-500'
