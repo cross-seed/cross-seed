@@ -51,6 +51,7 @@ type Tracker = {
   enabled: boolean;
   status: string | null;
   retryAfter: number | null;
+  retryAfterIso?: string | null;
   searchCap: boolean | null;
   tvSearchCap: boolean | null;
   movieSearchCap: boolean | null;
@@ -132,15 +133,13 @@ function TrackerSettings() {
     }),
   );
 
-  const { data: settings } = useSuspenseQuery(
-    trpc.settings.get.queryOptions(),
-  );
-
-  const formatRetryAfter = (retryAfter: number) => {
-    const date = new Date(retryAfter);
-    return date.toLocaleString(undefined, {
-      timeZone: settings.timeZone,
-    });
+  const formatRetryAfter = (
+    retryAfter: number | null,
+    retryAfterIso?: string | null,
+  ) => {
+    const value = retryAfterIso ?? retryAfter;
+    if (value === null || value === undefined) return 'Unknown';
+    return new Date(value).toLocaleString();
   };
 
   const getStatusBadge = (indexer: Tracker) => {
@@ -156,7 +155,7 @@ function TrackerSettings() {
           <Badge
             variant="destructive"
             className="bg-red-700"
-            title={`Rate limited until ${formatRetryAfter(indexer.retryAfter)}`}
+            title={`Rate limited until ${formatRetryAfter(indexer.retryAfter, indexer.retryAfterIso)}`}
           >
             Rate Limited
           </Badge>

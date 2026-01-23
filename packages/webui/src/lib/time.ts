@@ -9,7 +9,7 @@ export function formatRelativeTime(
   const now = new Date();
   const diffInMs = now.getTime() - date.getTime();
 
-  // More than 7 days, fall back to absolute date
+  // More than 7 days, fall back to absolute date in the browser locale.
   if (Math.abs(diffInMs) > ms('7d')) {
     return date.toLocaleDateString('en', {
       month: 'short',

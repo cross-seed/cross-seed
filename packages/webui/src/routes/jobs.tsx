@@ -70,6 +70,11 @@ function RouteComponent() {
       .join(' ');
   };
 
+  const getDateTitle = (value: string | null) => {
+    if (!value || value === 'now') return undefined;
+    return new Date(value).toLocaleString();
+  };
+
   return (
     <Page>
       <div className="overflow-x-auto rounded-lg border">
@@ -93,13 +98,21 @@ function RouteComponent() {
                 <TableCell>{job.interval}</TableCell>
                 <TableCell>
                   {job.lastExecution
-                    ? formatRelativeTime(job.lastExecution)
+                    ? (
+                        <span title={getDateTitle(job.lastExecution)}>
+                          {formatRelativeTime(job.lastExecution)}
+                        </span>
+                      )
                     : 'Never'}
                 </TableCell>
                 <TableCell>
                   {job.nextExecution === 'now'
                     ? 'Now'
-                    : formatRelativeTime(job.nextExecution)}
+                    : (
+                        <span title={getDateTitle(job.nextExecution)}>
+                          {formatRelativeTime(job.nextExecution)}
+                        </span>
+                      )}
                 </TableCell>
                 <TableCell>{getStatusBadge(job)}</TableCell>
                 <TableCell className="text-right">

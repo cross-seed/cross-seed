@@ -6,6 +6,7 @@ import { findAllSearchees, bulkSearchByNames } from "../../pipeline.js";
 import { Label } from "../../logger.js";
 import { getSearcheeSource } from "../../searchee.js";
 import { getAllIndexers, getEnabledIndexers } from "../../indexers.js";
+import { formatLocalIsoTimestamp } from "../../utils.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_BULK_SEARCH = 20;
@@ -120,11 +121,15 @@ export const searcheesRouter = router({
 							: Number(row.indexerCount ?? 0),
 					firstSearchedAt:
 						row.firstSearched != null
-							? new Date(Number(row.firstSearched)).toISOString()
+							? formatLocalIsoTimestamp(
+									new Date(Number(row.firstSearched)),
+								)
 							: null,
 					lastSearchedAt:
 						row.lastSearched != null
-							? new Date(Number(row.lastSearched)).toISOString()
+							? formatLocalIsoTimestamp(
+									new Date(Number(row.lastSearched)),
+								)
 							: null,
 					label: meta?.label ?? null,
 					source: meta ? getSearcheeSource(meta) : null,

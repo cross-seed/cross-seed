@@ -266,6 +266,27 @@ export function humanReadableDate(timestamp: number): string {
 	return new Date(timestamp).toLocaleString("sv");
 }
 
+function padTimePart(value: number, length: number = 2): string {
+	return String(Math.trunc(Math.abs(value))).padStart(length, "0");
+}
+
+export function formatLocalIsoTimestamp(date: Date): string {
+	const year = date.getFullYear();
+	const month = date.getMonth() + 1;
+	const day = date.getDate();
+	const hour = date.getHours();
+	const minute = date.getMinutes();
+	const second = date.getSeconds();
+	const millisecond = date.getMilliseconds();
+	const offsetMinutes = date.getTimezoneOffset();
+	const sign = offsetMinutes > 0 ? "-" : "+";
+	const absOffset = Math.abs(offsetMinutes);
+	const offsetHours = Math.floor(absOffset / 60);
+	const offsetMins = absOffset % 60;
+
+	return `${year}-${padTimePart(month)}-${padTimePart(day)}T${padTimePart(hour)}:${padTimePart(minute)}:${padTimePart(second)}.${padTimePart(millisecond, 3)}${sign}${padTimePart(offsetHours)}:${padTimePart(offsetMins)}`;
+}
+
 export function humanReadableSize(
 	bytes: number,
 	options?: { binary: boolean },

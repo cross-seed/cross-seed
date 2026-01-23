@@ -12,14 +12,20 @@ import {
 	mergeDisabledIndexer,
 } from "../../services/indexerService.js";
 import { TRPCError } from "@trpc/server";
+import { formatLocalIsoTimestamp } from "../../utils.js";
 
 export const indexersRouter = router({
 	// Get all indexers
 	getAll: authedProcedure.query(async () => {
 		const indexers = await listAllIndexers();
-		return indexers.sort((a, b) =>
-			(a.name || "").localeCompare(b.name || ""),
-		);
+		return indexers
+			.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+			.map((indexer) => ({
+				...indexer,
+				retryAfterIso: indexer.retryAfter
+					? formatLocalIsoTimestamp(new Date(indexer.retryAfter))
+					: null,
+			}));
 	}),
 
 	mergeDisabled: authedProcedure

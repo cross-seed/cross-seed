@@ -2,6 +2,7 @@ import { promises as fs, watch } from "fs";
 import { join } from "path";
 import { appDir } from "../configuration.js";
 import { logger } from "../logger.js";
+import { formatLocalIsoTimestamp } from "../utils.js";
 
 export interface LogEntry {
 	timestamp: string;
@@ -151,7 +152,7 @@ class LogWatcher {
 			} else {
 				// Orphan line with no preceding log entry
 				logEntries.push({
-					timestamp: new Date().toISOString(),
+					timestamp: formatLocalIsoTimestamp(new Date()),
 					level: "info",
 					label: "raw",
 					message: line,
@@ -175,7 +176,7 @@ class LogWatcher {
 		if (match) {
 			const [, timestamp, level, label, message] = match;
 			return {
-				timestamp: new Date(timestamp).toISOString(),
+				timestamp: this.toLocalIsoTimestamp(timestamp),
 				level,
 				label: label || undefined,
 				message: message.trim(),
@@ -183,6 +184,27 @@ class LogWatcher {
 		}
 
 		return null;
+	}
+
+	private toLocalIsoTimestamp(timestamp: string): string {
+		const match =
+			/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/.exec(
+				timestamp,
+			);
+		if (!match) {
+			return formatLocalIsoTimestamp(new Date(timestamp));
+		}
+		const [, year, month, day, hour, minute, second, millisecond] = match;
+		const date = new Date(
+			Number(year),
+			Number(month) - 1,
+			Number(day),
+			Number(hour),
+			Number(minute),
+			Number(second),
+			Number((millisecond ?? "0").padEnd(3, "0")),
+		);
+		return formatLocalIsoTimestamp(date);
 	}
 
 	private notifySubscribers(logEntry: LogEntry) {

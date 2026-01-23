@@ -3,7 +3,7 @@ import ms from "ms";
 import { router, authedProcedure } from "../index.js";
 import { getJobs, getJobLastRun, JobName, checkJobs } from "../../jobs.js";
 import { Label, logger } from "../../logger.js";
-import { humanReadableDate } from "../../utils.js";
+import { formatLocalIsoTimestamp, humanReadableDate } from "../../utils.js";
 import { db } from "../../db.js";
 
 type JobStatus = {
@@ -42,14 +42,14 @@ export const jobsRouter = router({
 
 			// Format last execution - return timestamp for frontend to format
 			const lastExecution = lastRun
-				? new Date(lastRun).toISOString()
+				? formatLocalIsoTimestamp(new Date(lastRun))
 				: null;
 
 			// Format next execution - return timestamp for frontend to format
 			const nextExecution =
 				now >= eligibilityTs
 					? "now"
-					: new Date(eligibilityTs).toISOString();
+					: formatLocalIsoTimestamp(new Date(eligibilityTs));
 
 			// Check if job can run now (not active and eligible for early run)
 			// Jobs can run "ahead of schedule" if current time >= lastRun time

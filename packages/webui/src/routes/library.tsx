@@ -160,8 +160,15 @@ function LibraryPage() {
     bulkSearchMutation.mutate({ names, force });
   };
 
-  const formatTimestamp = (value: string | null) =>
-    value ? formatRelativeTime(value) : 'Never';
+  const formatTimestamp = (value: string | null) => {
+    if (!value) {
+      return { display: 'Never', title: undefined };
+    }
+    return {
+      display: formatRelativeTime(value),
+      title: new Date(value).toLocaleString(),
+    };
+  };
 
   return (
     <Page>
@@ -322,6 +329,8 @@ function LibraryPage() {
             ) : (
               items.map((item) => {
                 const isSelected = selectedItems.has(item.id);
+                const firstSearched = formatTimestamp(item.firstSearchedAt);
+                const lastSearched = formatTimestamp(item.lastSearchedAt);
                 return (
                   <TableRow
                     key={item.id}
@@ -340,10 +349,14 @@ function LibraryPage() {
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell>{item.indexerCount}</TableCell>
                     <TableCell>
-                      {formatTimestamp(item.firstSearchedAt)}
+                      <span title={firstSearched.title}>
+                        {firstSearched.display}
+                      </span>
                     </TableCell>
                     <TableCell>
-                      {formatTimestamp(item.lastSearchedAt)}
+                      <span title={lastSearched.title}>
+                        {lastSearched.display}
+                      </span>
                     </TableCell>
                   </TableRow>
                 );
