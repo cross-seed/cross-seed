@@ -12,6 +12,29 @@ export interface LogEntry {
 
 type LogCallback = (log: LogEntry) => void;
 
+function parseLocalTimestampToIso(timestamp: string): string {
+	const match =
+		/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?$/.exec(
+			timestamp,
+		);
+	if (!match) {
+		const parsed = new Date(timestamp);
+		return Number.isNaN(parsed.getTime())
+			? timestamp
+			: parsed.toISOString();
+	}
+	const [, year, month, day, hour, minute, second, millisecond] = match;
+	return new Date(
+		Number(year),
+		Number(month) - 1,
+		Number(day),
+		Number(hour),
+		Number(minute),
+		Number(second),
+		millisecond ? Number(millisecond) : 0,
+	).toISOString();
+}
+
 class LogWatcher {
 	private watchers = new Map<string, ReturnType<typeof watch>>();
 	private subscribers = new Set<LogCallback>();
@@ -175,7 +198,7 @@ class LogWatcher {
 		if (match) {
 			const [, timestamp, level, label, message] = match;
 			return {
-				timestamp,
+				timestamp: parseLocalTimestampToIso(timestamp),
 				level,
 				label: label || undefined,
 				message: message.trim(),
