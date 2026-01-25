@@ -2,6 +2,9 @@ name: windows-global-install-repro
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - windows-global-install-repro
 
 jobs:
   repro:
