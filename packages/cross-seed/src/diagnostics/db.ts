@@ -57,12 +57,12 @@ export async function collectDbDiagnostics(): Promise<DbDiagnostics> {
 			sqlite = new DatabaseSync(dbPath, {
 				readOnly: true,
 			});
-			const pageSizeRow = sqlite
-				.prepare("PRAGMA page_size")
-				.get() as { page_size?: number } | undefined;
-			const pageCountRow = sqlite
-				.prepare("PRAGMA page_count")
-				.get() as { page_count?: number } | undefined;
+			const pageSizeRow = sqlite.prepare("PRAGMA page_size").get() as
+				| { page_size?: number }
+				| undefined;
+			const pageCountRow = sqlite.prepare("PRAGMA page_count").get() as
+				| { page_count?: number }
+				| undefined;
 			const freelistCountRow = sqlite
 				.prepare("PRAGMA freelist_count")
 				.get() as { freelist_count?: number } | undefined;

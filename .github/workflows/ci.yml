@@ -157,12 +157,19 @@ jobs:
                       crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
                   labels: ${{ needs.docker-meta.outputs.labels }}
             - name: Smoke test image (${{ matrix.arch }})
-              run: docker run --rm ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }} --version
+              run:
+                  docker run --rm ghcr.io/${{ github.repository_owner
+                  }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
+                  --version
             - name: Promote temp tags (${{ matrix.arch }})
               env:
                   TAGS: ${{ steps.tags.outputs.tags }}
-                  TEMP_GHCR: ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
-                  TEMP_DH: crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
+                  TEMP_GHCR:
+                      ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{
+                      github.sha }}-${{ matrix.arch }}
+                  TEMP_DH:
+                      crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch
+                      }}
               run: |
                   set -euo pipefail
                   while IFS= read -r tag; do
