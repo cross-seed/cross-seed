@@ -58,8 +58,26 @@ export class NodeSqliteClient extends BetterSqlite3Client {
 		const statement = connection.prepare(obj.sql);
 		const bindings = this._formatBindings(obj.bindings);
 
-		// hack - if we use an INSERT…RETURNING statement it won't work
-		if (obj.sql.toLowerCase().startsWith("select")) {
+		const method = obj.method;
+		let useAll: boolean;
+		switch (method) {
+			case "insert":
+			case "update":
+				useAll = Boolean(obj.returning);
+				break;
+			case "counter":
+			case "del":
+				useAll = false;
+				break;
+			default:
+				useAll = true;
+		}
+		if (method == null) {
+			const sql = obj.sql.trim().toLowerCase();
+			useAll = Boolean(obj.returning) || sql.startsWith("select");
+		}
+
+		if (useAll) {
 			obj.response = await statement.all(...bindings);
 			return obj;
 		}
