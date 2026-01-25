@@ -30,9 +30,6 @@ jobs:
         run: |
           Get-Command cross-seed
           where.exe cross-seed
-      - name: Attempt to run cross-seed
-        run: |
-          cross-seed --version
       - name: Dump global cross-seed tree
         run: |
           $globalModules = npm root -g
@@ -42,6 +39,16 @@ jobs:
             Get-ChildItem -Path $csPath -Depth 2
           } else {
             Write-Host "cross-seed not found"
+          }
+      - name: Dump cross-seed package.json
+        run: |
+          $globalModules = npm root -g
+          $csPkg = Join-Path $globalModules "cross-seed\\package.json"
+          Write-Host "cross-seed package.json: $csPkg"
+          if (Test-Path $csPkg) {
+            Get-Content $csPkg
+          } else {
+            Write-Host "cross-seed package.json not found"
           }
       - name: Check zod location
         run: |
@@ -70,6 +77,10 @@ jobs:
           } else {
             Write-Host "shared configSchema.js not found"
           }
+      - name: Attempt to run cross-seed
+        continue-on-error: true
+        run: |
+          cross-seed --version
       - name: Check global zod install
         run: |
           npm ls -g zod --all
