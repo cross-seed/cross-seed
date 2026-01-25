@@ -1,7 +1,9 @@
-import Sqlite from "better-sqlite3";
 import { unlink } from "fs/promises";
 import knex from "knex";
+import type { Knex } from "knex";
+import BetterSqlite3ClientImport from "knex/lib/dialects/better-sqlite3/index.js";
 import ms from "ms";
+import { DatabaseSync } from "node:sqlite";
 import { basename, join } from "path";
 import { getClients } from "./clients/TorrentClient.js";
 import { appDir } from "./configuration.js";
@@ -27,13 +29,95 @@ import {
 	yieldToEventLoop,
 } from "./utils.js";
 
+type KnexClientCtor = typeof Knex.Client;
+const BetterSqlite3Client =
+	BetterSqlite3ClientImport as unknown as KnexClientCtor;
+
+const formatBindings = (bindings?: Array<unknown>) => {
+	if (!bindings) return [];
+	return bindings.map((binding) => {
+		if (binding instanceof Date) {
+			return binding.valueOf();
+		}
+		if (typeof binding === "boolean") {
+			return Number(binding);
+		}
+		return binding;
+	});
+};
+
+export class NodeSqliteClient extends BetterSqlite3Client {
+	_driver() {
+		return DatabaseSync;
+	}
+
+	// Get a raw connection from the database, returning a promise with the connection object.
+	async acquireRawConnection() {
+		const { filename } = this
+			.connectionSettings as Knex.BetterSqlite3ConnectionConfig;
+		const connection = new this.driver(filename);
+		connection.exec("pragma journal_mode = WAL;");
+		return connection;
+	}
+
+	// Used to explicitly close a connection, called internally by the pool when
+	// a connection times out or the pool is shutdown.
+	async destroyRawConnection(connection) {
+		return connection.close();
+	}
+
+	// Runs the query on the specified connection, providing the bindings and any
+	// other necessary prep work.
+	async _query(connection, obj) {
+		if (!obj.sql) throw new Error("The query is empty");
+
+		if (!connection) {
+			throw new Error("No connection provided");
+		}
+
+		const statement = connection.prepare(obj.sql);
+		const bindings = formatBindings(obj.bindings);
+
+		const method = obj.method;
+		let useAll: boolean;
+		switch (method) {
+			case "insert":
+			case "update":
+				useAll = Boolean(obj.returning);
+				break;
+			case "counter":
+			case "del":
+				useAll = false;
+				break;
+			default:
+				useAll = true;
+		}
+		if (method == null) {
+			const sql = obj.sql.trim().toLowerCase();
+			useAll = Boolean(obj.returning) || sql.startsWith("select");
+		}
+
+		if (useAll) {
+			obj.response = await statement.all(...bindings);
+			return obj;
+		}
+
+		const response = await statement.run(...bindings);
+		obj.response = response;
+		obj.context = {
+			lastID: response.lastInsertRowid,
+			changes: response.changes,
+		};
+
+		return obj;
+	}
+}
+NodeSqliteClient.prototype.driverName = "node:sqlite";
+
 const filename = join(appDir(), "cross-seed.db");
-const rawSqliteHandle = new Sqlite(filename);
-rawSqliteHandle.pragma("journal_mode = WAL");
-rawSqliteHandle.close();
 
 export const db = knex({
-	client: "better-sqlite3",
+	client: NodeSqliteClient,
 	connection: { filename },
 	migrations: { migrationSource: migrations },
 	useNullAsDefault: true,

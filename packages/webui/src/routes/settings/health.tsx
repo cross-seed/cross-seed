@@ -133,7 +133,7 @@ function HealthPage() {
           </div>
 
           {!db ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               No database diagnostics available.
             </p>
           ) : (
@@ -151,7 +151,7 @@ function HealthPage() {
                   <p className="text-base font-semibold">
                     {formatSizeValue(db.sizes.db)}
                   </p>
-                  <p className="text-muted-foreground mt-1 break-all font-mono text-xs">
+                  <p className="text-muted-foreground mt-1 font-mono text-xs break-all">
                     {db.path}
                   </p>
                 </div>
@@ -195,7 +195,7 @@ function HealthPage() {
               </div>
 
               {db.dbstatError && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   Table size breakdown unavailable: {db.dbstatError}
                 </p>
               )}

@@ -1,5 +1,5 @@
-import Sqlite from "better-sqlite3";
 import { stat } from "fs/promises";
+import { DatabaseSync } from "node:sqlite";
 import { join } from "path";
 import { appDir } from "../configuration.js";
 
@@ -52,21 +52,32 @@ export async function collectDbDiagnostics(): Promise<DbDiagnostics> {
 
 		if (dbBytes === null) return diagnostics;
 
-		let sqlite: Sqlite.Database | null = null;
+		let sqlite: DatabaseSync | null = null;
 		try {
-			sqlite = new Sqlite(dbPath, {
-				readonly: true,
-				fileMustExist: true,
+			sqlite = new DatabaseSync(dbPath, {
+				readOnly: true,
 			});
-			const pageSize = sqlite.pragma("page_size", {
-				simple: true,
-			}) as number;
-			const pageCount = sqlite.pragma("page_count", {
-				simple: true,
-			}) as number;
-			const freelistCount = sqlite.pragma("freelist_count", {
-				simple: true,
-			}) as number;
+			const pageSizeRow = sqlite.prepare("PRAGMA page_size").get() as
+				| { page_size?: number }
+				| undefined;
+			const pageCountRow = sqlite.prepare("PRAGMA page_count").get() as
+				| { page_count?: number }
+				| undefined;
+			const freelistCountRow = sqlite
+				.prepare("PRAGMA freelist_count")
+				.get() as { freelist_count?: number } | undefined;
+			const pageSize =
+				typeof pageSizeRow?.page_size === "number"
+					? pageSizeRow.page_size
+					: null;
+			const pageCount =
+				typeof pageCountRow?.page_count === "number"
+					? pageCountRow.page_count
+					: null;
+			const freelistCount =
+				typeof freelistCountRow?.freelist_count === "number"
+					? freelistCountRow.freelist_count
+					: null;
 
 			diagnostics.pageSize = pageSize;
 			diagnostics.pageCount = pageCount;
