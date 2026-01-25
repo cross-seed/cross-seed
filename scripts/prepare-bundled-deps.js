@@ -14,10 +14,6 @@ const bundles = [
 		name: "@cross-seed/shared",
 		src: path.join(rootDir, "packages", "shared"),
 	},
-	{
-		name: "webui",
-		src: path.join(rootDir, "packages", "webui"),
-	},
 ];
 
 const packageDirForName = (name) => {

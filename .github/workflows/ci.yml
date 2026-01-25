@@ -32,15 +32,48 @@ jobs:
             - run: npm run typecheck
             - run: npm run build
             - run: npm run test
-            - name: Smoke test npm tarball
+            - name: Build npm tarball
               run: |
                   set -euo pipefail
                   npm -w packages/shared run build
                   pack_dir="$(mktemp -d)"
                   (cd packages/cross-seed && npm pack --workspaces=false --pack-destination "$pack_dir")
                   tarball="$(ls "$pack_dir"/cross-seed-*.tgz)"
-                  npm -C "$pack_dir" install "file:$tarball" --no-save --omit=dev
-                  node "$pack_dir/node_modules/cross-seed/dist/cmd.js" --version
+                  cp "$tarball" "$GITHUB_WORKSPACE/cross-seed.tgz"
+            - name: Smoke test npm tarball
+              run: |
+                  set -euo pipefail
+                  npm -C "$GITHUB_WORKSPACE" install "file:cross-seed.tgz" --no-save --omit=dev
+                  node "$GITHUB_WORKSPACE/node_modules/cross-seed/dist/cmd.js" --version
+            - name: Upload npm tarball
+              uses: actions/upload-artifact@v4
+              with:
+                  name: cross-seed-tarball
+                  path: cross-seed.tgz
+                  if-no-files-found: error
+
+    tarball-windows:
+        needs: native
+        runs-on: windows-latest
+        steps:
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - uses: actions/download-artifact@v4
+              with:
+                  name: cross-seed-tarball
+            - name: Show versions
+              run: |
+                  node -v
+                  npm -v
+                  npm config get prefix
+                  npm root -g
+            - name: Install tarball globally
+              run: |
+                  npm install -g .\cross-seed.tgz
+            - name: Run cross-seed
+              run: |
+                  cross-seed --version
 
     docker-meta:
         if: ${{ github.event_name != 'pull_request' }}

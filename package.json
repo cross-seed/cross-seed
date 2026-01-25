@@ -13,7 +13,9 @@
 	"scripts": {
 		"test": "npm --workspaces run test --if-present",
 		"coverage": "npm --workspaces run coverage --if-present",
-		"build": "npm -w packages/cross-seed run build && npm -w packages/api-types run build && npm -w packages/webui run build",
+		"build": "npm -w packages/cross-seed run build:all",
+		"build:api-types": "npm -w packages/api-types run build",
+		"build:webui": "npm -w packages/webui run build",
 		"build:all": "npm run build",
 		"watch": "npm -w packages/cross-seed run watch",
 		"dev": "concurrently --names \"TS,BE,FE\" --prefix-colors \"blue,green,magenta\" \"npm -w packages/cross-seed run watch\" \"npm -w packages/cross-seed run dev\" \"npm -w packages/webui run dev\"",
