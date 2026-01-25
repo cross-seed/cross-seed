@@ -53,6 +53,23 @@ jobs:
           } else {
             Write-Host "zod not found under cross-seed/node_modules"
           }
+      - name: Dump shared package + configSchema
+        run: |
+          $globalModules = npm root -g
+          $sharedPkg = Join-Path $globalModules "cross-seed\\node_modules\\@cross-seed\\shared\\package.json"
+          $sharedSchema = Join-Path $globalModules "cross-seed\\node_modules\\@cross-seed\\shared\\dist\\configSchema.js"
+          Write-Host "shared package.json: $sharedPkg"
+          if (Test-Path $sharedPkg) {
+            Get-Content $sharedPkg
+          } else {
+            Write-Host "shared package.json not found"
+          }
+          Write-Host "shared configSchema.js: $sharedSchema"
+          if (Test-Path $sharedSchema) {
+            Get-Content $sharedSchema
+          } else {
+            Write-Host "shared configSchema.js not found"
+          }
       - name: Check global zod install
         run: |
           npm ls -g zod --all
