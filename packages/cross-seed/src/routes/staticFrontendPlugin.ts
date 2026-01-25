@@ -1,16 +1,11 @@
 import { FastifyInstance } from "fastify";
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { dirname, extname, join } from "path";
+import { extname, join } from "path";
 import { isTruthy } from "../utils.js";
 import ErrnoException = NodeJS.ErrnoException;
 
 const SENTINEL_BASE_PATH = "/__CROSS_SEED_BASE_PATH__";
-const require = createRequire(import.meta.url);
-const STATIC_ROOT = join(
-	dirname(require.resolve("webui/package.json")),
-	"dist",
-);
+const STATIC_ROOT = join(import.meta.dirname, "..", "..", "dist", "webui");
 const INDEX_HTML_PATH = join(STATIC_ROOT, "index.html");
 const UTF8 = { encoding: "utf-8" } as const;
 const MIME_TYPES: Record<string, string> = {
