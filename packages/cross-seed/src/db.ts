@@ -1,6 +1,7 @@
 import { unlink } from "fs/promises";
 import knex from "knex";
-import BetterSqlite3Client from "knex/lib/dialects/better-sqlite3/index.js";
+import type { Knex } from "knex";
+import BetterSqlite3ClientImport from "knex/lib/dialects/better-sqlite3/index.js";
 import ms from "ms";
 import { DatabaseSync } from "node:sqlite";
 import { basename, join } from "path";
@@ -28,6 +29,23 @@ import {
 	yieldToEventLoop,
 } from "./utils.js";
 
+type KnexClientCtor = typeof Knex.Client;
+const BetterSqlite3Client =
+	BetterSqlite3ClientImport as unknown as KnexClientCtor;
+
+const formatBindings = (bindings?: Array<unknown>) => {
+	if (!bindings) return [];
+	return bindings.map((binding) => {
+		if (binding instanceof Date) {
+			return binding.valueOf();
+		}
+		if (typeof binding === "boolean") {
+			return Number(binding);
+		}
+		return binding;
+	});
+};
+
 export class NodeSqliteClient extends BetterSqlite3Client {
 	_driver() {
 		return DatabaseSync;
@@ -35,7 +53,9 @@ export class NodeSqliteClient extends BetterSqlite3Client {
 
 	// Get a raw connection from the database, returning a promise with the connection object.
 	async acquireRawConnection() {
-		const connection = new this.driver(this.connectionSettings.filename);
+		const { filename } = this
+			.connectionSettings as Knex.BetterSqlite3ConnectionConfig;
+		const connection = new this.driver(filename);
 		connection.exec("pragma journal_mode = WAL;");
 		return connection;
 	}
@@ -56,7 +76,7 @@ export class NodeSqliteClient extends BetterSqlite3Client {
 		}
 
 		const statement = connection.prepare(obj.sql);
-		const bindings = this._formatBindings(obj.bindings);
+		const bindings = formatBindings(obj.bindings);
 
 		const method = obj.method;
 		let useAll: boolean;
@@ -92,7 +112,6 @@ export class NodeSqliteClient extends BetterSqlite3Client {
 		return obj;
 	}
 }
-// @ts-expect-error set the driver name
 NodeSqliteClient.prototype.driverName = "node:sqlite";
 
 const filename = join(appDir(), "cross-seed.db");
