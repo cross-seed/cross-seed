@@ -661,13 +661,16 @@ export async function findAllSearchees(
 		Mutex.CREATE_ALL_SEARCHEES,
 		{ useQueue: true },
 		async () => {
-			if (Array.isArray(torrents)) {
+			const explicitTorrents = Array.isArray(torrents)
+				? torrents.map((torrent) => torrent.trim()).filter(Boolean)
+				: [];
+			if (explicitTorrents.length) {
 				const torrentInfos = await flatMapAsync(clients, (client) =>
 					client.getAllTorrents(),
 				);
 				rawSearchees.push(
 					...(
-						await mapAsync(torrents, (torrent) =>
+						await mapAsync(explicitTorrents, (torrent) =>
 							createSearcheeFromTorrentFile(
 								torrent,
 								torrentInfos,
