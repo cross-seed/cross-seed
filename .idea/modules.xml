@@ -2,10 +2,9 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$USER_HOME$/.cross-seed/config.iml" filepath="$USER_HOME$/.cross-seed/config.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/cross-seed.iml" filepath="$PROJECT_DIR$/.idea/cross-seed.iml" />
+      <module fileurl="file://$PROJECT_DIR$/packages/api-types/api-types.iml" filepath="$PROJECT_DIR$/packages/api-types/api-types.iml" />
+      <module fileurl="file://$PROJECT_DIR$/packages/cross-seed/cross-seed.iml" filepath="$PROJECT_DIR$/packages/cross-seed/cross-seed.iml" />
       <module fileurl="file://$PROJECT_DIR$/packages/shared/shared.iml" filepath="$PROJECT_DIR$/packages/shared/shared.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../cross-seed.org/website.iml" filepath="$PROJECT_DIR$/../cross-seed.org/website.iml" />
       <module fileurl="file://$PROJECT_DIR$/packages/webui/webui.iml" filepath="$PROJECT_DIR$/packages/webui/webui.iml" />
     </modules>
   </component>
