@@ -132,20 +132,20 @@ export default function TrackerEditSheet({
       return;
     }
 
-    if (!apikey.trim()) {
-      toast.error('API key is required');
-      return;
-    }
-
     if (mode === 'edit' && tracker) {
+      const trimmedApikey = apikey.trim();
       updateIndexer({
         id: tracker.id,
         name: name.trim() || null,
         url: url.trim(),
-        apikey: apikey.trim(),
         enabled,
+        ...(trimmedApikey ? { apikey: trimmedApikey } : {}),
       });
     } else if (mode === 'create') {
+      if (!apikey.trim()) {
+        toast.error('API key is required');
+        return;
+      }
       createIndexer({
         name: name.trim() || undefined,
         url: url.trim(),
@@ -222,15 +222,21 @@ export default function TrackerEditSheet({
             </div>
 
             <div className="grid gap-3">
-              <Label htmlFor="apikey">API Key</Label>
+              <Label htmlFor="apikey">
+                API Key{mode === 'edit' ? ' (leave blank to keep current)' : ''}
+              </Label>
               <Input
                 id="apikey"
                 type="password"
                 value={apikey}
                 onChange={(e) => setApikey(e.target.value)}
-                placeholder="Enter API key"
+                placeholder={
+                  mode === 'edit'
+                    ? 'Leave blank to keep current key'
+                    : 'Enter API key'
+                }
                 autoComplete="off"
-                required
+                required={mode === 'create'}
               />
             </div>
 
