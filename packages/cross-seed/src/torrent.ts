@@ -466,28 +466,48 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
 			searchees = await flatMapAsync(clients, async (client) => {
-				const { searchees } = await client.getClientSearchees({
-					includeFiles: true,
-					includeTrackers: true,
-				});
-				return searchees;
+				try {
+					const { searchees } = await client.getClientSearchees({
+						includeFiles: true,
+						includeTrackers: true,
+					});
+					return searchees;
+				} catch (e) {
+					const message =
+						e instanceof Error ? e.message : String(e ?? "");
+					logger.warn({
+						label: client.label,
+						message: `Indexing client torrents failed; disabling client until next retry: ${message}`,
+					});
+					logger.debug(e);
+					return [];
+				}
 			});
 		}
 	} else {
 		if (torrentDir) {
 			searchees = await indexTorrentDir(torrentDir);
 		} else {
-			searchees = await flatMapAsync(
-				clients,
-				async (client) =>
-					(
+			searchees = await flatMapAsync(clients, async (client) => {
+				try {
+					return (
 						await client.getClientSearchees({
 							newSearcheesOnly: true,
 							includeFiles: true,
 							includeTrackers: true,
 						})
-					).newSearchees,
-			);
+					).newSearchees;
+				} catch (e) {
+					const message =
+						e instanceof Error ? e.message : String(e ?? "");
+					logger.warn({
+						label: client.label,
+						message: `Indexing client torrents failed; disabling client until next retry: ${message}`,
+					});
+					logger.debug(e);
+					return [];
+				}
+			});
 		}
 	}
 	if (!seasonFromEpisodes) return;
