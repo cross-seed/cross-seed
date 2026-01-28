@@ -34,6 +34,7 @@ import {
   TestTube,
   ToggleLeft,
   ToggleRight,
+  Trash,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import TrackerViewSheet from '@/components/settings/TrackerViewSheet';
@@ -77,6 +78,7 @@ function TrackerSettings() {
     null,
   );
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
+  const [deletingTracker, setDeletingTracker] = useState<number | null>(null);
 
   const { data: indexers } = useSuspenseQuery(
     trpc.indexers.getAll.queryOptions(),
@@ -129,6 +131,26 @@ function TrackerSettings() {
       },
       onError: (error) => {
         toast.error(`Failed to merge tracker data: ${error.message}`);
+      },
+    }),
+  );
+
+  const { mutate: deleteIndexer } = useMutation(
+    trpc.indexers.delete.mutationOptions({
+      onSuccess: async (_result, variables) => {
+        setDeletingTracker(null);
+        toast.success('Tracker deleted successfully');
+        await queryClient.invalidateQueries({
+          queryKey: trpc.indexers.getAll.queryKey(),
+        });
+        if (selectedTracker?.id === variables.id) {
+          setSelectedTracker(null);
+          setViewSheetOpen(false);
+        }
+      },
+      onError: (error) => {
+        setDeletingTracker(null);
+        toast.error(`Failed to delete tracker: ${error.message}`);
       },
     }),
   );
@@ -283,6 +305,12 @@ function TrackerSettings() {
     setMergeDialogOpen(true);
   };
 
+  const handleDeleteTracker = (indexer: Tracker) => {
+    setOpenDropdown(null);
+    setDeletingTracker(indexer.id);
+    deleteIndexer({ id: indexer.id });
+  };
+
   const handleMergeDialogOpenChange = (open: boolean) => {
     setMergeDialogOpen(open);
     if (!open) {
@@ -424,6 +452,20 @@ function TrackerSettings() {
                             Merge
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTracker(indexer);
+                          }}
+                          disabled={deletingTracker === indexer.id}
+                        >
+                          <Trash className="mr-2 h-4 w-4" />
+                          {deletingTracker === indexer.id
+                            ? 'Deleting...'
+                            : 'Delete'}
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
