@@ -46,6 +46,10 @@ const run = (cmd, argv) => {
 	const res = spawnSync(cmd, argv, { stdio: "inherit", cwd: pkgDir });
 	if (res.status !== 0) process.exit(res.status ?? 1);
 };
+const runRoot = (cmd, argv) => {
+	const res = spawnSync(cmd, argv, { stdio: "inherit", cwd: rootDir });
+	if (res.status !== 0) process.exit(res.status ?? 1);
+};
 const runGh = (argv) => {
 	const res = spawnSync(ghCmd, argv, { stdio: "inherit", cwd: rootDir });
 	if (res.status !== 0) process.exit(res.status ?? 1);
@@ -91,6 +95,7 @@ if (!skipRelease) {
 
 run(npmCmd, ["--workspaces=false", "login"]);
 run(npmCmd, ["--workspaces=false", "version", rel]);
+runRoot(npmCmd, ["install", "--package-lock-only"]);
 
 const pkgJson = JSON.parse(
 	fs.readFileSync(path.join(pkgDir, "package.json"), "utf8"),
