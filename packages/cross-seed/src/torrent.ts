@@ -40,9 +40,13 @@ import {
 	getLargestFile,
 	getMovieKeys,
 	getSeasonKeys,
+	removeIndexedSearcheesByInfoHashes,
+	removeIndexedSearcheesByPaths,
+	SearcheeSource,
 	SearcheeLabel,
 	SearcheeWithInfoHash,
 	SearcheeWithoutInfoHash,
+	upsertIndexedSearchees,
 } from "./searchee.js";
 import {
 	createKeyTitle,
@@ -456,6 +460,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 				message: "Indexing torrentDir for reverse lookup...",
 			});
 			searchees = await loadTorrentDirLight(torrentDir);
+			await upsertIndexedSearchees(searchees, SearcheeSource.TORRENT);
 			if (clients.length) {
 				infoHashPathMap = await clients[0].getAllDownloadDirs({
 					metas: searchees,
@@ -560,6 +565,7 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 		const res = await createSearcheeFromTorrentFile(filePath, []);
 		if (res.isOk()) newSearchees.push(res.unwrap());
 	}
+	await upsertIndexedSearchees(newSearchees, SearcheeSource.TORRENT);
 
 	const rows = await db("torrent").select("file_path", "info_hash");
 	const toDelete = rows.filter((row) => !dirContents.has(row.file_path));
@@ -576,6 +582,10 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 				batch.map((row) => row.info_hash),
 			)
 			.del();
+		await removeIndexedSearcheesByInfoHashes(
+			SearcheeSource.TORRENT,
+			batch.map((row) => row.info_hash),
+		);
 	});
 
 	return newSearchees;
@@ -593,6 +603,10 @@ export async function indexTorrentsAndDataDirs(
 			).map((r) => r.info_hash);
 			await inBatches(hashes, async (batch) => {
 				await db("ensemble").whereIn("info_hash", batch).del();
+				await removeIndexedSearcheesByInfoHashes(
+					SearcheeSource.CLIENT,
+					batch,
+				);
 			});
 			await db("client_searchee").del();
 		} else {
@@ -611,6 +625,10 @@ export async function indexTorrentsAndDataDirs(
 			);
 			await inBatches(hashes, async (batch) => {
 				await db("ensemble").whereIn("info_hash", batch).del();
+				await removeIndexedSearcheesByInfoHashes(
+					SearcheeSource.TORRENT,
+					batch,
+				);
 			});
 			await db("torrent").del();
 		}
@@ -621,6 +639,7 @@ export async function indexTorrentsAndDataDirs(
 					.whereIn("path", batch)
 					.whereNull("client_host")
 					.del();
+				await removeIndexedSearcheesByPaths(SearcheeSource.DATA, batch);
 			});
 			await db("data").del();
 		} else {
@@ -632,6 +651,7 @@ export async function indexTorrentsAndDataDirs(
 					.whereIn("path", batch)
 					.whereNull("client_host")
 					.del();
+				await removeIndexedSearcheesByPaths(SearcheeSource.DATA, batch);
 			});
 		}
 		if (!seasonFromEpisodes) await db("ensemble").del();
