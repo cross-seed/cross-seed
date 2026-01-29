@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { db } from "../db.js";
 import { Label, logger } from "../logger.js";
-import { assembleUrl } from "../torznab.js";
+import { assembleUrl, updateCapsForIndexer } from "../torznab.js";
 import { USER_AGENT } from "../constants.js";
 import { getAllIndexers, type Indexer } from "../indexers.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
@@ -180,12 +180,16 @@ export async function createIndexer(
 
 	const indexer = deserializeRawRow(rawRow);
 
+	await updateCapsForIndexer(indexer);
+	const refreshedRow = await db("indexer").where({ id: indexer.id }).first();
+	const refreshedIndexer = deserializeRawRow(refreshedRow);
+
 	logger.verbose({
 		label: Label.TORZNAB,
 		message: `Created indexer: ${input.name || input.url}`,
 	});
 
-	return indexer;
+	return refreshedIndexer;
 }
 
 export async function updateIndexer(
@@ -215,12 +219,21 @@ export async function updateIndexer(
 	const updatedRawRow = await db("indexer").where({ id }).first();
 
 	const updatedIndexer = deserializeRawRow(updatedRawRow);
+	const shouldUpdateCaps =
+		updates.url !== undefined ||
+		updates.apikey !== undefined ||
+		!updatedIndexer.categories;
+	if (shouldUpdateCaps) {
+		await updateCapsForIndexer(updatedIndexer);
+	}
+	const refreshedRow = await db("indexer").where({ id }).first();
+	const refreshedIndexer = deserializeRawRow(refreshedRow);
 	logger.verbose({
 		label: Label.TORZNAB,
-		message: `Updated indexer: ${updatedIndexer.name || updatedIndexer.url}`,
+		message: `Updated indexer: ${refreshedIndexer.name || refreshedIndexer.url}`,
 	});
 
-	return resultOf(updatedIndexer);
+	return resultOf(refreshedIndexer);
 }
 
 export async function deleteIndexer(

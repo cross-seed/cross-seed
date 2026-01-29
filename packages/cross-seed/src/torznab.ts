@@ -687,27 +687,59 @@ export async function updateCaps(): Promise<void> {
 		await updateIndexerCapsById(indexerId, caps);
 	}
 	for (const indexer of indexers) {
-		if (!indexer.categories) {
-			logger.error({
-				label: Label.TORZNAB,
-				message: `Indexer ${indexer.name ?? indexer.url} failed to fetch caps`,
-			});
-			continue;
-		}
-		const supported: string[] = [];
-		const unsupported: string[] = [];
-		for (const mediaType of Object.keys(MediaType)) {
-			if (indexerDoesSupportMediaType(MediaType[mediaType], indexer)) {
-				supported.push(mediaType);
-			} else {
-				unsupported.push(mediaType);
-			}
-		}
-		logger.verbose({
-			label: Label.TORZNAB,
-			message: `${indexer.name ?? indexer.url} MediaTypes: Supported [${supported.join(", ")}] | Unsupported [${unsupported.join(", ")}]`,
-		});
+		logIndexerMediaTypes(indexer);
 	}
+}
+
+export async function updateCapsForIndexer(indexer: Indexer): Promise<void> {
+	try {
+		const caps = await fetchCaps(indexer);
+		await updateIndexerCapsById(indexer.id, caps);
+		const updatedIndexer: Indexer = {
+			...indexer,
+			searchCap: caps.search,
+			tvSearchCap: caps.tvSearch,
+			movieSearchCap: caps.movieSearch,
+			musicSearchCap: caps.musicSearch,
+			audioSearchCap: caps.audioSearch,
+			bookSearchCap: caps.bookSearch,
+			movieIdCaps: caps.movieIdSearch,
+			tvIdCaps: caps.tvIdSearch,
+			categories: caps.categories,
+			limits: caps.limits,
+		};
+		logIndexerMediaTypes(updatedIndexer);
+	} catch (e) {
+		const message = e instanceof Error ? e.message : String(e ?? "");
+		logger.warn({
+			label: Label.TORZNAB,
+			message: `Indexer ${indexer.name ?? indexer.url} failed to fetch caps: ${message}`,
+		});
+		logger.debug(e);
+	}
+}
+
+function logIndexerMediaTypes(indexer: Indexer): void {
+	if (!indexer.categories) {
+		logger.error({
+			label: Label.TORZNAB,
+			message: `Indexer ${indexer.name ?? indexer.url} failed to fetch caps`,
+		});
+		return;
+	}
+	const supported: string[] = [];
+	const unsupported: string[] = [];
+	for (const mediaType of Object.keys(MediaType)) {
+		if (indexerDoesSupportMediaType(MediaType[mediaType], indexer)) {
+			supported.push(mediaType);
+		} else {
+			unsupported.push(mediaType);
+		}
+	}
+	logger.verbose({
+		label: Label.TORZNAB,
+		message: `${indexer.name ?? indexer.url} MediaTypes: Supported [${supported.join(", ")}] | Unsupported [${unsupported.join(", ")}]`,
+	});
 }
 
 /**
