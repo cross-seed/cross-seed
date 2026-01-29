@@ -16,6 +16,7 @@ import {
 	ALL_SPACES_REGEX,
 	ALL_SQUARE_BRACKETS_REGEX,
 	ANIME_REGEX,
+	EBOOK_AND_MUSIC_RELEASE_REGEX,
 	EP_REGEX,
 	JSON_VALUES_REGEX,
 	LEVENSHTEIN_DIVISOR,
@@ -367,6 +368,12 @@ export function cleanseSeparators(str: string): string {
 
 export function cleanTitle(title: string): string {
 	return cleanseSeparators(title).match(SCENE_TITLE_REGEX)!.groups!.title;
+}
+
+export function cleanBookAndAudioTitle(title: string): string {
+	return cleanseSeparators(title)
+		.replace(EBOOK_AND_MUSIC_RELEASE_REGEX, "")
+		.trim();
 }
 
 export function reformatTitleForSearching(name: string): string {
