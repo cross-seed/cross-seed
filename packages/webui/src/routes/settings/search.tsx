@@ -66,7 +66,7 @@ function SearchRssSettings() {
                 {/* TODO: Error states or validations don't seem to work for these fields */}
 
                 <form.AppField name="delay">
-                  {(field) => <field.TextField label="Delay" type="number" />}
+                  {(field) => <field.NumberField label="Delay" />}
                 </form.AppField>
                 <form.AppField name="matchMode">
                   {(field) => (
@@ -83,9 +83,7 @@ function SearchRssSettings() {
                   {(field) => <field.DurationField label="Search Timeout" />}
                 </form.AppField>
                 <form.AppField name="searchLimit">
-                  {(field) => (
-                    <field.TextField label="Search Limit" type="number" />
-                  )}
+                  {(field) => <field.NumberField label="Search Limit" />}
                 </form.AppField>
                 <form.AppField name="excludeOlder">
                   {(field) => <field.DurationField label="Exclude Older" />}

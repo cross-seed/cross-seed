@@ -46,29 +46,29 @@ function SubmitButton({ label, actionLabel, size = 'md' }: SubmitButtonProps) {
                 <>{label ?? 'Save'}</>
               )}
             </Button>
-            {Object.keys(errors).length > 0 && (
-              <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-                <h4 className="font-medium">
-                  Please fix the following errors:
-                </h4>
-                <ul className="mt-2 list-disc pl-5">
-                  {JSON.stringify(fieldMeta)}
-                  {Object.entries(errors).map(([field, error]) => (
-                    <li key={field}>
-                      {field}:{' '}
-                      {typeof error === 'string'
-                        ? error
-                        : JSON.stringify(error)}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {/* Debugging section */}
+            {/* {Object.keys(errors).length > 0 && ( */}
+            {/*   <div className="mt-4 rounded-md bg-red-50 p-4 text-sm text-red-700"> */}
+            {/*     <h4 className="font-medium"> */}
+            {/*       Please fix the following errors: */}
+            {/*     </h4> */}
+            {/*     <ul className="mt-2 list-disc pl-5"> */}
+            {/*       {JSON.stringify(fieldMeta)}
+            {/*       {Object.entries(errors).map(([field, error]) => ( */}
+            {/*         <li key={field}> */}
+            {/*           {field}:{' '} */}
+            {/*           {typeof error === 'string' */}
+            {/*             ? error */}
+            {/*             : JSON.stringify(error)} */}
+            {/*         </li> */}
+            {/*       ))} */}
+            {/*     </ul> */}
+            {/*   </div> */}
+            {/* )} */}
           </div>
         )}
       </form.Subscribe>
 
-      {/* Debugging section */}
       {/* <form.Subscribe> */}
       {/*   {(state) => ( */}
       {/*     <div */}

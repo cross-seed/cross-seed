@@ -7,6 +7,7 @@ export const { useAppForm, withForm } = createFormHook({
   formContext,
   fieldComponents: {
     TextField: lazy(() => import('@/components/Form/text-field')),
+    NumberField: lazy(() => import('@/components/Form/number-field')),
     SwitchField: lazy(() => import('@/components/Form/switch-field')),
     SelectField: lazy(() => import('@/components/Form/select-field')),
     ArrayField: lazy(() => import('@/components/Form/array-field')),
