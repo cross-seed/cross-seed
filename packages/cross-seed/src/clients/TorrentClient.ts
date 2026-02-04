@@ -29,6 +29,15 @@ import Transmission from "./Transmission.js";
 
 const activeClients: TorrentClient[] = [];
 
+export function setClientsForTesting(clients: TorrentClient[]): void {
+	activeClients.length = 0;
+	activeClients.push(...clients);
+}
+
+export function resetClientsForTesting(): void {
+	activeClients.length = 0;
+}
+
 type TorrentClientType =
 	| Label.QBITTORRENT
 	| Label.RTORRENT
