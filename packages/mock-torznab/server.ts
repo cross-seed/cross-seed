@@ -191,6 +191,10 @@ function toXmlSerializable(torrent: NormalizedTorrent) {
 	};
 }
 
+function normalizeSearchToken(value: string): string {
+	return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 	const baseUrl = options.baseUrl ?? "http://mock-torznab.local";
 	const state: MockTorznabState = {
@@ -292,9 +296,9 @@ export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 				}
 				const filtered = q
 					? allTorrents.filter((torrent) =>
-							torrent.title
-								.toLowerCase()
-								.includes(q.toLowerCase()),
+							normalizeSearchToken(torrent.title).includes(
+								normalizeSearchToken(q),
+							),
 						)
 					: allTorrents;
 				const paged = filtered.slice(offset, offset + limit);
