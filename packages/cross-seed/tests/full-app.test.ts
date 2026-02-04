@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -22,7 +22,7 @@ const { getDefaultRuntimeConfig, createAppDirHierarchy } =
 	await import("../src/configuration.js");
 const { setRuntimeConfig } = await import("../src/runtimeConfig.js");
 const { createIndexer } = await import("../src/services/indexerService.js");
-const { Action } = await import("../src/constants.js");
+const { Action, LinkType } = await import("../src/constants.js");
 const { resetClientsForTesting, setClientsForTesting } =
 	await import("../src/clients/TorrentClient.js");
 const { getMediaType } = await import("../src/searchee.js");
@@ -300,5 +300,63 @@ describe.sequential("full app flows", () => {
 			.map((file) => parseMetadataFromFilename(file))
 			.filter((entry) => entry.infoHash === meta.infoHash);
 		expect(parsed.length).toBeGreaterThanOrEqual(1);
+	});
+
+	it("hardlinks files when linkDirs are configured", async () => {
+		const dataDir = join(TEST_ROOT, "hardlink", "data");
+		const outputDir = join(TEST_ROOT, "hardlink", "output");
+		const linkDir = join(TEST_ROOT, "hardlink", "links");
+		await mkdir(dataDir, { recursive: true });
+		await mkdir(outputDir, { recursive: true });
+		await mkdir(linkDir, { recursive: true });
+
+		const fileName = "Show.Name.S01E04.1080p.WEB-DL-GROUP.mkv";
+		const filePath = join(dataDir, fileName);
+		const fileSize = 1024 * 128;
+		await writeFile(filePath, Buffer.alloc(fileSize));
+
+		torznab.state.setTorrents([
+			{
+				id: "20",
+				title: fileName.replace(/\.mkv$/, ""),
+				torrentName: fileName,
+				files: [{ path: fileName, length: fileSize }],
+				tracker: "mock-torznab",
+			},
+		]);
+
+		const normalizedTorrent = torznab.state.torrents[0];
+		const meta = Metafile.decode(normalizedTorrent.torrentPayload);
+		const torrentPath = getTorrentSavePath(
+			meta,
+			getMediaType(meta),
+			normalizedTorrent.tracker,
+			outputDir,
+			{ cached: false },
+		);
+		await writeFile(torrentPath, meta.encode());
+
+		applyConfig({
+			action: Action.INJECT,
+			dataDirs: [dataDir],
+			outputDir,
+			useClientTorrents: false,
+			linkDirs: [linkDir],
+			linkType: LinkType.HARDLINK,
+			flatLinking: true,
+			includeSingleEpisodes: true,
+		});
+
+		const fakeClient = new FakeTorrentClient(fakeTorrent.server);
+		setClientsForTesting([fakeClient]);
+
+		const { injectSavedTorrents } = await import("../src/inject.js");
+		await injectSavedTorrents();
+
+		const linkedPath = join(linkDir, meta.files[0].path);
+		const sourceStat = await stat(filePath);
+		const linkedStat = await stat(linkedPath);
+		expect(linkedStat.ino).toBe(sourceStat.ino);
+		expect(linkedStat.dev).toBe(sourceStat.dev);
 	});
 });
