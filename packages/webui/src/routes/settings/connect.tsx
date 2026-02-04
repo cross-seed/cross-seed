@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import useConfigForm from '@/hooks/use-config-form';
-import { formOpts } from '@/components/Form/shared-form';
+import { defaultConnectFormValues } from '@/components/Form/shared-form';
 import { useAppForm } from '@/hooks/form';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
@@ -15,6 +15,9 @@ import { FormValidationProvider } from '@/contexts/Form/form-validation-provider
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { Page } from '@/components/Page';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
+import { RuntimeConfig } from '../../../../shared/configSchema';
+
+type ConnectFormData = z.infer<typeof connectValidationSchema>;
 
 function ConnectSettings() {
   const { isFieldRequired } = useConfigForm(connectValidationSchema);
@@ -22,7 +25,10 @@ function ConnectSettings() {
   const trpc = useTRPC();
   const { data: configData } = useQuery(
     trpc.settings.get.queryOptions(undefined, {
-      select: (data) => {
+      select: (data: {
+        config: RuntimeConfig;
+        apikey: string;
+      }): Partial<ConnectFormData> => {
         const fullDataset = formatConfigDataForForm(data.config);
         const filteredData = pickSchemaFields(
           connectValidationSchema,
@@ -38,8 +44,7 @@ function ConnectSettings() {
   const handleSubmit = useSettingsFormSubmit();
 
   const form = useAppForm({
-    ...formOpts,
-    defaultValues: configData ?? formOpts.defaultValues,
+    defaultValues: (configData ?? defaultConnectFormValues) as ConnectFormData,
     onSubmit: handleSubmit,
     validators: {
       onSubmit: connectValidationSchema,

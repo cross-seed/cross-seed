@@ -7,11 +7,13 @@ const runtimeShape = RUNTIME_CONFIG_SCHEMA.shape;
 export const generalValidationSchema = z.object({
   includeSingleEpisodes: runtimeShape.includeSingleEpisodes,
   includeNonVideos: runtimeShape.includeNonVideos,
-  blockList: runtimeShape.blockList.nullish(),
+  blockList: runtimeShape.blockList,
   snatchTimeout: runtimeShape.snatchTimeout.nullish(),
   autoResumeMaxDownload: runtimeShape.autoResumeMaxDownload,
   fuzzySizeThreshold: runtimeShape.fuzzySizeThreshold,
   seasonFromEpisodes: runtimeShape.seasonFromEpisodes.nullish(),
+  ignoreNonRelevantFilesToResume:
+    runtimeShape.ignoreNonRelevantFilesToResume.nullish(),
 });
 
 export const trackerValidationSchema = z.object({
@@ -61,29 +63,18 @@ export const connectValidationSchema = z.object({
   host: runtimeShape.host.nullish(),
   port: runtimeShape.port.nullish(),
   apiKey: runtimeShape.apiKey.nullish(),
-  radarr: z
-    .array(z.string().url().or(z.literal('')))
-    .transform((v) => v ?? [])
-    .nullable(),
-  sonarr: z
-    .array(z.string().url().or(z.literal('')))
-    .transform((v) => v ?? [])
-    .nullable(),
-  notificationWebhookUrls: z
-    .array(z.string().url().or(z.literal('')))
-    .optional(),
+  radarr: z.array(z.string().url().or(z.literal(''))).transform((v) => v ?? []),
+  sonarr: z.array(z.string().url().or(z.literal(''))).transform((v) => v ?? []),
+  notificationWebhookUrls: z.array(z.string().url().or(z.literal(''))),
 });
 
 export const directoryValidationSchema = z.object({
-  dataDirs: z
-    .array(z.string())
-    .transform((v) => v ?? [])
-    .nullable(),
+  dataDirs: z.array(z.string()).transform((v) => v ?? []),
   flatLinking: z
     .boolean()
     .transform((v) => (typeof v === 'boolean' ? v : false)),
   linkDir: z.string().nullish(),
-  linkDirs: z.array(z.string()).nullable(),
+  linkDirs: z.array(z.string()),
   linkType: z.nativeEnum(LinkType),
   maxDataDepth: z
     .number()
