@@ -1,0 +1,23 @@
+{
+	"name": "mock-torznab",
+	"version": "1.0.0",
+	"description": "A mock Torznab server.",
+	"main": "server.ts",
+	"type": "module",
+	"scripts": {
+		"start": "node server.ts",
+		"lint": "biome lint .",
+		"lint:fix": "biome lint --apply .",
+		"format": "biome format --write ."
+	},
+	"dependencies": {
+		"bencode": "^2.0.1",
+		"fast-xml-parser": "^4.0.0",
+		"fastify": "^4.0.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.2.2",
+		"@types/node": "^24.3.0",
+		"typescript": "^5.9.2"
+	}
+}
