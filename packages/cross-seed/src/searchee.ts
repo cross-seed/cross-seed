@@ -759,6 +759,7 @@ function organizeEnsembleKeys(
 			if (options.useFilters) continue;
 		}
 		if (options.useFilters && SEASON_REGEX.test(stem)) continue;
+		if (!hasExt(searchee.files, VIDEO_EXTENSIONS)) continue; // Anime regex matching is too loose
 		const animeKeys = getAnimeKeys(stem);
 		if (animeKeys) {
 			const info = getKeyMetaInfo(stem);

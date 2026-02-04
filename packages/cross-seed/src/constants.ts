@@ -26,7 +26,7 @@ export const IS_MULTI_EP_REGEX = /E\d+(?:[-.]?S\d+E\d|[-.]?E\d|[-.]\d)/i;
 export const SEASON_REGEX =
 	/^(?<title>.+?)[[(_.\s-]+(?<season>S(?:eason)?\s*\d+)(?=\b(?![_.\s~-]*E\d+))/i;
 export const BAD_SEASON_REGEX =
-	/^[[_.\s-]*[^[_.\s-]*?(?<season>S(?:eason)?\s*\d+)(?=\b(?![_.\s~-]*E\d+))/i;
+	/^[[_.\s-]*[^[_.\s-]*?(?<season>S\d+|(?:season)\s*\d+)(?=\b(?![_.\s~-]*E\d+))/i;
 export const MOVIE_REGEX =
 	/^(?<title>.+?)-?[_.\s][[(]?(?<year>(?:18|19|20)\d{2})[)\]]?(?![pix])/i;
 export const ANIME_REGEX =
@@ -44,7 +44,7 @@ export const REPACK_PROPER_REGEX =
 export const ARR_PROPER_REGEX = /(?:\b(?<arrtype>(?:Proper|\dv\d)))\b/;
 export const SCENE_TITLE_REGEX = /^(?:[a-z0-9]{3,5}-)?(?<title>.*)/;
 export const ARR_DIR_REGEX =
-	/^(?<title>(?!.*(?:(\d{3,4}[ipx])|([xh.]+26[4-6])|(dvd)|(mpeg)|(xvid)|(?:(he)|a)vc))[\p{L}\s:\w'’!();.,&–+-]+(?:\(\d{4}\))?)(?<id>\s[{[](?:tm|tv|im)db(?:id)?-\w+?[}\]])?$/iu;
+	/^(?<title>(?!.*(?:(\d{3,4}[ipx])|([xh.]+26[4-6])|(dvd)|(mpeg)|(xvid)|(?:(he)|a)vc|(?:uhd)|(?:blu[_.\s-]?ray)))[\p{L}\s:\w'’!();.,&–+-]+(?:\(\d{4}\))?)(?<id>\s[{[](?:tm|tv|im)db(?:id)?-\w+?[}\]])?$/iu;
 export const SONARR_SUBFOLDERS_REGEX =
 	/^(?:S(?:eason )?(?<seasonNum>\d{1,4}))$/i;
 export const NON_UNICODE_ALPHANUM_REGEX = /[^\p{L}\p{N}]+/giu;
