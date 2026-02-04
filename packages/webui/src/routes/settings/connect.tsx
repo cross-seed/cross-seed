@@ -83,11 +83,11 @@ function ConnectSettings() {
                 </div>
                 <div className="">
                   <form.AppField name="port" validators={{}}>
-                    {(field) => <field.TextField label="Port" type="number" />}
+                    {(field) => <field.NumberField label="port" />}
                   </form.AppField>
                 </div>
-                <div className="">
-                  <form.AppField name="apiKey" validators={{}}>
+                <div>
+                  <form.AppField name="apikey" validators={{}}>
                     {(field) => <field.TextField label="API Key" />}
                   </form.AppField>
                 </div>

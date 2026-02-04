@@ -273,9 +273,7 @@ function DirectorySettings() {
                       }
                     }
                   >
-                    {(field) => (
-                      <field.TextField label="Max Data Depth" type="number" />
-                    )}
+                    {(field) => <field.NumberField label="Max Data Depth" />}
                   </form.AppField>
                 </div>
               </fieldset>

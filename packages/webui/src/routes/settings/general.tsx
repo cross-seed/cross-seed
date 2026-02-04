@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { FieldInfo } from '@/components/Form/FieldInfo';
@@ -89,9 +88,9 @@ function GeneralSettings() {
                 <div className="">
                   <form.AppField name="fuzzySizeThreshold" validators={{}}>
                     {(field) => (
-                      <field.TextField
+                      <field.NumberField
                         label="Fuzzy Size Threshold"
-                        type="number"
+                        step="0.01"
                       />
                     )}
                   </form.AppField>
@@ -99,20 +98,14 @@ function GeneralSettings() {
                 <div className="">
                   <form.AppField name="seasonFromEpisodes" validators={{}}>
                     {(field) => (
-                      <field.TextField
-                        label="Season from Episodes"
-                        type="number"
-                      />
+                      <field.NumberField label="Season from Episodes" min="0" />
                     )}
                   </form.AppField>
                 </div>
                 <div className="">
                   <form.AppField name="autoResumeMaxDownload" validators={{}}>
                     {(field) => (
-                      <field.TextField
-                        label="Auto-resume Max Download"
-                        type="number"
-                      />
+                      <field.NumberField label="Auto-resume Max Download" />
                     )}
                   </form.AppField>
                 </div>
@@ -137,12 +130,7 @@ function GeneralSettings() {
                                   key={index}
                                   className="gap-y- mb-3 flex flex-col"
                                 >
-                                  <form.AppField
-                                    name={`blockList[${index}]`}
-                                    validators={{
-                                      onBlur: z.string(),
-                                    }}
-                                  >
+                                  <form.AppField name={`blockList[${index}]`}>
                                     {(subfield) => (
                                       <subfield.ArrayField
                                         showDelete={
