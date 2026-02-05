@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import path from 'path';
+import { realpathSync } from 'fs';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
@@ -25,6 +26,21 @@ export default defineConfig(({ command }) => ({
   },
   server: {
     port: 5173, // Default Vite port
+    fs: {
+      allow: [
+        path.resolve(__dirname),
+        path.resolve(__dirname, '../..'),
+        (() => {
+          try {
+            return realpathSync(
+              path.resolve(__dirname, '../../node_modules/vite'),
+            );
+          } catch {
+            return path.resolve(__dirname, '../../node_modules/vite');
+          }
+        })(),
+      ],
+    },
     proxy: {
       // Proxy tRPC requests to port 2468
       '/api/trpc': {

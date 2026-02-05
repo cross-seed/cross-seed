@@ -17,6 +17,16 @@ RUN npm run build:all && npm prune --omit=dev
 # Runtime layer
 FROM node:24-alpine
 WORKDIR /usr/src/cross-seed
+ARG BUILD_COMMIT_SHA
+ARG BUILD_BRANCH
+ARG BUILD_TAG
+ARG BUILD_MESSAGE
+ARG BUILD_DATE
+ENV BUILD_COMMIT_SHA=$BUILD_COMMIT_SHA \
+    BUILD_BRANCH=$BUILD_BRANCH \
+    BUILD_TAG=$BUILD_TAG \
+    BUILD_MESSAGE=$BUILD_MESSAGE \
+    BUILD_DATE=$BUILD_DATE
 RUN apk add catatonit curl tzdata
 COPY --from=build /usr/src/app/package*.json ./
 # Bring along pruned production deps and the workspace packages they link to.
