@@ -20,19 +20,13 @@ const MIME_TYPES: Record<string, string> = {
 	".svg": "image/svg+xml",
 	".ico": "image/x-icon",
 };
+const TEXT_EXT = [".html", ".css", ".js", ".mjs", ".json"];
 
 function injectBasePath(
-	content: string,
-	ext: string,
+	content: string | Buffer,
 	basePath: string,
-): string {
-	if (
-		ext === ".html" ||
-		ext === ".css" ||
-		ext === ".js" ||
-		ext === ".mjs" ||
-		ext === ".json"
-	) {
+): string | Buffer {
+	if (typeof content === "string") {
 		return content.replaceAll(SENTINEL_BASE_PATH, basePath);
 	}
 	return content;
@@ -55,12 +49,16 @@ export async function staticFrontendPlugin(
 			STATIC_ROOT,
 			...basePathRelativeUrl.split("/").filter(isTruthy),
 		);
-		let fileContents: string;
+		let fileContents: string | Buffer;
 		let fileExtension: string;
 
 		try {
-			fileContents = await readFile(desiredFilePath, UTF8);
 			fileExtension = extname(desiredFilePath);
+			const isText = TEXT_EXT.includes(fileExtension);
+			fileContents = await readFile(
+				desiredFilePath,
+				isText ? UTF8 : null,
+			);
 		} catch (e) {
 			if (
 				(e as ErrnoException).code == "ENOENT" ||
@@ -75,6 +73,6 @@ export async function staticFrontendPlugin(
 
 		return reply
 			.type(getContentType(fileExtension))
-			.send(injectBasePath(fileContents, fileExtension, basePath));
+			.send(injectBasePath(fileContents, basePath));
 	});
 }
