@@ -118,6 +118,60 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: authStatus } = useSuspenseQuery(
     trpc.auth.authStatus.queryOptions(),
   );
+  const { data: buildInfoResponse } = useSuspenseQuery(
+    trpc.meta.getBuildInfo.queryOptions(),
+  );
+  const buildInfo = buildInfoResponse?.build;
+  const buildVersion = buildInfoResponse?.version;
+  const buildTag = buildInfo?.tag ?? buildVersion;
+  const buildBranch = buildInfo?.branch ?? undefined;
+  const shortSha = buildInfo?.commitSha?.slice(0, 7);
+  const buildLine = [buildTag, shortSha, buildBranch]
+    .filter(Boolean)
+    .join(' · ');
+  const commitMessage = buildInfo?.message?.split('\n')[0]?.trim();
+  const buildDate = (() => {
+    if (!buildInfo?.date) return undefined;
+    const parsed = new Date(buildInfo.date);
+    if (Number.isNaN(parsed.getTime())) return buildInfo.date;
+    return parsed.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+    });
+  })();
+  const normalizedTag = buildInfo?.tag?.replace(/^v/i, '') ?? '';
+  const isVersionTrackingTag =
+    normalizedTag === 'latest' ||
+    /^\d+(\.\d+){0,2}([-.][0-9A-Za-z.]+)?$/.test(normalizedTag);
+  const formatVersion = (version?: string) => {
+    if (!version) return undefined;
+    return version.startsWith('v') ? version : `v${version}`;
+  };
+  const preferCommitInfo =
+    authStatus?.isDocker && buildInfo?.tag && !isVersionTrackingTag;
+  const commitLine = [shortSha, buildBranch, buildDate]
+    .filter(Boolean)
+    .join(' · ');
+  const hasCommitInfo = Boolean(commitLine || commitMessage);
+  const isSourceBuild =
+    !authStatus?.isDocker && !buildInfo?.tag && hasCommitInfo;
+  const isPublishedNpm =
+    !authStatus?.isDocker && !buildInfo?.tag && !hasCommitInfo;
+  const versionLabel = formatVersion(buildVersion);
+  const primaryLine = preferCommitInfo
+    ? commitLine || buildLine || versionLabel || ''
+    : isSourceBuild
+      ? commitLine || versionLabel || ''
+    : isPublishedNpm && versionLabel
+      ? `${versionLabel} (npm)`
+    : buildLine || versionLabel || '';
+  const secondaryLine = preferCommitInfo
+    ? versionLabel ?? ''
+    : isSourceBuild
+      ? versionLabel ?? commitMessage ?? ''
+    : commitMessage ?? '';
+  const hasBuildInfo = Boolean(primaryLine || secondaryLine);
 
   const { mutate: logout } = useMutation(
     trpc.auth.logOut.mutationOptions({
@@ -131,7 +185,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar variant="inset" {...props}>
-      <SidebarHeader className="relative flex px-4 pt-3.5 pb-2">
+      <SidebarHeader className="relative px-4 pt-3.5 pb-2">
         <div className="flex items-center gap-2">
           <img
             src={Logo}
@@ -141,6 +195,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           />
           <span className="text-xl font-bold">cross-seed</span>
         </div>
+        {hasBuildInfo && (
+          <div className="text-muted-foreground mt-0.5 space-y-0.5 text-xs">
+            {primaryLine && (
+              <div
+                title={
+                  preferCommitInfo || isSourceBuild ? commitMessage : undefined
+                }
+              >
+                {primaryLine}
+              </div>
+            )}
+            {secondaryLine && (
+              <div
+                className={preferCommitInfo ? 'opacity-70' : 'truncate'}
+                title={!preferCommitInfo ? commitMessage : undefined}
+              >
+                {secondaryLine}
+              </div>
+            )}
+          </div>
+        )}
       </SidebarHeader>
       <SidebarContent>
         {navItems.map((section) => (
