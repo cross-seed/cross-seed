@@ -148,11 +148,34 @@ jobs:
                       exit 1
                   fi
                   printf 'tags<<EOF\n%s\nEOF\n' "$tags" >> "$GITHUB_OUTPUT"
+            - name: Prepare build args
+              id: build-args
+              run: |
+                  set -euo pipefail
+                  echo "commit_sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+                  if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+                      echo "build_branch=" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "build_branch=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+                  fi
+                  echo "build_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+                  {
+                      echo "build_message<<EOF"
+                      git log -1 --pretty=%s
+                      echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
+                  echo "build_date=$(git log -1 --pretty=%cI)" >> "$GITHUB_OUTPUT"
             - name: Build and push temp image (${{ matrix.arch }})
               uses: docker/build-push-action@v5
               with:
                   push: true
                   platforms: ${{ matrix.platform }}
+                  build-args: |
+                      BUILD_COMMIT_SHA=${{ steps.build-args.outputs.commit_sha }}
+                      BUILD_BRANCH=${{ steps.build-args.outputs.build_branch }}
+                      BUILD_TAG=${{ steps.build-args.outputs.build_tag }}
+                      BUILD_MESSAGE=${{ steps.build-args.outputs.build_message }}
+                      BUILD_DATE=${{ steps.build-args.outputs.build_date }}
                   tags: |
                       ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
                       crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
