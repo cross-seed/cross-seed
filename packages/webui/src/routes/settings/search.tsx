@@ -1,5 +1,5 @@
 import { MatchMode } from '../../../../shared/constants';
-import { formOpts } from '../../components/Form/shared-form';
+import { defaultSearchFormValues } from '../../components/Form/shared-form';
 import { useAppForm } from '@/hooks/form';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
@@ -11,13 +11,20 @@ import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { createFileRoute } from '@tanstack/react-router';
 import { Page } from '@/components/Page';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
+import { RuntimeConfig } from '../../../../shared/configSchema';
+import z from 'zod';
+
+type SearchFormData = z.infer<typeof searchValidationSchema>;
 
 function SearchRssSettings() {
   const trpc = useTRPC();
   const { isFieldRequired } = useConfigForm(searchValidationSchema);
   const { data: configData } = useQuery(
     trpc.settings.get.queryOptions(undefined, {
-      select: (data) => {
+      select: (data: {
+        config: RuntimeConfig;
+        apikey: string;
+      }): Partial<SearchFormData> => {
         const fullDataset = formatConfigDataForForm(data.config);
         const filteredData = pickSchemaFields(
           searchValidationSchema,
@@ -33,8 +40,7 @@ function SearchRssSettings() {
   const handleSubmit = useSettingsFormSubmit();
 
   const form = useAppForm({
-    ...formOpts,
-    defaultValues: configData ?? formOpts.defaultValues,
+    defaultValues: (configData ?? defaultSearchFormValues) as SearchFormData,
     onSubmit: handleSubmit,
     validators: {
       onSubmit: searchValidationSchema,

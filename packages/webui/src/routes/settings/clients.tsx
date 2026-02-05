@@ -34,6 +34,10 @@ import { removeUserAndPassFromClientUrl } from '@/features/download-client-actio
 import { TDownloadClient } from '@/types/download-clients';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
+import z from 'zod';
+import { RuntimeConfig } from '../../../../shared/configSchema';
+
+type ClientFormData = z.infer<typeof downloaderValidationSchema>;
 
 function TorrentClientsSettings() {
   const trpc = useTRPC();
@@ -53,7 +57,10 @@ function TorrentClientsSettings() {
   const { isFieldRequired } = useConfigForm(downloaderValidationSchema);
   const { data: configData } = useQuery(
     trpc.settings.get.queryOptions(undefined, {
-      select: (data) => {
+      select: (data: {
+        config: RuntimeConfig;
+        apikey: string;
+      }): Partial<ClientFormData> => {
         const fullDataset = formatConfigDataForForm(data.config);
         const filteredData = pickSchemaFields(
           downloaderValidationSchema,
