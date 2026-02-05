@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -14,27 +14,6 @@ import { createMockTorznabServer } from "../../mock-torznab/server.js";
 import { createInjectedFetch } from "./support/injectedFetch.js";
 
 const TEST_ROOT = await mkdtemp(join(tmpdir(), "cross-seed-tests-"));
-process.env.CONFIG_DIR = join(TEST_ROOT, "config");
-
-const { db } = await import("../src/db.js");
-const { bulkSearch, scanRssFeeds } = await import("../src/pipeline.js");
-const { getDefaultRuntimeConfig, createAppDirHierarchy } =
-	await import("../src/configuration.js");
-const { setRuntimeConfig } = await import("../src/runtimeConfig.js");
-const { createIndexer } = await import("../src/services/indexerService.js");
-const { Action, LinkType } = await import("../src/constants.js");
-const { resetClientsForTesting, setClientsForTesting } =
-	await import("../src/clients/TorrentClient.js");
-const { getMediaType } = await import("../src/searchee.js");
-const { initializeLogger } = await import("../src/logger.js");
-const { initializePushNotifier } = await import("../src/pushNotifier.js");
-const {
-	getTorrentSavePath,
-	parseMetadataFromFilename,
-	snatchHistory,
-	indexTorrentsAndDataDirs,
-} = await import("../src/torrent.js");
-const { Metafile } = await import("../src/parseTorrent.js");
 
 const torznab = createMockTorznabServer({
 	baseUrl: "http://mock-torznab.local",
@@ -44,49 +23,91 @@ const { createFakeTorrentClientServer, FakeTorrentClient } =
 const fakeTorrent = createFakeTorrentClientServer();
 const realFetch = globalThis.fetch;
 
-async function resetDb() {
-	const tables = [
-		"indexer",
-		"rss",
-		"searchee",
-		"timestamp",
-		"decision",
-		"torrent",
-		"client_searchee",
-		"data",
-		"ensemble",
-		"job_log",
-		"settings",
-		"session",
-		"user",
-	];
-	for (const table of tables) {
-		try {
-			await db(table).del();
-		} catch {
-			// ignore missing tables in older migrations
-		}
-	}
-	snatchHistory.clear();
+type RuntimeEnv = {
+	db: typeof import("../src/db.js").db;
+	bulkSearch: typeof import("../src/pipeline.js").bulkSearch;
+	scanRssFeeds: typeof import("../src/pipeline.js").scanRssFeeds;
+	getDefaultRuntimeConfig: typeof import("../src/configuration.js").getDefaultRuntimeConfig;
+	setRuntimeConfig: typeof import("../src/runtimeConfig.js").setRuntimeConfig;
+	createIndexer: typeof import("../src/services/indexerService.js").createIndexer;
+	Action: typeof import("../src/constants.js").Action;
+	LinkType: typeof import("../src/constants.js").LinkType;
+	resetClientsForTesting: typeof import("../src/clients/TorrentClient.js").resetClientsForTesting;
+	setClientsForTesting: typeof import("../src/clients/TorrentClient.js").setClientsForTesting;
+	getMediaType: typeof import("../src/searchee.js").getMediaType;
+	initializeLogger: typeof import("../src/logger.js").initializeLogger;
+	initializePushNotifier: typeof import("../src/pushNotifier.js").initializePushNotifier;
+	getTorrentSavePath: typeof import("../src/torrent.js").getTorrentSavePath;
+	parseMetadataFromFilename: typeof import("../src/torrent.js").parseMetadataFromFilename;
+	indexTorrentsAndDataDirs: typeof import("../src/torrent.js").indexTorrentsAndDataDirs;
+	Metafile: typeof import("../src/parseTorrent.js").Metafile;
+};
+
+async function createRuntimeEnv(): Promise<RuntimeEnv> {
+	const configDir = await mkdtemp(join(TEST_ROOT, "config-"));
+	process.env.CONFIG_DIR = configDir;
+	vi.resetModules();
+
+	const { db } = await import("../src/db.js");
+	const { bulkSearch, scanRssFeeds } = await import("../src/pipeline.js");
+	const { getDefaultRuntimeConfig, createAppDirHierarchy } =
+		await import("../src/configuration.js");
+	const { setRuntimeConfig } = await import("../src/runtimeConfig.js");
+	const { createIndexer } = await import("../src/services/indexerService.js");
+	const { Action, LinkType } = await import("../src/constants.js");
+	const { resetClientsForTesting, setClientsForTesting } =
+		await import("../src/clients/TorrentClient.js");
+	const { getMediaType } = await import("../src/searchee.js");
+	const { initializeLogger } = await import("../src/logger.js");
+	const { initializePushNotifier } = await import("../src/pushNotifier.js");
+	const {
+		getTorrentSavePath,
+		parseMetadataFromFilename,
+		indexTorrentsAndDataDirs,
+	} = await import("../src/torrent.js");
+	const { Metafile } = await import("../src/parseTorrent.js");
+
+	createAppDirHierarchy();
+	initializeLogger({ verbose: false });
+	initializePushNotifier();
+	await db.migrate.latest();
+
+	return {
+		db,
+		bulkSearch,
+		scanRssFeeds,
+		getDefaultRuntimeConfig,
+		setRuntimeConfig,
+		createIndexer,
+		Action,
+		LinkType,
+		resetClientsForTesting,
+		setClientsForTesting,
+		getMediaType,
+		initializeLogger,
+		initializePushNotifier,
+		getTorrentSavePath,
+		parseMetadataFromFilename,
+		indexTorrentsAndDataDirs,
+		Metafile,
+	};
 }
 
 function applyConfig(
-	overrides: Partial<ReturnType<typeof getDefaultRuntimeConfig>>,
+	env: RuntimeEnv,
+	overrides: Partial<ReturnType<RuntimeEnv["getDefaultRuntimeConfig"]>>,
 ) {
-	setRuntimeConfig({
-		...getDefaultRuntimeConfig(),
+	env.setRuntimeConfig({
+		...env.getDefaultRuntimeConfig(),
 		...overrides,
 	});
-	initializePushNotifier();
+	env.initializePushNotifier();
 }
 
 describe.sequential("full app flows", () => {
 	beforeAll(async () => {
 		await torznab.server.ready();
 		await fakeTorrent.server.ready();
-		createAppDirHierarchy();
-		initializeLogger({ verbose: false });
-		await db.migrate.latest();
 		vi.stubGlobal(
 			"fetch",
 			createInjectedFetch({
@@ -98,8 +119,6 @@ describe.sequential("full app flows", () => {
 	});
 
 	beforeEach(async () => {
-		await resetDb();
-		resetClientsForTesting();
 		torznab.state.setTorrents([]);
 		fakeTorrent.state.reset();
 	});
@@ -108,11 +127,10 @@ describe.sequential("full app flows", () => {
 		vi.stubGlobal("fetch", realFetch);
 		await torznab.server.close();
 		await fakeTorrent.server.close();
-		await db.destroy();
-		await rm(TEST_ROOT, { recursive: true, force: true });
 	});
 
 	it("saves cross-seeds during bulk search", async () => {
+		const env = await createRuntimeEnv();
 		const dataDir = join(TEST_ROOT, "search", "data");
 		const outputDir = join(TEST_ROOT, "search", "output");
 		await mkdir(dataDir, { recursive: true });
@@ -132,8 +150,8 @@ describe.sequential("full app flows", () => {
 			},
 		]);
 
-		applyConfig({
-			action: Action.SAVE,
+		applyConfig(env, {
+			action: env.Action.SAVE,
 			dataDirs: [dataDir],
 			outputDir,
 			useClientTorrents: false,
@@ -142,20 +160,23 @@ describe.sequential("full app flows", () => {
 			includeSingleEpisodes: true,
 		});
 
-		await createIndexer({
+		await env.createIndexer({
 			name: "Mock",
 			url: `${torznab.state.baseUrl}/api`,
 			apikey: "test-key",
 			enabled: true,
 		});
 
-		await bulkSearch();
+		await env.bulkSearch();
 
 		const outputFiles = await readdir(outputDir);
 		expect(outputFiles.some((f) => f.endsWith(".torrent"))).toBe(true);
+
+		await env.db.destroy();
 	});
 
 	it("only processes new RSS candidates after last seen guid", async () => {
+		const env = await createRuntimeEnv();
 		const dataDir = join(TEST_ROOT, "rss", "data");
 		const outputDir = join(TEST_ROOT, "rss", "output");
 		await mkdir(dataDir, { recursive: true });
@@ -187,8 +208,8 @@ describe.sequential("full app flows", () => {
 			},
 		]);
 
-		applyConfig({
-			action: Action.SAVE,
+		applyConfig(env, {
+			action: env.Action.SAVE,
 			dataDirs: [dataDir],
 			outputDir,
 			useClientTorrents: false,
@@ -196,22 +217,24 @@ describe.sequential("full app flows", () => {
 			includeSingleEpisodes: true,
 		});
 
-		const indexer = await createIndexer({
+		const indexer = await env.createIndexer({
 			name: "Mock",
 			url: `${torznab.state.baseUrl}/api`,
 			apikey: "test-key",
 			enabled: true,
 		});
 
-		await indexTorrentsAndDataDirs({ startup: true });
-
-		await scanRssFeeds();
+		await env.indexTorrentsAndDataDirs({ startup: true });
+		await env.scanRssFeeds();
 
 		const afterFirst = (await readdir(outputDir)).filter((f) =>
 			f.endsWith(".torrent"),
 		).length;
 
-		const row = await db("rss").where({ indexer_id: indexer.id }).first();
+		const row = await env
+			.db("rss")
+			.where({ indexer_id: indexer.id })
+			.first();
 		expect(row?.last_seen_guid).toBe(`${torznab.state.baseUrl}/torrent/1`);
 
 		torznab.state.setTorrents([
@@ -233,22 +256,26 @@ describe.sequential("full app flows", () => {
 			},
 		]);
 
-		await scanRssFeeds();
+		await env.scanRssFeeds();
 
 		const afterSecond = (await readdir(outputDir)).filter((f) =>
 			f.endsWith(".torrent"),
 		).length;
 		expect(afterSecond).toBe(afterFirst + 1);
 
-		const updatedRow = await db("rss")
+		const updatedRow = await env
+			.db("rss")
 			.where({ indexer_id: indexer.id })
 			.first();
 		expect(updatedRow?.last_seen_guid).toBe(
 			`${torznab.state.baseUrl}/torrent/3`,
 		);
+
+		await env.db.destroy();
 	});
 
 	it("injects saved torrents into a fake client", async () => {
+		const env = await createRuntimeEnv();
 		const dataDir = join(TEST_ROOT, "inject", "data");
 		const outputDir = join(TEST_ROOT, "inject", "output");
 		await mkdir(dataDir, { recursive: true });
@@ -269,18 +296,18 @@ describe.sequential("full app flows", () => {
 		]);
 
 		const normalizedTorrent = torznab.state.torrents[0];
-		const meta = Metafile.decode(normalizedTorrent.torrentPayload);
-		const torrentPath = getTorrentSavePath(
+		const meta = env.Metafile.decode(normalizedTorrent.torrentPayload);
+		const torrentPath = env.getTorrentSavePath(
 			meta,
-			getMediaType(meta),
+			env.getMediaType(meta),
 			normalizedTorrent.tracker,
 			outputDir,
 			{ cached: false },
 		);
 		await writeFile(torrentPath, meta.encode());
 
-		applyConfig({
-			action: Action.INJECT,
+		applyConfig(env, {
+			action: env.Action.INJECT,
 			dataDirs: [dataDir],
 			outputDir,
 			useClientTorrents: false,
@@ -289,7 +316,7 @@ describe.sequential("full app flows", () => {
 		});
 
 		const fakeClient = new FakeTorrentClient(fakeTorrent.server);
-		setClientsForTesting([fakeClient]);
+		env.setClientsForTesting([fakeClient]);
 
 		const { injectSavedTorrents } = await import("../src/inject.js");
 		await injectSavedTorrents();
@@ -297,12 +324,15 @@ describe.sequential("full app flows", () => {
 		expect(fakeTorrent.state.torrents.has(meta.infoHash)).toBe(true);
 		const savedFiles = await readdir(outputDir);
 		const parsed = savedFiles
-			.map((file) => parseMetadataFromFilename(file))
+			.map((file) => env.parseMetadataFromFilename(file))
 			.filter((entry) => entry.infoHash === meta.infoHash);
 		expect(parsed.length).toBeGreaterThanOrEqual(1);
+
+		await env.db.destroy();
 	});
 
 	it("hardlinks files when linkDirs are configured", async () => {
+		const env = await createRuntimeEnv();
 		const dataDir = join(TEST_ROOT, "hardlink", "data");
 		const outputDir = join(TEST_ROOT, "hardlink", "output");
 		const linkDir = join(TEST_ROOT, "hardlink", "links");
@@ -326,29 +356,29 @@ describe.sequential("full app flows", () => {
 		]);
 
 		const normalizedTorrent = torznab.state.torrents[0];
-		const meta = Metafile.decode(normalizedTorrent.torrentPayload);
-		const torrentPath = getTorrentSavePath(
+		const meta = env.Metafile.decode(normalizedTorrent.torrentPayload);
+		const torrentPath = env.getTorrentSavePath(
 			meta,
-			getMediaType(meta),
+			env.getMediaType(meta),
 			normalizedTorrent.tracker,
 			outputDir,
 			{ cached: false },
 		);
 		await writeFile(torrentPath, meta.encode());
 
-		applyConfig({
-			action: Action.INJECT,
+		applyConfig(env, {
+			action: env.Action.INJECT,
 			dataDirs: [dataDir],
 			outputDir,
 			useClientTorrents: false,
 			linkDirs: [linkDir],
-			linkType: LinkType.HARDLINK,
+			linkType: env.LinkType.HARDLINK,
 			flatLinking: true,
 			includeSingleEpisodes: true,
 		});
 
 		const fakeClient = new FakeTorrentClient(fakeTorrent.server);
-		setClientsForTesting([fakeClient]);
+		env.setClientsForTesting([fakeClient]);
 
 		const { injectSavedTorrents } = await import("../src/inject.js");
 		await injectSavedTorrents();
@@ -358,5 +388,7 @@ describe.sequential("full app flows", () => {
 		const linkedStat = await stat(linkedPath);
 		expect(linkedStat.ino).toBe(sourceStat.ino);
 		expect(linkedStat.dev).toBe(sourceStat.dev);
+
+		await env.db.destroy();
 	});
 });
