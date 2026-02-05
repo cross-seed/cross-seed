@@ -1,33 +1,43 @@
 # cross-seed: Fully-automatic cross-seeding
 
-`cross-seed` automatically finds and downloads torrents that are "cross seeds"
-existing across your other trackers, all based on your existing torrents and/or
-data. It is designed to match comprehensively while minimizing manual
-intervention, but it's also highly configurable to match your preferences.
-
-## Torrent Client Integration
-
-`cross-seed` can inject new torrents it finds directly into your torrent client.
-
-If you use another client we do not currently support, and would like to help
-integrate it into `cross-seed`,
-[please open an issue here on GitHub to discuss it with us](https://github.com/cross-seed/cross-seed/issues).
+`cross-seed` is an app designed to help you download torrents that you can cross
+seed based on your existing torrents. It is designed to match conservatively to
+minimize manual intervention.
 
 ## Requirements
 
 - [Node >= 24](https://nodejs.org/en/download)
-- Indexers that support Torznab or an tracker/indexer manager such as
-  Prowlarr/Jackett (Prowlarr is preferred)
+- Any indexers that support Torznab (through Prowlarr or Jackett)
+- At least one torrent client: rTorrent, qBittorrent, Deluge, or Transmission
 
 ## Tutorial
 
-Head on over to [cross-seed.org](https://www.cross-seed.org) to get started.
-
-If you are migrating version to the latest available, please read
-[the v6 migration guide](https://www.cross-seed.org/docs/v6-migration).
+Head on over to
+[cross-seed.org](https://www.cross-seed.org/docs/basics/getting-started) to get
+started.
 
 ## Troubleshooting
 
 Feel free to
 [start a discussion](https://github.com/cross-seed/cross-seed/discussions/new),
 or reach out on [Discord](https://discord.gg/jpbUFzS5Wb).
+
+## Releases and Branches
+
+cross-seed roughly follows semantic versioning. Every release has a
+corresponding git tag. Git branches do not represent released code.
+
+Versions that look like v0.0.0 are _releases_ and are considered stable.
+Versions that look like v0.0.0*-0* are _prereleases_ and are not considered
+stable.
+
+We also publish Docker images at `ghcr.io/cross-seed/cross-seed` under several
+tag patterns: `:branch`, `:6`, `latest`.
+
+- `latest` - the most recent _release_.
+- `prerelease` - the most recent _release_ or _prerelease_.
+- `master` - The main development branch. Code that is intended for release, but
+  has not necessarily released yet. This is similar to `prerelease` but gets new
+  code first so is slightly more bleeding edge.
+- `nightly` - for open experimental PRs. Not always used and may fall behind
+  master.

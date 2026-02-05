@@ -96,6 +96,7 @@ jobs:
                       type=semver,pattern={{major}}
                       type=ref,event=branch
                       type=ref,event=pr
+                      type=raw,value=prerelease,enable=${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
 
     docker-build:
         if: ${{ github.event_name != 'pull_request' }}
