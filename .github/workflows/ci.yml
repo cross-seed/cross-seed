@@ -79,7 +79,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         runs-on: ubuntu-latest
         outputs:
-            tags: ${{ steps.taglist.outputs.tags }}
+            tags: ${{ steps.meta.outputs.tags }}
             labels: ${{ steps.meta.outputs.labels }}
         steps:
             - name: Docker meta
@@ -96,27 +96,7 @@ jobs:
                       type=semver,pattern={{major}}
                       type=ref,event=branch
                       type=ref,event=pr
-            - name: Compute prerelease tags
-              id: prerelease
-              run: |
-                  extra_tags=""
-                  if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.+)?$ ]]; then
-                      extra_tags="ghcr.io/${GITHUB_REPOSITORY_OWNER}/cross-seed:prerelease"$'\n'"crossseed/cross-seed:prerelease"
-                  fi
-                  printf 'extra_tags<<EOF\n%s\nEOF\n' "$extra_tags" >> "$GITHUB_OUTPUT"
-            - name: Combine tags
-              id: taglist
-              env:
-                  TAGS: ${{ steps.meta.outputs.tags }}
-                  EXTRA_TAGS: ${{ steps.prerelease.outputs.extra_tags }}
-              run: |
-                  set -euo pipefail
-                  tags="${TAGS}"
-                  if [ -n "${EXTRA_TAGS}" ]; then
-                      tags="${tags}"$'\n'"${EXTRA_TAGS}"
-                  fi
-                  tags="${tags%$'\n'}"
-                  printf 'tags<<EOF\n%s\nEOF\n' "$tags" >> "$GITHUB_OUTPUT"
+                      type=raw,value=prerelease,enable=${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
 
     docker-build:
         if: ${{ github.event_name != 'pull_request' }}
