@@ -121,6 +121,21 @@ export enum SearcheeSource {
 	VIRTUAL = "virtual",
 }
 
+const SEARCHEE_SOURCE_PRIORITY: Record<SearcheeSource, number> = {
+	[SearcheeSource.CLIENT]: 3,
+	[SearcheeSource.TORRENT]: 2,
+	[SearcheeSource.DATA]: 1,
+	[SearcheeSource.VIRTUAL]: 0,
+};
+
+function getSourcePriority(source: string | null | undefined): number {
+	if (!source) return -1;
+	return (
+		SEARCHEE_SOURCE_PRIORITY[source as SearcheeSource] ??
+		SEARCHEE_SOURCE_PRIORITY[SearcheeSource.VIRTUAL]
+	);
+}
+
 export function getSearcheeSource(searchee: Searchee): SearcheeSource {
 	if (searchee.savePath) {
 		return SearcheeSource.CLIENT;
@@ -400,6 +415,9 @@ export async function updateSearcheeClientDB(
 			.whereIn("info_hash", batch)
 			.where("client_host", clientHost)
 			.del();
+		await removeIndexedSearcheesByInfoHashes(SearcheeSource.CLIENT, batch, {
+			clientHost,
+		});
 	});
 	await inBatches(
 		newSearchees.map((searchee) => ({
@@ -421,6 +439,88 @@ export async function updateSearcheeClientDB(
 				.merge();
 		},
 	);
+	await upsertIndexedSearchees(newSearchees, SearcheeSource.CLIENT);
+}
+
+export async function upsertIndexedSearchees(
+	searchees: Searchee[],
+	source: SearcheeSource,
+): Promise<void> {
+	if (!searchees.length) return;
+
+	const names = Array.from(
+		new Set(searchees.map((searchee) => searchee.title)),
+	);
+	const existing = await db("searchee")
+		.whereIn("name", names)
+		.select("name", "source");
+	const existingSourceByName = new Map(
+		existing.map((row) => [row.name, row.source]),
+	);
+	const sourcePriority = getSourcePriority(source);
+	const filtered = searchees.filter((searchee) => {
+		const existingSource = existingSourceByName.get(searchee.title);
+		if (!existingSource) return true;
+		return sourcePriority >= getSourcePriority(existingSource);
+	});
+	if (!filtered.length) return;
+
+	const now = Date.now();
+	const rows = filtered.map((searchee) => {
+		const row: Record<string, unknown> = {
+			name: searchee.title,
+			title: searchee.title,
+			raw_name: searchee.name,
+			source,
+			files: JSON.stringify(searchee.files),
+			length: searchee.length,
+			updated_at: now,
+		};
+		if (searchee.infoHash) row.info_hash = searchee.infoHash;
+		if (searchee.path) row.path = searchee.path;
+		if (searchee.clientHost) row.client_host = searchee.clientHost;
+		if (searchee.savePath) row.save_path = searchee.savePath;
+		if (searchee.category !== undefined) {
+			row.category = searchee.category ?? null;
+		}
+		if (searchee.tags) row.tags = JSON.stringify(searchee.tags);
+		if (searchee.trackers) row.trackers = JSON.stringify(searchee.trackers);
+		return row;
+	});
+
+	await inBatches(rows, async (batch) => {
+		await db("searchee").insert(batch).onConflict("name").merge();
+	});
+}
+
+export async function removeIndexedSearcheesByPaths(
+	source: SearcheeSource,
+	paths: string[],
+): Promise<void> {
+	if (!paths.length) return;
+	await inBatches(paths, async (batch) => {
+		await db("searchee")
+			.whereIn("path", batch)
+			.where("source", source)
+			.del();
+	});
+}
+
+export async function removeIndexedSearcheesByInfoHashes(
+	source: SearcheeSource,
+	infoHashes: string[],
+	options?: { clientHost?: string },
+): Promise<void> {
+	if (!infoHashes.length) return;
+	await inBatches(infoHashes, async (batch) => {
+		let query = db("searchee")
+			.whereIn("info_hash", batch)
+			.where("source", source);
+		if (options?.clientHost) {
+			query = query.where("client_host", options.clientHost);
+		}
+		await query.del();
+	});
 }
 
 export function createSearcheeFromDB(dbTorrent): SearcheeClient {
