@@ -1,4 +1,5 @@
 import fastifyCookie from "@fastify/cookie";
+import cors from "@fastify/cors";
 import fastify, { FastifyInstance } from "fastify";
 import { Label, logger } from "./logger.js";
 import { baseApiPlugin } from "./routes/baseApi.js";
@@ -23,6 +24,7 @@ async function rootPlugin(
 
 async function createServer(basePath: string): Promise<FastifyInstance> {
 	const app = fastify({ logger: false });
+	await app.register(cors, { origin: "*" });
 	if (basePath) {
 		await app.register(rootPlugin, { prefix: basePath, basePath });
 		app.get("*", async (request, reply) => {
