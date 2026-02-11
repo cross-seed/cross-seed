@@ -15,6 +15,7 @@ import settings from "./13-settings.js";
 import indexerEnabledFlag from "./14-indexer-enabled-flag.js";
 import removeUrlUniqueConstraint from "./15-remove-url-unique-constraint.js";
 import pruneInactiveIndexers from "./16-prune-inactive-indexers.js";
+import searcheeMetadata from "./17-searchee-metadata.js";
 
 export const migrations = {
 	getMigrations: () =>
@@ -36,6 +37,7 @@ export const migrations = {
 			indexerEnabledFlag,
 			removeUrlUniqueConstraint,
 			pruneInactiveIndexers,
+			searcheeMetadata,
 		]),
 	getMigrationName: (migration) => migration.name,
 	getMigration: (migration) => migration,

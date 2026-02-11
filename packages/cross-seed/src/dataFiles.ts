@@ -14,7 +14,10 @@ import {
 	File,
 	getFilesFromDataRoot,
 	parseTitle,
+	removeIndexedSearcheesByPaths,
+	SearcheeSource,
 	SearcheeWithoutInfoHash,
+	upsertIndexedSearchees,
 } from "./searchee.js";
 import { createEnsemblePieces, EnsembleEntry } from "./torrent.js";
 import {
@@ -133,6 +136,7 @@ export async function indexDataDirs(options: {
 		await inBatches(deletedPaths, async (batch) => {
 			await db("data").whereIn("path", batch).del();
 			await db("ensemble").whereIn("path", batch).del();
+			await removeIndexedSearcheesByPaths(SearcheeSource.DATA, batch);
 		});
 		await indexDataPaths(paths);
 	});
@@ -148,6 +152,7 @@ async function indexDataPaths(paths: string[]): Promise<number> {
 	const memoizedLengths = new Map<string, number>();
 	const dataRows: DataEntry[] = [];
 	const ensembleRows: EnsembleEntry[] = [];
+	const searchees: SearcheeWithoutInfoHash[] = [];
 	let processed = 0;
 	for (const path of paths) {
 		processed += 1;
@@ -162,6 +167,14 @@ async function indexDataPaths(paths: string[]): Promise<number> {
 		if (!files.length) continue;
 		const title = parseTitle(basename(path), files, path);
 		if (!title) continue;
+		searchees.push({
+			infoHash: undefined,
+			path,
+			files,
+			name: basename(path),
+			title,
+			length: files.reduce((sum, file) => sum + file.length, 0),
+		});
 		dataRows.push({ title, path });
 		if (seasonFromEpisodes) {
 			const ensembleEntries = indexEnsembleDataEntry(title, path, files);
@@ -177,6 +190,7 @@ async function indexDataPaths(paths: string[]): Promise<number> {
 			.onConflict(["client_host", "path"])
 			.merge();
 	});
+	await upsertIndexedSearchees(searchees, SearcheeSource.DATA);
 	return dataRows.length;
 }
 
