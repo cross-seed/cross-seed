@@ -263,6 +263,7 @@ async function getSavePath(
 			Object.assign(searchee, refreshedSearchee);
 		}
 		if (
+			options.onlyCompleted &&
 			!(await client.isTorrentComplete(searchee.infoHash)).orElse(false)
 		) {
 			return resultOfErr("TORRENT_NOT_COMPLETE");
