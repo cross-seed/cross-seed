@@ -40,6 +40,7 @@
 		"@typescript-eslint/eslint-plugin": "^6.16.0",
 		"@typescript-eslint/parser": "^6.16.0",
 		"@vitest/coverage-v8": "^3.1.1",
+		"bencode": "^4.0.0",
 		"concurrently": "^9.1.2",
 		"eslint": "^8.56.0",
 		"husky": "^7.0.0",
