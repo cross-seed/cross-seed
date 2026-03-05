@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import DeleteOption from '@/components/Buttons/DeleteOption';
 import useConfigForm from '@/hooks/use-config-form';
 import { defaultConnectFormValues } from '@/components/Form/shared-form';
@@ -99,6 +100,7 @@ function ConnectSettings() {
     }),
   );
 
+  const [advancedOpen, setAdvancedOpen] = useState<Set<number>>(new Set());
   const [lastFieldAdded, setLastFieldAdded] = useState<string | null>(null);
   useEffect(() => {
     if (lastFieldAdded) {
@@ -352,10 +354,32 @@ function ConnectSettings() {
                                     <FieldInfo fieldMeta={fieldMeta} />
                                   )}
                                 </form.Subscribe>
-                                <details className="mt-1" open={!!(_.headers || _.payload)}>
-                                  <summary className="text-muted-foreground cursor-pointer text-xs select-none">
-                                    Advanced (custom headers &amp; payload)
-                                  </summary>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <Switch
+                                    id={`notificationWebhookUrls-${index}-advanced`}
+                                    checked={advancedOpen.has(index) || !!(_.headers || _.payload)}
+                                    onCheckedChange={(checked) => {
+                                      setAdvancedOpen((prev) => {
+                                        const next = new Set(prev);
+                                        if (checked) {
+                                          next.add(index);
+                                        } else {
+                                          next.delete(index);
+                                          form.setFieldValue(`notificationWebhookUrls[${index}].headers`, '');
+                                          form.setFieldValue(`notificationWebhookUrls[${index}].payload`, '');
+                                        }
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                  <Label
+                                    htmlFor={`notificationWebhookUrls-${index}-advanced`}
+                                    className="text-muted-foreground text-xs"
+                                  >
+                                    Custom headers & payload
+                                  </Label>
+                                </div>
+                                {(advancedOpen.has(index) || !!(_.headers || _.payload)) && (
                                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                   <div>
                                     <Label className="text-muted-foreground text-xs">
@@ -409,7 +433,7 @@ function ConnectSettings() {
                                             )
                                           }
                                           onBlur={subfield.handleBlur}
-                                          placeholder='{"topic": "cross-seed"}'
+                                          placeholder='{"topic": "cross-seed", "priority": 3, "tags": ["seedbox"]}'
                                           rows={2}
                                           className="resize-y font-mono text-xs"
                                         />
@@ -428,7 +452,7 @@ function ConnectSettings() {
                                     </form.Subscribe>
                                   </div>
                                 </div>
-                                </details>
+                                )}
                               </fieldset>
                             ),
                           )}
