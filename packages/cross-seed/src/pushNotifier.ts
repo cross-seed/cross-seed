@@ -25,6 +25,12 @@ enum Event {
 
 type TrackerName = string;
 
+export interface WebhookResult {
+	url: string;
+	ok: boolean;
+	error?: string;
+}
+
 interface PushNotification {
 	title?: string;
 	body: string;
@@ -42,7 +48,7 @@ export class PushNotifier {
 		title = PROGRAM_NAME,
 		body,
 		...rest
-	}: PushNotification): Promise<void[]> {
+	}: PushNotification): Promise<WebhookResult[]> {
 		return mapAsync(this.entries, async (entry) => {
 			const isObject = typeof entry !== "string";
 			const url = isObject ? entry.url : entry;
@@ -76,12 +82,19 @@ export class PushNotifier {
 							responseText.length > 100 ? "..." : ""
 						}"`,
 					);
+					return {
+						url,
+						ok: false,
+						error: `${response.status} ${response.statusText}`,
+					};
 				}
+				return { url, ok: true };
 			} catch (e) {
 				logger.error(
 					`${url} failed to send push notification: ${e.message}`,
 				);
 				logger.debug(e);
+				return { url, ok: false, error: e.message };
 			}
 		});
 	}
