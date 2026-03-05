@@ -65,7 +65,35 @@ export const connectValidationSchema = z.object({
   apiKey: runtimeShape.apiKey.nullish(),
   radarr: z.array(z.string().url().or(z.literal(''))).transform((v) => v ?? []),
   sonarr: z.array(z.string().url().or(z.literal(''))).transform((v) => v ?? []),
-  notificationWebhookUrls: z.array(z.string().url().or(z.literal(''))),
+  notificationWebhookUrls: z.array(
+    z.object({
+      url: z.string().url().or(z.literal('')),
+      payload: z.string().refine(
+        (val) => {
+          if (!val) return true;
+          try {
+            JSON.parse(val);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { message: 'Must be valid JSON' },
+      ),
+      headers: z.string().refine(
+        (val) => {
+          if (!val) return true;
+          try {
+            JSON.parse(val);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { message: 'Must be valid JSON' },
+      ),
+    }),
+  ),
 });
 
 export const directoryValidationSchema = z.object({
