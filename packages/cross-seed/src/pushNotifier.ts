@@ -169,8 +169,17 @@ export function sendResultsNotification(
 			: "Saved";
 		const decisions = notableSuccesses.map(([{ decision }]) => decision);
 
+		const markdownBody = [
+			`**Result:** ${performedAction}`,
+			`**Torrent:** ${name}`,
+			`**Trackers:** ${trackersListStr} (${numTrackers})`,
+			`**Match type:** ${formatAsList(decisions, { sort: true })}`,
+			`**Source:** ${searcheeSource} (${source})`,
+		].join("\n");
+
 		void pushNotifier.notify({
 			body: `${source}: ${performedAction} ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
+			markdownBody,
 			extra: {
 				event: Event.RESULTS,
 				name,
@@ -205,8 +214,17 @@ export function sendResultsNotification(
 		const trackersListStr = formatAsList(trackers, { sort: true });
 		const decisions = failures.map(([{ decision }]) => decision);
 
+		const failMarkdownBody = [
+			`**Result:** Failed to inject`,
+			`**Torrent:** ${name}`,
+			`**Trackers:** ${trackersListStr} (${numTrackers})`,
+			`**Match type:** ${formatAsList(decisions, { sort: true })}`,
+			`**Source:** ${searcheeSource} (${source})`,
+		].join("\n");
+
 		void pushNotifier.notify({
 			body: `${source}: Failed to inject ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
+			markdownBody: failMarkdownBody,
 			extra: {
 				event: Event.RESULTS,
 				name,
