@@ -115,6 +115,9 @@ jobs:
         runs-on: ${{ matrix.runner }}
         steps:
             - uses: actions/checkout@v4
+            - name: Lowercase owner
+              id: owner
+              run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
             - name: Login to GHCR
@@ -170,18 +173,18 @@ jobs:
                       BUILD_MESSAGE=${{ steps.build-args.outputs.build_message }}
                       BUILD_DATE=${{ steps.build-args.outputs.build_date }}
                   tags: |
-                      ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
+                      ghcr.io/${{ steps.owner.outputs.name }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
                   labels: ${{ needs.docker-meta.outputs.labels }}
             - name: Smoke test image (${{ matrix.arch }})
               run:
-                  docker run --rm ghcr.io/${{ github.repository_owner
+                  docker run --rm ghcr.io/${{ steps.owner.outputs.name
                   }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
                   --version
             - name: Promote temp tags (${{ matrix.arch }})
               env:
                   TAGS: ${{ steps.tags.outputs.tags }}
                   TEMP_GHCR:
-                      ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{
+                      ghcr.io/${{ steps.owner.outputs.name }}/cross-seed:ci-${{
                       github.sha }}-${{ matrix.arch }}
               run: |
                   set -euo pipefail
