@@ -1,9 +1,9 @@
 /**
- * Remove any empty string values from an array of strings.
- * @param  array - The array of strings to filter.
+ * Remove any empty string values from an array.
+ * @param  array - The array to filter.
  * @return - The filtered array with empty string values removed.
  */
-export function removeEmptyArrayValues(array: string[]) {
+export function removeEmptyArrayValues(array: unknown[]) {
   return array.filter((item) => item !== '');
 }
 
