@@ -379,7 +379,7 @@ function ConnectSettings() {
                                           checked={subfield.state.value === 'markdown'}
                                           onCheckedChange={(checked) => {
                                             subfield.handleChange(
-                                              checked ? 'markdown' : undefined,
+                                              checked ? 'markdown' : 'plain',
                                             );
                                           }}
                                         />
@@ -504,7 +504,7 @@ function ConnectSettings() {
                                   url: '',
                                   payload: '',
                                   headers: '',
-                                  bodyFormat: undefined,
+                                  bodyFormat: 'plain',
                                 });
                                 setLastFieldAdded(
                                   `notificationWebhookUrls-${field.state.value?.length ?? 0}-url`,
