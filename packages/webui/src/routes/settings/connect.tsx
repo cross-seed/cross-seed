@@ -369,6 +369,31 @@ function ConnectSettings() {
                                   )}
                                 </form.Subscribe>
                                 <div className="mt-1 flex items-center gap-2">
+                                  <form.Field
+                                    name={`notificationWebhookUrls[${index}].bodyFormat`}
+                                  >
+                                    {(subfield) => (
+                                      <>
+                                        <Switch
+                                          id={`notificationWebhookUrls-${index}-bodyFormat`}
+                                          checked={subfield.state.value === 'markdown'}
+                                          onCheckedChange={(checked) => {
+                                            subfield.handleChange(
+                                              checked ? 'markdown' : undefined,
+                                            );
+                                          }}
+                                        />
+                                        <Label
+                                          htmlFor={`notificationWebhookUrls-${index}-bodyFormat`}
+                                          className="text-muted-foreground text-xs"
+                                        >
+                                          Markdown body
+                                        </Label>
+                                      </>
+                                    )}
+                                  </form.Field>
+                                </div>
+                                <div className="mt-1 flex items-center gap-2">
                                   <Switch
                                     id={`notificationWebhookUrls-${index}-advanced`}
                                     checked={advancedOpen.has(index) || !!(entry.headers || entry.payload)}
