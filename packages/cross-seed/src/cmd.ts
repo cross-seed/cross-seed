@@ -191,7 +191,11 @@ program
 	.command("test-notification")
 	.description("Send a test notification")
 	.addOption(verboseOption)
-	.action(withFullRuntime(sendTestNotification));
+	.action(
+		withFullRuntime(async () => {
+			await sendTestNotification();
+		}),
+	);
 
 program.showHelpAfterError("(add --help for additional information)");
 
