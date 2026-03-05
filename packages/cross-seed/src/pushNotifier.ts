@@ -85,9 +85,7 @@ export class PushNotifier {
 					: DEFAULT_HEADERS;
 
 				const selectedBody =
-					isObject &&
-					entry.bodyFormat === "markdown" &&
-					markdownBody
+					isObject && entry.bodyFormat === "markdown" && markdownBody
 						? markdownBody
 						: body;
 
@@ -201,9 +199,7 @@ export function sendResultsNotification(
 			`**Source:** ${searcheeSource} (${source})`,
 		].join("\n");
 
-		const result = injected
-			? InjectionResult.SUCCESS
-			: SaveResult.SAVED;
+		const result = injected ? InjectionResult.SUCCESS : SaveResult.SAVED;
 
 		void pushNotifier.notify({
 			body: `${source}: ${performedAction} ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
