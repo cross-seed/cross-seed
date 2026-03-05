@@ -35,7 +35,26 @@ interface PushNotification {
 	title?: string;
 	body: string;
 	markdownBody?: string;
+	templateVars?: Record<string, string>;
 	extra?: Record<string, unknown>;
+}
+
+function substituteTemplateVars(
+	obj: Record<string, unknown>,
+	vars: Record<string, string>,
+): Record<string, unknown> {
+	const result: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(obj)) {
+		if (typeof value === "string") {
+			result[key] = value.replace(
+				/\{(\w+)\}/g,
+				(match, varName: string) => vars[varName] ?? match,
+			);
+		} else {
+			result[key] = value;
+		}
+	}
+	return result;
 }
 
 const DEFAULT_HEADERS: Record<string, string> = {
@@ -54,6 +73,7 @@ export class PushNotifier {
 		title = PROGRAM_NAME,
 		body,
 		markdownBody,
+		templateVars,
 		...rest
 	}: PushNotification): Promise<WebhookResult[]> {
 		return mapAsync(this.entries, async (entry) => {
@@ -71,7 +91,7 @@ export class PushNotifier {
 						? markdownBody
 						: body;
 
-				const payload = isObject
+				let payload: Record<string, unknown> = isObject
 					? {
 							title,
 							body: selectedBody,
@@ -80,6 +100,10 @@ export class PushNotifier {
 							...entry.payload,
 						}
 					: { title, body: selectedBody, ...rest };
+
+				if (isObject && entry.payload && templateVars) {
+					payload = substituteTemplateVars(payload, templateVars);
+				}
 
 				const response = await fetch(url, {
 					method: "POST",
