@@ -88,7 +88,6 @@ jobs:
               with:
                   images: |
                       ghcr.io/${{ github.repository_owner }}/cross-seed
-                      crossseed/cross-seed
                   tags: |
                       type=semver,pattern=version-{{version}}
                       type=semver,pattern={{version}}
@@ -101,7 +100,6 @@ jobs:
     docker-build:
         if: ${{ github.event_name != 'pull_request' }}
         needs: docker-meta
-        environment: Docker Hub
         strategy:
             fail-fast: false
             matrix:
@@ -125,11 +123,6 @@ jobs:
                   registry: ghcr.io
                   username: ${{ github.repository_owner }}
                   password: ${{ secrets.GITHUB_TOKEN }}
-            - name: Login to DockerHub
-              uses: docker/login-action@v3
-              with:
-                  username: ${{ secrets.DOCKERHUB_USERNAME }}
-                  password: ${{ secrets.DOCKERHUB_TOKEN }}
             - name: Prepare tags
               id: tags
               env:
@@ -178,7 +171,6 @@ jobs:
                       BUILD_DATE=${{ steps.build-args.outputs.build_date }}
                   tags: |
                       ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
-                      crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
                   labels: ${{ needs.docker-meta.outputs.labels }}
             - name: Smoke test image (${{ matrix.arch }})
               run:
@@ -191,18 +183,11 @@ jobs:
                   TEMP_GHCR:
                       ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{
                       github.sha }}-${{ matrix.arch }}
-                  TEMP_DH:
-                      crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch
-                      }}
               run: |
                   set -euo pipefail
                   while IFS= read -r tag; do
                       [ -z "$tag" ] && continue
-                      if [[ "$tag" == ghcr.io/* ]]; then
-                          docker buildx imagetools create --tag "$tag" "$TEMP_GHCR"
-                      else
-                          docker buildx imagetools create --tag "$tag" "$TEMP_DH"
-                      fi
+                      docker buildx imagetools create --tag "$tag" "$TEMP_GHCR"
                   done <<< "$TAGS"
 
     docker-manifest:
@@ -210,7 +195,6 @@ jobs:
         needs:
             - docker-meta
             - docker-build
-        environment: Docker Hub
         runs-on: ubuntu-latest
         steps:
             - name: Set up Docker Buildx
@@ -221,11 +205,6 @@ jobs:
                   registry: ghcr.io
                   username: ${{ github.repository_owner }}
                   password: ${{ secrets.GITHUB_TOKEN }}
-            - name: Login to DockerHub
-              uses: docker/login-action@v3
-              with:
-                  username: ${{ secrets.DOCKERHUB_USERNAME }}
-                  password: ${{ secrets.DOCKERHUB_TOKEN }}
             - name: Create multi-architecture manifests
               env:
                   TAGS: ${{ needs.docker-meta.outputs.tags }}
