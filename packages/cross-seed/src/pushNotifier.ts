@@ -201,16 +201,33 @@ export function sendResultsNotification(
 			`**Source:** ${searcheeSource} (${source})`,
 		].join("\n");
 
+		const result = injected
+			? InjectionResult.SUCCESS
+			: SaveResult.SAVED;
+
 		void pushNotifier.notify({
 			body: `${source}: ${performedAction} ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
 			markdownBody,
+			templateVars: {
+				source,
+				performedAction,
+				name,
+				numTrackers: String(numTrackers),
+				trackersListStr,
+				searcheeSource,
+				decisions: formatAsList(decisions, { sort: true }),
+				trackers: trackers.join(", "),
+				result,
+				paused: String(paused),
+				infoHashes: infoHashes.join(", "),
+			},
 			extra: {
 				event: Event.RESULTS,
 				name,
 				infoHashes,
 				trackers,
 				source,
-				result: injected ? InjectionResult.SUCCESS : SaveResult.SAVED,
+				result,
 				paused,
 				decisions,
 				searchee: {
@@ -249,6 +266,19 @@ export function sendResultsNotification(
 		void pushNotifier.notify({
 			body: `${source}: Failed to inject ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
 			markdownBody: failMarkdownBody,
+			templateVars: {
+				source,
+				performedAction: "Failed to inject",
+				name,
+				numTrackers: String(numTrackers),
+				trackersListStr,
+				searcheeSource,
+				decisions: formatAsList(decisions, { sort: true }),
+				trackers: trackers.join(", "),
+				result: String(failures[0][2]),
+				paused: "false",
+				infoHashes: infoHashes.join(", "),
+			},
 			extra: {
 				event: Event.RESULTS,
 				name,
@@ -280,7 +310,27 @@ export function initializePushNotifier(): void {
 
 export async function sendTestNotification(): Promise<WebhookResult[]> {
 	const results = await pushNotifier.notify({
-		body: "Test",
+		body: "Test notification from cross-seed",
+		markdownBody: [
+			"**Result:** Injected",
+			"**Torrent:** Test.Torrent.2024.1080p.BluRay.x264",
+			"**Trackers:** ExampleTracker (1)",
+			"**Match type:** MATCH",
+			"**Source:** torrentClient (TestClient)",
+		].join("\n"),
+		templateVars: {
+			source: "TestClient",
+			performedAction: "Injected",
+			name: "Test.Torrent.2024.1080p.BluRay.x264",
+			numTrackers: "1",
+			trackersListStr: "ExampleTracker",
+			searcheeSource: "torrentClient",
+			decisions: "MATCH",
+			trackers: "ExampleTracker",
+			result: InjectionResult.SUCCESS,
+			paused: "false",
+			infoHashes: "abc123def456",
+		},
 		extra: { event: Event.TEST },
 	});
 	logger.info("Sent test notification");
