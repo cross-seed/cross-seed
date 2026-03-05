@@ -37,6 +37,11 @@ interface PushNotification {
 	extra?: Record<string, unknown>;
 }
 
+const DEFAULT_HEADERS: Record<string, string> = {
+	"Content-Type": "application/json",
+	"User-Agent": USER_AGENT,
+};
+
 export class PushNotifier {
 	entries: WebhookEntry[];
 
@@ -53,13 +58,9 @@ export class PushNotifier {
 			const isObject = typeof entry !== "string";
 			const url = isObject ? entry.url : entry;
 			try {
-				const defaultHeaders: Record<string, string> = {
-					"Content-Type": "application/json",
-					"User-Agent": USER_AGENT,
-				};
 				const headers = isObject
-					? { ...defaultHeaders, ...entry.headers }
-					: defaultHeaders;
+					? { ...DEFAULT_HEADERS, ...entry.headers }
+					: DEFAULT_HEADERS;
 
 				const payload = isObject
 					? { title, body, message: body, ...rest, ...entry.payload }
