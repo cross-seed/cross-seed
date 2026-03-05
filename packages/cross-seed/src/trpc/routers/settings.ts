@@ -7,6 +7,10 @@ import { getDbConfig, setDbConfig, updateDbConfig } from "../../dbConfig.js";
 import { getDefaultRuntimeConfig } from "../../configuration.js";
 import { omitUndefined } from "../../utils/object.js";
 import { parseRuntimeConfig } from "../../configSchema.js";
+import {
+	initializePushNotifier,
+	sendTestNotification,
+} from "../../pushNotifier.js";
 
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
@@ -94,6 +98,19 @@ export const settingsRouter = router({
 		} catch (error) {
 			logger.error({ label: Label.SERVER, message: error.message });
 			throw new Error(`Failed to validate config: ${error.message}`);
+		}
+	}),
+
+	testNotification: authedProcedure.mutation(async () => {
+		try {
+			initializePushNotifier();
+			await sendTestNotification();
+			return { success: true, message: "Test notification sent" };
+		} catch (error) {
+			logger.error({ label: Label.SERVER, message: error.message });
+			throw new Error(
+				`Failed to send test notification: ${error.message}`,
+			);
 		}
 	}),
 });
