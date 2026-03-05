@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { Action, LinkType, MatchMode } from "./constants.js";
 
+export const WebhookObjectSchema = z.object({
+	url: z.string(),
+	payload: z.record(z.unknown()).optional(),
+	headers: z.record(z.string()).optional(),
+});
+
+export type WebhookEntry = string | z.infer<typeof WebhookObjectSchema>;
+
 export const RUNTIME_CONFIG_SCHEMA = z.object({
 	delay: z.number().int().min(30).max(3600),
 	torznab: z.array(z.string()),
@@ -29,7 +37,9 @@ export const RUNTIME_CONFIG_SCHEMA = z.object({
 	action: z.nativeEnum(Action),
 	torrentClients: z.array(z.string()),
 	duplicateCategories: z.boolean(),
-	notificationWebhookUrls: z.array(z.string()),
+	notificationWebhookUrls: z.array(
+		z.union([z.string(), WebhookObjectSchema]),
+	),
 	torrents: z.array(z.string()),
 	port: z.number().int().min(1).max(65535).optional(),
 	host: z.string().optional(),

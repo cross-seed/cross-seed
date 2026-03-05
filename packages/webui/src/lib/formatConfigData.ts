@@ -1,11 +1,19 @@
 import { Config } from '@/types/config';
 
 /**
- * Currently acts as an identity function—kept around as a dedicated hook
- * point in case the UI needs one-off tweaks to API data in the future.
+ * Transforms API config data for the WebUI form.
+ * Object webhook entries are mapped to their URL string for display.
  */
 export function formatConfigDataForForm(config: Config) {
-  return config;
+  return {
+    ...config,
+    ...(config.notificationWebhookUrls && {
+      notificationWebhookUrls: config.notificationWebhookUrls.map(
+        (e: unknown) =>
+          typeof e === 'string' ? e : (e as { url: string }).url,
+      ),
+    }),
+  };
   //  return {
   //    ...config,
 

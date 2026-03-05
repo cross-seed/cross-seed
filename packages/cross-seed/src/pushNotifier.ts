@@ -1,4 +1,5 @@
 import ms from "ms";
+import { WebhookEntry } from "@cross-seed/shared/configSchema";
 import { estimatePausedStatus } from "./clients/TorrentClient.js";
 import {
 	ActionResult,
@@ -31,10 +32,10 @@ interface PushNotification {
 }
 
 export class PushNotifier {
-	urls: string[];
+	entries: WebhookEntry[];
 
-	constructor(urls: string[]) {
-		this.urls = urls;
+	constructor(entries: WebhookEntry[]) {
+		this.entries = entries;
 	}
 
 	async notify({
@@ -42,15 +43,26 @@ export class PushNotifier {
 		body,
 		...rest
 	}: PushNotification): Promise<void[]> {
-		return mapAsync(this.urls, async (url) => {
+		return mapAsync(this.entries, async (entry) => {
+			const isObject = typeof entry !== "string";
+			const url = isObject ? entry.url : entry;
 			try {
+				const defaultHeaders: Record<string, string> = {
+					"Content-Type": "application/json",
+					"User-Agent": USER_AGENT,
+				};
+				const headers = isObject
+					? { ...defaultHeaders, ...entry.headers }
+					: defaultHeaders;
+
+				const payload = isObject
+					? { title, body, message: body, ...rest, ...entry.payload }
+					: { title, body, ...rest };
+
 				const response = await fetch(url, {
 					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						"User-Agent": USER_AGENT,
-					},
-					body: JSON.stringify({ title, body, ...rest }),
+					headers,
+					body: JSON.stringify(payload),
 					signal: AbortSignal.timeout(ms("5 minutes")),
 				});
 

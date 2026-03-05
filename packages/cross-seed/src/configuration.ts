@@ -50,7 +50,14 @@ export interface FileConfig {
 	transmissionRpcUrl?: string;
 	delugeRpcUrl?: string;
 	duplicateCategories?: boolean;
-	notificationWebhookUrls?: string[];
+	notificationWebhookUrls?: (
+		| string
+		| {
+				url: string;
+				payload?: Record<string, unknown>;
+				headers?: Record<string, string>;
+		  }
+	)[];
 	notificationWebhookUrl?: string;
 	port?: number;
 	host?: string;
@@ -416,17 +423,27 @@ function addClient(clients: Set<string>, prefix: string, url: unknown): void {
 	}
 }
 
-function collectWebhookUrls(fileConfig: FileConfig): string[] | undefined {
-	const urls = new Set<string>();
-	if (isStringArray(fileConfig.notificationWebhookUrls)) {
-		fileConfig.notificationWebhookUrls.forEach((url) => {
-			if (typeof url === "string") urls.add(url);
-		});
+function collectWebhookUrls(
+	fileConfig: FileConfig,
+): FileConfig["notificationWebhookUrls"] | undefined {
+	const seen = new Set<string>();
+	const entries: NonNullable<FileConfig["notificationWebhookUrls"]> = [];
+	if (Array.isArray(fileConfig.notificationWebhookUrls)) {
+		for (const entry of fileConfig.notificationWebhookUrls) {
+			const url = typeof entry === "string" ? entry : entry.url;
+			if (!seen.has(url)) {
+				seen.add(url);
+				entries.push(entry);
+			}
+		}
 	}
 	if (typeof fileConfig.notificationWebhookUrl === "string") {
-		urls.add(fileConfig.notificationWebhookUrl);
+		if (!seen.has(fileConfig.notificationWebhookUrl)) {
+			seen.add(fileConfig.notificationWebhookUrl);
+			entries.push(fileConfig.notificationWebhookUrl);
+		}
 	}
-	return urls.size ? Array.from(urls) : undefined;
+	return entries.length ? entries : undefined;
 }
 
 export async function getFileConfig(): Promise<FileConfig | undefined> {
