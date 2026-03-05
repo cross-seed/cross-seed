@@ -430,9 +430,10 @@ function collectWebhookUrls(
 	const entries: NonNullable<FileConfig["notificationWebhookUrls"]> = [];
 	if (Array.isArray(fileConfig.notificationWebhookUrls)) {
 		for (const entry of fileConfig.notificationWebhookUrls) {
-			const url = typeof entry === "string" ? entry : entry.url;
-			if (!seen.has(url)) {
-				seen.add(url);
+			const key =
+				typeof entry === "string" ? entry : JSON.stringify(entry);
+			if (!seen.has(key)) {
+				seen.add(key);
 				entries.push(entry);
 			}
 		}

@@ -36,8 +36,12 @@ function transformWebhooksForApi(
     .map((e) => {
       if (!e.payload && !e.headers) return e.url;
       const obj: { url: string; payload?: unknown; headers?: unknown } = { url: e.url };
-      if (e.payload) obj.payload = JSON.parse(e.payload);
-      if (e.headers) obj.headers = JSON.parse(e.headers);
+      if (e.payload) {
+        try { obj.payload = JSON.parse(e.payload); } catch { /* invalid JSON, omit */ }
+      }
+      if (e.headers) {
+        try { obj.headers = JSON.parse(e.headers); } catch { /* invalid JSON, omit */ }
+      }
       return obj;
     });
 }
@@ -324,7 +328,7 @@ function ConnectSettings() {
                             )}
                           </Label>
                           {field.state.value?.map(
-                            (_: WebhookFormEntry, index: number) => (
+                            (entry: WebhookFormEntry, index: number) => (
                               <fieldset
                                 key={index}
                                 className="border-border space-y-2 rounded-md border p-3"
@@ -370,7 +374,7 @@ function ConnectSettings() {
                                 <div className="mt-1 flex items-center gap-2">
                                   <Switch
                                     id={`notificationWebhookUrls-${index}-advanced`}
-                                    checked={advancedOpen.has(index) || !!(_.headers || _.payload)}
+                                    checked={advancedOpen.has(index) || !!(entry.headers || entry.payload)}
                                     onCheckedChange={(checked) => {
                                       setAdvancedOpen((prev) => {
                                         const next = new Set(prev);
@@ -392,7 +396,7 @@ function ConnectSettings() {
                                     Custom headers & payload
                                   </Label>
                                 </div>
-                                {(advancedOpen.has(index) || !!(_.headers || _.payload)) && (
+                                {(advancedOpen.has(index) || !!(entry.headers || entry.payload)) && (
                                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                   <div>
                                     <Label className="text-muted-foreground text-xs">

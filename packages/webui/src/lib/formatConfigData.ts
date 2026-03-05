@@ -13,16 +13,19 @@ export function formatConfigDataForForm(config: Config) {
           if (typeof e === 'string') {
             return { url: e, payload: '', headers: '' };
           }
-          const obj = e as {
-            url: string;
-            payload?: unknown;
-            headers?: unknown;
-          };
-          return {
-            url: obj.url,
-            payload: obj.payload ? JSON.stringify(obj.payload) : '',
-            headers: obj.headers ? JSON.stringify(obj.headers) : '',
-          };
+          if (typeof e === 'object' && e !== null && 'url' in e) {
+            const obj = e as {
+              url: string;
+              payload?: unknown;
+              headers?: unknown;
+            };
+            return {
+              url: obj.url,
+              payload: obj.payload ? JSON.stringify(obj.payload) : '',
+              headers: obj.headers ? JSON.stringify(obj.headers) : '',
+            };
+          }
+          return { url: '', payload: '', headers: '' };
         },
       ),
     }),

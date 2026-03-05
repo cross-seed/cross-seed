@@ -3,7 +3,7 @@
  * @param  array - The array to filter.
  * @return - The filtered array with empty string values removed.
  */
-export function removeEmptyArrayValues(array: unknown[]) {
+export function removeEmptyArrayValues<T>(array: T[]) {
   return array.filter((item) => item !== '');
 }
 
