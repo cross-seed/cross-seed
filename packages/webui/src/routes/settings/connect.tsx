@@ -1,5 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Loader2, TestTube } from 'lucide-react';
 import { FieldInfo } from '@/components/Form/FieldInfo';
 import { z } from 'zod';
 import { Label } from '@/components/ui/label';
@@ -81,6 +84,20 @@ function ConnectSettings() {
       onSubmit: connectValidationSchema,
     },
   });
+
+  const [isTesting, setIsTesting] = useState(false);
+  const { mutate: testWebhooks } = useMutation(
+    trpc.settings.testNotification.mutationOptions({
+      onSuccess: () => {
+        setIsTesting(false);
+        toast.success('Test notification sent!');
+      },
+      onError: (error) => {
+        setIsTesting(false);
+        toast.error(`Test failed: ${error.message}`);
+      },
+    }),
+  );
 
   const [lastFieldAdded, setLastFieldAdded] = useState<string | null>(null);
   useEffect(() => {
@@ -415,23 +432,47 @@ function ConnectSettings() {
                               </fieldset>
                             ),
                           )}
-                          <Button
-                            variant="secondary"
-                            type="button"
-                            onClick={() => {
-                              field.pushValue({
-                                url: '',
-                                payload: '',
-                                headers: '',
-                              });
-                              setLastFieldAdded(
-                                `notificationWebhookUrls-${field.state.value?.length ?? 0}-url`,
-                              );
-                            }}
-                            title="Add webhook"
-                          >
-                            Add
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="secondary"
+                              type="button"
+                              onClick={() => {
+                                field.pushValue({
+                                  url: '',
+                                  payload: '',
+                                  headers: '',
+                                });
+                                setLastFieldAdded(
+                                  `notificationWebhookUrls-${field.state.value?.length ?? 0}-url`,
+                                );
+                              }}
+                              title="Add webhook"
+                            >
+                              Add
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              type="button"
+                              disabled={isTesting || !field.state.value?.some((e) => e.url)}
+                              onClick={() => {
+                                setIsTesting(true);
+                                testWebhooks({});
+                              }}
+                              title="Test all saved webhooks"
+                            >
+                              {isTesting ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Testing…
+                                </>
+                              ) : (
+                                <>
+                                  <TestTube className="h-4 w-4" />
+                                  Test Webhooks
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         </div>
                       );
                     }}
