@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Loader2, TestTube } from 'lucide-react';
 import { FieldInfo } from '@/components/Form/FieldInfo';
@@ -22,7 +21,7 @@ import { FormValidationProvider } from '@/contexts/Form/form-validation-provider
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { Page } from '@/components/Page';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
-import { RuntimeConfig } from '../../../../shared/configSchema';
+import { RuntimeConfig, WebhookEntry } from '../../../../shared/configSchema';
 
 type ConnectFormData = z.infer<typeof connectValidationSchema>;
 
@@ -30,7 +29,7 @@ type WebhookFormEntry = { url: string; payload: string; headers: string };
 
 function transformWebhooksForApi(
   entries: WebhookFormEntry[],
-): (string | { url: string; payload?: Record<string, unknown>; headers?: Record<string, string> })[] {
+): WebhookEntry[] {
   return entries
     .filter((e) => e.url !== '')
     .map((e) => {
@@ -90,32 +89,27 @@ function ConnectSettings() {
     },
   });
 
-  const [isTesting, setIsTesting] = useState(false);
-  const { mutate: testWebhooks } = useMutation(
-    trpc.settings.testNotification.mutationOptions({
-      onSuccess: (data) => {
-        setIsTesting(false);
-        const results = data.results;
-        const failures = results.filter((r) => !r.ok);
-        if (failures.length === 0) {
-          toast.success('All webhooks sent successfully!');
-        } else {
-          for (const r of results) {
-            const maskedUrl = r.url.replace(/:\/\/[^@/]*@/, '://***@');
-            if (r.ok) {
-              toast.success(`Webhook sent: ${maskedUrl}`);
-            } else {
-              toast.error(`Webhook failed: ${maskedUrl} — ${r.error}`);
-            }
+  const { mutate: testWebhooks, isPending: isTesting } = trpc.settings.testNotification.useMutation({
+    onSuccess: (data) => {
+      const results = data.results;
+      const failures = results.filter((r) => !r.ok);
+      if (failures.length === 0) {
+        toast.success('All webhooks sent successfully!');
+      } else {
+        for (const r of results) {
+          const maskedUrl = r.url.replace(/:\/\/[^@/]*@/, '://***@');
+          if (r.ok) {
+            toast.success(`Webhook sent: ${maskedUrl}`);
+          } else {
+            toast.error(`Webhook failed: ${maskedUrl} — ${r.error}`);
           }
         }
-      },
-      onError: (error) => {
-        setIsTesting(false);
-        toast.error(`Test failed: ${error.message}`);
-      },
-    }),
-  );
+      }
+    },
+    onError: (error) => {
+      toast.error(`Test failed: ${error.message}`);
+    },
+  });
 
   const [advancedOpen, setAdvancedOpen] = useState<Set<number>>(new Set());
   const [lastFieldAdded, setLastFieldAdded] = useState<string | null>(null);
@@ -496,7 +490,6 @@ function ConnectSettings() {
                               type="button"
                               disabled={isTesting || !field.state.value?.some((e) => e.url)}
                               onClick={() => {
-                                setIsTesting(true);
                                 testWebhooks({});
                               }}
                               title="Test all saved webhooks"

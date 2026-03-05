@@ -1,4 +1,5 @@
 import { Config } from '@/types/config';
+import { WebhookObjectSchema } from '../../../shared/configSchema';
 
 /**
  * Transforms API config data for the WebUI form.
@@ -13,16 +14,12 @@ export function formatConfigDataForForm(config: Config) {
           if (typeof e === 'string') {
             return { url: e, payload: '', headers: '' };
           }
-          if (typeof e === 'object' && e !== null && 'url' in e) {
-            const obj = e as {
-              url: string;
-              payload?: unknown;
-              headers?: unknown;
-            };
+          const parsed = WebhookObjectSchema.safeParse(e);
+          if (parsed.success) {
             return {
-              url: obj.url,
-              payload: obj.payload ? JSON.stringify(obj.payload) : '',
-              headers: obj.headers ? JSON.stringify(obj.headers) : '',
+              url: parsed.data.url,
+              payload: parsed.data.payload ? JSON.stringify(parsed.data.payload) : '',
+              headers: parsed.data.headers ? JSON.stringify(parsed.data.headers) : '',
             };
           }
           return { url: '', payload: '', headers: '' };

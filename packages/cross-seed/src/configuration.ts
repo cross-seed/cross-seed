@@ -13,6 +13,7 @@ import {
 } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
+import { WebhookEntry } from "@cross-seed/shared/configSchema";
 import { omitUndefined } from "./utils/object.js";
 
 const require = createRequire(import.meta.url);
@@ -50,14 +51,7 @@ export interface FileConfig {
 	transmissionRpcUrl?: string;
 	delugeRpcUrl?: string;
 	duplicateCategories?: boolean;
-	notificationWebhookUrls?: (
-		| string
-		| {
-				url: string;
-				payload?: Record<string, unknown>;
-				headers?: Record<string, string>;
-		  }
-	)[];
+	notificationWebhookUrls?: WebhookEntry[];
 	notificationWebhookUrl?: string;
 	port?: number;
 	host?: string;
