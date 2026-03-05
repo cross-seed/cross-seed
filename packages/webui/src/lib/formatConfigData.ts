@@ -12,7 +12,7 @@ export function formatConfigDataForForm(config: Config) {
       notificationWebhookUrls: config.notificationWebhookUrls.map(
         (e: unknown) => {
           if (typeof e === 'string') {
-            return { url: e, payload: '', headers: '' };
+            return { url: e, payload: '', headers: '', bodyFormat: undefined };
           }
           const parsed = WebhookObjectSchema.safeParse(e);
           if (parsed.success) {
@@ -20,9 +20,10 @@ export function formatConfigDataForForm(config: Config) {
               url: parsed.data.url,
               payload: parsed.data.payload ? JSON.stringify(parsed.data.payload) : '',
               headers: parsed.data.headers ? JSON.stringify(parsed.data.headers) : '',
+              bodyFormat: parsed.data.bodyFormat,
             };
           }
-          return { url: '', payload: '', headers: '' };
+          return { url: '', payload: '', headers: '', bodyFormat: undefined };
         },
       ),
     }),

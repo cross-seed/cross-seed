@@ -33,13 +33,16 @@ function transformWebhooksForApi(
   return entries
     .filter((e) => e.url !== '')
     .map((e) => {
-      if (!e.payload && !e.headers) return e.url;
-      const obj: { url: string; payload?: unknown; headers?: unknown } = { url: e.url };
+      if (!e.payload && !e.headers && !e.bodyFormat) return e.url;
+      const obj: { url: string; payload?: unknown; headers?: unknown; bodyFormat?: string } = { url: e.url };
       if (e.payload) {
         try { obj.payload = JSON.parse(e.payload); } catch { /* invalid JSON, omit */ }
       }
       if (e.headers) {
         try { obj.headers = JSON.parse(e.headers); } catch { /* invalid JSON, omit */ }
+      }
+      if (e.bodyFormat) {
+        obj.bodyFormat = e.bodyFormat;
       }
       return obj;
     });
@@ -476,6 +479,7 @@ function ConnectSettings() {
                                   url: '',
                                   payload: '',
                                   headers: '',
+                                  bodyFormat: undefined,
                                 });
                                 setLastFieldAdded(
                                   `notificationWebhookUrls-${field.state.value?.length ?? 0}-url`,
