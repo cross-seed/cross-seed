@@ -9,8 +9,21 @@ export function formatConfigDataForForm(config: Config) {
     ...config,
     ...(config.notificationWebhookUrls && {
       notificationWebhookUrls: config.notificationWebhookUrls.map(
-        (e: unknown) =>
-          typeof e === 'string' ? e : (e as { url: string }).url,
+        (e: unknown) => {
+          if (typeof e === 'string') {
+            return { url: e, payload: '', headers: '' };
+          }
+          const obj = e as {
+            url: string;
+            payload?: unknown;
+            headers?: unknown;
+          };
+          return {
+            url: obj.url,
+            payload: obj.payload ? JSON.stringify(obj.payload) : '',
+            headers: obj.headers ? JSON.stringify(obj.headers) : '',
+          };
+        },
       ),
     }),
   };
