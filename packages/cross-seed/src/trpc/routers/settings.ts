@@ -104,8 +104,8 @@ export const settingsRouter = router({
 	testNotification: authedProcedure.mutation(async () => {
 		try {
 			initializePushNotifier();
-			await sendTestNotification();
-			return { success: true, message: "Test notification sent" };
+			const results = await sendTestNotification();
+			return { results };
 		} catch (error) {
 			logger.error({ label: Label.SERVER, message: error.message });
 			throw new Error(
