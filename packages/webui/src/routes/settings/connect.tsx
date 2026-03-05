@@ -13,7 +13,7 @@ import DeleteOption from '@/components/Buttons/DeleteOption';
 import useConfigForm from '@/hooks/use-config-form';
 import { defaultConnectFormValues } from '@/components/Form/shared-form';
 import { useAppForm } from '@/hooks/form';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { connectValidationSchema } from '@/types/config';
@@ -92,7 +92,8 @@ function ConnectSettings() {
     },
   });
 
-  const { mutate: testWebhooks, isPending: isTesting } = trpc.settings.testNotification.useMutation({
+  const { mutate: testWebhooks, isPending: isTesting } = useMutation(
+    trpc.settings.testNotification.mutationOptions({
     onSuccess: (data) => {
       const results = data.results;
       const failures = results.filter((r) => !r.ok);
@@ -112,7 +113,8 @@ function ConnectSettings() {
     onError: (error) => {
       toast.error(`Test failed: ${error.message}`);
     },
-  });
+  }),
+  );
 
   const [advancedOpen, setAdvancedOpen] = useState<Set<number>>(new Set());
   const [lastFieldAdded, setLastFieldAdded] = useState<string | null>(null);
