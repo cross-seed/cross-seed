@@ -83,6 +83,7 @@ export const connectValidationSchema = z.object({
       url: z.string().url().or(z.literal('')),
       payload: optionalJsonString,
       headers: optionalJsonString,
+      bodyFormat: z.enum(['plain', 'markdown']).optional(),
     }),
   ),
 });

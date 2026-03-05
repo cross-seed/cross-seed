@@ -25,7 +25,7 @@ import { RuntimeConfig, WebhookEntry } from '../../../../shared/configSchema';
 
 type ConnectFormData = z.infer<typeof connectValidationSchema>;
 
-type WebhookFormEntry = { url: string; payload: string; headers: string };
+type WebhookFormEntry = { url: string; payload: string; headers: string; bodyFormat?: 'plain' | 'markdown' };
 
 function transformWebhooksForApi(
   entries: WebhookFormEntry[],
