@@ -1,9 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FieldInfo } from '@/components/Form/FieldInfo';
 import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import DeleteOption from '@/components/Buttons/DeleteOption';
 import useConfigForm from '@/hooks/use-config-form';
 import { defaultConnectFormValues } from '@/components/Form/shared-form';
 import { useAppForm } from '@/hooks/form';
@@ -18,6 +20,22 @@ import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 import { RuntimeConfig } from '../../../../shared/configSchema';
 
 type ConnectFormData = z.infer<typeof connectValidationSchema>;
+
+type WebhookFormEntry = { url: string; payload: string; headers: string };
+
+function transformWebhooksForApi(
+  entries: WebhookFormEntry[],
+): (string | { url: string; payload?: Record<string, unknown>; headers?: Record<string, string> })[] {
+  return entries
+    .filter((e) => e.url !== '')
+    .map((e) => {
+      if (!e.payload && !e.headers) return e.url;
+      const obj: { url: string; payload?: unknown; headers?: unknown } = { url: e.url };
+      if (e.payload) obj.payload = JSON.parse(e.payload);
+      if (e.headers) obj.headers = JSON.parse(e.headers);
+      return obj;
+    });
+}
 
 function ConnectSettings() {
   const { isFieldRequired } = useConfigForm(connectValidationSchema);
@@ -41,7 +59,19 @@ function ConnectSettings() {
     }),
   );
 
-  const handleSubmit = useSettingsFormSubmit();
+  const baseHandleSubmit = useSettingsFormSubmit();
+  const handleSubmit = useCallback(
+    async ({ value }: { value: ConnectFormData }) => {
+      const transformed = {
+        ...value,
+        notificationWebhookUrls: transformWebhooksForApi(
+          value.notificationWebhookUrls as WebhookFormEntry[],
+        ),
+      };
+      return baseHandleSubmit({ value: transformed });
+    },
+    [baseHandleSubmit],
+  );
 
   const form = useAppForm({
     defaultValues: (configData ?? defaultConnectFormValues) as ConnectFormData,
@@ -245,7 +275,7 @@ function ConnectSettings() {
                     }}
                   </form.Field>
                 </div>
-                <div className="">
+                <div>
                   <form.Field
                     name="notificationWebhookUrls"
                     mode="array"
@@ -255,65 +285,142 @@ function ConnectSettings() {
                       return (
                         <div className="space-y-3">
                           <Label htmlFor={field.name} className="block w-full">
-                            Notification Webhook URL(s)
+                            Notification Webhook(s)
                             {isFieldRequired(field.name) && (
                               <span className="pl-1 text-red-500">*</span>
                             )}
                           </Label>
                           {field.state.value?.map(
-                            (_: string, index: number) => {
-                              return (
-                                <div
-                                  key={index}
-                                  className="gap-y- mb-3 flex flex-col"
-                                >
-                                  <form.AppField
-                                    name={`notificationWebhookUrls[${index}]`}
+                            (_: WebhookFormEntry, index: number) => (
+                              <fieldset
+                                key={index}
+                                className="border-border space-y-2 rounded-md border p-3"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <form.Field
+                                    name={`notificationWebhookUrls[${index}].url`}
                                     validators={{
-                                      onBlur: z
-                                        .string()
-                                        .min(3)
-                                        .url()
-                                        .or(z.literal('')),
+                                      onBlur: z.string().url().or(z.literal('')),
                                     }}
                                   >
                                     {(subfield) => (
-                                      <subfield.ArrayField
-                                        showDelete={
-                                          field.state.value &&
-                                          field.state.value?.length > 1
+                                      <Input
+                                        id={`notificationWebhookUrls-${index}-url`}
+                                        name={subfield.name}
+                                        value={subfield.state.value}
+                                        onChange={(e) =>
+                                          subfield.handleChange(e.target.value)
                                         }
-                                        index={index}
-                                        onDelete={() => {
-                                          field.removeValue(index);
-                                        }}
+                                        onBlur={subfield.handleBlur}
+                                        placeholder="https://example.com/webhook"
+                                        className="flex-1"
                                       />
                                     )}
-                                  </form.AppField>
-                                  <form.Subscribe
-                                    selector={(f) =>
-                                      f.fieldMeta[
-                                        `${field.name}[${index}]` as keyof typeof f.fieldMeta
-                                      ]
-                                    }
-                                  >
-                                    {(fieldMeta) => (
-                                      <FieldInfo fieldMeta={fieldMeta} />
-                                    )}
-                                  </form.Subscribe>
+                                  </form.Field>
+                                  {(field.state.value?.length ?? 0) > 1 && (
+                                    <DeleteOption
+                                      onClick={() => field.removeValue(index)}
+                                    />
+                                  )}
                                 </div>
-                              );
-                            },
+                                <form.Subscribe
+                                  selector={(f) =>
+                                    f.fieldMeta[
+                                      `notificationWebhookUrls[${index}].url` as keyof typeof f.fieldMeta
+                                    ]
+                                  }
+                                >
+                                  {(fieldMeta) => (
+                                    <FieldInfo fieldMeta={fieldMeta} />
+                                  )}
+                                </form.Subscribe>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                  <div>
+                                    <Label className="text-muted-foreground text-xs">
+                                      Headers (JSON)
+                                    </Label>
+                                    <form.Field
+                                      name={`notificationWebhookUrls[${index}].headers`}
+                                    >
+                                      {(subfield) => (
+                                        <Input
+                                          name={subfield.name}
+                                          value={subfield.state.value}
+                                          onChange={(e) =>
+                                            subfield.handleChange(
+                                              e.target.value,
+                                            )
+                                          }
+                                          onBlur={subfield.handleBlur}
+                                          placeholder='{"Authorization": "Bearer token"}'
+                                          className="font-mono text-xs"
+                                        />
+                                      )}
+                                    </form.Field>
+                                    <form.Subscribe
+                                      selector={(f) =>
+                                        f.fieldMeta[
+                                          `notificationWebhookUrls[${index}].headers` as keyof typeof f.fieldMeta
+                                        ]
+                                      }
+                                    >
+                                      {(fieldMeta) => (
+                                        <FieldInfo fieldMeta={fieldMeta} />
+                                      )}
+                                    </form.Subscribe>
+                                  </div>
+                                  <div>
+                                    <Label className="text-muted-foreground text-xs">
+                                      Payload (JSON)
+                                    </Label>
+                                    <form.Field
+                                      name={`notificationWebhookUrls[${index}].payload`}
+                                    >
+                                      {(subfield) => (
+                                        <Input
+                                          name={subfield.name}
+                                          value={subfield.state.value}
+                                          onChange={(e) =>
+                                            subfield.handleChange(
+                                              e.target.value,
+                                            )
+                                          }
+                                          onBlur={subfield.handleBlur}
+                                          placeholder='{"topic": "cross-seed"}'
+                                          className="font-mono text-xs"
+                                        />
+                                      )}
+                                    </form.Field>
+                                    <form.Subscribe
+                                      selector={(f) =>
+                                        f.fieldMeta[
+                                          `notificationWebhookUrls[${index}].payload` as keyof typeof f.fieldMeta
+                                        ]
+                                      }
+                                    >
+                                      {(fieldMeta) => (
+                                        <FieldInfo fieldMeta={fieldMeta} />
+                                      )}
+                                    </form.Subscribe>
+                                  </div>
+                                </div>
+                              </fieldset>
+                            ),
                           )}
                           <Button
                             variant="secondary"
                             type="button"
                             onClick={() => {
-                              field.pushValue('');
-                              const newFieldId = `${field.name}-${field.state.value?.length ? field.state.value.length - 1 : 0}`;
-                              setLastFieldAdded(newFieldId);
+                              field.pushValue({
+                                url: '',
+                                payload: '',
+                                headers: '',
+                              });
+                              setLastFieldAdded(
+                                `notificationWebhookUrls-${field.state.value?.length ?? 0}-url`,
+                              );
                             }}
-                            title={`Add ${field.name}`}
+                            title="Add webhook"
                           >
                             Add
                           </Button>
