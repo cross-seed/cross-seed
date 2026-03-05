@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import DeleteOption from '@/components/Buttons/DeleteOption';
 import useConfigForm from '@/hooks/use-config-form';
 import { defaultConnectFormValues } from '@/components/Form/shared-form';
@@ -343,7 +344,7 @@ function ConnectSettings() {
                                       name={`notificationWebhookUrls[${index}].headers`}
                                     >
                                       {(subfield) => (
-                                        <Input
+                                        <Textarea
                                           name={subfield.name}
                                           value={subfield.state.value}
                                           onChange={(e) =>
@@ -353,7 +354,8 @@ function ConnectSettings() {
                                           }
                                           onBlur={subfield.handleBlur}
                                           placeholder='{"Authorization": "Bearer token"}'
-                                          className="font-mono text-xs"
+                                          rows={2}
+                                          className="resize-y font-mono text-xs"
                                         />
                                       )}
                                     </form.Field>
@@ -377,7 +379,7 @@ function ConnectSettings() {
                                       name={`notificationWebhookUrls[${index}].payload`}
                                     >
                                       {(subfield) => (
-                                        <Input
+                                        <Textarea
                                           name={subfield.name}
                                           value={subfield.state.value}
                                           onChange={(e) =>
@@ -387,7 +389,8 @@ function ConnectSettings() {
                                           }
                                           onBlur={subfield.handleBlur}
                                           placeholder='{"topic": "cross-seed"}'
-                                          className="font-mono text-xs"
+                                          rows={2}
+                                          className="resize-y font-mono text-xs"
                                         />
                                       )}
                                     </form.Field>
