@@ -6,11 +6,10 @@ import {
 	createAppDirHierarchy,
 	getDefaultRuntimeConfig,
 	getFileConfig,
-	stripDefaults,
 	transformFileConfig,
 } from "./configuration.js";
 import { db } from "./db.js";
-import { getDbConfig, setDbConfig } from "./dbConfig.js";
+import { setDbConfig } from "./dbConfig.js";
 import {
 	exitOnCrossSeedErrors,
 	initializeLogger,
@@ -115,62 +114,41 @@ async function applyExistingApiKey(config: RuntimeConfig): Promise<void> {
 async function determineRuntimeConfig(rawOptions: Record<string, unknown>) {
 	const cliOptions = omitUndefined(rawOptions) as Partial<RuntimeConfig>;
 
-	// first, try to load from database (existing user happy path)
-	let dbOverrides: Partial<RuntimeConfig> | undefined;
-	try {
-		dbOverrides = await getDbConfig();
-	} catch (dbError) {
-		logger.debug("Unable to load configuration from database", dbError);
-	}
-
-	if (dbOverrides !== undefined) {
-		return {
-			...getDefaultRuntimeConfig(),
-			...dbOverrides,
-			...cliOptions,
-		};
-	}
-
-	// then, try to migrate from file config (v6 to v7 upgrade path)
+	// Always read config.js when present (source of truth per docs)
+	let fileOverrides: Partial<RuntimeConfig> = {};
 	try {
 		const fileConfig = await getFileConfig();
 		if (fileConfig) {
-			const transformedFileConfig = transformFileConfig(fileConfig);
-			const runtimeFromFile = {
-				...getDefaultRuntimeConfig(),
-				...transformedFileConfig,
-			} as RuntimeConfig;
-			await applyExistingApiKey(runtimeFromFile);
-			await setDbConfig(runtimeFromFile);
-			const resolvedOverrides = stripDefaults(runtimeFromFile);
-			logger.info("Migrated file config to database");
-			return {
-				...getDefaultRuntimeConfig(),
-				...resolvedOverrides,
-				...cliOptions,
-			};
+			fileOverrides = transformFileConfig(fileConfig);
+			logger.info("Loaded configuration from config.js");
 		}
-	} catch (migrationError) {
+	} catch (fileError) {
 		logger.error(
-			new Error(
-				"Failed to import configuration file, falling back to defaults",
-				{ cause: migrationError },
-			),
+			new Error("Failed to import configuration file, using defaults", {
+				cause: fileError,
+			}),
 		);
 	}
 
-	// finally, fall back to defaults (new user happy path or migration failure)
-	const defaultRuntime = getDefaultRuntimeConfig();
-	await setDbConfig(defaultRuntime);
-	await resetApiKey();
-	logger.info("Created initial database config from defaults");
-	const resolvedOverrides = stripDefaults(defaultRuntime);
-
-	return {
+	// Merge: defaults ← config.js ← CLI options
+	const runtimeConfig = {
 		...getDefaultRuntimeConfig(),
-		...resolvedOverrides,
+		...fileOverrides,
 		...cliOptions,
-	};
+	} as RuntimeConfig;
+
+	// Preserve API key from DB if not set in config.js/CLI
+	await applyExistingApiKey(runtimeConfig);
+
+	// Persist to DB so WebUI/API reflects current state
+	await setDbConfig(runtimeConfig);
+
+	// Generate API key on first-ever startup (no key in DB or config)
+	if (!runtimeConfig.apiKey) {
+		runtimeConfig.apiKey = await resetApiKey();
+	}
+
+	return runtimeConfig;
 }
 
 /**
