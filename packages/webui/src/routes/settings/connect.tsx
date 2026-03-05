@@ -335,7 +335,11 @@ function ConnectSettings() {
                                     <FieldInfo fieldMeta={fieldMeta} />
                                   )}
                                 </form.Subscribe>
-                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <details className="mt-1" open={!!(_.headers || _.payload)}>
+                                  <summary className="text-muted-foreground cursor-pointer text-xs select-none">
+                                    Advanced (custom headers &amp; payload)
+                                  </summary>
+                                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                   <div>
                                     <Label className="text-muted-foreground text-xs">
                                       Headers (JSON)
@@ -407,6 +411,7 @@ function ConnectSettings() {
                                     </form.Subscribe>
                                   </div>
                                 </div>
+                                </details>
                               </fieldset>
                             ),
                           )}
