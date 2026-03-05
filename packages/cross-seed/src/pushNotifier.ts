@@ -34,6 +34,7 @@ export interface WebhookResult {
 interface PushNotification {
 	title?: string;
 	body: string;
+	markdownBody?: string;
 	extra?: Record<string, unknown>;
 }
 
@@ -52,6 +53,7 @@ export class PushNotifier {
 	async notify({
 		title = PROGRAM_NAME,
 		body,
+		markdownBody,
 		...rest
 	}: PushNotification): Promise<WebhookResult[]> {
 		return mapAsync(this.entries, async (entry) => {
@@ -62,9 +64,22 @@ export class PushNotifier {
 					? { ...DEFAULT_HEADERS, ...entry.headers }
 					: DEFAULT_HEADERS;
 
+				const selectedBody =
+					isObject &&
+					entry.bodyFormat === "markdown" &&
+					markdownBody
+						? markdownBody
+						: body;
+
 				const payload = isObject
-					? { title, body, message: body, ...rest, ...entry.payload }
-					: { title, body, ...rest };
+					? {
+							title,
+							body: selectedBody,
+							message: selectedBody,
+							...rest,
+							...entry.payload,
+						}
+					: { title, body: selectedBody, ...rest };
 
 				const response = await fetch(url, {
 					method: "POST",
