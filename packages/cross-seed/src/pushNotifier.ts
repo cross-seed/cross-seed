@@ -34,7 +34,27 @@ export interface WebhookResult {
 interface PushNotification {
 	title?: string;
 	body: string;
+	markdownBody?: string;
+	templateVars?: Record<string, string>;
 	extra?: Record<string, unknown>;
+}
+
+function substituteTemplateVars(
+	obj: Record<string, unknown>,
+	vars: Record<string, string>,
+): Record<string, unknown> {
+	const result: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(obj)) {
+		if (typeof value === "string") {
+			result[key] = value.replace(
+				/\{(\w+)\}/g,
+				(match, varName: string) => vars[varName] ?? match,
+			);
+		} else {
+			result[key] = value;
+		}
+	}
+	return result;
 }
 
 const DEFAULT_HEADERS: Record<string, string> = {
@@ -52,6 +72,8 @@ export class PushNotifier {
 	async notify({
 		title = PROGRAM_NAME,
 		body,
+		markdownBody,
+		templateVars,
 		...rest
 	}: PushNotification): Promise<WebhookResult[]> {
 		return mapAsync(this.entries, async (entry) => {
@@ -62,9 +84,24 @@ export class PushNotifier {
 					? { ...DEFAULT_HEADERS, ...entry.headers }
 					: DEFAULT_HEADERS;
 
-				const payload = isObject
-					? { title, body, message: body, ...rest, ...entry.payload }
-					: { title, body, ...rest };
+				const selectedBody =
+					isObject && entry.bodyFormat === "markdown" && markdownBody
+						? markdownBody
+						: body;
+
+				let payload: Record<string, unknown> = isObject
+					? {
+							title,
+							body: selectedBody,
+							message: selectedBody,
+							...rest,
+							...entry.payload,
+						}
+					: { title, body: selectedBody, ...rest };
+
+				if (isObject && entry.payload && templateVars) {
+					payload = substituteTemplateVars(payload, templateVars);
+				}
 
 				const response = await fetch(url, {
 					method: "POST",
@@ -154,15 +191,39 @@ export function sendResultsNotification(
 			: "Saved";
 		const decisions = notableSuccesses.map(([{ decision }]) => decision);
 
+		const markdownBody = [
+			`**Result:** ${performedAction}`,
+			`**Torrent:** ${name}`,
+			`**Trackers:** ${trackersListStr} (${numTrackers})`,
+			`**Match type:** ${formatAsList(decisions, { sort: true })}`,
+			`**Source:** ${searcheeSource} (${source})`,
+		].join("\n");
+
+		const result = injected ? InjectionResult.SUCCESS : SaveResult.SAVED;
+
 		void pushNotifier.notify({
 			body: `${source}: ${performedAction} ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
+			markdownBody,
+			templateVars: {
+				source,
+				performedAction,
+				name,
+				numTrackers: String(numTrackers),
+				trackersListStr,
+				searcheeSource,
+				decisions: formatAsList(decisions, { sort: true }),
+				trackers: trackers.join(", "),
+				result,
+				paused: String(paused),
+				infoHashes: infoHashes.join(", "),
+			},
 			extra: {
 				event: Event.RESULTS,
 				name,
 				infoHashes,
 				trackers,
 				source,
-				result: injected ? InjectionResult.SUCCESS : SaveResult.SAVED,
+				result,
 				paused,
 				decisions,
 				searchee: {
@@ -190,8 +251,30 @@ export function sendResultsNotification(
 		const trackersListStr = formatAsList(trackers, { sort: true });
 		const decisions = failures.map(([{ decision }]) => decision);
 
+		const failMarkdownBody = [
+			`**Result:** Failed to inject`,
+			`**Torrent:** ${name}`,
+			`**Trackers:** ${trackersListStr} (${numTrackers})`,
+			`**Match type:** ${formatAsList(decisions, { sort: true })}`,
+			`**Source:** ${searcheeSource} (${source})`,
+		].join("\n");
+
 		void pushNotifier.notify({
 			body: `${source}: Failed to inject ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
+			markdownBody: failMarkdownBody,
+			templateVars: {
+				source,
+				performedAction: "Failed to inject",
+				name,
+				numTrackers: String(numTrackers),
+				trackersListStr,
+				searcheeSource,
+				decisions: formatAsList(decisions, { sort: true }),
+				trackers: trackers.join(", "),
+				result: String(failures[0][2]),
+				paused: "false",
+				infoHashes: infoHashes.join(", "),
+			},
 			extra: {
 				event: Event.RESULTS,
 				name,
@@ -223,7 +306,27 @@ export function initializePushNotifier(): void {
 
 export async function sendTestNotification(): Promise<WebhookResult[]> {
 	const results = await pushNotifier.notify({
-		body: "Test",
+		body: "Test notification from cross-seed",
+		markdownBody: [
+			"**Result:** Injected",
+			"**Torrent:** Test.Torrent.2024.1080p.BluRay.x264",
+			"**Trackers:** ExampleTracker (1)",
+			"**Match type:** MATCH",
+			"**Source:** torrentClient (TestClient)",
+		].join("\n"),
+		templateVars: {
+			source: "TestClient",
+			performedAction: "Injected",
+			name: "Test.Torrent.2024.1080p.BluRay.x264",
+			numTrackers: "1",
+			trackersListStr: "ExampleTracker",
+			searcheeSource: "torrentClient",
+			decisions: "MATCH",
+			trackers: "ExampleTracker",
+			result: InjectionResult.SUCCESS,
+			paused: "false",
+			infoHashes: "abc123def456",
+		},
 		extra: { event: Event.TEST },
 	});
 	logger.info("Sent test notification");
