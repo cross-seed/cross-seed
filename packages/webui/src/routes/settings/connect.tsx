@@ -89,9 +89,22 @@ function ConnectSettings() {
   const [isTesting, setIsTesting] = useState(false);
   const { mutate: testWebhooks } = useMutation(
     trpc.settings.testNotification.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (data) => {
         setIsTesting(false);
-        toast.success('Test notification sent!');
+        const results = data.results;
+        const failures = results.filter((r) => !r.ok);
+        if (failures.length === 0) {
+          toast.success('All webhooks sent successfully!');
+        } else {
+          for (const r of results) {
+            const maskedUrl = r.url.replace(/:\/\/[^@/]*@/, '://***@');
+            if (r.ok) {
+              toast.success(`Webhook sent: ${maskedUrl}`);
+            } else {
+              toast.error(`Webhook failed: ${maskedUrl} — ${r.error}`);
+            }
+          }
+        }
       },
       onError: (error) => {
         setIsTesting(false);
