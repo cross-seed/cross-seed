@@ -220,7 +220,11 @@ export function initializePushNotifier(): void {
 	pushNotifier = new PushNotifier(notificationWebhookUrls);
 }
 
-export async function sendTestNotification(): Promise<void> {
-	await pushNotifier.notify({ body: "Test", extra: { event: Event.TEST } });
+export async function sendTestNotification(): Promise<WebhookResult[]> {
+	const results = await pushNotifier.notify({
+		body: "Test",
+		extra: { event: Event.TEST },
+	});
 	logger.info("Sent test notification");
+	return results;
 }
