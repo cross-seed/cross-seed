@@ -1,10 +1,18 @@
 import { z } from "zod";
 import { Action, LinkType, MatchMode } from "./constants.js";
 
+export const BodyFormat = {
+	PLAIN: "plain",
+	MARKDOWN: "markdown",
+} as const;
+
+export type BodyFormat = (typeof BodyFormat)[keyof typeof BodyFormat];
+
 export const WebhookObjectSchema = z.object({
 	url: z.string(),
 	payload: z.record(z.unknown()).optional(),
 	headers: z.record(z.string()).optional(),
+	bodyFormat: z.enum(["plain", "markdown"]).optional(),
 });
 
 export type WebhookEntry = string | z.infer<typeof WebhookObjectSchema>;
