@@ -12,18 +12,21 @@ export function formatConfigDataForForm(config: Config) {
       notificationWebhookUrls: config.notificationWebhookUrls.map(
         (e: unknown) => {
           if (typeof e === 'string') {
-            return { url: e, payload: '', headers: '', bodyFormat: undefined };
+            return { url: e, payload: '', headers: '' };
           }
           const parsed = WebhookObjectSchema.safeParse(e);
           if (parsed.success) {
             return {
               url: parsed.data.url,
-              payload: parsed.data.payload ? JSON.stringify(parsed.data.payload) : '',
-              headers: parsed.data.headers ? JSON.stringify(parsed.data.headers) : '',
-              bodyFormat: parsed.data.bodyFormat,
+              payload: parsed.data.payload
+                ? JSON.stringify(parsed.data.payload)
+                : '',
+              headers: parsed.data.headers
+                ? JSON.stringify(parsed.data.headers)
+                : '',
             };
           }
-          return { url: '', payload: '', headers: '', bodyFormat: undefined };
+          return { url: '', payload: '', headers: '' };
         },
       ),
     }),
