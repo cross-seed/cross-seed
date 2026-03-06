@@ -25,7 +25,7 @@ import { RuntimeConfig, WebhookEntry } from '../../../../shared/configSchema';
 
 type ConnectFormData = z.infer<typeof connectValidationSchema>;
 
-type WebhookFormEntry = { url: string; payload: string; headers: string; bodyFormat?: 'plain' | 'markdown' };
+type WebhookFormEntry = { url: string; payload: string; headers: string };
 
 function transformWebhooksForApi(
   entries: WebhookFormEntry[],
@@ -33,16 +33,13 @@ function transformWebhooksForApi(
   return entries
     .filter((e) => e.url !== '')
     .map((e) => {
-      if (!e.payload && !e.headers && !e.bodyFormat) return e.url;
-      const obj: { url: string; payload?: unknown; headers?: unknown; bodyFormat?: string } = { url: e.url };
+      if (!e.payload && !e.headers) return e.url;
+      const obj: { url: string; payload?: unknown; headers?: unknown } = { url: e.url };
       if (e.payload) {
         try { obj.payload = JSON.parse(e.payload); } catch { /* invalid JSON, omit */ }
       }
       if (e.headers) {
         try { obj.headers = JSON.parse(e.headers); } catch { /* invalid JSON, omit */ }
-      }
-      if (e.bodyFormat) {
-        obj.bodyFormat = e.bodyFormat;
       }
       return obj;
     });
@@ -371,31 +368,6 @@ function ConnectSettings() {
                                   )}
                                 </form.Subscribe>
                                 <div className="mt-1 flex items-center gap-2">
-                                  <form.Field
-                                    name={`notificationWebhookUrls[${index}].bodyFormat`}
-                                  >
-                                    {(subfield) => (
-                                      <>
-                                        <Switch
-                                          id={`notificationWebhookUrls-${index}-bodyFormat`}
-                                          checked={subfield.state.value === 'markdown'}
-                                          onCheckedChange={(checked) => {
-                                            subfield.handleChange(
-                                              checked ? 'markdown' : undefined,
-                                            );
-                                          }}
-                                        />
-                                        <Label
-                                          htmlFor={`notificationWebhookUrls-${index}-bodyFormat`}
-                                          className="text-muted-foreground text-xs"
-                                        >
-                                          Markdown body
-                                        </Label>
-                                      </>
-                                    )}
-                                  </form.Field>
-                                </div>
-                                <div className="mt-1 flex items-center gap-2">
                                   <Switch
                                     id={`notificationWebhookUrls-${index}-advanced`}
                                     checked={advancedOpen.has(index) || !!(entry.headers || entry.payload)}
@@ -506,7 +478,6 @@ function ConnectSettings() {
                                   url: '',
                                   payload: '',
                                   headers: '',
-                                  bodyFormat: undefined,
                                 });
                                 setLastFieldAdded(
                                   `notificationWebhookUrls-${field.state.value?.length ?? 0}-url`,
