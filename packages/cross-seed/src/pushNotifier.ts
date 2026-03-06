@@ -34,7 +34,6 @@ export interface WebhookResult {
 interface PushNotification {
 	title?: string;
 	body: string;
-	markdownBody?: string;
 	templateVars?: Record<string, string>;
 	extra?: Record<string, unknown>;
 }
@@ -72,7 +71,6 @@ export class PushNotifier {
 	async notify({
 		title = PROGRAM_NAME,
 		body,
-		markdownBody,
 		templateVars,
 		...rest
 	}: PushNotification): Promise<WebhookResult[]> {
@@ -84,20 +82,15 @@ export class PushNotifier {
 					? { ...DEFAULT_HEADERS, ...entry.headers }
 					: DEFAULT_HEADERS;
 
-				const selectedBody =
-					isObject && entry.bodyFormat === "markdown" && markdownBody
-						? markdownBody
-						: body;
-
 				let payload: Record<string, unknown> = isObject
 					? {
 							title,
-							body: selectedBody,
-							message: selectedBody,
+							body,
+							message: body,
 							...rest,
 							...entry.payload,
 						}
-					: { title, body: selectedBody, ...rest };
+					: { title, body, ...rest };
 
 				if (isObject && entry.payload && templateVars) {
 					payload = substituteTemplateVars(payload, templateVars);
@@ -191,19 +184,10 @@ export function sendResultsNotification(
 			: "Saved";
 		const decisions = notableSuccesses.map(([{ decision }]) => decision);
 
-		const markdownBody = [
-			`**Result:** ${performedAction}`,
-			`**Torrent:** ${name}`,
-			`**Trackers:** ${trackersListStr} (${numTrackers})`,
-			`**Match type:** ${formatAsList(decisions, { sort: true })}`,
-			`**Source:** ${searcheeSource} (${source})`,
-		].join("\n");
-
 		const result = injected ? InjectionResult.SUCCESS : SaveResult.SAVED;
 
 		void pushNotifier.notify({
 			body: `${source}: ${performedAction} ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
-			markdownBody,
 			templateVars: {
 				source,
 				performedAction,
@@ -251,17 +235,8 @@ export function sendResultsNotification(
 		const trackersListStr = formatAsList(trackers, { sort: true });
 		const decisions = failures.map(([{ decision }]) => decision);
 
-		const failMarkdownBody = [
-			`**Result:** Failed to inject`,
-			`**Torrent:** ${name}`,
-			`**Trackers:** ${trackersListStr} (${numTrackers})`,
-			`**Match type:** ${formatAsList(decisions, { sort: true })}`,
-			`**Source:** ${searcheeSource} (${source})`,
-		].join("\n");
-
 		void pushNotifier.notify({
 			body: `${source}: Failed to inject ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
-			markdownBody: failMarkdownBody,
 			templateVars: {
 				source,
 				performedAction: "Failed to inject",
@@ -307,13 +282,6 @@ export function initializePushNotifier(): void {
 export async function sendTestNotification(): Promise<WebhookResult[]> {
 	const results = await pushNotifier.notify({
 		body: "Test notification from cross-seed",
-		markdownBody: [
-			"**Result:** Injected",
-			"**Torrent:** Test.Torrent.2024.1080p.BluRay.x264",
-			"**Trackers:** ExampleTracker (1)",
-			"**Match type:** MATCH",
-			"**Source:** torrentClient (TestClient)",
-		].join("\n"),
 		templateVars: {
 			source: "TestClient",
 			performedAction: "Injected",
