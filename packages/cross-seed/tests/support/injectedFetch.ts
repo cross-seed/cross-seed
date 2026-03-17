@@ -50,6 +50,9 @@ export function createInjectedFetch(
 		const headers = headersToObject(
 			init?.headers ? new Headers(init.headers) : request.headers,
 		);
+		headers.host ??= url.host;
+		headers["x-forwarded-host"] ??= url.host;
+		headers["x-forwarded-proto"] ??= url.protocol.slice(0, -1);
 
 		let payload: Buffer | undefined;
 		if (method !== "GET" && method !== "HEAD") {

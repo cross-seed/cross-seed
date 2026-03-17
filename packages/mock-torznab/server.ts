@@ -38,20 +38,32 @@ export interface MockTorznabOptions {
 export interface MockTorznabState {
 	baseUrl: string;
 	now: number;
-	torrents: NormalizedTorrent[];
+	torrents: StoredTorrent[];
 	setTorrents: (torrents: MockTorznabTorrent[]) => void;
 	setNow: (now: number) => void;
+	resolveTorrents: (baseUrl?: string) => ResolvedTorrent[];
+	resolveTorrentById: (
+		id: string,
+		baseUrl?: string,
+	) => ResolvedTorrent | undefined;
 }
 
-type NormalizedTorrent = {
+type StoredTorrent = {
 	id: string;
 	title: string;
-	guid: string;
-	link: string;
+	guid?: string;
+	link?: string;
 	pubDate: string;
 	size: number;
+	files: TorrentFile[];
+	torrentName: string;
 	tracker: string;
 	attributes: Record<string, unknown>;
+};
+
+type ResolvedTorrent = StoredTorrent & {
+	guid: string;
+	link: string;
 	torrentPayload: Buffer;
 };
 
@@ -107,17 +119,14 @@ function buildTorrentPayload(
 
 function normalizeTorrents(
 	torrents: MockTorznabTorrent[],
-	baseUrl: string,
 	now: number,
-): NormalizedTorrent[] {
+): StoredTorrent[] {
 	return torrents.map((torrent, index) => {
 		const id = torrent.id ?? String(index + 1);
 		const fallbackSize = torrent.size ?? 734003200;
 		const files = normalizeFiles(torrent, fallbackSize);
 		const size = torrent.size ?? sumFileSizes(files);
 		const torrentName = torrent.torrentName ?? torrent.title;
-		const link = torrent.link ?? `${baseUrl}/download/${id}.torrent`;
-		const guid = torrent.guid ?? `${baseUrl}/torrent/${id}`;
 		const pubDate = normalizePubDate(torrent.pubDate, now - index * 1000);
 		const tracker = torrent.tracker ?? "mock-torznab";
 		const attributes = {
@@ -126,27 +135,23 @@ function normalizeTorrents(
 			grabs: 42,
 			...torrent.attributes,
 		};
-		const torrentPayload = buildTorrentPayload(
-			torrentName,
-			files,
-			`${baseUrl}/announce`,
-		);
 
 		return {
 			id,
 			title: torrent.title,
-			guid,
-			link,
+			guid: torrent.guid,
+			link: torrent.link,
 			pubDate,
 			size,
+			files,
+			torrentName,
 			tracker,
 			attributes,
-			torrentPayload,
 		};
 	});
 }
 
-function getDefaultTorrents(query: string, baseUrl: string, now: number) {
+function getDefaultTorrents(query: string, now: number) {
 	const normalizedQuery = query.trim()
 		? query.trim().replace(/\s+/g, ".")
 		: "test";
@@ -158,12 +163,31 @@ function getDefaultTorrents(query: string, baseUrl: string, now: number) {
 				id: String(index + 1),
 			};
 		}),
-		baseUrl,
 		now,
 	);
 }
 
-function toXmlSerializable(torrent: NormalizedTorrent) {
+function resolveTorrent(
+	torrent: StoredTorrent,
+	baseUrl: string,
+): ResolvedTorrent {
+	const guid = torrent.guid ?? `${baseUrl}/torrent/${torrent.id}`;
+	const link = torrent.link ?? `${baseUrl}/download/${torrent.id}.torrent`;
+	const torrentPayload = buildTorrentPayload(
+		torrent.torrentName,
+		torrent.files,
+		`${baseUrl}/announce`,
+	);
+
+	return {
+		...torrent,
+		guid,
+		link,
+		torrentPayload,
+	};
+}
+
+function toXmlSerializable(torrent: ResolvedTorrent) {
 	return {
 		title: torrent.title,
 		guid: torrent.guid,
@@ -195,6 +219,26 @@ function normalizeSearchToken(value: string): string {
 	return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
+function resolveBaseUrl(
+	request: FastifyRequest,
+	fallbackBaseUrl: string,
+): string {
+	const forwardedProto = request.headers["x-forwarded-proto"];
+	const forwardedHost = request.headers["x-forwarded-host"];
+	const host = Array.isArray(forwardedHost)
+		? forwardedHost[0]
+		: forwardedHost || request.headers.host;
+	if (!host) return fallbackBaseUrl;
+
+	const fallback = new URL(fallbackBaseUrl);
+	const protocolValue = Array.isArray(forwardedProto)
+		? forwardedProto[0]
+		: forwardedProto;
+	const protocol = protocolValue || fallback.protocol.slice(0, -1);
+
+	return `${protocol}://${host}`;
+}
+
 export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 	const baseUrl = options.baseUrl ?? "http://mock-torznab.local";
 	const state: MockTorznabState = {
@@ -202,10 +246,19 @@ export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 		now: options.now ?? Date.now(),
 		torrents: [],
 		setTorrents(torrents) {
-			state.torrents = normalizeTorrents(torrents, baseUrl, state.now);
+			state.torrents = normalizeTorrents(torrents, state.now);
 		},
 		setNow(now) {
 			state.now = now;
+		},
+		resolveTorrents(resolveBase = state.baseUrl) {
+			return state.torrents.map((torrent) =>
+				resolveTorrent(torrent, resolveBase),
+			);
+		},
+		resolveTorrentById(id, resolveBase = state.baseUrl) {
+			const torrent = state.torrents.find((entry) => entry.id === id);
+			return torrent ? resolveTorrent(torrent, resolveBase) : undefined;
 		},
 	};
 	state.setTorrents(options.torrents ?? []);
@@ -229,6 +282,7 @@ export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 			reply: FastifyReply,
 		) => {
 			const { t, q } = request.query;
+			const requestBaseUrl = resolveBaseUrl(request, state.baseUrl);
 
 			if (t === "caps") {
 				const caps = {
@@ -239,7 +293,7 @@ export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 							"@_title": "Mock Torznab",
 							"@_strapline": "A mock Torznab server",
 							"@_email": "test@test.com",
-							"@_url": baseUrl,
+							"@_url": requestBaseUrl,
 						},
 						limits: { "@_max": "100", "@_default": "50" },
 						searching: {
@@ -287,11 +341,7 @@ export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 				const offset = Number(request.query.offset ?? 0);
 				let allTorrents = state.torrents;
 				if (!allTorrents.length) {
-					allTorrents = getDefaultTorrents(
-						q || "test",
-						baseUrl,
-						state.now,
-					);
+					allTorrents = getDefaultTorrents(q || "test", state.now);
 					state.torrents = allTorrents;
 				}
 				const filtered = q
@@ -302,7 +352,9 @@ export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 						)
 					: allTorrents;
 				const paged = filtered.slice(offset, offset + limit);
-				const xmlTorrents = paged.map(toXmlSerializable);
+				const xmlTorrents = paged.map((torrent) =>
+					toXmlSerializable(resolveTorrent(torrent, requestBaseUrl)),
+				);
 				const feed = {
 					"?xml": { "@_version": "1.0", "@_encoding": "UTF-8" },
 					rss: {
@@ -312,12 +364,12 @@ export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 							"http://torznab.com/schemas/2015/feed",
 						channel: {
 							"atom:link": {
-								"@_href": `${baseUrl}/api?t=${t}&q=${encodeURIComponent(q || "")}`,
+								"@_href": `${requestBaseUrl}/api?t=${t}&q=${encodeURIComponent(q || "")}`,
 								"@_rel": "self",
 								"@_type": "application/rss+xml",
 							},
 							title: "Mock Torznab",
-							link: baseUrl,
+							link: requestBaseUrl,
 							description: "Mock Torznab feed",
 							item: xmlTorrents,
 						},
@@ -337,8 +389,9 @@ export function createMockTorznabServer(options: MockTorznabOptions = {}) {
 			request: FastifyRequest<{ Params: { id: string } }>,
 			reply: FastifyReply,
 		) => {
-			const torrent = state.torrents.find(
-				(entry) => entry.id === request.params.id,
+			const torrent = state.resolveTorrentById(
+				request.params.id,
+				resolveBaseUrl(request, state.baseUrl),
 			);
 			if (!torrent) {
 				reply.code(404).send({ error: "Torrent not found" });

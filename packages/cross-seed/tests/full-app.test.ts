@@ -295,7 +295,7 @@ describe.sequential("full app flows", () => {
 			},
 		]);
 
-		const normalizedTorrent = torznab.state.torrents[0];
+		const normalizedTorrent = torznab.state.resolveTorrents()[0];
 		const meta = env.Metafile.decode(normalizedTorrent.torrentPayload);
 		const torrentPath = env.getTorrentSavePath(
 			meta,
@@ -355,7 +355,7 @@ describe.sequential("full app flows", () => {
 			},
 		]);
 
-		const normalizedTorrent = torznab.state.torrents[0];
+		const normalizedTorrent = torznab.state.resolveTorrents()[0];
 		const meta = env.Metafile.decode(normalizedTorrent.torrentPayload);
 		const torrentPath = env.getTorrentSavePath(
 			meta,
