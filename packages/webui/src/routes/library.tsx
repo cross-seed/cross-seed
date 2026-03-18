@@ -59,7 +59,21 @@ function LibraryPage() {
   );
 
   const query = useSuspenseQuery(trpc.searchees.list.queryOptions(queryInput));
+  const { data: settingsData } = useSuspenseQuery(
+    trpc.settings.get.queryOptions(),
+  );
+  const { data: indexers } = useSuspenseQuery(
+    trpc.indexers.getAll.queryOptions(),
+  );
   const { data, isFetching } = query;
+
+  const settings = settingsData as {
+    config?: { torrentClients?: string[] };
+  };
+  const indexerList = indexers as unknown[];
+
+  const hasTorrentClients = (settings.config?.torrentClients?.length ?? 0) > 0;
+  const hasIndexers = (indexerList?.length ?? 0) > 0;
 
   useEffect(() => {
     if (page * PAGE_SIZE < data.total) return;
@@ -305,12 +319,51 @@ function LibraryPage() {
                     <span className="text-muted-foreground text-sm">
                       No items indexed yet.
                     </span>
-                    <span className="text-muted-foreground text-xs">
-                      Add a torrent client to start building your library.
-                    </span>
-                    <Button asChild size="sm">
-                      <Link to="/settings/clients">Add torrent client</Link>
-                    </Button>
+                    {!hasTorrentClients && !hasIndexers && (
+                      <>
+                        <span className="text-muted-foreground text-xs">
+                          Add a torrent client and at least one tracker to start
+                          building your library.
+                        </span>
+                        <div className="mt-1 flex flex-wrap justify-center gap-2">
+                          <Button asChild size="sm">
+                            <Link to="/settings/clients">
+                              Add torrent client
+                            </Link>
+                          </Button>
+                          <Button asChild size="sm">
+                            <Link to="/settings/trackers">Add tracker</Link>
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    {!hasTorrentClients && hasIndexers && (
+                      <>
+                        <span className="text-muted-foreground text-xs">
+                          Add a torrent client to start building your library.
+                        </span>
+                        <Button asChild size="sm" className="mt-1">
+                          <Link to="/settings/clients">Add torrent client</Link>
+                        </Button>
+                      </>
+                    )}
+                    {hasTorrentClients && !hasIndexers && (
+                      <>
+                        <span className="text-muted-foreground text-xs">
+                          Add at least one tracker to start indexing your
+                          library.
+                        </span>
+                        <Button asChild size="sm" className="mt-1">
+                          <Link to="/settings/trackers">Add tracker</Link>
+                        </Button>
+                      </>
+                    )}
+                    {hasTorrentClients && hasIndexers && (
+                      <span className="text-muted-foreground text-xs">
+                        Your setup is ready. Run cleanup or wait for the next
+                        scheduled indexing pass.
+                      </span>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

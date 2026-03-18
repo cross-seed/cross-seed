@@ -179,13 +179,16 @@ export default function ClientEditSheet({
                   {(field) => (
                     <>
                       <field.SelectField label="Client" options={CLIENTS} />
-                      {field.state.value === CLIENTS.rtorrent.toLowerCase() && (
+                      {
+                        // TODO: commented out the SwitchField for plugin since it's unsupported yet.
+                        /* {field.state.value === CLIENTS.rtorrent.toLowerCase() && (
                         <form.AppField name="plugin">
                           {(field) => (
                             <field.SwitchField label="Use Plugin URL" />
                           )}
                         </form.AppField>
-                      )}
+                      )} */
+                      }
                     </>
                   )}
                 </form.AppField>

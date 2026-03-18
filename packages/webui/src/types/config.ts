@@ -42,8 +42,10 @@ export const downloaderValidationSchema = z.object({
   skipRecheck: z.boolean(),
   torrentDir: z
     .string()
-    .nullable()
-    .transform((v) => v ?? null),
+    .nullish()
+    .transform((value) =>
+      value == null || value.trim() === '' ? null : value,
+    ),
   outputDir: z.string().min(1, ZodErrorMessages.emptyString),
   injectDir: z.string().optional(),
 });

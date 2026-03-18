@@ -1,30 +1,72 @@
+const safeDecode = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+const normalizeCredentialsForUrlParser = (rawUrl: string) => {
+  const match = rawUrl.match(/^([a-z][a-z\d+\-.]*:\/\/)([^@]+)@(.+)$/i);
+  if (!match) return rawUrl;
+
+  const [, protocolPrefix, authPart, hostAndPath] = match;
+  const separatorIdx = authPart.indexOf(':');
+  if (separatorIdx === -1) return rawUrl;
+
+  const rawUsername = authPart.slice(0, separatorIdx);
+  const rawPassword = authPart.slice(separatorIdx + 1);
+  const encodedUsername = encodeURIComponent(safeDecode(rawUsername));
+  const encodedPassword = encodeURIComponent(safeDecode(rawPassword));
+  return `${protocolPrefix}${encodedUsername}:${encodedPassword}@${hostAndPath}`;
+};
+
+const parseClientUrl = (clientUrl: string) =>
+  new URL(normalizeCredentialsForUrlParser(clientUrl));
+
 export function getProtocolFromClientUrl(clientUrl: string) {
-  const url = new URL(clientUrl);
+  const url = parseClientUrl(clientUrl);
   return url.protocol;
 }
 
 export function getHostFromClientUrl(clientUrl: string) {
-  const url = new URL(clientUrl);
+  const url = parseClientUrl(clientUrl);
   return url.host;
 }
 
 export function getUsernameFromClientUrl(clientUrl: string) {
-  const url = new URL(clientUrl);
+  const url = parseClientUrl(clientUrl);
   console.log('getusername fn', url);
 }
 
 export function getPasswordFromClientUrl(clientUrl: string) {
-  const url = new URL(clientUrl);
+  const url = parseClientUrl(clientUrl);
   console.log('getpassword fn', url);
 }
 
 export const removeUserAndPassFromClientUrl = (url: string) => {
   try {
-    const protocol = getProtocolFromClientUrl(url);
-    const host = getHostFromClientUrl(url);
-    return `${protocol}//${host}`;
+    const parsedUrl = parseClientUrl(url);
+    return `${parsedUrl.protocol}//${parsedUrl.host}`;
   } catch (error) {
-    // Gracefully degrade if an invalid URL sneaks in so the UI doesn't crash
+    // Fallback for malformed legacy URLs: strip auth segment by using the last '@'.
+    const protocolSeparator = '://';
+    const protocolEnd = url.indexOf(protocolSeparator);
+    const authStart =
+      protocolEnd === -1 ? -1 : protocolEnd + protocolSeparator.length;
+    const atIndex = url.lastIndexOf('@');
+
+    if (authStart !== -1 && atIndex > authStart) {
+      const rebuiltUrl = `${url.slice(0, authStart)}${url.slice(atIndex + 1)}`;
+      try {
+        const parsedFallback = new URL(rebuiltUrl);
+        return `${parsedFallback.protocol}//${parsedFallback.host}`;
+      } catch {
+        return rebuiltUrl;
+      }
+    }
+
+    // Gracefully degrade if an invalid URL sneaks in so the UI doesn't crash.
     console.warn('Unable to strip credentials from client URL', error);
     return url;
   }
@@ -45,10 +87,10 @@ export function buildClientTestUrl({
 }) {
   let auth = '';
   if (client !== 'deluge' && username) {
-    auth = username;
+    auth = encodeURIComponent(username);
   }
   if (password) {
-    auth += `:${password}`;
+    auth += `:${encodeURIComponent(password)}`;
   }
   auth += '@';
   const path = assignClientPath(client, false);
@@ -75,10 +117,10 @@ export function buildClientUrl({
 }) {
   let auth = '';
   if (username) {
-    auth += username;
+    auth += encodeURIComponent(username);
   }
   if (password) {
-    auth += `:${password}`;
+    auth += `:${encodeURIComponent(password)}`;
   }
   auth += '@';
   const path = assignClientPath(client, usePlugin);
