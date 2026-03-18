@@ -136,17 +136,23 @@ export async function cleanupDB(): Promise<void> {
 			label: Label.CLEANUP,
 			message: "Refreshing all client torrents...",
 		});
-		const searchees = await flatMapAsync(
-			getClients(),
-			async (client) =>
-				(
+		const searchees = await flatMapAsync(getClients(), async (client) => {
+			try {
+				return (
 					await client.getClientSearchees({
 						refresh: [],
 						includeFiles: true,
 						includeTrackers: true,
 					})
-				).searchees,
-		);
+				).searchees;
+			} catch (error) {
+				logger.error({
+					label: Label.CLEANUP,
+					message: `Failed to refresh ${client.label}: ${error instanceof Error ? error.message : String(error)}`,
+				});
+				return [];
+			}
+		});
 		if (!seasonFromEpisodes) return;
 		logger.verbose({
 			label: Label.CLEANUP,

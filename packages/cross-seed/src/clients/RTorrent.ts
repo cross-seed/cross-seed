@@ -332,6 +332,21 @@ export default class RTorrent implements TorrentClient {
 		}
 	}
 
+	async validateConnection(): Promise<void> {
+		try {
+			await this.methodCallP<string>("session.name", []);
+		} catch (e) {
+			logger.debug({ label: this.label, message: e });
+			throw new CrossSeedError(
+				`[${this.label}] Failed to reach rTorrent at ${this.clientHost}: ${e.message}`,
+			);
+		}
+		logger.info({
+			label: this.label,
+			message: `Logged in successfully${this.readonly ? " (readonly)" : ""}`,
+		});
+	}
+
 	async validateConfig(): Promise<void> {
 		const { torrentDir } = getRuntimeConfig();
 		try {

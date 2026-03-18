@@ -484,11 +484,35 @@ export function extractCredentialsFromUrl(
 	url: string,
 	basePath?: string,
 ): Result<{ username: string; password: string; href: string }, "invalid URL"> {
+	const safeDecode = (value: string): string => {
+		try {
+			return decodeURIComponent(value);
+		} catch {
+			return value;
+		}
+	};
+
+	const normalizeCredentialsForUrlParser = (rawUrl: string): string => {
+		const match = rawUrl.match(/^([a-z][a-z\d+\-.]*:\/\/)([^@]+)@(.+)$/i);
+		if (!match) return rawUrl;
+
+		const [, protocolPrefix, authPart, hostAndPath] = match;
+		const separatorIdx = authPart.indexOf(":");
+		if (separatorIdx === -1) return rawUrl;
+
+		const rawUsername = authPart.slice(0, separatorIdx);
+		const rawPassword = authPart.slice(separatorIdx + 1);
+		const encodedUsername = encodeURIComponent(safeDecode(rawUsername));
+		const encodedPassword = encodeURIComponent(safeDecode(rawPassword));
+		return `${protocolPrefix}${encodedUsername}:${encodedPassword}@${hostAndPath}`;
+	};
+
 	try {
-		const { origin, pathname, username, password } = new URL(url);
+		const parsed = new URL(normalizeCredentialsForUrlParser(url));
+		const { origin, pathname, username, password } = parsed;
 		return resultOf({
-			username: decodeURIComponent(username),
-			password: decodeURIComponent(password),
+			username: safeDecode(username),
+			password: safeDecode(password),
 			href: basePath
 				? origin + path.posix.join(pathname, basePath)
 				: pathname === "/"
@@ -496,6 +520,7 @@ export function extractCredentialsFromUrl(
 					: origin + pathname,
 		});
 	} catch (e) {
+		logger.error(`extractCredentialsFromUrl - ERROR parsing: ${url}`, e);
 		return resultOfErr("invalid URL");
 	}
 }

@@ -180,6 +180,11 @@ export function instantiateDownloadClients() {
 	}
 }
 
+export function reloadDownloadClients() {
+	activeClients.length = 0;
+	instantiateDownloadClients();
+}
+
 export function getClients(): TorrentClient[] {
 	return activeClients;
 }

@@ -163,14 +163,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     ? commitLine || buildLine || versionLabel || ''
     : isSourceBuild
       ? commitLine || versionLabel || ''
-    : isPublishedNpm && versionLabel
-      ? `${versionLabel} (npm)`
-    : buildLine || versionLabel || '';
+      : isPublishedNpm && versionLabel
+        ? `${versionLabel} (npm)`
+        : buildLine || versionLabel || '';
   const secondaryLine = preferCommitInfo
-    ? versionLabel ?? ''
+    ? (versionLabel ?? '')
     : isSourceBuild
-      ? versionLabel ?? commitMessage ?? ''
-    : commitMessage ?? '';
+      ? (versionLabel ?? commitMessage ?? '')
+      : (commitMessage ?? '');
   const hasBuildInfo = Boolean(primaryLine || secondaryLine);
 
   const { mutate: logout } = useMutation(

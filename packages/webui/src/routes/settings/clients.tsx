@@ -30,7 +30,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import ClientViewSheet from '@/features/download-client-actions/ClientViewSheet';
 import ClientEditSheet from '@/features/download-client-actions/ClientEditSheet';
-import { removeUserAndPassFromClientUrl } from '@/features/download-client-actions/lib/urls';
+import {
+  buildClientUrl,
+  getHostFromClientUrl,
+  getProtocolFromClientUrl,
+  removeUserAndPassFromClientUrl,
+} from '@/features/download-client-actions/lib/urls';
 import { TDownloadClient } from '@/types/download-clients';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
@@ -158,24 +163,45 @@ function TorrentClientsSettings() {
   }, [configData]);
 
   const getUserFromClientUrl = (url: string) => {
-    if (url.includes('@')) {
-      const user = url.split('://')[1].split('@')[0];
-      if (user.includes(':')) {
-        return user.split(':')[0];
-      }
-      return user.replace(':', '');
+    const protocolSeparator = '://';
+    const protocolEnd = url.indexOf(protocolSeparator);
+    if (protocolEnd === -1) return '';
+
+    const authStart = protocolEnd + protocolSeparator.length;
+    const atIndex = url.lastIndexOf('@');
+    if (atIndex <= authStart) return '';
+
+    const authPart = url.slice(authStart, atIndex);
+    const separatorIdx = authPart.indexOf(':');
+    const username =
+      separatorIdx === -1 ? authPart : authPart.slice(0, separatorIdx);
+
+    try {
+      return decodeURIComponent(username);
+    } catch {
+      return username;
     }
-    return '';
   };
 
   const getPassFromClientUrl = (url: string) => {
-    if (url.includes('@')) {
-      const pass = url.split('://')[1].split('@')[0];
-      if (pass.includes(':')) {
-        return pass.split(':')[1];
-      }
+    const protocolSeparator = '://';
+    const protocolEnd = url.indexOf(protocolSeparator);
+    if (protocolEnd === -1) return '';
+
+    const authStart = protocolEnd + protocolSeparator.length;
+    const atIndex = url.lastIndexOf('@');
+    if (atIndex <= authStart) return '';
+
+    const authPart = url.slice(authStart, atIndex);
+    const separatorIdx = authPart.indexOf(':');
+    if (separatorIdx === -1) return '';
+
+    const password = authPart.slice(separatorIdx + 1);
+    try {
+      return decodeURIComponent(password);
+    } catch {
+      return password;
     }
-    return '';
   };
 
   const handleAddClient = (e: React.MouseEvent) => {
@@ -211,10 +237,25 @@ function TorrentClientsSettings() {
 
   const handleDeleteClient = (client: TDownloadClient) => {
     setOpenDropdown(null);
-    const updatedClients = clients?.filter((c) => c.url !== client.url);
+    const updatedClients =
+      client.index !== undefined
+        ? clients?.filter((c) => c.index !== client.index)
+        : clients?.filter((c) => c.url !== client.url);
     setClients(updatedClients);
-    // Delete from the db
-    saveConfig({ torrentClients: updatedClients || [] });
+
+    const serializedClients = (updatedClients || []).map((entry) =>
+      buildClientUrl({
+        client: entry.client,
+        protocol: getProtocolFromClientUrl(entry.url),
+        host: getHostFromClientUrl(entry.url),
+        username: entry.user ?? '',
+        password: entry.password ?? '',
+        readonly: entry.readOnly ?? false,
+      }),
+    );
+
+    // Persist as string[] (runtime config format), not UI objects.
+    saveConfig({ torrentClients: serializedClients });
   };
 
   const handleEditSheetOpenChange = (open: boolean) => {

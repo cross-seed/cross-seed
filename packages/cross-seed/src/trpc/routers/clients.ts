@@ -1,7 +1,7 @@
 import { authedProcedure, router } from "../index.js";
 import { z } from "zod";
 import QBittorrent from "../../clients/QBittorrent.js";
-// import RTorrent from "../../clients/RTorrent.js";
+import RTorrent from "../../clients/RTorrent.js";
 import Deluge from "../../clients/Deluge.js";
 import Transmission from "../../clients/Transmission.js";
 
@@ -11,6 +11,7 @@ const testConnectionInputSchema = z.object({
 	username: z.string().optional(),
 	password: z.string().optional(),
 	readonly: z.boolean().default(false),
+	plugin: z.boolean().default(false).optional(),
 });
 
 export const clientsRouter = router({
@@ -40,9 +41,10 @@ export const clientsRouter = router({
 						}
 						break;
 					}
-					// case "rtorrent":
-					// 	client = new RTorrent(url, clientHost, 0, readonly);
-					// 	break;
+					case "rtorrent":
+						client = new RTorrent(url, clientHost, 0, readonly);
+						await client.validateConnection();
+						break;
 					case "transmission":
 						client = new Transmission(url, clientHost, 0, readonly);
 						await client.validateConfig();
