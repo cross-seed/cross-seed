@@ -1,9 +1,24 @@
-import type { FastifyInstance } from "fastify";
+type FetchInput = string | URL | Request;
+type FetchLike = (input: FetchInput, init?: RequestInit) => Promise<Response>;
+type InjectResponse = {
+	statusCode: number;
+	headers: Record<string, string | string[] | number | undefined>;
+	payload: string;
+	rawPayload?: Buffer;
+};
+type InjectServer = {
+	inject: (options: {
+		method?: string;
+		url: string;
+		headers?: Record<string, string>;
+		payload?: Buffer;
+	}) => Promise<InjectResponse>;
+};
 
 export type InjectedFetchOptions = {
-	server: FastifyInstance;
+	server: InjectServer;
 	baseUrl: string;
-	realFetch?: typeof fetch;
+	realFetch?: FetchLike;
 };
 
 function headersToObject(headers: Headers): Record<string, string> {
@@ -35,15 +50,16 @@ export function createInjectedFetch(
 	options: InjectedFetchOptions,
 ): typeof fetch {
 	const baseOrigin = new URL(options.baseUrl).origin;
-	const realFetch = options.realFetch ?? globalThis.fetch;
+	const realFetch =
+		options.realFetch ?? ((input, init) => globalThis.fetch(input, init));
 
-	return (async (input: RequestInfo | URL, init?: RequestInit) => {
+	return (async (input: FetchInput, init?: RequestInit) => {
 		const request =
 			input instanceof Request ? input : new Request(input, init);
 		const url = new URL(request.url);
 
 		if (url.origin !== baseOrigin) {
-			return realFetch(input as RequestInfo, init);
+			return realFetch(input, init);
 		}
 
 		const method = init?.method ?? request.method;

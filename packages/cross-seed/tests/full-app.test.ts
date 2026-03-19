@@ -10,8 +10,8 @@ import {
 	it,
 	vi,
 } from "vitest";
-import { createMockTorznabServer } from "../../mock-torznab/server.js";
 import { createInjectedFetch } from "./support/injectedFetch.js";
+import { createMockTorznabServer } from "./support/mockTorznab.js";
 
 const TEST_ROOT = await mkdtemp(join(tmpdir(), "cross-seed-tests-"));
 
