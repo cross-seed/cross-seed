@@ -2,10 +2,27 @@
 	"name": "mock-torznab",
 	"version": "1.0.0",
 	"description": "A mock Torznab server.",
-	"main": "server.ts",
 	"type": "module",
+	"main": "./dist/server.js",
+	"types": "./dist/server.d.ts",
+	"files": [
+		"dist/"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/server.d.ts",
+			"default": "./dist/server.js"
+		},
+		"./server.js": {
+			"types": "./dist/server.d.ts",
+			"default": "./dist/server.js"
+		}
+	},
 	"scripts": {
-		"start": "node server.ts",
+		"build": "tsc -p tsconfig.json",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"prestart": "npm run build",
+		"start": "node dist/server.js",
 		"lint": "biome lint .",
 		"lint:fix": "biome lint --apply .",
 		"format": "biome format --write ."
@@ -13,7 +30,7 @@
 	"dependencies": {
 		"bencode": "^2.0.1",
 		"fast-xml-parser": "^4.0.0",
-		"fastify": "^4.0.0"
+		"fastify": "^5.7.3"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.2",
