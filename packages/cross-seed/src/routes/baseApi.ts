@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import chalk from "chalk";
 import { FastifyInstance } from "fastify";
 import { existsSync } from "fs";
@@ -170,6 +171,20 @@ export async function baseApiPlugin(app: FastifyInstance) {
 			}
 		},
 	);
+
+	// Enable CORS for /ping, /webhook, and /announce endpoints
+	const CORS_ENABLED_ROUTES = ["/api/ping", "/api/webhook", "/api/announce"];
+	await app.register(cors, {
+		delegator: (req, callback) => {
+			if (
+				CORS_ENABLED_ROUTES.some((route) => req.url.startsWith(route))
+			) {
+				callback(null, { origin: "*" });
+			} else {
+				callback(null, { origin: false });
+			}
+		},
+	});
 
 	/**
 	 * Trigger a search for a torrent
