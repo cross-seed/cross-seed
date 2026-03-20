@@ -55,6 +55,9 @@
 		"xmlrpc": "^1.3.2",
 		"zod": "^3.22.4"
 	},
+	"devDependencies": {
+		"fast-xml-parser": "^4.0.0"
+	},
 	"np": {
 		"yarn": false
 	}

@@ -8,8 +8,7 @@
 		"packages/cross-seed",
 		"packages/shared",
 		"packages/webui",
-		"packages/api-types",
-		"packages/mock-torznab"
+		"packages/api-types"
 	],
 	"scripts": {
 		"test": "npm --workspaces run test --if-present",
