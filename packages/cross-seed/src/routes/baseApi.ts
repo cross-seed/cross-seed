@@ -90,7 +90,7 @@ function parseData(data: string) {
 	let parsed;
 	try {
 		parsed = JSON.parse(data);
-	} catch (_) {
+	} catch {
 		parsed = qsParse(data);
 	}
 
@@ -102,7 +102,7 @@ function parseData(data: string) {
 		if ("size" in parsed && typeof parsed.size === "string") {
 			parsed.size = Number(parsed.size);
 		}
-	} catch (e) {
+	} catch {
 		throw new Error(`Unable to parse request body: "${data}"`);
 	}
 
@@ -204,8 +204,9 @@ export async function baseApiPlugin(app: FastifyInstance) {
 		let data;
 		try {
 			data = request.body;
-		} catch (e) {
-			const message = e.message;
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : String(error);
 			logger.error({
 				label: Label.WEBHOOK,
 				message,

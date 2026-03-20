@@ -51,7 +51,7 @@ function getProviderName(
 export async function collectProblems(): Promise<Problem[]> {
 	const results = await Promise.allSettled(
 		registeredProblemProviders.map((registration) =>
-			registration.provider(),
+			Promise.resolve().then(() => registration.provider()),
 		),
 	);
 

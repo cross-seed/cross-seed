@@ -42,18 +42,18 @@ export async function staticFrontendPlugin(
 ) {
 	// Custom static file handler that replaces sentinel values
 	app.get("*", async (request, reply) => {
-		const basePathRelativeUrl = request.url.startsWith(basePath)
-			? request.url.slice(basePath.length)
+		const requestPath = request.url.split("?")[0];
+		const basePathRelativeUrl = requestPath.startsWith(basePath)
+			? requestPath.slice(basePath.length)
 			: "MALFORMED_REQUEST_URL"; // should never happen because this route is only registered under basePath
 		const desiredFilePath = join(
 			STATIC_ROOT,
 			...basePathRelativeUrl.split("/").filter(isTruthy),
 		);
 		let fileContents: string | Buffer;
-		let fileExtension: string;
+		let fileExtension = extname(desiredFilePath);
 
 		try {
-			fileExtension = extname(desiredFilePath);
 			const isText = TEXT_EXT.includes(fileExtension);
 			fileContents = await readFile(
 				desiredFilePath,
@@ -64,6 +64,9 @@ export async function staticFrontendPlugin(
 				(e as ErrnoException).code == "ENOENT" ||
 				(e as ErrnoException).code == "EISDIR"
 			) {
+				if (!(request.headers.accept?.includes("text/html") ?? false)) {
+					return reply.code(404).type("text/plain").send("Not Found");
+				}
 				fileContents = await readFile(INDEX_HTML_PATH, UTF8);
 				fileExtension = ".html";
 			} else {
