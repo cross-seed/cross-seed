@@ -1,4 +1,5 @@
 import { distance } from "fastest-levenshtein";
+import bencode from "bencode";
 import { readdir, readFile, stat } from "fs/promises";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
@@ -25,11 +26,7 @@ import {
 } from "./dataFiles.js";
 import { db } from "./db.js";
 import { Label, logger, logOnce } from "./logger.js";
-import {
-	decodeBencode,
-	Metafile,
-	updateMetafileMetadata,
-} from "./parseTorrent.js";
+import { Metafile, updateMetafileMetadata } from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
 import { isOk, Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
@@ -137,7 +134,7 @@ export async function parseTorrentWithMetadata(
 		if (await exists(fastResumePath)) {
 			updateMetafileMetadata(
 				meta,
-				decodeBencode(await readFile(fastResumePath)),
+				bencode.decode(await readFile(fastResumePath)),
 			);
 			return meta;
 		} else {

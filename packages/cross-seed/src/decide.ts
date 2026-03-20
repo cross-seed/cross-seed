@@ -48,7 +48,6 @@ import {
 	stripExtension,
 	withMutex,
 } from "./utils.js";
-import { decodeBencode } from "./parseTorrent.js";
 
 export interface ResultAssessment {
 	decision: Decision;
@@ -550,7 +549,9 @@ export async function updateTorrentCache(
 	let count = 0;
 	for (const torrentPath of torrentPaths) {
 		try {
-			const torrent: Torrent = decodeBencode(await readFile(torrentPath));
+			const torrent: Torrent = bencode.decode(
+				await readFile(torrentPath),
+			);
 			const announce = torrent.announce?.toString();
 			const announceList = torrent["announce-list"]?.map((tier) =>
 				tier.map((url) => url.toString()),
