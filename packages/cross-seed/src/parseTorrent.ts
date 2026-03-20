@@ -4,6 +4,27 @@ import { join } from "path";
 import { File, parseTitle } from "./searchee.js";
 import { fallback, isTruthy } from "./utils.js";
 
+function normalizeBencodeValue<T>(value: T): T {
+	if (Buffer.isBuffer(value)) {
+		return value;
+	}
+	if (value instanceof Uint8Array) {
+		return Buffer.from(value) as T;
+	}
+	if (Array.isArray(value)) {
+		return value.map((entry) => normalizeBencodeValue(entry)) as T;
+	}
+	if (value && typeof value === "object") {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, entry]) => [
+				key,
+				normalizeBencodeValue(entry),
+			]),
+		) as T;
+	}
+	return value;
+}
+
 interface TorrentDirent {
 	length: number;
 	path?: Buffer[];
@@ -169,7 +190,7 @@ export class Metafile {
 	}
 
 	static decode(buf: Buffer) {
-		return new Metafile(bencode.decode(buf));
+		return new Metafile(normalizeBencodeValue(bencode.decode(buf)));
 	}
 
 	getFileSystemSafeName(): string {
@@ -179,4 +200,9 @@ export class Metafile {
 	encode(): Buffer {
 		return bencode.encode(this.raw);
 	}
+}
+
+export function decodeBencode<T>(buf: Buffer | Uint8Array): T {
+	const source = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+	return normalizeBencodeValue(bencode.decode(source));
 }
