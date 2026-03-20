@@ -39,7 +39,7 @@
 		"@cross-seed/shared": "file:../shared",
 		"@fastify/cookie": "^11.0.2",
 		"@fastify/cors": "^11.2.0",
-		"@trpc/server": "^11.8.0",
+		"@trpc/server": "^11.13.4",
 		"bcryptjs": "^3.0.2",
 		"bencode": "^2.0.1",
 		"chalk": "^5.0.0",
@@ -56,7 +56,7 @@
 		"zod": "^3.22.4"
 	},
 	"devDependencies": {
-		"fast-xml-parser": "^4.0.0"
+		"fast-xml-parser": "^5.5.7"
 	},
 	"np": {
 		"yarn": false
