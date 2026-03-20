@@ -217,7 +217,8 @@ export async function cleanupDB(): Promise<void> {
 			label: Label.CLEANUP,
 			message: "Pruning unused torrent cache entries...",
 		});
-		const excludeCutoff = (excludeRecentSearch ?? 0) + ms("1 month");
+		const excludeCutoff =
+			(excludeRecentSearch ?? 0) + ms("1 month" as ms.StringValue);
 		let cutoffMs = ms("1 year");
 		let logCutoff = "1 year";
 		if (excludeCutoff > cutoffMs) {
