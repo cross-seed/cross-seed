@@ -32,8 +32,8 @@ import ClientViewSheet from '@/features/download-client-actions/ClientViewSheet'
 import ClientEditSheet from '@/features/download-client-actions/ClientEditSheet';
 import {
   buildClientUrl,
-  getHostFromClientUrl,
-  getProtocolFromClientUrl,
+  getPasswordFromClientUrl,
+  getUsernameFromClientUrl,
   removeUserAndPassFromClientUrl,
 } from '@/features/download-client-actions/lib/urls';
 import { TDownloadClient } from '@/types/download-clients';
@@ -127,14 +127,14 @@ function TorrentClientsSettings() {
           user = client.user || '';
           password = client.password || '';
         } else if (typeof client === 'string') {
-          clientApp = String(client).split(':')[0];
-          readOnly = String(client).includes('readonly');
-          const firstIndex = String(client).indexOf(':');
-          const fullUrl = readOnly
-            ? String(client).substring(
-                String(client).indexOf(':', firstIndex + 1) + 1,
-              )
-            : String(client).substring(String(client).indexOf(':') + 1);
+          const serializedClient = String(client);
+          clientApp = serializedClient.split(':')[0];
+          const readonlyPrefix = `${clientApp}:readonly:`;
+          const defaultPrefix = `${clientApp}:`;
+          readOnly = serializedClient.startsWith(readonlyPrefix);
+          const fullUrl = serializedClient.startsWith(readonlyPrefix)
+            ? serializedClient.slice(readonlyPrefix.length)
+            : serializedClient.slice(defaultPrefix.length);
 
           if (!fullUrl) return null;
 
@@ -142,8 +142,8 @@ function TorrentClientsSettings() {
           if (!sanitizedUrl) return null;
 
           url = sanitizedUrl;
-          user = getUserFromClientUrl(fullUrl);
-          password = getPassFromClientUrl(fullUrl);
+          user = getUsernameFromClientUrl(fullUrl);
+          password = getPasswordFromClientUrl(fullUrl);
         }
 
         if (!clientApp || !url) return null;
@@ -161,48 +161,6 @@ function TorrentClientsSettings() {
 
     setClients(mappedClients);
   }, [configData]);
-
-  const getUserFromClientUrl = (url: string) => {
-    const protocolSeparator = '://';
-    const protocolEnd = url.indexOf(protocolSeparator);
-    if (protocolEnd === -1) return '';
-
-    const authStart = protocolEnd + protocolSeparator.length;
-    const atIndex = url.lastIndexOf('@');
-    if (atIndex <= authStart) return '';
-
-    const authPart = url.slice(authStart, atIndex);
-    const separatorIdx = authPart.indexOf(':');
-    const username =
-      separatorIdx === -1 ? authPart : authPart.slice(0, separatorIdx);
-
-    try {
-      return decodeURIComponent(username);
-    } catch {
-      return username;
-    }
-  };
-
-  const getPassFromClientUrl = (url: string) => {
-    const protocolSeparator = '://';
-    const protocolEnd = url.indexOf(protocolSeparator);
-    if (protocolEnd === -1) return '';
-
-    const authStart = protocolEnd + protocolSeparator.length;
-    const atIndex = url.lastIndexOf('@');
-    if (atIndex <= authStart) return '';
-
-    const authPart = url.slice(authStart, atIndex);
-    const separatorIdx = authPart.indexOf(':');
-    if (separatorIdx === -1) return '';
-
-    const password = authPart.slice(separatorIdx + 1);
-    try {
-      return decodeURIComponent(password);
-    } catch {
-      return password;
-    }
-  };
 
   const handleAddClient = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -246,8 +204,7 @@ function TorrentClientsSettings() {
     const serializedClients = (updatedClients || []).map((entry) =>
       buildClientUrl({
         client: entry.client,
-        protocol: getProtocolFromClientUrl(entry.url),
-        host: getHostFromClientUrl(entry.url),
+        endpointUrl: entry.url,
         username: entry.user ?? '',
         password: entry.password ?? '',
         readonly: entry.readOnly ?? false,

@@ -30,7 +30,6 @@ export const clientValidationSchema = z.object({
     .optional()
     .default(false)
     .or(z.null().transform(() => false)),
-  plugin: z.boolean().nullish().default(false),
 });
 
 export const downloaderValidationSchema = z.object({

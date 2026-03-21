@@ -5,13 +5,11 @@ export const testConnection = async ({
   url,
   username = '',
   password,
-  plugin = false,
 }: {
   client: string;
   url: string;
   username: string;
   password: string;
-  plugin: boolean;
 }): Promise<{ success: boolean }> => {
   try {
     const result = await trpcClient.clients.testConnection.mutate({
@@ -20,7 +18,6 @@ export const testConnection = async ({
       username,
       password,
       readonly: false,
-      plugin,
     });
 
     return { success: result.success };

@@ -20,8 +20,6 @@ import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import useConfigForm from '@/hooks/use-config-form';
 import { FormValidationProvider } from '@/contexts/Form/form-validation-provider';
 import {
-  getHostFromClientUrl,
-  getProtocolFromClientUrl,
   buildClientUrl,
   buildClientTestUrl,
 } from './lib/urls';
@@ -79,16 +77,12 @@ export default function ClientEditSheet({
         } else {
           // build url first
           const validatedData = result.data;
-          const protocol = getProtocolFromClientUrl(validatedData.url);
-          const host = getHostFromClientUrl(validatedData.url);
           const clientString = buildClientUrl({
             client: validatedData.client,
-            protocol,
-            host,
+            endpointUrl: validatedData.url,
             username: validatedData.user ?? '',
             password: validatedData.password ?? '',
             readonly: validatedData.readOnly,
-            // * TODO: add usePlugin for rtorrent clients
           });
 
           let updatedClients: string[];
@@ -124,8 +118,7 @@ export default function ClientEditSheet({
 
     const testUrl = buildClientTestUrl({
       client,
-      protocol: getProtocolFromClientUrl(url),
-      host: getHostFromClientUrl(url),
+      endpointUrl: url,
       username,
       password,
     });
@@ -134,7 +127,6 @@ export default function ClientEditSheet({
       url: testUrl,
       username,
       password,
-      plugin: false,
     });
     if (result.success) {
       toast.success('Connection successful!', {
@@ -177,26 +169,14 @@ export default function ClientEditSheet({
               <div className="grid gap-3">
                 <form.AppField name="client">
                   {(field) => (
-                    <>
-                      <field.SelectField label="Client" options={CLIENTS} />
-                      {
-                        // TODO: commented out the SwitchField for plugin since it's unsupported yet.
-                        /* {field.state.value === CLIENTS.rtorrent.toLowerCase() && (
-                        <form.AppField name="plugin">
-                          {(field) => (
-                            <field.SwitchField label="Use Plugin URL" />
-                          )}
-                        </form.AppField>
-                      )} */
-                      }
-                    </>
+                    <field.SelectField label="Client" options={CLIENTS} />
                   )}
                 </form.AppField>
               </div>
 
               <div className="grid gap-3">
                 <form.AppField name="url">
-                  {(field) => <field.TextField label="Client URL" />}
+                  {(field) => <field.TextField label="Endpoint URL" />}
                 </form.AppField>
               </div>
 
