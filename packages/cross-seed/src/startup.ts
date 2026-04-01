@@ -107,7 +107,7 @@ async function applyExistingApiKey(config: RuntimeConfig): Promise<void> {
 		if (existingApiKey?.apikey && !config.apiKey) {
 			config.apiKey = existingApiKey.apikey;
 		}
-	} catch (error) {
+	} catch {
 		// best-effort only
 	}
 }

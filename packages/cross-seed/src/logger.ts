@@ -49,7 +49,7 @@ function redactUrlPassword(message: string, urlStr: string) {
 			message = message.split(urlDecodedPassword).join(REDACTED_MSG);
 			message = message.split(urlEncodedPassword).join(REDACTED_MSG);
 		}
-	} catch (e) {
+	} catch {
 		// do nothing
 	}
 	return message;

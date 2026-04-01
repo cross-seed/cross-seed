@@ -495,7 +495,7 @@ export function extractCredentialsFromUrl(
 					? origin
 					: origin + pathname,
 		});
-	} catch (e) {
+	} catch {
 		return resultOfErr("invalid URL");
 	}
 }

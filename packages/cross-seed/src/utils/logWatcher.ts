@@ -117,7 +117,7 @@ class LogWatcher {
 		try {
 			const stats = await fs.stat(filePath);
 			this.lastPositions.set(filePath, stats.size);
-		} catch (error) {
+		} catch {
 			// File doesn't exist yet, start from beginning
 			this.lastPositions.set(filePath, 0);
 		}

@@ -645,7 +645,7 @@ async function fetchCaps(indexer: Indexer): Promise<Caps> {
 	try {
 		const parsedXml = await xml2js.parseStringPromise(responseText);
 		return parseTorznabCaps(parsedXml);
-	} catch (_) {
+	} catch {
 		const error = new Error(
 			`${indexer.name ?? indexer.url} responded with invalid XML when fetching caps, check verbose logs`,
 		);

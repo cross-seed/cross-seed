@@ -381,7 +381,7 @@ function parseDurationValue(value: unknown): number | undefined {
 	if (value === null) return 0;
 	if (typeof value === "number" && Number.isFinite(value)) return value;
 	if (typeof value === "string") {
-		const parsed = ms(value);
+		const parsed = ms(value as ms.StringValue);
 		if (typeof parsed === "number" && Number.isFinite(parsed)) {
 			return parsed;
 		}
