@@ -4,6 +4,19 @@ import { RUNTIME_CONFIG_SCHEMA } from '../../../shared/configSchema';
 
 const runtimeShape = RUNTIME_CONFIG_SCHEMA.shape;
 
+const optionalJsonString = z.string().refine(
+  (val) => {
+    if (!val) return true;
+    try {
+      JSON.parse(val);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { message: 'Must be valid JSON' },
+);
+
 export const generalValidationSchema = z.object({
   includeSingleEpisodes: runtimeShape.includeSingleEpisodes,
   includeNonVideos: runtimeShape.includeNonVideos,
@@ -65,7 +78,13 @@ export const connectValidationSchema = z.object({
   apiKey: runtimeShape.apiKey.nullish(),
   radarr: z.array(z.string().url().or(z.literal(''))).transform((v) => v ?? []),
   sonarr: z.array(z.string().url().or(z.literal(''))).transform((v) => v ?? []),
-  notificationWebhookUrls: z.array(z.string().url().or(z.literal(''))),
+  notificationWebhookUrls: z.array(
+    z.object({
+      url: z.string().url().or(z.literal('')),
+      payload: optionalJsonString,
+      headers: optionalJsonString,
+    }),
+  ),
 });
 
 export const directoryValidationSchema = z.object({
