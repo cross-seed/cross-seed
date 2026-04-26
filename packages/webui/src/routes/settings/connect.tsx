@@ -27,13 +27,15 @@ function ConnectSettings() {
     trpc.settings.get.queryOptions(undefined, {
       select: (data: {
         config: RuntimeConfig;
-        apikey: string;
+        apiKey: string;
       }): Partial<ConnectFormData> => {
         const fullDataset = formatConfigDataForForm(data.config);
         const filteredData = pickSchemaFields(
           connectValidationSchema,
           fullDataset,
-          { includeUndefined: true },
+          {
+            includeUndefined: true,
+          },
         );
 
         return filteredData;
@@ -92,7 +94,7 @@ function ConnectSettings() {
                   </form.AppField>
                 </div>
                 <div>
-                  <form.AppField name="apikey" validators={{}}>
+                  <form.AppField name="apiKey" validators={{}}>
                     {(field) => <field.TextField label="API Key" />}
                   </form.AppField>
                 </div>
