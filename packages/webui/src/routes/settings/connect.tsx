@@ -27,7 +27,7 @@ function ConnectSettings() {
     trpc.settings.get.queryOptions(undefined, {
       select: (data: {
         config: RuntimeConfig;
-        apikey: string;
+        apiKey: string;
       }): Partial<ConnectFormData> => {
         const fullDataset = formatConfigDataForForm(data.config);
         const filteredData = pickSchemaFields(
@@ -92,7 +92,7 @@ function ConnectSettings() {
                   </form.AppField>
                 </div>
                 <div>
-                  <form.AppField name="apikey" validators={{}}>
+                  <form.AppField name="apiKey" validators={{}}>
                     {(field) => <field.TextField label="API Key" />}
                   </form.AppField>
                 </div>
@@ -143,7 +143,7 @@ function ConnectSettings() {
                                     <form.Subscribe
                                       selector={(f) =>
                                         f.fieldMeta[
-                                          `${field.name}[${index}]` as keyof typeof f.fieldMeta
+                                        `${field.name}[${index}]` as keyof typeof f.fieldMeta
                                         ]
                                       }
                                     >
@@ -216,7 +216,7 @@ function ConnectSettings() {
                                     <form.Subscribe
                                       selector={(f) =>
                                         f.fieldMeta[
-                                          `${field.name}[${index}]` as keyof typeof f.fieldMeta
+                                        `${field.name}[${index}]` as keyof typeof f.fieldMeta
                                         ]
                                       }
                                     >
@@ -293,7 +293,7 @@ function ConnectSettings() {
                                   <form.Subscribe
                                     selector={(f) =>
                                       f.fieldMeta[
-                                        `${field.name}[${index}]` as keyof typeof f.fieldMeta
+                                      `${field.name}[${index}]` as keyof typeof f.fieldMeta
                                       ]
                                     }
                                   >
