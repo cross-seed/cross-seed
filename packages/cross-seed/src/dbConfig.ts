@@ -28,6 +28,7 @@ export async function setDbConfig(
 	};
 	const validatedConfig = parseRuntimeConfig(mergedConfig);
 	const overrides = stripDefaults(validatedConfig);
+	const indexersToAdd: { url: string; apikey: string }[] = [];
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
@@ -52,15 +53,22 @@ export async function setDbConfig(
 					url: url,
 				});
 				if (existingIndexer.length === 0) {
-					await createIndexer({
+					indexersToAdd.push({
 						url,
 						apikey: apiKey ?? "",
-						enabled: true,
 					});
 				}
 			}
 		}
 	});
+
+	for (const tracker of indexersToAdd) {
+		await createIndexer({
+			url: tracker.url,
+			apikey: tracker.apikey ?? "",
+			enabled: true,
+		});
+	}
 }
 
 export async function updateDbConfig(
