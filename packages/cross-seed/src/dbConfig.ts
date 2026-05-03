@@ -6,6 +6,7 @@ import {
 	parseRuntimeConfig,
 	parseRuntimeConfigOverrides,
 } from "./configSchema.js";
+import { createIndexer } from "./services/indexerService.js";
 
 export async function getDbConfig(): Promise<
 	Partial<RuntimeConfig> | undefined
@@ -38,6 +39,26 @@ export async function setDbConfig(
 				apikey: null,
 				settings_json: JSON.stringify(overrides),
 			});
+		}
+		// Also add any torznab links to indexers table
+		if (validatedConfig.torznab && Array.isArray(validatedConfig.torznab)) {
+			for (const tracker of validatedConfig.torznab) {
+				const baseUrl = new URL(tracker);
+				const url = `${baseUrl.origin}${baseUrl.pathname}`;
+				const apiKey = new URLSearchParams(baseUrl.searchParams).get(
+					"apikey",
+				);
+				const existingIndexer = await trx("indexer").where({
+					url: url,
+				});
+				if (existingIndexer.length === 0) {
+					await createIndexer({
+						url,
+						apikey: apiKey ?? "",
+						enabled: true,
+					});
+				}
+			}
 		}
 	});
 }
