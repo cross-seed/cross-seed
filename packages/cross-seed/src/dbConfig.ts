@@ -6,6 +6,7 @@ import {
 	parseRuntimeConfig,
 	parseRuntimeConfigOverrides,
 } from "./configSchema.js";
+import { createIndexer } from "./services/indexerService.js";
 
 export async function getDbConfig(): Promise<
 	Partial<RuntimeConfig> | undefined
@@ -27,6 +28,7 @@ export async function setDbConfig(
 	};
 	const validatedConfig = parseRuntimeConfig(mergedConfig);
 	const overrides = stripDefaults(validatedConfig);
+	const indexersToAdd: { url: string; apikey: string }[] = [];
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
@@ -39,7 +41,34 @@ export async function setDbConfig(
 				settings_json: JSON.stringify(overrides),
 			});
 		}
+		// Also add any torznab links to indexers table
+		if (validatedConfig.torznab && Array.isArray(validatedConfig.torznab)) {
+			for (const tracker of validatedConfig.torznab) {
+				const baseUrl = new URL(tracker);
+				const url = `${baseUrl.origin}${baseUrl.pathname}`;
+				const apiKey = new URLSearchParams(baseUrl.searchParams).get(
+					"apikey",
+				);
+				const existingIndexer = await trx("indexer").where({
+					url: url,
+				});
+				if (existingIndexer.length === 0) {
+					indexersToAdd.push({
+						url,
+						apikey: apiKey ?? "",
+					});
+				}
+			}
+		}
 	});
+
+	for (const tracker of indexersToAdd) {
+		await createIndexer({
+			url: tracker.url,
+			apikey: tracker.apikey ?? "",
+			enabled: true,
+		});
+	}
 }
 
 export async function updateDbConfig(
