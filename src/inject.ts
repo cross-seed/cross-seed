@@ -6,6 +6,7 @@ import path, { basename } from "path";
 import { performActionWithoutMutex } from "./action.js";
 import {
 	byClientHostPriority,
+	getClients,
 	TorrentClient,
 	waitForTorrentToComplete,
 } from "./clients/TorrentClient.js";
@@ -58,6 +59,7 @@ import {
 	isTruthy,
 	Mutex,
 	sanitizeInfoHash,
+	someAsync,
 	withMutex,
 } from "./utils.js";
 
@@ -170,6 +172,7 @@ async function whichSearcheesMatchTorrent(
 		areMediaTitlesSimilar(searchee.title, meta.name) ||
 		areMediaTitlesSimilar(searchee.name, meta.name) ||
 		areMediaTitlesSimilar(searchee.name, meta.title);
+	let isComplete: boolean | undefined;
 	let foundBlocked = false;
 	let fuzzyFail = false;
 	const matches: AllMatches = [];
@@ -203,12 +206,21 @@ async function whichSearcheesMatchTorrent(
 					message: `Ignoring title mismatch for ${getLogString(meta, chalk.bold.white)} with ${getLogString(searchee, chalk.bold.white)}`,
 				});
 			} else {
-				logger.warn({
-					label: Label.INJECT,
-					message: `Skipping match for ${getLogString(meta, chalk.bold.white)} with ${getLogString(searchee, chalk.bold.white)} due to title mismatch (use "${chalk.bold.white("cross-seed inject --ignore-titles")}" if this is an erroneous rejection)`,
-				});
-				fuzzyFail = true;
-				continue;
+				if (isComplete === undefined) {
+					isComplete = await someAsync(getClients(), async (c) =>
+						(await c.isTorrentComplete(meta.infoHash)).orElse(
+							false,
+						),
+					);
+				}
+				if (!isComplete) {
+					logger.warn({
+						label: Label.INJECT,
+						message: `Skipping match for ${getLogString(meta, chalk.bold.white)} with ${getLogString(searchee, chalk.bold.white)} due to title mismatch (use "${chalk.bold.white("cross-seed inject --ignore-titles")}" if this is an erroneous rejection)`,
+					});
+					fuzzyFail = true;
+					continue;
+				}
 			}
 		}
 
