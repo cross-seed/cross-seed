@@ -40,6 +40,7 @@ import {
 	SnatchError,
 } from "./torrent.js";
 import {
+	errorMessage,
 	exists,
 	extractInt,
 	getLogString,
@@ -475,7 +476,7 @@ async function getCachedTorrent(
 	} catch (e) {
 		logger.error({
 			label: `${searcheeLabel}/${Label.DECIDE}`,
-			message: `Failed to parse cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))} - deleting: ${e.message}`,
+			message: `Failed to parse cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))} - deleting: ${errorMessage(e)}`,
 		});
 		logger.debug(e);
 		try {
@@ -484,7 +485,7 @@ async function getCachedTorrent(
 			if (await exists(torrentPath)) {
 				logger.error({
 					label: `${searcheeLabel}/${Label.DECIDE}`,
-					message: `Failed to delete corrupted cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))}: ${e.message}`,
+					message: `Failed to delete corrupted cached torrent ${torrentPath.replace(infoHash, sanitizeInfoHash(infoHash))}: ${errorMessage(e)}`,
 				});
 				logger.debug(e);
 			}
@@ -510,11 +511,11 @@ async function cacheTorrentFile(
 		await writeFile(torrentPath, new Uint8Array(meta.encode()));
 		cached = true;
 		if (candidate.indexerId && meta.trackers.length) {
-			const dbIndexer = await db("indexer")
-				.where({ id: candidate.indexerId })
+			const dbIndexer = await db<{ trackers: string | null }>("indexer")
+				.where("id", candidate.indexerId)
 				.first();
 			const dbTrackers: string[] = dbIndexer?.trackers
-				? JSON.parse(dbIndexer.trackers)
+				? (JSON.parse(dbIndexer.trackers) as string[])
 				: [];
 			let added = false;
 			for (const tracker of meta.trackers) {
@@ -532,7 +533,7 @@ async function cacheTorrentFile(
 	} catch (e) {
 		logger.error({
 			label: `${searcheeLabel}/${Label.DECIDE}`,
-			message: `Error while caching torrent ${getLogString(meta)}: ${e.message}`,
+			message: `Error while caching torrent ${getLogString(meta)}: ${errorMessage(e)}`,
 		});
 		logger.debug(e);
 		return cached;
@@ -549,9 +550,9 @@ export async function updateTorrentCache(
 	let count = 0;
 	for (const torrentPath of torrentPaths) {
 		try {
-			const torrent: Torrent = bencode.decode(
+			const torrent = bencode.decode(
 				await readFile(torrentPath),
-			);
+			) as Torrent;
 			const announce = torrent.announce?.toString();
 			const announceList = torrent["announce-list"]?.map((tier) =>
 				tier.map((url) => url.toString()),
@@ -699,7 +700,13 @@ export async function assessCandidateCaching(
 	const { name, guid, link, tracker } = candidate;
 
 	const cacheEntry = await db("decision")
-		.select({
+		.select<{
+			id: number;
+			infoHash: string;
+			decision: Decision;
+			firstSeen: number;
+			fuzzySizeFactor: number;
+		}>({
 			id: "decision.id",
 			infoHash: "decision.info_hash",
 			decision: "decision.decision",

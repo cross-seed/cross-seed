@@ -26,11 +26,16 @@ import {
 } from "./dataFiles.js";
 import { db } from "./db.js";
 import { Label, logger, logOnce } from "./logger.js";
-import { Metafile, updateMetafileMetadata } from "./parseTorrent.js";
+import {
+	Metafile,
+	TorrentMetadata,
+	updateMetafileMetadata,
+} from "./parseTorrent.js";
 import { Candidate } from "./pipeline.js";
 import { isOk, Result, resultOf, resultOfErr } from "./Result.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
+	ClientSearcheeRow,
 	createSearcheeFromDB,
 	createSearcheeFromPath,
 	createSearcheeFromTorrentFile,
@@ -52,6 +57,7 @@ import {
 	flatMapAsync,
 	getLogString,
 	inBatches,
+	errorMessage,
 	mapAsync,
 	Mutex,
 	notExists,
@@ -97,8 +103,7 @@ function logRecoverableTorrentDirError(
 	torrentDir: string,
 	error: unknown,
 ): void {
-	const message =
-		error instanceof Error ? error.message : String(error ?? "");
+	const message = error instanceof Error ? error.message : "";
 	logger.warn({
 		label: Label.INDEX,
 		message: `Skipping torrentDir indexing for "${torrentDir}": ${message}`,
@@ -134,7 +139,9 @@ export async function parseTorrentWithMetadata(
 		if (await exists(fastResumePath)) {
 			updateMetafileMetadata(
 				meta,
-				bencode.decode(await readFile(fastResumePath)),
+				bencode.decode(
+					await readFile(fastResumePath),
+				) as TorrentMetadata,
 			);
 			return meta;
 		} else {
@@ -196,13 +203,14 @@ async function snatchOnce(
 					: undefined,
 		});
 	} catch (e) {
-		if (e.name === "AbortError" || e.name === "TimeoutError") {
+		const errName = e instanceof Error ? e.name : "";
+		if (errName === "AbortError" || errName === "TimeoutError") {
 			logger.debug(`${candidate.name}: ${url}`);
 			return {
 				snatchError: SnatchError.ABORTED,
 				extra: `snatch timed out`,
 			};
-		} else if (isMagnetRedirectError(e)) {
+		} else if (e instanceof Error && isMagnetRedirectError(e)) {
 			logger.debug(`${candidate.name}: ${url}`);
 			return { snatchError: SnatchError.MAGNET_LINK };
 		}
@@ -620,7 +628,9 @@ export async function indexTorrentsAndDataDirs(
 			getRuntimeConfig();
 		if (!useClientTorrents) {
 			const hashes = (
-				await db("client_searchee").select("info_hash")
+				await db<{ info_hash: string }>("client_searchee").select(
+					"info_hash",
+				)
 			).map((r) => r.info_hash);
 			await inBatches(hashes, async (batch) => {
 				await db("ensemble").whereIn("info_hash", batch).del();
@@ -646,7 +656,9 @@ export async function indexTorrentsAndDataDirs(
 			await db("torrent").del();
 		}
 		if (!dataDirs.length) {
-			const paths = (await db("data").select("path")).map((r) => r.path);
+			const paths = (
+				await db<{ path: string }>("data").select("path")
+			).map((r) => r.path);
 			await inBatches(paths, async (batch) => {
 				await db("ensemble")
 					.whereIn("path", batch)
@@ -655,7 +667,9 @@ export async function indexTorrentsAndDataDirs(
 			});
 			await db("data").del();
 		} else {
-			const paths = (await db("data").select("path")).map((r) => r.path);
+			const paths = (
+				await db<{ path: string }>("data").select("path")
+			).map((r) => r.path);
 			const toDelete = paths.filter((p) => !isChildPath(p, dataDirs));
 			await inBatches(toDelete, async (batch) => {
 				await db("data").whereIn("path", batch).del();
@@ -680,7 +694,7 @@ export async function indexTorrentsAndDataDirs(
 				} catch (e) {
 					const log = {
 						label: Label.INDEX,
-						message: `Indexing failed (${maxRetries - attempt}): ${e.message}`,
+						message: `Indexing failed (${maxRetries - attempt}): ${errorMessage(e)}`,
 					};
 					logger.debug(e);
 					if (attempt < maxRetries) {
@@ -697,8 +711,12 @@ export async function indexTorrentsAndDataDirs(
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {
 	const { useClientTorrents } = getRuntimeConfig();
-	const database = useClientTorrents ? db("client_searchee") : db("torrent");
-	return new Set((await database.select("*")).map((e) => e.info_hash));
+	const database = useClientTorrents
+		? db<{ info_hash: string }>("client_searchee")
+		: db<{ info_hash: string }>("torrent");
+	return new Set(
+		(await database.select("info_hash")).map((e) => e.info_hash),
+	);
 }
 
 export async function loadTorrentDirLight(
@@ -789,10 +807,10 @@ export async function getSimilarByName(name: string): Promise<{
 	);
 
 	const filterEntries = async (dbEntries: TorrentEntry[]) => {
-		return filterAsyncYield(dbEntries, async (dbEntry) => {
+		return filterAsyncYield(dbEntries, (dbEntry) => {
 			const entry = getKeysFromName(dbEntry.title ?? dbEntry.name!);
-			if (entry.element !== element) return false;
-			if (!entry.keyTitles.length) return false;
+			if (entry.element !== element) return Promise.resolve(false);
+			if (!entry.keyTitles.length) return Promise.resolve(false);
 			const maxDistance = Math.min(
 				candidateMaxDistance,
 				Math.floor(
@@ -800,11 +818,14 @@ export async function getSimilarByName(name: string): Promise<{
 						LEVENSHTEIN_DIVISOR,
 				),
 			);
-			return entry.keyTitles.some((dbKeyTitle) => {
-				return keyTitles.some(
-					(keyTitle) => distance(keyTitle, dbKeyTitle) <= maxDistance,
-				);
-			});
+			return Promise.resolve(
+				entry.keyTitles.some((dbKeyTitle) => {
+					return keyTitles.some(
+						(keyTitle) =>
+							distance(keyTitle, dbKeyTitle) <= maxDistance,
+					);
+				}),
+			);
 		});
 	};
 
@@ -893,11 +914,11 @@ async function getTorrentByFuzzyName(
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
 	let filteredNames: TorrentEntry[] = [];
 	if (fullMatch) {
-		filteredNames = await filterAsyncYield(database, async (dbEntry) => {
+		filteredNames = await filterAsyncYield(database, (dbEntry) => {
 			const dbMatch = createKeyTitle(
 				stripExtension(dbEntry.title ?? dbEntry.name!),
 			);
-			return fullMatch === dbMatch;
+			return Promise.resolve(fullMatch === dbMatch);
 		});
 	}
 
@@ -907,13 +928,13 @@ async function getTorrentByFuzzyName(
 	const candidateMaxDistance = Math.floor(stem.length / LEVENSHTEIN_DIVISOR);
 	const potentialMatches = await filterAsyncYield(
 		filteredNames,
-		async (dbEntry) => {
+		(dbEntry) => {
 			const dbTitle = stripExtension(dbEntry.title ?? dbEntry.name!);
 			const maxDistance = Math.min(
 				candidateMaxDistance,
 				Math.floor(dbTitle.length / LEVENSHTEIN_DIVISOR),
 			);
-			return distance(stem, dbTitle) <= maxDistance;
+			return Promise.resolve(distance(stem, dbTitle) <= maxDistance);
 		},
 	);
 
@@ -936,7 +957,9 @@ export async function getTorrentByCriteria(
 	criteria: TorrentLocator,
 ): Promise<SearcheeWithInfoHash[]> {
 	const { useClientTorrents } = getRuntimeConfig();
-	const database = useClientTorrents ? db("client_searchee") : db("torrent");
+	const database = useClientTorrents
+		? db<ClientSearcheeRow>("client_searchee")
+		: db<{ file_path: string; info_hash: string }>("torrent");
 	const dbTorrents = await database.where((b) =>
 		b.where({ info_hash: criteria.infoHash }),
 	);
@@ -946,23 +969,23 @@ export async function getTorrentByCriteria(
 		)}`;
 		throw new Error(message);
 	}
-	if (useClientTorrents) return dbTorrents.map(createSearcheeFromDB);
+	if (useClientTorrents)
+		return (dbTorrents as ClientSearcheeRow[]).map(createSearcheeFromDB);
 
 	const client = getClients()[0];
 	const torrentInfos =
 		client && client.clientType !== Label.QBITTORRENT
 			? await client.getAllTorrents()
 			: [];
+	const torrentRow = dbTorrents[0] as { file_path: string };
 	return [
 		(
 			await createSearcheeFromTorrentFile(
-				dbTorrents[0].file_path,
+				torrentRow.file_path,
 				torrentInfos,
 			)
 		).unwrapOrThrow(
-			new Error(
-				`Failed to create searchee from ${dbTorrents[0].file_path}`,
-			),
+			new Error(`Failed to create searchee from ${torrentRow.file_path}`),
 		),
 	];
 }

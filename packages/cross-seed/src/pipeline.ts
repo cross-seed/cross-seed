@@ -86,6 +86,7 @@ import {
 	stripExtension,
 	withMutex,
 	WithRequired,
+	errorMessage,
 } from "./utils.js";
 
 export interface Candidate {
@@ -276,7 +277,7 @@ async function findMatchesBatch(
 			const searcheeLog = getLogString(searchee, chalk.bold.white);
 			logger.error({
 				label: searchee.label,
-				message: `${progress}Error searching for ${searcheeLog}: ${e.message}`,
+				message: `${progress}Error searching for ${searcheeLog}: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 		}
@@ -388,7 +389,7 @@ export async function searchForLocalTorrentByCriteria(
 			const searcheeLog = getLogString(searchee, chalk.bold.white);
 			logger.error({
 				label: searchee.label,
-				message: `${progress}Error searching for ${searcheeLog}: ${e.message}`,
+				message: `${progress}Error searching for ${searcheeLog}: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 		}
@@ -405,7 +406,7 @@ async function getSearcheesForCandidate(
 	const { keys, clientSearchees, dataSearchees } = await getSimilarByName(
 		candidate.name,
 	);
-	const method = keys.length ? `[${keys}]` : "fuzzy fallback";
+	const method = keys.length ? `[${keys.join(", ")}]` : "fuzzy fallback";
 	if (!clientSearchees.length && !dataSearchees.length) {
 		logger.verbose({
 			label: searcheeLabel,
@@ -445,11 +446,15 @@ async function getEnsembleForCandidate(
 	const candidateLog = `${chalk.bold.white(candidate.name)} from ${candidate.tracker}`;
 	const { ensembleTitles, keyTitles, season } = seasonKeys;
 	const keys = keyTitles.map((keyTitle) => `${keyTitle}.${season}`);
-	const ensemble = await db("ensemble").whereIn("ensemble", keys);
+	const ensemble = await db<{
+		client_host: string | null;
+		path: string;
+		element: string;
+	}>("ensemble").whereIn("ensemble", keys);
 	if (ensemble.length === 0) {
 		logger.verbose({
 			label: searcheeLabel,
-			message: `Did not find an ${method} [${ensembleTitles}] for ${candidateLog}`,
+			message: `Did not find an ${method} [${ensembleTitles.join(", ")}] for ${candidateLog}`,
 		});
 		return null;
 	}
@@ -489,7 +494,7 @@ async function getEnsembleForCandidate(
 	if (filesWithElement.length === 0) {
 		logger.verbose({
 			label: searcheeLabel,
-			message: `Did not find any files for ${method} [${ensembleTitles}] for ${candidateLog}: sources may be incomplete or missing`,
+			message: `Did not find any files for ${method} [${ensembleTitles.join(", ")}] for ${candidateLog}: sources may be incomplete or missing`,
 		});
 		return null;
 	}
@@ -522,7 +527,7 @@ async function getEnsembleForCandidate(
 	}));
 	logger.verbose({
 		label: searcheeLabel,
-		message: `Using (${searchees.length}) ${method} [${ensembleTitles}] for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
+		message: `Using (${searchees.length}) ${method} [${ensembleTitles.join(", ")}] for ${candidateLog}: ${humanReadableSize(totalLength)} - ${files.length} files`,
 	});
 	return { searchees, method };
 }
@@ -562,7 +567,7 @@ export async function checkNewCandidateMatch(
 
 	logger.verbose({
 		label: searcheeLabel,
-		message: `Unique entries (${searchees.length}) [${searchees.map((m) => m.title)}] using ${formatAsList(methods, { sort: true })} for ${chalk.bold.white(candidate.name)} from ${candidate.tracker}`,
+		message: `Unique entries (${searchees.length}) [${searchees.map((m) => m.title).join(", ")}] using ${formatAsList(methods, { sort: true })} for ${chalk.bold.white(candidate.name)} from ${candidate.tracker}`,
 	});
 	searchees.sort(
 		comparing(
@@ -773,7 +778,7 @@ async function findSearchableTorrents(options?: {
 		...(await filterAsync(realSearchees, filterByContent)),
 	];
 	for (const searchee of validSearchees) {
-		const key = await getSearchString(searchee);
+		const key = getSearchString(searchee);
 		if (!grouping.has(key)) {
 			grouping.set(key, []);
 		}
@@ -924,7 +929,7 @@ export async function scanRssFeeds() {
 	await indexTorrentsAndDataDirs();
 	let numCandidates = 0;
 	await mapAsync(
-		await queryRssFeeds(lastRun, enabledIndexers),
+		queryRssFeeds(lastRun, enabledIndexers),
 		async (candidates) => {
 			for await (const candidate of candidates) {
 				await checkNewCandidateMatch(candidate, Label.RSS);

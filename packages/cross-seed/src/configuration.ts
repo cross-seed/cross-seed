@@ -14,6 +14,7 @@ import {
 	TORRENT_CACHE_FOLDER,
 } from "./constants.js";
 import { CrossSeedError } from "./errors.js";
+import { errorCode } from "./utils.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
 import { WebhookEntry } from "@cross-seed/shared/configSchema";
 import { omitUndefined } from "./utils/object.js";
@@ -91,7 +92,7 @@ export function appDir(): string {
 	try {
 		accessSync(appDir, constants.R_OK | constants.W_OK);
 	} catch (e) {
-		if (e.code === "ENOENT") {
+		if (errorCode(e) === "ENOENT") {
 			mkdirSync(appDir, { recursive: true });
 			return appDir;
 		}
@@ -465,14 +466,16 @@ export async function getFileConfig(): Promise<FileConfig | undefined> {
 
 	try {
 		if (isSea()) {
-			return require(configPath);
+			return require(configPath) as FileConfig;
 		}
-		return (await import(pathToFileURL(configPath).toString())).default;
+		return (
+			(await import(pathToFileURL(configPath).toString())) as {
+				default: FileConfig;
+			}
+		).default;
 	} catch (e) {
-		if (
-			e.code === "MODULE_NOT_FOUND" ||
-			e.code === "ERR_MODULE_NOT_FOUND"
-		) {
+		const code = errorCode(e);
+		if (code === "MODULE_NOT_FOUND" || code === "ERR_MODULE_NOT_FOUND") {
 			return undefined;
 		}
 		throw e;

@@ -44,6 +44,7 @@ import {
 	cleanBookAndAudioTitle,
 	cleanTitle,
 	comparing,
+	errorMessage,
 	extractInt,
 	formatAsList,
 	getAnimeQueries,
@@ -227,12 +228,12 @@ function parseTorznabCaps(xml: TorznabCaps): Caps {
 	};
 }
 
-async function createTorznabSearchQueries(
+function createTorznabSearchQueries(
 	searchee: Searchee,
 	mediaType: MediaType,
 	caps: Caps,
 	parsedMedia?: ParsedMedia,
-): Promise<Query[]> {
+): Query[] {
 	const stem = stripExtension(searchee.title);
 	const relevantIds: IdSearchParams = parsedMedia
 		? getRelevantArrIds(caps, parsedMedia)
@@ -337,11 +338,9 @@ async function createTorznabSearchQueries(
  * @param searchee - The searchee object to generate the search string for.
  * @returns The search string that would be used to query indexers.
  */
-export async function getSearchString(searchee: Searchee): Promise<string> {
+export function getSearchString(searchee: Searchee): string {
 	const mediaType = getMediaType(searchee);
-	const params = (
-		await createTorznabSearchQueries(searchee, mediaType, ALL_CAPS)
-	)[0];
+	const params = createTorznabSearchQueries(searchee, mediaType, ALL_CAPS)[0];
 	const season = params.season !== undefined ? `.S${params.season}` : "";
 	const ep = params.ep !== undefined ? `.E${params.ep}` : "";
 	return `${params.q}${season}${ep}`.toLowerCase();
@@ -352,6 +351,7 @@ export async function getSearchString(searchee: Searchee): Promise<string> {
  * @param name - The name of the searchee.
  * @return The search string that would be used to query indexers.
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function estimateSearchString(name: string): Promise<string> {
 	const searchee: Searchee = {
 		name,
@@ -377,13 +377,13 @@ export async function logQueries(
 	const stem = stripExtension(searcheeTitle);
 	logger.info(
 		// @ts-expect-error needs conversion to use searchee instead of stem
-		`RAW: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS))}`,
+		`RAW: ${inspect(createTorznabSearchQueries(stem, mediaType, ALL_CAPS))}`,
 	);
 	const res = await scanAllArrsForMedia(searcheeTitle, mediaType);
 	const parsedMedia = res.orElse(undefined);
 	logger.info(
 		// @ts-expect-error needs conversion to use searchee instead of stem
-		`ID: ${inspect(await createTorznabSearchQueries(stem, mediaType, ALL_CAPS, parsedMedia))}`,
+		`ID: ${inspect(createTorznabSearchQueries(stem, mediaType, ALL_CAPS, parsedMedia))}`,
 	);
 }
 
@@ -461,7 +461,7 @@ export async function* rssPager(
 		} catch (e) {
 			logger.error({
 				label: Label.RSS,
-				message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: ${e.message}`,
+				message: `Paging ${indexer.name ?? indexer.url} stopped at page ${i + 1}: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 			break;
@@ -524,10 +524,10 @@ export async function* rssPager(
 	}
 }
 
-export async function queryRssFeeds(
+export function queryRssFeeds(
 	lastRun: number,
 	indexers: Indexer[],
-): Promise<AsyncGenerator<Candidate>[]> {
+): AsyncGenerator<Candidate>[] {
 	const timeSinceLastRun = Date.now() - lastRun;
 	return indexers.map((indexer) => rssPager(indexer, timeSinceLastRun));
 }
@@ -551,7 +551,7 @@ export async function searchTorznab(
 	const indexerCandidates = await makeRequests(
 		indexersToSearch,
 		searchee.label,
-		async (indexer): Promise<Query[]> => {
+		(indexer): Promise<Query[]> => {
 			const caps = {
 				search: indexer.searchCap,
 				tvSearch: indexer.tvSearchCap,
@@ -564,11 +564,13 @@ export async function searchTorznab(
 				categories: indexer.categories,
 				limits: indexer.limits,
 			};
-			return createTorznabSearchQueries(
-				searchee,
-				mediaType,
-				caps,
-				parsedMedia,
+			return Promise.resolve(
+				createTorznabSearchQueries(
+					searchee,
+					mediaType,
+					caps,
+					parsedMedia,
+				),
 			);
 		},
 	);
@@ -586,7 +588,7 @@ export function assembleUrl(
 	searchParams.set("apikey", apikey);
 
 	for (const [key, value] of Object.entries(params)) {
-		if (value != null) searchParams.set(key, value);
+		if (value != null) searchParams.set(key, String(value));
 	}
 
 	url.search = searchParams.toString();
@@ -605,7 +607,7 @@ async function fetchCaps(indexer: Indexer): Promise<Caps> {
 		);
 	} catch (e) {
 		const error = new Error(
-			`${indexer.name ?? indexer.url} failed to respond, check verbose logs: ${e.message}`,
+			`${indexer.name ?? indexer.url} failed to respond, check verbose logs: ${errorMessage(e)}`,
 		);
 		logger.error(error.message);
 		logger.debug(e);
@@ -643,7 +645,9 @@ async function fetchCaps(indexer: Indexer): Promise<Caps> {
 		throw error;
 	}
 	try {
-		const parsedXml = await xml2js.parseStringPromise(responseText);
+		const parsedXml = (await xml2js.parseStringPromise(
+			responseText,
+		)) as TorznabCaps;
 		return parseTorznabCaps(parsedXml);
 	} catch {
 		const error = new Error(
@@ -739,7 +743,12 @@ function logIndexerMediaTypes(indexer: Indexer): void {
 	const supported: string[] = [];
 	const unsupported: string[] = [];
 	for (const mediaType of Object.keys(MediaType)) {
-		if (indexerDoesSupportMediaType(MediaType[mediaType], indexer)) {
+		if (
+			indexerDoesSupportMediaType(
+				MediaType[mediaType as keyof typeof MediaType],
+				indexer,
+			)
+		) {
 			supported.push(mediaType);
 		} else {
 			unsupported.push(mediaType);
@@ -968,7 +977,7 @@ async function getAndLogIndexers(
 	// Invalidate cache if searchStr or ids is different
 	let shouldScanArr = true;
 	let parsedMedia: ParsedMedia | undefined;
-	const searchStr = await getSearchString(searchee);
+	const searchStr = getSearchString(searchee);
 	if (cachedSearch.q === searchStr) {
 		shouldScanArr = false;
 		const res = await scanAllArrsForMedia(searchee.title, mediaType);
