@@ -527,10 +527,12 @@ export function extractCredentialsFromUrl(
 
 // ================================ FUNCTIONAL ================================
 
-export const tap = (fn) => (value) => {
-	fn(value);
-	return value;
-};
+export const tap =
+	<T>(fn: (v: T) => void) =>
+	(value: T): T => {
+		fn(value);
+		return value;
+	};
 
 export function fallback<T>(...args: T[]): T | undefined {
 	for (const arg of args) {
@@ -762,7 +764,7 @@ export function replaceLastOccurrence(
 export function escapeUnescapedQuotesInJsonValues(jsonStr: string): string {
 	return jsonStr.replace(
 		JSON_VALUES_REGEX,
-		(match, _p1, _offset, _str, groups) => {
+		(match, _p1, _offset, _str, groups: { value: string }) => {
 			const escapedValue = groups.value.replace(/(?<!\\)"/g, '\\"');
 			return match.replace(groups.value, escapedValue);
 		},
@@ -901,4 +903,13 @@ export class AsyncSemaphore {
 			this.permits++;
 		}
 	}
+}
+
+export function errorMessage(e: unknown): string {
+	return e instanceof Error ? e.message : String(e);
+}
+
+export function errorCode(e: unknown): string | undefined {
+	if (e instanceof Error && "code" in e) return e.code as string;
+	return undefined;
 }
