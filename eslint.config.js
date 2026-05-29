@@ -18,7 +18,7 @@ export default tseslint.config(
 	js.configs.recommended,
 	{
 		files: ["packages/cross-seed/{src,tests}/**/*.ts"],
-		extends: [...tseslint.configs.recommended],
+		extends: [...tseslint.configs.recommendedTypeChecked],
 		languageOptions: {
 			ecmaVersion: 2022,
 			globals: globals.node,
