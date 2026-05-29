@@ -17,7 +17,9 @@ async function up(knex: Knex.Knex): Promise<void> {
 		if (!row.apikey) continue;
 
 		const settings =
-			row.settings_json == null ? {} : JSON.parse(row.settings_json);
+			row.settings_json == null
+				? {}
+				: (JSON.parse(row.settings_json) as Record<string, unknown>);
 		if (typeof settings.apiKey === "string" && settings.apiKey.length > 0) {
 			continue;
 		}

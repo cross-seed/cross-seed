@@ -17,6 +17,13 @@ import removeUrlUniqueConstraint from "./15-remove-url-unique-constraint.js";
 import pruneInactiveIndexers from "./16-prune-inactive-indexers.js";
 import apiKeySettingsJson from "./17-api-key-settings-json.js";
 
+import { Knex } from "knex";
+type Migration = {
+	name: string;
+	up: (knex: Knex) => Promise<void>;
+	down?: (knex: Knex) => Promise<void>;
+};
+
 export const migrations = {
 	getMigrations: () =>
 		Promise.resolve([
@@ -39,6 +46,6 @@ export const migrations = {
 			pruneInactiveIndexers,
 			apiKeySettingsJson,
 		]),
-	getMigrationName: (migration) => migration.name,
-	getMigration: (migration) => migration,
+	getMigrationName: (migration: Migration) => migration.name,
+	getMigration: (migration: Migration) => Promise.resolve(migration),
 };

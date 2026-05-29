@@ -30,6 +30,7 @@ async function up(knex: Knex.Knex): Promise<void> {
 	});
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await
 async function down(knex: Knex.Knex): Promise<void> {
 	void knex.schema.dropTable("client_searchee");
 	void knex.schema.dropTable("data");

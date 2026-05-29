@@ -22,6 +22,7 @@ import {
 import {
 	filterAsync,
 	flatMapAsync,
+	errorMessage,
 	getLogString,
 	humanReadableDate,
 	inBatches,
@@ -46,12 +47,14 @@ const formatBindings = (bindings?: Array<unknown>) => {
 	});
 };
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 export class NodeSqliteClient extends BetterSqlite3Client {
 	_driver() {
 		return DatabaseSync;
 	}
 
 	// Get a raw connection from the database, returning a promise with the connection object.
+	// eslint-disable-next-line @typescript-eslint/require-await
 	async acquireRawConnection() {
 		const { filename } = this
 			.connectionSettings as Knex.BetterSqlite3ConnectionConfig;
@@ -62,13 +65,14 @@ export class NodeSqliteClient extends BetterSqlite3Client {
 
 	// Used to explicitly close a connection, called internally by the pool when
 	// a connection times out or the pool is shutdown.
-	async destroyRawConnection(connection) {
+	// eslint-disable-next-line @typescript-eslint/require-await
+	async destroyRawConnection(connection: any) {
 		return connection.close();
 	}
 
 	// Runs the query on the specified connection, providing the bindings and any
 	// other necessary prep work.
-	async _query(connection, obj) {
+	async _query(connection: any, obj: any) {
 		if (!obj.sql) throw new Error("The query is empty");
 
 		if (!connection) {
@@ -112,6 +116,7 @@ export class NodeSqliteClient extends BetterSqlite3Client {
 		return obj;
 	}
 }
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any */
 NodeSqliteClient.prototype.driverName = "node:sqlite";
 
 const filename = join(appDir(), "cross-seed.db");
@@ -177,7 +182,9 @@ export async function cleanupDB(): Promise<void> {
 			message: "Pruning deleted dataDirs entries...",
 		});
 		const deletedPaths = await filterAsync(
-			(await db("data").select("path")).map((e) => e.path),
+			(await db<{ path: string }>("data").select("path")).map(
+				(e) => e.path,
+			),
 			(p) => notExists(p),
 		);
 		await inBatches(deletedPaths, async (batch) => {
@@ -192,7 +199,9 @@ export async function cleanupDB(): Promise<void> {
 			message: "Pruning deleted ensemble entries...",
 		});
 		const deletedPaths = await filterAsync(
-			(await db("ensemble").select("path")).map((e) => e.path),
+			(await db<{ path: string }>("ensemble").select("path")).map(
+				(e) => e.path,
+			),
 			(p) => notExists(p),
 		);
 		await inBatches(deletedPaths, async (batch) => {
@@ -200,7 +209,7 @@ export async function cleanupDB(): Promise<void> {
 			await db("ensemble").whereIn("path", batch).del();
 		});
 	})();
-	await (async () => {
+	(() => {
 		logger.verbose({
 			label: Label.CLEANUP,
 			message: "Pruning failed snatch history entries...",
@@ -259,7 +268,7 @@ export async function cleanupDB(): Promise<void> {
 			} catch (e) {
 				logger.error({
 					label: Label.CLEANUP,
-					message: `Failed to parse ${torrentPath} when cleaning up unused torrents: ${e.message}`,
+					message: `Failed to parse ${torrentPath} when cleaning up unused torrents: ${errorMessage(e)}`,
 				});
 				logger.debug(e);
 			}
@@ -276,7 +285,7 @@ export async function cleanupDB(): Promise<void> {
 			} catch (e) {
 				logger.error({
 					label: Label.CLEANUP,
-					message: `Failed to delete ${torrentPath} when cleaning up unused torrents: ${e.message}`,
+					message: `Failed to delete ${torrentPath} when cleaning up unused torrents: ${errorMessage(e)}`,
 				});
 				logger.debug(e);
 			}
