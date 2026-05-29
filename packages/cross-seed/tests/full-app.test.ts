@@ -118,7 +118,7 @@ describe.sequential("full app flows", () => {
 		);
 	});
 
-	beforeEach(async () => {
+	beforeEach(() => {
 		torznab.state.setTorrents([]);
 		fakeTorrent.state.reset();
 	});

@@ -49,6 +49,7 @@ export function createFakeTorrentClientServer() {
 		},
 	};
 
+	// eslint-disable-next-line @typescript-eslint/require-await
 	server.get("/torrents", async () => {
 		return Array.from(state.torrents.values());
 	});
@@ -63,6 +64,7 @@ export function createFakeTorrentClientServer() {
 		return torrent;
 	});
 
+	// eslint-disable-next-line @typescript-eslint/require-await
 	server.post("/torrents", async (request) => {
 		const payload = request.body as FakeTorrent;
 		state.addTorrent(payload);
@@ -93,7 +95,7 @@ export function createFakeTorrentClientServer() {
 	return { server, state };
 }
 
-async function parseJson<T>(responseText?: string): Promise<T | undefined> {
+function parseJson<T>(responseText?: string): T | undefined {
 	if (!responseText) return undefined;
 	return JSON.parse(responseText) as T;
 }
@@ -130,7 +132,7 @@ export class FakeTorrentClient implements TorrentClient {
 				? { "content-type": "application/json" }
 				: undefined,
 		});
-		const body = await parseJson<T>(res.payload);
+		const body = parseJson<T>(res.payload);
 		return { status: res.statusCode, body };
 	}
 
@@ -174,6 +176,7 @@ export class FakeTorrentClient implements TorrentClient {
 		}));
 	}
 
+	// eslint-disable-next-line @typescript-eslint/require-await
 	async getClientSearchees(): Promise<ClientSearcheeResult> {
 		return { searchees: [], newSearchees: [] };
 	}
@@ -257,6 +260,7 @@ export class FakeTorrentClient implements TorrentClient {
 		await this.request("POST", `/torrents/${infoHash}/recheck`);
 	}
 
+	// eslint-disable-next-line @typescript-eslint/require-await
 	async validateConfig(): Promise<void> {
 		return;
 	}

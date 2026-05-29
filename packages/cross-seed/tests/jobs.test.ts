@@ -52,7 +52,7 @@ function addFakeJob(
 		runAheadOfSchedule: false,
 		configOverride: {},
 		shouldRun: () => true,
-		run: vi.fn(async () => true),
+		run: vi.fn(() => Promise.resolve(true)),
 		...overrides,
 	};
 
