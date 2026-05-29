@@ -49,4 +49,5 @@ test.db
 coverage/
 .vscode/
 **/.claude/settings.local.json
+packages/webui/src/routeTree.gen.ts
 .npm-cache/
