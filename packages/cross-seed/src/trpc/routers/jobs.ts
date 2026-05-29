@@ -73,7 +73,7 @@ export const jobsRouter = router({
 				name: z.nativeEnum(JobName),
 			}),
 		)
-		.mutation(async ({ input }) => {
+		.mutation(({ input }) => {
 			const jobs = getJobs();
 			const job = jobs.find((j) => j.name === input.name);
 

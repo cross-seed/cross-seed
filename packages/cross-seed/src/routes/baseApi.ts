@@ -21,7 +21,7 @@ import {
 } from "../pipeline.js";
 import { getRuntimeConfig, RuntimeConfig } from "../runtimeConfig.js";
 import { indexTorrentsAndDataDirs } from "../torrent.js";
-import { formatAsList, sanitizeInfoHash } from "../utils.js";
+import { errorMessage, formatAsList, sanitizeInfoHash } from "../utils.js";
 import { authorize } from "../utils/authUtils.js";
 
 const ANNOUNCE_SCHEMA = z
@@ -86,21 +86,22 @@ const JOB_SCHEMA = z
 	.partial()
 	.refine((data) => Object.values(JobName).includes(data.name as JobName));
 
-function parseData(data: string) {
-	let parsed;
+function parseData(data: string): unknown {
+	let parsed: unknown;
 	try {
-		parsed = JSON.parse(data);
+		parsed = JSON.parse(data) as unknown;
 	} catch {
 		parsed = qsParse(data);
 	}
 
 	// transformations
 	try {
-		if ("infoHash" in parsed) {
-			parsed.infoHash = parsed.infoHash.toLowerCase();
+		const obj = parsed as Record<string, unknown>;
+		if ("infoHash" in obj && typeof obj.infoHash === "string") {
+			obj.infoHash = obj.infoHash.toLowerCase();
 		}
-		if ("size" in parsed && typeof parsed.size === "string") {
-			parsed.size = Number(parsed.size);
+		if ("size" in obj && typeof obj.size === "string") {
+			obj.size = Number(obj.size);
 		}
 	} catch {
 		throw new Error(`Unable to parse request body: "${data}"`);
@@ -201,23 +202,12 @@ export async function baseApiPlugin(app: FastifyInstance) {
 		}
 		await indexTorrentsAndDataDirs();
 
-		let data;
+		const rawData: unknown = request.body;
+		let data: z.infer<typeof WEBHOOK_SCHEMA>;
 		try {
-			data = request.body;
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : String(error);
-			logger.error({
-				label: Label.WEBHOOK,
-				message,
-			});
-			return reply.code(400).send(message);
-		}
-
-		try {
-			data = WEBHOOK_SCHEMA.parse(data);
+			data = WEBHOOK_SCHEMA.parse(rawData);
 		} catch {
-			const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/reference/api#post-apiwebhook): ${inspect(data)}`;
+			const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/reference/api#post-apiwebhook): ${inspect(rawData)}`;
 			logger.error({ label: Label.WEBHOOK, message });
 			return reply.code(400).send(message);
 		}
@@ -264,7 +254,7 @@ export async function baseApiPlugin(app: FastifyInstance) {
 		} catch (e) {
 			logger.error({
 				label: Label.WEBHOOK,
-				message: e.message,
+				message: errorMessage(e),
 			});
 			logger.debug(e);
 		}
@@ -280,25 +270,16 @@ export async function baseApiPlugin(app: FastifyInstance) {
 
 		const { dataDirs, torrentDir, useClientTorrents } = getRuntimeConfig();
 
-		let data;
+		const rawData: unknown = request.body;
+		let data: z.infer<typeof ANNOUNCE_SCHEMA>;
 		try {
-			data = request.body;
-		} catch (e) {
-			const message = e.message;
-			logger.error({
-				label: Label.ANNOUNCE,
-				message,
-			});
-			return reply.code(400).send(message);
-		}
-
-		try {
-			data = ANNOUNCE_SCHEMA.parse(data);
-		} catch ({ errors }) {
+			data = ANNOUNCE_SCHEMA.parse(rawData);
+		} catch (zodErr) {
+			const errors = zodErr instanceof z.ZodError ? zodErr.errors : [];
 			const message = `Missing required params (https://www.cross-seed.org/docs/v6-migration#autobrr-update): {${formatAsList(
 				errors.map(({ path }) => path.join(".")),
 				{ sort: true, type: "unit" },
-			)}} in ${inspect(data)}\n${inspect(errors)}`;
+			)}} in ${inspect(rawData)}\n${inspect(errors)}`;
 			logger.error({ label: Label.ANNOUNCE, message });
 			return reply.code(400).send(message);
 		}
@@ -336,10 +317,10 @@ export async function baseApiPlugin(app: FastifyInstance) {
 		} catch (e) {
 			logger.error({
 				label: Label.ANNOUNCE,
-				message: e.message,
+				message: errorMessage(e),
 			});
 			logger.debug(e);
-			return reply.code(500).send(e.message);
+			return reply.code(500).send(errorMessage(e));
 		}
 	});
 
@@ -351,22 +332,12 @@ export async function baseApiPlugin(app: FastifyInstance) {
 	}>("/job", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
-		let data;
+		const rawData: unknown = request.body;
+		let data: z.infer<typeof JOB_SCHEMA>;
 		try {
-			data = request.body;
-		} catch (e) {
-			const message = e.message;
-			logger.error({
-				label: Label.SERVER,
-				message,
-			});
-			return reply.code(400).send(message);
-		}
-
-		try {
-			data = JOB_SCHEMA.parse(data);
+			data = JOB_SCHEMA.parse(rawData);
 		} catch {
-			const message = `Job name must be one of ${formatAsList(Object.values(JobName), { sort: true, style: "narrow", type: "unit" })} - received: ${inspect(data)}`;
+			const message = `Job name must be one of ${formatAsList(Object.values(JobName), { sort: true, style: "narrow", type: "unit" })} - received: ${inspect(rawData)}`;
 			logger.error({ label: Label.SERVER, message });
 			return reply.code(400).send(message);
 		}

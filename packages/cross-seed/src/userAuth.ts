@@ -25,7 +25,7 @@ export async function createUser(
 ): Promise<User> {
 	const hashedPassword = await bcrypt.hash(password, 10);
 
-	const [user] = await db("user")
+	const [user] = await db<User>("user")
 		.insert({
 			username,
 			password: hashedPassword,
@@ -43,7 +43,7 @@ export async function createUser(
 export async function findUserByUsername(
 	username: string,
 ): Promise<User | undefined> {
-	return db("user").where({ username }).first();
+	return db<User>("user").where({ username }).first();
 }
 
 export async function validateUserCredentials(
@@ -78,7 +78,7 @@ export async function createSession(userId: number): Promise<Session> {
 }
 
 export async function validateSession(sessionId: string): Promise<User | null> {
-	const session = await db("session")
+	const session = await db<Session>("session")
 		.where({
 			id: sessionId,
 		})
@@ -89,9 +89,9 @@ export async function validateSession(sessionId: string): Promise<User | null> {
 		return null;
 	}
 
-	const user = await db("user").where({ id: session.user_id }).first();
+	const user = await db<User>("user").where({ id: session.user_id }).first();
 
-	return user || null;
+	return user ?? null;
 }
 
 export async function removeSession(sessionId: string): Promise<void> {

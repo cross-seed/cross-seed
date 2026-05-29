@@ -7,9 +7,9 @@ import { getDbConfig, setDbConfig, updateDbConfig } from "../../dbConfig.js";
 import { getDefaultRuntimeConfig } from "../../configuration.js";
 import { omitUndefined } from "../../utils/object.js";
 import { parseRuntimeConfig } from "../../configSchema.js";
-import { WebhookObjectSchema } from "@cross-seed/shared/configSchema";
 import { sendTestNotification } from "../../pushNotifier.js";
 import { reloadDownloadClients } from "../../clients/TorrentClient.js";
+import { errorMessage } from "../../utils.js";
 
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
@@ -25,8 +25,8 @@ export const settingsRouter = router({
 				apiKey,
 			};
 		} catch (error) {
-			logger.error({ label: Label.SERVER, message: error.message });
-			throw new Error(`Failed to read config: ${error.message}`);
+			logger.error({ label: Label.SERVER, message: errorMessage(error) });
+			throw new Error(`Failed to read config: ${errorMessage(error)}`);
 		}
 	}),
 
@@ -55,8 +55,13 @@ export const settingsRouter = router({
 
 				return { success: true };
 			} catch (error) {
-				logger.error({ label: Label.SERVER, message: error.message });
-				throw new Error(`Failed to save config: ${error.message}`);
+				logger.error({
+					label: Label.SERVER,
+					message: errorMessage(error),
+				});
+				throw new Error(
+					`Failed to save config: ${errorMessage(error)}`,
+				);
 			}
 		}),
 
@@ -68,8 +73,13 @@ export const settingsRouter = router({
 				setRuntimeConfig({ ...getRuntimeConfig(), apiKey });
 				return { apiKey };
 			} catch (error) {
-				logger.error({ label: Label.SERVER, message: error.message });
-				throw new Error(`Failed to save API key: ${error.message}`);
+				logger.error({
+					label: Label.SERVER,
+					message: errorMessage(error),
+				});
+				throw new Error(
+					`Failed to save API key: ${errorMessage(error)}`,
+				);
 			}
 		}),
 
@@ -79,8 +89,8 @@ export const settingsRouter = router({
 			setRuntimeConfig({ ...getRuntimeConfig(), apiKey });
 			return { apiKey };
 		} catch (error) {
-			logger.error({ label: Label.SERVER, message: error.message });
-			throw new Error(`Failed to reset API key: ${error.message}`);
+			logger.error({ label: Label.SERVER, message: errorMessage(error) });
+			throw new Error(`Failed to reset API key: ${errorMessage(error)}`);
 		}
 	}),
 
@@ -108,12 +118,17 @@ export const settingsRouter = router({
 
 				return { success: true };
 			} catch (error) {
-				logger.error({ label: Label.SERVER, message: error.message });
-				throw new Error(`Failed to replace config: ${error.message}`);
+				logger.error({
+					label: Label.SERVER,
+					message: errorMessage(error),
+				});
+				throw new Error(
+					`Failed to replace config: ${errorMessage(error)}`,
+				);
 			}
 		}),
 
-	validate: authedProcedure.query(async () => {
+	validate: authedProcedure.query(() => {
 		try {
 			// This is a placeholder for config validation
 			// We need to implement proper validation logic
@@ -122,15 +137,30 @@ export const settingsRouter = router({
 				validations: { paths: true, torznab: true },
 			};
 		} catch (error) {
-			logger.error({ label: Label.SERVER, message: error.message });
-			throw new Error(`Failed to validate config: ${error.message}`);
+			logger.error({ label: Label.SERVER, message: errorMessage(error) });
+			throw new Error(
+				`Failed to validate config: ${errorMessage(error)}`,
+			);
 		}
 	}),
 
 	testNotification: authedProcedure
 		.input(
 			z.object({
-				webhooks: z.array(z.union([z.string(), WebhookObjectSchema])),
+				webhooks: z.array(
+					z.union([
+						z.string(),
+						z.object({
+							url: z.string().url(),
+							payload: z
+								.record(z.string(), z.unknown())
+								.optional(),
+							headers: z
+								.record(z.string(), z.string())
+								.optional(),
+						}),
+					]),
+				),
 			}),
 		)
 		.mutation(async ({ input }) => {
@@ -138,9 +168,12 @@ export const settingsRouter = router({
 				const results = await sendTestNotification(input.webhooks);
 				return { results };
 			} catch (error) {
-				logger.error({ label: Label.SERVER, message: error.message });
+				logger.error({
+					label: Label.SERVER,
+					message: errorMessage(error),
+				});
 				throw new Error(
-					`Failed to send test notification: ${error.message}`,
+					`Failed to send test notification: ${errorMessage(error)}`,
 				);
 			}
 		}),

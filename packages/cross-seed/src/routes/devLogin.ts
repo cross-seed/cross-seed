@@ -18,6 +18,7 @@ function normalizeRedirectTo(redirectTo: unknown): string {
 	return redirectTo;
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function devLoginPlugin(
 	app: FastifyInstance,
 	{ basePath }: { basePath: string },

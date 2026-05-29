@@ -22,14 +22,18 @@ export const clientsRouter = router({
 
 			const clientHost = new URL(url).host;
 
-			let client;
 			let message = "";
 			try {
 				switch (clientName) {
 					case "qbittorrent": {
-						client = new QBittorrent(url, clientHost, 0, readonly);
-						await client.login();
-						const prefs = await client.getPreferences();
+						const qb = new QBittorrent(
+							url,
+							clientHost,
+							0,
+							readonly,
+						);
+						await qb.login();
+						const prefs = await qb.getPreferences();
 						if (
 							prefs.bypass_auth_subnet_whitelist_enabled ||
 							prefs.bypass_local_auth
@@ -42,21 +46,29 @@ export const clientsRouter = router({
 						break;
 					}
 					case "rtorrent":
-						client = new RTorrent(url, clientHost, 0, readonly);
-						await client.validateConnection();
+						await new RTorrent(
+							url,
+							clientHost,
+							0,
+							readonly,
+						).validateConnection();
 						break;
 					case "transmission":
-						client = new Transmission(url, clientHost, 0, readonly);
-						await client.validateConfig();
+						await new Transmission(
+							url,
+							clientHost,
+							0,
+							readonly,
+						).validateConfig();
 						break;
 					case "deluge":
-						client = new Deluge(url, clientHost, 0, readonly);
-						await client.authenticate();
+						await new Deluge(
+							url,
+							clientHost,
+							0,
+							readonly,
+						).validateConfig();
 						break;
-					default:
-						throw new Error(
-							`Unsupported client type: ${clientName}`,
-						);
 				}
 
 				return {

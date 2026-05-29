@@ -12,8 +12,11 @@ import {
 	testExistingIndexer,
 	testNewIndexer,
 	updateIndexer,
+	type IndexerNotFoundError,
+	type TestConnectionError,
 } from "../services/indexerService.js";
 import { authorize } from "../utils/authUtils.js";
+import type { Result } from "../Result.js";
 
 // Helper function to parse and validate ID from route params
 async function parseIdParam(
@@ -35,6 +38,7 @@ async function parseIdParam(
  * Prowlarr Integration API Routes
  * Base path: /api/indexer/v1
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function indexerApiPlugin(app: FastifyInstance) {
 	/**
 	 * Indexer management status for Prowlarr integration
@@ -189,7 +193,10 @@ export async function indexerApiPlugin(app: FastifyInstance) {
 	}>("/test", async (request, reply) => {
 		if (!(await authorize(request, reply))) return;
 
-		let result;
+		let result: Result<
+			{ success: true; message: string },
+			IndexerNotFoundError | TestConnectionError
+		>;
 
 		if (request.body.id) {
 			// Test existing indexer

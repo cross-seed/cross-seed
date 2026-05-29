@@ -2,6 +2,7 @@ import { z } from "zod";
 import { authedProcedure, router } from "../index.js";
 import { Label, logger } from "../../logger.js";
 import { getLogWatcher, type LogEntry } from "../../utils/logWatcher.js";
+import { errorMessage } from "../../utils.js";
 
 export const logsRouter = router({
 	getVerbose: authedProcedure.query(async () => {
@@ -18,9 +19,11 @@ export const logsRouter = router({
 		} catch (error) {
 			logger.error({
 				label: Label.SERVER,
-				message: `Failed to read verbose logs: ${error.message}`,
+				message: `Failed to read verbose logs: ${errorMessage(error)}`,
 			});
-			throw new Error(`Failed to read verbose logs: ${error.message}`);
+			throw new Error(
+				`Failed to read verbose logs: ${errorMessage(error)}`,
+			);
 		}
 	}),
 
@@ -38,9 +41,9 @@ export const logsRouter = router({
 			} catch (error) {
 				logger.error({
 					label: Label.SERVER,
-					message: `Failed to read logs: ${error.message}`,
+					message: `Failed to read logs: ${errorMessage(error)}`,
 				});
-				throw new Error(`Failed to read logs: ${error.message}`);
+				throw new Error(`Failed to read logs: ${errorMessage(error)}`);
 			}
 		}),
 
@@ -69,7 +72,7 @@ export const logsRouter = router({
 			} catch (error) {
 				logger.error({
 					label: Label.SERVER,
-					message: `Failed to load historical logs: ${error.message}`,
+					message: `Failed to load historical logs: ${errorMessage(error)}`,
 				});
 			}
 

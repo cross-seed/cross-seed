@@ -142,7 +142,7 @@ export const authRouter = router({
 			});
 		}),
 
-	logOut: unauthedProcedure.mutation(async ({ ctx }) => {
+	logOut: unauthedProcedure.mutation(({ ctx }) => {
 		ctx.deleteSession();
 
 		logger.info({

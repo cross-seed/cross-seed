@@ -69,6 +69,7 @@ async function readStaticFile(
 	return typeof asset === "string" ? asset : Buffer.from(asset);
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function staticFrontendPlugin(
 	app: FastifyInstance,
 	{ basePath }: { basePath: string },
