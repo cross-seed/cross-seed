@@ -17,6 +17,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import {
+	ClientSearcheeRow,
 	createSearcheeFromDB,
 	File,
 	parseTitle,
@@ -26,6 +27,7 @@ import {
 	updateSearcheeClientDB,
 } from "../searchee.js";
 import {
+	errorMessage,
 	extractCredentialsFromUrl,
 	fromBatches,
 	isTruthy,
@@ -150,15 +152,25 @@ export default class RTorrent implements TorrentClient {
 		});
 	}
 
-	private async methodCallP<R>(method: string, args): Promise<R> {
+	private async methodCallP<R>(method: string, args: unknown[]): Promise<R> {
 		const msg = `Calling method ${method} with params ${inspect(args, { depth: null, compact: true })}`;
 		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
 		logger.verbose({ label: this.label, message });
-		return new Promise((resolve, reject) => {
-			this.client.methodCall(method, args, (err, data) => {
-				if (err) return reject(err);
-				return resolve(data);
-			});
+		return new Promise<R>((resolve, reject) => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+			(this.client as any).methodCall(
+				method,
+				args,
+				(err: unknown, data: R) => {
+					if (err)
+						return reject(
+							err instanceof Error
+								? err
+								: new Error(errorMessage(err)),
+						);
+					return resolve(data);
+				},
+			);
 		});
 	}
 
@@ -248,7 +260,7 @@ export default class RTorrent implements TorrentClient {
 				args,
 			);
 		} catch (e) {
-			logger.debug({ label: this.label, message: e });
+			logger.debug({ label: this.label, message: String(e) });
 			return resultOfErr("FAILURE");
 		}
 
@@ -288,7 +300,7 @@ export default class RTorrent implements TorrentClient {
 				isActive: Boolean(Number(isActiveStr)),
 			});
 		} catch (e) {
-			logger.error({ label: this.label, message: e });
+			logger.error({ label: this.label, message: String(e) });
 			logger.debug("Failure caused by server response below:");
 			logger.debug(inspect(response));
 			return resultOfErr("FAILURE");
@@ -336,9 +348,9 @@ export default class RTorrent implements TorrentClient {
 		try {
 			await this.methodCallP<string>("session.name", []);
 		} catch (e) {
-			logger.debug({ label: this.label, message: e });
+			logger.debug({ label: this.label, message: String(e) });
 			throw new CrossSeedError(
-				`[${this.label}] Failed to reach rTorrent at ${this.clientHost}: ${e.message}`,
+				`[${this.label}] Failed to reach rTorrent at ${this.clientHost}: ${errorMessage(e)}`,
 			);
 		}
 		logger.info({
@@ -352,9 +364,9 @@ export default class RTorrent implements TorrentClient {
 		try {
 			await this.methodCallP<string[]>("download_list", []);
 		} catch (e) {
-			logger.debug({ label: this.label, message: e });
+			logger.debug({ label: this.label, message: String(e) });
 			throw new CrossSeedError(
-				`[${this.label}] Failed to reach rTorrent at ${this.clientHost}: ${e.message}`,
+				`[${this.label}] Failed to reach rTorrent at ${this.clientHost}: ${errorMessage(e)}`,
 			);
 		}
 		logger.info({
@@ -439,7 +451,7 @@ export default class RTorrent implements TorrentClient {
 				} catch (e) {
 					logger.error({
 						label: this.label,
-						message: `Failed to get download directories for all torrents: ${e.message}`,
+						message: `Failed to get download directories for all torrents: ${errorMessage(e)}`,
 					});
 					logger.debug(e);
 					return [];
@@ -474,7 +486,7 @@ export default class RTorrent implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				label: this.label,
-				message: `Error parsing response for all torrents: ${e.message}`,
+				message: `Error parsing response for all torrents: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 			return new Map();
@@ -550,7 +562,7 @@ export default class RTorrent implements TorrentClient {
 				} catch (e) {
 					logger.error({
 						label: this.label,
-						message: `Failed to get torrent info for all torrents: ${e.message}`,
+						message: `Failed to get torrent info for all torrents: ${errorMessage(e)}`,
 					});
 					logger.debug(e);
 					return [];
@@ -581,7 +593,7 @@ export default class RTorrent implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				label: this.label,
-				message: `Error parsing response for all torrents: ${e.message}`,
+				message: `Error parsing response for all torrents: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 			return [];
@@ -657,7 +669,7 @@ export default class RTorrent implements TorrentClient {
 				} catch (e) {
 					logger.error({
 						label: this.label,
-						message: `Failed to get client torrents: ${e.message}`,
+						message: `Failed to get client torrents: ${errorMessage(e)}`,
 					});
 					logger.debug(e);
 					return [];
@@ -676,14 +688,18 @@ export default class RTorrent implements TorrentClient {
 		for (let i = 0; i < hashes.length; i++) {
 			const infoHash = hashes[i].toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await db("client_searchee")
+			const dbTorrent = await db<ClientSearcheeRow>("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
-			const name: string = results[i * numMethods][0];
-			const directory: string = results[i * numMethods + 2][0];
-			const isMultiFile = Boolean(Number(results[i * numMethods + 3][0]));
-			const labels: string = results[i * numMethods + 4][0];
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const r: any[][] = results;
+			const name: string = r[i * numMethods][0] as string;
+			const directory: string = r[i * numMethods + 2][0] as string;
+			const isMultiFile = Boolean(
+				Number(r[i * numMethods + 3][0] as string),
+			);
+			const labels: string = r[i * numMethods + 4][0] as string;
 			const savePath = isMultiFile ? dirname(directory) : directory;
 			const tags = labels.length
 				? decodeURIComponent(labels)
@@ -707,12 +723,14 @@ export default class RTorrent implements TorrentClient {
 						: options.refresh.includes(infoHash);
 			if (!modified && !refresh) {
 				if (!options?.newSearcheesOnly) {
-					searchees.push(createSearcheeFromDB(dbTorrent));
+					searchees.push(createSearcheeFromDB(dbTorrent!));
 				}
 				continue;
 			}
-			const length = Number(results[i * numMethods + 1][0]);
-			const files: File[] = results[i * numMethods + 5][0].map((arr) => ({
+			const length = Number(r[i * numMethods + 1][0] as string);
+			const files: File[] = (
+				r[i * numMethods + 5][0] as [string, string][]
+			).map((arr) => ({
 				name: basename(arr[0]),
 				path: isMultiFile ? join(basename(directory), arr[0]) : arr[0],
 				length: Number(arr[1]),
@@ -725,7 +743,7 @@ export default class RTorrent implements TorrentClient {
 				continue;
 			}
 			const trackers = organizeTrackers(
-				results[i * numMethods + 6][0].map((arr) => ({
+				(r[i * numMethods + 6][0] as [string, string][]).map((arr) => ({
 					url: arr[0],
 					tier: Number(arr[1]),
 				})),
@@ -877,7 +895,7 @@ export default class RTorrent implements TorrentClient {
 			} catch (e) {
 				logger.verbose({
 					label: this.label,
-					message: `Failed to inject torrent ${meta.name} on attempt ${i + 1}/${retries}: ${e.message}`,
+					message: `Failed to inject torrent ${meta.name} on attempt ${i + 1}/${retries}: ${errorMessage(e)}`,
 				});
 				logger.debug(e);
 				await wait(1000 * Math.pow(2, i));

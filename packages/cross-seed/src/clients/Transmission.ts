@@ -16,6 +16,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import {
+	ClientSearcheeRow,
 	createSearcheeFromDB,
 	parseTitle,
 	Searchee,
@@ -23,7 +24,12 @@ import {
 	SearcheeWithInfoHash,
 	updateSearcheeClientDB,
 } from "../searchee.js";
-import { extractCredentialsFromUrl, sanitizeInfoHash, wait } from "../utils.js";
+import {
+	errorMessage,
+	extractCredentialsFromUrl,
+	sanitizeInfoHash,
+	wait,
+} from "../utils.js";
 import {
 	shouldResumeFromNonRelevantFiles,
 	clientSearcheeModified,
@@ -48,7 +54,7 @@ type Method =
 	| "torrent-start";
 
 interface Response<T> {
-	result: "success" | string;
+	result: string;
 	arguments: T;
 }
 
@@ -171,7 +177,7 @@ export default class Transmission implements TorrentClient {
 			} else {
 				logger.error({
 					label: this.label,
-					message: `Transmission responded with an error: ${e.message}`,
+					message: `Transmission responded with an error: ${errorMessage(e)}`,
 				});
 				logger.debug(e);
 			}
@@ -185,7 +191,7 @@ export default class Transmission implements TorrentClient {
 			await this.request("session-get", {}, 1, ms("10 seconds"));
 		} catch (e) {
 			throw new CrossSeedError(
-				`[${this.label}] Failed to reach Transmission at ${this.clientHost}: ${e.message}`,
+				`[${this.label}] Failed to reach Transmission at ${this.clientHost}: ${errorMessage(e)}`,
 			);
 		}
 		logger.info({
@@ -247,7 +253,11 @@ export default class Transmission implements TorrentClient {
 		);
 		return result
 			.mapOk((r) => r.downloadDir)
-			.mapErr((err) => (err === "FAILURE" ? "UNKNOWN_ERROR" : err));
+			.mapErr((err) =>
+				err === InjectionResult.FAILURE
+					? "UNKNOWN_ERROR"
+					: "TORRENT_NOT_COMPLETE",
+			);
 	}
 
 	async getAllDownloadDirs(options: {
@@ -358,7 +368,7 @@ export default class Transmission implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				label: this.label,
-				message: `Failed to get torrents from client: ${e.message}`,
+				message: `Failed to get torrents from client: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 			return { searchees, newSearchees };
@@ -373,7 +383,7 @@ export default class Transmission implements TorrentClient {
 		for (const torrent of torrents) {
 			const infoHash = torrent.hashString.toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await db("client_searchee")
+			const dbTorrent = await db<ClientSearcheeRow>("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
@@ -397,7 +407,7 @@ export default class Transmission implements TorrentClient {
 						: options.refresh.includes(infoHash);
 			if (!modified && !refresh) {
 				if (!options?.newSearcheesOnly) {
-					searchees.push(createSearcheeFromDB(dbTorrent));
+					searchees.push(createSearcheeFromDB(dbTorrent!));
 				}
 				continue;
 			}

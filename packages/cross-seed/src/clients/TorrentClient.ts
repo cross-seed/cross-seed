@@ -20,7 +20,12 @@ import { Label, logger } from "../logger.js";
 import { Metafile, sanitizeTrackerUrl } from "../parseTorrent.js";
 import { Result } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
-import { Searchee, SearcheeClient, SearcheeWithInfoHash } from "../searchee.js";
+import {
+	ClientSearcheeRow,
+	Searchee,
+	SearcheeClient,
+	SearcheeWithInfoHash,
+} from "../searchee.js";
 import { hasExt, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
@@ -183,8 +188,6 @@ export function instantiateDownloadClients() {
 					new Deluge(url, clientHost, priority, readonly),
 				);
 				break;
-			default:
-				throw new Error(`Invalid client type: ${clientType}`);
 		}
 	}
 }
@@ -208,7 +211,7 @@ export function byClientHostPriority(clientHost: string | undefined): number {
 
 export function clientSearcheeModified(
 	label: string,
-	dbTorrent,
+	dbTorrent: ClientSearcheeRow | undefined,
 	name: string,
 	savePath: string,
 	options: { category?: string; tags?: string[] } = {},

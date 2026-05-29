@@ -18,6 +18,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import {
+	ClientSearcheeRow,
 	createSearcheeFromDB,
 	File,
 	parseTitle,
@@ -27,6 +28,7 @@ import {
 	updateSearcheeClientDB,
 } from "../searchee.js";
 import {
+	errorMessage,
 	extractCredentialsFromUrl,
 	extractInt,
 	getLogString,
@@ -54,6 +56,8 @@ const X_WWW_FORM_URLENCODED = {
 
 interface Preferences {
 	resume_data_storage_type?: "Legacy" | "SQLite";
+	bypass_auth_subnet_whitelist_enabled?: boolean;
+	bypass_local_auth?: boolean;
 }
 
 interface TorrentInfo {
@@ -215,7 +219,9 @@ export default class QBittorrent implements TorrentClient {
 				signal: AbortSignal.timeout(ms("10 seconds")),
 			});
 		} catch (e) {
-			throw new CrossSeedError(`qBittorrent login failed: ${e.message}`);
+			throw new CrossSeedError(
+				`qBittorrent login failed: ${errorMessage(e)}`,
+			);
 		}
 
 		if (!response.ok) {
@@ -266,8 +272,7 @@ export default class QBittorrent implements TorrentClient {
 		try {
 			await this.login();
 		} catch (e) {
-			e.message = `[${this.label}] ${e.message}`;
-			throw e;
+			throw new CrossSeedError(`[${this.label}] ${errorMessage(e)}`);
 		}
 		await this.createTag();
 
@@ -298,7 +303,7 @@ export default class QBittorrent implements TorrentClient {
 				? JSON.stringify(Object.fromEntries(body))
 				: JSON.stringify(body).replace(
 						/(?:hash(?:es)?=)([a-z0-9]{40})/i,
-						(match, hash) =>
+						(match: string, hash: string) =>
 							match.replace(hash, sanitizeInfoHash(hash)),
 					);
 
@@ -360,14 +365,14 @@ export default class QBittorrent implements TorrentClient {
 				if (i >= retries) {
 					logger.error({
 						label: this.label,
-						message: `Request failed after ${retries} retries: ${e.message}`,
+						message: `Request failed after ${retries} retries: ${errorMessage(e)}`,
 					});
 					logger.debug(e);
 					break;
 				}
 				logger.verbose({
 					label: this.label,
-					message: `Request failed, ${retries - i} retries remaining: ${e.message}`,
+					message: `Request failed, ${retries - i} retries remaining: ${errorMessage(e)}`,
 				});
 				await wait(Math.min(ms("1 second") * 2 ** i, ms("10 seconds")));
 				continue;
@@ -387,7 +392,7 @@ export default class QBittorrent implements TorrentClient {
 				`[${this.label}] qBittorrent failed to retrieve preferences`,
 			);
 		}
-		return JSON.parse(responseText);
+		return JSON.parse(responseText) as Preferences;
 	}
 
 	/**
@@ -486,7 +491,11 @@ export default class QBittorrent implements TorrentClient {
 
 	async getAllCategories(): Promise<CategoryInfo[]> {
 		const responseText = await this.request("/torrents/categories", "");
-		return responseText ? Object.values(JSON.parse(responseText)) : [];
+		return responseText
+			? Object.values(
+					JSON.parse(responseText) as Record<string, CategoryInfo>,
+				)
+			: [];
 	}
 
 	torrentFileToFile(torrentFile: TorrentFile): File {
@@ -505,10 +514,10 @@ export default class QBittorrent implements TorrentClient {
 		);
 		if (!responseText) return null;
 		try {
-			const files: TorrentFile[] = JSON.parse(responseText);
-			return files.map(this.torrentFileToFile);
+			const files = JSON.parse(responseText) as TorrentFile[];
+			return files.map((f) => this.torrentFileToFile(f));
 		} catch (e) {
-			logger.debug({ label: this.label, message: e });
+			logger.debug({ label: this.label, message: String(e) });
 			return null;
 		}
 	}
@@ -521,10 +530,10 @@ export default class QBittorrent implements TorrentClient {
 		);
 		if (!responseText) return null;
 		try {
-			const trackers: TorrentTracker[] = JSON.parse(responseText);
+			const trackers = JSON.parse(responseText) as TorrentTracker[];
 			return organizeTrackers(trackers);
 		} catch (e) {
-			logger.debug({ label: this.label, message: e });
+			logger.debug({ label: this.label, message: String(e) });
 			return null;
 		}
 	}
@@ -587,8 +596,8 @@ export default class QBittorrent implements TorrentClient {
 			}
 			return resultOf(this.getCorrectSavePath(meta, torrentInfo));
 		} catch (e) {
-			logger.debug({ label: this.label, message: e });
-			if (e.message.includes("retrieve")) {
+			logger.debug({ label: this.label, message: String(e) });
+			if (errorMessage(e).includes("retrieve")) {
 				return resultOfErr("NOT_FOUND");
 			}
 			return resultOfErr("UNKNOWN_ERROR");
@@ -679,7 +688,7 @@ export default class QBittorrent implements TorrentClient {
 		if (options?.includeTrackers) params.append("includeTrackers", "true");
 		const responseText = await this.request("/torrents/info", params);
 		if (!responseText) return [];
-		return JSON.parse(responseText);
+		return JSON.parse(responseText) as TorrentInfo[];
 	}
 
 	/*
@@ -773,7 +782,7 @@ export default class QBittorrent implements TorrentClient {
 				torrent.infohash_v1 || torrent.hash
 			).toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await db("client_searchee")
+			const dbTorrent = await db<ClientSearcheeRow>("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
@@ -804,12 +813,12 @@ export default class QBittorrent implements TorrentClient {
 						: options.refresh.includes(infoHash);
 			if (!modified && !refresh) {
 				if (!options?.newSearcheesOnly) {
-					searchees.push(createSearcheeFromDB(dbTorrent));
+					searchees.push(createSearcheeFromDB(dbTorrent!));
 				}
 				continue;
 			}
 			const files =
-				torrent.files?.map(this.torrentFileToFile) ??
+				torrent.files?.map((f) => this.torrentFileToFile(f)) ??
 				(await this.getFiles(torrent.hash));
 			if (!files) {
 				logger.verbose({
@@ -1145,7 +1154,7 @@ export default class QBittorrent implements TorrentClient {
 			} catch (e) {
 				logger.error({
 					label: this.label,
-					message: `Failed to add torrent (polling client to confirm): ${e.message}`,
+					message: `Failed to add torrent (polling client to confirm): ${errorMessage(e)}`,
 				});
 				logger.debug(e);
 			}
@@ -1165,7 +1174,7 @@ export default class QBittorrent implements TorrentClient {
 		} catch (e) {
 			logger.error({
 				label: this.label,
-				message: `Injection failed for ${getLogString(newTorrent)}: ${e.message}`,
+				message: `Injection failed for ${getLogString(newTorrent)}: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 			return InjectionResult.FAILURE;

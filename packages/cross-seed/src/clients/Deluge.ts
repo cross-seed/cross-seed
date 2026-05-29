@@ -17,6 +17,7 @@ import { Metafile } from "../parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
 import {
+	ClientSearcheeRow,
 	createSearcheeFromDB,
 	parseTitle,
 	Searchee,
@@ -25,6 +26,7 @@ import {
 	updateSearcheeClientDB,
 } from "../searchee.js";
 import {
+	errorMessage,
 	extractCredentialsFromUrl,
 	getLogString,
 	sanitizeInfoHash,
@@ -160,7 +162,7 @@ export default class Deluge implements TorrentClient {
 				);
 			}
 		} catch (networkError) {
-			throw new CrossSeedError(networkError);
+			throw new CrossSeedError(errorMessage(networkError));
 		}
 		const isConnectedResponse = await this.call<boolean>(
 			"web.connected",
@@ -238,10 +240,9 @@ export default class Deluge implements TorrentClient {
 				signal: AbortSignal.timeout(ms("10 seconds")),
 			});
 		} catch (networkError) {
-			if (
-				networkError.name === "AbortError" ||
-				networkError.name === "TimeoutError"
-			) {
+			const errName =
+				networkError instanceof Error ? networkError.name : "";
+			if (errName === "AbortError" || errName === "TimeoutError") {
 				throw new Error(
 					`[${this.label}] Deluge method ${method} timed out after 10 seconds`,
 				);
@@ -446,7 +447,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.warn({
 				label: this.label,
-				message: `Failed to label ${getLogString(newTorrent)} as ${label}: ${e.message}`,
+				message: `Failed to label ${getLogString(newTorrent)} as ${label}: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 		}
@@ -773,7 +774,7 @@ export default class Deluge implements TorrentClient {
 		for (const [hash, torrent] of Object.entries(torrents)) {
 			const infoHash = hash.toLowerCase();
 			infoHashes.add(infoHash);
-			const dbTorrent = await db("client_searchee")
+			const dbTorrent = await db<ClientSearcheeRow>("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
@@ -797,7 +798,7 @@ export default class Deluge implements TorrentClient {
 						: options.refresh.includes(infoHash);
 			if (!modified && !refresh) {
 				if (!options?.newSearcheesOnly) {
-					searchees.push(createSearcheeFromDB(dbTorrent));
+					searchees.push(createSearcheeFromDB(dbTorrent!));
 				}
 				continue;
 			}
@@ -899,7 +900,7 @@ export default class Deluge implements TorrentClient {
 			const log = options?.useVerbose ? logger.verbose : logger.error;
 			log({
 				label: this.label,
-				message: `Failed to fetch torrent data for ${infoHash}: ${e.message}`,
+				message: `Failed to fetch torrent data for ${infoHash}: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 			throw new Error(
