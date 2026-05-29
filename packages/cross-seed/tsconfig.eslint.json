@@ -8,7 +8,12 @@
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
 		"sourceMap": true,
-		"strictNullChecks": true
+		"strictNullChecks": true,
+		"paths": {
+			"@cross-seed/shared/constants": ["../shared/constants.ts"],
+			"@cross-seed/shared/configSchema": ["../shared/configSchema.ts"],
+			"@cross-seed/shared/utils": ["../shared/utils.ts"]
+		}
 	},
 	"include": ["./src/**/*", "./tests/**/*"]
 }

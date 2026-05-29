@@ -275,9 +275,14 @@ export async function baseApiPlugin(app: FastifyInstance) {
 		try {
 			data = ANNOUNCE_SCHEMA.parse(rawData);
 		} catch (zodErr) {
-			const errors = zodErr instanceof z.ZodError ? zodErr.errors : [];
+			const zodError = zodErr instanceof z.ZodError ? zodErr : null;
+			const errors: string[] = zodError
+				? zodError.issues.map((issue) =>
+						(issue.path as (string | number)[]).join("."),
+					)
+				: [];
 			const message = `Missing required params (https://www.cross-seed.org/docs/v6-migration#autobrr-update): {${formatAsList(
-				errors.map(({ path }) => path.join(".")),
+				errors,
 				{ sort: true, type: "unit" },
 			)}} in ${inspect(rawData)}\n${inspect(errors)}`;
 			logger.error({ label: Label.ANNOUNCE, message });
