@@ -8,7 +8,8 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@cross-seed/backend/*": ["../cross-seed/dist/*"]
     },
     /* Bundler mode */
     "moduleResolution": "bundler",

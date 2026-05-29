@@ -10,7 +10,6 @@ export default tseslint.config(
 			"node_modules/**",
 			"packages/api-types/**",
 			"packages/mock-torznab/**",
-			"packages/shared/**",
 			"packages/webui/**",
 			"sea/**",
 		],
@@ -43,6 +42,22 @@ export default tseslint.config(
 			"@typescript-eslint/no-unnecessary-type-assertion": "error",
 			"@typescript-eslint/no-var-requires": "off",
 			"@typescript-eslint/return-await": "error",
+		},
+	},
+	{
+		files: ["packages/shared/*.ts"],
+		extends: [...tseslint.configs.recommendedTypeChecked],
+		languageOptions: {
+			ecmaVersion: 2022,
+			globals: globals.node,
+			parserOptions: {
+				project: "./packages/shared/tsconfig.json",
+				tsconfigRootDir: import.meta.dirname,
+			},
+			sourceType: "module",
+		},
+		rules: {
+			"no-mixed-spaces-and-tabs": "off",
 		},
 	},
 	{
