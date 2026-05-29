@@ -31,10 +31,9 @@ jobs:
               with:
                   node-version: 26
             - run: npm ci
-            - run: npm -w packages/shared run build && npm -w packages/api-types run build && npm -w packages/webui run build
+            - run: npm run build
             - run: npm run lint
             - run: npm run typecheck
-            - run: npm run build
             - run: npm run test
             - name: Build npm tarball
               run: |
