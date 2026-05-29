@@ -91,7 +91,7 @@ async function collectDataLinkingProblemDescriptors(
 				});
 			}
 		} catch (error) {
-			logger.debug({ label: Label.INJECT, message: error });
+			logger.debug({ label: Label.INJECT, message: String(error) });
 			problems.push({
 				category: "linkDirs",
 				name: "linkDir",

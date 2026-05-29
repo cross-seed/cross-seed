@@ -165,11 +165,11 @@ export function deserialize(dbIndexer: DbIndexer): Indexer {
 		musicSearchCap: Boolean(rest.musicSearchCap),
 		audioSearchCap: Boolean(rest.audioSearchCap),
 		bookSearchCap: Boolean(rest.bookSearchCap),
-		trackers: JSON.parse(trackers ?? "null"),
-		tvIdCaps: JSON.parse(tvIdCaps ?? "null"),
-		movieIdCaps: JSON.parse(movieIdCaps ?? "null"),
-		categories: JSON.parse(catCaps ?? "null"),
-		limits: JSON.parse(limitsCaps ?? "null"),
+		trackers: JSON.parse(trackers ?? "null") as string[] | null,
+		tvIdCaps: JSON.parse(tvIdCaps ?? "null") as IdSearchCaps,
+		movieIdCaps: JSON.parse(movieIdCaps ?? "null") as IdSearchCaps,
+		categories: JSON.parse(catCaps ?? "null") as IndexerCategories,
+		limits: JSON.parse(limitsCaps ?? "null") as IndexerLimits,
 	};
 }
 

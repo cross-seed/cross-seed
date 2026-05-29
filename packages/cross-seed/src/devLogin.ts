@@ -6,6 +6,7 @@ import {
 	createUser,
 	findUserByUsername,
 	hasUsers,
+	type User,
 } from "./userAuth.js";
 
 const DEFAULT_ORIGIN = "http://localhost:2468";
@@ -42,9 +43,9 @@ export async function createDevLogin(
 	);
 	const requestedUsername = options.user?.trim();
 
-	let user = requestedUsername
+	let user: User | undefined = requestedUsername
 		? await findUserByUsername(requestedUsername)
-		: await db("user").first();
+		: await db<User>("user").first();
 
 	if (!user) {
 		if (await hasUsers()) {

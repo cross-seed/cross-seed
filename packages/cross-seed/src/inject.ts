@@ -53,6 +53,7 @@ import {
 	exists,
 	findFallback,
 	formatAsList,
+	errorMessage,
 	getLogString,
 	hasExt,
 	humanReadableDate,
@@ -135,7 +136,7 @@ async function deleteTorrentFileIfSafe(torrentFilePath: string): Promise<void> {
 		if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
 			logger.error({
 				label: Label.INJECT,
-				message: `Failed to delete ${filePathLog}: ${e.message}`,
+				message: `Failed to delete ${filePathLog}: ${errorMessage(e)}`,
 			});
 			logger.debug(e);
 		}
@@ -570,7 +571,7 @@ async function loadMetafile(
 	} catch (e) {
 		logger.error({
 			label: Label.INJECT,
-			message: `${progress} Failed to parse ${filePathLog}: ${e.message}`,
+			message: `${progress} Failed to parse ${filePathLog}: ${errorMessage(e)}`,
 		});
 		logger.debug(e);
 		return resultOfErr("FAILED_TO_PARSE");
@@ -871,7 +872,7 @@ export async function restoreFromTorrentCache(): Promise<void> {
 			} catch (e) {
 				logger.error(
 					chalk.bold.red(
-						`Failure when processing ${torrentFilePath}, filename metadata will be unknown: ${e.message}`,
+						`Failure when processing ${torrentFilePath}, filename metadata will be unknown: ${errorMessage(e)}`,
 					),
 				);
 				logger.error(e);
@@ -885,7 +886,7 @@ export async function restoreFromTorrentCache(): Promise<void> {
 		} catch (e) {
 			logger.error(
 				chalk.bold.red(
-					`Failed to copy ${torrentFilePath}: ${e.message}`,
+					`Failed to copy ${torrentFilePath}: ${errorMessage(e)}`,
 				),
 			);
 			logger.error(e);

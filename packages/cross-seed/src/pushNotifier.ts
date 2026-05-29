@@ -14,7 +14,7 @@ import { ResultAssessment } from "./decide.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { getSearcheeSource, SearcheeWithLabel } from "./searchee.js";
-import { findFallback, formatAsList, mapAsync } from "./utils.js";
+import { errorMessage, findFallback, formatAsList, mapAsync } from "./utils.js";
 
 export let pushNotifier: PushNotifier;
 
@@ -136,12 +136,12 @@ export class PushNotifier {
 					serializedPayload = JSON.stringify(payload);
 				} catch (e) {
 					logger.error(
-						`${url} has an unserializable webhook payload: ${e.message}`,
+						`${url} has an unserializable webhook payload: ${errorMessage(e)}`,
 					);
 					return {
 						url,
 						ok: false,
-						error: `Invalid payload: ${e.message}`,
+						error: `Invalid payload: ${errorMessage(e)}`,
 					};
 				}
 
@@ -171,10 +171,10 @@ export class PushNotifier {
 				return { url, ok: true };
 			} catch (e) {
 				logger.error(
-					`${url} failed to send push notification: ${e.message}`,
+					`${url} failed to send push notification: ${errorMessage(e)}`,
 				);
 				logger.debug(e);
-				return { url, ok: false, error: e.message };
+				return { url, ok: false, error: errorMessage(e) };
 			}
 		});
 	}

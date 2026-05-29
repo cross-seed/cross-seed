@@ -19,6 +19,7 @@ import {
 import { createEnsemblePieces, EnsembleEntry } from "./torrent.js";
 import {
 	createKeyTitle,
+	errorMessage,
 	exists,
 	filterAsync,
 	filterAsyncYield,
@@ -205,13 +206,10 @@ export async function getDataByFuzzyName(
 	// Attempt to filter torrents in DB to match incoming data before fuzzy check
 	let filteredNames: DataEntry[] = [];
 	if (fullMatch) {
-		filteredNames = await filterAsyncYield(
-			allDataEntries,
-			async (dbData) => {
-				const dbMatch = createKeyTitle(stripExtension(dbData.title));
-				return fullMatch === dbMatch;
-			},
-		);
+		filteredNames = await filterAsyncYield(allDataEntries, (dbData) => {
+			const dbMatch = createKeyTitle(stripExtension(dbData.title));
+			return Promise.resolve(fullMatch === dbMatch);
+		});
 	}
 
 	// If none match, proceed with fuzzy name check on all names.
@@ -287,7 +285,7 @@ export async function findPotentialNestedRoots(
 			return [root];
 		}
 	} catch (e) {
-		logger.verbose(`Failed to process path ${root}: ${e.message}`);
+		logger.verbose(`Failed to process path ${root}: ${errorMessage(e)}`);
 		logger.debug(e);
 		return [];
 	}

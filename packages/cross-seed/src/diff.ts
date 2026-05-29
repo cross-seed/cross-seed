@@ -1,5 +1,6 @@
 import { deepStrictEqual } from "assert";
 import { parseTorrentFromPath } from "./torrent.js";
+import type { File } from "./searchee.js";
 
 function diff(thing1, thing2) {
 	console.log(
@@ -19,9 +20,9 @@ export async function diffCmd(first: string, second: string): Promise<void> {
 	const f2 = (await parseTorrentFromPath(second)).files;
 	const sortBy =
 		f1.length === 1
-			? (a, b) => b.length - a.length
+			? (a: File, b: File) => b.length - a.length
 			: f2.length === 1
-				? (a, b) => a.length - b.length
-				: (a, b) => a.path.localeCompare(b.path);
+				? (a: File, b: File) => a.length - b.length
+				: (a: File, b: File) => a.path.localeCompare(b.path);
 	return diff(f1.sort(sortBy), f2.sort(sortBy));
 }

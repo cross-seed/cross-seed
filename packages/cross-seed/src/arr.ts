@@ -84,10 +84,8 @@ async function makeArrApiCall<ResponseType>(
 		});
 		clonedResponse = response.clone();
 	} catch (networkError) {
-		if (
-			networkError.name === "AbortError" ||
-			networkError.name === "TimeoutError"
-		) {
+		const errName = networkError instanceof Error ? networkError.name : "";
+		if (errName === "AbortError" || errName === "TimeoutError") {
 			return resultOfErr(new Error("connection timeout"));
 		}
 		return resultOfErr(networkError);
@@ -126,7 +124,7 @@ async function getMediaFromArr(
 }
 
 export function formatFoundIds(foundIds: ExternalIds): string {
-	return Object.entries(foundIds)
+	return (Object.entries(foundIds) as [string, string | undefined][])
 		.filter(([idName]) =>
 			["imdbid", "tmdbid", "tvdbid", "tvmazeid"].includes(
 				idName.toLowerCase(),

@@ -66,9 +66,8 @@ export async function collectProblems(): Promise<Problem[]> {
 			return;
 		}
 
-		const error = result.reason;
-		const message =
-			error instanceof Error ? error.message : String(error ?? "unknown");
+		const error: unknown = result.reason;
+		const message = error instanceof Error ? error.message : "unknown";
 
 		const providerName = getProviderName(registration, index);
 		problems.push({

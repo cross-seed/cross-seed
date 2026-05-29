@@ -6,6 +6,7 @@ import { USER_AGENT } from "../constants.js";
 import { getAllIndexers, type Indexer } from "../indexers.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import ms from "ms";
+import { errorMessage } from "../utils.js";
 
 // Helper function to deserialize raw database row (snake_case columns) to Indexer
 function deserializeRawRow(rawRow: unknown): Indexer {
@@ -24,11 +25,15 @@ function deserializeRawRow(rawRow: unknown): Indexer {
 		musicSearchCap: Boolean(row.music_search_cap),
 		audioSearchCap: Boolean(row.audio_search_cap),
 		bookSearchCap: Boolean(row.book_search_cap),
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		tvIdCaps: row.tv_id_caps ? JSON.parse(row.tv_id_caps as string) : null,
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		movieIdCaps: row.movie_id_caps
 			? JSON.parse(row.movie_id_caps as string)
 			: null,
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		categories: row.cat_caps ? JSON.parse(row.cat_caps as string) : null,
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		limits: row.limits_caps ? JSON.parse(row.limits_caps as string) : null,
 	} as Indexer;
 }
@@ -127,7 +132,7 @@ export async function testIndexerConnection(
 			message: "Connection successful",
 		});
 	} catch (error) {
-		const message = error.message;
+		const message = errorMessage(error);
 
 		logger.warn({
 			label: Label.TORZNAB,
@@ -135,7 +140,8 @@ export async function testIndexerConnection(
 		});
 
 		// Handle timeout specifically - AbortSignal.timeout() throws TimeoutError (DOMException)
-		if (error.name === "TimeoutError" || error.name === "AbortError") {
+		const errorName = error instanceof Error ? error.name : "";
+		if (errorName === "TimeoutError" || errorName === "AbortError") {
 			return resultOfErr({
 				code: "TIMEOUT",
 				message: "Connection timed out",
@@ -334,11 +340,13 @@ export async function mergeDisabledIndexer(
 
 		const sourceTimestamps = await trx("timestamp")
 			.where({ indexer_id: sourceId })
-			.select(
-				"searchee_id as searcheeId",
-				"first_searched as firstSearched",
-				"last_searched as lastSearched",
-			);
+			.select<
+				{
+					searcheeId: number;
+					firstSearched: number;
+					lastSearched: number;
+				}[]
+			>("searchee_id as searcheeId", "first_searched as firstSearched", "last_searched as lastSearched");
 
 		if (sourceTimestamps.length > 0) {
 			const rows = sourceTimestamps.map((row) => ({

@@ -50,6 +50,7 @@ import {
 	exists,
 	filterAsync,
 	findAFileWithExt,
+	errorMessage,
 	findAsync,
 	formatAsList,
 	getLogString,
@@ -158,7 +159,7 @@ async function linkAllFilesInMetafile(
 			} catch (e) {
 				logger.error({
 					label: searchee.label,
-					message: `--- Linking failed, ${srcFilePath} -> ${destFilePath}: ${e.message}`,
+					message: `--- Linking failed, ${srcFilePath} -> ${destFilePath}: ${errorMessage(e)}`,
 				});
 				throw e;
 			}
@@ -337,7 +338,7 @@ async function getClientAndDestinationDir(
 			logger.debug(e);
 			return null;
 		}
-		let error: Error;
+		let error: unknown;
 		for (const testClient of getClients().filter((c) => !c.readonly)) {
 			const torrentSavePaths = new Set(
 				(
@@ -483,7 +484,7 @@ async function saveToOutputDir(
 	} catch (e) {
 		logger.error({
 			label: searchee.label,
-			message: `Failed to save ${getLogString(newMeta, chalk.green.bold)} on ${chalk.bold(tracker)} to outputDir while processing ${chalk.bold(decision)} with ${getLogString(searchee, chalk.magenta.bold)}: ${e.message}`,
+			message: `Failed to save ${getLogString(newMeta, chalk.green.bold)} on ${chalk.bold(tracker)} to outputDir while processing ${chalk.bold(decision)} with ${getLogString(searchee, chalk.magenta.bold)}: ${errorMessage(e)}`,
 		});
 		logger.debug(e);
 	}
@@ -715,7 +716,7 @@ export async function performActionWithoutMutex(
 	} catch (e) {
 		logger.error({
 			label: searchee.label,
-			message: e,
+			message: errorMessage(e),
 		});
 		const actionResult = InjectionResult.FAILURE;
 		logActionResult(actionResult);
@@ -854,12 +855,10 @@ async function linkFile(
 					fs.constants.COPYFILE_FICLONE,
 				);
 				break;
-			default:
-				throw new Error(`Unsupported linkType: ${linkType}`);
 		}
 		return true;
 	} catch (e) {
-		if (e.code === "EEXIST") return false;
+		if ((e as NodeJS.ErrnoException).code === "EEXIST") return false;
 		throw e;
 	}
 }

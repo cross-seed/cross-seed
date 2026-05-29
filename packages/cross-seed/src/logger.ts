@@ -55,10 +55,7 @@ function redactUrlPassword(message: string, urlStr: string) {
 	return message;
 }
 
-function redactMessage(
-	message: string | unknown,
-	options: Record<string, unknown>,
-) {
+function redactMessage(message: unknown, options: Record<string, unknown>) {
 	if (typeof message !== "string") {
 		return message;
 	}
@@ -68,11 +65,11 @@ function redactMessage(
 	ret = ret.replace(/pass=[a-zA-Z0-9]+/g, `pass=${REDACTED_MSG}`);
 	ret = ret.replace(
 		/(?:(?:auto|download)[./]\d+[./])([a-zA-Z0-9]+)/g,
-		(match, key) => match.replace(key, REDACTED_MSG),
+		(match, key: string) => match.replace(key, REDACTED_MSG),
 	);
 	ret = ret.replace(
 		/(?:\d+[./](?:auto|download)[./])([a-zA-Z0-9]+)/g,
-		(match, key) => match.replace(key, REDACTED_MSG),
+		(match, key: string) => match.replace(key, REDACTED_MSG),
 	);
 	ret = ret.replace(/apiKey: '.+'/g, `apiKey: ${REDACTED_MSG}`);
 
@@ -88,7 +85,7 @@ function redactMessage(
 			for (const clientEntry of value) {
 				ret = redactUrlPassword(
 					ret,
-					parseClientEntry(clientEntry)!.url,
+					parseClientEntry(clientEntry as string)!.url,
 				);
 			}
 		}
@@ -96,7 +93,7 @@ function redactMessage(
 	return ret;
 }
 
-function stripAnsiChars(message: string | unknown) {
+function stripAnsiChars(message: unknown) {
 	if (typeof message !== "string") {
 		return message;
 	}
@@ -127,19 +124,26 @@ export function initializeLogger(options: Record<string, unknown>): void {
 			}),
 			winston.format.errors({ stack: true }),
 			winston.format.splat(),
-			winston.format.printf(
-				({ level, message, label, timestamp, stack, cause }) => {
-					const msg = !stack
-						? `${message}${cause ? `\n${cause}` : ""}`
-						: `${stack}${cause ? `\n${cause}` : ""}`.replace(
-								ERROR_PREFIX_REGEX,
-								"",
-							);
-					return `${timestamp} ${level}: ${
-						label ? `[${label}] ` : ""
-					}${stripAnsiChars(redactMessage(msg, options))}`;
-				},
-			),
+			winston.format.printf((info) => {
+				const { level, message, timestamp, stack, cause, label } =
+					info as {
+						level: string;
+						message: string;
+						timestamp: string;
+						stack?: string;
+						cause?: string;
+						label?: string;
+					};
+				const msg = !stack
+					? `${message}${cause ? `\n${cause}` : ""}`
+					: `${stack}${cause ? `\n${cause}` : ""}`.replace(
+							ERROR_PREFIX_REGEX,
+							"",
+						);
+				return `${timestamp} ${level}: ${
+					label ? `[${label}] ` : ""
+				}${String(stripAnsiChars(redactMessage(msg, options)))}`;
+			}),
 		),
 		transports: [
 			new DailyRotateFile({
@@ -171,30 +175,33 @@ export function initializeLogger(options: Record<string, unknown>): void {
 					winston.format.errors({ stack: true }),
 					winston.format.splat(),
 					winston.format.colorize(),
-					winston.format.printf(
-						({
+					winston.format.printf((info) => {
+						const {
 							level,
 							message,
 							label,
 							timestamp,
 							stack,
 							cause,
-						}) => {
-							timestamp = (timestamp as string).replace(
-								SUB_SECOND_TS_REGEX,
-								"",
-							);
-							const msg = !stack
-								? `${message}${cause ? `\n${cause}` : ""}`
-								: `${stack}${cause ? `\n${cause}` : ""}`.replace(
-										ERROR_PREFIX_REGEX,
-										"",
-									);
-							return `${timestamp} ${level}: ${
-								label ? `[${label}] ` : ""
-							}${redactMessage(msg, options)}`;
-						},
-					),
+						} = info as {
+							level: string;
+							message: string;
+							timestamp: string;
+							stack?: string;
+							cause?: string;
+							label?: string;
+						};
+						const ts = timestamp.replace(SUB_SECOND_TS_REGEX, "");
+						const msg = !stack
+							? `${message}${cause ? `\n${cause}` : ""}`
+							: `${stack}${cause ? `\n${cause}` : ""}`.replace(
+									ERROR_PREFIX_REGEX,
+									"",
+								);
+						return `${ts} ${level}: ${
+							label ? `[${label}] ` : ""
+						}${String(redactMessage(msg, options))}`;
+					}),
 				),
 			}),
 		],
