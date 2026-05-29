@@ -67,7 +67,7 @@ export const clientsRouter = router({
 							clientHost,
 							0,
 							readonly,
-						).validateConfig();
+						).authenticate();
 						break;
 				}
 

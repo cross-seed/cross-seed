@@ -134,7 +134,7 @@ export default class Deluge implements TorrentClient {
 	/**
 	 * connects and authenticates to the webui
 	 */
-	private async authenticate(): Promise<void> {
+	async authenticate(): Promise<void> {
 		const { href, password } = extractCredentialsFromUrl(
 			this.url,
 		).unwrapOrThrow(
