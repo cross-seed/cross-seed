@@ -48,7 +48,7 @@ function SelectField<T extends Record<string, string>>({
       </Label>
       {/* Adding `key` is kind of a hack to get Select to properly re-render on intial load */}
       <Select
-        key={`${field.name}-${field.state.value}`}
+        key={`${field.name}-${String(field.state.value)}`}
         name={field.name}
         defaultValue={field.state.value as string}
         onValueChange={(value) => field.handleChange(value)}

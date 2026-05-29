@@ -3,7 +3,7 @@ import { baseValidationSchema } from '@/types/config';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { formatConfigDataForForm } from '@/lib/formatConfigData';
 import { Config } from '@/types/config';
-import { ZodObject, ZodRawShape } from 'zod';
+import { ZodObject, ZodRawShape, ZodTypeAny } from 'zod';
 
 export const useConfigForm = (schema: ZodObject<ZodRawShape>) => {
   const trpc = useTRPC();
@@ -20,7 +20,7 @@ export const useConfigForm = (schema: ZodObject<ZodRawShape>) => {
       console.warn(`Field "${field}" not found in schema.`);
       return false;
     }
-    return !schemaField.isOptional() && !schemaField.isNullable();
+    return !(schemaField as ZodTypeAny).isOptional() && !(schemaField as ZodTypeAny).isNullable();
   };
 
   return {

@@ -34,7 +34,7 @@ export function LoginForm({
   const { mutate: login, isPending } = useMutation(
     trpc.auth.logIn.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({
+        void queryClient.invalidateQueries({
           queryKey: trpc.auth.authStatus.queryKey(),
         });
       },

@@ -17,7 +17,6 @@ import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { Page } from '@/components/Page';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 import { z } from 'zod';
-import { RuntimeConfig } from '../../../../shared/configSchema';
 import { Clipboard, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,11 +31,11 @@ function GeneralSettings() {
     trpc.settings.get.queryOptions(undefined),
   );
   const configData = settingsData?.config
-    ? (pickSchemaFields(
+    ? pickSchemaFields(
         generalValidationSchema,
-        formatConfigDataForForm(settingsData.config as RuntimeConfig),
+        formatConfigDataForForm(settingsData.config),
         { includeUndefined: true },
-      ) as Partial<GeneralFormData>)
+      )
     : undefined;
 
   const handleSubmit = useSettingsFormSubmit();
@@ -111,7 +110,7 @@ function GeneralSettings() {
             onSubmit={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              form.handleSubmit();
+              void form.handleSubmit();
             }}
             noValidate
           >
@@ -243,7 +242,7 @@ function GeneralSettings() {
                         type="button"
                         variant="outline"
                         disabled={!apiKeyDraft}
-                        onClick={copyApiKey}
+                        onClick={() => { void copyApiKey(); }}
                       >
                         <Clipboard />
                         Copy

@@ -20,7 +20,7 @@ export const FieldInfo: FC<FieldInfoProps> = ({
             if (typeof error === 'object' && error !== null) {
               // Handle the case where error is an object
               return (
-                <span key={i}>{error?.message || JSON.stringify(error)}</span>
+                <span key={i}>{(error as { message?: string }).message ?? JSON.stringify(error)}</span>
               );
             }
             return <span key={i}>{error}</span>;

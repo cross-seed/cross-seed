@@ -40,7 +40,7 @@ const ImportConfigButton: FC = () => {
         },
       });
     } catch (error) {
-      toast.error(`Error during import: ${error}`);
+      toast.error(`Error during import: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 

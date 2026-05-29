@@ -6,19 +6,18 @@ export function useSettingsFormSubmit() {
   const { saveConfig } = useSaveConfigHook();
 
   return useCallback(
-    async ({ value }: { value: unknown }) => {
+    ({ value }: { value: Record<string, unknown> }) => {
       try {
         Object.keys(value).forEach((attr) => {
-          const key = attr as keyof typeof value;
-          const val = value[key];
+          const val = value[attr];
           if (val && Array.isArray(val)) {
-            value[key] = removeEmptyArrayValues(val);
+            value[attr] = removeEmptyArrayValues(val);
           }
         });
 
-        removeNullFields(value as Record<string, unknown>);
+        removeNullFields(value);
 
-        await saveConfig(value);
+        saveConfig(value);
         return { value };
       } catch (err) {
         console.error('Exception:', err);

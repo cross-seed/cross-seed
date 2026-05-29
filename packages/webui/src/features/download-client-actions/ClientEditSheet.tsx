@@ -63,12 +63,12 @@ export default function ClientEditSheet({
   const form = useAppForm({
     ...formOpts,
     defaultValues: client ?? {},
-    onSubmit: async ({ value }) => {
+    onSubmit: ({ value }) => {
       // Full schema validation
       try {
         const sanitizedValue = {
           ...value,
-          readOnly: value?.readOnly ?? false,
+          readOnly: (value as TDownloadClient | null)?.readOnly ?? false,
         };
         const result = clientValidationSchema.safeParse(sanitizedValue);
         if (!result.success) {
@@ -96,7 +96,7 @@ export default function ClientEditSheet({
           saveConfig({ torrentClients: updatedClients });
           onOpenChange(false);
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('Exception during full validation:', err);
         return {
           status: 'error',
@@ -113,8 +113,8 @@ export default function ClientEditSheet({
     setIsTesting(true);
     const client = String(form.getFieldValue('client'));
     const url = String(form.getFieldValue('url'));
-    const username = String(form.getFieldValue('user') || '');
-    const password = String(form.getFieldValue('password') || '');
+    const username = String((form.getFieldValue('user') as string | undefined) ?? '');
+    const password = String((form.getFieldValue('password') as string | undefined) ?? '');
 
     const testUrl = buildClientTestUrl({
       client,
@@ -151,7 +151,7 @@ export default function ClientEditSheet({
             onSubmit={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              form.handleSubmit();
+              void form.handleSubmit();
             }}
           >
             <SheetHeader>
@@ -202,13 +202,13 @@ export default function ClientEditSheet({
 
               <form.Subscribe
                 selector={(state) => ({
-                  urlValue: state.values.url,
+                  urlValue: state.values.url as string | undefined,
                   urlMeta: state.fieldMeta.url,
-                  userValue: state.values.user,
+                  userValue: state.values.user as string | undefined,
                   userMeta: state.fieldMeta.user,
-                  passwordValue: state.values.password,
+                  passwordValue: state.values.password as string | undefined,
                   passwordMeta: state.fieldMeta.password,
-                  clientValue: state.values.client,
+                  clientValue: state.values.client as string | undefined,
                 })}
               >
                 {({
@@ -238,7 +238,7 @@ export default function ClientEditSheet({
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={handleTest}
+                        onClick={() => { void handleTest(); }}
                         disabled={!canTest}
                         className="w-full"
                       >

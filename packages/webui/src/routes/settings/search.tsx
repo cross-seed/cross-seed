@@ -62,7 +62,7 @@ function SearchRssSettings() {
             onSubmit={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              form.handleSubmit();
+              void form.handleSubmit();
             }}
             noValidate
           >

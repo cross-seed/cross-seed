@@ -67,7 +67,7 @@ function HealthPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => refetch()}
+          onClick={() => { void refetch(); }}
           disabled={isFetching}
         >
           <RefreshCw

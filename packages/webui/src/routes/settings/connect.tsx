@@ -80,11 +80,11 @@ function ConnectSettings() {
 
   const baseHandleSubmit = useSettingsFormSubmit();
   const handleSubmit = useCallback(
-    async ({ value }: { value: ConnectFormData }) => {
+    ({ value }: { value: ConnectFormData }) => {
       const transformed = {
         ...value,
         notificationWebhookUrls: transformWebhooksForApi(
-          value.notificationWebhookUrls as WebhookFormEntry[],
+          value.notificationWebhookUrls,
         ),
       };
       return baseHandleSubmit({ value: transformed });
@@ -151,7 +151,7 @@ function ConnectSettings() {
             onSubmit={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              form.handleSubmit();
+              void form.handleSubmit();
             }}
             noValidate
           >

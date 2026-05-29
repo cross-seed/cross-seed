@@ -24,7 +24,7 @@ const ArrayField: FC<ArrayFieldProps> = ({
         type="text"
         id={`${field.name}`}
         className="form-input"
-        value={field.state.value ? String(field.state.value) : ''}
+        value={field.state.value != null ? (field.state.value as string) : ''}
         aria-invalid={
           !!(
             field.state.meta.isTouched &&

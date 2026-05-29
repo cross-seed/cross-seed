@@ -25,7 +25,7 @@ function DebugSettings() {
         toast.success('Settings saved successfully!', {
           description: 'Your changes will take effect on the next restart.',
         });
-        queryClient.invalidateQueries({ queryKey: ['settings.get'] });
+        void queryClient.invalidateQueries({ queryKey: ['settings.get'] });
       },
       onError: (error: unknown) => {
         const message =
@@ -90,7 +90,7 @@ function DebugSettings() {
     }
 
     try {
-      const parsedConfig = JSON.parse(jsonValue);
+      const parsedConfig = JSON.parse(jsonValue) as unknown;
       saveMutation.mutate(parsedConfig);
     } catch {
       toast.error('Failed to parse JSON');

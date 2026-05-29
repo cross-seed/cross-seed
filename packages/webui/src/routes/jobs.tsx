@@ -49,7 +49,7 @@ function RouteComponent() {
     }),
   );
 
-  const getStatusBadge = (job: Job) => {
+  const getStatusBadge = (job: (typeof jobs)[number]) => {
     if (job.isActive) {
       return (
         <Badge variant="default" className="bg-blue-500">
