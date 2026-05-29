@@ -47,6 +47,7 @@ import {
 	inBatches,
 	isBadTitle,
 	isTruthy,
+	errorMessage,
 	notExists,
 	mapAsync,
 	stripExtension,
@@ -384,8 +385,8 @@ export async function updateSearcheeClientDB(
 	newSearchees: SearcheeClient[],
 	infoHashes: Set<string>,
 ): Promise<void> {
-	const removedInfoHashes: string[] = (
-		await db("client_searchee")
+	const removedInfoHashes = (
+		await db<{ info_hash: string }>("client_searchee")
 			.where("client_host", clientHost)
 			.select("info_hash")
 	)
@@ -423,18 +424,35 @@ export async function updateSearcheeClientDB(
 	);
 }
 
-export function createSearcheeFromDB(dbTorrent): SearcheeClient {
+export interface ClientSearcheeRow {
+	info_hash: string;
+	name: string;
+	title: string;
+	files: string;
+	length: number;
+	client_host: string;
+	save_path: string;
+	category?: string | null;
+	tags?: string | null;
+	trackers: string;
+}
+
+export function createSearcheeFromDB(
+	dbTorrent: ClientSearcheeRow,
+): SearcheeClient {
 	return {
 		infoHash: dbTorrent.info_hash,
 		name: dbTorrent.name,
 		title: dbTorrent.title,
-		files: JSON.parse(dbTorrent.files),
+		files: JSON.parse(dbTorrent.files) as File[],
 		length: dbTorrent.length,
 		clientHost: dbTorrent.client_host,
 		savePath: dbTorrent.save_path,
 		category: dbTorrent.category ?? undefined,
-		tags: dbTorrent.tags ? JSON.parse(dbTorrent.tags) : undefined,
-		trackers: JSON.parse(dbTorrent.trackers),
+		tags: dbTorrent.tags
+			? (JSON.parse(dbTorrent.tags) as string[])
+			: undefined,
+		trackers: JSON.parse(dbTorrent.trackers) as string[],
 	};
 }
 
@@ -472,7 +490,7 @@ export async function createSearcheeFromTorrentFile(
 	} catch (e) {
 		logger.error({
 			label: Label.INDEX,
-			message: `Failed to parse ${basename(filePath)}: ${e.message}`,
+			message: `Failed to parse ${basename(filePath)}: ${errorMessage(e)}`,
 		});
 		logger.debug(e);
 		return resultOfErr(e);
@@ -927,14 +945,14 @@ export async function createEnsembleSearchees(
 				allSearchees,
 				options,
 			);
-			const torrentSavePaths = useClientTorrents
-				? new Map()
+			const torrentSavePaths: Map<string, string> = useClientTorrents
+				? new Map<string, string>()
 				: ((await getClients()[0]?.getAllDownloadDirs({
 						metas: allSearchees.filter(
 							hasInfoHash,
 						) as SearcheeWithInfoHash[],
 						onlyCompleted: false,
-					})) ?? new Map());
+					})) ?? new Map<string, string>());
 
 			const seasonSearchees: SearcheeWithLabel[] = [];
 			for (const [key, episodeSearchees] of keyMap) {

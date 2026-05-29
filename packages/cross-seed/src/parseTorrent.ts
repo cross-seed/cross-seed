@@ -34,7 +34,7 @@ export interface Torrent {
  * qBittorrent: .fastresume, Transmission: .resume, rTorrent: .rtorrent
  * Deluge doesn't store labels in fastresume, but in label.conf
  */
-interface TorrentMetadata {
+export interface TorrentMetadata {
 	trackers?: Buffer[][];
 	"qBt-category"?: Buffer;
 	"qBt-tags"?: Buffer;
@@ -169,7 +169,7 @@ export class Metafile {
 	}
 
 	static decode(buf: Buffer) {
-		return new Metafile(bencode.decode(buf));
+		return new Metafile(bencode.decode(buf) as Torrent);
 	}
 
 	getFileSystemSafeName(): string {
