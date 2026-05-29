@@ -8,6 +8,7 @@ import { collectDataLinkingProblems } from "./problems/linking.js";
 import { collectPathProblems } from "./problems/path.js";
 import { collectRecommendationProblems } from "./runtimeConfig.js";
 import { collectSearcheeProblems } from "./searchee.js";
+import { errorMessage } from "./utils.js";
 
 export type ProblemSeverity = "error" | "warning" | "info";
 
@@ -67,7 +68,7 @@ export async function collectProblems(): Promise<Problem[]> {
 		}
 
 		const error: unknown = result.reason;
-		const message = error instanceof Error ? error.message : "unknown";
+		const message = errorMessage(error);
 
 		const providerName = getProviderName(registration, index);
 		problems.push({

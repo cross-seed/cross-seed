@@ -103,7 +103,7 @@ function logRecoverableTorrentDirError(
 	torrentDir: string,
 	error: unknown,
 ): void {
-	const message = error instanceof Error ? error.message : "";
+	const message = errorMessage(error);
 	logger.warn({
 		label: Label.INDEX,
 		message: `Skipping torrentDir indexing for "${torrentDir}": ${message}`,
