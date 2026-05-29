@@ -58,12 +58,12 @@ export default function ClientEditSheet({
     }),
   );
 
-  const { saveConfig, isLoading: isSaving } = useSaveConfigHook();
+  const { saveConfigAsync, isLoading: isSaving } = useSaveConfigHook();
 
   const form = useAppForm({
     ...formOpts,
     defaultValues: client ?? {},
-    onSubmit: ({ value }) => {
+    onSubmit: async ({ value }) => {
       // Full schema validation
       try {
         const sanitizedValue = {
@@ -93,7 +93,7 @@ export default function ClientEditSheet({
             updatedClients = [...(existingClients || []), clientString];
           }
 
-          saveConfig({ torrentClients: updatedClients });
+          await saveConfigAsync({ torrentClients: updatedClients });
           onOpenChange(false);
         }
       } catch (err: unknown) {

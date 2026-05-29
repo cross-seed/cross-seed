@@ -3,10 +3,10 @@ import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import { removeEmptyArrayValues, removeNullFields } from '@/lib/transformers';
 
 export function useSettingsFormSubmit() {
-  const { saveConfig } = useSaveConfigHook();
+  const { saveConfigAsync } = useSaveConfigHook();
 
   return useCallback(
-    ({ value }: { value: Record<string, unknown> }) => {
+    async ({ value }: { value: Record<string, unknown> }) => {
       try {
         Object.keys(value).forEach((attr) => {
           const val = value[attr];
@@ -17,7 +17,7 @@ export function useSettingsFormSubmit() {
 
         removeNullFields(value);
 
-        saveConfig(value);
+        await saveConfigAsync(value);
         return { value };
       } catch (err) {
         console.error('Exception:', err);
@@ -27,6 +27,6 @@ export function useSettingsFormSubmit() {
         };
       }
     },
-    [saveConfig],
+    [saveConfigAsync],
   );
 }
