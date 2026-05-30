@@ -19,7 +19,8 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.json"
+		"build": "tsc -p tsconfig.json",
+		"lint": "eslint ."
 	},
 	"dependencies": {
 		"zod": "^4.3.6"
