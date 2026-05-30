@@ -6,13 +6,13 @@ const rootDir = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),
 	"..",
 );
-const pkgDir = path.join(rootDir, "packages", "cross-seed");
+const pkgDir = path.join(rootDir, "cross-seed");
 const nodeModulesDir = path.join(pkgDir, "node_modules");
 
 const bundles = [
 	{
 		name: "@cross-seed/shared",
-		src: path.join(rootDir, "packages", "shared"),
+		src: path.join(rootDir, "shared"),
 	},
 ];
 
