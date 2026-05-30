@@ -66,7 +66,7 @@ async function listFiles(dir) {
 }
 
 async function createWebuiAssets() {
-	const webuiDist = join(repoRoot, "packages/cross-seed/dist/webui");
+	const webuiDist = join(repoRoot, "cross-seed/dist/webui");
 	const files = await listFiles(webuiDist);
 	return Object.fromEntries(
 		files.map((file) => [
@@ -160,7 +160,7 @@ async function main() {
 
 	const bundlePath = join(seaDir, "bundle.mjs");
 	await esbuild.build({
-		entryPoints: [join(repoRoot, "packages/cross-seed/dist/cmd.js")],
+		entryPoints: [join(repoRoot, "cross-seed/dist/cmd.js")],
 		bundle: true,
 		platform: "node",
 		format: "esm",
@@ -187,7 +187,7 @@ async function main() {
 	}
 
 	await cp(
-		join(repoRoot, "packages/cross-seed/package.json"),
+		join(repoRoot, "cross-seed/package.json"),
 		join(seaDir, "package.json"),
 	);
 	await rm(join(seaDir, "node-binaries"), { recursive: true, force: true });

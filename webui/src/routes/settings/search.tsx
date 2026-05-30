@@ -1,4 +1,4 @@
-import { MatchMode } from '../../../../shared/constants';
+import { MatchMode } from '@cross-seed/shared/constants';
 import { defaultSearchFormValues } from '../../components/Form/shared-form';
 import { useAppForm } from '@/hooks/form';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { createFileRoute } from '@tanstack/react-router';
 import { Page } from '@/components/Page';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
-import { RuntimeConfig } from '../../../../shared/configSchema';
+import { RuntimeConfig } from '@cross-seed/shared/configSchema';
 import z from 'zod';
 
 type SearchFormData = z.infer<typeof searchValidationSchema>;

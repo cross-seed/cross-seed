@@ -3,9 +3,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const crossSeedDist = join(repoRoot, "packages/cross-seed/dist");
+const crossSeedDist = join(repoRoot, "cross-seed/dist");
 const webuiDest = join(crossSeedDist, "webui");
-const webuiSource = join(repoRoot, "packages/webui/dist");
+const webuiSource = join(repoRoot, "webui/dist");
 
 await rm(webuiDest, { recursive: true, force: true });
 await mkdir(crossSeedDist, { recursive: true });

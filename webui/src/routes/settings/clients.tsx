@@ -1,4 +1,4 @@
-import { Action } from '../../../../shared/constants';
+import { Action } from '@cross-seed/shared/constants';
 import { useEffect, useState } from 'react';
 import useConfigForm from '@/hooks/use-config-form';
 import { formOpts } from '@/components/Form/shared-form';
@@ -40,7 +40,7 @@ import { TDownloadClient } from '@/types/download-clients';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
 import { useSaveConfigHook } from '@/hooks/saveFormHook';
 import z from 'zod';
-import { RuntimeConfig } from '../../../../shared/configSchema';
+import { RuntimeConfig } from '@cross-seed/shared/configSchema';
 
 type ClientFormData = z.infer<typeof downloaderValidationSchema>;
 

@@ -41,7 +41,7 @@ const rootDir = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),
 	"..",
 );
-const pkgDir = path.join(rootDir, "packages", "cross-seed");
+const pkgDir = path.join(rootDir, "cross-seed");
 const run = (cmd, argv) => {
 	const res = spawnSync(cmd, argv, { stdio: "inherit", cwd: pkgDir });
 	if (res.status !== 0) process.exit(res.status ?? 1);
@@ -109,9 +109,9 @@ const pkgJson = JSON.parse(
 const dirty = gitStatus();
 if (dirty) {
 	const files = [
-		"packages/cross-seed/package.json",
+		"cross-seed/package.json",
 		"package-lock.json",
-		"packages/cross-seed/package-lock.json",
+		"cross-seed/package-lock.json",
 	].filter((file) => fs.existsSync(path.join(rootDir, file)));
 	runGit(["add", ...files]);
 	runGit(["commit", "-m", `v${pkgJson.version}`]);

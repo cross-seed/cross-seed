@@ -38,9 +38,9 @@ jobs:
             - name: Build npm tarball
               run: |
                   set -euo pipefail
-                  npm -w packages/shared run build
+                  npm -w shared run build
                   pack_dir="$(mktemp -d)"
-                  (cd packages/cross-seed && npm pack --workspaces=false --pack-destination "$pack_dir")
+                  (cd cross-seed && npm pack --workspaces=false --pack-destination "$pack_dir")
                   tarball="$(ls "$pack_dir"/cross-seed-*.tgz)"
                   cp "$tarball" "$GITHUB_WORKSPACE/cross-seed.tgz"
             - name: Smoke test npm tarball

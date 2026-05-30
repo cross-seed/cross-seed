@@ -21,7 +21,7 @@ import { FormValidationProvider } from '@/contexts/Form/form-validation-provider
 import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { Page } from '@/components/Page';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
-import { RuntimeConfig, WebhookEntry } from '../../../../shared/configSchema';
+import { RuntimeConfig, WebhookEntry } from '@cross-seed/shared/configSchema';
 
 type ConnectFormData = z.infer<typeof connectValidationSchema>;
 

@@ -1,4 +1,4 @@
-import { LinkType } from '../../../../shared/constants';
+import { LinkType } from '@cross-seed/shared/constants';
 import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ import { pickSchemaFields } from '@/lib/pick-schema-fields';
 import { createFileRoute } from '@tanstack/react-router';
 import { Page } from '@/components/Page';
 import { useSettingsFormSubmit } from '@/hooks/use-settings-form-submit';
-import { RuntimeConfig } from '../../../../shared/configSchema';
+import { RuntimeConfig } from '@cross-seed/shared/configSchema';
 
 type DirectoryFormData = z.infer<typeof directoryValidationSchema>;
 

@@ -2,16 +2,16 @@
 FROM node:26-alpine AS build
 WORKDIR /usr/src/app
 COPY package*.json ./
-COPY packages/cross-seed/package*.json packages/cross-seed/tsconfig*.json ./packages/cross-seed/
-COPY packages/shared/package*.json packages/shared/tsconfig.json ./packages/shared/
-COPY packages/api-types/package*.json packages/api-types/tsconfig.json ./packages/api-types/
-COPY packages/webui/package*.json packages/webui/tsconfig*.json ./packages/webui/
+COPY cross-seed/package*.json cross-seed/tsconfig*.json ./cross-seed/
+COPY shared/package*.json shared/tsconfig.json ./shared/
+COPY api-types/package*.json api-types/tsconfig.json ./api-types/
+COPY webui/package*.json webui/tsconfig*.json ./webui/
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 RUN npm ci --workspaces --no-fund
-COPY packages/shared packages/shared
-COPY packages/api-types packages/api-types
-COPY packages/webui packages/webui
-COPY packages/cross-seed packages/cross-seed
+COPY shared shared
+COPY api-types api-types
+COPY webui webui
+COPY cross-seed cross-seed
 COPY scripts/copy-webui.js scripts/copy-webui.js
 RUN npm run build:all && npm prune --omit=dev
 
@@ -32,11 +32,11 @@ RUN apk add catatonit curl tzdata
 COPY --from=build /usr/src/app/package*.json ./
 # Bring along pruned production deps and the workspace packages they link to.
 COPY --from=build /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/packages/shared ./packages/shared
-COPY --from=build /usr/src/app/packages/api-types ./packages/api-types
-COPY --from=build /usr/src/app/packages/webui ./packages/webui
-COPY --from=build /usr/src/app/packages/cross-seed ./packages/cross-seed
-RUN npm link ./packages/cross-seed
+COPY --from=build /usr/src/app/shared ./shared
+COPY --from=build /usr/src/app/api-types ./api-types
+COPY --from=build /usr/src/app/webui ./webui
+COPY --from=build /usr/src/app/cross-seed ./cross-seed
+RUN npm link ./cross-seed
 ENV CONFIG_DIR=/config
 ENV DOCKER_ENV=true
 EXPOSE 2468

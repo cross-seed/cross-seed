@@ -1,7 +1,7 @@
 import { formOptions } from '@tanstack/react-form';
-import { defaultConfig } from '../../../../shared/constants';
-import { RuntimeConfig } from '../../../../shared/configSchema';
-import { Action, LinkType, MatchMode } from '../../../../shared/constants';
+import { defaultConfig } from '@cross-seed/shared/constants';
+import { RuntimeConfig } from '@cross-seed/shared/configSchema';
+import { Action, LinkType, MatchMode } from '@cross-seed/shared/constants';
 
 export const formOpts = formOptions({
   defaultValues: defaultConfig,

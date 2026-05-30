@@ -2,7 +2,7 @@ import {
   RuntimeConfig,
   WebhookEntry,
   WebhookObjectSchema,
-} from '../../../shared/configSchema';
+} from '@cross-seed/shared/configSchema';
 
 /**
  * Transforms API config data for the WebUI form. Webhook entries are normalized

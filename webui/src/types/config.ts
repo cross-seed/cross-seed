@@ -1,6 +1,10 @@
 import { z } from 'zod';
-import { Action, LinkType, ZodErrorMessages } from '../../../shared/constants';
-import { RUNTIME_CONFIG_SCHEMA } from '../../../shared/configSchema';
+import {
+  Action,
+  LinkType,
+  ZodErrorMessages,
+} from '@cross-seed/shared/constants';
+import { RUNTIME_CONFIG_SCHEMA } from '@cross-seed/shared/configSchema';
 
 const runtimeShape = RUNTIME_CONFIG_SCHEMA.shape;
 

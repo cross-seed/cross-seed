@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import importPlugin from "eslint-plugin-import-x";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
@@ -19,7 +20,11 @@ export default tseslint.config(
 			},
 			sourceType: "module",
 		},
+		plugins: {
+			import: importPlugin,
+		},
 		rules: {
+			"import/no-relative-packages": "error",
 			"no-mixed-spaces-and-tabs": "off",
 			"@typescript-eslint/await-thenable": "error",
 			"@typescript-eslint/no-floating-promises": "error",
