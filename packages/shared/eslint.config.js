@@ -2,25 +2,25 @@ import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-// Root config for editor integration and scripts only.
-// Each package owns its own eslint.config.js and lint script.
 export default tseslint.config(
 	{
-		ignores: [
-			"coverage/**",
-			"dist/**",
-			"node_modules/**",
-			"packages/**",
-			"sea/**",
-		],
+		ignores: ["dist/**", "node_modules/**"],
 	},
 	js.configs.recommended,
 	{
-		files: ["scripts/**/*.js"],
+		files: ["*.ts"],
+		extends: [...tseslint.configs.recommendedTypeChecked],
 		languageOptions: {
 			ecmaVersion: 2022,
 			globals: globals.node,
+			parserOptions: {
+				project: "./tsconfig.json",
+				tsconfigRootDir: import.meta.dirname,
+			},
 			sourceType: "module",
+		},
+		rules: {
+			"no-mixed-spaces-and-tabs": "off",
 		},
 	},
 );
