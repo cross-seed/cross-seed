@@ -73,7 +73,6 @@ export const clientValidationSchema = z.object({
 });
 
 export const downloaderValidationSchema = z.object({
-  torrentClients: z.array(clientValidationSchema).nullish(),
   action: z.nativeEnum(Action),
   duplicateCategories: z.boolean(),
   useClientTorrents: z.boolean(),

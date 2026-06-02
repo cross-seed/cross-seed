@@ -64,7 +64,7 @@
 		"proseWrap": "always"
 	},
 	"lint-staged": {
-		"*.{js,ts}": "eslint --cache",
-		"*.{js,json,ts,css,md}": "prettier --write"
+		"*.{js,jsx,ts,tsx}": "eslint --cache",
+		"*.{js,jsx,json,ts,tsx,css,md}": "prettier --write"
 	}
 }

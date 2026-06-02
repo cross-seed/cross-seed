@@ -42,7 +42,7 @@ import { useSaveConfigHook } from "@/hooks/saveFormHook";
 import z from "zod";
 import { RuntimeConfig } from "@cross-seed/shared/configSchema";
 
-type ClientFormData = z.input<typeof downloaderValidationSchema>;
+type ClientOptionsFormData = z.input<typeof downloaderValidationSchema>;
 
 function TorrentClientsSettings() {
   const trpc = useTRPC();
@@ -65,15 +65,18 @@ function TorrentClientsSettings() {
       select: (data: {
         config: RuntimeConfig;
         apiKey: string;
-      }): Partial<ClientFormData> => {
+      }): {
+        formData: Partial<ClientOptionsFormData>;
+        torrentClients: Array<string | TDownloadClient>;
+      } => {
         const fullDataset = formatConfigDataForForm(data.config);
-        const filteredData = pickSchemaFields(
-          downloaderValidationSchema,
-          fullDataset,
-          { includeUndefined: true },
-        );
 
-        return filteredData;
+        return {
+          formData: pickSchemaFields(downloaderValidationSchema, fullDataset, {
+            includeUndefined: true,
+          }),
+          torrentClients: data.config.torrentClients,
+        };
       },
     }),
   );
@@ -81,8 +84,8 @@ function TorrentClientsSettings() {
   const handleSubmit = useSettingsFormSubmit();
 
   const form = useAppForm({
-    defaultValues: (configData ??
-      defaultDownloadClientFormValues) as ClientFormData,
+    defaultValues: (configData?.formData ??
+      defaultDownloadClientFormValues) as ClientOptionsFormData,
     onSubmit: handleSubmit,
     validators: {
       onSubmit: downloaderValidationSchema,
