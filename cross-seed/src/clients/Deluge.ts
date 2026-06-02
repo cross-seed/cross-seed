@@ -139,12 +139,12 @@ export default class Deluge implements TorrentClient {
 			this.url,
 		).unwrapOrThrow(
 			new CrossSeedError(
-				`[${this.label}] delugeRpcUrl must be percent-encoded`,
+				`[${this.label}] The Deluge WebUI URL must be percent-encoded`,
 			),
 		);
 		if (!password) {
 			throw new CrossSeedError(
-				`[${this.label}] You need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)`,
+				`[${this.label}] You need to define a password in the Deluge WebUI URL. (e.g. http://:<PASSWORD>@localhost:8112)`,
 			);
 		}
 		try {
@@ -212,14 +212,20 @@ export default class Deluge implements TorrentClient {
 		params: unknown[],
 		retries = 1,
 	): Promise<Result<ResultType, ErrorType>> {
-		const msg = `Calling method ${method} with params ${inspect(params, { depth: null, compact: true })}`;
-		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
-		logger.verbose({ label: this.label, message });
+		const truncate = (message: string) =>
+			message.length > 1000 ? `${message.slice(0, 1000)}...` : message;
 		const { href } = extractCredentialsFromUrl(this.url).unwrapOrThrow(
 			new CrossSeedError(
-				`[${this.label}] delugeRpcUrl must be percent-encoded`,
+				`[${this.label}] The Deluge WebUI URL must be percent-encoded`,
 			),
 		);
+
+		const message =
+			method === "auth.login"
+				? `Calling authentication method ${method}`
+				: `Calling method ${method} with params ${inspect(params, { depth: null, compact: true })}`;
+		logger.verbose({ label: this.label, message: truncate(message) });
+
 		const headers = new Headers({
 			"Content-Type": "application/json",
 			"User-Agent": USER_AGENT,
