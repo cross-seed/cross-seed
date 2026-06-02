@@ -122,7 +122,7 @@ export default class Deluge implements TorrentClient {
 			label: this.label,
 			message: `Logged in successfully${this.readonly ? " (readonly)" : ""}`,
 		});
-
+		await this.call<boolean>("auth.delete_session", [], 0);
 		if (!torrentDir) return;
 		if (!(await readdir(torrentDir)).some((f) => f.endsWith(".state"))) {
 			throw new CrossSeedError(
