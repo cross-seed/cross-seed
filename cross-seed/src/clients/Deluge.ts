@@ -117,7 +117,6 @@ export default class Deluge implements TorrentClient {
 	async validateConfig(): Promise<void> {
 		const { torrentDir } = getRuntimeConfig();
 		await this.authenticate();
-		this.isLabelEnabled = await this.labelEnabled();
 		logger.info({
 			label: this.label,
 			message: `Logged in successfully${this.readonly ? " (readonly)" : ""}`,
@@ -198,6 +197,7 @@ export default class Deluge implements TorrentClient {
 				);
 			}
 		}
+		this.isLabelEnabled = await this.labelEnabled();
 	}
 
 	/**
