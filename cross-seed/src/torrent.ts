@@ -25,6 +25,15 @@ import {
 	shouldIgnorePathHeuristically,
 } from "./dataFiles.js";
 import { db } from "./db.js";
+import {
+	createClientLibrarySourceKey,
+	createDataLibrarySourceKey,
+	createTorrentLibraryItemInput,
+	createTorrentLibrarySourceKey,
+	LibraryItemSource,
+	markLibraryItemsMissingBySourceKeys,
+	syncLibraryItems,
+} from "./libraryInventory.js";
 import { Label, logger, logOnce } from "./logger.js";
 import {
 	Metafile,
@@ -482,6 +491,20 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 			});
 			try {
 				searchees = await loadTorrentDirLight(torrentDir);
+				await syncLibraryItems({
+					source: LibraryItemSource.TORRENT,
+					sourceInstance: torrentDir,
+					itemsToUpsert: searchees
+						.filter((searchee) => searchee.path)
+						.map((searchee) =>
+							createTorrentLibraryItemInput(
+								searchee,
+								searchee.path!,
+								torrentDir,
+							),
+						),
+					pruneMissing: true,
+				});
 			} catch (error) {
 				if (!isRecoverableTorrentDirError(error)) throw error;
 				logRecoverableTorrentDirError(torrentDir, error);
@@ -566,6 +589,7 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 	const dirContents = new Set(await findAllTorrentFilesInDir(dir));
 
 	const newSearchees: SearcheeWithInfoHash[] = [];
+	const upsertedSourceKeys = new Set<string>();
 	for (const filePath of dirContents) {
 		const doesAlreadyExist = await db("torrent")
 			.select("id")
@@ -595,7 +619,11 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 			.onConflict("file_path")
 			.ignore();
 		const res = await createSearcheeFromTorrentFile(filePath, []);
-		if (res.isOk()) newSearchees.push(res.unwrap());
+		if (res.isOk()) {
+			const searchee = { ...res.unwrap(), path: filePath };
+			newSearchees.push(searchee);
+			upsertedSourceKeys.add(createTorrentLibrarySourceKey(filePath));
+		}
 	}
 
 	const rows = await db("torrent").select("file_path", "info_hash");
@@ -613,6 +641,22 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 				batch.map((row) => row.info_hash),
 			)
 			.del();
+		await markLibraryItemsMissingBySourceKeys(
+			batch.map((row) => createTorrentLibrarySourceKey(row.file_path)),
+		);
+	});
+	await syncLibraryItems({
+		source: LibraryItemSource.TORRENT,
+		sourceInstance: dir,
+		itemsToUpsert: newSearchees
+			.filter((searchee) => searchee.path)
+			.map((searchee) =>
+				createTorrentLibraryItemInput(searchee, searchee.path!, dir),
+			),
+		sourceKeysSeen: Array.from(dirContents)
+			.map(createTorrentLibrarySourceKey)
+			.filter((sourceKey) => !upsertedSourceKeys.has(sourceKey)),
+		pruneMissing: true,
 	});
 
 	return newSearchees;
@@ -625,17 +669,31 @@ export async function indexTorrentsAndDataDirs(
 		const { dataDirs, seasonFromEpisodes, torrentDir, useClientTorrents } =
 			getRuntimeConfig();
 		if (!useClientTorrents) {
-			const hashes = (
-				await db<{ info_hash: string }>("client_searchee").select(
-					"info_hash",
-				)
-			).map((r) => r.info_hash);
+			const clientRows = await db<{
+				client_host: string;
+				info_hash: string;
+			}>("client_searchee").select("client_host", "info_hash");
+			const hashes = clientRows.map((r) => r.info_hash);
 			await inBatches(hashes, async (batch) => {
 				await db("ensemble").whereIn("info_hash", batch).del();
 			});
+			await markLibraryItemsMissingBySourceKeys(
+				clientRows.map((row) =>
+					createClientLibrarySourceKey({
+						clientHost: row.client_host,
+						infoHash: row.info_hash,
+					}),
+				),
+			);
 			await db("client_searchee").del();
 		} else {
 			const clientHosts = getClients().map((client) => client.clientHost);
+			const clientRowsToDelete = await db<{
+				client_host: string;
+				info_hash: string;
+			}>("client_searchee")
+				.select("client_host", "info_hash")
+				.whereNotIn("client_host", clientHosts);
 			await db("client_searchee")
 				.whereNotIn("client_host", clientHosts)
 				.del();
@@ -643,14 +701,29 @@ export async function indexTorrentsAndDataDirs(
 				.whereNotNull("client_host")
 				.whereNotIn("client_host", clientHosts)
 				.del();
+			await markLibraryItemsMissingBySourceKeys(
+				clientRowsToDelete.map((row) =>
+					createClientLibrarySourceKey({
+						clientHost: row.client_host,
+						infoHash: row.info_hash,
+					}),
+				),
+			);
 		}
 		if (!torrentDir) {
-			const hashes = (await db("torrent").select("info_hash")).map(
-				(r) => r.info_hash,
+			const torrentRows = await db("torrent").select(
+				"file_path",
+				"info_hash",
 			);
+			const hashes = torrentRows.map((r) => r.info_hash);
 			await inBatches(hashes, async (batch) => {
 				await db("ensemble").whereIn("info_hash", batch).del();
 			});
+			await markLibraryItemsMissingBySourceKeys(
+				torrentRows.map((row) =>
+					createTorrentLibrarySourceKey(row.file_path),
+				),
+			);
 			await db("torrent").del();
 		}
 		if (!dataDirs.length) {
@@ -662,6 +735,9 @@ export async function indexTorrentsAndDataDirs(
 					.whereIn("path", batch)
 					.whereNull("client_host")
 					.del();
+				await markLibraryItemsMissingBySourceKeys(
+					batch.map(createDataLibrarySourceKey),
+				);
 			});
 			await db("data").del();
 		} else {
@@ -675,6 +751,9 @@ export async function indexTorrentsAndDataDirs(
 					.whereIn("path", batch)
 					.whereNull("client_host")
 					.del();
+				await markLibraryItemsMissingBySourceKeys(
+					batch.map(createDataLibrarySourceKey),
+				);
 			});
 		}
 		if (!seasonFromEpisodes) await db("ensemble").del();
@@ -734,7 +813,10 @@ export async function loadTorrentDirLight(
 			torrentInfos,
 		);
 		if (searcheeResult.isOk()) {
-			searchees.push(searcheeResult.unwrap());
+			searchees.push({
+				...searcheeResult.unwrap(),
+				path: torrentFilePath,
+			});
 		}
 	}
 	return searchees;

@@ -10,6 +10,7 @@ const TEST_ROOT = await mkdtemp(
 type LibraryInventoryEnv = {
 	db: typeof import("../src/db.js").db;
 	inventory: typeof import("../src/libraryInventory.js");
+	updateSearcheeClientDB: typeof import("../src/searchee.js").updateSearcheeClientDB;
 };
 
 async function createLibraryInventoryEnv(): Promise<LibraryInventoryEnv> {
@@ -20,11 +21,12 @@ async function createLibraryInventoryEnv(): Promise<LibraryInventoryEnv> {
 	const { db } = await import("../src/db.js");
 	const { createAppDirHierarchy } = await import("../src/configuration.js");
 	const inventory = await import("../src/libraryInventory.js");
+	const { updateSearcheeClientDB } = await import("../src/searchee.js");
 
 	createAppDirHierarchy();
 	await db.migrate.latest();
 
-	return { db, inventory };
+	return { db, inventory, updateSearcheeClientDB };
 }
 
 describe.sequential("library inventory sync", () => {
@@ -315,5 +317,111 @@ describe.sequential("library inventory sync", () => {
 			status: env.inventory.LibraryScanStatus.FAILED,
 			error: "boom",
 		});
+	});
+
+	it("dual writes client searchees and tombstones removed client items", async () => {
+		await env.updateSearcheeClientDB(
+			"client-a",
+			[
+				{
+					infoHash: "hash-a",
+					clientHost: "client-a",
+					name: "Raw.Show.S01E01",
+					title: "Parsed Show S01E01",
+					files: [
+						{
+							name: "episode-a.mkv",
+							path: "episode-a.mkv",
+							length: 100,
+						},
+					],
+					length: 100,
+					savePath: "/downloads",
+					category: "tv",
+					tags: ["tag-a"],
+					trackers: ["tracker-a"],
+				},
+				{
+					infoHash: "hash-b",
+					clientHost: "client-a",
+					name: "Raw.Show.S01E02",
+					title: "Parsed Show S01E02",
+					files: [
+						{
+							name: "episode-b.mkv",
+							path: "episode-b.mkv",
+							length: 200,
+						},
+					],
+					length: 200,
+					savePath: "/downloads",
+					category: "tv",
+					tags: ["tag-b"],
+					trackers: ["tracker-b"],
+				},
+			],
+			new Set(["hash-a", "hash-b"]),
+		);
+
+		expect(await env.db("client_searchee")).toHaveLength(2);
+		expect(
+			await env.db("library_item").where({
+				source: env.inventory.LibraryItemSource.CLIENT,
+				source_instance: "client-a",
+			}),
+		).toHaveLength(2);
+
+		await env.updateSearcheeClientDB(
+			"client-a",
+			[
+				{
+					infoHash: "hash-a",
+					clientHost: "client-a",
+					name: "Raw.Show.S01E01.Updated",
+					title: "Parsed Show S01E01",
+					files: [
+						{
+							name: "episode-a.mkv",
+							path: "episode-a.mkv",
+							length: 125,
+						},
+					],
+					length: 125,
+					savePath: "/downloads",
+					category: "tv",
+					tags: ["tag-a", "updated"],
+					trackers: ["tracker-a"],
+				},
+			],
+			new Set(["hash-a"]),
+		);
+
+		const activeRow = await env
+			.db("library_item")
+			.where({
+				source_key: env.inventory.createClientLibrarySourceKey({
+					clientHost: "client-a",
+					infoHash: "hash-a",
+				}),
+			})
+			.first();
+		const removedRow = await env
+			.db("library_item")
+			.where({
+				source_key: env.inventory.createClientLibrarySourceKey({
+					clientHost: "client-a",
+					infoHash: "hash-b",
+				}),
+			})
+			.first();
+
+		expect(await env.db("client_searchee")).toHaveLength(1);
+		expect(activeRow).toMatchObject({
+			name: "Raw.Show.S01E01.Updated",
+			length: 125,
+			missing_since: null,
+		});
+		expect(JSON.parse(activeRow!.tags!)).toEqual(["tag-a", "updated"]);
+		expect(removedRow?.missing_since).toEqual(expect.any(Number));
 	});
 });

@@ -175,6 +175,103 @@ describe.sequential("full app flows", () => {
 		await env.db.destroy();
 	});
 
+	it("persists indexed dataDir items in library inventory", async () => {
+		const env = await createRuntimeEnv();
+		const dataDir = join(TEST_ROOT, "library-data", "data");
+		const outputDir = join(TEST_ROOT, "library-data", "output");
+		await mkdir(dataDir, { recursive: true });
+		await mkdir(outputDir, { recursive: true });
+
+		const fileName = "Library.Show.S01E01.1080p.WEB-DL-GROUP.mkv";
+		const filePath = join(dataDir, fileName);
+		const fileSize = 1024 * 32;
+		await writeFile(filePath, Buffer.alloc(fileSize));
+
+		applyConfig(env, {
+			dataDirs: [dataDir],
+			outputDir,
+			useClientTorrents: false,
+			includeSingleEpisodes: true,
+		});
+
+		await env.indexTorrentsAndDataDirs({ startup: true });
+
+		const dataRows = await env.db("data");
+		const libraryRows = await env.db("library_item").where({
+			source: "dataDir",
+			source_instance: dataDir,
+		});
+
+		expect(dataRows).toHaveLength(1);
+		expect(libraryRows).toHaveLength(1);
+		expect(libraryRows[0]).toMatchObject({
+			source_key: `dataDir:${filePath}`,
+			path: filePath,
+			name: fileName,
+			title: fileName,
+			length: fileSize,
+			missing_since: null,
+		});
+
+		await env.db.destroy();
+	});
+
+	it("persists indexed torrentDir items in library inventory", async () => {
+		const env = await createRuntimeEnv();
+		const torrentDir = join(TEST_ROOT, "library-torrent", "torrents");
+		const outputDir = join(TEST_ROOT, "library-torrent", "output");
+		await mkdir(torrentDir, { recursive: true });
+		await mkdir(outputDir, { recursive: true });
+
+		torznab.state.setTorrents([
+			{
+				id: "library-torrent",
+				title: "Library.Show.S01E02.1080p.WEB-DL-GROUP",
+				torrentName: "Library.Show.S01E02.1080p.WEB-DL-GROUP",
+				files: [
+					{
+						path: "Library.Show.S01E02.1080p.WEB-DL-GROUP.mkv",
+						length: 1024 * 64,
+					},
+				],
+				tracker: "mock-torznab",
+			},
+		]);
+		const normalizedTorrent = torznab.state.resolveTorrents()[0];
+		const meta = env.Metafile.decode(normalizedTorrent.torrentPayload);
+		const torrentPath = join(torrentDir, `${meta.infoHash}.torrent`);
+		await writeFile(torrentPath, meta.encode());
+
+		applyConfig(env, {
+			dataDirs: [],
+			outputDir,
+			torrentDir,
+			useClientTorrents: false,
+			includeSingleEpisodes: true,
+			seasonFromEpisodes: 0,
+		});
+
+		await env.indexTorrentsAndDataDirs({ startup: true });
+
+		const libraryRows = await env.db("library_item").where({
+			source: "torrentFile",
+			source_instance: torrentDir,
+		});
+
+		expect(libraryRows).toHaveLength(1);
+		expect(libraryRows[0]).toMatchObject({
+			source_key: `torrentFile:${torrentPath}`,
+			path: torrentPath,
+			info_hash: meta.infoHash,
+			name: meta.name,
+			title: "Library.Show.S01E02.1080p.WEB-DL-GROUP",
+			length: meta.length,
+			missing_since: null,
+		});
+
+		await env.db.destroy();
+	});
+
 	it("only processes new RSS candidates after last seen guid", async () => {
 		const env = await createRuntimeEnv();
 		const dataDir = join(TEST_ROOT, "rss", "data");

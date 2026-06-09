@@ -1,6 +1,12 @@
 import { db } from "./db.js";
-import type { File } from "./searchee.js";
+import type {
+	File,
+	SearcheeClient,
+	SearcheeWithInfoHash,
+	SearcheeWithoutInfoHash,
+} from "./searchee.js";
 import { inBatches } from "./utils.js";
+import type { WithRequired } from "./utils.js";
 
 export enum LibraryItemSource {
 	CLIENT = "torrentClient",
@@ -45,6 +51,15 @@ export interface LibraryItemInput {
 	contentFingerprint?: string | null;
 }
 
+type SyncLibraryItemsOptions = {
+	source: LibraryItemSource;
+	sourceInstance?: string | null;
+	itemsToUpsert?: LibraryItemInput[];
+	sourceKeysSeen?: string[];
+	pruneMissing?: boolean;
+	now?: number;
+};
+
 interface LibraryScanRow {
 	id: number;
 	source: string;
@@ -86,6 +101,121 @@ export function createTorrentLibrarySourceKey(filePath: string): string {
 
 export function createDataLibrarySourceKey(path: string): string {
 	return `${LibraryItemSource.DATA}:${path}`;
+}
+
+function createContentFingerprint(input: {
+	infoHash?: string | null;
+	path?: string | null;
+	name: string;
+	title: string;
+	files: File[];
+	length: number;
+	savePath?: string | null;
+	category?: string | null;
+	tags?: string[] | null;
+	trackers?: string[] | null;
+}): string {
+	return JSON.stringify({
+		infoHash: input.infoHash ?? null,
+		path: input.path ?? null,
+		name: input.name,
+		title: input.title,
+		files: input.files,
+		length: input.length,
+		savePath: input.savePath ?? null,
+		category: input.category ?? null,
+		tags: input.tags ?? null,
+		trackers: input.trackers ?? null,
+	});
+}
+
+export function createClientLibraryItemInput(
+	searchee: SearcheeClient,
+): LibraryItemInput {
+	return {
+		source: LibraryItemSource.CLIENT,
+		sourceInstance: searchee.clientHost,
+		sourceKey: createClientLibrarySourceKey({
+			clientHost: searchee.clientHost,
+			infoHash: searchee.infoHash,
+		}),
+		clientHost: searchee.clientHost,
+		infoHash: searchee.infoHash,
+		name: searchee.name,
+		title: searchee.title,
+		files: searchee.files,
+		length: searchee.length,
+		savePath: searchee.savePath,
+		category: searchee.category ?? null,
+		tags: searchee.tags ?? null,
+		trackers: searchee.trackers,
+		contentFingerprint: createContentFingerprint({
+			infoHash: searchee.infoHash,
+			name: searchee.name,
+			title: searchee.title,
+			files: searchee.files,
+			length: searchee.length,
+			savePath: searchee.savePath,
+			category: searchee.category ?? null,
+			tags: searchee.tags ?? null,
+			trackers: searchee.trackers,
+		}),
+	};
+}
+
+export function createTorrentLibraryItemInput(
+	searchee: SearcheeWithInfoHash,
+	filePath: string,
+	sourceInstance: string,
+): LibraryItemInput {
+	return {
+		source: LibraryItemSource.TORRENT,
+		sourceInstance,
+		sourceKey: createTorrentLibrarySourceKey(filePath),
+		infoHash: searchee.infoHash,
+		path: filePath,
+		name: searchee.name,
+		title: searchee.title,
+		files: searchee.files,
+		length: searchee.length,
+		category: searchee.category ?? null,
+		tags: searchee.tags ?? null,
+		trackers: searchee.trackers ?? null,
+		contentFingerprint: createContentFingerprint({
+			infoHash: searchee.infoHash,
+			path: filePath,
+			name: searchee.name,
+			title: searchee.title,
+			files: searchee.files,
+			length: searchee.length,
+			category: searchee.category ?? null,
+			tags: searchee.tags ?? null,
+			trackers: searchee.trackers ?? null,
+		}),
+	};
+}
+
+export function createDataLibraryItemInput(
+	searchee: WithRequired<SearcheeWithoutInfoHash, "path">,
+	sourceInstance: string,
+): LibraryItemInput {
+	return {
+		source: LibraryItemSource.DATA,
+		sourceInstance,
+		sourceKey: createDataLibrarySourceKey(searchee.path),
+		path: searchee.path,
+		name: searchee.name,
+		title: searchee.title,
+		files: searchee.files,
+		length: searchee.length,
+		contentFingerprint: createContentFingerprint({
+			path: searchee.path,
+			name: searchee.name,
+			title: searchee.title,
+			files: searchee.files,
+			length: searchee.length,
+		}),
+	};
 }
 
 export async function beginLibraryScan(input: {
@@ -281,4 +411,53 @@ export async function pruneMissingLibraryItems(
 
 	await incrementScanCounts(scanId, { itemsRemoved });
 	return itemsRemoved;
+}
+
+export async function markLibraryItemsMissingBySourceKeys(
+	sourceKeys: string[],
+	options: { now?: number } = {},
+): Promise<number> {
+	if (!sourceKeys.length) return 0;
+
+	let itemsRemoved = 0;
+	const now = options.now ?? Date.now();
+	await inBatches(sourceKeys, async (batch) => {
+		itemsRemoved += await db("library_item")
+			.whereIn("source_key", batch)
+			.whereNull("missing_since")
+			.update({
+				missing_since: now,
+				updated_at: now,
+			});
+	});
+	return itemsRemoved;
+}
+
+export async function syncLibraryItems(
+	options: SyncLibraryItemsOptions,
+): Promise<LibraryScan> {
+	const scan = await beginLibraryScan({
+		source: options.source,
+		sourceInstance: options.sourceInstance ?? null,
+		now: options.now,
+	});
+	try {
+		await upsertLibraryItems(scan.id, options.itemsToUpsert ?? [], {
+			now: options.now,
+		});
+		await markLibraryItemsSeen(scan.id, options.sourceKeysSeen ?? [], {
+			now: options.now,
+		});
+		const completedScan = await completeLibraryScan(scan.id, {
+			now: options.now,
+		});
+		if (options.pruneMissing) {
+			await pruneMissingLibraryItems(scan.id, { now: options.now });
+			return (await getLibraryScan(scan.id)) ?? completedScan;
+		}
+		return completedScan;
+	} catch (error) {
+		await failLibraryScan(scan.id, error, { now: options.now });
+		throw error;
+	}
 }

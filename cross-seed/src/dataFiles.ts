@@ -7,6 +7,14 @@ import {
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { db } from "./db.js";
+import {
+	createDataLibraryItemInput,
+	createDataLibrarySourceKey,
+	LibraryItemSource,
+	markLibraryItemsMissingBySourceKeys,
+	syncLibraryItems,
+} from "./libraryInventory.js";
+import type { LibraryItemInput } from "./libraryInventory.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
@@ -25,6 +33,7 @@ import {
 	filterAsyncYield,
 	flatMapAsync,
 	inBatches,
+	isChildPath,
 	isTruthy,
 	mapAsync,
 	yieldToEventLoop,
@@ -42,6 +51,18 @@ const watchers: Map<string, FSWatcher> = new Map();
 const modifiedPaths: Map<string, Set<string>> = new Map();
 const modifiedPathTimes: Map<string, Map<string, number>> = new Map();
 const STABILITY_WINDOW_MS = 60_000;
+
+function getDataSourceInstance(path: string, dataDirs: string[]): string {
+	return (
+		dataDirs.find(
+			(dataDir) =>
+				resolve(path) === resolve(dataDir) ||
+				isChildPath(path, [dataDir]),
+		) ??
+		dataDirs[0] ??
+		path
+	);
+}
 
 function createWatcher(dataDir: string): FSWatcher {
 	return watch(dataDir, { recursive: true, persistent: false }, (_, f) => {
@@ -84,7 +105,9 @@ export async function indexDataDirs(options: {
 				);
 			}
 		}
-		const numEntries = await indexDataPaths(searcheePaths);
+		const numEntries = await indexDataPaths(searcheePaths, {
+			pruneMissing: true,
+		});
 		logger.info(`Validated ${numEntries} entries from dataDirs...`);
 	}
 
@@ -134,6 +157,9 @@ export async function indexDataDirs(options: {
 		await inBatches(deletedPaths, async (batch) => {
 			await db("data").whereIn("path", batch).del();
 			await db("ensemble").whereIn("path", batch).del();
+			await markLibraryItemsMissingBySourceKeys(
+				batch.map(createDataLibrarySourceKey),
+			);
 		});
 		await indexDataPaths(paths);
 	});
@@ -143,12 +169,16 @@ export async function indexDataDirs(options: {
  * Adds the data and ensemble entries to the database.
  * @param paths The paths to index.
  */
-async function indexDataPaths(paths: string[]): Promise<number> {
-	const { seasonFromEpisodes } = getRuntimeConfig();
+async function indexDataPaths(
+	paths: string[],
+	options: { pruneMissing?: boolean } = {},
+): Promise<number> {
+	const { dataDirs, seasonFromEpisodes } = getRuntimeConfig();
 	const memoizedPaths = new Map<string, string[]>();
 	const memoizedLengths = new Map<string, number>();
 	const dataRows: DataEntry[] = [];
 	const ensembleRows: EnsembleEntry[] = [];
+	const libraryItems: LibraryItemInput[] = [];
 	let processed = 0;
 	for (const path of paths) {
 		processed += 1;
@@ -163,6 +193,19 @@ async function indexDataPaths(paths: string[]): Promise<number> {
 		if (!files.length) continue;
 		const title = parseTitle(basename(path), files, path);
 		if (!title) continue;
+		libraryItems.push(
+			createDataLibraryItemInput(
+				{
+					infoHash: undefined,
+					path,
+					files,
+					name: basename(path),
+					title,
+					length: files.reduce((sum, file) => sum + file.length, 0),
+				},
+				getDataSourceInstance(path, dataDirs),
+			),
+		);
 		dataRows.push({ title, path });
 		if (seasonFromEpisodes) {
 			const ensembleEntries = indexEnsembleDataEntry(title, path, files);
@@ -178,6 +221,31 @@ async function indexDataPaths(paths: string[]): Promise<number> {
 			.onConflict(["client_host", "path"])
 			.merge();
 	});
+	const itemsBySourceInstance = new Map<string | null, LibraryItemInput[]>();
+	for (const item of libraryItems) {
+		const sourceInstance = item.sourceInstance ?? null;
+		const items = itemsBySourceInstance.get(sourceInstance) ?? [];
+		items.push(item);
+		itemsBySourceInstance.set(sourceInstance, items);
+	}
+	for (const [sourceInstance, items] of itemsBySourceInstance) {
+		await syncLibraryItems({
+			source: LibraryItemSource.DATA,
+			sourceInstance,
+			itemsToUpsert: items,
+			pruneMissing: options.pruneMissing ?? false,
+		});
+	}
+	if (options.pruneMissing) {
+		for (const dataDir of dataDirs) {
+			if (itemsBySourceInstance.has(dataDir)) continue;
+			await syncLibraryItems({
+				source: LibraryItemSource.DATA,
+				sourceInstance: dataDir,
+				pruneMissing: true,
+			});
+		}
+	}
 	return dataRows.length;
 }
 
@@ -236,6 +304,9 @@ export async function getDataByFuzzyName(
 	await inBatches(entriesToDelete, async (batch) => {
 		await db("data").whereIn("path", batch).del();
 		await db("ensemble").whereIn("path", batch).del();
+		await markLibraryItemsMissingBySourceKeys(
+			batch.map(createDataLibrarySourceKey),
+		);
 	});
 	return (
 		await mapAsync(potentialMatches, (dbData) =>
