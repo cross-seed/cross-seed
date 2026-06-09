@@ -1,0 +1,284 @@
+import { db } from "./db.js";
+import type { File } from "./searchee.js";
+import { inBatches } from "./utils.js";
+
+export enum LibraryItemSource {
+	CLIENT = "torrentClient",
+	TORRENT = "torrentFile",
+	DATA = "dataDir",
+}
+
+export enum LibraryScanStatus {
+	RUNNING = "running",
+	SUCCEEDED = "succeeded",
+	FAILED = "failed",
+}
+
+export interface LibraryScan {
+	id: number;
+	source: LibraryItemSource;
+	sourceInstance: string | null;
+	status: LibraryScanStatus;
+	startedAt: number;
+	finishedAt: number | null;
+	error: string | null;
+	itemsSeen: number;
+	itemsUpserted: number;
+	itemsRemoved: number;
+}
+
+export interface LibraryItemInput {
+	source: LibraryItemSource;
+	sourceKey: string;
+	sourceInstance?: string | null;
+	clientHost?: string | null;
+	infoHash?: string | null;
+	path?: string | null;
+	name: string;
+	title: string;
+	files: File[];
+	length: number;
+	savePath?: string | null;
+	category?: string | null;
+	tags?: string[] | null;
+	trackers?: string[] | null;
+	contentFingerprint?: string | null;
+}
+
+interface LibraryScanRow {
+	id: number;
+	source: string;
+	source_instance: string | null;
+	status: string;
+	started_at: number;
+	finished_at: number | null;
+	error: string | null;
+	items_seen: number;
+	items_upserted: number;
+	items_removed: number;
+}
+
+function deserializeScan(row: LibraryScanRow): LibraryScan {
+	return {
+		id: row.id,
+		source: row.source as LibraryItemSource,
+		sourceInstance: row.source_instance,
+		status: row.status as LibraryScanStatus,
+		startedAt: row.started_at,
+		finishedAt: row.finished_at,
+		error: row.error,
+		itemsSeen: row.items_seen,
+		itemsUpserted: row.items_upserted,
+		itemsRemoved: row.items_removed,
+	};
+}
+
+export function createClientLibrarySourceKey(input: {
+	clientHost: string;
+	infoHash: string;
+}): string {
+	return `${LibraryItemSource.CLIENT}:${input.clientHost}:${input.infoHash}`;
+}
+
+export function createTorrentLibrarySourceKey(filePath: string): string {
+	return `${LibraryItemSource.TORRENT}:${filePath}`;
+}
+
+export function createDataLibrarySourceKey(path: string): string {
+	return `${LibraryItemSource.DATA}:${path}`;
+}
+
+export async function beginLibraryScan(input: {
+	source: LibraryItemSource;
+	sourceInstance?: string | null;
+	now?: number;
+}): Promise<LibraryScan> {
+	const now = input.now ?? Date.now();
+	const [scan] = await db("library_scan")
+		.insert({
+			source: input.source,
+			source_instance: input.sourceInstance ?? null,
+			status: LibraryScanStatus.RUNNING,
+			started_at: now,
+		})
+		.returning("*");
+
+	return deserializeScan(scan);
+}
+
+export async function getLibraryScan(id: number): Promise<LibraryScan | null> {
+	const scan = await db("library_scan").where({ id }).first();
+	return scan ? deserializeScan(scan) : null;
+}
+
+async function incrementScanCounts(
+	scanId: number,
+	counts: {
+		itemsSeen?: number;
+		itemsUpserted?: number;
+		itemsRemoved?: number;
+	},
+): Promise<void> {
+	await db("library_scan")
+		.where({ id: scanId })
+		.increment("items_seen", counts.itemsSeen ?? 0)
+		.increment("items_upserted", counts.itemsUpserted ?? 0)
+		.increment("items_removed", counts.itemsRemoved ?? 0);
+}
+
+export async function upsertLibraryItems(
+	scanId: number,
+	items: LibraryItemInput[],
+	options: { now?: number } = {},
+): Promise<void> {
+	if (!items.length) return;
+
+	const now = options.now ?? Date.now();
+	const rows = items.map((item) => ({
+		source: item.source,
+		source_instance: item.sourceInstance ?? null,
+		source_key: item.sourceKey,
+		client_host: item.clientHost ?? null,
+		info_hash: item.infoHash ?? null,
+		path: item.path ?? null,
+		name: item.name,
+		title: item.title,
+		files: JSON.stringify(item.files),
+		length: item.length,
+		save_path: item.savePath ?? null,
+		category: item.category ?? null,
+		tags: item.tags ? JSON.stringify(item.tags) : null,
+		trackers: item.trackers ? JSON.stringify(item.trackers) : null,
+		content_fingerprint: item.contentFingerprint ?? null,
+		first_seen_at: now,
+		last_seen_at: now,
+		last_indexed_at: now,
+		missing_since: null,
+		last_seen_scan_id: scanId,
+		updated_at: now,
+	}));
+
+	await inBatches(rows, async (batch) => {
+		await db("library_item")
+			.insert(batch)
+			.onConflict("source_key")
+			.merge([
+				"source",
+				"source_instance",
+				"client_host",
+				"info_hash",
+				"path",
+				"name",
+				"title",
+				"files",
+				"length",
+				"save_path",
+				"category",
+				"tags",
+				"trackers",
+				"content_fingerprint",
+				"last_seen_at",
+				"last_indexed_at",
+				"missing_since",
+				"last_seen_scan_id",
+				"updated_at",
+			]);
+	});
+	await incrementScanCounts(scanId, {
+		itemsSeen: items.length,
+		itemsUpserted: items.length,
+	});
+}
+
+export async function markLibraryItemsSeen(
+	scanId: number,
+	sourceKeys: string[],
+	options: { now?: number } = {},
+): Promise<void> {
+	if (!sourceKeys.length) return;
+
+	const now = options.now ?? Date.now();
+	await inBatches(sourceKeys, async (batch) => {
+		await db("library_item").whereIn("source_key", batch).update({
+			last_seen_at: now,
+			last_seen_scan_id: scanId,
+			missing_since: null,
+			updated_at: now,
+		});
+	});
+	await incrementScanCounts(scanId, { itemsSeen: sourceKeys.length });
+}
+
+export async function completeLibraryScan(
+	scanId: number,
+	options: { now?: number } = {},
+): Promise<LibraryScan> {
+	await db("library_scan")
+		.where({ id: scanId })
+		.update({
+			status: LibraryScanStatus.SUCCEEDED,
+			finished_at: options.now ?? Date.now(),
+			error: null,
+		});
+
+	const scan = await getLibraryScan(scanId);
+	if (!scan) throw new Error(`Library scan ${scanId} not found`);
+	return scan;
+}
+
+export async function failLibraryScan(
+	scanId: number,
+	error: unknown,
+	options: { now?: number } = {},
+): Promise<LibraryScan> {
+	await db("library_scan")
+		.where({ id: scanId })
+		.update({
+			status: LibraryScanStatus.FAILED,
+			finished_at: options.now ?? Date.now(),
+			error: error instanceof Error ? error.message : String(error),
+		});
+
+	const scan = await getLibraryScan(scanId);
+	if (!scan) throw new Error(`Library scan ${scanId} not found`);
+	return scan;
+}
+
+export async function pruneMissingLibraryItems(
+	scanId: number,
+	options: { now?: number } = {},
+): Promise<number> {
+	const scan = await getLibraryScan(scanId);
+	if (!scan) throw new Error(`Library scan ${scanId} not found`);
+	if (scan.status !== LibraryScanStatus.SUCCEEDED) {
+		throw new Error(
+			`Cannot prune library items for ${scan.status} scan ${scanId}`,
+		);
+	}
+
+	const now = options.now ?? Date.now();
+	const query = db("library_item")
+		.where({
+			source: scan.source,
+			missing_since: null,
+		})
+		.where((builder) => {
+			if (scan.sourceInstance === null) {
+				builder.whereNull("source_instance");
+			} else {
+				builder.where("source_instance", scan.sourceInstance);
+			}
+		})
+		.where((builder) => {
+			builder
+				.whereNull("last_seen_scan_id")
+				.orWhere("last_seen_scan_id", "!=", scanId);
+		});
+	const itemsRemoved = await query.update({
+		missing_since: now,
+		updated_at: now,
+	});
+
+	await incrementScanCounts(scanId, { itemsRemoved });
+	return itemsRemoved;
+}
