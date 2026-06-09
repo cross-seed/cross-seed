@@ -167,6 +167,7 @@ export function createTorrentLibraryItemInput(
 	searchee: SearcheeWithInfoHash,
 	filePath: string,
 	sourceInstance: string,
+	options: { contentFingerprint?: string | null } = {},
 ): LibraryItemInput {
 	return {
 		source: LibraryItemSource.TORRENT,
@@ -181,17 +182,19 @@ export function createTorrentLibraryItemInput(
 		category: searchee.category ?? null,
 		tags: searchee.tags ?? null,
 		trackers: searchee.trackers ?? null,
-		contentFingerprint: createContentFingerprint({
-			infoHash: searchee.infoHash,
-			path: filePath,
-			name: searchee.name,
-			title: searchee.title,
-			files: searchee.files,
-			length: searchee.length,
-			category: searchee.category ?? null,
-			tags: searchee.tags ?? null,
-			trackers: searchee.trackers ?? null,
-		}),
+		contentFingerprint:
+			options.contentFingerprint ??
+			createContentFingerprint({
+				infoHash: searchee.infoHash,
+				path: filePath,
+				name: searchee.name,
+				title: searchee.title,
+				files: searchee.files,
+				length: searchee.length,
+				category: searchee.category ?? null,
+				tags: searchee.tags ?? null,
+				trackers: searchee.trackers ?? null,
+			}),
 	};
 }
 

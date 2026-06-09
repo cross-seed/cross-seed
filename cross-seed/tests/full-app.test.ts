@@ -283,6 +283,14 @@ describe.sequential("full app flows", () => {
 			length: meta.length,
 			missing_since: null,
 		});
+		const torrentStat = await stat(torrentPath);
+		expect(libraryRows[0].content_fingerprint).toBe(
+			JSON.stringify({
+				path: torrentPath,
+				size: torrentStat.size,
+				mtimeMs: torrentStat.mtimeMs,
+			}),
+		);
 
 		await env.indexTorrentsAndDataDirs({ startup: true });
 		const latestScan = await env

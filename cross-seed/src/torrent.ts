@@ -1,4 +1,5 @@
 import { distance } from "fastest-levenshtein";
+import type { Stats } from "fs";
 import { readdir, readFile, stat } from "fs/promises";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
@@ -34,6 +35,7 @@ import {
 	markLibraryItemsMissingBySourceKeys,
 	syncLibraryItems,
 } from "./libraryInventory.js";
+import type { LibraryItemInput } from "./libraryInventory.js";
 import { Label, logger, logOnce } from "./logger.js";
 import {
 	Metafile,
@@ -78,6 +80,21 @@ import {
 export interface TorrentLocator {
 	infoHash?: string;
 	path?: string;
+}
+
+interface TorrentLibraryItemRow {
+	source_key: string;
+	info_hash: string | null;
+	path: string | null;
+	name: string;
+	title: string;
+	files: string;
+	length: number;
+	category: string | null;
+	tags: string | null;
+	trackers: string | null;
+	content_fingerprint: string | null;
+	missing_since: number | null;
 }
 
 export interface FilenameMetadata {
@@ -490,21 +507,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 				message: "Indexing torrentDir for reverse lookup...",
 			});
 			try {
-				searchees = await loadTorrentDirLight(torrentDir);
-				await syncLibraryItems({
-					source: LibraryItemSource.TORRENT,
-					sourceInstance: torrentDir,
-					itemsToUpsert: searchees
-						.filter((searchee) => searchee.path)
-						.map((searchee) =>
-							createTorrentLibraryItemInput(
-								searchee,
-								searchee.path!,
-								torrentDir,
-							),
-						),
-					pruneMissing: true,
-				});
+				searchees = await loadTorrentDirIncremental(torrentDir);
 			} catch (error) {
 				if (!isRecoverableTorrentDirError(error)) throw error;
 				logRecoverableTorrentDirError(torrentDir, error);
@@ -819,6 +822,126 @@ export async function loadTorrentDirLight(
 			});
 		}
 	}
+	return searchees;
+}
+
+function createTorrentFileFingerprint(filePath: string, stats: Stats): string {
+	return JSON.stringify({
+		path: filePath,
+		size: stats.size,
+		mtimeMs: stats.mtimeMs,
+	});
+}
+
+function createSearcheeFromTorrentLibraryItem(
+	row: TorrentLibraryItemRow,
+): SearcheeWithInfoHash | null {
+	if (!row.info_hash || !row.path) return null;
+	return {
+		infoHash: row.info_hash,
+		path: row.path,
+		name: row.name,
+		title: row.title,
+		files: JSON.parse(row.files) as File[],
+		length: row.length,
+		category: row.category ?? undefined,
+		tags: row.tags ? (JSON.parse(row.tags) as string[]) : undefined,
+		trackers: row.trackers
+			? (JSON.parse(row.trackers) as string[])
+			: undefined,
+	};
+}
+
+async function loadTorrentDirIncremental(
+	torrentDir: string,
+): Promise<SearcheeWithInfoHash[]> {
+	const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
+	const sourceKeys = torrentFilePaths.map(createTorrentLibrarySourceKey);
+	const existingRows = await db("library_item")
+		.where({
+			source: LibraryItemSource.TORRENT,
+			source_instance: torrentDir,
+		})
+		.whereIn("source_key", sourceKeys)
+		.select(
+			"source_key",
+			"info_hash",
+			"path",
+			"name",
+			"title",
+			"files",
+			"length",
+			"category",
+			"tags",
+			"trackers",
+			"content_fingerprint",
+			"missing_since",
+		);
+	const existingBySourceKey = new Map(
+		existingRows.map((row) => [row.source_key, row]),
+	);
+
+	const searchees: SearcheeWithInfoHash[] = [];
+	const sourceKeysSeen: string[] = [];
+	const pathsToParse: Array<{
+		filePath: string;
+		fingerprint: string;
+	}> = [];
+	for (const filePath of torrentFilePaths) {
+		const fingerprint = createTorrentFileFingerprint(
+			filePath,
+			await stat(filePath),
+		);
+		const sourceKey = createTorrentLibrarySourceKey(filePath);
+		const existing = existingBySourceKey.get(sourceKey);
+		if (
+			existing &&
+			existing.missing_since === null &&
+			existing.content_fingerprint === fingerprint
+		) {
+			const searchee = createSearcheeFromTorrentLibraryItem(existing);
+			if (searchee) {
+				searchees.push(searchee);
+				sourceKeysSeen.push(sourceKey);
+				continue;
+			}
+		}
+		pathsToParse.push({ filePath, fingerprint });
+	}
+
+	const client = getClients()[0];
+	const torrentInfos =
+		pathsToParse.length && client && client.clientType !== Label.QBITTORRENT
+			? await client.getAllTorrents()
+			: [];
+	const itemsToUpsert: LibraryItemInput[] = [];
+	for (const { filePath, fingerprint } of pathsToParse) {
+		const searcheeResult = await createSearcheeFromTorrentFile(
+			filePath,
+			torrentInfos,
+		);
+		if (searcheeResult.isOk()) {
+			const searchee = {
+				...searcheeResult.unwrap(),
+				path: filePath,
+			};
+			searchees.push(searchee);
+			itemsToUpsert.push(
+				createTorrentLibraryItemInput(searchee, filePath, torrentDir, {
+					contentFingerprint: fingerprint,
+				}),
+			);
+		}
+	}
+
+	await syncLibraryItems({
+		source: LibraryItemSource.TORRENT,
+		sourceInstance: torrentDir,
+		itemsToUpsert,
+		sourceKeysSeen,
+		pruneMissing: true,
+	});
+
 	return searchees;
 }
 
