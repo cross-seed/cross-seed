@@ -264,7 +264,32 @@ export async function upsertLibraryItems(
 	if (!items.length) return;
 
 	const now = options.now ?? Date.now();
-	const rows = items.map((item) => ({
+	const existingRows = await db("library_item")
+		.whereIn(
+			"source_key",
+			items.map((item) => item.sourceKey),
+		)
+		.select("source_key", "content_fingerprint", "missing_since");
+	const existingBySourceKey = new Map(
+		existingRows.map((row) => [row.source_key, row]),
+	);
+	const unchangedSourceKeys: string[] = [];
+	const changedItems = items.filter((item) => {
+		const existing = existingBySourceKey.get(item.sourceKey);
+		if (
+			existing &&
+			existing.missing_since === null &&
+			existing.content_fingerprint === (item.contentFingerprint ?? null)
+		) {
+			unchangedSourceKeys.push(item.sourceKey);
+			return false;
+		}
+		return true;
+	});
+	await markLibraryItemsSeen(scanId, unchangedSourceKeys, { now });
+	if (!changedItems.length) return;
+
+	const rows = changedItems.map((item) => ({
 		source: item.source,
 		source_instance: item.sourceInstance ?? null,
 		source_key: item.sourceKey,
@@ -315,8 +340,8 @@ export async function upsertLibraryItems(
 			]);
 	});
 	await incrementScanCounts(scanId, {
-		itemsSeen: items.length,
-		itemsUpserted: items.length,
+		itemsSeen: changedItems.length,
+		itemsUpserted: changedItems.length,
 	});
 }
 
@@ -333,7 +358,6 @@ export async function markLibraryItemsSeen(
 			last_seen_at: now,
 			last_seen_scan_id: scanId,
 			missing_since: null,
-			updated_at: now,
 		});
 	});
 	await incrementScanCounts(scanId, { itemsSeen: sourceKeys.length });

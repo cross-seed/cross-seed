@@ -213,6 +213,21 @@ describe.sequential("full app flows", () => {
 			missing_since: null,
 		});
 
+		await env.indexTorrentsAndDataDirs({ startup: true });
+		const latestScan = await env
+			.db("library_scan")
+			.where({
+				source: "dataDir",
+				source_instance: dataDir,
+			})
+			.orderBy("id", "desc")
+			.first();
+		expect(latestScan).toMatchObject({
+			items_seen: 1,
+			items_upserted: 0,
+			items_removed: 0,
+		});
+
 		await env.db.destroy();
 	});
 
@@ -267,6 +282,21 @@ describe.sequential("full app flows", () => {
 			title: "Library.Show.S01E02.1080p.WEB-DL-GROUP",
 			length: meta.length,
 			missing_since: null,
+		});
+
+		await env.indexTorrentsAndDataDirs({ startup: true });
+		const latestScan = await env
+			.db("library_scan")
+			.where({
+				source: "torrentFile",
+				source_instance: torrentDir,
+			})
+			.orderBy("id", "desc")
+			.first();
+		expect(latestScan).toMatchObject({
+			items_seen: 1,
+			items_upserted: 0,
+			items_removed: 0,
 		});
 
 		await env.db.destroy();

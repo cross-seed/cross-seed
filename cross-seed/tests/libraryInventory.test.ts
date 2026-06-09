@@ -264,6 +264,65 @@ describe.sequential("library inventory sync", () => {
 		expect(scan?.itemsRemoved).toBe(1);
 	});
 
+	it("marks unchanged fingerprint items seen without rewriting indexed metadata", async () => {
+		const sourceKey =
+			env.inventory.createDataLibrarySourceKey("/media/show");
+		const item = {
+			source: env.inventory.LibraryItemSource.DATA,
+			sourceInstance: "/media",
+			sourceKey,
+			path: "/media/show",
+			name: "Show",
+			title: "Show",
+			files: [
+				{
+					name: "episode.mkv",
+					path: "/media/show/episode.mkv",
+					length: 100,
+				},
+			],
+			length: 100,
+			contentFingerprint: "same-fingerprint",
+		};
+		const firstScan = await env.inventory.beginLibraryScan({
+			source: env.inventory.LibraryItemSource.DATA,
+			sourceInstance: "/media",
+			now: 1_000,
+		});
+		await env.inventory.upsertLibraryItems(firstScan.id, [item], {
+			now: 1_100,
+		});
+		await env.inventory.completeLibraryScan(firstScan.id, { now: 1_200 });
+
+		const secondScan = await env.inventory.beginLibraryScan({
+			source: env.inventory.LibraryItemSource.DATA,
+			sourceInstance: "/media",
+			now: 2_000,
+		});
+		await env.inventory.upsertLibraryItems(secondScan.id, [item], {
+			now: 2_100,
+		});
+
+		const row = await env
+			.db("library_item")
+			.where({ source_key: sourceKey })
+			.first();
+		const scan = await env.inventory.getLibraryScan(secondScan.id);
+
+		expect(row).toMatchObject({
+			first_seen_at: 1_100,
+			last_seen_at: 2_100,
+			last_indexed_at: 1_100,
+			updated_at: 1_100,
+			last_seen_scan_id: secondScan.id,
+		});
+		expect(scan).toMatchObject({
+			itemsSeen: 1,
+			itemsUpserted: 0,
+			itemsRemoved: 0,
+		});
+	});
+
 	it("does not prune inventory from failed scans", async () => {
 		const sourceKey =
 			env.inventory.createDataLibrarySourceKey("/media/show");
