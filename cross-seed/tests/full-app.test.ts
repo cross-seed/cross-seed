@@ -40,6 +40,8 @@ type RuntimeEnv = {
 	getTorrentSavePath: typeof import("../src/torrent.js").getTorrentSavePath;
 	parseMetadataFromFilename: typeof import("../src/torrent.js").parseMetadataFromFilename;
 	indexTorrentsAndDataDirs: typeof import("../src/torrent.js").indexTorrentsAndDataDirs;
+	getInfoHashesToExclude: typeof import("../src/torrent.js").getInfoHashesToExclude;
+	getTorrentByCriteria: typeof import("../src/torrent.js").getTorrentByCriteria;
 	Metafile: typeof import("../src/parseTorrent.js").Metafile;
 };
 
@@ -64,6 +66,8 @@ async function createRuntimeEnv(): Promise<RuntimeEnv> {
 		getTorrentSavePath,
 		parseMetadataFromFilename,
 		indexTorrentsAndDataDirs,
+		getInfoHashesToExclude,
+		getTorrentByCriteria,
 	} = await import("../src/torrent.js");
 	const { Metafile } = await import("../src/parseTorrent.js");
 
@@ -89,6 +93,8 @@ async function createRuntimeEnv(): Promise<RuntimeEnv> {
 		getTorrentSavePath,
 		parseMetadataFromFilename,
 		indexTorrentsAndDataDirs,
+		getInfoHashesToExclude,
+		getTorrentByCriteria,
 		Metafile,
 	};
 }
@@ -291,6 +297,18 @@ describe.sequential("full app flows", () => {
 				mtimeMs: torrentStat.mtimeMs,
 			}),
 		);
+		expect(await env.db("torrent")).toHaveLength(0);
+		await expect(env.getInfoHashesToExclude()).resolves.toContain(
+			meta.infoHash,
+		);
+		await expect(
+			env.getTorrentByCriteria({ infoHash: meta.infoHash }),
+		).resolves.toMatchObject([
+			{
+				infoHash: meta.infoHash,
+				path: torrentPath,
+			},
+		]);
 
 		await env.indexTorrentsAndDataDirs({ startup: true });
 		const latestScan = await env
