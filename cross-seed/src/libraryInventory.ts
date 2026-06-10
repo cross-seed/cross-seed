@@ -60,6 +60,50 @@ export interface LibraryFileInput {
 	length: number;
 }
 
+export interface LibraryInventoryFile {
+	path: string;
+	name: string;
+	length: number;
+}
+
+export interface LibraryInventoryItem {
+	id: number;
+	source: LibraryItemSource;
+	sourceInstance: string | null;
+	sourceKey: string;
+	clientHost: string | null;
+	infoHash: string | null;
+	path: string | null;
+	name: string;
+	title: string;
+	length: number;
+	savePath: string | null;
+	category: string | null;
+	tags: string[] | null;
+	trackers: string[] | null;
+	contentFingerprint: string | null;
+	firstSeenAt: string;
+	lastSeenAt: string;
+	lastIndexedAt: string;
+	updatedAt: string;
+	fileCount: number;
+	files?: LibraryInventoryFile[];
+}
+
+export interface LibraryScanStatusSummary {
+	source: LibraryItemSource;
+	sourceInstance: string | null;
+	status: LibraryScanStatus;
+	startedAt: string;
+	finishedAt: string | null;
+	error: string | null;
+	itemsSeen: number;
+	itemsUpserted: number;
+	itemsRemoved: number;
+	activeItems: number;
+	activeFiles: number;
+}
+
 type SyncLibraryItemsOptions = {
 	source: LibraryItemSource;
 	sourceInstance?: string | null;
@@ -83,6 +127,41 @@ interface LibraryScanRow {
 	items_removed: number;
 }
 
+interface LibraryItemRow {
+	id: number;
+	source: string;
+	source_instance: string | null;
+	source_key: string;
+	client_host: string | null;
+	info_hash: string | null;
+	path: string | null;
+	name: string;
+	title: string;
+	files: string;
+	length: number;
+	save_path: string | null;
+	category: string | null;
+	tags: string | null;
+	trackers: string | null;
+	content_fingerprint: string | null;
+	first_seen_at: number;
+	last_seen_at: number;
+	last_indexed_at: number;
+	updated_at: number;
+	file_count?: string | number;
+}
+
+interface LibraryFileRow {
+	item_source_key: string;
+	path: string;
+	name: string;
+	length: number;
+}
+
+interface CountRow {
+	count: string | number;
+}
+
 function deserializeScan(row: LibraryScanRow): LibraryScan {
 	return {
 		id: row.id,
@@ -95,6 +174,44 @@ function deserializeScan(row: LibraryScanRow): LibraryScan {
 		itemsSeen: row.items_seen,
 		itemsUpserted: row.items_upserted,
 		itemsRemoved: row.items_removed,
+	};
+}
+
+function timestampToISOString(timestamp: number): string {
+	return new Date(timestamp).toISOString();
+}
+
+function parseJsonArray<T>(value: string | null): T[] | null {
+	if (!value) return null;
+	return JSON.parse(value) as T[];
+}
+
+function deserializeInventoryItem(
+	row: LibraryItemRow,
+	files?: LibraryInventoryFile[],
+): LibraryInventoryItem {
+	return {
+		id: row.id,
+		source: row.source as LibraryItemSource,
+		sourceInstance: row.source_instance,
+		sourceKey: row.source_key,
+		clientHost: row.client_host,
+		infoHash: row.info_hash,
+		path: row.path,
+		name: row.name,
+		title: row.title,
+		length: row.length,
+		savePath: row.save_path,
+		category: row.category,
+		tags: parseJsonArray<string>(row.tags),
+		trackers: parseJsonArray<string>(row.trackers),
+		contentFingerprint: row.content_fingerprint,
+		firstSeenAt: timestampToISOString(row.first_seen_at),
+		lastSeenAt: timestampToISOString(row.last_seen_at),
+		lastIndexedAt: timestampToISOString(row.last_indexed_at),
+		updatedAt: timestampToISOString(row.updated_at),
+		fileCount: Number(row.file_count ?? 0),
+		...(files ? { files } : {}),
 	};
 }
 
@@ -265,6 +382,175 @@ export async function beginLibraryScan(input: {
 export async function getLibraryScan(id: number): Promise<LibraryScan | null> {
 	const scan = await db("library_scan").where({ id }).first();
 	return scan ? deserializeScan(scan) : null;
+}
+
+export async function listLibraryItems(options: {
+	source?: LibraryItemSource;
+	sourceInstance?: string | null;
+	search?: string;
+	includeFiles?: boolean;
+	limit?: number;
+	offset?: number;
+}): Promise<{
+	items: LibraryInventoryItem[];
+	total: number;
+	limit: number;
+	offset: number;
+}> {
+	const limit = options.limit ?? 50;
+	const offset = options.offset ?? 0;
+	const query = db("library_item")
+		.whereNull("missing_since")
+		.modify((builder) => {
+			if (options.source) builder.where("source", options.source);
+			if (options.sourceInstance !== undefined) {
+				if (options.sourceInstance === null) {
+					builder.whereNull("source_instance");
+				} else {
+					builder.where("source_instance", options.sourceInstance);
+				}
+			}
+			if (options.search) {
+				builder.where((searchBuilder) => {
+					searchBuilder
+						.where("title", "like", `%${options.search}%`)
+						.orWhere("name", "like", `%${options.search}%`)
+						.orWhere("path", "like", `%${options.search}%`)
+						.orWhere("info_hash", "like", `%${options.search}%`);
+				});
+			}
+		});
+
+	const countRows = (await query
+		.clone()
+		.count<CountRow>({ count: "*" })) as unknown as CountRow[];
+	const rows = (await query
+		.clone()
+		.select("library_item.*")
+		.select(
+			db("library_file")
+				.count("*")
+				.whereRaw(
+					"library_file.item_source_key = library_item.source_key",
+				)
+				.whereNull("library_file.missing_since")
+				.as("file_count"),
+		)
+		.orderBy("last_seen_at", "desc")
+		.orderBy("title", "asc")
+		.limit(limit)
+		.offset(offset)) as unknown as LibraryItemRow[];
+
+	const filesBySourceKey = new Map<string, LibraryInventoryFile[]>();
+	if (options.includeFiles && rows.length) {
+		const fileRows = (await db("library_file")
+			.whereIn(
+				"item_source_key",
+				rows.map((row) => row.source_key),
+			)
+			.whereNull("missing_since")
+			.select("item_source_key", "path", "name", "length")
+			.orderBy("path", "asc")) as unknown as LibraryFileRow[];
+		for (const file of fileRows) {
+			const files = filesBySourceKey.get(file.item_source_key) ?? [];
+			files.push({
+				path: file.path,
+				name: file.name,
+				length: file.length,
+			});
+			filesBySourceKey.set(file.item_source_key, files);
+		}
+	}
+
+	return {
+		items: rows.map((row) =>
+			deserializeInventoryItem(
+				row,
+				options.includeFiles
+					? (filesBySourceKey.get(row.source_key) ?? [])
+					: undefined,
+			),
+		),
+		total: Number(countRows[0]?.count ?? 0),
+		limit,
+		offset,
+	};
+}
+
+export async function getLibraryScanStatuses(
+	options: {
+		source?: LibraryItemSource;
+		sourceInstance?: string | null;
+	} = {},
+): Promise<LibraryScanStatusSummary[]> {
+	const scans = (await db("library_scan")
+		.modify((builder) => {
+			if (options.source) builder.where("source", options.source);
+			if (options.sourceInstance !== undefined) {
+				if (options.sourceInstance === null) {
+					builder.whereNull("source_instance");
+				} else {
+					builder.where("source_instance", options.sourceInstance);
+				}
+			}
+		})
+		.orderBy("id", "desc")) as unknown as LibraryScanRow[];
+
+	const latestScans = new Map<string, LibraryScanRow>();
+	for (const scan of scans) {
+		const key = `${scan.source}\0${scan.source_instance ?? ""}`;
+		if (!latestScans.has(key)) latestScans.set(key, scan);
+	}
+
+	return Promise.all(
+		Array.from(latestScans.values()).map(async (scan) => {
+			const scope = { source: scan.source };
+			const itemCountQuery = db("library_item")
+				.where(scope)
+				.whereNull("missing_since")
+				.modify((builder) => {
+					if (scan.source_instance === null) {
+						builder.whereNull("source_instance");
+					} else {
+						builder.where("source_instance", scan.source_instance);
+					}
+				});
+			const fileCountQuery = db("library_file")
+				.where(scope)
+				.whereNull("missing_since")
+				.modify((builder) => {
+					if (scan.source_instance === null) {
+						builder.whereNull("source_instance");
+					} else {
+						builder.where("source_instance", scan.source_instance);
+					}
+				});
+			const [itemCount, fileCount] = (await Promise.all([
+				itemCountQuery.count<CountRow>({
+					count: "*",
+				}),
+				fileCountQuery.count<CountRow>({
+					count: "*",
+				}),
+			])) as unknown as [CountRow[], CountRow[]];
+			return {
+				source: scan.source as LibraryItemSource,
+				sourceInstance: scan.source_instance,
+				status: scan.status as LibraryScanStatus,
+				startedAt: timestampToISOString(scan.started_at),
+				finishedAt:
+					scan.finished_at !== null
+						? timestampToISOString(scan.finished_at)
+						: null,
+				error: scan.error,
+				itemsSeen: scan.items_seen,
+				itemsUpserted: scan.items_upserted,
+				itemsRemoved: scan.items_removed,
+				activeItems: Number(itemCount[0]?.count ?? 0),
+				activeFiles: Number(fileCount[0]?.count ?? 0),
+			};
+		}),
+	);
 }
 
 async function incrementScanCounts(

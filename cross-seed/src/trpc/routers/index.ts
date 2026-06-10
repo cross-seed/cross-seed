@@ -9,6 +9,7 @@ import { healthRouter } from "./health.js";
 import { searcheesRouter } from "./searchees.js";
 import { clientsRouter } from "./clients.js";
 import { metaRouter } from "./meta.js";
+import { libraryRouter } from "./library.js";
 
 // Main app router
 export const appRouter = router({
@@ -22,6 +23,7 @@ export const appRouter = router({
 	searchees: searcheesRouter,
 	clients: clientsRouter,
 	meta: metaRouter,
+	library: libraryRouter,
 });
 
 // Export type definition of API
