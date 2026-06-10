@@ -1,6 +1,6 @@
 import { FSWatcher, watch } from "fs";
 import { readdir, readFile, stat } from "fs/promises";
-import { basename, dirname, extname, join, resolve, sep } from "path";
+import { basename, dirname, extname, join, relative, resolve, sep } from "path";
 import {
 	IGNORED_FOLDERS_SUBSTRINGS,
 	LEVENSHTEIN_DIVISOR,
@@ -8,6 +8,7 @@ import {
 } from "./constants.js";
 import { db } from "./db.js";
 import {
+	createLibraryFileInputs,
 	createDataLibraryItemInput,
 	createDataLibrarySourceKey,
 	LibraryItemSource,
@@ -45,6 +46,17 @@ import { distance } from "fastest-levenshtein";
 interface DataEntry {
 	title: string;
 	path: string;
+}
+
+interface DataFileStat {
+	path: string;
+	name: string;
+	length: number;
+}
+
+interface DataRootCandidate {
+	path: string;
+	files: File[];
 }
 
 const watchers: Map<string, FSWatcher> = new Map();
@@ -95,19 +107,29 @@ export async function indexDataDirs(options: {
 			modifiedPathTimes.set(dataDir, new Map());
 			watchers.set(dataDir, createWatcher(dataDir));
 		}
-		const searcheePaths = await findSearcheesFromAllDataDirs();
+		const searcheeCandidates =
+			await findSearcheeCandidatesFromAllDataDirs();
 		const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
 		if (await exists(maxUserWatchesPath)) {
 			const limit = parseInt(await readFile(maxUserWatchesPath, "utf8"));
-			if (limit < searcheePaths.length * 2) {
+			if (limit < searcheeCandidates.length * 2) {
 				logger.error(
 					`max_user_watches too low for proper indexing of dataDirs. It is recommended to set fs.inotify.max_user_watches=1048576 in /etc/sysctl.conf (only on the host system if using docker) - current: ${limit}`,
 				);
 			}
 		}
-		const numEntries = await indexDataPaths(searcheePaths, {
-			pruneMissing: true,
-		});
+		const numEntries = await indexDataPaths(
+			searcheeCandidates.map((candidate) => candidate.path),
+			{
+				pruneMissing: true,
+				precomputedFiles: new Map(
+					searcheeCandidates.map((candidate) => [
+						candidate.path,
+						candidate.files,
+					]),
+				),
+			},
+		);
 		logger.info(`Validated ${numEntries} entries from dataDirs...`);
 	}
 
@@ -171,7 +193,10 @@ export async function indexDataDirs(options: {
  */
 async function indexDataPaths(
 	paths: string[],
-	options: { pruneMissing?: boolean } = {},
+	options: {
+		pruneMissing?: boolean;
+		precomputedFiles?: Map<string, File[]>;
+	} = {},
 ): Promise<number> {
 	const { dataDirs, seasonFromEpisodes } = getRuntimeConfig();
 	const memoizedPaths = new Map<string, string[]>();
@@ -185,27 +210,24 @@ async function indexDataPaths(
 		if (processed % 500 === 0) {
 			await yieldToEventLoop();
 		}
-		const files = await getFilesFromDataRoot(
-			path,
-			memoizedPaths,
-			memoizedLengths,
-		);
+		const files =
+			options.precomputedFiles?.get(path) ??
+			(await getFilesFromDataRoot(path, memoizedPaths, memoizedLengths));
 		if (!files.length) continue;
 		const title = parseTitle(basename(path), files, path);
 		if (!title) continue;
-		libraryItems.push(
-			createDataLibraryItemInput(
-				{
-					infoHash: undefined,
-					path,
-					files,
-					name: basename(path),
-					title,
-					length: files.reduce((sum, file) => sum + file.length, 0),
-				},
-				getDataSourceInstance(path, dataDirs),
-			),
+		const libraryItem = createDataLibraryItemInput(
+			{
+				infoHash: undefined,
+				path,
+				files,
+				name: basename(path),
+				title,
+				length: files.reduce((sum, file) => sum + file.length, 0),
+			},
+			getDataSourceInstance(path, dataDirs),
 		);
+		libraryItems.push(libraryItem);
 		dataRows.push({ title, path });
 		if (seasonFromEpisodes) {
 			const ensembleEntries = indexEnsembleDataEntry(title, path, files);
@@ -233,6 +255,7 @@ async function indexDataPaths(
 			source: LibraryItemSource.DATA,
 			sourceInstance,
 			itemsToUpsert: items,
+			filesToUpsert: items.flatMap(createLibraryFileInputs),
 			pruneMissing: options.pruneMissing ?? false,
 		});
 	}
@@ -360,6 +383,87 @@ export async function findPotentialNestedRoots(
 		logger.debug(e);
 		return [];
 	}
+}
+
+function createFilesForRoot(root: string, files: DataFileStat[]): File[] {
+	const parentDir = dirname(root);
+	return files.map((file) => ({
+		path: relative(parentDir, file.path),
+		name: file.name,
+		length: file.length,
+	}));
+}
+
+async function collectPotentialNestedRootCandidates(
+	root: string,
+	depth: number,
+	isDirHint?: boolean,
+): Promise<{ candidates: DataRootCandidate[]; files: DataFileStat[] }> {
+	try {
+		const rootStat = isDirHint !== undefined ? null : await stat(root);
+		const isDir =
+			isDirHint !== undefined ? isDirHint : rootStat!.isDirectory();
+
+		if (!isDir) {
+			const fileStat = rootStat ?? (await stat(root));
+			const files = [
+				{
+					path: root,
+					name: basename(root),
+					length: fileStat.size,
+				},
+			];
+			if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir)) {
+				return { candidates: [], files };
+			}
+			return {
+				candidates: [
+					{ path: root, files: createFilesForRoot(root, files) },
+				],
+				files,
+			};
+		}
+
+		const directChildren = await readdir(root, { withFileTypes: true });
+		const childResults = await mapAsync(directChildren, (dirent) =>
+			collectPotentialNestedRootCandidates(
+				join(root, dirent.name),
+				depth - 1,
+				dirent.isDirectory(),
+			),
+		);
+		const files = childResults.flatMap((result) => result.files);
+		const candidates = childResults.flatMap((result) => result.candidates);
+		if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir)) {
+			return { candidates: [], files };
+		}
+		return {
+			candidates: [
+				...candidates,
+				{ path: root, files: createFilesForRoot(root, files) },
+			],
+			files,
+		};
+	} catch (e) {
+		logger.verbose(`Failed to process path ${root}: ${errorMessage(e)}`);
+		logger.debug(e);
+		return { candidates: [], files: [] };
+	}
+}
+
+async function findSearcheeCandidatesFromAllDataDirs(): Promise<
+	DataRootCandidate[]
+> {
+	const { dataDirs, maxDataDepth } = getRuntimeConfig();
+	return flatMapAsync(dataDirs, async (dataDir) =>
+		flatMapAsync(await readdir(dataDir), async (dirent) => {
+			const result = await collectPotentialNestedRootCandidates(
+				join(dataDir, dirent),
+				maxDataDepth,
+			);
+			return result.candidates;
+		}),
+	);
 }
 
 export async function findSearcheesFromAllDataDirs(): Promise<string[]> {

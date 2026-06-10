@@ -323,6 +323,115 @@ describe.sequential("library inventory sync", () => {
 		});
 	});
 
+	it("syncs file rows and tombstones them with missing items", async () => {
+		const sourceKey =
+			env.inventory.createDataLibrarySourceKey("/media/show");
+		const item = {
+			source: env.inventory.LibraryItemSource.DATA,
+			sourceInstance: "/media",
+			sourceKey,
+			path: "/media/show",
+			name: "Show",
+			title: "Show",
+			files: [
+				{
+					name: "episode.mkv",
+					path: "show/episode.mkv",
+					length: 100,
+				},
+			],
+			length: 100,
+		};
+
+		const scan = await env.inventory.syncLibraryItems({
+			source: env.inventory.LibraryItemSource.DATA,
+			sourceInstance: "/media",
+			itemsToUpsert: [item],
+			filesToUpsert: env.inventory.createLibraryFileInputs(item),
+			pruneMissing: true,
+			now: 1_000,
+		});
+
+		const fileRow = await env
+			.db("library_file")
+			.where({ item_source_key: sourceKey })
+			.first();
+		expect(fileRow).toMatchObject({
+			source: env.inventory.LibraryItemSource.DATA,
+			source_instance: "/media",
+			path: "show/episode.mkv",
+			name: "episode.mkv",
+			length: 100,
+			first_seen_at: 1_000,
+			last_seen_at: 1_000,
+			last_seen_scan_id: scan.id,
+			missing_since: null,
+		});
+
+		const replacementScan = await env.inventory.syncLibraryItems({
+			source: env.inventory.LibraryItemSource.DATA,
+			sourceInstance: "/media",
+			itemsToUpsert: [
+				{
+					...item,
+					files: [
+						{
+							name: "episode-2.mkv",
+							path: "show/episode-2.mkv",
+							length: 200,
+						},
+					],
+					length: 200,
+				},
+			],
+			filesToUpsert: env.inventory.createLibraryFileInputs({
+				...item,
+				files: [
+					{
+						name: "episode-2.mkv",
+						path: "show/episode-2.mkv",
+						length: 200,
+					},
+				],
+				length: 200,
+			}),
+			now: 1_500,
+		});
+
+		const fileRowsAfterReplacement = await env
+			.db("library_file")
+			.where({ item_source_key: sourceKey })
+			.orderBy("path");
+		expect(fileRowsAfterReplacement).toHaveLength(2);
+		expect(fileRowsAfterReplacement).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					path: "show/episode.mkv",
+					missing_since: 1_500,
+				}),
+				expect.objectContaining({
+					path: "show/episode-2.mkv",
+					length: 200,
+					last_seen_scan_id: replacementScan.id,
+					missing_since: null,
+				}),
+			]),
+		);
+
+		await env.inventory.markLibraryItemsMissingBySourceKeys([sourceKey], {
+			now: 2_000,
+		});
+
+		const missingFileRow = await env
+			.db("library_file")
+			.where({ item_source_key: sourceKey })
+			.first();
+		expect(missingFileRow).toMatchObject({
+			missing_since: 2_000,
+			updated_at: 2_000,
+		});
+	});
+
 	it("does not prune inventory from failed scans", async () => {
 		const sourceKey =
 			env.inventory.createDataLibrarySourceKey("/media/show");

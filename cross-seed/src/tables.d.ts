@@ -66,6 +66,32 @@ declare module "knex/types/tables.js" {
 		updated_at: number;
 	}
 
+	interface LibraryFile {
+		id: number;
+		source: string;
+		source_instance: string | null;
+		item_source_key: string;
+		path: string;
+		name: string;
+		length: number;
+		first_seen_at: number;
+		last_seen_at: number;
+		missing_since: number | null;
+		last_seen_scan_id: number | null;
+		updated_at: number;
+	}
+
+	type LibraryFileInsert = Omit<
+		LibraryFile,
+		"id" | "source_instance" | "missing_since" | "last_seen_scan_id"
+	> &
+		Partial<
+			Pick<
+				LibraryFile,
+				"source_instance" | "missing_since" | "last_seen_scan_id"
+			>
+		>;
+
 	type LibraryItemInsert = Omit<
 		LibraryItem,
 		| "id"
@@ -169,6 +195,13 @@ declare module "knex/types/tables.js" {
 		decision: Knex.CompositeTableType<Decision, Omit<Decision, "id">>;
 		indexer: Knex.CompositeTableType<Indexer, Omit<Indexer, "id">>;
 		job_log: Knex.CompositeTableType<JobLog, Omit<JobLog, "id">>;
+		library_file: Knex.CompositeTableType<
+			LibraryFile,
+			LibraryFileInsert,
+			Partial<
+				Omit<LibraryFile, "id" | "item_source_key" | "first_seen_at">
+			>
+		>;
 		library_item: Knex.CompositeTableType<
 			LibraryItem,
 			LibraryItemInsert,

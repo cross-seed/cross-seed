@@ -51,10 +51,20 @@ export interface LibraryItemInput {
 	contentFingerprint?: string | null;
 }
 
+export interface LibraryFileInput {
+	source: LibraryItemSource;
+	sourceInstance?: string | null;
+	itemSourceKey: string;
+	path: string;
+	name: string;
+	length: number;
+}
+
 type SyncLibraryItemsOptions = {
 	source: LibraryItemSource;
 	sourceInstance?: string | null;
 	itemsToUpsert?: LibraryItemInput[];
+	filesToUpsert?: LibraryFileInput[];
 	sourceKeysSeen?: string[];
 	pruneMissing?: boolean;
 	now?: number;
@@ -221,6 +231,19 @@ export function createDataLibraryItemInput(
 	};
 }
 
+export function createLibraryFileInputs(
+	item: LibraryItemInput,
+): LibraryFileInput[] {
+	return item.files.map((file) => ({
+		source: item.source,
+		sourceInstance: item.sourceInstance ?? null,
+		itemSourceKey: item.sourceKey,
+		path: file.path,
+		name: file.name,
+		length: file.length,
+	}));
+}
+
 export async function beginLibraryScan(input: {
 	source: LibraryItemSource;
 	sourceInstance?: string | null;
@@ -366,6 +389,107 @@ export async function markLibraryItemsSeen(
 	await incrementScanCounts(scanId, { itemsSeen: sourceKeys.length });
 }
 
+export async function upsertLibraryFiles(
+	scanId: number,
+	files: LibraryFileInput[],
+	options: { now?: number } = {},
+): Promise<void> {
+	if (!files.length) return;
+
+	const now = options.now ?? Date.now();
+	const rows = files.map((file) => ({
+		source: file.source,
+		source_instance: file.sourceInstance ?? null,
+		item_source_key: file.itemSourceKey,
+		path: file.path,
+		name: file.name,
+		length: file.length,
+		first_seen_at: now,
+		last_seen_at: now,
+		missing_since: null,
+		last_seen_scan_id: scanId,
+		updated_at: now,
+	}));
+
+	await inBatches(rows, async (batch) => {
+		await db("library_file")
+			.insert(batch)
+			.onConflict(["item_source_key", "path"])
+			.merge([
+				"source",
+				"source_instance",
+				"name",
+				"length",
+				"last_seen_at",
+				"missing_since",
+				"last_seen_scan_id",
+				"updated_at",
+			]);
+	});
+}
+
+export async function pruneMissingLibraryFiles(
+	scanId: number,
+	options: { now?: number } = {},
+): Promise<number> {
+	const scan = await getLibraryScan(scanId);
+	if (!scan) throw new Error(`Library scan ${scanId} not found`);
+	if (scan.status !== LibraryScanStatus.SUCCEEDED) {
+		throw new Error(
+			`Cannot prune library files for ${scan.status} scan ${scanId}`,
+		);
+	}
+
+	const now = options.now ?? Date.now();
+	const query = db("library_file")
+		.where({
+			source: scan.source,
+			missing_since: null,
+		})
+		.where((builder) => {
+			if (scan.sourceInstance === null) {
+				builder.whereNull("source_instance");
+			} else {
+				builder.where("source_instance", scan.sourceInstance);
+			}
+		})
+		.where((builder) => {
+			builder
+				.whereNull("last_seen_scan_id")
+				.orWhere("last_seen_scan_id", "!=", scanId);
+		});
+	return query.update({
+		missing_since: now,
+		updated_at: now,
+	});
+}
+
+export async function pruneMissingLibraryFilesForItems(
+	scanId: number,
+	itemSourceKeys: string[],
+	options: { now?: number } = {},
+): Promise<number> {
+	if (!itemSourceKeys.length) return 0;
+
+	const now = options.now ?? Date.now();
+	let filesRemoved = 0;
+	await inBatches(itemSourceKeys, async (batch) => {
+		filesRemoved += await db("library_file")
+			.whereIn("item_source_key", batch)
+			.whereNull("missing_since")
+			.where((builder) => {
+				builder
+					.whereNull("last_seen_scan_id")
+					.orWhere("last_seen_scan_id", "!=", scanId);
+			})
+			.update({
+				missing_since: now,
+				updated_at: now,
+			});
+	});
+	return filesRemoved;
+}
+
 export async function completeLibraryScan(
 	scanId: number,
 	options: { now?: number } = {},
@@ -456,6 +580,13 @@ export async function markLibraryItemsMissingBySourceKeys(
 				missing_since: now,
 				updated_at: now,
 			});
+		await db("library_file")
+			.whereIn("item_source_key", batch)
+			.whereNull("missing_since")
+			.update({
+				missing_since: now,
+				updated_at: now,
+			});
 	});
 	return itemsRemoved;
 }
@@ -475,11 +606,26 @@ export async function syncLibraryItems(
 		await markLibraryItemsSeen(scan.id, options.sourceKeysSeen ?? [], {
 			now: options.now,
 		});
+		await upsertLibraryFiles(scan.id, options.filesToUpsert ?? [], {
+			now: options.now,
+		});
 		const completedScan = await completeLibraryScan(scan.id, {
 			now: options.now,
 		});
+		await pruneMissingLibraryFilesForItems(
+			scan.id,
+			Array.from(
+				new Set(
+					(options.filesToUpsert ?? []).map(
+						(file) => file.itemSourceKey,
+					),
+				),
+			),
+			{ now: options.now },
+		);
 		if (options.pruneMissing) {
 			await pruneMissingLibraryItems(scan.id, { now: options.now });
+			await pruneMissingLibraryFiles(scan.id, { now: options.now });
 			return (await getLibraryScan(scan.id)) ?? completedScan;
 		}
 		return completedScan;

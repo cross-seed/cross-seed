@@ -207,14 +207,26 @@ describe.sequential("full app flows", () => {
 			source: "dataDir",
 			source_instance: dataDir,
 		});
+		const libraryFileRows = await env.db("library_file").where({
+			source: "dataDir",
+			source_instance: dataDir,
+		});
 
 		expect(dataRows).toHaveLength(1);
 		expect(libraryRows).toHaveLength(1);
+		expect(libraryFileRows).toHaveLength(1);
 		expect(libraryRows[0]).toMatchObject({
 			source_key: `dataDir:${filePath}`,
 			path: filePath,
 			name: fileName,
 			title: fileName,
+			length: fileSize,
+			missing_since: null,
+		});
+		expect(libraryFileRows[0]).toMatchObject({
+			item_source_key: `dataDir:${filePath}`,
+			path: fileName,
+			name: fileName,
 			length: fileSize,
 			missing_since: null,
 		});
