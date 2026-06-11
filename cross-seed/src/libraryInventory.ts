@@ -90,6 +90,11 @@ export interface LibraryInventoryItem {
 	files?: LibraryInventoryFile[];
 }
 
+export interface LibrarySourceCount {
+	source: LibraryItemSource;
+	count: number;
+}
+
 export interface LibraryScanStatusSummary {
 	source: LibraryItemSource;
 	sourceInstance: string | null;
@@ -159,6 +164,11 @@ interface LibraryFileRow {
 }
 
 interface CountRow {
+	count: string | number;
+}
+
+interface SourceCountRow {
+	source: string;
 	count: string | number;
 }
 
@@ -391,39 +401,70 @@ export async function listLibraryItems(options: {
 	includeFiles?: boolean;
 	limit?: number;
 	offset?: number;
+	sortBy?: "lastSeenAt" | "title" | "length" | "source";
+	sortDirection?: "asc" | "desc";
 }): Promise<{
 	items: LibraryInventoryItem[];
 	total: number;
 	limit: number;
 	offset: number;
+	sourceCounts: LibrarySourceCount[];
 }> {
 	const limit = options.limit ?? 50;
 	const offset = options.offset ?? 0;
-	const query = db("library_item")
-		.whereNull("missing_since")
-		.modify((builder) => {
-			if (options.source) builder.where("source", options.source);
-			if (options.sourceInstance !== undefined) {
-				if (options.sourceInstance === null) {
-					builder.whereNull("source_instance");
-				} else {
-					builder.where("source_instance", options.sourceInstance);
+	const sortBy = options.sortBy ?? "lastSeenAt";
+	const sortDirection = options.sortDirection ?? "desc";
+	const createQuery = (filterOptions: { includeSource: boolean }) =>
+		db("library_item")
+			.whereNull("missing_since")
+			.modify((queryBuilder) => {
+				if (filterOptions.includeSource && options.source) {
+					queryBuilder.where("source", options.source);
 				}
-			}
-			if (options.search) {
-				builder.where((searchBuilder) => {
-					searchBuilder
-						.where("title", "like", `%${options.search}%`)
-						.orWhere("name", "like", `%${options.search}%`)
-						.orWhere("path", "like", `%${options.search}%`)
-						.orWhere("info_hash", "like", `%${options.search}%`);
-				});
-			}
-		});
+				if (options.sourceInstance !== undefined) {
+					if (options.sourceInstance === null) {
+						queryBuilder.whereNull("source_instance");
+					} else {
+						queryBuilder.where(
+							"source_instance",
+							options.sourceInstance,
+						);
+					}
+				}
+				if (options.search) {
+					queryBuilder.where((searchBuilder) => {
+						searchBuilder
+							.where("title", "like", `%${options.search}%`)
+							.orWhere("name", "like", `%${options.search}%`)
+							.orWhere("path", "like", `%${options.search}%`)
+							.orWhere(
+								"info_hash",
+								"like",
+								`%${options.search}%`,
+							);
+					});
+				}
+			});
+	const query = createQuery({ includeSource: true });
+	const sourceCountsQuery = createQuery({
+		includeSource: false,
+	});
+	const sortColumn = {
+		lastSeenAt: "last_seen_at",
+		title: "title",
+		length: "length",
+		source: "source",
+	}[sortBy];
 
 	const countRows = (await query
 		.clone()
 		.count<CountRow>({ count: "*" })) as unknown as CountRow[];
+	const sourceCountRows = (await sourceCountsQuery
+		.clone()
+		.select("source")
+		.count<SourceCountRow>({ count: "*" })
+		.groupBy("source")
+		.orderBy("source", "asc")) as unknown as SourceCountRow[];
 	const rows = (await query
 		.clone()
 		.select("library_item.*")
@@ -436,7 +477,7 @@ export async function listLibraryItems(options: {
 				.whereNull("library_file.missing_since")
 				.as("file_count"),
 		)
-		.orderBy("last_seen_at", "desc")
+		.orderBy(sortColumn, sortDirection)
 		.orderBy("title", "asc")
 		.limit(limit)
 		.offset(offset)) as unknown as LibraryItemRow[];
@@ -474,6 +515,10 @@ export async function listLibraryItems(options: {
 		total: Number(countRows[0]?.count ?? 0),
 		limit,
 		offset,
+		sourceCounts: sourceCountRows.map((row) => ({
+			source: row.source as LibraryItemSource,
+			count: Number(row.count),
+		})),
 	};
 }
 

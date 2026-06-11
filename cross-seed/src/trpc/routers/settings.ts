@@ -10,6 +10,34 @@ import { parseRuntimeConfig } from "../../configSchema.js";
 import { sendTestNotification } from "../../pushNotifier.js";
 import { reloadDownloadClients } from "../../clients/TorrentClient.js";
 import { errorMessage } from "../../utils.js";
+import { indexTorrentsAndDataDirs } from "../../torrent.js";
+import type { RuntimeConfig } from "../../runtimeConfig.js";
+
+function arrayContentsChanged(a: string[], b: string[]): boolean {
+	if (a.length !== b.length) return true;
+	return a.some((value, index) => value !== b[index]);
+}
+
+function torrentSourceConfigChanged(
+	before: RuntimeConfig,
+	after: RuntimeConfig,
+): boolean {
+	return (
+		before.useClientTorrents !== after.useClientTorrents ||
+		before.torrentDir !== after.torrentDir ||
+		arrayContentsChanged(before.dataDirs ?? [], after.dataDirs ?? [])
+	);
+}
+
+function triggerLibraryIndexing(): void {
+	void indexTorrentsAndDataDirs({ startup: true }).catch((error) => {
+		logger.error({
+			label: Label.INDEX,
+			message: `Failed to index library after source config update: ${errorMessage(error)}`,
+		});
+		logger.debug(error);
+	});
+}
 
 export const settingsRouter = router({
 	get: authedProcedure.query(async () => {
@@ -39,19 +67,24 @@ export const settingsRouter = router({
 					label: Label.SERVER,
 					message: `Saving config updates...`,
 				});
+				const previousConfig = getRuntimeConfig();
 
 				// Save to database
 				await updateDbConfig(input);
 
 				// Update in-memory config with the merged result
 				const updatedOverrides = await getDbConfig();
-				setRuntimeConfig({
+				const updatedConfig = {
 					...getDefaultRuntimeConfig(),
 					...updatedOverrides,
-				});
+				};
+				setRuntimeConfig(updatedConfig);
 
 				// Keep in-process torrent clients in sync with updated settings.
 				reloadDownloadClients();
+				if (torrentSourceConfigChanged(previousConfig, updatedConfig)) {
+					triggerLibraryIndexing();
+				}
 
 				return { success: true };
 			} catch (error) {
@@ -103,6 +136,7 @@ export const settingsRouter = router({
 					label: Label.SERVER,
 					message: `Replacing full config...`,
 				});
+				const previousConfig = getRuntimeConfig();
 
 				const parsedConfig = parseRuntimeConfig(
 					input satisfies Record<string, unknown>,
@@ -111,10 +145,15 @@ export const settingsRouter = router({
 
 				// Update in-memory config so changes are visible immediately
 				const sanitizedInput = omitUndefined(parsedConfig);
-				setRuntimeConfig({
+				const updatedConfig = {
 					...getDefaultRuntimeConfig(),
 					...sanitizedInput,
-				});
+				};
+				setRuntimeConfig(updatedConfig);
+				reloadDownloadClients();
+				if (torrentSourceConfigChanged(previousConfig, updatedConfig)) {
+					triggerLibraryIndexing();
+				}
 
 				return { success: true };
 			} catch (error) {

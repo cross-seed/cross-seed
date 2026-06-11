@@ -1,11 +1,9 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, authedProcedure } from "../index.js";
-import { db } from "../../db.js";
-import { findAllSearchees, bulkSearchByNames } from "../../pipeline.js";
-import { Label } from "../../logger.js";
-import { getSearcheeSource } from "../../searchee.js";
+import { bulkSearchByNames } from "../../pipeline.js";
 import { getAllIndexers, getEnabledIndexers } from "../../indexers.js";
+import { listLibraryItems } from "../../libraryInventory.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_BULK_SEARCH = 20;
@@ -32,118 +30,35 @@ export const searcheesRouter = router({
 		.query(async ({ input }) => {
 			const { search, limit, offset } = input;
 
-			let query = db("searchee");
-			if (search) {
-				query = query.where("searchee.name", "like", `%${search}%`);
-			}
-
-			const [{ count }] = await query
-				.clone()
-				.count<{ count: string | number }>({ count: "*" });
-
-			const rows = await query
-				.clone()
-				.leftJoin("timestamp", "searchee.id", "timestamp.searchee_id")
-				.select({
-					dbId: "searchee.id",
-					name: "searchee.name",
-				})
-				.min({
-					firstSearched: "timestamp.first_searched",
-				})
-				.max({
-					lastSearched: "timestamp.last_searched",
-				})
-				.countDistinct({
-					indexerCount: "timestamp.indexer_id",
-				})
-				.groupBy("searchee.id", "searchee.name")
-				.orderBy("lastSearched", "desc")
-				.orderBy("firstSearched", "desc")
-				.orderBy("name", "asc")
-				.limit(limit)
-				.offset(offset);
-
-			const [allSearchees, allIndexers, enabledIndexers] =
+			const [libraryItems, allIndexers, enabledIndexers] =
 				await Promise.all([
-					findAllSearchees(Label.SEARCH),
+					listLibraryItems({ search, limit, offset }),
 					getAllIndexers(),
 					getEnabledIndexers(),
 				]);
 
-			// TODO: drop the in-memory metadata lookup when searchee rows expose persistent IDs directly via TRPC.
-			const searcheeMeta = new Map<
-				string,
-				(typeof allSearchees)[number]
-			>();
-			for (const searchee of allSearchees) {
-				const keyCandidates = [searchee.title, searchee.name].filter(
-					(candidate): candidate is string =>
-						typeof candidate === "string" && candidate.length > 0,
-				);
-				for (const key of keyCandidates) {
-					if (!searcheeMeta.has(key)) {
-						searcheeMeta.set(key, searchee);
-					}
-				}
-			}
-
-			const items = rows.map((row) => {
-				const displayName =
-					// @ts-expect-error something funky going on with knex types
-					typeof row.name === "string" && row.name.length
-						? row.name
-						: "(unknown)";
-				const meta =
-					searcheeMeta.get(displayName) ??
-					searcheeMeta.get(displayName.trim());
-
-				const idCandidate =
-					(typeof row.dbId === "number"
-						? row.dbId
-						: row.dbId != null
-							? Number(row.dbId)
-							: null) ??
-					meta?.infoHash ??
-					meta?.path ??
-					displayName;
-
-				return {
-					id:
-						typeof idCandidate === "number"
-							? idCandidate
-							: String(idCandidate),
-					name: displayName,
-					indexerCount:
-						typeof row.indexerCount === "number"
-							? row.indexerCount
-							: Number(row.indexerCount ?? 0),
-					firstSearchedAt:
-						row.firstSearched != null
-							? new Date(Number(row.firstSearched)).toISOString()
-							: null,
-					lastSearchedAt:
-						row.lastSearched != null
-							? new Date(Number(row.lastSearched)).toISOString()
-							: null,
-					label: meta?.label ?? null,
-					source: meta ? getSearcheeSource(meta) : null,
-					length: meta?.length ?? null,
-					clientHost: meta?.clientHost ?? null,
-				};
-			});
-
 			return {
-				total: Number(count ?? 0),
+				total: libraryItems.total,
 				pagination: {
 					limit,
 					offset,
 				},
+				sourceCounts: libraryItems.sourceCounts,
 				indexerTotals: {
 					configured: allIndexers.length,
 					enabled: enabledIndexers.length,
 				},
-				items,
+				items: libraryItems.items.map((item) => ({
+					id: item.sourceKey,
+					name: item.title || item.name,
+					indexerCount: 0,
+					firstSearchedAt: null,
+					lastSearchedAt: null,
+					label: null,
+					source: item.source,
+					length: item.length,
+					clientHost: item.clientHost,
+				})),
 			};
 		}),
 	bulkSearch: authedProcedure

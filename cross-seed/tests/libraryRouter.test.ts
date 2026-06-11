@@ -107,6 +107,16 @@ describe.sequential("library router", () => {
 			total: 1,
 			limit: 50,
 			offset: 0,
+			sourceCounts: [
+				{
+					source: env.inventory.LibraryItemSource.DATA,
+					count: 1,
+				},
+				{
+					source: env.inventory.LibraryItemSource.CLIENT,
+					count: 1,
+				},
+			],
 			items: [
 				{
 					source: env.inventory.LibraryItemSource.DATA,
@@ -129,6 +139,53 @@ describe.sequential("library router", () => {
 			],
 		});
 		expect(result.items[0].lastSeenAt).toBe("1970-01-01T00:00:01.000Z");
+	});
+
+	it("returns library rows through searchees.list without search history rows", async () => {
+		const sourceKey =
+			env.inventory.createDataLibrarySourceKey("/media/show");
+		await env.inventory.syncLibraryItems({
+			source: env.inventory.LibraryItemSource.DATA,
+			sourceInstance: "/media",
+			itemsToUpsert: [
+				{
+					source: env.inventory.LibraryItemSource.DATA,
+					sourceInstance: "/media",
+					sourceKey,
+					path: "/media/show",
+					name: "Show",
+					title: "Show S01",
+					files: [],
+					length: 100,
+				},
+			],
+			now: 1_000,
+		});
+
+		expect(await env.db("searchee")).toHaveLength(0);
+
+		const result = await createCaller(env).searchees.list({
+			search: "Show",
+		});
+
+		expect(result).toMatchObject({
+			total: 1,
+			sourceCounts: [
+				{
+					source: env.inventory.LibraryItemSource.DATA,
+					count: 1,
+				},
+			],
+			items: [
+				{
+					id: sourceKey,
+					name: "Show S01",
+					source: env.inventory.LibraryItemSource.DATA,
+					length: 100,
+					clientHost: null,
+				},
+			],
+		});
 	});
 
 	it("returns the latest scan status with active inventory counts", async () => {
