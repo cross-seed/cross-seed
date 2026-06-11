@@ -217,7 +217,7 @@ function LibraryPage() {
   const clearSelection = () => setSelectedItems(new Map());
 
   const bulkSearchMutation = useMutation(
-    trpc.searchees.bulkSearch.mutationOptions({
+    trpc.library.bulkSearch.mutationOptions({
       onSuccess: (result) => {
         const { attempted, totalFound, skipped } = result;
         if (attempted === 0) {

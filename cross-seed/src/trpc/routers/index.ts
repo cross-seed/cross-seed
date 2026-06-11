@@ -6,7 +6,6 @@ import { jobsRouter } from "./jobs.js";
 import { statsRouter } from "./stats.js";
 import { indexersRouter } from "./indexers.js";
 import { healthRouter } from "./health.js";
-import { searcheesRouter } from "./searchees.js";
 import { clientsRouter } from "./clients.js";
 import { metaRouter } from "./meta.js";
 import { libraryRouter } from "./library.js";
@@ -20,7 +19,6 @@ export const appRouter = router({
 	stats: statsRouter,
 	indexers: indexersRouter,
 	health: healthRouter,
-	searchees: searcheesRouter,
 	clients: clientsRouter,
 	meta: metaRouter,
 	library: libraryRouter,
