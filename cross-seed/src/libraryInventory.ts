@@ -14,6 +14,8 @@ export enum LibraryItemSource {
 	DATA = "dataDir",
 }
 
+export type LibraryItemSourceValue = `${LibraryItemSource}`;
+
 export enum LibraryScanStatus {
 	RUNNING = "running",
 	SUCCEEDED = "succeeded",
@@ -68,7 +70,7 @@ export interface LibraryInventoryFile {
 
 export interface LibraryInventoryItem {
 	id: number;
-	source: LibraryItemSource;
+	source: LibraryItemSourceValue;
 	sourceInstance: string | null;
 	sourceKey: string;
 	clientHost: string | null;
@@ -91,12 +93,12 @@ export interface LibraryInventoryItem {
 }
 
 export interface LibrarySourceCount {
-	source: LibraryItemSource;
+	source: LibraryItemSourceValue;
 	count: number;
 }
 
 export interface LibraryScanStatusSummary {
-	source: LibraryItemSource;
+	source: LibraryItemSourceValue;
 	sourceInstance: string | null;
 	status: LibraryScanStatus;
 	startedAt: string;
@@ -202,7 +204,7 @@ function deserializeInventoryItem(
 ): LibraryInventoryItem {
 	return {
 		id: row.id,
-		source: row.source as LibraryItemSource,
+		source: row.source as LibraryItemSourceValue,
 		sourceInstance: row.source_instance,
 		sourceKey: row.source_key,
 		clientHost: row.client_host,
@@ -395,7 +397,7 @@ export async function getLibraryScan(id: number): Promise<LibraryScan | null> {
 }
 
 export async function listLibraryItems(options: {
-	source?: LibraryItemSource;
+	source?: LibraryItemSourceValue;
 	sourceInstance?: string | null;
 	search?: string;
 	includeFiles?: boolean;
@@ -516,7 +518,7 @@ export async function listLibraryItems(options: {
 		limit,
 		offset,
 		sourceCounts: sourceCountRows.map((row) => ({
-			source: row.source as LibraryItemSource,
+			source: row.source as LibraryItemSourceValue,
 			count: Number(row.count),
 		})),
 	};
@@ -524,7 +526,7 @@ export async function listLibraryItems(options: {
 
 export async function getLibraryScanStatuses(
 	options: {
-		source?: LibraryItemSource;
+		source?: LibraryItemSourceValue;
 		sourceInstance?: string | null;
 	} = {},
 ): Promise<LibraryScanStatusSummary[]> {

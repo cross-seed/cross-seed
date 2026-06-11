@@ -2,11 +2,10 @@ import { z } from "zod";
 import { authedProcedure, router } from "../index.js";
 import {
 	getLibraryScanStatuses,
-	LibraryItemSource,
 	listLibraryItems,
 } from "../../libraryInventory.js";
 
-const librarySourceSchema = z.nativeEnum(LibraryItemSource);
+const librarySourceSchema = z.enum(["torrentClient", "torrentFile", "dataDir"]);
 
 const libraryScopeSchema = z.object({
 	source: librarySourceSchema.optional(),
