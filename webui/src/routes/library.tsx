@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { useTRPC } from "@/lib/trpc";
 import {
   Table,
@@ -59,6 +59,13 @@ function toBoolean(value: boolean | "indeterminate"): boolean {
 
 const PAGE_SIZE = 25;
 const MAX_BULK_SELECTION = 20;
+const EMPTY_LIBRARY_DATA = {
+  items: [],
+  total: 0,
+  limit: PAGE_SIZE,
+  offset: 0,
+  sourceCounts: [],
+};
 
 const SOURCE_LABELS: Record<LibrarySource, string> = {
   torrentClient: "Client",
@@ -118,8 +125,10 @@ function LibraryPage() {
     [page, search, sortBy, sortDirection, sourceFilter],
   );
 
-  const query = useSuspenseQuery(
-    trpc.library.listItems.queryOptions(queryInput),
+  const query = useQuery(
+    trpc.library.listItems.queryOptions(queryInput, {
+      placeholderData: keepPreviousData,
+    }),
   );
   const scanQuery = useQuery(
     trpc.library.getScanStatuses.queryOptions(undefined, {
@@ -132,7 +141,7 @@ function LibraryPage() {
     }),
   );
 
-  const { data, isFetching } = query;
+  const { data = EMPTY_LIBRARY_DATA, isFetching, isLoading } = query;
   const items = data.items;
   const scans = scanQuery.data ?? [];
   const sourceCounts = data.sourceCounts;
@@ -470,7 +479,11 @@ function LibraryPage() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border">
+      <div
+        className={`overflow-x-auto rounded-lg border transition-opacity ${
+          isFetching && !isLoading ? "opacity-70" : ""
+        }`}
+      >
         <Table>
           <TableHeader className="bg-muted sticky top-0 z-10">
             <TableRow className="border-b">
