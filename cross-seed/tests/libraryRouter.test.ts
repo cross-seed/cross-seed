@@ -141,6 +141,49 @@ describe.sequential("library router", () => {
 		expect(result.items[0].lastSeenAt).toBe("1970-01-01T00:00:01.000Z");
 	});
 
+	it("paginates library items with a stable cursor", async () => {
+		const items = ["/media/a", "/media/b", "/media/c"].map((path) => ({
+			source: env.inventory.LibraryItemSource.DATA,
+			sourceInstance: "/media",
+			sourceKey: env.inventory.createDataLibrarySourceKey(path),
+			path,
+			name: path.split("/").at(-1) ?? path,
+			title: "Same Title",
+			files: [],
+			length: 100,
+		}));
+		await env.inventory.syncLibraryItems({
+			source: env.inventory.LibraryItemSource.DATA,
+			sourceInstance: "/media",
+			itemsToUpsert: items,
+			now: 1_000,
+		});
+
+		const firstPage = await createCaller(env).library.listItems({
+			limit: 2,
+			sortBy: "title",
+			sortDirection: "asc",
+		});
+
+		expect(firstPage.items.map((item) => item.sourceKey)).toEqual([
+			items[0].sourceKey,
+			items[1].sourceKey,
+		]);
+		expect(firstPage.nextCursor).toEqual(expect.any(String));
+
+		const secondPage = await createCaller(env).library.listItems({
+			limit: 2,
+			cursor: firstPage.nextCursor,
+			sortBy: "title",
+			sortDirection: "asc",
+		});
+
+		expect(secondPage.items.map((item) => item.sourceKey)).toEqual([
+			items[2].sourceKey,
+		]);
+		expect(secondPage.nextCursor).toBeNull();
+	});
+
 	it("returns library rows through searchees.list without search history rows", async () => {
 		const sourceKey =
 			env.inventory.createDataLibrarySourceKey("/media/show");

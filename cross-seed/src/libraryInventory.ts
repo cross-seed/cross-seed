@@ -174,6 +174,23 @@ interface SourceCountRow {
 	count: string | number;
 }
 
+type LibraryItemSortBy = "lastSeenAt" | "title" | "length" | "source";
+type LibraryItemSortDirection = "asc" | "desc";
+
+type LibraryItemsCursor = {
+	sortBy: LibraryItemSortBy;
+	sortDirection: LibraryItemSortDirection;
+	value: string | number;
+	sourceKey: string;
+};
+
+const libraryItemSortColumns = {
+	lastSeenAt: "last_seen_at",
+	title: "title",
+	length: "length",
+	source: "source",
+} as const satisfies Record<LibraryItemSortBy, keyof LibraryItemRow>;
+
 function deserializeScan(row: LibraryScanRow): LibraryScan {
 	return {
 		id: row.id,
@@ -225,6 +242,42 @@ function deserializeInventoryItem(
 		fileCount: Number(row.file_count ?? 0),
 		...(files ? { files } : {}),
 	};
+}
+
+function encodeLibraryItemsCursor(
+	row: LibraryItemRow,
+	sortBy: LibraryItemSortBy,
+	sortDirection: LibraryItemSortDirection,
+): string {
+	const cursor: LibraryItemsCursor = {
+		sortBy,
+		sortDirection,
+		value: row[libraryItemSortColumns[sortBy]],
+		sourceKey: row.source_key,
+	};
+	return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeLibraryItemsCursor(
+	cursor: string | null | undefined,
+): LibraryItemsCursor | null {
+	if (!cursor) return null;
+	const parsed = JSON.parse(
+		Buffer.from(cursor, "base64url").toString("utf8"),
+	) as Partial<LibraryItemsCursor>;
+	if (
+		(parsed.sortBy !== "lastSeenAt" &&
+			parsed.sortBy !== "title" &&
+			parsed.sortBy !== "length" &&
+			parsed.sortBy !== "source") ||
+		(parsed.sortDirection !== "asc" && parsed.sortDirection !== "desc") ||
+		(typeof parsed.value !== "string" &&
+			typeof parsed.value !== "number") ||
+		typeof parsed.sourceKey !== "string"
+	) {
+		throw new Error("Invalid library items cursor");
+	}
+	return parsed as LibraryItemsCursor;
 }
 
 export function createClientLibrarySourceKey(input: {
@@ -403,19 +456,22 @@ export async function listLibraryItems(options: {
 	includeFiles?: boolean;
 	limit?: number;
 	offset?: number;
-	sortBy?: "lastSeenAt" | "title" | "length" | "source";
-	sortDirection?: "asc" | "desc";
+	cursor?: string | null;
+	sortBy?: LibraryItemSortBy;
+	sortDirection?: LibraryItemSortDirection;
 }): Promise<{
 	items: LibraryInventoryItem[];
 	total: number;
 	limit: number;
 	offset: number;
+	nextCursor: string | null;
 	sourceCounts: LibrarySourceCount[];
 }> {
 	const limit = options.limit ?? 50;
 	const offset = options.offset ?? 0;
 	const sortBy = options.sortBy ?? "lastSeenAt";
 	const sortDirection = options.sortDirection ?? "desc";
+	const cursor = decodeLibraryItemsCursor(options.cursor);
 	const createQuery = (filterOptions: { includeSource: boolean }) =>
 		db("library_item")
 			.whereNull("missing_since")
@@ -451,12 +507,7 @@ export async function listLibraryItems(options: {
 	const sourceCountsQuery = createQuery({
 		includeSource: false,
 	});
-	const sortColumn = {
-		lastSeenAt: "last_seen_at",
-		title: "title",
-		length: "length",
-		source: "source",
-	}[sortBy];
+	const sortColumn = libraryItemSortColumns[sortBy];
 
 	const countRows = (await query
 		.clone()
@@ -479,17 +530,43 @@ export async function listLibraryItems(options: {
 				.whereNull("library_file.missing_since")
 				.as("file_count"),
 		)
+		.modify((queryBuilder) => {
+			if (!cursor) return;
+			if (
+				cursor.sortBy !== sortBy ||
+				cursor.sortDirection !== sortDirection
+			) {
+				throw new Error(
+					"Library items cursor sort does not match query",
+				);
+			}
+			queryBuilder.where((cursorBuilder) => {
+				cursorBuilder
+					.where(
+						sortColumn,
+						sortDirection === "asc" ? ">" : "<",
+						cursor.value,
+					)
+					.orWhere((tieBuilder) => {
+						tieBuilder
+							.where(sortColumn, cursor.value)
+							.where("source_key", ">", cursor.sourceKey);
+					});
+			});
+		})
 		.orderBy(sortColumn, sortDirection)
-		.orderBy("title", "asc")
-		.limit(limit)
-		.offset(offset)) as unknown as LibraryItemRow[];
+		.orderBy("source_key", "asc")
+		.limit(limit + 1)
+		.offset(cursor ? 0 : offset)) as unknown as LibraryItemRow[];
+	const nextRow = rows.length > limit ? rows[limit] : null;
+	const pageRows = rows.slice(0, limit);
 
 	const filesBySourceKey = new Map<string, LibraryInventoryFile[]>();
-	if (options.includeFiles && rows.length) {
+	if (options.includeFiles && pageRows.length) {
 		const fileRows = (await db("library_file")
 			.whereIn(
 				"item_source_key",
-				rows.map((row) => row.source_key),
+				pageRows.map((row) => row.source_key),
 			)
 			.whereNull("missing_since")
 			.select("item_source_key", "path", "name", "length")
@@ -506,7 +583,7 @@ export async function listLibraryItems(options: {
 	}
 
 	return {
-		items: rows.map((row) =>
+		items: pageRows.map((row) =>
 			deserializeInventoryItem(
 				row,
 				options.includeFiles
@@ -517,6 +594,13 @@ export async function listLibraryItems(options: {
 		total: Number(countRows[0]?.count ?? 0),
 		limit,
 		offset,
+		nextCursor: nextRow
+			? encodeLibraryItemsCursor(
+					pageRows[pageRows.length - 1],
+					sortBy,
+					sortDirection,
+				)
+			: null,
 		sourceCounts: sourceCountRows.map((row) => ({
 			source: row.source as LibraryItemSourceValue,
 			count: Number(row.count),

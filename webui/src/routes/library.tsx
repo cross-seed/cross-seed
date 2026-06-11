@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+} from "@tanstack/react-query";
 import { useTRPC } from "@/lib/trpc";
 import {
   Table,
@@ -29,15 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Folder,
-  Loader2,
-  Search,
-  Server,
-} from "lucide-react";
+import { ChevronDown, Folder, Loader2, Search, Server } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/library")({
@@ -60,6 +57,7 @@ const EMPTY_LIBRARY_DATA = {
   total: 0,
   limit: PAGE_SIZE,
   offset: 0,
+  nextCursor: null,
   sourceCounts: [],
 };
 
@@ -94,7 +92,7 @@ function formatTimestamp(value: string | null) {
 
 function LibraryPage() {
   const trpc = useTRPC();
-  const [page, setPage] = useState(0);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sortBy, setSortBy] = useState<SortBy>("lastSeenAt");
@@ -108,15 +106,16 @@ function LibraryPage() {
       search: search.trim() || undefined,
       source: sourceFilter === "all" ? undefined : sourceFilter,
       limit: PAGE_SIZE,
-      offset: page * PAGE_SIZE,
       sortBy,
       sortDirection,
     }),
-    [page, search, sortBy, sortDirection, sourceFilter],
+    [search, sortBy, sortDirection, sourceFilter],
   );
 
-  const query = useQuery(
-    trpc.library.listItems.queryOptions(queryInput, {
+  const query = useInfiniteQuery(
+    trpc.library.listItems.infiniteQueryOptions(queryInput, {
+      initialCursor: null,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
       placeholderData: keepPreviousData,
     }),
   );
@@ -131,10 +130,19 @@ function LibraryPage() {
     }),
   );
 
-  const { data = EMPTY_LIBRARY_DATA, isFetching, isLoading } = query;
-  const items = data.items;
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isLoading,
+  } = query;
+  const pages = data?.pages ?? [EMPTY_LIBRARY_DATA];
+  const firstPage = pages[0] ?? EMPTY_LIBRARY_DATA;
+  const items = pages.flatMap((page) => page.items);
   const scans = scanQuery.data ?? [];
-  const sourceCounts = data.sourceCounts;
+  const sourceCounts = firstPage.sourceCounts;
   const totalIndexed = sourceCounts.reduce((sum, row) => sum + row.count, 0);
   const activeScanCount = scans.filter((scan) =>
     isScanStatus(scan.status, "running"),
@@ -143,28 +151,31 @@ function LibraryPage() {
     isScanStatus(scan.status, "failed"),
   ).length;
   const latestScan = scans[0] ?? null;
+  const loadedTotal = firstPage.total;
 
   useEffect(() => {
-    setPage(0);
-  }, [search, sortBy, sortDirection, sourceFilter]);
+    const target = loadMoreRef.current;
+    if (!target || !hasNextPage) return;
 
-  useEffect(() => {
-    if (page * PAGE_SIZE < data.total) return;
-    if (data.total === 0) {
-      setPage(0);
-      return;
-    }
-    const newPage = Math.max(0, Math.ceil(data.total / PAGE_SIZE) - 1);
-    if (newPage !== page) {
-      setPage(newPage);
-    }
-  }, [data.total, page]);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting || isFetchingNextPage) return;
+        void fetchNextPage();
+      },
+      { rootMargin: "400px" },
+    );
 
-  const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
-  const canGoPrev = page > 0;
-  const canGoNext = (page + 1) * PAGE_SIZE < data.total;
-  const rangeStart = data.total === 0 ? 0 : page * PAGE_SIZE + 1;
-  const rangeEnd = data.total === 0 ? 0 : page * PAGE_SIZE + items.length;
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const loadMore = () => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
+  };
+
+  const rangeStart = loadedTotal === 0 ? 0 : 1;
+  const rangeEnd = items.length;
 
   const allSelectedOnPage =
     items.length > 0 &&
@@ -276,7 +287,7 @@ function LibraryPage() {
             )}
           </div>
           <p className="text-muted-foreground text-sm">
-            Showing {rangeStart}-{rangeEnd} of {data.total} indexed items
+            Showing {rangeStart}-{rangeEnd} of {loadedTotal} indexed items
             {scanSummary ? ` · ${scanSummary}` : ""}
           </p>
         </div>
@@ -333,33 +344,6 @@ function LibraryPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <span>
-              Page {Math.min(page + 1, totalPages)} of {totalPages}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setPage((prev) => Math.max(0, prev - 1))}
-                disabled={!canGoPrev || isFetching}
-              >
-                <span className="sr-only">Go to previous page</span>
-                <ChevronLeft className="size-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setPage((prev) => prev + 1)}
-                disabled={!canGoNext || isFetching}
-              >
-                <span className="sr-only">Go to next page</span>
-                <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -446,7 +430,7 @@ function LibraryPage() {
             <TableRow className="border-b">
               <TableHead className="w-10">
                 <Checkbox
-                  aria-label="Select all items on this page"
+                  aria-label="Select all loaded items"
                   checked={
                     allSelectedOnPage
                       ? true
@@ -541,6 +525,27 @@ function LibraryPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+      <div
+        ref={loadMoreRef}
+        className="text-muted-foreground flex min-h-10 items-center justify-center text-sm"
+      >
+        {hasNextPage ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={loadMore}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : null}
+            Load more
+          </Button>
+        ) : loadedTotal > 0 ? (
+          <span>All indexed items loaded</span>
+        ) : null}
       </div>
     </Page>
   );

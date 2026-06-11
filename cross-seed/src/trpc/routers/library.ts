@@ -21,6 +21,7 @@ export const libraryRouter = router({
 					includeFiles: z.boolean().default(false),
 					limit: z.number().int().min(1).max(200).default(50),
 					offset: z.number().int().min(0).default(0),
+					cursor: z.string().nullable().optional(),
 					sortBy: z
 						.enum(["lastSeenAt", "title", "length", "source"])
 						.default("lastSeenAt"),
@@ -30,6 +31,7 @@ export const libraryRouter = router({
 					includeFiles: false,
 					limit: 50,
 					offset: 0,
+					cursor: null,
 					sortBy: "lastSeenAt",
 					sortDirection: "desc",
 				}),
