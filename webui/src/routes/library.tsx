@@ -33,11 +33,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Database,
   Folder,
-  HardDrive,
   Loader2,
   Search,
   Server,
@@ -71,12 +67,6 @@ const SOURCE_LABELS: Record<LibrarySource, string> = {
   torrentClient: "Client",
   torrentFile: "Torrent dir",
   dataDir: "Data dir",
-};
-
-const SOURCE_ICONS: Record<LibrarySource, typeof Server> = {
-  torrentClient: Server,
-  torrentFile: HardDrive,
-  dataDir: Folder,
 };
 
 function isScanStatus(status: unknown, value: string): boolean {
@@ -261,22 +251,49 @@ function LibraryPage() {
     bulkSearchMutation.mutate({ names, force });
   };
 
+  const scanSummary = latestScan
+    ? `Latest ${getSourceLabel(latestScan.source)} scan ${formatTimestamp(
+        latestScan.finishedAt ?? latestScan.startedAt,
+      )} · saw ${latestScan.itemsSeen} item${
+        latestScan.itemsSeen === 1 ? "" : "s"
+      }`
+    : null;
+
   return (
     <Page>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Library</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold">Library</h1>
+            {activeScanCount > 0 && (
+              <Badge variant="secondary">
+                <Loader2 className="size-3 animate-spin" />
+                Indexing
+              </Badge>
+            )}
+            {activeScanCount === 0 && failedScanCount > 0 && (
+              <Badge variant="destructive">Indexing failed</Badge>
+            )}
+          </div>
           <p className="text-muted-foreground text-sm">
             Showing {rangeStart}-{rangeEnd} of {data.total} indexed items
+            {scanSummary ? ` · ${scanSummary}` : ""}
           </p>
         </div>
-        <div className="bg-muted/30 text-muted-foreground flex flex-col gap-2 rounded-lg border px-3 py-2 text-sm lg:flex-row lg:items-center lg:gap-4">
-          <div className="flex items-center gap-2">
-            <span>
-              {selectedCount > 0
-                ? `${selectedCount} item${selectedCount === 1 ? "" : "s"} selected`
-                : "No items selected"}
-            </span>
+        <div className="text-muted-foreground flex flex-wrap items-center justify-end gap-3 text-sm">
+          {selectedCount > 0 && (
+            <div className="flex items-center gap-2">
+              <span>
+                {selectedCount} item{selectedCount === 1 ? "" : "s"} selected
+              </span>
+              {selectedCount > MAX_BULK_SELECTION && (
+                <span className="text-destructive text-xs">
+                  Limit {MAX_BULK_SELECTION}
+                </span>
+              )}
+            </div>
+          )}
+          {selectedCount > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -315,23 +332,12 @@ function LibraryPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-          <div className="bg-border hidden h-4 w-px lg:block" />
+          )}
           <div className="flex items-center gap-2 text-sm font-medium">
             <span>
               Page {Math.min(page + 1, totalPages)} of {totalPages}
             </span>
             <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="hidden h-7 w-7 p-0 lg:flex"
-                onClick={() => setPage(0)}
-                disabled={!canGoPrev || isFetching}
-              >
-                <span className="sr-only">Go to first page</span>
-                <ChevronsLeft className="size-4" />
-              </Button>
               <Button
                 variant="outline"
                 size="icon"
@@ -352,70 +358,55 @@ function LibraryPage() {
                 <span className="sr-only">Go to next page</span>
                 <ChevronRight className="size-4" />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="hidden h-7 w-7 p-0 lg:flex"
-                onClick={() => setPage(totalPages - 1)}
-                disabled={!canGoNext || isFetching}
-              >
-                <span className="sr-only">Go to last page</span>
-                <ChevronsRight className="size-4" />
-              </Button>
             </div>
           </div>
-          {selectedCount > MAX_BULK_SELECTION && (
-            <span className="text-destructive text-xs">
-              Bulk search is limited to {MAX_BULK_SELECTION} items at a time.
-            </span>
-          )}
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant={sourceFilter === "all" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setSourceFilter("all")}
-        >
-          <Database className="mr-2 size-4" />
-          All
-          <span className="ml-2 text-xs opacity-80">{totalIndexed}</span>
-        </Button>
-        {(["torrentClient", "torrentFile", "dataDir"] as const).map(
-          (source) => {
-            const Icon = SOURCE_ICONS[source];
-            const count =
-              sourceCounts.find((row) => row.source === source)?.count ?? 0;
-            return (
-              <Button
-                key={source}
-                type="button"
-                variant={sourceFilter === source ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSourceFilter(source)}
-              >
-                <Icon className="mr-2 size-4" />
-                {getSourceLabel(source)}
-                <span className="ml-2 text-xs opacity-80">{count}</span>
-              </Button>
-            );
-          },
-        )}
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-1 items-center gap-2">
-          <Search className="text-muted-foreground size-4" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Filter by title, path, or hash"
-            className="max-w-md"
-          />
+        <div className="flex flex-wrap items-center gap-1">
+          <Button
+            type="button"
+            variant={sourceFilter === "all" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setSourceFilter("all")}
+          >
+            All
+            <span className="text-muted-foreground ml-1 text-xs">
+              {totalIndexed}
+            </span>
+          </Button>
+          {(["torrentClient", "torrentFile", "dataDir"] as const).map(
+            (source) => {
+              const count =
+                sourceCounts.find((row) => row.source === source)?.count ?? 0;
+              return (
+                <Button
+                  key={source}
+                  type="button"
+                  variant={sourceFilter === source ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setSourceFilter(source)}
+                >
+                  {getSourceLabel(source)}
+                  <span className="text-muted-foreground ml-1 text-xs">
+                    {count}
+                  </span>
+                </Button>
+              );
+            },
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Filter library"
+              className="h-8 w-64 pl-8"
+            />
+          </div>
           <Select
             value={sortBy}
             onValueChange={(value) => setSortBy(value as SortBy)}
@@ -444,40 +435,6 @@ function LibraryPage() {
           </Select>
         </div>
       </div>
-
-      {(activeScanCount > 0 || failedScanCount > 0 || latestScan) && (
-        <div className="bg-muted/30 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-sm">
-          {activeScanCount > 0 ? (
-            <Badge variant="secondary">
-              <Loader2 className="size-3 animate-spin" />
-              Indexing now
-            </Badge>
-          ) : failedScanCount > 0 ? (
-            <Badge variant="destructive">Indexing failed</Badge>
-          ) : (
-            <Badge variant="outline">Indexed</Badge>
-          )}
-          {latestScan && (
-            <span className="text-muted-foreground">
-              Latest {getSourceLabel(latestScan.source)} scan{" "}
-              {formatTimestamp(latestScan.finishedAt ?? latestScan.startedAt)}
-              {" · "}
-              saw {latestScan.itemsSeen} item
-              {latestScan.itemsSeen === 1 ? "" : "s"}
-            </span>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void query.refetch();
-              void scanQuery.refetch();
-            }}
-          >
-            Refresh
-          </Button>
-        </div>
-      )}
 
       <div
         className={`overflow-x-auto rounded-lg border transition-opacity ${
