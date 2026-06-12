@@ -529,25 +529,19 @@ export default class Deluge implements TorrentClient {
 				"core.add_torrent_file",
 				params,
 			);
+
 			if (addResponse.isErr()) {
-				const addResponseError = addResponse.unwrapErr();
-				if (addResponseError.message.includes("already")) {
+				const err = addResponse.unwrapErr();
+				if (err.message.includes("already")) {
 					return InjectionResult.ALREADY_EXISTS;
-				} else if (addResponseError) {
-					logger.debug({
-						label: this.label,
-						message: `Injection failed: ${addResponseError.message}`,
-					});
-					return InjectionResult.FAILURE;
-				} else {
-					logger.debug({
-						label: this.label,
-						message: `Unknown injection failure: ${getLogString(newTorrent)}`,
-					});
 				}
+				logger.debug({
+					label: this.label,
+					message: `Injection failed: ${err.message}`,
+				});
 				return InjectionResult.FAILURE;
 			}
-
+			await wait(250);
 			// addResponse is known to be OK
 			await this.setLabel(
 				newTorrent,
@@ -655,7 +649,10 @@ export default class Deluge implements TorrentClient {
 	}): Promise<Map<string, string>> {
 		const dirs = new Map<string, string>();
 		let response: Result<TorrentStatus, ErrorType>;
-		const params: UpdateUiParams = [["save_path", "progress"], {}];
+		const params: UpdateUiParams = [
+			["save_path", "progress", "state", "total_remaining"],
+			{},
+		];
 		try {
 			response = await this.call("web.update_ui", params);
 		} catch {
