@@ -1,8 +1,8 @@
+import { humanReadableSize } from "@cross-seed/shared/utils";
 import { readdir } from "fs/promises";
 import ms from "ms";
 import { basename } from "path";
 import { inspect } from "util";
-import { humanReadableSize } from "@cross-seed/shared/utils";
 import {
 	DecisionAnyMatch,
 	InjectionResult,
@@ -33,7 +33,6 @@ import {
 	wait,
 } from "../utils.js";
 import {
-	shouldResumeFromNonRelevantFiles,
 	clientSearcheeModified,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
@@ -42,12 +41,14 @@ import {
 	resumeErrSleepTime,
 	resumeSleepTime,
 	shouldRecheck,
+	shouldResumeFromNonRelevantFiles,
 	TorrentClient,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
 
 interface TorrentInfo {
 	name?: string;
+	hash?: string;
 	complete?: boolean;
 	save_path?: string;
 	state?: string;
@@ -58,6 +59,10 @@ interface TorrentInfo {
 	files?: { path: string; size: number }[];
 	trackers?: { url: string; tier: number }[];
 }
+
+type TorrentInfoField = keyof TorrentInfo;
+type UpdateUiFilter = { hash?: string } & Record<string, unknown>;
+type UpdateUiParams = [fields: TorrentInfoField[], filter: UpdateUiFilter];
 
 enum DelugeErrorCode {
 	NO_AUTH = 1,
@@ -93,8 +98,8 @@ export default class Deluge implements TorrentClient {
 	readonly readonly: boolean;
 	readonly label: string;
 	private delugeCookie: string | null = null;
-	private delugeLabel = TORRENT_TAG;
-	private delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
+	readonly delugeLabel = TORRENT_TAG;
+	readonly delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
 	private isLabelEnabled: boolean;
 	private delugeRequestId: number = 0;
 
@@ -199,6 +204,20 @@ export default class Deluge implements TorrentClient {
 		}
 		this.isLabelEnabled = await this.labelEnabled();
 	}
+
+	// web.update_ui method (typed params + forced return)
+	private async call(
+		method: "web.update_ui",
+		params: UpdateUiParams,
+		retries?: number,
+	): Promise<Result<TorrentStatus, ErrorType>>;
+
+	// standard RPC method fallback
+	private async call<ResultType>(
+		method: string,
+		params: unknown[],
+		retries?: number,
+	): Promise<Result<ResultType, ErrorType>>;
 
 	/**
 	 * ensures authentication and sends JSON-RPC calls to deluge
@@ -409,11 +428,9 @@ export default class Deluge implements TorrentClient {
 			!ogLabel.endsWith(this.delugeLabelSuffix) && // no .cross-seed
 			ogLabel !== linkCategory; // not data
 
-		return !searchee.infoHash
-			? (linkCategory ?? "")
-			: shouldSuffixLabel
-				? `${ogLabel}${this.delugeLabelSuffix}`
-				: ogLabel;
+		return shouldSuffixLabel
+			? `${ogLabel}${this.delugeLabelSuffix}`
+			: ogLabel;
 	}
 
 	/**
@@ -527,24 +544,24 @@ export default class Deluge implements TorrentClient {
 						label: this.label,
 						message: `Unknown injection failure: ${getLogString(newTorrent)}`,
 					});
-					return InjectionResult.FAILURE;
 				}
+				return InjectionResult.FAILURE;
 			}
-			if (addResponse.isOk()) {
-				await this.setLabel(
-					newTorrent,
-					this.calculateLabel(searchee, torrentInfo!),
-				);
 
-				if (toRecheck) {
-					// when paused, libtorrent doesnt start rechecking
-					// leaves torrent ready to download - ~99%
-					await wait(1000);
-					await this.recheckTorrent(newTorrent.infoHash);
-					void this.resumeInjection(newTorrent, decision, {
-						checkOnce: false,
-					});
-				}
+			// addResponse is known to be OK
+			await this.setLabel(
+				newTorrent,
+				this.calculateLabel(searchee, torrentInfo!),
+			);
+
+			if (toRecheck) {
+				// when paused, libtorrent doesnt start rechecking
+				// leaves torrent ready to download - ~99%
+				await wait(1000);
+				await this.recheckTorrent(newTorrent.infoHash);
+				void this.resumeInjection(newTorrent, decision, {
+					checkOnce: false,
+				});
 			}
 		} catch (error) {
 			logger.error({
@@ -601,9 +618,12 @@ export default class Deluge implements TorrentClient {
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
 		let response: Result<TorrentStatus, ErrorType>;
-		const params = [["save_path", "progress"], { hash: meta.infoHash }];
+		const params: UpdateUiParams = [
+			["save_path", "progress", "state", "total_remaining"],
+			{ hash: meta.infoHash },
+		];
 		try {
-			response = await this.call<TorrentStatus>("web.update_ui", params);
+			response = await this.call("web.update_ui", params);
 		} catch {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
@@ -618,7 +638,7 @@ export default class Deluge implements TorrentClient {
 		if (!torrent) {
 			return resultOfErr("NOT_FOUND");
 		}
-		if (options.onlyCompleted && torrent.progress !== 100) {
+		if (options.onlyCompleted && !this.isComplete(torrent)) {
 			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}
 		return resultOf(torrent.save_path!);
@@ -635,9 +655,9 @@ export default class Deluge implements TorrentClient {
 	}): Promise<Map<string, string>> {
 		const dirs = new Map<string, string>();
 		let response: Result<TorrentStatus, ErrorType>;
-		const params = [["save_path", "progress"], {}];
+		const params: UpdateUiParams = [["save_path", "progress"], {}];
 		try {
-			response = await this.call<TorrentStatus>("web.update_ui", params);
+			response = await this.call("web.update_ui", params);
 		} catch {
 			return dirs;
 		}
@@ -649,7 +669,7 @@ export default class Deluge implements TorrentClient {
 			return dirs;
 		}
 		for (const [hash, torrent] of Object.entries(torrentResponse)) {
-			if (options.onlyCompleted && torrent.progress !== 100) continue;
+			if (options.onlyCompleted && !this.isComplete(torrent)) continue;
 			dirs.set(hash, torrent.save_path!);
 		}
 		return dirs;
@@ -665,10 +685,8 @@ export default class Deluge implements TorrentClient {
 	): Promise<Result<boolean, Error>> {
 		const infoHash = inputHash.toLowerCase();
 		try {
-			const torrentsRes = await this.call<TorrentStatus>(
-				"web.update_ui",
-				[[], {}],
-			);
+			const params: UpdateUiParams = [[], { hash: infoHash }];
+			const torrentsRes = await this.call("web.update_ui", params);
 			if (torrentsRes.isErr()) {
 				const err = torrentsRes.unwrapErr();
 				throw new Error(
@@ -677,9 +695,8 @@ export default class Deluge implements TorrentClient {
 			}
 			const torrents = torrentsRes.unwrap().torrents;
 			if (!torrents) throw new Error("No torrents found");
-			for (const hash of Object.keys(torrents)) {
-				if (hash.toLowerCase() === infoHash) return resultOf(true);
-			}
+			// torrents infoHash are already toLower() in deluge
+			if (infoHash in torrents) return resultOf(true);
 			return resultOf(false);
 		} catch (e) {
 			return resultOfErr(e);
@@ -726,11 +743,8 @@ export default class Deluge implements TorrentClient {
 	 * @return All torrents in the client
 	 */
 	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
-		const params = [["hash", "label"], {}];
-		const response = await this.call<TorrentStatus>(
-			"web.update_ui",
-			params,
-		);
+		const params: UpdateUiParams = [["hash", "label"], {}];
+		const response = await this.call("web.update_ui", params);
 		if (!response.isOk()) {
 			return [];
 		}
@@ -757,10 +771,11 @@ export default class Deluge implements TorrentClient {
 		const searchees: SearcheeClient[] = [];
 		const newSearchees: SearcheeClient[] = [];
 		const infoHashes = new Set<string>();
-		const torrentsRes = await this.call<TorrentStatus>("web.update_ui", [
+		const params: UpdateUiParams = [
 			["name", "label", "save_path", "total_size", "files", "trackers"],
 			{},
-		]);
+		];
+		const torrentsRes = await this.call("web.update_ui", params);
 		if (torrentsRes.isErr()) {
 			logger.error({
 				label: this.label,
@@ -841,6 +856,14 @@ export default class Deluge implements TorrentClient {
 		return { searchees, newSearchees };
 	}
 
+	private isComplete(t: TorrentInfo): boolean {
+		return (
+			t.state === "Seeding" ||
+			t.progress === 100 ||
+			(t.state === "Paused" && !t.total_remaining)
+		);
+	}
+
 	/**
 	 * returns information needed to complete/validate injection
 	 * @return Promise of TorrentInfo type
@@ -855,7 +878,7 @@ export default class Deluge implements TorrentClient {
 	): Promise<TorrentInfo> {
 		let torrent: TorrentInfo;
 		try {
-			const params = [
+			const params: UpdateUiParams = [
 				[
 					"name",
 					"state",
@@ -868,7 +891,7 @@ export default class Deluge implements TorrentClient {
 			];
 
 			const response = (
-				await this.call<TorrentStatus>("web.update_ui", params)
+				await this.call("web.update_ui", params)
 			).unwrapOrThrow(new Error("failed to fetch the torrent list"));
 
 			if (response.torrents) {
@@ -882,15 +905,10 @@ export default class Deluge implements TorrentClient {
 				throw new Error(`Torrent not found in client (${infoHash})`);
 			}
 
-			const completedTorrent =
-				(torrent.state === "Paused" &&
-					(torrent.progress === 100 || !torrent.total_remaining)) ||
-				torrent.state === "Seeding" ||
-				torrent.progress === 100 ||
-				!torrent.total_remaining;
+			const completedTorrent = this.isComplete(torrent);
 
 			const torrentLabel =
-				this.isLabelEnabled && torrent.label!.length != 0
+				this.isLabelEnabled && torrent.label?.length != 0
 					? torrent.label
 					: undefined;
 
