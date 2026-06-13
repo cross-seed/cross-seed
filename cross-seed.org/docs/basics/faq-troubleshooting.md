@@ -136,6 +136,81 @@ need a method to clean up the orphaned data if it exists.
 `cross-seed` does not manage ratio, delete torrents for cleanup, or decide when
 tracker rules let you remove data.
 
+### My database (`cross-seed.db`) has become HUGE!
+
+#### Locating the cross-seed.db
+
+cross-seed stores all of its data and records (history) inside the
+`cross-seed.db` file located in your `/config` mount (Docker) or wherever your
+config.js file is located (for non-Docker this is usually in the `.config` or
+`.cross-seed` directory in your `$HOME` (Linux) or `%APPDATA%` (Windows); this
+would be the same place as config.js (v6.x).
+
+**Before anything is done, if possible (space permitting) make a backup of your
+`cross-seed.db` file.**
+
+#### What is wrong?
+
+Sometimes, bad shutdowns/crashes, as well as race conditions if you run more
+than one instance of cross-seed at a time (running a search or inject operation
+from the command line while the daemon is running), can balloon the `.db` file
+with freelist pages.
+
+**You should not run two instances of cross-seed with the same config directory.
+You can set an alternate config directory with copies of the same items in it
+using the environmental variable `$CONFIG_DIR`**
+
+#### What is the problem?
+
+If you are running v6, Linux has a `sqlite` package. For Windows, you can get
+the SQLite DB Browser at https://sqlitebrowser.org/dl/ (other methods of
+managing the database are fine as long as you have access to SQL commands when
+interfacing with the database, such as SQLiteBrowser from LinuxServer located at
+https://docs.linuxserver.io/images/docker-sqlitebrowser/)
+
+For the pre-release of v7, you can check your "Health" section to identify what
+parts of your .db file have the extra disk space used, often this would be the
+freelist pages, and if that is the source of the size then we are in luck, as it
+is an easy fix.
+
+#### What do I do?
+
+1. First stop cross-seed and any instance of the daemon you may have running in
+   the background.
+
+2. For Linux users, or if you are running this on a seedbox, you will need SSH
+   access and a binary called `sqlite3` - if you do not have this, you should
+   ask your administrator to install the `sqlite3` package using any package
+   manager. (If you are on Windows, or have the `database file` locally and are
+   running Windows, you can use SQLite DB Browser from the link above to open
+   the `cross-seed.db` file.)
+
+3. Open the SQLite database using `sqlite3 cross-seed.db` or by selecting it and
+   dragging it into the SQLite DB Browser (If using the DB Browser, you will
+   need to go to the `Execute SQL` tab once the database is open)
+
+4. Run the following command to see how many freelist pages you have
+
+```sql
+PRAGMA freelist_count;
+```
+
+5. If this returns a value above 0, then there are freelist pages that can be
+   cleaned. Use the following command to clean all freelist pages and reduce the
+   database size.
+
+```sql
+VACUUM;
+```
+
+6. Close the database file in DB Browser or use the `exit` command in the
+   sqlite3 command line.
+
+#### Sharing with us
+
+Please report back the results of this. If this has not fixed your database's
+size issue, we will likely want to perform some diagnostics.
+
 ### Is cross-seed a torrent management tool?
 
 No. `cross-seed` finds cross-seed matches, links data when configured, and
