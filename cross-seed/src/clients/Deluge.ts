@@ -415,14 +415,15 @@ export default class Deluge implements TorrentClient {
 	private calculateLabel(
 		searchee: Searchee,
 		torrentInfo: TorrentInfo,
+		destinationDir?: string,
 	): string {
 		const { linkCategory, duplicateCategories } = getRuntimeConfig();
 		if (!searchee.infoHash || !torrentInfo.label) {
-			return this.delugeLabel;
+			return destinationDir ? linkCategory : this.delugeLabel;
 		}
 		const ogLabel = torrentInfo.label;
 		if (!duplicateCategories) {
-			return ogLabel;
+			return destinationDir ? linkCategory : ogLabel;
 		}
 		const shouldSuffixLabel =
 			!ogLabel.endsWith(this.delugeLabelSuffix) && // no .cross-seed
@@ -545,7 +546,11 @@ export default class Deluge implements TorrentClient {
 			// addResponse is known to be OK
 			await this.setLabel(
 				newTorrent,
-				this.calculateLabel(searchee, torrentInfo!),
+				this.calculateLabel(
+					searchee,
+					torrentInfo!,
+					options.destinationDir,
+				),
 			);
 
 			if (toRecheck) {
