@@ -416,13 +416,13 @@ export default class Deluge implements TorrentClient {
 		searchee: Searchee,
 		torrentInfo: TorrentInfo,
 	): string {
-		const { linkCategory, duplicateCategories } = getRuntimeConfig();
+		const { linkCategory, duplicateCategories, linkDirs } = getRuntimeConfig();
 		if (!searchee.infoHash || !torrentInfo.label) {
-			return this.delugeLabel;
+			return linkDirs.length ? linkCategory : this.delugeLabel;
 		}
 		const ogLabel = torrentInfo.label;
 		if (!duplicateCategories) {
-			return ogLabel;
+			return linkDirs.length ? linkCategory : ogLabel;
 		}
 		const shouldSuffixLabel =
 			!ogLabel.endsWith(this.delugeLabelSuffix) && // no .cross-seed
