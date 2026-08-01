@@ -83,6 +83,11 @@ type TorrentDuplicateResponse = { "torrent-duplicate": TorrentMetadata };
 type TorrentAddedResponse = { "torrent-added": TorrentMetadata };
 type TorrentAddResponse = TorrentAddedResponse | TorrentDuplicateResponse;
 
+// distinguishes "Transmission understood the request and rejected it" (not
+// worth retrying) from a transport/parse failure like non-JSON or a body
+// stream erroring mid-read (worth retrying, same as a failed fetch)
+class TransmissionResultError extends Error {}
+
 function doesAlreadyExist(
 	args: TorrentAddResponse,
 ): args is TorrentDuplicateResponse {
@@ -140,48 +145,95 @@ export default class Transmission implements TorrentClient {
 			headers.set("Authorization", `Basic ${credentials}`);
 		}
 
-		const response = await fetch(href, {
-			method: "POST",
-			body: JSON.stringify({ method, arguments: args }),
-			headers,
-			signal: AbortSignal.timeout(timeout || ms("5 minutes")),
-		});
-		if (response.status === 409) {
-			this.xTransmissionSessionId = response.headers.get(
-				XTransmissionSessionId,
-			)!;
-			return this.request(method, args, retries - 1);
-		}
-		try {
-			const responseBody = (await response.clone().json()) as Response<T>;
-			if (
-				responseBody.result === "success" ||
-				responseBody.result === "duplicate torrent" // slight hack but best solution for now
-			) {
-				return responseBody.arguments;
-			} else {
-				throw new Error(
-					`Transmission responded with error: "${responseBody.result}"`,
+		// Bounded retries for transient failures: a failed connection, or a
+		// response whose body fails to read/parse after headers already
+		// arrived (e.g. the socket closing mid-stream). A full retry
+		// re-fetches from scratch, since re-reading an already-broken
+		// response won't succeed. Separate from the `retries` param above,
+		// which governs the session-id-refresh flow on a 409.
+		const transientRetries = 3;
+		for (let attempt = 0; ; attempt++) {
+			let response: Awaited<ReturnType<typeof fetch>>;
+			try {
+				response = await fetch(href, {
+					method: "POST",
+					body: JSON.stringify({ method, arguments: args }),
+					headers,
+					signal: AbortSignal.timeout(timeout || ms("5 minutes")),
+				});
+			} catch (networkError) {
+				if (attempt >= transientRetries) {
+					throw new Error(
+						`[${this.label}] Failed to connect to Transmission at ${href}`,
+						{ cause: networkError },
+					);
+				}
+				logger.verbose({
+					label: this.label,
+					message: `Transmission request failed to connect, ${transientRetries - attempt} retries remaining: ${errorMessage(networkError)}`,
+				});
+				await wait(
+					Math.min(ms("1 second") * 2 ** attempt, ms("10 seconds")),
 				);
+				continue;
 			}
-		} catch (e) {
-			if (e instanceof SyntaxError) {
-				logger.error({
-					label: this.label,
-					message: `Transmission returned non-JSON response`,
-				});
-				logger.debug({
-					label: this.label,
-					message: response.clone().text(),
-				});
-			} else {
-				logger.error({
-					label: this.label,
-					message: `Transmission responded with an error: ${errorMessage(e)}`,
-				});
-				logger.debug(e);
+			if (response.status === 409) {
+				this.xTransmissionSessionId = response.headers.get(
+					XTransmissionSessionId,
+				)!;
+				return this.request(method, args, retries - 1);
 			}
-			throw e;
+			try {
+				const responseBody = (await response
+					.clone()
+					.json()) as Response<T>;
+				if (
+					responseBody.result === "success" ||
+					responseBody.result === "duplicate torrent" // slight hack but best solution for now
+				) {
+					return responseBody.arguments;
+				} else {
+					throw new TransmissionResultError(
+						`Transmission responded with error: "${responseBody.result}"`,
+					);
+				}
+			} catch (e) {
+				if (e instanceof TransmissionResultError) {
+					logger.error({
+						label: this.label,
+						message: `Transmission responded with an error: ${errorMessage(e)}`,
+					});
+					logger.debug(e);
+					throw e;
+				}
+				if (attempt >= transientRetries) {
+					if (e instanceof SyntaxError) {
+						logger.error({
+							label: this.label,
+							message: `Transmission returned non-JSON response`,
+						});
+						logger.debug({
+							label: this.label,
+							message: await response.clone().text(),
+						});
+					} else {
+						logger.error({
+							label: this.label,
+							message: `Transmission responded with an error: ${errorMessage(e)}`,
+						});
+						logger.debug(e);
+					}
+					throw e;
+				}
+				logger.verbose({
+					label: this.label,
+					message: `Failed to read Transmission's response, ${transientRetries - attempt} retries remaining: ${errorMessage(e)}`,
+				});
+				await wait(
+					Math.min(ms("1 second") * 2 ** attempt, ms("10 seconds")),
+				);
+				continue;
+			}
 		}
 	}
 
