@@ -100,7 +100,7 @@ export default class Deluge implements TorrentClient {
 	private delugeCookie: string | null = null;
 	readonly delugeLabel = TORRENT_TAG;
 	readonly delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
-	private isLabelEnabled: boolean;
+	private isLabelEnabled: boolean = false;
 	private delugeRequestId: number = 0;
 
 	constructor(
@@ -128,6 +128,7 @@ export default class Deluge implements TorrentClient {
 		});
 		await this.call<boolean>("auth.delete_session", [], 0);
 		if (!torrentDir) return;
+
 		if (!(await readdir(torrentDir)).some((f) => f.endsWith(".state"))) {
 			throw new CrossSeedError(
 				`[${this.label}] Invalid torrentDir, if no torrents are in client set to null for now: https://www.cross-seed.org/docs/basics/options#torrentdir`,
@@ -369,6 +370,7 @@ export default class Deluge implements TorrentClient {
 					});
 					return;
 				}
+
 				const maxRemainingBytes = getMaxRemainingBytes(meta, decision, {
 					torrentLog,
 					label: this.label,
@@ -384,6 +386,7 @@ export default class Deluge implements TorrentClient {
 					) {
 						logger.warn({
 							label: this.label,
+
 							message: `autoResumeMaxDownload will not resume ${torrentLog}: remainingSize ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} > ${humanReadableSize(maxRemainingBytes, { binary: true })} limit`,
 						});
 						return;
@@ -395,6 +398,7 @@ export default class Deluge implements TorrentClient {
 			}
 			logger.info({
 				label: this.label,
+
 				message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining`,
 			});
 			await this.call<string>("core.resume_torrent", [[infoHash]]);
@@ -503,7 +507,7 @@ export default class Deluge implements TorrentClient {
 					return InjectionResult.TORRENT_NOT_COMPLETE;
 			}
 			if (
-				!options.destinationDir &&
+				typeof options.destinationDir !== "string" &&
 				(!searchee.infoHash || !torrentInfo!)
 			) {
 				logger.debug({
@@ -512,12 +516,14 @@ export default class Deluge implements TorrentClient {
 				});
 				return InjectionResult.FAILURE;
 			}
-
+			let destinationDir: string;
 			const torrentFileName = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
 			const encodedTorrentData = newTorrent.encode().toString("base64");
-			const destinationDir = options.destinationDir
-				? options.destinationDir
-				: torrentInfo!.save_path!;
+			if (typeof options.destinationDir == "string") {
+				destinationDir = options.destinationDir;
+			} else {
+				destinationDir = torrentInfo!.save_path!;
+			}
 			const toRecheck = shouldRecheck(newTorrent, decision);
 			const params = this.formatData(
 				torrentFileName,
@@ -701,7 +707,7 @@ export default class Deluge implements TorrentClient {
 			if (infoHash in torrents) return resultOf(true);
 			return resultOf(false);
 		} catch (e) {
-			return resultOfErr(e);
+			return resultOfErr(e as Error);
 		}
 	}
 
