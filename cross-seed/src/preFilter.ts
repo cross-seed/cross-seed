@@ -77,7 +77,7 @@ export function isSingleEpisode(
 
 function isCrossSeed(searchee: Searchee): boolean {
 	const { linkCategory } = getRuntimeConfig();
-	if (linkCategory?.length && searchee.category === linkCategory) return true; // qBit, Deluge
+	if (linkCategory.length && searchee.category === linkCategory) return true; // qBit, Deluge
 	if (searchee.category === TORRENT_TAG) return true; // Deluge
 	if (searchee.category?.endsWith(TORRENT_CATEGORY_SUFFIX)) return true; // qBit, Deluge
 	if (searchee.tags?.includes(TORRENT_TAG)) return true; // qBit, rTorrent, Transmission

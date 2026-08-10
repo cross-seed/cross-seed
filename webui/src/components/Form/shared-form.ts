@@ -31,7 +31,7 @@ export const defaultTrackerFormValues: Partial<RuntimeConfig> = {
 export const defaultDownloadClientFormValues: Partial<RuntimeConfig> = {
   action: Action.INJECT,
   duplicateCategories: false,
-  linkCategory: undefined,
+  linkCategory: "cross-seed-link",
   outputDir: "",
   skipRecheck: true,
   torrentClients: [],

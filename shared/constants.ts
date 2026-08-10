@@ -115,7 +115,7 @@ export const defaultConfig: RuntimeConfig = {
 	matchMode: MatchMode.STRICT,
 	skipRecheck: true,
 	autoResumeMaxDownload: 52428800,
-	linkCategory: undefined,
+	linkCategory: "cross-seed-link",
 	linkDirs: [],
 	linkType: LinkType.HARDLINK,
 	flatLinking: false,
