@@ -546,7 +546,11 @@ export default class Deluge implements TorrentClient {
 			// addResponse is known to be OK
 			await this.setLabel(
 				newTorrent,
-				this.calculateLabel(searchee, torrentInfo!, options.destinationDir),
+				this.calculateLabel(
+					searchee,
+					torrentInfo!,
+					options.destinationDir,
+				),
 			);
 
 			if (toRecheck) {
