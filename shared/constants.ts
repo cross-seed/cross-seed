@@ -120,6 +120,8 @@ export const defaultConfig: RuntimeConfig = {
 	linkType: LinkType.HARDLINK,
 	flatLinking: false,
 	maxDataDepth: 2,
+	categoryTemplate: undefined,
+	tagsTemplate: undefined,
 	torrentDir: undefined,
 	outputDir: "",
 	injectDir: "",

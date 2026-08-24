@@ -419,50 +419,81 @@ export default class QBittorrent implements TorrentClient {
 		category: string,
 		savePath: string,
 		autoTMM: boolean,
+		searcheeInfo: TorrentInfo | undefined,
 	): Promise<string> {
-		const { duplicateCategories, linkCategory } = getRuntimeConfig();
+		const { categoryTemplate, duplicateCategories, linkCategory } =
+			getRuntimeConfig();
+		const searcheeCategory = searcheeInfo?.category;
 
-		if (!duplicateCategories) {
-			return category;
-		}
-		if (!category.length || category === linkCategory) {
-			return category; // Use tags for category duplication if linking
+		if (categoryTemplate !== undefined) {
+			if (
+				!searcheeCategory &&
+				categoryTemplate.includes("{searcheeCategory}")
+			) {
+				return category;
+			}
+			category = categoryTemplate.replaceAll(
+				"{searcheeCategory}",
+				() => searcheeCategory ?? "",
+			);
+		} else {
+			if (!duplicateCategories) return category;
+			if (!category.length || category === linkCategory) {
+				return category; // Use tags for category duplication if linking
+			}
+			category = category.endsWith(TORRENT_CATEGORY_SUFFIX)
+				? category
+				: `${category}${TORRENT_CATEGORY_SUFFIX}`;
 		}
 
-		const dupeCategory = category.endsWith(TORRENT_CATEGORY_SUFFIX)
-			? category
-			: `${category}${TORRENT_CATEGORY_SUFFIX}`;
-		if (!autoTMM) return dupeCategory;
+		if (!category.length || !autoTMM) return category;
 
 		// savePath is guaranteed to be the base category's save path due to autoTMM
 		const categories = await this.getAllCategories();
-		const newRes = categories.find((c) => c.name === dupeCategory);
+		const newRes = categories.find((c) => c.name === category);
 		if (!newRes) {
-			await this.createCategory(dupeCategory, savePath);
+			await this.createCategory(category, savePath);
 		} else if (newRes.savePath !== savePath) {
-			await this.editCategory(dupeCategory, savePath);
+			await this.editCategory(category, savePath);
 		}
-		return dupeCategory;
+		return category;
 	}
 
 	private getTagsForNewTorrent(
 		searcheeInfo: TorrentInfo | undefined,
 		destinationDir: string | undefined,
 	): string {
-		const { duplicateCategories, linkCategory } = getRuntimeConfig();
+		const { duplicateCategories, linkCategory, tagsTemplate } =
+			getRuntimeConfig();
+		const searcheeCategory = searcheeInfo?.category;
 
-		if (!duplicateCategories || !searcheeInfo || !destinationDir) {
+		if (tagsTemplate?.length) {
+			if (
+				!searcheeCategory &&
+				tagsTemplate.some((tag) => tag.includes("{searcheeCategory}"))
+			) {
+				return TORRENT_TAG;
+			}
+			return tagsTemplate
+				.map((tag) =>
+					tag.replaceAll(
+						"{searcheeCategory}",
+						() => searcheeCategory ?? "",
+					),
+				)
+				.join(",");
+		}
+
+		if (!duplicateCategories || !searcheeCategory || !destinationDir) {
 			return TORRENT_TAG; // Require destinationDir to duplicate category using tags
 		}
-		const searcheeCategory = searcheeInfo.category;
-		if (!searcheeCategory.length || searcheeCategory === linkCategory) {
-			return TORRENT_TAG;
-		}
+		if (searcheeCategory === linkCategory) return TORRENT_TAG;
 
-		if (searcheeCategory.endsWith(TORRENT_CATEGORY_SUFFIX)) {
-			return `${TORRENT_TAG},${searcheeCategory}`;
-		}
-		return `${TORRENT_TAG},${searcheeCategory}${TORRENT_CATEGORY_SUFFIX}`;
+		return `${TORRENT_TAG},${
+			searcheeCategory.endsWith(TORRENT_CATEGORY_SUFFIX)
+				? searcheeCategory
+				: `${searcheeCategory}${TORRENT_CATEGORY_SUFFIX}`
+		}`;
 	}
 
 	async createTag(): Promise<void> {
@@ -1126,6 +1157,7 @@ export default class QBittorrent implements TorrentClient {
 						category,
 						savePath,
 						autoTMM,
+						searcheeInfo,
 					),
 				);
 			}
