@@ -203,7 +203,7 @@ export default class RTorrent implements TorrentClient {
 				bytesLeft: number;
 				hashing: 0 | 1 | 2 | 3;
 				isMultiFile: boolean;
-				isActive: boolean;
+				isStarted: boolean;
 			},
 			"FAILURE" | "TORRENT_NOT_COMPLETE" | "NOT_FOUND"
 		>
@@ -249,7 +249,7 @@ export default class RTorrent implements TorrentClient {
 					params: [hash],
 				},
 				{
-					methodName: "d.is_active",
+					methodName: "d.state",
 					params: [hash],
 				},
 			],
@@ -285,7 +285,7 @@ export default class RTorrent implements TorrentClient {
 				[hashingStr],
 				[isCompleteStr],
 				[isMultiFileStr],
-				[isActiveStr],
+				[stateStr],
 			] = response;
 			const isComplete = Boolean(Number(isCompleteStr));
 			if (options.onlyCompleted && !isComplete) {
@@ -297,7 +297,7 @@ export default class RTorrent implements TorrentClient {
 				bytesLeft: Number(bytesLeftStr),
 				hashing: Number(hashingStr) as 0 | 1 | 2 | 3,
 				isMultiFile: Boolean(Number(isMultiFileStr)),
-				isActive: Boolean(Number(isActiveStr)),
+				isStarted: Boolean(Number(stateStr)),
 			});
 		} catch (e) {
 			logger.error({ label: this.label, message: String(e) });
@@ -800,10 +800,10 @@ export default class RTorrent implements TorrentClient {
 				continue;
 			}
 			const torrentLog = `${torrentInfo.name} [${sanitizeInfoHash(infoHash)}]`;
-			if (torrentInfo.isActive) {
+			if (torrentInfo.isStarted) {
 				logger.warn({
 					label: this.label,
-					message: `Will not resume torrent ${torrentLog}: active`,
+					message: `Will not resume torrent ${torrentLog}: started`,
 				});
 				return;
 			}
