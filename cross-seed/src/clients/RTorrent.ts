@@ -873,24 +873,13 @@ export default class RTorrent implements TorrentClient {
 		const retries = 5;
 		for (let i = 0; i < retries; i++) {
 			try {
-				await this.methodCallP<void>(
-					loadType,
-					[
-						"",
-						new Metafile(rawWithLibtorrentResume).encode(),
-						`d.directory_base.set="${directoryBase}"`,
-						`d.custom1.set="${TORRENT_TAG}"`,
-						`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
-						toRecheck
-							? `d.check_hash=${meta.infoHash.toUpperCase()}`
-							: null,
-					].filter((e) => e !== null),
-				);
-				if (toRecheck) {
-					void this.resumeInjection(meta, decision, {
-						checkOnce: false,
-					});
-				}
+				await this.methodCallP<void>(loadType, [
+					"",
+					new Metafile(rawWithLibtorrentResume).encode(),
+					`d.directory_base.set="${directoryBase}"`,
+					`d.custom1.set="${TORRENT_TAG}"`,
+					`d.custom.set=addtime,${Math.round(Date.now() / 1000)}`,
+				]);
 				break;
 			} catch (e) {
 				logger.verbose({
@@ -904,6 +893,23 @@ export default class RTorrent implements TorrentClient {
 
 		for (let i = 0; i < 5; i++) {
 			if ((await this.isTorrentInClient(meta.infoHash)).orElse(false)) {
+				if (toRecheck) {
+					// Hash-check is its own RPC, not a load.* parameter.
+					// Proxies such as ruTorrent httprpc strip unknown load
+					// commands, so `d.check_hash=` on load.raw never ran.
+					try {
+						await this.recheckTorrent(meta.infoHash);
+					} catch (e) {
+						logger.verbose({
+							label: this.label,
+							message: `Failed to start hash check for ${meta.name}: ${errorMessage(e)}`,
+						});
+						logger.debug(e);
+					}
+					void this.resumeInjection(meta, decision, {
+						checkOnce: false,
+					});
+				}
 				return InjectionResult.SUCCESS;
 			}
 			await wait(100 * Math.pow(2, i));
