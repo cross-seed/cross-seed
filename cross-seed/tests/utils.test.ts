@@ -5,7 +5,11 @@ import { searcheeFactory } from "./factories/searchee.js";
 import { humanReadableSize } from "@cross-seed/shared/utils";
 import { MediaType, SEASON_REGEX } from "../src/constants.js";
 import { getMediaType } from "../src/searchee.js";
-import { extractInt, sanitizeUrl } from "../src/utils.js";
+import {
+	cleanBookAndAudioTitle,
+	extractInt,
+	sanitizeUrl,
+} from "../src/utils.js";
 
 describe("humanReadableSize", () => {
 	it("returns a human-readable size", () => {
@@ -172,5 +176,33 @@ describe("sanitizeUrl", () => {
 		expect(sanitizeUrl("https://example.com/path?query=string")).toBe(
 			"https://example.com/path",
 		);
+	});
+});
+
+describe("cleanBookAndAudioTitle", () => {
+	it("preserves interior spaces in plain titles (#1204)", () => {
+		expect(cleanBookAndAudioTitle("Jane Doe")).toBe("Jane Doe");
+		expect(cleanBookAndAudioTitle("John Q Public")).toBe("John Q Public");
+		expect(
+			cleanBookAndAudioTitle("Gardening All-in-One For Beginners"),
+		).toBe("Gardening All-in-One For Beginners");
+	});
+
+	it("cleanses separators before matching", () => {
+		expect(
+			cleanBookAndAudioTitle("Widget Farming_ A Practical Guide"),
+		).toBe("Widget Farming A Practical Guide");
+	});
+
+	it("still strips format tokens", () => {
+		expect(cleanBookAndAudioTitle("Some Great Title mobi")).toBe(
+			"Some Great Title",
+		);
+	});
+
+	it("still strips narrator credits", () => {
+		expect(
+			cleanBookAndAudioTitle("A Tale of Two Widgets Read By John Smith"),
+		).toBe("A Tale of Two Widgets");
 	});
 });
