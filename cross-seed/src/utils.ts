@@ -371,9 +371,16 @@ export function cleanTitle(title: string): string {
 }
 
 export function cleanBookAndAudioTitle(title: string): string {
-	return cleanseSeparators(title)
-		.replace(EBOOK_AND_MUSIC_RELEASE_REGEX, "")
+	const cleansed = cleanseSeparators(title);
+	const cleaned = cleansed
+		.replace(EBOOK_AND_MUSIC_RELEASE_REGEX, " ")
+		.replace(ALL_SPACES_REGEX, " ")
+		.replace(/(?:\s*-\s*){2,}/g, " - ")
+		.replace(/^[\s-]+|[\s-]+$/g, "")
 		.trim();
+	// A global replace can consume the whole string (e.g. "1984.epub" is a year
+	// plus an extension); an empty query would return the indexer's entire feed.
+	return cleaned || cleansed;
 }
 
 export function reformatTitleForSearching(name: string): string {

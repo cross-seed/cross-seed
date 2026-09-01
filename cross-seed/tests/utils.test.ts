@@ -194,15 +194,53 @@ describe("cleanBookAndAudioTitle", () => {
 		).toBe("Widget Farming A Practical Guide");
 	});
 
-	it("still strips format tokens", () => {
+	it("strips every format token, not just the first match", () => {
 		expect(cleanBookAndAudioTitle("Some Great Title mobi")).toBe(
 			"Some Great Title",
 		);
+		expect(
+			cleanBookAndAudioTitle("01 - A Widget Story - Jane Doe.epub"),
+		).toBe("A Widget Story - Jane Doe");
+	});
+
+	it("strips years, catalog tags and long catalog numbers", () => {
+		expect(
+			cleanBookAndAudioTitle(
+				"A Band - An Album (2004) [CD FLAC] {ABC 255}",
+			),
+		).toBe("A Band - An Album");
+		expect(cleanBookAndAudioTitle("0310283205 A Widget Treatise.pdf")).toBe(
+			"A Widget Treatise",
+		);
+	});
+
+	it("keeps numbers that belong to the title", () => {
+		expect(
+			cleanBookAndAudioTitle("Fahrenheit 451 - Ray Bradbury.epub"),
+		).toBe("Fahrenheit 451 - Ray Bradbury");
+		expect(cleanBookAndAudioTitle("Catch-22 - Joseph Heller.mobi")).toBe(
+			"Catch-22 - Joseph Heller",
+		);
+		expect(
+			cleanBookAndAudioTitle(
+				"01 Around the World in 80 Days (Read by Patrick Tull).m4b",
+			),
+		).toBe("Around the World in 80 Days");
 	});
 
 	it("still strips narrator credits", () => {
 		expect(
 			cleanBookAndAudioTitle("A Tale of Two Widgets Read By John Smith"),
 		).toBe("A Tale of Two Widgets");
+	});
+
+	it("collapses separators orphaned by removed tokens", () => {
+		expect(cleanBookAndAudioTitle("A Band - 2000 - An Album - FLAC")).toBe(
+			"A Band - An Album",
+		);
+	});
+
+	it("falls back to the cleansed title rather than emitting an empty query", () => {
+		expect(cleanBookAndAudioTitle("1984.epub")).toBe("1984 epub");
 	});
 });
