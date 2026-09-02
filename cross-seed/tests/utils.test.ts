@@ -237,6 +237,25 @@ describe("cleanBookAndAudioTitle", () => {
 		);
 	});
 
+	it("does not eat ordinary words ending in k, b, p or s", () => {
+		// [kbps]{2,4}\b matched any such word ending; harmless when the replace
+		// was non-global, corrupting once it became global.
+		expect(cleanBookAndAudioTitle("Books Maps Steps Jobs Bass")).toBe(
+			"Books Maps Steps Jobs Bass",
+		);
+		expect(cleanBookAndAudioTitle("Monafekk-Empire")).toBe(
+			"Monafekk Empire",
+		);
+	});
+
+	it("still strips real format tokens", () => {
+		expect(cleanBookAndAudioTitle("An Album 320 kbps")).toBe("An Album");
+		expect(cleanBookAndAudioTitle("An Album FLAC")).toBe("An Album");
+		expect(cleanBookAndAudioTitle("A Widget Story.epub")).toBe(
+			"A Widget Story",
+		);
+	});
+
 	it("still strips narrator credits", () => {
 		expect(
 			cleanBookAndAudioTitle("A Tale of Two Widgets Read By John Smith"),
