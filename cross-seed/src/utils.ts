@@ -22,6 +22,7 @@ import {
 	LEVENSHTEIN_DIVISOR,
 	MIN_VIDEO_QUERY_LENGTH,
 	MOVIE_REGEX,
+	NON_ALPHANUM_KEEP_HYPHEN_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
 	RELEASE_GROUP_REGEX,
 	REPACK_PROPER_REGEX,
@@ -379,17 +380,18 @@ function collapseSpacing(str: string): string {
 }
 
 export function cleanBookAndAudioTitle(title: string): string {
-	// Parenthesized groups are source/publisher tags, catalog numbers and
-	// narrator credits far more often than title text, and cleanseSeparators()
-	// would otherwise flatten them into bare words. Same treatment the
-	// "noParentheses" search variant applies below.
-	const cleansed = cleanseSeparators(
-		title.replace(ALL_PARENTHESES_REGEX, " "),
-	);
+	const cleansed = cleanseSeparators(title);
+	// Punctuation is noise in an indexer query, so drop it - but to a *space*,
+	// never to nothing, or adjacent words fuse ("Abaddons" measurably returns
+	// fewer results than "Abaddon s"). Hyphens are kept: they are common inside
+	// real titles and indexers ignore them. Surplus words are harmless, since
+	// candidates are filtered on size afterwards.
 	const cleaned = collapseSpacing(
 		cleansed
 			.replace(EBOOK_AND_MUSIC_RELEASE_REGEX, " ")
-			.replace(/-+/g, " "),
+			.replace(NON_ALPHANUM_KEEP_HYPHEN_REGEX, " ")
+			.replace(/(?:\s*-\s*){2,}/g, " - ")
+			.replace(/^[\s-]+|[\s-]+$/g, ""),
 	);
 	// A global replace can consume the whole string (e.g. "1984.epub" is a year
 	// plus an extension); an empty query would return the indexer's entire feed.

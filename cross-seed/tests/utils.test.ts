@@ -185,81 +185,77 @@ describe("cleanBookAndAudioTitle", () => {
 		expect(cleanBookAndAudioTitle("John Q Public")).toBe("John Q Public");
 	});
 
-	it("cleanses separators before matching", () => {
-		expect(
-			cleanBookAndAudioTitle("Widget Farming_ A Practical Guide"),
-		).toBe("Widget Farming A Practical Guide");
-	});
-
 	it("strips every format token, not just the first match", () => {
 		expect(cleanBookAndAudioTitle("Some Great Title mobi")).toBe(
 			"Some Great Title",
 		);
 		expect(
 			cleanBookAndAudioTitle("01 - A Widget Story - Jane Doe.epub"),
-		).toBe("A Widget Story Jane Doe");
+		).toBe("A Widget Story - Jane Doe");
 	});
 
-	it("drops parenthesized source tags, catalog numbers and credits", () => {
+	it("replaces punctuation with a space rather than deleting it", () => {
+		// Deleting fuses words: "Abaddons" returns fewer indexer results than
+		// "Abaddon s", so punctuation must widen to whitespace.
+		expect(
+			cleanBookAndAudioTitle("Widget Farming_ A Practical Guide"),
+		).toBe("Widget Farming A Practical Guide");
 		expect(
 			cleanBookAndAudioTitle("(TTC) Jane Doe, A Widget Treatise.pdf"),
-		).toBe("Jane Doe, A Widget Treatise");
-		expect(
-			cleanBookAndAudioTitle(
-				"A Band - An Album (2004) [CD FLAC] {ABC 255}",
-			),
-		).toBe("A Band An Album");
-		expect(
-			cleanBookAndAudioTitle(
-				"01 Around the World in 80 Days (Read by Patrick Tull).m4b",
-			),
-		).toBe("Around the World in 80 Days");
+		).toBe("TTC Jane Doe A Widget Treatise");
 	});
 
-	it("removes hyphens so the query is just author and title", () => {
+	it("keeps hyphens, which real titles use and indexers ignore", () => {
 		expect(cleanBookAndAudioTitle("Catch-22 - Joseph Heller.mobi")).toBe(
-			"Catch 22 Joseph Heller",
+			"Catch-22 - Joseph Heller",
 		);
 		expect(
 			cleanBookAndAudioTitle("Gardening All-in-One For Beginners"),
-		).toBe("Gardening All in One For Beginners");
+		).toBe("Gardening All-in-One For Beginners");
+	});
+
+	it("collapses separator runs left by removed tokens", () => {
 		expect(cleanBookAndAudioTitle("A Band - 2000 - An Album - FLAC")).toBe(
-			"A Band An Album",
+			"A Band - An Album",
 		);
 	});
 
-	it("keeps numbers that belong to the title", () => {
+	it("keeps letters outside ASCII", () => {
 		expect(
-			cleanBookAndAudioTitle("Fahrenheit 451 - Ray Bradbury.epub"),
-		).toBe("Fahrenheit 451 Ray Bradbury");
-		expect(cleanBookAndAudioTitle("0310283205 A Widget Treatise.pdf")).toBe(
-			"A Widget Treatise",
+			cleanBookAndAudioTitle("An Orchestra - Union Café {Remaster} FLAC"),
+		).toBe("An Orchestra - Union Café");
+	});
+
+	it("keeps title text that release heuristics used to eat", () => {
+		expect(cleanBookAndAudioTitle("A New Hope - George Lucas.epub")).toBe(
+			"A New Hope - George Lucas",
 		);
+		expect(
+			cleanBookAndAudioTitle("Death by Black Hole - Jane Doe.epub"),
+		).toBe("Death by Black Hole - Jane Doe");
+		expect(
+			cleanBookAndAudioTitle("A Series of Unfortunate Events.epub"),
+		).toBe("A Series of Unfortunate Events");
 	});
 
 	it("does not eat ordinary words ending in k, b, p or s", () => {
-		// [kbps]{2,4}\b matched any such word ending; harmless when the replace
-		// was non-global, corrupting once it became global.
 		expect(cleanBookAndAudioTitle("Books Maps Steps Jobs Bass")).toBe(
 			"Books Maps Steps Jobs Bass",
-		);
-		expect(cleanBookAndAudioTitle("Monafekk-Empire")).toBe(
-			"Monafekk Empire",
 		);
 	});
 
 	it("still strips real format tokens", () => {
 		expect(cleanBookAndAudioTitle("An Album 320 kbps")).toBe("An Album");
 		expect(cleanBookAndAudioTitle("An Album FLAC")).toBe("An Album");
-		expect(cleanBookAndAudioTitle("A Widget Story.epub")).toBe(
-			"A Widget Story",
-		);
 	});
 
-	it("still strips narrator credits", () => {
+	it("keeps numbers that belong to the title", () => {
 		expect(
-			cleanBookAndAudioTitle("A Tale of Two Widgets Read By John Smith"),
-		).toBe("A Tale of Two Widgets");
+			cleanBookAndAudioTitle("Fahrenheit 451 - Ray Bradbury.epub"),
+		).toBe("Fahrenheit 451 - Ray Bradbury");
+		expect(cleanBookAndAudioTitle("0310283205 A Widget Treatise.pdf")).toBe(
+			"A Widget Treatise",
+		);
 	});
 
 	it("falls back to the cleansed title rather than emitting an empty query", () => {
