@@ -370,14 +370,27 @@ export function cleanTitle(title: string): string {
 	return cleanseSeparators(title).match(SCENE_TITLE_REGEX)!.groups!.title;
 }
 
+/**
+ * Normalizes runs of whitespace to single spaces and trims the ends, which is
+ * what token removal tends to leave behind.
+ */
+function collapseSpacing(str: string): string {
+	return str.replace(ALL_SPACES_REGEX, " ").trim();
+}
+
 export function cleanBookAndAudioTitle(title: string): string {
-	const cleansed = cleanseSeparators(title);
-	const cleaned = cleansed
-		.replace(EBOOK_AND_MUSIC_RELEASE_REGEX, " ")
-		.replace(ALL_SPACES_REGEX, " ")
-		.replace(/(?:\s*-\s*){2,}/g, " - ")
-		.replace(/^[\s-]+|[\s-]+$/g, "")
-		.trim();
+	// Parenthesized groups are source/publisher tags, catalog numbers and
+	// narrator credits far more often than title text, and cleanseSeparators()
+	// would otherwise flatten them into bare words. Same treatment the
+	// "noParentheses" search variant applies below.
+	const cleansed = cleanseSeparators(
+		title.replace(ALL_PARENTHESES_REGEX, " "),
+	);
+	const cleaned = collapseSpacing(
+		cleansed
+			.replace(EBOOK_AND_MUSIC_RELEASE_REGEX, " ")
+			.replace(/-+/g, " "),
+	);
 	// A global replace can consume the whole string (e.g. "1984.epub" is a year
 	// plus an extension); an empty query would return the indexer's entire feed.
 	return cleaned || cleansed;

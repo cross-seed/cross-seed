@@ -183,9 +183,6 @@ describe("cleanBookAndAudioTitle", () => {
 	it("preserves interior spaces in plain titles (#1204)", () => {
 		expect(cleanBookAndAudioTitle("Jane Doe")).toBe("Jane Doe");
 		expect(cleanBookAndAudioTitle("John Q Public")).toBe("John Q Public");
-		expect(
-			cleanBookAndAudioTitle("Gardening All-in-One For Beginners"),
-		).toBe("Gardening All-in-One For Beginners");
 	});
 
 	it("cleanses separators before matching", () => {
@@ -200,27 +197,18 @@ describe("cleanBookAndAudioTitle", () => {
 		);
 		expect(
 			cleanBookAndAudioTitle("01 - A Widget Story - Jane Doe.epub"),
-		).toBe("A Widget Story - Jane Doe");
+		).toBe("A Widget Story Jane Doe");
 	});
 
-	it("strips years, catalog tags and long catalog numbers", () => {
+	it("drops parenthesized source tags, catalog numbers and credits", () => {
+		expect(
+			cleanBookAndAudioTitle("(TTC) Jane Doe, A Widget Treatise.pdf"),
+		).toBe("Jane Doe, A Widget Treatise");
 		expect(
 			cleanBookAndAudioTitle(
 				"A Band - An Album (2004) [CD FLAC] {ABC 255}",
 			),
-		).toBe("A Band - An Album");
-		expect(cleanBookAndAudioTitle("0310283205 A Widget Treatise.pdf")).toBe(
-			"A Widget Treatise",
-		);
-	});
-
-	it("keeps numbers that belong to the title", () => {
-		expect(
-			cleanBookAndAudioTitle("Fahrenheit 451 - Ray Bradbury.epub"),
-		).toBe("Fahrenheit 451 - Ray Bradbury");
-		expect(cleanBookAndAudioTitle("Catch-22 - Joseph Heller.mobi")).toBe(
-			"Catch-22 - Joseph Heller",
-		);
+		).toBe("A Band An Album");
 		expect(
 			cleanBookAndAudioTitle(
 				"01 Around the World in 80 Days (Read by Patrick Tull).m4b",
@@ -228,16 +216,31 @@ describe("cleanBookAndAudioTitle", () => {
 		).toBe("Around the World in 80 Days");
 	});
 
+	it("removes hyphens so the query is just author and title", () => {
+		expect(cleanBookAndAudioTitle("Catch-22 - Joseph Heller.mobi")).toBe(
+			"Catch 22 Joseph Heller",
+		);
+		expect(
+			cleanBookAndAudioTitle("Gardening All-in-One For Beginners"),
+		).toBe("Gardening All in One For Beginners");
+		expect(cleanBookAndAudioTitle("A Band - 2000 - An Album - FLAC")).toBe(
+			"A Band An Album",
+		);
+	});
+
+	it("keeps numbers that belong to the title", () => {
+		expect(
+			cleanBookAndAudioTitle("Fahrenheit 451 - Ray Bradbury.epub"),
+		).toBe("Fahrenheit 451 Ray Bradbury");
+		expect(cleanBookAndAudioTitle("0310283205 A Widget Treatise.pdf")).toBe(
+			"A Widget Treatise",
+		);
+	});
+
 	it("still strips narrator credits", () => {
 		expect(
 			cleanBookAndAudioTitle("A Tale of Two Widgets Read By John Smith"),
 		).toBe("A Tale of Two Widgets");
-	});
-
-	it("collapses separators orphaned by removed tokens", () => {
-		expect(cleanBookAndAudioTitle("A Band - 2000 - An Album - FLAC")).toBe(
-			"A Band - An Album",
-		);
 	});
 
 	it("falls back to the cleansed title rather than emitting an empty query", () => {
