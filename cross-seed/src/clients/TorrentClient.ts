@@ -26,7 +26,7 @@ import {
 	SearcheeClient,
 	SearcheeWithInfoHash,
 } from "../searchee.js";
-import { hasExt, isTruthy, wait } from "../utils.js";
+import { hasExt, hostIdentity, isTruthy, wait } from "../utils.js";
 import Deluge from "./Deluge.js";
 import QBittorrent from "./QBittorrent.js";
 import RTorrent from "./RTorrent.js";
@@ -143,8 +143,8 @@ export function clientsAreUnique(torrentClients: string[]): {
 } {
 	const uniqueHosts =
 		new Set(
-			torrentClients.map(
-				(entry) => new URL(parseClientEntry(entry)!.url).host,
+			torrentClients.map((entry) =>
+				hostIdentity(new URL(parseClientEntry(entry)!.url)),
 			),
 		).size === torrentClients.length;
 	if (uniqueHosts) return { uniqueHosts: true, uniqueWithPathname: true };
@@ -165,7 +165,7 @@ export function instantiateDownloadClients() {
 		const { clientType, readonly, url } = parseClientEntry(clientEntryRaw)!;
 		const urlObj = new URL(url);
 		const clientHost = uniqueHosts
-			? urlObj.host
+			? hostIdentity(urlObj)
 			: `${urlObj.host}${urlObj.pathname}`;
 		switch (clientType) {
 			case Label.QBITTORRENT:

@@ -480,6 +480,10 @@ export function getApikey(url: string) {
 	return new URL(url).searchParams.get("apikey");
 }
 
+export function hostIdentity(url: URL): string {
+	return url.host || url.pathname;
+}
+
 export function extractCredentialsFromUrl(
 	url: string,
 	basePath?: string,

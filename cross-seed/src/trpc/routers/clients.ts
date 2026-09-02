@@ -4,6 +4,7 @@ import QBittorrent from "../../clients/QBittorrent.js";
 import RTorrent from "../../clients/RTorrent.js";
 import Deluge from "../../clients/Deluge.js";
 import Transmission from "../../clients/Transmission.js";
+import { hostIdentity } from "../../utils.js";
 
 const testConnectionInputSchema = z.object({
 	client: z.enum(["qbittorrent", "rtorrent", "transmission", "deluge"]),
@@ -20,7 +21,7 @@ export const clientsRouter = router({
 		.mutation(async ({ input }) => {
 			const { client: clientName, url, readonly } = input;
 
-			const clientHost = new URL(url).host;
+			const clientHost = hostIdentity(new URL(url));
 
 			let message = "";
 			try {
