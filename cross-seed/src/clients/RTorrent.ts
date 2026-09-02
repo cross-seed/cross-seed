@@ -203,6 +203,7 @@ export default class RTorrent implements TorrentClient {
 				bytesLeft: number;
 				hashing: 0 | 1 | 2 | 3;
 				isMultiFile: boolean;
+				isStarted: boolean;
 				isActive: boolean;
 			},
 			"FAILURE" | "TORRENT_NOT_COMPLETE" | "NOT_FOUND"
@@ -215,6 +216,7 @@ export default class RTorrent implements TorrentClient {
 					[string],
 					[string],
 					["0" | "1" | "2" | "3"],
+					["0" | "1"],
 					["0" | "1"],
 					["0" | "1"],
 					["0" | "1"],
@@ -246,6 +248,10 @@ export default class RTorrent implements TorrentClient {
 				},
 				{
 					methodName: "d.is_multi_file",
+					params: [hash],
+				},
+				{
+					methodName: "d.state",
 					params: [hash],
 				},
 				{
@@ -285,6 +291,7 @@ export default class RTorrent implements TorrentClient {
 				[hashingStr],
 				[isCompleteStr],
 				[isMultiFileStr],
+				[stateStr],
 				[isActiveStr],
 			] = response;
 			const isComplete = Boolean(Number(isCompleteStr));
@@ -297,6 +304,7 @@ export default class RTorrent implements TorrentClient {
 				bytesLeft: Number(bytesLeftStr),
 				hashing: Number(hashingStr) as 0 | 1 | 2 | 3,
 				isMultiFile: Boolean(Number(isMultiFileStr)),
+				isStarted: Boolean(Number(stateStr)),
 				isActive: Boolean(Number(isActiveStr)),
 			});
 		} catch (e) {
@@ -800,10 +808,16 @@ export default class RTorrent implements TorrentClient {
 				continue;
 			}
 			const torrentLog = `${torrentInfo.name} [${sanitizeInfoHash(infoHash)}]`;
-			if (torrentInfo.isActive) {
+			// Only bail when the torrent is genuinely running. d.state and
+			// d.is_active are independent: recheckTorrent() pauses before
+			// hashing, which clears is_active while leaving state at 1, and an
+			// injected torrent loaded by load.raw has state 0 while rTorrent
+			// may still report is_active as 1. Gating on either flag alone
+			// strands one of those two cases stopped.
+			if (torrentInfo.isStarted && torrentInfo.isActive) {
 				logger.warn({
 					label: this.label,
-					message: `Will not resume torrent ${torrentLog}: active`,
+					message: `Will not resume torrent ${torrentLog}: already running`,
 				});
 				return;
 			}
@@ -831,7 +845,13 @@ export default class RTorrent implements TorrentClient {
 				label: this.label,
 				message: `Resuming torrent ${torrentLog}`,
 			});
+			// d.start sets the started/stopped state; d.resume only clears the
+			// paused flag. Torrents injected for a recheck are loaded with
+			// load.raw (stopped), so resuming alone leaves them at d.state=0 --
+			// seeding nothing while reporting d.is_active=1.
+			await this.methodCallP<void>("d.start", [infoHash]);
 			await this.methodCallP<void>("d.resume", [infoHash]);
+			return;
 		}
 		logger.warn({
 			label: this.label,
