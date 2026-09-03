@@ -27,7 +27,7 @@ export const RELEASE_GROUP_REGEX =
 	/(?<=-)(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)(?<group>[\w .]+?)(?:\[.+\])?(?:\))?(?:\s\[.+\])?$/i;
 export const ANIME_GROUP_REGEX = /^\s*\[(?<group>.+?)\]/i;
 export const EBOOK_AND_MUSIC_RELEASE_REGEX =
-	/(\d+k?\b|['']s\b|\[.*?]|\(.*?\)|\{.*?}|[kbps]{2,4}\b|m4b\b|pdf\b|docx\b|epub\b|mobi\b|azw3\b|m4a\b|mp3\b|flac|\sWEB\b|audiobook\b|\bebook\b|\bNew\b|[a\W]+(novela?|saga|series)|(Read|Narrated)?\W?By\W\w+\W*\w*\b|[^a-zA-Z0-9])/i;
+	/(^\s*\d+\s*[-.]?(?=\s)|\b(?:19|20)\d{2}\b|\b\d{5,}\b|\d+k\b|['']s\b|\{.*?}|\b\d+\s?kbps\b|\bkbps\b|\bm4b\b|\bpdf\b|\bdocx\b|\bepub\b|\bmobi\b|\bazw3\b|\bm4a\b|\bmp3\b|\bflac\b|\sWEB\b|audiobook\b|\bebook\b)/gi;
 export const RESOLUTION_REGEX = /\b(?<res>\d{3,4}[pix](?:\d{3,4}[pi]?)?)\b/i;
 export const RES_STRICT_REGEX = /(?<res>(?:2160|1080|720)[pi])/;
 export const YEARS_REGEX = /(?<year>(?:19|20)\d{2})(?![pix])/gi;
@@ -52,6 +52,8 @@ export const AKA_REGEX = /(?:[_.\s-]+|\b)a[_.\s-]?k[_.\s-]?a(?:[_.\s-]+|\b)/i;
 export const ALL_SPACES_REGEX = /\s+/g;
 export const ALL_SQUARE_BRACKETS_REGEX = /\[.*?\]|「.*?」|｢.*?｣|【.*?】/g;
 export const ALL_PARENTHESES_REGEX = /\(.*?\)/g;
+/** Any character that is neither a letter, a number, whitespace, nor a hyphen. */
+export const NON_ALPHANUM_KEEP_HYPHEN_REGEX = /[^\p{L}\p{N}\s-]/gu;
 
 // Needs to be handled through helper functions since there are variations
 const SOURCE_REGEXES = {

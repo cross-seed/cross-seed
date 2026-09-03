@@ -13,6 +13,7 @@ import {
 	ALL_EXTENSIONS,
 	ALL_PARENTHESES_REGEX,
 	ALL_SPACES_REGEX,
+	NON_ALPHANUM_KEEP_HYPHEN_REGEX,
 	ALL_SQUARE_BRACKETS_REGEX,
 	ANIME_REGEX,
 	EBOOK_AND_MUSIC_RELEASE_REGEX,
@@ -338,10 +339,31 @@ export function cleanTitle(title: string): string {
 	return cleanseSeparators(title).match(SCENE_TITLE_REGEX)!.groups!.title;
 }
 
+/**
+ * Normalizes runs of whitespace to single spaces and trims the ends, which is
+ * what token removal tends to leave behind.
+ */
+function collapseSpacing(str: string): string {
+	return str.replace(ALL_SPACES_REGEX, " ").trim();
+}
+
 export function cleanBookAndAudioTitle(title: string): string {
-	return cleanseSeparators(title)
-		.replace(EBOOK_AND_MUSIC_RELEASE_REGEX, "")
-		.trim();
+	const cleansed = cleanseSeparators(title);
+	// Punctuation is noise in an indexer query, so drop it - but to a *space*,
+	// never to nothing, or adjacent words fuse ("Abaddons" measurably returns
+	// fewer results than "Abaddon s"). Hyphens are kept: they are common inside
+	// real titles and indexers ignore them. Surplus words are harmless, since
+	// candidates are filtered on size afterwards.
+	const cleaned = collapseSpacing(
+		cleansed
+			.replace(EBOOK_AND_MUSIC_RELEASE_REGEX, " ")
+			.replace(NON_ALPHANUM_KEEP_HYPHEN_REGEX, " ")
+			.replace(/(?:\s*-\s*){2,}/g, " - ")
+			.replace(/^[\s-]+|[\s-]+$/g, ""),
+	);
+	// A global replace can consume the whole string (e.g. "1984.epub" is a year
+	// plus an extension); an empty query would return the indexer's entire feed.
+	return cleaned || cleansed;
 }
 
 export function reformatTitleForSearching(name: string): string {
