@@ -225,13 +225,20 @@ export default function ClientEditSheet({
                 }) => {
                   // Determine if test button should be enabled
                   const urlValid = urlValue && !urlMeta?.errors?.length;
+                  // SCGI has no credentials to enter.
+                  const isScgi =
+                    typeof urlValue === "string" &&
+                    urlValue.trimStart().toLowerCase().startsWith("scgi:");
                   const passwordValid =
-                    clientValue === "transmission" &&
-                    passwordValue === undefined
+                    isScgi ||
+                    (clientValue === "transmission" &&
+                      passwordValue === undefined)
                       ? true
                       : passwordValue && !passwordMeta?.errors?.length;
                   const userValid =
-                    clientValue === "deluge" || clientValue === "transmission"
+                    isScgi ||
+                    clientValue === "deluge" ||
+                    clientValue === "transmission"
                       ? true
                       : userValue && !userMeta?.errors?.length;
 
