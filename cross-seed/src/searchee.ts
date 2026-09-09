@@ -390,6 +390,7 @@ export async function updateSearcheeClientDB(
 	clientHost: string,
 	newSearchees: SearcheeClient[],
 	infoHashes: Set<string>,
+	scanId?: number,
 ): Promise<void> {
 	const removedInfoHashes = (
 		await db<{ info_hash: string }>("client_searchee")
@@ -437,6 +438,7 @@ export async function updateSearcheeClientDB(
 		),
 	);
 	await syncLibraryItems({
+		scanId,
 		source: LibraryItemSource.CLIENT,
 		sourceInstance: clientHost,
 		itemsToUpsert: newSearchees.map(createClientLibraryItemInput),

@@ -1,4 +1,12 @@
-import { mkdtemp, mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import {
+	mkdtemp,
+	mkdir,
+	readdir,
+	rename,
+	stat,
+	unlink,
+	writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -258,6 +266,63 @@ describe.sequential("full app flows", () => {
 		});
 	});
 
+	it("preserves unavailable directory inventory and recovers without restart", async () => {
+		const env = await createRuntimeEnv();
+		const dataDir = join(TEST_ROOT, "recovery-data");
+		const healthyDir = join(TEST_ROOT, "healthy-data");
+		await mkdir(dataDir);
+		await mkdir(healthyDir);
+		const filePath = join(dataDir, "Recovery.Show.S01E01.mkv");
+		await writeFile(filePath, Buffer.alloc(1024));
+		applyConfig(env, {
+			dataDirs: [dataDir, healthyDir],
+			useClientTorrents: false,
+		});
+		await env.indexTorrentsAndDataDirs({ startup: true });
+		await rename(dataDir, `${dataDir}.offline`);
+		await writeFile(
+			join(healthyDir, "Healthy.Show.S01E01.mkv"),
+			Buffer.alloc(1024),
+		);
+		await expect(
+			env.indexTorrentsAndDataDirs({ startup: true }),
+		).resolves.toBeUndefined();
+		expect(
+			await env.db("library_item").whereNull("missing_since"),
+		).toHaveLength(2);
+		const failedScan = await env
+			.db("library_scan")
+			.where({ source_instance: dataDir })
+			.orderBy("id", "desc")
+			.first();
+		expect(failedScan).toMatchObject({ status: "failed" });
+		expect(failedScan?.error).toContain("ENOENT");
+		await rename(`${dataDir}.offline`, dataDir);
+		await unlink(filePath);
+		await env.indexTorrentsAndDataDirs();
+		expect(
+			(
+				await env
+					.db("library_item")
+					.where({ source_instance: dataDir })
+					.first()
+			)?.missing_since,
+		).toBeTypeOf("number");
+		expect(
+			await env
+				.db("library_scan")
+				.where({ source_instance: dataDir })
+				.orderBy("id", "desc")
+				.first(),
+		).toMatchObject({ status: "succeeded", items_seen: 0 });
+		expect(
+			await env
+				.db("library_item")
+				.where({ source_instance: healthyDir })
+				.whereNull("missing_since"),
+		).toHaveLength(1);
+	});
+
 	it("persists indexed torrentDir items in library inventory", async () => {
 		const env = await createRuntimeEnv();
 		const torrentDir = join(TEST_ROOT, "library-torrent", "torrents");
@@ -290,7 +355,7 @@ describe.sequential("full app flows", () => {
 			torrentDir,
 			useClientTorrents: false,
 			includeSingleEpisodes: true,
-			seasonFromEpisodes: 0,
+			seasonFromEpisodes: 1,
 		});
 
 		await env.indexTorrentsAndDataDirs({ startup: true });
@@ -345,6 +410,102 @@ describe.sequential("full app flows", () => {
 			items_upserted: 0,
 			items_removed: 0,
 		});
+	});
+
+	it("records a failed torrent directory scan without deleting its inventory", async () => {
+		const env = await createRuntimeEnv();
+		const torrentDir = join(TEST_ROOT, "offline-torrents");
+		await mkdir(torrentDir);
+		const { syncLibraryItems, LibraryItemSource } =
+			await import("../src/libraryInventory.js");
+		await syncLibraryItems({
+			source: LibraryItemSource.TORRENT,
+			sourceInstance: torrentDir,
+			itemsToUpsert: [
+				{
+					source: LibraryItemSource.TORRENT,
+					sourceInstance: torrentDir,
+					sourceKey: `torrentFile:${torrentDir}/old.torrent`,
+					path: `${torrentDir}/old.torrent`,
+					name: "Old",
+					title: "Old",
+					length: 1,
+					files: [],
+				},
+			],
+		});
+		await rename(torrentDir, `${torrentDir}.offline`);
+		applyConfig(env, {
+			torrentDir,
+			dataDirs: [],
+			useClientTorrents: false,
+		});
+		await env.indexTorrentsAndDataDirs({ startup: true });
+		expect(
+			await env.db("library_item").whereNull("missing_since"),
+		).toHaveLength(1);
+		expect(
+			await env.db("library_scan").orderBy("id", "desc").first(),
+		).toMatchObject({ status: "failed" });
+		await rename(`${torrentDir}.offline`, torrentDir);
+		await env.indexTorrentsAndDataDirs();
+		expect(
+			await env.db("library_item").whereNull("missing_since"),
+		).toHaveLength(0);
+		expect(
+			await env.db("library_scan").orderBy("id", "desc").first(),
+		).toMatchObject({ status: "succeeded" });
+	});
+
+	it("distinguishes client disconnection from a successful empty torrent list", async () => {
+		const env = await createRuntimeEnv();
+		const { default: QBittorrent } =
+			await import("../src/clients/QBittorrent.js");
+		const client = new QBittorrent(
+			"http://localhost:8080",
+			"localhost:8080",
+			0,
+			false,
+		);
+		const { updateSearcheeClientDB } = await import("../src/searchee.js");
+		await updateSearcheeClientDB(
+			client.clientHost,
+			[
+				{
+					clientHost: client.clientHost,
+					infoHash: "a".repeat(40),
+					name: "Old",
+					title: "Old",
+					files: [],
+					length: 1,
+					savePath: "/data",
+					trackers: [],
+				},
+			],
+			new Set(["a".repeat(40)]),
+		);
+		applyConfig(env, { useClientTorrents: true, dataDirs: [] });
+		env.setClientsForTesting([client]);
+		const list = vi
+			.spyOn(client, "getAllTorrentInfo")
+			.mockRejectedValue(new Error("Disconnected"));
+		await env.indexTorrentsAndDataDirs({ startup: true });
+		expect(
+			await env.db("library_item").whereNull("missing_since"),
+		).toHaveLength(1);
+		expect(
+			await env.db("library_scan").orderBy("id", "desc").first(),
+		).toMatchObject({ status: "failed", error: "Disconnected" });
+		list.mockResolvedValue([]);
+		await env.indexTorrentsAndDataDirs();
+		expect(
+			await env.db("library_item").whereNull("missing_since"),
+		).toHaveLength(0);
+		expect(await env.db("client_searchee")).toHaveLength(0);
+		expect(
+			await env.db("library_scan").orderBy("id", "desc").first(),
+		).toMatchObject({ status: "succeeded" });
+		list.mockRestore();
 	});
 
 	it("only processes new RSS candidates after last seen guid", async () => {

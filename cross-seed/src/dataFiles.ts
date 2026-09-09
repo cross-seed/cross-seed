@@ -8,6 +8,9 @@ import {
 } from "./constants.js";
 import { db } from "./db.js";
 import {
+	beginLibraryScan,
+	completeLibraryScan,
+	failLibraryScan,
 	createLibraryFileInputs,
 	createDataLibraryItemInput,
 	createDataLibrarySourceKey,
@@ -64,11 +67,13 @@ const modifiedPaths: Map<string, Set<string>> = new Map();
 const modifiedPathTimes: Map<string, Map<string, number>> = new Map();
 const STABILITY_WINDOW_MS = 60_000;
 const WATCHER_RETRY_MS = 1000;
+const failedDataDirs = new Set<string>();
 const watcherRetries = new Map<string, NodeJS.Timeout>();
 
 export function destroyDataDirWatchers(): void {
 	for (const timer of watcherRetries.values()) clearTimeout(timer);
 	watcherRetries.clear();
+	failedDataDirs.clear();
 	for (const watcher of watchers.values()) watcher.close();
 	watchers.clear();
 	modifiedPaths.clear();
@@ -129,43 +134,65 @@ export async function indexDataDirs(options: {
 	if (options.startup) destroyDataDirWatchers();
 	if (!dataDirs.length) return;
 
-	if (options.startup) {
-		logger.info({
-			label: Label.INDEX,
-			message: "Indexing dataDirs for reverse lookup...",
-		});
-		for (const dataDir of dataDirs) {
+	for (const dataDir of dataDirs) {
+		if (!options.startup && !failedDataDirs.has(dataDir)) continue;
+		if (options.startup) {
 			modifiedPaths.set(dataDir, new Set());
 			modifiedPathTimes.set(dataDir, new Map());
 			createWatcher(dataDir);
 		}
-		const searcheeCandidates =
-			await findSearcheeCandidatesFromAllDataDirs();
-		const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
-		if (await exists(maxUserWatchesPath)) {
-			const limit = parseInt(await readFile(maxUserWatchesPath, "utf8"));
-			if (limit < searcheeCandidates.length * 2) {
-				logger.error(
-					`max_user_watches too low for proper indexing of dataDirs. It is recommended to set fs.inotify.max_user_watches=1048576 in /etc/sysctl.conf (only on the host system if using docker) - current: ${limit}`,
+		const scan = await beginLibraryScan({
+			source: LibraryItemSource.DATA,
+			sourceInstance: dataDir,
+		});
+		try {
+			const candidates = await findSearcheeCandidatesFromDataDir(
+				dataDir,
+				maxDataDepth,
+			);
+			const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
+			if (await exists(maxUserWatchesPath)) {
+				const limit = parseInt(
+					await readFile(maxUserWatchesPath, "utf8"),
 				);
+				if (limit < candidates.length * 2) {
+					logger.error(
+						`max_user_watches too low for proper indexing of dataDirs. It is recommended to set fs.inotify.max_user_watches=1048576 in /etc/sysctl.conf (only on the host system if using docker) - current: ${limit}`,
+					);
+				}
 			}
+			const count = await indexDataPaths(
+				candidates.map((candidate) => candidate.path),
+				{
+					pruneMissing: true,
+					dataDirs: [dataDir],
+					scanId: scan.id,
+					precomputedFiles: new Map(
+						candidates.map((candidate) => [
+							candidate.path,
+							candidate.files,
+						]),
+					),
+				},
+			);
+			failedDataDirs.delete(dataDir);
+			logger.info({
+				label: Label.INDEX,
+				message: `Validated ${count} entries from dataDir ${dataDir}`,
+			});
+		} catch (error) {
+			failedDataDirs.add(dataDir);
+			await failLibraryScan(scan.id, error);
+			logger.error({
+				label: Label.INDEX,
+				message: `Unable to index dataDir ${dataDir}; keeping previous inventory: ${errorMessage(error)}`,
+			});
+			logger.debug(error);
 		}
-		const numEntries = await indexDataPaths(
-			searcheeCandidates.map((candidate) => candidate.path),
-			{
-				pruneMissing: true,
-				precomputedFiles: new Map(
-					searcheeCandidates.map((candidate) => [
-						candidate.path,
-						candidate.files,
-					]),
-				),
-			},
-		);
-		logger.info(`Validated ${numEntries} entries from dataDirs...`);
 	}
 
 	await mapAsync(dataDirs, async (dataDir) => {
+		if (failedDataDirs.has(dataDir)) return;
 		const modified = modifiedPaths.get(dataDir)!;
 		const modifiedTimes = modifiedPathTimes.get(dataDir)!;
 		const eventPaths: string[] = [];
@@ -178,44 +205,65 @@ export async function indexDataDirs(options: {
 			eventPaths.push(path);
 		}
 		if (!eventPaths.length) return;
-		logger.verbose(`Indexing dataDir ${dataDir} due to recent changes...`);
-		eventPaths.sort(
-			(a, b) =>
-				b.split(sep).filter(isTruthy).length -
-				a.split(sep).filter(isTruthy).length,
-		);
-		const deletedPaths: string[] = [];
-		const paths = await filterAsync(
-			Array.from(
-				eventPaths.reduce<Set<string>>((acc, path) => {
-					const affectedPaths: string[] = [path];
-					let parentPath = dirname(path);
-					while (resolve(parentPath) !== resolve(dataDir)) {
-						affectedPaths.push(parentPath);
-						parentPath = dirname(parentPath);
-					}
-					for (const affectedPath of affectedPaths.slice(
-						-maxDataDepth,
-					)) {
-						acc.add(affectedPath);
-					}
-					return acc;
-				}, new Set()),
-			),
-			async (path) => {
-				if (await exists(path)) return true;
-				deletedPaths.push(path);
-				return false;
-			},
-		);
-		await inBatches(deletedPaths, async (batch) => {
-			await db("data").whereIn("path", batch).del();
-			await db("ensemble").whereIn("path", batch).del();
-			await markLibraryItemsMissingBySourceKeys(
-				batch.map(createDataLibrarySourceKey),
-			);
+		const scan = await beginLibraryScan({
+			source: LibraryItemSource.DATA,
+			sourceInstance: dataDir,
 		});
-		await indexDataPaths(paths);
+		try {
+			await readdir(dataDir); // An unavailable source is not a set of deleted files.
+			logger.verbose(
+				`Indexing dataDir ${dataDir} due to recent changes...`,
+			);
+			eventPaths.sort(
+				(a, b) =>
+					b.split(sep).filter(isTruthy).length -
+					a.split(sep).filter(isTruthy).length,
+			);
+			const deletedPaths: string[] = [];
+			const paths = await filterAsync(
+				Array.from(
+					eventPaths.reduce<Set<string>>((acc, path) => {
+						const affectedPaths: string[] = [path];
+						let parentPath = dirname(path);
+						while (resolve(parentPath) !== resolve(dataDir)) {
+							affectedPaths.push(parentPath);
+							parentPath = dirname(parentPath);
+						}
+						for (const affectedPath of affectedPaths.slice(
+							-maxDataDepth,
+						)) {
+							acc.add(affectedPath);
+						}
+						return acc;
+					}, new Set()),
+				),
+				async (path) => {
+					if (await exists(path)) return true;
+					deletedPaths.push(path);
+					return false;
+				},
+			);
+			await inBatches(deletedPaths, async (batch) => {
+				await db("data").whereIn("path", batch).del();
+				await db("ensemble").whereIn("path", batch).del();
+				await markLibraryItemsMissingBySourceKeys(
+					batch.map(createDataLibrarySourceKey),
+				);
+			});
+			await indexDataPaths(paths, {
+				dataDirs: [dataDir],
+				scanId: scan.id,
+			});
+			// A removal-only update has no items to sync.
+			await completeLibraryScan(scan.id);
+		} catch (error) {
+			failedDataDirs.add(dataDir);
+			await failLibraryScan(scan.id, error);
+			logger.error({
+				label: Label.INDEX,
+				message: `Unable to refresh dataDir ${dataDir}: ${errorMessage(error)}`,
+			});
+		}
 	});
 }
 
@@ -227,10 +275,13 @@ async function indexDataPaths(
 	paths: string[],
 	options: {
 		pruneMissing?: boolean;
+		dataDirs?: string[];
+		scanId?: number;
 		precomputedFiles?: Map<string, File[]>;
 	} = {},
 ): Promise<number> {
-	const { dataDirs, seasonFromEpisodes } = getRuntimeConfig();
+	const { seasonFromEpisodes } = getRuntimeConfig();
+	const dataDirs = options.dataDirs ?? getRuntimeConfig().dataDirs;
 	const memoizedPaths = new Map<string, string[]>();
 	const memoizedLengths = new Map<string, number>();
 	const dataRows: DataEntry[] = [];
@@ -284,6 +335,7 @@ async function indexDataPaths(
 	}
 	for (const [sourceInstance, items] of itemsBySourceInstance) {
 		await syncLibraryItems({
+			scanId: options.scanId,
 			source: LibraryItemSource.DATA,
 			sourceInstance,
 			itemsToUpsert: items,
@@ -295,6 +347,7 @@ async function indexDataPaths(
 		for (const dataDir of dataDirs) {
 			if (itemsBySourceInstance.has(dataDir)) continue;
 			await syncLibraryItems({
+				scanId: options.scanId,
 				source: LibraryItemSource.DATA,
 				sourceInstance: dataDir,
 				pruneMissing: true,
@@ -479,23 +532,21 @@ async function collectPotentialNestedRootCandidates(
 	} catch (e) {
 		logger.verbose(`Failed to process path ${root}: ${errorMessage(e)}`);
 		logger.debug(e);
-		return { candidates: [], files: [] };
+		throw e;
 	}
 }
 
-async function findSearcheeCandidatesFromAllDataDirs(): Promise<
-	DataRootCandidate[]
-> {
-	const { dataDirs, maxDataDepth } = getRuntimeConfig();
-	return flatMapAsync(dataDirs, async (dataDir) =>
-		flatMapAsync(await readdir(dataDir), async (dirent) => {
-			const result = await collectPotentialNestedRootCandidates(
-				join(dataDir, dirent),
-				maxDataDepth,
-			);
-			return result.candidates;
-		}),
-	);
+async function findSearcheeCandidatesFromDataDir(
+	dataDir: string,
+	maxDataDepth: number,
+): Promise<DataRootCandidate[]> {
+	return flatMapAsync(await readdir(dataDir), async (dirent) => {
+		const result = await collectPotentialNestedRootCandidates(
+			join(dataDir, dirent),
+			maxDataDepth,
+		);
+		return result.candidates;
+	});
 }
 
 export async function findSearcheesFromAllDataDirs(): Promise<string[]> {

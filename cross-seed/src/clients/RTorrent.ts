@@ -658,12 +658,22 @@ export default class RTorrent implements TorrentClient {
 	}
 
 	async getClientSearchees(options?: {
+		libraryScanId?: number;
 		newSearcheesOnly?: boolean;
 		refresh?: string[];
 	}): Promise<ClientSearcheeResult> {
 		const searchees: SearcheeClient[] = [];
 		const newSearchees: SearcheeClient[] = [];
 		const hashes = await this.methodCallP<string[]>("download_list", []);
+		if (!hashes.length) {
+			await updateSearcheeClientDB(
+				this.clientHost,
+				[],
+				new Set(),
+				options?.libraryScanId,
+			);
+			return { searchees, newSearchees };
+		}
 		type ReturnType = any[][] | Fault[]; // eslint-disable-line @typescript-eslint/no-explicit-any
 		function isFault(response: ReturnType): response is Fault[] {
 			return "faultString" in response[0];
@@ -820,7 +830,12 @@ export default class RTorrent implements TorrentClient {
 			newSearchees.push(searchee);
 			searchees.push(searchee);
 		}
-		await updateSearcheeClientDB(this.clientHost, newSearchees, infoHashes);
+		await updateSearcheeClientDB(
+			this.clientHost,
+			newSearchees,
+			infoHashes,
+			options?.libraryScanId,
+		);
 		return { searchees, newSearchees };
 	}
 

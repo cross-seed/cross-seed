@@ -112,6 +112,7 @@ export interface LibraryScanStatusSummary {
 }
 
 type SyncLibraryItemsOptions = {
+	scanId?: number;
 	source: LibraryItemSource;
 	sourceInstance?: string | null;
 	itemsToUpsert?: LibraryItemInput[];
@@ -1011,11 +1012,22 @@ export async function markLibraryItemsMissingBySourceKeys(
 export async function syncLibraryItems(
 	options: SyncLibraryItemsOptions,
 ): Promise<LibraryScan> {
-	const scan = await beginLibraryScan({
-		source: options.source,
-		sourceInstance: options.sourceInstance ?? null,
-		now: options.now,
-	});
+	const scan =
+		options.scanId === undefined
+			? await beginLibraryScan({
+					source: options.source,
+					sourceInstance: options.sourceInstance ?? null,
+					now: options.now,
+				})
+			: await getLibraryScan(options.scanId);
+	if (
+		!scan ||
+		scan.status !== LibraryScanStatus.RUNNING ||
+		scan.source !== options.source ||
+		scan.sourceInstance !== (options.sourceInstance ?? null)
+	) {
+		throw new Error("Invalid library scan for source sync");
+	}
 	try {
 		await upsertLibraryItems(scan.id, options.itemsToUpsert ?? [], {
 			now: options.now,

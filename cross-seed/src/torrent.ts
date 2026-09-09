@@ -7,6 +7,7 @@ import { decode } from "./bencode.js";
 import {
 	getClients,
 	TorrentMetadataInClient,
+	TorrentClient,
 } from "./clients/TorrentClient.js";
 import { isChildPath } from "./utils.js";
 import {
@@ -31,7 +32,11 @@ import {
 	createDataLibrarySourceKey,
 	createTorrentLibraryItemInput,
 	createTorrentLibrarySourceKey,
+	beginLibraryScan,
+	getLibraryScan,
+	failLibraryScan,
 	LibraryItemSource,
+	LibraryScanStatus,
 	markLibraryItemsMissingBySourceKeys,
 	syncLibraryItems,
 } from "./libraryInventory.js";
@@ -495,6 +500,36 @@ export async function cacheEnsembleTorrentEntry(
 	}));
 }
 
+async function scanClientInventory(
+	client: TorrentClient,
+	newSearcheesOnly: boolean,
+) {
+	const scan = await beginLibraryScan({
+		source: LibraryItemSource.CLIENT,
+		sourceInstance: client.clientHost,
+	});
+	try {
+		const result = await client.getClientSearchees({
+			newSearcheesOnly,
+			includeFiles: true,
+			includeTrackers: true,
+			libraryScanId: scan.id,
+		});
+		if (
+			(await getLibraryScan(scan.id))?.status !==
+			LibraryScanStatus.SUCCEEDED
+		) {
+			throw new Error(
+				"Client did not complete its inventory refresh; preserving previous inventory",
+			);
+		}
+		return result;
+	} catch (error) {
+		await failLibraryScan(scan.id, error);
+		throw error;
+	}
+}
+
 async function indexTorrents(options: { startup: boolean }): Promise<void> {
 	const { seasonFromEpisodes, torrentDir, useClientTorrents } =
 		getRuntimeConfig();
@@ -516,28 +551,36 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 				logRecoverableTorrentDirError(torrentDir, error);
 				searchees = [];
 			}
-			if (clients.length) {
-				infoHashPathMap = await clients[0].getAllDownloadDirs({
-					metas: searchees,
-					onlyCompleted: false,
-					v1HashOnly: true,
-				});
+			if (clients.length && seasonFromEpisodes) {
+				try {
+					infoHashPathMap = await clients[0].getAllDownloadDirs({
+						metas: searchees,
+						onlyCompleted: false,
+						v1HashOnly: true,
+					});
+				} catch (error) {
+					infoHashPathMap = new Map();
+					logger.warn({
+						label: Label.INDEX,
+						message: `Skipping client-dependent episode grouping: ${errorMessage(error)}`,
+					});
+				}
 			}
 		} else {
 			logger.info("Indexing client torrents for reverse lookup...");
 			searchees = await flatMapAsync(clients, async (client) => {
 				try {
-					const { searchees } = await client.getClientSearchees({
-						includeFiles: true,
-						includeTrackers: true,
-					});
+					const { searchees } = await scanClientInventory(
+						client,
+						false,
+					);
 					return searchees;
 				} catch (e) {
 					const message =
 						e instanceof Error ? e.message : String(e ?? "");
 					logger.warn({
 						label: client.label,
-						message: `Indexing client torrents failed; disabling client until next retry: ${message}`,
+						message: `Indexing client torrents failed; keeping previous inventory until next retry: ${message}`,
 					});
 					logger.debug(e);
 					return [];
@@ -556,19 +599,14 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		} else {
 			searchees = await flatMapAsync(clients, async (client) => {
 				try {
-					return (
-						await client.getClientSearchees({
-							newSearcheesOnly: true,
-							includeFiles: true,
-							includeTrackers: true,
-						})
-					).newSearchees;
+					return (await scanClientInventory(client, true))
+						.newSearchees;
 				} catch (e) {
 					const message =
 						e instanceof Error ? e.message : String(e ?? "");
 					logger.warn({
 						label: client.label,
-						message: `Indexing client torrents failed; disabling client until next retry: ${message}`,
+						message: `Indexing client torrents failed; keeping previous inventory until next retry: ${message}`,
 					});
 					logger.debug(e);
 					return [];
@@ -624,6 +662,34 @@ async function runIndexing(options: { startup: boolean }): Promise<void> {
 	if (options.startup) {
 		const { dataDirs, seasonFromEpisodes, torrentDir, useClientTorrents } =
 			getRuntimeConfig();
+		const configuredSources = new Map<LibraryItemSource, Set<string>>([
+			[LibraryItemSource.DATA, new Set(dataDirs)],
+			[
+				LibraryItemSource.TORRENT,
+				new Set(torrentDir ? [torrentDir] : []),
+			],
+			[
+				LibraryItemSource.CLIENT,
+				new Set(
+					useClientTorrents
+						? getClients().map((client) => client.clientHost)
+						: [],
+				),
+			],
+		]);
+		const activeItems = await db("library_item")
+			.whereNull("missing_since")
+			.select("source", "source_instance", "source_key");
+		await markLibraryItemsMissingBySourceKeys(
+			activeItems
+				.filter(
+					(item) =>
+						!configuredSources
+							.get(item.source as LibraryItemSource)
+							?.has(item.source_instance ?? ""),
+				)
+				.map((item) => item.source_key),
+		);
 		if (!useClientTorrents) {
 			const clientRows = await db<{
 				client_host: string;
@@ -827,94 +893,120 @@ async function loadTorrentDirIncremental(
 	torrentDir: string,
 	options: { includeUnchanged?: boolean } = { includeUnchanged: true },
 ): Promise<SearcheeWithInfoHash[]> {
-	const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
-	const sourceKeys = torrentFilePaths.map(createTorrentLibrarySourceKey);
-	const existingRows = await db("library_item")
-		.where({
-			source: LibraryItemSource.TORRENT,
-			source_instance: torrentDir,
-		})
-		.whereIn("source_key", sourceKeys)
-		.select(
-			"source_key",
-			"info_hash",
-			"path",
-			"name",
-			"title",
-			"files",
-			"length",
-			"category",
-			"tags",
-			"trackers",
-			"content_fingerprint",
-			"missing_since",
-		);
-	const existingBySourceKey = new Map(
-		existingRows.map((row) => [row.source_key, row]),
-	);
-
-	const searchees: SearcheeWithInfoHash[] = [];
-	const sourceKeysSeen: string[] = [];
-	const pathsToParse: Array<{
-		filePath: string;
-		fingerprint: string;
-	}> = [];
-	for (const filePath of torrentFilePaths) {
-		const fingerprint = createTorrentFileFingerprint(
-			filePath,
-			await stat(filePath),
-		);
-		const sourceKey = createTorrentLibrarySourceKey(filePath);
-		const existing = existingBySourceKey.get(sourceKey);
-		if (
-			existing &&
-			existing.missing_since === null &&
-			existing.content_fingerprint === fingerprint
-		) {
-			const searchee = createSearcheeFromTorrentLibraryItem(existing);
-			if (searchee) {
-				if (options.includeUnchanged) searchees.push(searchee);
-				sourceKeysSeen.push(sourceKey);
-				continue;
-			}
-		}
-		pathsToParse.push({ filePath, fingerprint });
-	}
-
-	const client = getClients()[0];
-	const torrentInfos =
-		pathsToParse.length && client && client.clientType !== Label.QBITTORRENT
-			? await client.getAllTorrents()
-			: [];
-	const itemsToUpsert: LibraryItemInput[] = [];
-	for (const { filePath, fingerprint } of pathsToParse) {
-		const searcheeResult = await createSearcheeFromTorrentFile(
-			filePath,
-			torrentInfos,
-		);
-		if (searcheeResult.isOk()) {
-			const searchee = {
-				...searcheeResult.unwrap(),
-				path: filePath,
-			};
-			searchees.push(searchee);
-			itemsToUpsert.push(
-				createTorrentLibraryItemInput(searchee, filePath, torrentDir, {
-					contentFingerprint: fingerprint,
-				}),
-			);
-		}
-	}
-
-	await syncLibraryItems({
+	const scan = await beginLibraryScan({
 		source: LibraryItemSource.TORRENT,
 		sourceInstance: torrentDir,
-		itemsToUpsert,
-		sourceKeysSeen,
-		pruneMissing: true,
 	});
+	try {
+		const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
+		const sourceKeys = torrentFilePaths.map(createTorrentLibrarySourceKey);
+		const existingRows = await db("library_item")
+			.where({
+				source: LibraryItemSource.TORRENT,
+				source_instance: torrentDir,
+			})
+			.whereIn("source_key", sourceKeys)
+			.select(
+				"source_key",
+				"info_hash",
+				"path",
+				"name",
+				"title",
+				"files",
+				"length",
+				"category",
+				"tags",
+				"trackers",
+				"content_fingerprint",
+				"missing_since",
+			);
+		const existingBySourceKey = new Map(
+			existingRows.map((row) => [row.source_key, row]),
+		);
 
-	return searchees;
+		const searchees: SearcheeWithInfoHash[] = [];
+		const sourceKeysSeen: string[] = [];
+		const pathsToParse: Array<{
+			filePath: string;
+			fingerprint: string;
+		}> = [];
+		for (const filePath of torrentFilePaths) {
+			const fingerprint = createTorrentFileFingerprint(
+				filePath,
+				await stat(filePath),
+			);
+			const sourceKey = createTorrentLibrarySourceKey(filePath);
+			const existing = existingBySourceKey.get(sourceKey);
+			if (
+				existing &&
+				existing.missing_since === null &&
+				existing.content_fingerprint === fingerprint
+			) {
+				const searchee = createSearcheeFromTorrentLibraryItem(existing);
+				if (searchee) {
+					if (options.includeUnchanged) searchees.push(searchee);
+					sourceKeysSeen.push(sourceKey);
+					continue;
+				}
+			}
+			pathsToParse.push({ filePath, fingerprint });
+		}
+
+		const client = getClients()[0];
+		let torrentInfos: TorrentMetadataInClient[] = [];
+		if (
+			pathsToParse.length &&
+			client &&
+			client.clientType !== Label.QBITTORRENT
+		) {
+			try {
+				torrentInfos = await client.getAllTorrents();
+			} catch (error) {
+				logger.warn({
+					label: Label.INDEX,
+					message: `Client metadata unavailable; indexing torrent files without it: ${errorMessage(error)}`,
+				});
+			}
+		}
+		const itemsToUpsert: LibraryItemInput[] = [];
+		for (const { filePath, fingerprint } of pathsToParse) {
+			const searcheeResult = await createSearcheeFromTorrentFile(
+				filePath,
+				torrentInfos,
+			);
+			if (searcheeResult.isOk()) {
+				const searchee = {
+					...searcheeResult.unwrap(),
+					path: filePath,
+				};
+				searchees.push(searchee);
+				itemsToUpsert.push(
+					createTorrentLibraryItemInput(
+						searchee,
+						filePath,
+						torrentDir,
+						{
+							contentFingerprint: fingerprint,
+						},
+					),
+				);
+			}
+		}
+
+		await syncLibraryItems({
+			scanId: scan.id,
+			source: LibraryItemSource.TORRENT,
+			sourceInstance: torrentDir,
+			itemsToUpsert,
+			sourceKeysSeen,
+			pruneMissing: true,
+		});
+
+		return searchees;
+	} catch (error) {
+		await failLibraryScan(scan.id, error);
+		throw error;
+	}
 }
 
 function getKeysFromName(stem: string): {
