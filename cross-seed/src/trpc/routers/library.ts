@@ -5,6 +5,8 @@ import {
 	getLibraryScanStatuses,
 	listLibraryItems,
 } from "../../libraryInventory.js";
+import { getRuntimeConfig } from "../../runtimeConfig.js";
+import { getClients } from "../../clients/TorrentClient.js";
 import { bulkSearchByNames } from "../../pipeline.js";
 
 const librarySourceSchema = z.enum(["torrentClient", "torrentFile", "dataDir"]);
@@ -43,7 +45,22 @@ export const libraryRouter = router({
 
 	getScanStatuses: authedProcedure
 		.input(libraryScopeSchema.default({}))
-		.query(({ input }) => getLibraryScanStatuses(input)),
+		.query(async ({ input }) => {
+			const { dataDirs, torrentDir, useClientTorrents } =
+				getRuntimeConfig();
+			const clients = new Set(
+				useClientTorrents
+					? getClients().map((client) => client.clientHost)
+					: [],
+			);
+			return (await getLibraryScanStatuses(input)).filter((scan) => {
+				if (scan.source === "dataDir")
+					return dataDirs.includes(scan.sourceInstance ?? "");
+				if (scan.source === "torrentFile")
+					return scan.sourceInstance === torrentDir;
+				return clients.has(scan.sourceInstance ?? "");
+			});
+		}),
 
 	bulkSearch: authedProcedure
 		.input(

@@ -12,9 +12,11 @@ export const useSaveConfigHook = () => {
         queryKey: trpc.settings.get.queryKey(),
         exact: false,
       });
-      toast.success("Settings saved successfully!", {
-        description: "Your changes will take effect on the next restart.",
+      await queryClient.invalidateQueries({ queryKey: trpc.library.pathKey() });
+      await queryClient.invalidateQueries({
+        queryKey: trpc.stats.getOverview.pathKey(),
       });
+      toast.success("Settings saved successfully!");
     },
     onError: (error) => {
       toast.error("Failed to save settings", {

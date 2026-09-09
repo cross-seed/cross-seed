@@ -5,6 +5,7 @@ import {
   useInfiniteQuery,
   useMutation,
   useQuery,
+  useQueryClient,
 } from "@tanstack/react-query";
 import { useTRPC } from "@/lib/trpc";
 import {
@@ -92,6 +93,7 @@ function formatTimestamp(value: string | null) {
 
 function LibraryPage() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -129,6 +131,23 @@ function LibraryPage() {
       },
     }),
   );
+
+  const scanRevision = JSON.stringify(scanQuery.data);
+  const previousScanRevision = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (
+      scanRevision === undefined ||
+      scanRevision === previousScanRevision.current
+    )
+      return;
+    previousScanRevision.current = scanRevision;
+    void queryClient.invalidateQueries({
+      queryKey: trpc.library.listItems.pathKey(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.stats.getOverview.pathKey(),
+    });
+  }, [scanRevision, queryClient, trpc]);
 
   const {
     data,
@@ -346,6 +365,42 @@ function LibraryPage() {
           )}
         </div>
       </div>
+
+      {failedScanCount > 0 && (
+        <div
+          role="status"
+          className="border-destructive/40 bg-destructive/5 space-y-2 rounded-md border p-3 text-sm"
+        >
+          <p>
+            Some sources could not be refreshed. Their last-known inventory is
+            retained.
+          </p>
+          {scans
+            .filter((scan) => isScanStatus(scan.status, "failed"))
+            .map((scan) => (
+              <div
+                key={`${scan.source}:${scan.sourceInstance}`}
+                className="break-words"
+              >
+                <span className="font-medium">
+                  {scan.sourceInstance ?? getSourceLabel(scan.source)}
+                </span>
+                {scan.error ? `: ${scan.error}` : " — scan failed"}
+              </div>
+            ))}
+          <p>
+            Check the source connection or path in{" "}
+            <Link to="/settings/clients" className="underline">
+              Clients
+            </Link>{" "}
+            or{" "}
+            <Link to="/settings/directories" className="underline">
+              Directories
+            </Link>
+            . Cross-seed will retry automatically.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-1">

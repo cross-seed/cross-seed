@@ -20,7 +20,14 @@ async function createLibraryRouterEnv(): Promise<LibraryRouterEnv> {
 	vi.resetModules();
 
 	const { db } = await import("../src/db.js");
-	const { createAppDirHierarchy } = await import("../src/configuration.js");
+	const { createAppDirHierarchy, getDefaultRuntimeConfig } =
+		await import("../src/configuration.js");
+	const { setRuntimeConfig } = await import("../src/runtimeConfig.js");
+	setRuntimeConfig({
+		...getDefaultRuntimeConfig(),
+		dataDirs: ["/media"],
+		useClientTorrents: false,
+	});
 	const { appRouter } = await import("../src/trpc/routers/index.js");
 	const inventory = await import("../src/libraryInventory.js");
 
@@ -139,6 +146,15 @@ describe.sequential("library router", () => {
 			],
 		});
 		expect(result.items[0].lastSeenAt).toBe("1970-01-01T00:00:01.000Z");
+		await expect(
+			createCaller(env).stats.getOverview(),
+		).resolves.toMatchObject({ indexedItems: 2, totalSearchees: 0 });
+		await env.inventory.markLibraryItemsMissingBySourceKeys([
+			dataSourceKey,
+		]);
+		await expect(
+			createCaller(env).stats.getOverview(),
+		).resolves.toMatchObject({ indexedItems: 1, totalSearchees: 0 });
 	});
 
 	it("paginates library items with a stable cursor", async () => {
@@ -234,5 +250,11 @@ describe.sequential("library router", () => {
 				activeFiles: 1,
 			},
 		]);
+		const { getRuntimeConfig, setRuntimeConfig } =
+			await import("../src/runtimeConfig.js");
+		setRuntimeConfig({ ...getRuntimeConfig(), dataDirs: [] });
+		await expect(
+			createCaller(env).library.getScanStatuses(),
+		).resolves.toEqual([]);
 	});
 });
