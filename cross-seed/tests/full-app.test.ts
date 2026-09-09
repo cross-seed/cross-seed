@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	afterAll,
+	afterEach,
 	beforeAll,
 	beforeEach,
 	describe,
@@ -45,6 +46,8 @@ type RuntimeEnv = {
 	Metafile: typeof import("../src/parseTorrent.js").Metafile;
 };
 
+let cleanupRuntime: (() => Promise<void>) | undefined;
+
 async function createRuntimeEnv(): Promise<RuntimeEnv> {
 	const configDir = await mkdtemp(join(TEST_ROOT, "config-"));
 	process.env.CONFIG_DIR = configDir;
@@ -75,6 +78,11 @@ async function createRuntimeEnv(): Promise<RuntimeEnv> {
 	initializeLogger({ verbose: false });
 	initializePushNotifier();
 	await db.migrate.latest();
+	const { destroyDataDirWatchers } = await import("../src/dataFiles.js");
+	cleanupRuntime = async () => {
+		destroyDataDirWatchers();
+		await db.destroy();
+	};
 
 	return {
 		db,
@@ -122,6 +130,11 @@ describe.sequential("full app flows", () => {
 				realFetch,
 			}),
 		);
+	});
+
+	afterEach(async () => {
+		await cleanupRuntime?.();
+		cleanupRuntime = undefined;
 	});
 
 	beforeEach(() => {
@@ -177,8 +190,6 @@ describe.sequential("full app flows", () => {
 
 		const outputFiles = await readdir(outputDir);
 		expect(outputFiles.some((f) => f.endsWith(".torrent"))).toBe(true);
-
-		await env.db.destroy();
 	});
 
 	it("persists indexed dataDir items in library inventory", async () => {
@@ -245,8 +256,6 @@ describe.sequential("full app flows", () => {
 			items_upserted: 0,
 			items_removed: 0,
 		});
-
-		await env.db.destroy();
 	});
 
 	it("persists indexed torrentDir items in library inventory", async () => {
@@ -336,8 +345,6 @@ describe.sequential("full app flows", () => {
 			items_upserted: 0,
 			items_removed: 0,
 		});
-
-		await env.db.destroy();
 	});
 
 	it("only processes new RSS candidates after last seen guid", async () => {
@@ -435,8 +442,6 @@ describe.sequential("full app flows", () => {
 		expect(updatedRow?.last_seen_guid).toBe(
 			`${torznab.state.baseUrl}/torrent/3`,
 		);
-
-		await env.db.destroy();
 	});
 
 	it("injects saved torrents into a fake client", async () => {
@@ -490,8 +495,6 @@ describe.sequential("full app flows", () => {
 		// Successful injection removes the input after completion is confirmed.
 		// That cleanup runs in the background when injectDir is not set.
 		await expect.poll(() => readdir(outputDir)).toEqual([]);
-
-		await env.db.destroy();
 	});
 
 	it("hardlinks files when linkDirs are configured", async () => {
@@ -551,7 +554,5 @@ describe.sequential("full app flows", () => {
 		const linkedStat = await stat(linkedPath);
 		expect(linkedStat.ino).toBe(sourceStat.ino);
 		expect(linkedStat.dev).toBe(sourceStat.dev);
-
-		await env.db.destroy();
 	});
 });

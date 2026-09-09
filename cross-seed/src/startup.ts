@@ -12,6 +12,7 @@ import {
 	stripDefaults,
 	transformFileConfig,
 } from "./configuration.js";
+import { destroyDataDirWatchers } from "./dataFiles.js";
 import { db } from "./db.js";
 import { getDbConfig, setDbConfig } from "./dbConfig.js";
 import { CrossSeedError } from "./errors.js";
@@ -32,6 +33,7 @@ import { getLogWatcher } from "./utils/logWatcher.js";
 import { omitUndefined } from "./utils/object.js";
 
 export async function exitGracefully() {
+	destroyDataDirWatchers();
 	await db.destroy();
 	process.exit();
 }

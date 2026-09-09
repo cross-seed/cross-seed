@@ -63,6 +63,17 @@ const watchers: Map<string, FSWatcher> = new Map();
 const modifiedPaths: Map<string, Set<string>> = new Map();
 const modifiedPathTimes: Map<string, Map<string, number>> = new Map();
 const STABILITY_WINDOW_MS = 60_000;
+const WATCHER_RETRY_MS = 1000;
+const watcherRetries = new Map<string, NodeJS.Timeout>();
+
+export function destroyDataDirWatchers(): void {
+	for (const timer of watcherRetries.values()) clearTimeout(timer);
+	watcherRetries.clear();
+	for (const watcher of watchers.values()) watcher.close();
+	watchers.clear();
+	modifiedPaths.clear();
+	modifiedPathTimes.clear();
+}
 
 function getDataSourceInstance(path: string, dataDirs: string[]): string {
 	return (
@@ -76,25 +87,46 @@ function getDataSourceInstance(path: string, dataDirs: string[]): string {
 	);
 }
 
-function createWatcher(dataDir: string): FSWatcher {
-	return watch(dataDir, { recursive: true, persistent: false }, (_, f) => {
-		if (!f) return;
-		const fullPath = resolve(join(dataDir, f));
-		if (fullPath === resolve(dataDir)) return;
-		modifiedPaths.get(dataDir)!.add(fullPath);
-		modifiedPathTimes.get(dataDir)!.set(fullPath, Date.now());
-	}).on("error", (e) => {
-		logger.error(`Restarting watcher for dataDir ${dataDir}: ${e.message}`);
+function createWatcher(dataDir: string): void {
+	const retry = (e: Error) => {
+		logger.error(`Retrying watcher for dataDir ${dataDir}: ${e.message}`);
 		logger.debug(e);
-		watchers.get(dataDir)!.close();
-		watchers.set(dataDir, createWatcher(dataDir));
-	});
+		watchers.get(dataDir)?.close();
+		watchers.delete(dataDir);
+		if (watcherRetries.has(dataDir)) return;
+		const timer = setTimeout(() => {
+			watcherRetries.delete(dataDir);
+			createWatcher(dataDir);
+		}, WATCHER_RETRY_MS);
+		timer.unref();
+		watcherRetries.set(dataDir, timer);
+	};
+	try {
+		const watcher = watch(
+			dataDir,
+			{ recursive: true, persistent: false },
+			(_, f) => {
+				if (!f || watchers.get(dataDir) !== watcher) return;
+				const fullPath = resolve(join(dataDir, f));
+				if (fullPath === resolve(dataDir)) return;
+				modifiedPaths.get(dataDir)!.add(fullPath);
+				modifiedPathTimes.get(dataDir)!.set(fullPath, Date.now());
+			},
+		);
+		watchers.set(dataDir, watcher);
+		watcher.on("error", (e) => {
+			if (watchers.get(dataDir) === watcher) retry(e);
+		});
+	} catch (e) {
+		retry(e as Error);
+	}
 }
 
 export async function indexDataDirs(options: {
 	startup: boolean;
 }): Promise<void> {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
+	if (options.startup) destroyDataDirWatchers();
 	if (!dataDirs.length) return;
 
 	if (options.startup) {
@@ -105,7 +137,7 @@ export async function indexDataDirs(options: {
 		for (const dataDir of dataDirs) {
 			modifiedPaths.set(dataDir, new Set());
 			modifiedPathTimes.set(dataDir, new Map());
-			watchers.set(dataDir, createWatcher(dataDir));
+			createWatcher(dataDir);
 		}
 		const searcheeCandidates =
 			await findSearcheeCandidatesFromAllDataDirs();

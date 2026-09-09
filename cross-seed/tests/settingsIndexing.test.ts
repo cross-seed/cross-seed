@@ -9,6 +9,7 @@ const TEST_ROOT = await mkdtemp(
 );
 
 type SettingsIndexingEnv = {
+	destroyDataDirWatchers: typeof import("../src/dataFiles.js").destroyDataDirWatchers;
 	db: typeof import("../src/db.js").db;
 	appRouter: typeof import("../src/trpc/routers/index.js").appRouter;
 	Action: typeof import("../src/constants.js").Action;
@@ -29,7 +30,8 @@ async function createSettingsIndexingEnv(): Promise<SettingsIndexingEnv> {
 	initializeLogger({ verbose: false });
 	await db.migrate.latest();
 
-	return { db, appRouter, Action };
+	const { destroyDataDirWatchers } = await import("../src/dataFiles.js");
+	return { db, appRouter, Action, destroyDataDirWatchers };
 }
 
 function createCaller(env: SettingsIndexingEnv) {
@@ -48,6 +50,7 @@ describe.sequential("settings source indexing", () => {
 	});
 
 	afterEach(async () => {
+		env.destroyDataDirWatchers();
 		await env.db.destroy();
 	});
 
