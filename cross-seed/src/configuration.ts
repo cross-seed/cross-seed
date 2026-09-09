@@ -16,7 +16,11 @@ import {
 import { CrossSeedError } from "./errors.js";
 import { errorCode } from "./utils.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
-import { WebhookEntry } from "@cross-seed/shared/configSchema";
+import {
+	RUNTIME_CONFIG_SCHEMA,
+	WebhookEntry,
+} from "@cross-seed/shared/configSchema";
+import { z } from "zod";
 import { omitUndefined } from "./utils/object.js";
 
 export interface FileConfig {
@@ -175,9 +179,45 @@ export function stripDefaults(
 	return overrides;
 }
 
+// Validate before legacy transformations can discard an invalid supplied value.
+// Keep v6 duration syntax, disabled values, and legacy aliases compatible.
+const legacyDurationSchema = z
+	.unknown()
+	.refine(
+		(value) =>
+			value === undefined || parseDurationValue(value) !== undefined,
+		"Expected a duration string, milliseconds, or null",
+	);
+const fileConfigSchema = RUNTIME_CONFIG_SCHEMA.partial().extend({
+	matchMode: z
+		.union([RUNTIME_CONFIG_SCHEMA.shape.matchMode, z.literal("risky")])
+		.optional(),
+	seasonFromEpisodes: z.union([
+		RUNTIME_CONFIG_SCHEMA.shape.seasonFromEpisodes,
+		z.literal(false),
+		z.null(),
+	]),
+	excludeOlder: legacyDurationSchema.optional(),
+	excludeRecentSearch: legacyDurationSchema.optional(),
+	searchCadence: legacyDurationSchema.optional(),
+	rssCadence: legacyDurationSchema.optional(),
+	snatchTimeout: legacyDurationSchema.optional(),
+	searchTimeout: legacyDurationSchema.optional(),
+	torrentDir: z.string().nullish(),
+	outputDir: z.string().nullish(),
+	linkDir: z.string().nullish(),
+	qbittorrentUrl: z.string().nullish(),
+	rtorrentRpcUrl: z.string().nullish(),
+	transmissionRpcUrl: z.string().nullish(),
+	delugeRpcUrl: z.string().nullish(),
+	notificationWebhookUrl: z.string().nullish(),
+	pconfigVersion: z.number().optional(),
+});
+
 export function transformFileConfig(
 	fileConfig: FileConfig,
 ): Partial<RuntimeConfig> {
+	fileConfigSchema.parse(fileConfig);
 	const result: Partial<RuntimeConfig> = {};
 
 	if (typeof fileConfig.delay === "number") {

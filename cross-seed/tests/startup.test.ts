@@ -83,6 +83,11 @@ describe.sequential("startup config migration", () => {
 	it.each([
 		["invalid JavaScript", "export default { torznab: ["],
 		["invalid settings", "export default { delay: 1 };"],
+		["invalid delay type", 'export default { delay: "oops" };'],
+		["invalid source list", "export default { dataDirs: [123] };"],
+		["invalid duration", 'export default { searchCadence: "oops" };'],
+		["invalid boolean", 'export default { useClientTorrents: "false" };'],
+		["invalid enum", 'export default { matchMode: "oops" };'],
 		["missing dependency", 'import "./missing.js"; export default {};'],
 		["invalid export", "export default null;"],
 	])(
@@ -157,5 +162,19 @@ export default {
 		await expect(readFile(`${env.configPath}.bak.1`, "utf8")).resolves.toBe(
 			`${MIGRATED_CONFIG_COMMENT}${configContents}`,
 		);
+	});
+	it("imports legacy durations, disabled values, aliases, and nullable paths", async () => {
+		const env = await createStartupEnv();
+		await writeFile(
+			env.configPath,
+			`export default { searchCadence: "2h", excludeOlder: null, seasonFromEpisodes: false, torrentDir: null, outputDir: null, linkDir: "/legacy/links", matchMode: "risky", useClientTorrents: false };`,
+		);
+		await expect(env.determineRuntimeConfig({})).resolves.toMatchObject({
+			searchCadence: 7200000,
+			excludeOlder: 0,
+			seasonFromEpisodes: 0,
+			linkDirs: ["/legacy/links"],
+			matchMode: "flexible",
+		});
 	});
 });
