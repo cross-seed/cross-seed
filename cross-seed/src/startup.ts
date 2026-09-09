@@ -14,6 +14,7 @@ import {
 } from "./configuration.js";
 import { db } from "./db.js";
 import { getDbConfig, setDbConfig } from "./dbConfig.js";
+import { CrossSeedError } from "./errors.js";
 import {
 	exitOnCrossSeedErrors,
 	initializeLogger,
@@ -191,15 +192,13 @@ export async function determineRuntimeConfig(
 			};
 		}
 	} catch (migrationError) {
-		logger.error(
-			new Error(
-				"Failed to import configuration file, falling back to defaults",
-				{ cause: migrationError },
-			),
+		throw new CrossSeedError(
+			`Failed to import configuration file ${getFileConfigPath()}. Fix the file and restart cross-seed; default settings have not been saved.`,
+			{ cause: migrationError },
 		);
 	}
 
-	// finally, fall back to defaults (new user happy path or migration failure)
+	// Only a new installation without a config file should create defaults.
 	const defaultRuntime = getDefaultRuntimeConfig();
 	await setDbConfig(defaultRuntime);
 	await resetApiKey();

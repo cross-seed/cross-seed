@@ -462,22 +462,29 @@ export function getFileConfigPath(): string {
 
 export async function getFileConfig(): Promise<FileConfig | undefined> {
 	const configPath = getFileConfigPath();
-	const require = createRequire(configPath);
-
 	try {
-		if (isSea()) {
-			return require(configPath) as FileConfig;
-		}
-		return (
-			(await import(pathToFileURL(configPath).toString())) as {
-				default: FileConfig;
-			}
-		).default;
+		accessSync(configPath, constants.F_OK);
 	} catch (e) {
-		const code = errorCode(e);
-		if (code === "MODULE_NOT_FOUND" || code === "ERR_MODULE_NOT_FOUND") {
-			return undefined;
-		}
+		if (errorCode(e) === "ENOENT") return undefined;
 		throw e;
 	}
+
+	// Module-not-found errors during evaluation may refer to a dependency of
+	// an existing config. They must not be mistaken for a new installation.
+	const require = createRequire(configPath);
+	const fileConfig: unknown = isSea()
+		? require(configPath)
+		: (
+				(await import(pathToFileURL(configPath).toString())) as {
+					default: unknown;
+				}
+			).default;
+	if (
+		fileConfig === null ||
+		typeof fileConfig !== "object" ||
+		Array.isArray(fileConfig)
+	) {
+		throw new Error("Configuration file must export a settings object");
+	}
+	return fileConfig;
 }
