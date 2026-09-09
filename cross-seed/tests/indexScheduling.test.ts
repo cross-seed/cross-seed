@@ -86,4 +86,48 @@ describe.sequential("indexing scheduling", () => {
 		await refresh;
 		expect(index).toHaveBeenCalledTimes(4);
 	});
+	it.each([undefined, "/new/torrents"])(
+		"changing torrentDir to %s cleans ensemble entries",
+		async (torrentDir) => {
+			const { getRuntimeConfig, setRuntimeConfig } =
+				await import("../src/runtimeConfig.js");
+			setRuntimeConfig({ ...getRuntimeConfig(), torrentDir });
+			const { syncLibraryItems, LibraryItemSource } =
+				await import("../src/libraryInventory.js");
+			const { indexTorrentsAndDataDirs } =
+				await import("../src/torrent.js");
+			const infoHash = "a".repeat(40);
+			await syncLibraryItems({
+				source: LibraryItemSource.TORRENT,
+				sourceInstance: "/old/torrents",
+				itemsToUpsert: [
+					{
+						source: LibraryItemSource.TORRENT,
+						sourceInstance: "/old/torrents",
+						sourceKey: "torrentFile:/old/torrents/item.torrent",
+						path: "/old/torrents/item.torrent",
+						infoHash,
+						title: "Old",
+						name: "Old",
+						files: [],
+						length: 1,
+					},
+				],
+			});
+			await db("ensemble").insert({
+				client_host: null,
+				path: "/data/old.mkv",
+				info_hash: infoHash,
+				ensemble: "old.s1",
+				element: "1",
+			});
+			await indexTorrentsAndDataDirs({ startup: true });
+			expect(
+				await db("library_item").whereNull("missing_since"),
+			).toHaveLength(0);
+			expect(
+				await db("ensemble").where({ info_hash: infoHash }),
+			).toHaveLength(0);
+		},
+	);
 });

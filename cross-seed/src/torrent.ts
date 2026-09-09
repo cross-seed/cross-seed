@@ -679,17 +679,31 @@ async function runIndexing(options: { startup: boolean }): Promise<void> {
 		]);
 		const activeItems = await db("library_item")
 			.whereNull("missing_since")
-			.select("source", "source_instance", "source_key");
-		await markLibraryItemsMissingBySourceKeys(
-			activeItems
-				.filter(
-					(item) =>
-						!configuredSources
-							.get(item.source as LibraryItemSource)
-							?.has(item.source_instance ?? ""),
-				)
-				.map((item) => item.source_key),
+			.select("source", "source_instance", "source_key", "info_hash");
+		const removedItems = activeItems.filter(
+			(item) =>
+				!configuredSources
+					.get(item.source as LibraryItemSource)
+					?.has(item.source_instance ?? ""),
 		);
+		const removedTorrentHashes = removedItems.filter(
+			(item) =>
+				(item.source as LibraryItemSource) ===
+				LibraryItemSource.TORRENT,
+		);
+		await inBatches(
+			removedTorrentHashes.map((item) => item.info_hash).filter(isTruthy),
+			async (hashes) => {
+				await db("ensemble")
+					.whereNull("client_host")
+					.whereIn("info_hash", hashes)
+					.del();
+			},
+		);
+		await markLibraryItemsMissingBySourceKeys(
+			removedItems.map((item) => item.source_key),
+		);
+
 		if (!useClientTorrents) {
 			const clientRows = await db<{
 				client_host: string;
