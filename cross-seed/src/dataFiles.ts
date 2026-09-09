@@ -119,6 +119,8 @@ function createWatcher(dataDir: string): void {
 			},
 		);
 		watchers.set(dataDir, watcher);
+		// Events during an outage cannot be recovered by reopening the watcher.
+		failedDataDirs.add(dataDir);
 		watcher.on("error", (e) => {
 			if (watchers.get(dataDir) === watcher) retry(e);
 		});

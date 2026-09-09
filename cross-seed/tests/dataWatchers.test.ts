@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -97,5 +97,32 @@ describe.sequential("data directory watcher lifecycle", () => {
 			dataFiles.indexDataDirs({ startup: true }),
 		).resolves.toBeUndefined();
 		expect(watch).toHaveBeenCalledOnce();
+	});
+	it("rescans files changed while watcher is disconnected", async () => {
+		const deletedPath = join(
+			runtime.getRuntimeConfig().dataDirs[0],
+			"Deleted.Show.S01E01.mkv",
+		);
+		await writeFile(deletedPath, Buffer.alloc(100));
+		await dataFiles.indexDataDirs({ startup: true });
+		vi.useFakeTimers();
+		created[0].emit("error", new Error("EMFILE"));
+		await unlink(deletedPath);
+		const path = join(
+			runtime.getRuntimeConfig().dataDirs[0],
+			"Missed.Show.S01E01.mkv",
+		);
+		await writeFile(path, Buffer.alloc(100));
+		await vi.advanceTimersByTimeAsync(1000);
+		vi.useRealTimers();
+		await dataFiles.indexDataDirs({ startup: false });
+		expect(
+			await db("library_item").where({ path }).whereNull("missing_since"),
+		).toHaveLength(1);
+		expect(
+			await db("library_item")
+				.where({ path: deletedPath })
+				.whereNull("missing_since"),
+		).toHaveLength(0);
 	});
 });
