@@ -50,6 +50,7 @@ describe.sequential("settings source indexing", () => {
 	});
 
 	afterEach(async () => {
+		vi.restoreAllMocks();
 		env.destroyDataDirWatchers();
 		await env.db.destroy();
 	});
@@ -94,5 +95,23 @@ describe.sequential("settings source indexing", () => {
 			items_seen: 1,
 			items_upserted: 1,
 		});
+	});
+	it.each([
+		{ torrentClients: ["qbittorrent:http://localhost:8080"] },
+		{ maxDataDepth: 3 },
+		{ seasonFromEpisodes: 0.5 },
+	])("refreshes inventory after changing %j", async (patch) => {
+		const torrent = await import("../src/torrent.js");
+		const index = vi
+			.spyOn(torrent, "indexTorrentsAndDataDirs")
+			.mockResolvedValue(undefined);
+		const caller = createCaller(env);
+		await caller.settings.save({ useClientTorrents: false });
+		index.mockClear();
+		await caller.settings.save(patch);
+		expect(index).toHaveBeenCalledWith({ startup: true });
+		index.mockClear();
+		await caller.settings.save(patch);
+		expect(index).not.toHaveBeenCalled();
 	});
 });

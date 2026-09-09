@@ -71,11 +71,9 @@ import {
 	errorMessage,
 	isTruthy,
 	mapAsync,
-	Mutex,
 	notExists,
 	stripExtension,
 	wait,
-	withMutex,
 } from "./utils.js";
 
 export interface TorrentLocator {
@@ -470,12 +468,11 @@ export async function cacheEnsembleTorrentEntry(
 	} else if (torrentSavePaths) {
 		savePath = torrentSavePaths.get(searchee.infoHash);
 	} else {
-		const downloadDirResult = await getClients()[0].getDownloadDir(
-			searchee,
-			{
-				onlyCompleted: false,
-			},
-		);
+		const client = getClients()[0];
+		if (!client) return null;
+		const downloadDirResult = await client.getDownloadDir(searchee, {
+			onlyCompleted: false,
+		});
 		if (downloadDirResult.isErr()) {
 			logger.error(
 				`Failed to get download dir for ${getLogString(searchee)}: ${downloadDirResult.unwrapErr()}`,
@@ -598,9 +595,32 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 	return loadTorrentDirIncremental(dir, { includeUnchanged: false });
 }
 
-export async function indexTorrentsAndDataDirs(
+let activeIndexing: Promise<void> | undefined;
+let startupIndexingRequested = false;
+
+export function indexTorrentsAndDataDirs(
 	options = { startup: false },
 ): Promise<void> {
+	startupIndexingRequested ||= options.startup;
+	if (activeIndexing) return activeIndexing;
+	activeIndexing = (async () => {
+		do {
+			const startup = startupIndexingRequested;
+			startupIndexingRequested = false;
+			try {
+				await runIndexing({ startup });
+			} catch (error) {
+				// A settings update queued during a failed scan still gets a turn.
+				if (!startupIndexingRequested) throw error;
+			}
+		} while (startupIndexingRequested);
+	})().finally(() => {
+		activeIndexing = undefined;
+	});
+	return activeIndexing;
+}
+
+async function runIndexing(options: { startup: boolean }): Promise<void> {
 	if (options.startup) {
 		const { dataDirs, seasonFromEpisodes, torrentDir, useClientTorrents } =
 			getRuntimeConfig();
@@ -690,32 +710,26 @@ export async function indexTorrentsAndDataDirs(
 		}
 		if (!seasonFromEpisodes) await db("ensemble").del();
 	}
-	return withMutex(
-		Mutex.INDEX_TORRENTS_AND_DATA_DIRS,
-		{ useQueue: false },
-		async () => {
-			const maxRetries = 3;
-			for (let attempt = 1; attempt <= maxRetries; attempt++) {
-				try {
-					await indexDataDirs(options); // Running together may increase failures
-					await indexTorrents(options); // Run second so this data is more fresh
-					break;
-				} catch (e) {
-					const log = {
-						label: Label.INDEX,
-						message: `Indexing failed (${maxRetries - attempt}): ${errorMessage(e)}`,
-					};
-					logger.debug(e);
-					if (attempt < maxRetries) {
-						logger.verbose(log);
-					} else {
-						logger.error(log);
-						if (options.startup) throw e;
-					}
-				}
+	const maxRetries = 3;
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			await indexDataDirs(options); // Running together may increase failures
+			await indexTorrents(options); // Run second so this data is more fresh
+			break;
+		} catch (e) {
+			const log = {
+				label: Label.INDEX,
+				message: `Indexing failed (${maxRetries - attempt}): ${errorMessage(e)}`,
+			};
+			logger.debug(e);
+			if (attempt < maxRetries) {
+				logger.verbose(log);
+			} else {
+				logger.error(log);
+				if (options.startup) throw e;
 			}
-		},
-	);
+		}
+	}
 }
 
 export async function getInfoHashesToExclude(): Promise<Set<string>> {

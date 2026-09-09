@@ -25,6 +25,12 @@ function torrentSourceConfigChanged(
 	return (
 		before.useClientTorrents !== after.useClientTorrents ||
 		before.torrentDir !== after.torrentDir ||
+		before.maxDataDepth !== after.maxDataDepth ||
+		before.seasonFromEpisodes !== after.seasonFromEpisodes ||
+		arrayContentsChanged(
+			before.torrentClients ?? [],
+			after.torrentClients ?? [],
+		) ||
 		arrayContentsChanged(before.dataDirs ?? [], after.dataDirs ?? [])
 	);
 }
