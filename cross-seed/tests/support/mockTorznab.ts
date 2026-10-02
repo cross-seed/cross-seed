@@ -10,6 +10,9 @@ const builder = new XMLBuilder({
 	ignoreAttributes: false,
 	format: true,
 	attributeNamePrefix: "@_",
+	// Otherwise isPermaLink="true" is written as a bare `isPermaLink`, which is
+	// not valid XML
+	suppressBooleanAttributes: false,
 });
 
 type TorrentFile = { path: string; length: number };
@@ -23,6 +26,8 @@ export interface MockTorznabTorrent {
 	tracker?: string;
 	attributes?: Record<string, unknown>;
 	guid?: string;
+	// Emit <guid isPermaLink="true">, which RSS 2.0 allows and some trackers send
+	guidIsPermaLink?: boolean;
 	link?: string;
 	torrentName?: string;
 }
@@ -51,6 +56,7 @@ type StoredTorrent = {
 	id: string;
 	title: string;
 	guid?: string;
+	guidIsPermaLink: boolean;
 	link?: string;
 	pubDate: string;
 	size: number;
@@ -139,6 +145,7 @@ function normalizeTorrents(
 			id,
 			title: torrent.title,
 			guid: torrent.guid,
+			guidIsPermaLink: torrent.guidIsPermaLink ?? false,
 			link: torrent.link,
 			pubDate,
 			size,
@@ -189,7 +196,9 @@ function resolveTorrent(
 function toXmlSerializable(torrent: ResolvedTorrent) {
 	return {
 		title: torrent.title,
-		guid: torrent.guid,
+		guid: torrent.guidIsPermaLink
+			? { "#text": torrent.guid, "@_isPermaLink": "true" }
+			: torrent.guid,
 		link: torrent.link,
 		comments: torrent.guid,
 		pubDate: torrent.pubDate,
