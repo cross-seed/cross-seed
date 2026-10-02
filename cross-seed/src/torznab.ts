@@ -104,13 +104,21 @@ type TorznabCaps = {
 	};
 };
 
+// xml2js yields an element's text as a plain string, but as { _: text, $: attrs }
+// as soon as the element carries an attribute, e.g. <guid isPermaLink="true">.
+type XmlText = string | { _: string };
+
+function xmlText(node: XmlText): string {
+	return typeof node === "string" ? node : node._;
+}
+
 interface TorznabResult {
-	guid: [string];
+	guid: [XmlText];
 	title: [string];
 	prowlarrindexer?: [{ _: string }];
 	jackettindexer?: [{ _: string }];
 	indexer?: [{ _: string }];
-	link: [string];
+	link: [XmlText];
 	size: [string];
 	pubDate: [string];
 }
@@ -138,7 +146,7 @@ function parseTorznabResults(
 	}
 
 	return items.map((item) => ({
-		guid: item.guid[0],
+		guid: xmlText(item.guid[0]),
 		name: item.title[0],
 		tracker: (
 			item?.prowlarrindexer?.[0]?._ ??
@@ -146,7 +154,7 @@ function parseTorznabResults(
 			item?.indexer?.[0]?._ ??
 			UNKNOWN_TRACKER
 		).trim(),
-		link: item.link[0],
+		link: xmlText(item.link[0]),
 		size: Number(item.size[0]),
 		pubDate: new Date(item.pubDate[0]).getTime(),
 		indexerId,

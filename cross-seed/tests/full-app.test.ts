@@ -274,6 +274,58 @@ describe.sequential("full app flows", () => {
 		await env.db.destroy();
 	});
 
+	it("reads guids that carry attributes", async () => {
+		const env = await createRuntimeEnv();
+		const dataDir = join(TEST_ROOT, "rss-permalink", "data");
+		const outputDir = join(TEST_ROOT, "rss-permalink", "output");
+		await mkdir(dataDir, { recursive: true });
+		await mkdir(outputDir, { recursive: true });
+
+		const fileName = "Show.Name.S01E03.1080p.WEB-DL-GROUP.mkv";
+		const fileSize = 1024 * 128;
+		await writeFile(join(dataDir, fileName), Buffer.alloc(fileSize));
+
+		torznab.state.setTorrents([
+			{
+				id: "1",
+				title: fileName.replace(/\.mkv$/, ""),
+				files: [{ path: fileName, length: fileSize }],
+				tracker: "mock-torznab",
+				guidIsPermaLink: true,
+			},
+		]);
+
+		applyConfig(env, {
+			action: env.Action.SAVE,
+			dataDirs: [dataDir],
+			outputDir,
+			useClientTorrents: false,
+			linkDirs: [],
+			includeSingleEpisodes: true,
+		});
+
+		const indexer = await env.createIndexer({
+			name: "Mock",
+			url: `${torznab.state.baseUrl}/api`,
+			apikey: "test-key",
+			enabled: true,
+		});
+
+		await env.indexTorrentsAndDataDirs({ startup: true });
+		await env.scanRssFeeds();
+
+		const outputFiles = await readdir(outputDir);
+		expect(outputFiles.some((f) => f.endsWith(".torrent"))).toBe(true);
+
+		const row = await env
+			.db("rss")
+			.where({ indexer_id: indexer.id })
+			.first();
+		expect(row?.last_seen_guid).toBe(`${torznab.state.baseUrl}/torrent/1`);
+
+		await env.db.destroy();
+	});
+
 	it("injects saved torrents into a fake client", async () => {
 		const env = await createRuntimeEnv();
 		const dataDir = join(TEST_ROOT, "inject", "data");
