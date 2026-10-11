@@ -30,6 +30,17 @@ describe("Metafile with a hybrid torrent", () => {
 		expect(meta.infoHash).toBe(sha1(hybrid.info));
 	});
 
+	it("computes the infohash from the exact bytes when info has a key that is not UTF-8", () => {
+		const withKey = buildHybridTorrent({ binaryInfoKey: true });
+		// guards this test: the bencode package changes the key, and so the hash
+		const decoded = bencode.decode(withKey.torrent) as { info: unknown };
+		const viaPackage = Buffer.from(bencode.encode(decoded.info));
+		expect(viaPackage.equals(withKey.info)).toBe(false);
+
+		const meta = Metafile.decode(withKey.torrent);
+		expect(meta.infoHash).toBe(sha1(withKey.info));
+	});
+
 	it("reads the torrent's metadata", () => {
 		const meta = Metafile.decode(hybrid.torrent);
 		expect(meta.name).toBe(hybrid.name);
@@ -92,12 +103,14 @@ describe("Metafile with a v1 torrent", () => {
 		expect(Metafile.decode(encoded).encode().equals(encoded)).toBe(true);
 	});
 
-	it("rejects data that is not a torrent", () => {
+	it("rejects a dictionary that is not a torrent", () => {
 		expect(() => Metafile.decode(Buffer.from("d3:fooi1ee"))).toThrow(
 			"Torrent is missing required field: info",
 		);
-		expect(() => Metafile.decode(Buffer.from("not bencode"))).toThrow(
-			/bencode/i,
-		);
+	});
+
+	it("does not produce a Metafile from text that is not bencode", () => {
+		// no message is asserted, it is the codec's and varies between them
+		expect(() => Metafile.decode(Buffer.from("not bencode"))).toThrow();
 	});
 });

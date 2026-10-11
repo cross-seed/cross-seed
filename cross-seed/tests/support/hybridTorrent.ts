@@ -37,7 +37,16 @@ export interface HybridTorrent {
 }
 
 export function buildHybridTorrent(
-	options: { announce?: string } = {},
+	options: {
+		announce?: string;
+		/**
+		 * Adds a key that is not valid UTF-8 to the info dictionary, so that
+		 * the infohash depends on keeping its bytes intact. Torrents with such
+		 * a key are rare, but the infohash is computed from the same bytes
+		 * that every client hashes.
+		 */
+		binaryInfoKey?: boolean;
+	} = {},
 ): HybridTorrent {
 	const announce = options.announce ?? "https://tracker.example/announce";
 	const name = "Show.Name.S01E01.1080p.WEB-DL-GROUP.mkv";
@@ -74,6 +83,10 @@ export function buildHybridTorrent(
 		["name", bytes(name)],
 		["piece length", int(pieceLength)],
 		["pieces", bytes(Buffer.alloc(40, 0xab))],
+		// 0xff sorts after every ASCII key, so this one goes last
+		...(options.binaryInfoKey
+			? [[Buffer.from([0xff, 0xfe, 0x80]), int(1)] as [Buffer, Buffer]]
+			: []),
 	]);
 	const torrent = dict([
 		["announce", bytes(announce)],
