@@ -1,6 +1,6 @@
-import bencode from "bencode";
 import { createHash } from "crypto";
 import { join } from "path";
+import { decode, encode } from "./bencode.js";
 import { File, parseTitle } from "./searchee.js";
 import { fallback, isTruthy } from "./utils.js";
 
@@ -118,7 +118,7 @@ export class Metafile {
 		}
 
 		this.raw = raw;
-		this.infoHash = sha1(bencode.encode(raw.info));
+		this.infoHash = sha1(encode(raw.info));
 		this.name = fallback(raw.info["name.utf-8"], raw.info.name)!.toString();
 		this.pieceLength = raw.info["piece length"];
 
@@ -169,7 +169,7 @@ export class Metafile {
 	}
 
 	static decode(buf: Buffer) {
-		return new Metafile(bencode.decode(buf) as Torrent);
+		return new Metafile(decode(buf) as Torrent);
 	}
 
 	getFileSystemSafeName(): string {
@@ -177,6 +177,6 @@ export class Metafile {
 	}
 
 	encode(): Buffer {
-		return bencode.encode(this.raw);
+		return encode(this.raw);
 	}
 }
