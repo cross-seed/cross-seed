@@ -1,11 +1,18 @@
 /**
  * A lossless bencode codec.
  *
- * The `bencode` package decodes dictionary keys into UTF-8 strings and encodes
- * them back the same way. Keys that are not valid UTF-8 are therefore replaced
- * with U+FFFD, and `encode(decode(x))` no longer equals `x`. Hybrid (v1 + v2,
- * BEP 52) torrents hit this: their top level `piece layers` dictionary is keyed
- * by raw 32 byte merkle roots.
+ * The `bencode` package turns dictionary keys into text: UTF-8 in 2.x, which
+ * replaces the bytes that are not valid with U+FFFD, and since 4.0.0 a hex
+ * string for a key that is not valid UTF-8. Either way `encode(decode(x))` no
+ * longer equals `x`. Hybrid (v1 + v2, BEP 52) torrents hit this: their top
+ * level `piece layers` dictionary is keyed by raw 32 byte merkle roots.
+ *
+ * This is a workaround for webtorrent/node-bencode#88, open since 2020 and not
+ * fixed in 4.0.1. It can be replaced by a `bencode` release that returns hybrid
+ * and v2 torrents byte for byte, returns `Buffer`s and keeps the validation
+ * described below: the hybrid tests (parseTorrent, torrentCache and
+ * rtorrentInject) are the check. Swapping in 4.x as it is would not do: it is
+ * ESM and returns `Uint8Array`s, and it still fails those tests.
  *
  * Representation:
  * - byte strings are `Buffer`s. When decoding, they are views into the input
@@ -32,6 +39,10 @@
  * after the first value are ignored, as before. Encoding throws on a number
  * that is not a safe integer, where the package wrote a truncated or wrong one
  * (`1.5` became `i1e`, `NaN` became `i0e`).
+ *
+ * That validation matters on its own: cross-seed decodes torrents that
+ * indexers send, and `l-3:abe` aborts the whole process with `bencode` 2.0.3
+ * and 4.0.1 (the heap runs out), where this codec throws an ordinary error.
  */
 
 export type BencodeValue = number | Buffer | BencodeValue[] | BencodeDict;
