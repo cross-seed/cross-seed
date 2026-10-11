@@ -5,7 +5,11 @@ import { searcheeFactory } from "./factories/searchee.js";
 import { humanReadableSize } from "@cross-seed/shared/utils";
 import { MediaType, SEASON_REGEX } from "../src/constants.js";
 import { getMediaType } from "../src/searchee.js";
-import { extractInt, sanitizeUrl } from "../src/utils.js";
+import {
+	cleanBookAndAudioTitle,
+	extractInt,
+	sanitizeUrl,
+} from "../src/utils.js";
 
 describe("humanReadableSize", () => {
 	it("returns a human-readable size", () => {
@@ -172,5 +176,89 @@ describe("sanitizeUrl", () => {
 		expect(sanitizeUrl("https://example.com/path?query=string")).toBe(
 			"https://example.com/path",
 		);
+	});
+});
+
+describe("cleanBookAndAudioTitle", () => {
+	it("preserves interior spaces in plain titles (#1204)", () => {
+		expect(cleanBookAndAudioTitle("Jane Doe")).toBe("Jane Doe");
+		expect(cleanBookAndAudioTitle("John Q Public")).toBe("John Q Public");
+	});
+
+	it("strips every format token, not just the first match", () => {
+		expect(cleanBookAndAudioTitle("Some Great Title mobi")).toBe(
+			"Some Great Title",
+		);
+		expect(
+			cleanBookAndAudioTitle("01 - A Widget Story - Jane Doe.epub"),
+		).toBe("A Widget Story - Jane Doe");
+	});
+
+	it("replaces punctuation with a space rather than deleting it", () => {
+		// Deleting fuses words: "Abaddons" returns fewer indexer results than
+		// "Abaddon s", so punctuation must widen to whitespace.
+		expect(
+			cleanBookAndAudioTitle("Widget Farming_ A Practical Guide"),
+		).toBe("Widget Farming A Practical Guide");
+		expect(
+			cleanBookAndAudioTitle("(TTC) Jane Doe, A Widget Treatise.pdf"),
+		).toBe("TTC Jane Doe A Widget Treatise");
+	});
+
+	it("keeps hyphens, which real titles use and indexers ignore", () => {
+		expect(cleanBookAndAudioTitle("Catch-22 - Joseph Heller.mobi")).toBe(
+			"Catch-22 - Joseph Heller",
+		);
+		expect(
+			cleanBookAndAudioTitle("Gardening All-in-One For Beginners"),
+		).toBe("Gardening All-in-One For Beginners");
+	});
+
+	it("collapses separator runs left by removed tokens", () => {
+		expect(cleanBookAndAudioTitle("A Band - 2000 - An Album - FLAC")).toBe(
+			"A Band - An Album",
+		);
+	});
+
+	it("keeps letters outside ASCII", () => {
+		expect(
+			cleanBookAndAudioTitle("An Orchestra - Union Café {Remaster} FLAC"),
+		).toBe("An Orchestra - Union Café");
+	});
+
+	it("keeps title text that release heuristics used to eat", () => {
+		expect(cleanBookAndAudioTitle("A New Hope - George Lucas.epub")).toBe(
+			"A New Hope - George Lucas",
+		);
+		expect(
+			cleanBookAndAudioTitle("Death by Black Hole - Jane Doe.epub"),
+		).toBe("Death by Black Hole - Jane Doe");
+		expect(
+			cleanBookAndAudioTitle("A Series of Unfortunate Events.epub"),
+		).toBe("A Series of Unfortunate Events");
+	});
+
+	it("does not eat ordinary words ending in k, b, p or s", () => {
+		expect(cleanBookAndAudioTitle("Books Maps Steps Jobs Bass")).toBe(
+			"Books Maps Steps Jobs Bass",
+		);
+	});
+
+	it("still strips real format tokens", () => {
+		expect(cleanBookAndAudioTitle("An Album 320 kbps")).toBe("An Album");
+		expect(cleanBookAndAudioTitle("An Album FLAC")).toBe("An Album");
+	});
+
+	it("keeps numbers that belong to the title", () => {
+		expect(
+			cleanBookAndAudioTitle("Fahrenheit 451 - Ray Bradbury.epub"),
+		).toBe("Fahrenheit 451 - Ray Bradbury");
+		expect(cleanBookAndAudioTitle("0310283205 A Widget Treatise.pdf")).toBe(
+			"A Widget Treatise",
+		);
+	});
+
+	it("falls back to the cleansed title rather than emitting an empty query", () => {
+		expect(cleanBookAndAudioTitle("1984.epub")).toBe("1984 epub");
 	});
 });
