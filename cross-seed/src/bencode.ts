@@ -20,6 +20,18 @@
  * `encode(decode(x))` returns `x` for any canonical bencode (sorted keys, no
  * leading zeros), which is what torrent clients write. Non canonical input is
  * normalised: keys get sorted and leading zeros are dropped.
+ *
+ * Decoding is stricter than the `bencode` package, which returned a value for
+ * some input that is not valid bencode: empty input, a string shorter than its
+ * length prefix, a sign, a fraction or no digits where a number is expected
+ * (`i+5e`, `i1.5e`, `ie`, `5.5:abc`), and a negative length inside a list or
+ * dictionary, which made it loop until it ran out of memory. Those throw here.
+ * So does an integer of 2^53 or more, which is valid bencode that a number
+ * cannot hold exactly (the package rounded it), and so does nesting deeper
+ * than `MAX_DEPTH`, which the package accepted up to about 5000 levels. Bytes
+ * after the first value are ignored, as before. Encoding throws on a number
+ * that is not a safe integer, where the package wrote a truncated or wrong one
+ * (`1.5` became `i1e`, `NaN` became `i0e`).
  */
 
 export type BencodeValue = number | Buffer | BencodeValue[] | BencodeDict;
