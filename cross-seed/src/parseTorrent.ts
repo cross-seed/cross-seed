@@ -101,6 +101,10 @@ export class Metafile {
 	tags?: string[];
 	trackers: string[];
 	raw: Torrent;
+	// The bytes decode(buf) was given. bencode's decode is not the inverse of its
+	// encode for binary dict keys (see encode()), so these are re-encode's source of
+	// truth. Held by reference: decode already aliases buf through this.raw.
+	private originalBytes?: Buffer;
 
 	constructor(raw: Torrent) {
 		ensure(raw.info, "info");
@@ -169,7 +173,9 @@ export class Metafile {
 	}
 
 	static decode(buf: Buffer) {
-		return new Metafile(bencode.decode(buf) as Torrent);
+		const meta = new Metafile(bencode.decode(buf) as Torrent);
+		meta.originalBytes = buf;
+		return meta;
 	}
 
 	getFileSystemSafeName(): string {
@@ -177,6 +183,12 @@ export class Metafile {
 	}
 
 	encode(): Buffer {
-		return bencode.encode(this.raw);
+		// bencode's decode is not the inverse of its encode for binary dict keys: it
+		// turns every key into a string, so the 32-byte binary keys in a hybrid or v2
+		// torrent's top-level "piece layers" dict do not survive a re-encode and the
+		// client rejects the injected torrent (#1192). Return the original bytes when
+		// we have them; a metafile built from a raw object (the rTorrent resume path)
+		// has none and re-encodes.
+		return this.originalBytes ?? bencode.encode(this.raw);
 	}
 }
