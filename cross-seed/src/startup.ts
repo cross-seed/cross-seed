@@ -37,6 +37,19 @@ export async function exitGracefully() {
 process.on("SIGINT", exitGracefully);
 process.on("SIGTERM", exitGracefully);
 
+// Some background work (e.g. TorrentClient#resumeInjection polling loops)
+// is intentionally fire-and-forget and not awaited by its caller. If one of
+// those rejects - most commonly a transient network error talking to a
+// torrent client - Node's default behavior is to treat it as an unhandled
+// rejection and crash the whole daemon. Log it and keep running instead;
+// losing a single background poll shouldn't take down the daemon.
+process.on("unhandledRejection", (reason) => {
+	logger.error(
+		"Unhandled promise rejection (this is a bug, please report it) - the daemon will continue running:",
+	);
+	logger.error(reason);
+});
+
 async function ensureConfiguredDirectories(): Promise<void> {
 	const { outputDir, linkDirs = [] } = getRuntimeConfig();
 	const directories: { path: string; label: string }[] = [];
