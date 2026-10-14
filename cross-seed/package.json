@@ -41,7 +41,6 @@
 		"@fastify/cors": "^11.2.0",
 		"@trpc/server": "^11.13.4",
 		"bcryptjs": "^3.0.2",
-		"bencode": "^2.0.1",
 		"chalk": "^5.0.0",
 		"commander": "^14.0.3",
 		"fastest-levenshtein": "^1.0.16",
@@ -56,6 +55,7 @@
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
+		"bencode": "^2.0.1",
 		"fast-xml-parser": "^5.7.0",
 		"rimraf": "^6.1.3"
 	},
