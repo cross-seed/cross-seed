@@ -2,7 +2,7 @@ import { type Stats } from "fs";
 import { readdir, stat } from "fs/promises";
 import { basename, dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
-import xmlrpc, { Client } from "xmlrpc";
+import xmlrpc from "xmlrpc";
 import { humanReadableSize } from "@cross-seed/shared/utils";
 import {
 	DecisionAnyMatch,
@@ -35,6 +35,7 @@ import {
 	sanitizeInfoHash,
 	wait,
 } from "../utils.js";
+import { createScgiClient, parseScgiUrl, type RpcTransport } from "./scgi.js";
 import {
 	shouldResumeFromNonRelevantFiles,
 	clientSearcheeModified,
@@ -108,7 +109,7 @@ async function createLibTorrentResumeTree(
 }
 
 export default class RTorrent implements TorrentClient {
-	client: Client;
+	client: RpcTransport;
 	readonly clientHost: string;
 	readonly clientPriority: number;
 	readonly clientType = Label.RTORRENT;
@@ -126,6 +127,19 @@ export default class RTorrent implements TorrentClient {
 		this.clientPriority = priority;
 		this.readonly = readonly;
 		this.label = `${this.clientType}@${this.clientHost}`;
+
+		const scgiUrl = parseScgiUrl(url);
+		if (scgiUrl) {
+			if (scgiUrl.username || scgiUrl.password) {
+				logger.warn({
+					label: this.label,
+					message: `Ignoring the credentials in this SCGI url: SCGI has no authentication. Restrict the socket with filesystem permissions, or keep network.scgi.open_port bound to localhost.`,
+				});
+			}
+			this.client = createScgiClient(scgiUrl, { label: this.label });
+			return;
+		}
+
 		const { href, username, password } = extractCredentialsFromUrl(
 			url,
 		).unwrapOrThrow(
@@ -157,20 +171,15 @@ export default class RTorrent implements TorrentClient {
 		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
 		logger.verbose({ label: this.label, message });
 		return new Promise<R>((resolve, reject) => {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-			(this.client as any).methodCall(
-				method,
-				args,
-				(err: unknown, data: R) => {
-					if (err)
-						return reject(
-							err instanceof Error
-								? err
-								: new Error(errorMessage(err)),
-						);
-					return resolve(data);
-				},
-			);
+			this.client.methodCall(method, args, (err, data) => {
+				if (err)
+					return reject(
+						err instanceof Error
+							? err
+							: new Error(errorMessage(err)),
+					);
+				return resolve(data as R);
+			});
 		});
 	}
 
