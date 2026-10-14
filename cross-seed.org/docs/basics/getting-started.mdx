@@ -32,20 +32,40 @@ You can install `cross-seed` using one of the following methods:
 
 ### Native installation with `npm`
 
-You'll need **Node.js 20** or greater. You can check your versions with the
-following commands:
+cross-seed v6 is compatible with **Node.js 20** through **Node.js 22**.
+**Node.js 22 LTS** is recommended, as previous versions have reached their
+limited support period or end of life, meaning that security patches will not be
+available from NodeJS developers in the future.
+
+You can check your versions with the following commands:
 
 ```shell
 node -v
 nodejs -v
 ```
 
-If the above commands returns a version number of `20.x.x` or greater, you can
-install `cross-seed` with the following command:
+If the above commands returns a version number of '20.x.x' through '22.x.x' you
+are on a compatible version for **cross-seed v6** and can install
+`cross-seed v6` with the following commands:
 
 ```shell
 npm install -g cross-seed
 ```
+
+::: warning
+
+If the version check returns anything below 22.x.x, if possible, we recommend
+updating your Node.js installation to **Node.js 22 LTS**, as it is still
+actively supported.
+
+**Node.js 20 LTS and 21** are compatible, but should be used _ONLY_ if you
+require these versions for compatibility with other Node applications and cannot
+update.
+
+Programs such as `nvm` ([Node Version Manager](https://github.com/nvm-sh/nvm))
+can allow for multiple versions of Node.js to be installed simultaneously.
+
+:::
 
 ### Windows installation
 
