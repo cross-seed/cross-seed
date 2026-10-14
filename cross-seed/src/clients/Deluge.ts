@@ -100,7 +100,7 @@ export default class Deluge implements TorrentClient {
 	private delugeCookie: string | null = null;
 	readonly delugeLabel = TORRENT_TAG;
 	readonly delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
-	private isLabelEnabled: boolean;
+	private isLabelEnabled: boolean = false;
 	private delugeRequestId: number = 0;
 
 	constructor(
@@ -200,6 +200,76 @@ export default class Deluge implements TorrentClient {
 				throw new CrossSeedError(
 					`[${this.label}] Unable to connect WebUI to Deluge daemon. Connect to the WebUI to resolve this.`,
 				);
+			}
+		}
+		this.isLabelEnabled = await this.labelEnabled();
+	}
+	/**
+	 * connects and authenticates to the webui when potential RPC desync is detected
+	 * @returns void
+	 */
+	private async reconnectBadStateWebUI(): Promise<void> {
+		const isConnectedResponse = await this.call<boolean>(
+			"web.connected",
+			[],
+			0,
+		);
+		if (isConnectedResponse.isOk() && !isConnectedResponse.unwrap()) {
+			logger.warn({
+				label: this.label,
+				message:
+					"Deluge WebUI is connected to RPC daemon, but a desync may be occurring.\n\tAttempting to reconnect to resolve this.",
+			});
+		} else {
+			const webuiHostList = (
+				await this.call<WebHostList>("web.get_hosts", [], 0)
+			).unwrapOrThrow(
+				new Error(
+					`[${this.label}] failed to get host-list for reconnect.\n\tManual reconnect from the WebUI Connection Manager to potentially resolve this.`,
+				),
+			);
+			const disconnectResponse = await this.call<undefined>(
+				"web.disconnect",
+				[webuiHostList[0][0]],
+				0,
+			);
+			if (disconnectResponse.isOk() && disconnectResponse.unwrap()) {
+				logger.info({
+					label: this.label,
+					message:
+						"Deluge WebUI successfully disconnected from the RPC daemon.",
+				});
+			} else {
+				throw new CrossSeedError(
+					`[${this.label}] Unable to disconnect WebUI from Deluge RPC daemon.\n\tManual disconnect and reconnect the WebUI from the WebUI Connection Manager to potentially resolve this.`,
+				);
+			}
+			await wait(300);
+			const connectResponse = await this.call<undefined>(
+				"web.connect",
+				[webuiHostList[0][0]],
+				0,
+			);
+			if (connectResponse.isOk() && connectResponse.unwrap()) {
+				logger.info({
+					label: this.label,
+					message:
+						"Deluge WebUI connected to primary RPC daemon in the WebUI host list.\n\tWill retry failed injections during next 'inject' job (hourly), or run from 'Jobs' manually.",
+				});
+			} else {
+				const isReConnectedResponse = await this.call<boolean>(
+					"web.connected",
+					[],
+					0,
+				);
+				if (
+					isReConnectedResponse.isOk() &&
+					!isReConnectedResponse.unwrap()
+				) {
+					throw new CrossSeedError(
+						`[${this.label}] Unable to connect WebUI to Deluge daemon.\n\tManual reconnect the WebUI from Connection Manager to potentially resolve this.`,
+					);
+				}
 			}
 		}
 		this.isLabelEnabled = await this.labelEnabled();
@@ -415,14 +485,23 @@ export default class Deluge implements TorrentClient {
 	private calculateLabel(
 		searchee: Searchee,
 		torrentInfo: TorrentInfo,
+		destinationDir?: string,
 	): string {
 		const { linkCategory, duplicateCategories } = getRuntimeConfig();
 		if (!searchee.infoHash || !torrentInfo.label) {
-			return this.delugeLabel;
+			return destinationDir
+				? linkCategory
+					? linkCategory
+					: this.delugeLabel
+				: this.delugeLabel;
 		}
 		const ogLabel = torrentInfo.label;
 		if (!duplicateCategories) {
-			return ogLabel;
+			return destinationDir
+				? linkCategory
+					? linkCategory
+					: ogLabel
+				: ogLabel;
 		}
 		const shouldSuffixLabel =
 			!ogLabel.endsWith(this.delugeLabelSuffix) && // no .cross-seed
@@ -505,13 +584,31 @@ export default class Deluge implements TorrentClient {
 				!options.destinationDir &&
 				(!searchee.infoHash || !torrentInfo!)
 			) {
-				logger.debug({
-					label: this.label,
-					message: `Injection failure: ${getLogString(searchee)} was missing critical data.`,
-				});
+				if (searchee.infoHash) {
+					logger.warn({
+						label: this.label,
+						message: `Searchee torrent may have been deleted, critical data is missing: ${getLogString(searchee)}`,
+					});
+				}
+				await this.reconnectBadStateWebUI();
+				await wait(250);
 				return InjectionResult.FAILURE;
 			}
 
+			if (!options.destinationDir) {
+				if (!searchee) {
+					// This is never possible, being made explicit here
+					throw new Error(
+						`Searchee torrent may have been deleted, critical data is missing: ${getLogString(searchee)}`,
+					);
+				} else if (searchee.infoHash) {
+					logger.warn({
+						label: this.label,
+						message: `Searchee torrent may have been deleted, injection results may not meet expectations: ${getLogString(searchee)}\n\tPossible Deluge WebUI Desync...Reconnecting Web Daemon to RPC...`,
+					});
+					return InjectionResult.FAILURE;
+				}
+			}
 			const torrentFileName = `${newTorrent.getFileSystemSafeName()}.cross-seed.torrent`;
 			const encodedTorrentData = newTorrent.encode().toString("base64");
 			const destinationDir = options.destinationDir
@@ -545,7 +642,11 @@ export default class Deluge implements TorrentClient {
 			// addResponse is known to be OK
 			await this.setLabel(
 				newTorrent,
-				this.calculateLabel(searchee, torrentInfo!),
+				this.calculateLabel(
+					searchee,
+					torrentInfo!,
+					options.destinationDir,
+				),
 			);
 
 			if (toRecheck) {
@@ -696,7 +797,7 @@ export default class Deluge implements TorrentClient {
 			if (infoHash in torrents) return resultOf(true);
 			return resultOf(false);
 		} catch (e) {
-			return resultOfErr(e);
+			return resultOfErr(e as Error);
 		}
 	}
 
