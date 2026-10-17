@@ -172,6 +172,8 @@ export const TORRENT_CACHE_FOLDER = "torrent_cache";
 export const LOGS_FOLDER = "logs";
 export const UNKNOWN_TRACKER = "UnknownTracker";
 export const MAX_PATH_BYTES = 255;
+/** ANIME_REGEX is slow on long names, and a file name can't be longer */
+export const MAX_ANIME_NAME_LENGTH = MAX_PATH_BYTES;
 export const LEVENSHTEIN_DIVISOR = 3;
 export const MIN_VIDEO_QUERY_LENGTH = 3;
 

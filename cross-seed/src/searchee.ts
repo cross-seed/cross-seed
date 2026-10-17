@@ -12,7 +12,6 @@ import {
 	ABS_WIN_PATH_REGEX,
 	AKA_REGEX,
 	ANIME_GROUP_REGEX,
-	ANIME_REGEX,
 	ARR_DIR_REGEX,
 	AUDIO_EXTENSIONS,
 	BAD_GROUP_PARSE_REGEX,
@@ -50,6 +49,7 @@ import {
 	errorMessage,
 	notExists,
 	mapAsync,
+	matchAnime,
 	stripExtension,
 	WithRequired,
 	WithUndefined,
@@ -142,7 +142,7 @@ export function getMediaType({ title, files }: Searchee): MediaType {
 			return MediaType.SEASON;
 		case hasExt(files, VIDEO_EXTENSIONS):
 			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
-			if (ANIME_REGEX.test(title)) return MediaType.ANIME;
+			if (matchAnime(title)) return MediaType.ANIME;
 			return MediaType.VIDEO;
 		case hasExt(files, VIDEO_DISC_EXTENSIONS):
 			if (MOVIE_REGEX.test(title)) return MediaType.MOVIE;
@@ -366,7 +366,7 @@ export function parseTitle(
 				return `${title} S${seasonMatch.groups!.seasonNum}${metaInfo}`;
 			}
 		}
-		const anime = videoFile.name.match(ANIME_REGEX);
+		const anime = matchAnime(videoFile.name);
 		if (anime) {
 			const season = seasonMatch
 				? `S${seasonMatch.groups!.seasonNum}`
@@ -628,7 +628,7 @@ export function getAnimeKeys(stem: string): {
 	keyTitles: string[];
 	release: number;
 } | null {
-	const match = stem.match(ANIME_REGEX);
+	const match = matchAnime(stem);
 	if (!match) return null;
 	const titles = getAllTitles([match.groups!.title, match.groups!.altTitle]);
 	const keyTitles: string[] = [];
@@ -657,7 +657,7 @@ export function getReleaseGroup(stem: string): string | null {
 		stem.match(EP_REGEX) ??
 		stem.match(SEASON_REGEX) ??
 		stem.match(MOVIE_REGEX) ??
-		stem.match(ANIME_REGEX);
+		matchAnime(stem);
 	const titles = getAllTitles(
 		[match?.groups?.title, match?.groups?.altTitle].filter(isTruthy),
 	);

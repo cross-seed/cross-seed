@@ -104,3 +104,22 @@ describe("Metafile paths", () => {
 		expect(message.length).toBeLessThan(300);
 	});
 });
+
+describe("Metafile titles", () => {
+	// ANIME_REGEX takes seconds to fail on a long name made of brackets
+	const hostile = "[a]".repeat(800) + ".mkv";
+
+	it("parses a single file torrent with a long name quickly", () => {
+		const start = performance.now();
+		const meta = Metafile.decode(singleFile(hostile));
+		expect(meta.title).toBe(hostile);
+		expect(performance.now() - start).toBeLessThan(1000);
+	});
+
+	it("parses a torrent with a long file name quickly", () => {
+		const start = performance.now();
+		const meta = Metafile.decode(multiFile("Release", hostile));
+		expect(meta.title).toBe("Release");
+		expect(performance.now() - start).toBeLessThan(1000);
+	});
+});
