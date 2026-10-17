@@ -49,8 +49,14 @@ export const CALIBRE_INDEXNUM_REGEX = /\s?\(\d+\)$/;
 export const INFO_HASH_REGEX = /^[a-z0-9]{40}$/i;
 export const SAVED_TORRENTS_INFO_REGEX =
 	/^\[(?<mediaType>.+?)\]\[(?<tracker>.+?)\](?<name>.+?)(?:\[(?<infoHash>[a-z0-9]{40})\])?(?<cached>.cached)?\.torrent$/i;
+/**
+ * Every string can only be split into these in one way. Alternatives that
+ * could split the same text in several (`[0-9]+` next to `[0-9]`, or a dot
+ * both alone and in `[xh.]{1,2}[2456]`) made this regex take twice as long
+ * for every digit it can't match, around 25 seconds for 30 of them.
+ */
 export const BAD_GROUP_PARSE_REGEX =
-	/^(?<badmatch>(?:dl|DDP?|aac|eac3|atmos|dts|ma|hd|[heav.c]{3.5}|[xh.]{1,2}[2456]|[0-9]+[ip]?|dxva|full|blu|ray|s(?:eason)?\W\d+|\W){3,})$/i;
+	/^(?<badmatch>(?:dl|DDP?|aac|eac3|atmos|dts|ma|hd|[heav.c]{3.5}|[xh][xh.]?[2456]|[0-9][ip]?|dxva|full|blu|ray|s(?:eason)?\W\d|\W){3,})$/i;
 export const JSON_VALUES_REGEX = /".+?"\s*:\s*"(?<value>.+?)"\s*(?:,|})/g;
 export const ABS_WIN_PATH_REGEX = /^[a-z]:|^\\/i;
 export const AKA_REGEX = /(?:[_.\s-]+|\b)a[_.\s-]?k[_.\s-]?a(?:[_.\s-]+|\b)/i;

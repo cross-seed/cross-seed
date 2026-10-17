@@ -123,3 +123,13 @@ describe("Metafile titles", () => {
 		expect(performance.now() - start).toBeLessThan(1000);
 	});
 });
+
+describe("Metafile titles with a release group", () => {
+	it("parses a torrent whose file name ends in a long run of digits quickly", () => {
+		const file = `Show.S01E01-${"1".repeat(30)}x.mkv`;
+		const start = performance.now();
+		const meta = Metafile.decode(multiFile("Show", file));
+		expect(meta.title).toMatch(/^Show S1E1/);
+		expect(performance.now() - start).toBeLessThan(1000);
+	});
+});
