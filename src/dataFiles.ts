@@ -7,6 +7,7 @@ import {
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { db } from "./db.js";
+import { cacheEnsembleDataEntries, EnsembleDataEntry } from "./ensemble.js";
 import { logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import {
@@ -16,7 +17,7 @@ import {
 	parseTitle,
 	SearcheeWithoutInfoHash,
 } from "./searchee.js";
-import { createEnsemblePieces, EnsembleEntry } from "./torrent.js";
+import { createEnsemblePieces } from "./torrent.js";
 import {
 	createKeyTitle,
 	exists,
@@ -136,7 +137,7 @@ async function indexDataPaths(paths: string[]): Promise<number> {
 	const memoizedPaths = new Map<string, string[]>();
 	const memoizedLengths = new Map<string, number>();
 	const dataRows: DataEntry[] = [];
-	const ensembleRows: EnsembleEntry[] = [];
+	const ensembleRows: EnsembleDataEntry[] = [];
 	for (const path of paths) {
 		const files = await getFilesFromDataRoot(
 			path,
@@ -155,12 +156,7 @@ async function indexDataPaths(paths: string[]): Promise<number> {
 	await inBatches(dataRows, async (batch) => {
 		await db("data").insert(batch).onConflict("path").merge();
 	});
-	await inBatches(ensembleRows, async (batch) => {
-		await db("ensemble")
-			.insert(batch)
-			.onConflict(["client_host", "path"])
-			.merge();
-	});
+	await cacheEnsembleDataEntries(db, ensembleRows);
 	return dataRows.length;
 }
 
@@ -168,7 +164,7 @@ function indexEnsembleDataEntry(
 	title: string,
 	path: string,
 	files: File[],
-): EnsembleEntry[] | null {
+): EnsembleDataEntry[] | null {
 	const ensemblePieces = createEnsemblePieces(title, files);
 	if (!ensemblePieces || !ensemblePieces.length) return null;
 	return ensemblePieces.map((ensemblePiece) => ({

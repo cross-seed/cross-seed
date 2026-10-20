@@ -7,6 +7,7 @@ import { getClients } from "./clients/TorrentClient.js";
 import { appDir } from "./configuration.js";
 import { TORRENT_CACHE_FOLDER } from "./constants.js";
 import { getCachedTorrentName, rebuildGuidInfoHashMap } from "./decide.js";
+import { cleanupDuplicateEnsembleDataEntries } from "./ensemble.js";
 import { Label, logger } from "./logger.js";
 import { getRuntimeConfig } from "./runtimeConfig.js";
 import { migrations } from "./migrations/migrations.js";
@@ -40,6 +41,17 @@ export const db = knex({
 });
 
 export async function cleanupDB(): Promise<void> {
+	logger.verbose({
+		label: Label.CLEANUP,
+		message: "Removing duplicate ensemble entries from dataDirs...",
+	});
+	const duplicatesRemoved = await cleanupDuplicateEnsembleDataEntries(db);
+	if (duplicatesRemoved) {
+		logger.info({
+			label: Label.CLEANUP,
+			message: `Removed ${duplicatesRemoved} duplicate ensemble entries and vacuumed the database`,
+		});
+	}
 	const {
 		dataDirs,
 		excludeRecentSearch,
