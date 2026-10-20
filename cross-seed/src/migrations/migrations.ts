@@ -16,6 +16,7 @@ import indexerEnabledFlag from "./14-indexer-enabled-flag.js";
 import removeUrlUniqueConstraint from "./15-remove-url-unique-constraint.js";
 import pruneInactiveIndexers from "./16-prune-inactive-indexers.js";
 import apiKeySettingsJson from "./17-api-key-settings-json.js";
+import uniqueEnsembleDataMappings from "./18-unique-ensemble-data-mappings.js";
 
 import { Knex } from "knex";
 type Migration = {
@@ -45,6 +46,7 @@ export const migrations = {
 			removeUrlUniqueConstraint,
 			pruneInactiveIndexers,
 			apiKeySettingsJson,
+			uniqueEnsembleDataMappings,
 		]),
 	getMigrationName: (migration: Migration) => migration.name,
 	getMigration: (migration: Migration) => Promise.resolve(migration),
