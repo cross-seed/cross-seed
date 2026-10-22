@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import QBittorrent from "../src/clients/QBittorrent.js";
 import { Decision, InjectionResult } from "../src/constants.js";
 import type { Metafile } from "../src/parseTorrent.js";
 import { getRuntimeConfig, setRuntimeConfig } from "../src/runtimeConfig.js";
+import { resultOf } from "../src/Result.js";
 import type { Searchee } from "../src/searchee.js";
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
 
 function buildClient(versionMajor: number, versionMinor: number) {
 	const capture: { form?: FormData } = {};
@@ -15,32 +20,14 @@ function buildClient(versionMajor: number, versionMinor: number) {
 	);
 	qb.versionMajor = versionMajor;
 	qb.versionMinor = versionMinor;
-	qb.isTorrentInClient = async () => {
-		const { resultOf } = await import("../src/Result.js");
-		return resultOf(false);
-	};
-	let calls = 0;
-	qb.getTorrentInfo = (async () => {
-		calls++;
-		return calls === 1
-			? {
-					hash: "old",
-					save_path: "/tmp",
-					auto_tmm: false,
-					category: "",
-					state: "uploading",
-				}
-			: { hash: "new" };
-	}) as unknown as QBittorrent["getTorrentInfo"];
-	qb.addTorrent = async (formData) => {
+	vi.spyOn(qb, "isTorrentInClient").mockResolvedValue(resultOf(false));
+	vi.spyOn(qb, "getTorrentInfo").mockResolvedValue({
+		hash: "new",
+	} as NonNullable<Awaited<ReturnType<QBittorrent["getTorrentInfo"]>>>);
+	vi.spyOn(qb, "addTorrent").mockImplementation((formData) => {
 		capture.form = formData;
-	};
-	(qb as unknown as { getCategoryForNewTorrent: () => Promise<string> })
-		.getCategoryForNewTorrent = async () => "";
-	(qb as unknown as { getTagsForNewTorrent: () => string })
-		.getTagsForNewTorrent = () => "tag";
-	(qb as unknown as { getLayoutForNewTorrent: () => string })
-		.getLayoutForNewTorrent = () => "Original";
+		return Promise.resolve();
+	});
 	return { qb, capture };
 }
 
@@ -49,7 +36,7 @@ async function injectWith(versionMajor: number, versionMinor: number) {
 		...getRuntimeConfig(),
 		skipRecheck: true,
 		linkCategory: "",
-	} as never);
+	});
 	const { qb, capture } = buildClient(versionMajor, versionMinor);
 	const newTorrent = {
 		infoHash: "new",
@@ -58,9 +45,15 @@ async function injectWith(versionMajor: number, versionMinor: number) {
 		encode: () => new Uint8Array([1]),
 	} as unknown as Metafile;
 	const searchee = { infoHash: "old", files: [] } as unknown as Searchee;
-	const result = await qb.inject(newTorrent, searchee, Decision.MATCH_SIZE_ONLY, {
-		onlyCompleted: false,
-	});
+	const result = await qb.inject(
+		newTorrent,
+		searchee,
+		Decision.MATCH_SIZE_ONLY,
+		{
+			onlyCompleted: false,
+			destinationDir: "/tmp",
+		},
+	);
 	expect(result).toBe(InjectionResult.SUCCESS);
 	if (!capture.form) throw new Error("addTorrent was not called");
 	return capture.form;
