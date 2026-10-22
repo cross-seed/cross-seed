@@ -31,7 +31,6 @@ import {
 	wait,
 } from "../utils.js";
 import {
-	shouldResumeFromNonRelevantFiles,
 	clientSearcheeModified,
 	ClientSearcheeResult,
 	getMaxRemainingBytes,
@@ -40,6 +39,7 @@ import {
 	resumeErrSleepTime,
 	resumeSleepTime,
 	shouldRecheck,
+	shouldResumeFromNonRelevantFiles,
 	TorrentClient,
 	TorrentMetadataInClient,
 } from "./TorrentClient.js";
@@ -91,10 +91,11 @@ export default class Deluge implements TorrentClient {
 	readonly readonly: boolean;
 	readonly label: string;
 	private delugeCookie: string | null = null;
-	private delugeLabel = TORRENT_TAG;
-	private delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
-	private isLabelEnabled: boolean;
+	readonly delugeLabel = TORRENT_TAG;
+	readonly delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
+	private isLabelEnabled: boolean = false;
 	private delugeRequestId: number = 0;
+	private activeSessions: number = 0;
 
 	constructor(
 		url: string,
@@ -110,17 +111,35 @@ export default class Deluge implements TorrentClient {
 	}
 
 	/**
+	 * deletes the active webui session when no actions are in flight
+	 */
+	private async endSession(): Promise<void> {
+		if (!this.delugeCookie || this.activeSessions > 0) return;
+		try {
+			await this.call<boolean>("auth.delete_session", [], 0);
+		} catch (e) {
+			logger.debug(e);
+		} finally {
+			this.delugeCookie = null;
+		}
+	}
+
+	/**
 	 * validates the login and host for deluge webui
 	 */
 	async validateConfig(): Promise<void> {
 		const { torrentDir } = getRuntimeConfig();
-		await this.authenticate();
-		this.isLabelEnabled = await this.labelEnabled();
-		logger.info({
-			label: this.label,
-			message: `Logged in successfully${this.readonly ? " (readonly)" : ""}`,
-		});
-
+		this.activeSessions++;
+		try {
+			await this.authenticate();
+			logger.info({
+				label: this.label,
+				message: `Logged in successfully${this.readonly ? " (readonly)" : ""}`,
+			});
+		} finally {
+			this.activeSessions--;
+			await this.endSession();
+		}
 		if (!torrentDir) return;
 		if (!(await readdir(torrentDir)).some((f) => f.endsWith(".state"))) {
 			throw new CrossSeedError(
@@ -132,19 +151,20 @@ export default class Deluge implements TorrentClient {
 	/**
 	 * connects and authenticates to the webui
 	 */
-	private async authenticate(): Promise<void> {
+	async authenticate(): Promise<void> {
 		const { href, password } = extractCredentialsFromUrl(
 			this.url,
 		).unwrapOrThrow(
 			new CrossSeedError(
-				`[${this.label}] delugeRpcUrl must be percent-encoded`,
+				`[${this.label}] The Deluge WebUI URL must be percent-encoded`,
 			),
 		);
 		if (!password) {
 			throw new CrossSeedError(
-				`[${this.label}] You need to define a password in the delugeRpcUrl. (e.g. http://:<PASSWORD>@localhost:8112)`,
+				`[${this.label}] You need to define a password in the Deluge WebUI URL. (e.g. http://:<PASSWORD>@localhost:8112)`,
 			);
 		}
+		this.delugeCookie = null;
 		try {
 			const authResponse = (
 				await this.call<boolean>("auth.login", [password], 0)
@@ -185,7 +205,16 @@ export default class Deluge implements TorrentClient {
 				[webuiHostList[0][0]],
 				0,
 			);
-			if (connectResponse.isOk() && connectResponse.unwrap()) {
+			await wait(300);
+			const reconnectedResponse = await this.call<boolean>(
+				"web.connected",
+				[],
+				0,
+			);
+			if (
+				(connectResponse.isOk() && connectResponse.unwrap()) ||
+				(reconnectedResponse.isOk() && reconnectedResponse.unwrap())
+			) {
 				logger.info({
 					label: this.label,
 					message: "Deluge WebUI connected to the daemon.",
@@ -196,6 +225,7 @@ export default class Deluge implements TorrentClient {
 				);
 			}
 		}
+		this.isLabelEnabled = await this.labelEnabled();
 	}
 
 	/**
@@ -210,14 +240,27 @@ export default class Deluge implements TorrentClient {
 		params: unknown[],
 		retries = 1,
 	): Promise<Result<ResultType, ErrorType>> {
-		const msg = `Calling method ${method} with params ${inspect(params, { depth: null, compact: true })}`;
-		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
-		logger.verbose({ label: this.label, message });
+		if (
+			!this.delugeCookie &&
+			method !== "auth.login" &&
+			method !== "auth.delete_session"
+		) {
+			await this.authenticate();
+		}
+		const truncate = (message: string) =>
+			message.length > 1000 ? `${message.slice(0, 1000)}...` : message;
 		const { href } = extractCredentialsFromUrl(this.url).unwrapOrThrow(
 			new CrossSeedError(
-				`[${this.label}] delugeRpcUrl must be percent-encoded`,
+				`[${this.label}] The Deluge WebUI URL must be percent-encoded`,
 			),
 		);
+
+		const message =
+			method === "auth.login"
+				? `Calling authentication method ${method}`
+				: `Calling method ${method} with params ${inspect(params, { depth: null, compact: true })}`;
+		logger.verbose({ label: this.label, message: truncate(message) });
+
 		const headers = new Headers({
 			"Content-Type": "application/json",
 			"User-Agent": USER_AGENT,
@@ -238,10 +281,9 @@ export default class Deluge implements TorrentClient {
 				signal: AbortSignal.timeout(ms("10 seconds")),
 			});
 		} catch (networkError) {
-			if (
-				networkError.name === "AbortError" ||
-				networkError.name === "TimeoutError"
-			) {
+			const errName =
+				networkError instanceof Error ? networkError.name : "";
+			if (errName === "AbortError" || errName === "TimeoutError") {
 				throw new Error(
 					`[${this.label}] Deluge method ${method} timed out after 10 seconds`,
 				);
@@ -322,62 +364,72 @@ export default class Deluge implements TorrentClient {
 		let sleepTime = resumeSleepTime;
 		const stopTime = getResumeStopTime();
 		let stop = false;
-		while (Date.now() < stopTime) {
-			if (options.checkOnce) {
-				if (stop) return;
-				stop = true;
-			}
-			await wait(sleepTime);
-			let torrentInfo: TorrentInfo;
-			let torrentLog: string;
-			try {
-				torrentInfo = await this.getTorrentInfo(infoHash);
-				if (torrentInfo.state === "Checking") {
-					continue;
+		this.activeSessions++;
+		try {
+			while (Date.now() < stopTime) {
+				if (options.checkOnce) {
+					if (stop) return;
+					stop = true;
 				}
-				torrentLog = `${torrentInfo.name} [${sanitizeInfoHash(infoHash)}]`;
-				if (torrentInfo.state !== "Paused") {
-					logger.warn({
-						label: this.label,
-						message: `Will not resume ${torrentLog}: state is ${torrentInfo.state}`,
-					});
-					return;
-				}
-				const maxRemainingBytes = getMaxRemainingBytes(meta, decision, {
-					torrentLog,
-					label: this.label,
-				});
-				if (torrentInfo.total_remaining! > maxRemainingBytes) {
-					if (
-						!shouldResumeFromNonRelevantFiles(
-							meta,
-							torrentInfo.total_remaining!,
-							decision,
-							{ torrentLog, label: this.label },
-						)
-					) {
+				await wait(sleepTime);
+				let torrentInfo: TorrentInfo;
+				let torrentLog: string;
+				try {
+					torrentInfo = await this.getTorrentInfo(infoHash);
+					if (torrentInfo.state === "Checking") {
+						continue;
+					}
+					torrentLog = `${torrentInfo.name} [${sanitizeInfoHash(infoHash)}]`;
+					if (torrentInfo.state !== "Paused") {
 						logger.warn({
 							label: this.label,
-							message: `autoResumeMaxDownload will not resume ${torrentLog}: remainingSize ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} > ${humanReadableSize(maxRemainingBytes, { binary: true })} limit`,
+							message: `Will not resume ${torrentLog}: state is ${torrentInfo.state}`,
 						});
 						return;
 					}
+					const maxRemainingBytes = getMaxRemainingBytes(
+						meta,
+						decision,
+						{
+							torrentLog,
+							label: this.label,
+						},
+					);
+					if (torrentInfo.total_remaining! > maxRemainingBytes) {
+						if (
+							!shouldResumeFromNonRelevantFiles(
+								meta,
+								torrentInfo.total_remaining!,
+								decision,
+								{ torrentLog, label: this.label },
+							)
+						) {
+							logger.warn({
+								label: this.label,
+								message: `autoResumeMaxDownload will not resume ${torrentLog}: remainingSize ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} > ${humanReadableSize(maxRemainingBytes, { binary: true })} limit`,
+							});
+							return;
+						}
+					}
+				} catch {
+					sleepTime = resumeErrSleepTime; // Dropping connections or restart
+					continue;
 				}
-			} catch (e) {
-				sleepTime = resumeErrSleepTime; // Dropping connections or restart
-				continue;
+				logger.info({
+					label: this.label,
+					message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining`,
+				});
+				await this.call<string>("core.resume_torrent", [[infoHash]]);
+				return;
 			}
-			logger.info({
+			logger.warn({
 				label: this.label,
-				message: `Resuming ${torrentLog}: ${humanReadableSize(torrentInfo.total_remaining!, { binary: true })} remaining`,
+				message: `Will not resume torrent ${infoHash}: timeout`,
 			});
-			await this.call<string>("core.resume_torrent", [[infoHash]]);
-			return;
+		} finally {
+			this.activeSessions--;
+			await this.endSession();
 		}
-		logger.warn({
-			label: this.label,
-			message: `Will not resume torrent ${infoHash}: timeout`,
-		});
 	}
 
 	/**
@@ -403,7 +455,7 @@ export default class Deluge implements TorrentClient {
 			ogLabel !== linkCategory; // not data
 
 		return !searchee.infoHash
-			? linkCategory ?? ""
+			? (linkCategory ?? "")
 			: shouldSuffixLabel
 				? `${ogLabel}${this.delugeLabelSuffix}`
 				: ogLabel;
@@ -467,6 +519,7 @@ export default class Deluge implements TorrentClient {
 		decision: DecisionAnyMatch,
 		options: { onlyCompleted: boolean; destinationDir?: string },
 	): Promise<InjectionResult> {
+		this.activeSessions++;
 		try {
 			const existsRes = await this.isTorrentInClient(newTorrent.infoHash);
 			if (existsRes.isErr()) return InjectionResult.FAILURE;
@@ -546,6 +599,9 @@ export default class Deluge implements TorrentClient {
 			});
 			logger.debug(error);
 			return InjectionResult.FAILURE;
+		} finally {
+			this.activeSessions--;
+			await this.endSession();
 		}
 		return InjectionResult.SUCCESS;
 	}
@@ -597,7 +653,7 @@ export default class Deluge implements TorrentClient {
 		const params = [["save_path", "progress"], { hash: meta.infoHash }];
 		try {
 			response = await this.call<TorrentStatus>("web.update_ui", params);
-		} catch (e) {
+		} catch {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
 		if (!response.isOk()) {
@@ -631,7 +687,7 @@ export default class Deluge implements TorrentClient {
 		const params = [["save_path", "progress"], {}];
 		try {
 			response = await this.call<TorrentStatus>("web.update_ui", params);
-		} catch (e) {
+		} catch {
 			return dirs;
 		}
 		if (!response.isOk()) {
@@ -692,7 +748,7 @@ export default class Deluge implements TorrentClient {
 				useVerbose: true,
 			});
 			return torrentInfo.complete ? resultOf(true) : resultOf(false);
-		} catch (e) {
+		} catch {
 			return resultOfErr("NOT_FOUND");
 		}
 	}
@@ -710,7 +766,7 @@ export default class Deluge implements TorrentClient {
 				useVerbose: true,
 			});
 			return resultOf(torrentInfo.state === "Checking");
-		} catch (e) {
+		} catch {
 			return resultOfErr("NOT_FOUND");
 		}
 	}
@@ -750,88 +806,108 @@ export default class Deluge implements TorrentClient {
 		const searchees: SearcheeClient[] = [];
 		const newSearchees: SearcheeClient[] = [];
 		const infoHashes = new Set<string>();
-		const torrentsRes = await this.call<TorrentStatus>("web.update_ui", [
-			["name", "label", "save_path", "total_size", "files", "trackers"],
-			{},
-		]);
-		if (torrentsRes.isErr()) {
-			logger.error({
-				label: this.label,
-				message: "Failed to get torrents from client",
-			});
-			logger.debug(torrentsRes.unwrapErr());
-			return { searchees, newSearchees };
-		}
-		const torrents = torrentsRes.unwrap().torrents;
-		if (!torrents || !Object.keys(torrents).length) {
-			logger.verbose({
-				label: this.label,
-				message: "No torrents found in client",
-			});
-			return { searchees, newSearchees };
-		}
-		for (const [hash, torrent] of Object.entries(torrents)) {
-			const infoHash = hash.toLowerCase();
-			infoHashes.add(infoHash);
-			const dbTorrent = await db("client_searchee")
-				.where("info_hash", infoHash)
-				.where("client_host", this.clientHost)
-				.first();
-			const name = torrent.name!;
-			const savePath = torrent.save_path!;
-			const category = torrent.label ?? "";
-			const modified = clientSearcheeModified(
-				this.label,
-				dbTorrent,
-				name,
-				savePath,
-				{
-					category,
-				},
+		this.activeSessions++;
+		try {
+			const torrentsRes = await this.call<TorrentStatus>(
+				"web.update_ui",
+				[
+					[
+						"name",
+						"label",
+						"save_path",
+						"total_size",
+						"files",
+						"trackers",
+					],
+					{},
+				],
 			);
-			const refresh =
-				options?.refresh === undefined
-					? false
-					: options.refresh.length === 0
-						? true
-						: options.refresh.includes(infoHash);
-			if (!modified && !refresh) {
-				if (!options?.newSearcheesOnly) {
-					searchees.push(createSearcheeFromDB(dbTorrent));
-				}
-				continue;
+			if (torrentsRes.isErr()) {
+				logger.error({
+					label: this.label,
+					message: "Failed to get torrents from client",
+				});
+				logger.debug(torrentsRes.unwrapErr());
+				return { searchees, newSearchees };
 			}
-			const files = torrent.files!.map((file) => ({
-				name: basename(file.path),
-				path: file.path,
-				length: file.size,
-			}));
-			if (!files.length) {
+			const torrents = torrentsRes.unwrap().torrents;
+			if (!torrents || !Object.keys(torrents).length) {
 				logger.verbose({
 					label: this.label,
-					message: `No files found for ${torrent.name} [${sanitizeInfoHash(infoHash)}]: skipping`,
+					message: "No torrents found in client",
 				});
-				continue;
+				return { searchees, newSearchees };
 			}
-			const trackers = organizeTrackers(torrent.trackers!);
-			const title = parseTitle(name, files) ?? name;
-			const length = torrent.total_size!;
-			const searchee: SearcheeClient = {
-				infoHash,
-				name,
-				title,
-				files,
-				length,
-				clientHost: this.clientHost,
-				savePath,
-				category,
-				trackers,
-			};
-			newSearchees.push(searchee);
-			searchees.push(searchee);
+			for (const [hash, torrent] of Object.entries(torrents)) {
+				const infoHash = hash.toLowerCase();
+				infoHashes.add(infoHash);
+				const dbTorrent = await db("client_searchee")
+					.where("info_hash", infoHash)
+					.where("client_host", this.clientHost)
+					.first();
+				const name = torrent.name!;
+				const savePath = torrent.save_path!;
+				const category = torrent.label ?? "";
+				const modified = clientSearcheeModified(
+					this.label,
+					dbTorrent,
+					name,
+					savePath,
+					{
+						category,
+					},
+				);
+				const refresh =
+					options?.refresh === undefined
+						? false
+						: options.refresh.length === 0
+							? true
+							: options.refresh.includes(infoHash);
+				if (!modified && !refresh) {
+					if (!options?.newSearcheesOnly) {
+						searchees.push(createSearcheeFromDB(dbTorrent));
+					}
+					continue;
+				}
+				const files = torrent.files!.map((file) => ({
+					name: basename(file.path),
+					path: file.path,
+					length: file.size,
+				}));
+				if (!files.length) {
+					logger.verbose({
+						label: this.label,
+						message: `No files found for ${torrent.name} [${sanitizeInfoHash(infoHash)}]: skipping`,
+					});
+					continue;
+				}
+				const trackers = organizeTrackers(torrent.trackers!);
+				const title = parseTitle(name, files) ?? name;
+				const length = torrent.total_size!;
+				const searchee: SearcheeClient = {
+					infoHash,
+					name,
+					title,
+					files,
+					length,
+					clientHost: this.clientHost,
+					savePath,
+					category,
+					trackers,
+				};
+				newSearchees.push(searchee);
+				searchees.push(searchee);
+			}
+			await updateSearcheeClientDB(
+				this.clientHost,
+				newSearchees,
+				infoHashes,
+			);
+			return { searchees, newSearchees };
+		} finally {
+			this.activeSessions--;
+			await this.endSession();
 		}
-		await updateSearcheeClientDB(this.clientHost, newSearchees, infoHashes);
-		return { searchees, newSearchees };
 	}
 
 	/**
