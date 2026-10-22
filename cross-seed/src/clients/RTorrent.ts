@@ -11,6 +11,7 @@ import {
 	TORRENT_TAG,
 	USER_AGENT,
 } from "../constants.js";
+import { runInBackground } from "../utils/background.js";
 import { db } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
@@ -965,9 +966,11 @@ export default class RTorrent implements TorrentClient {
 						});
 						logger.debug(e);
 					}
-					void this.resumeInjection(meta, decision, {
-						checkOnce: false,
-					});
+					runInBackground(
+						this.resumeInjection(meta, decision, {
+							checkOnce: false,
+						}),
+					);
 				}
 				return InjectionResult.SUCCESS;
 			}

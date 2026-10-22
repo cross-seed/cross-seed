@@ -1,5 +1,6 @@
 import { promises as fs, watch } from "fs";
 import { join } from "path";
+import { runInBackground } from "./background.js";
 import { appDir } from "../configuration.js";
 import { logger } from "../logger.js";
 
@@ -56,7 +57,7 @@ class LogWatcher {
 
 	private watchLogFile(filePath: string) {
 		// Initialize position to end of file (only watch new entries)
-		void this.initializePosition(filePath);
+		runInBackground(this.initializePosition(filePath));
 
 		const clearRetryTimer = () => {
 			const existingTimer = this.retryTimers.get(filePath);
@@ -83,7 +84,7 @@ class LogWatcher {
 		try {
 			const watcher = watch(filePath, (eventType) => {
 				if (eventType === "change") {
-					void this.handleFileChange(filePath);
+					runInBackground(this.handleFileChange(filePath));
 				} else if (eventType === "rename") {
 					// File was rotated or replaced - reset position and retry watching
 					this.lastPositions.set(filePath, 0);

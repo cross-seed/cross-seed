@@ -1,4 +1,5 @@
 import ms from "ms";
+import { runInBackground } from "./utils/background.js";
 import { Action } from "./constants.js";
 import { cleanupDB, db } from "./db.js";
 import { injectSavedTorrents } from "./inject.js";
@@ -180,7 +181,7 @@ export async function checkJobs(
 export async function jobsLoop(): Promise<void> {
 	createJobs();
 
-	setInterval(checkJobs, ms("1 minute"));
+	setInterval(() => runInBackground(checkJobs()), ms("1 minute"));
 	await checkJobs({ isFirstRun: true, useQueue: false });
 	// jobs take too long to run to completion so let process.exit take care of stopping
 	return new Promise(() => {});

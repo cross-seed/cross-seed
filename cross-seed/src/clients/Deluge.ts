@@ -10,6 +10,7 @@ import {
 	TORRENT_TAG,
 	USER_AGENT,
 } from "../constants.js";
+import { runInBackground } from "../utils/background.js";
 import { db } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
@@ -578,9 +579,11 @@ export default class Deluge implements TorrentClient {
 				// leaves torrent ready to download - ~99%
 				await wait(1000);
 				await this.recheckTorrent(newTorrent.infoHash);
-				void this.resumeInjection(newTorrent, decision, {
-					checkOnce: false,
-				});
+				runInBackground(
+					this.resumeInjection(newTorrent, decision, {
+						checkOnce: false,
+					}),
+				);
 			}
 		} catch (error) {
 			logger.error({

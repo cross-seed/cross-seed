@@ -247,4 +247,4 @@ async function main() {
 	await program.parseAsync();
 }
 
-void main();
+await main();

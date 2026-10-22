@@ -9,6 +9,7 @@ import {
 	TORRENT_TAG,
 	USER_AGENT,
 } from "../constants.js";
+import { runInBackground } from "../utils/background.js";
 import { db } from "../db.js";
 import { CrossSeedError } from "../errors.js";
 import { Label, logger } from "../logger.js";
@@ -628,9 +629,11 @@ export default class Transmission implements TorrentClient {
 				},
 			);
 			if (toRecheck) {
-				void this.resumeInjection(newTorrent, decision, {
-					checkOnce: false,
-				});
+				runInBackground(
+					this.resumeInjection(newTorrent, decision, {
+						checkOnce: false,
+					}),
+				);
 			}
 		} catch {
 			return InjectionResult.FAILURE;

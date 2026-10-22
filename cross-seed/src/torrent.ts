@@ -958,9 +958,7 @@ export async function getTorrentByCriteria(
 	const database = useClientTorrents
 		? db<ClientSearcheeRow>("client_searchee")
 		: db<{ file_path: string; info_hash: string }>("torrent");
-	const dbTorrents = await database.where((b) =>
-		b.where({ info_hash: criteria.infoHash }),
-	);
+	const dbTorrents = await database.where({ info_hash: criteria.infoHash });
 	if (!dbTorrents.length) {
 		const message = `Torrent client does not have any torrent with criteria ${inspect(
 			criteria,
