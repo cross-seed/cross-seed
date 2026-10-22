@@ -2,6 +2,7 @@ import { type Stats } from "fs";
 import { readdir, stat } from "fs/promises";
 import { basename, dirname, join, resolve, sep } from "path";
 import { inspect } from "util";
+import ms from "ms";
 import xmlrpc, { Client } from "xmlrpc";
 import { humanReadableSize } from "@cross-seed/shared/utils";
 import {
@@ -152,26 +153,64 @@ export default class RTorrent implements TorrentClient {
 		});
 	}
 
-	private async methodCallP<R>(method: string, args: unknown[]): Promise<R> {
+	private async methodCallP<R>(
+		method: string,
+		args: unknown[],
+		transientRetries = 3,
+	): Promise<R> {
 		const msg = `Calling method ${method} with params ${inspect(args, { depth: null, compact: true })}`;
 		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
 		logger.verbose({ label: this.label, message });
-		return new Promise<R>((resolve, reject) => {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-			(this.client as any).methodCall(
-				method,
-				args,
-				(err: unknown, data: R) => {
-					if (err)
-						return reject(
-							err instanceof Error
-								? err
-								: new Error(errorMessage(err)),
-						);
-					return resolve(data);
-				},
-			);
-		});
+
+		// Retry transport failures only; RPC faults and unexpected errors must
+		// reach the caller immediately.
+		const retries = Math.max(transientRetries, 0);
+		for (let attempt = 0; ; attempt++) {
+			try {
+				return await new Promise<R>((resolve, reject) => {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+					(this.client as any).methodCall(
+						method,
+						args,
+						(err: unknown, data: R) => {
+							if (err)
+								return reject(
+									err instanceof Error
+										? err
+										: new Error(errorMessage(err)),
+								);
+							return resolve(data);
+						},
+					);
+				});
+			} catch (e) {
+				if (
+					attempt >= retries ||
+					!(e instanceof Error) ||
+					"faultCode" in e ||
+					!("code" in e) ||
+					!new Set([
+						"ECONNRESET",
+						"ECONNREFUSED",
+						"ECONNABORTED",
+						"ETIMEDOUT",
+						"EPIPE",
+						"EAI_AGAIN",
+						"ENETUNREACH",
+						"EHOSTUNREACH",
+					]).has(String(e.code))
+				) {
+					throw e;
+				}
+				logger.verbose({
+					label: this.label,
+					message: `Method ${method} failed, ${retries - attempt} retries remaining: ${errorMessage(e)}`,
+				});
+				await wait(
+					Math.min(ms("1 second") * 2 ** attempt, ms("10 seconds")),
+				);
+			}
+		}
 	}
 
 	async isTorrentInClient(

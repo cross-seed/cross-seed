@@ -251,40 +251,65 @@ export default class Deluge implements TorrentClient {
 		});
 		if (this.delugeCookie) headers.set("Cookie", this.delugeCookie);
 
+		// Bounded retries for transient failures: a failed connection, or a
+		// response whose body fails to read/parse after headers already
+		// arrived (e.g. the socket closing mid-stream). Separate from the
+		// `retries` param above, which governs the NO_AUTH re-auth flow.
+		const transientRetries = 3;
 		let response: Response, json: DelugeJSON<ResultType>;
-
-		try {
-			response = await fetch(href, {
-				body: JSON.stringify({
-					method,
-					params,
-					id: this.delugeRequestId++,
-				}),
-				method: "POST",
-				headers,
-				signal: AbortSignal.timeout(ms("10 seconds")),
-			});
-		} catch (networkError) {
-			const errName =
-				networkError instanceof Error ? networkError.name : "";
-			if (errName === "AbortError" || errName === "TimeoutError") {
-				throw new Error(
-					`[${this.label}] Deluge method ${method} timed out after 10 seconds`,
+		for (let attempt = 0; ; attempt++) {
+			try {
+				response = await fetch(href, {
+					body: JSON.stringify({
+						method,
+						params,
+						id: this.delugeRequestId++,
+					}),
+					method: "POST",
+					headers,
+					signal: AbortSignal.timeout(ms("10 seconds")),
+				});
+			} catch (networkError) {
+				const errName =
+					networkError instanceof Error ? networkError.name : "";
+				if (errName === "AbortError" || errName === "TimeoutError") {
+					throw new Error(
+						`[${this.label}] Deluge method ${method} timed out after 10 seconds`,
+					);
+				}
+				if (attempt >= transientRetries) {
+					throw new Error(
+						`[${this.label}] Failed to connect to Deluge at ${href}`,
+						{ cause: networkError },
+					);
+				}
+				logger.verbose({
+					label: this.label,
+					message: `Deluge method ${method} failed to connect, ${transientRetries - attempt} retries remaining: ${errorMessage(networkError)}`,
+				});
+				await wait(
+					Math.min(ms("1 second") * 2 ** attempt, ms("10 seconds")),
 				);
+				continue;
 			}
-			throw new Error(
-				`[${this.label}] Failed to connect to Deluge at ${href}`,
-				{
-					cause: networkError,
-				},
-			);
-		}
-		try {
-			json = (await response.json()) as DelugeJSON<ResultType>;
-		} catch (jsonParseError) {
-			throw new Error(
-				`[${this.label}] Deluge method ${method} response was non-JSON ${jsonParseError}`,
-			);
+			try {
+				json = (await response.json()) as DelugeJSON<ResultType>;
+				break;
+			} catch (jsonParseError) {
+				if (attempt >= transientRetries) {
+					throw new Error(
+						`[${this.label}] Deluge method ${method} response was non-JSON ${jsonParseError}`,
+					);
+				}
+				logger.verbose({
+					label: this.label,
+					message: `Deluge method ${method} failed to read response body, ${transientRetries - attempt} retries remaining: ${errorMessage(jsonParseError)}`,
+				});
+				await wait(
+					Math.min(ms("1 second") * 2 ** attempt, ms("10 seconds")),
+				);
+				continue;
+			}
 		}
 		if (json.error?.code === DelugeErrorCode.NO_AUTH && retries > 0) {
 			this.delugeCookie = null;
