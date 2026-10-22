@@ -162,13 +162,8 @@ export default class RTorrent implements TorrentClient {
 		const message = msg.length > 1000 ? `${msg.slice(0, 1000)}...` : msg;
 		logger.verbose({ label: this.label, message });
 
-		// Bounded retries for transient failures (e.g. a dropped connection
-		// talking to rtorrent's XML-RPC endpoint). Every failure from the
-		// underlying `xmlrpc` client - network or parse alike - already
-		// funnels through this single callback into a normal rejection, so
-		// unlike the HTTP+fetch clients there's no separate "body read"
-		// failure mode that can escape unretried; this just adds the retry
-		// itself, which didn't exist here at all before.
+		// Retry transport failures only; RPC faults and unexpected errors must
+		// reach the caller immediately.
 		const retries = Math.max(transientRetries, 0);
 		for (let attempt = 0; ; attempt++) {
 			try {
@@ -189,7 +184,22 @@ export default class RTorrent implements TorrentClient {
 					);
 				});
 			} catch (e) {
-				if (attempt >= retries) {
+				if (
+					attempt >= retries ||
+					!(e instanceof Error) ||
+					"faultCode" in e ||
+					!("code" in e) ||
+					!new Set([
+						"ECONNRESET",
+						"ECONNREFUSED",
+						"ECONNABORTED",
+						"ETIMEDOUT",
+						"EPIPE",
+						"EAI_AGAIN",
+						"ENETUNREACH",
+						"EHOSTUNREACH",
+					]).has(String(e.code))
+				) {
 					throw e;
 				}
 				logger.verbose({

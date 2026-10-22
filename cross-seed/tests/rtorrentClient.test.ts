@@ -1,4 +1,12 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import {
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import type { Client } from "xmlrpc";
 import RTorrent from "../src/clients/RTorrent.js";
 import { initializeLogger } from "../src/logger.js";
@@ -21,6 +29,9 @@ function stubMethodCall(
 }
 
 describe("RTorrent methodCallP retries", () => {
+	beforeEach(() => vi.useFakeTimers());
+	afterEach(() => vi.useRealTimers());
+
 	beforeAll(() => {
 		initializeLogger({ verbose: false });
 	});
@@ -31,13 +42,20 @@ describe("RTorrent methodCallP retries", () => {
 		stubMethodCall(client, (_method, _args, callback) => {
 			calls++;
 			if (calls === 1) {
-				callback(new Error("ECONNRESET"), undefined);
+				callback(
+					Object.assign(new Error("socket hang up"), {
+						code: "ECONNRESET",
+					}),
+					undefined,
+				);
 				return;
 			}
 			callback(null, ["abc123"]);
 		});
 
-		const result = await client.isTorrentInClient("abc123");
+		const pending = client.isTorrentInClient("abc123");
+		await vi.runAllTimersAsync();
+		const result = await pending;
 
 		if (!result.isOk()) throw new Error("expected an Ok result");
 		expect(result.unwrap()).toBe(true);
@@ -49,12 +67,42 @@ describe("RTorrent methodCallP retries", () => {
 		const client = newRTorrent();
 		stubMethodCall(client, (_method, _args, callback) => {
 			calls++;
-			callback(new Error("ECONNRESET"), undefined);
+			callback(
+				Object.assign(new Error("socket hang up"), {
+					code: "ECONNRESET",
+				}),
+				undefined,
+			);
 		});
+
+		const pending = client.isTorrentInClient("abc123");
+		await vi.runAllTimersAsync();
+		const result = await pending;
+
+		expect(result.isErr()).toBe(true);
+		expect(calls).toBe(4); // 1 initial attempt + 3 retries
+	});
+
+	it.each([
+		Object.assign(new Error("Could not find info-hash."), {
+			faultCode: -501,
+			faultString: "Could not find info-hash.",
+		}),
+		new TypeError("unexpected client bug"),
+		{ faultCode: -501, faultString: "Unknown method" },
+	])("does not retry permanent or unexpected failures: %s", async (error) => {
+		const client = newRTorrent();
+		const methodCall = vi.fn(
+			(_method, _args, callback: MethodCallCallback) => {
+				callback(error, undefined);
+			},
+		);
+		stubMethodCall(client, methodCall);
 
 		const result = await client.isTorrentInClient("abc123");
 
 		expect(result.isErr()).toBe(true);
-		expect(calls).toBe(4); // 1 initial attempt + 3 retries
-	}, 15_000);
+		expect(methodCall).toHaveBeenCalledTimes(1);
+		expect(vi.getTimerCount()).toBe(0);
+	});
 });
