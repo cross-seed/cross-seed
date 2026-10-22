@@ -36,6 +36,7 @@ import {
 	sanitizeInfoHash,
 	wait,
 } from "../utils.js";
+import { skipRecheckField } from "./qbittorrent-version.js";
 import {
 	shouldResumeFromNonRelevantFiles,
 	clientSearcheeModified,
@@ -1151,7 +1152,10 @@ export default class QBittorrent implements TorrentClient {
 					options.destinationDir,
 				),
 			);
-			formData.append("skip_checking", (!toRecheck).toString());
+			formData.append(
+				skipRecheckField(this.versionMajor, this.versionMinor),
+				(!toRecheck).toString(),
+			);
 			formData.append(
 				this.versionMajor >= 5 ? "stopped" : "paused",
 				toRecheck.toString(),
