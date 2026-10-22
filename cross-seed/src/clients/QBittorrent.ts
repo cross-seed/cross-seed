@@ -687,8 +687,18 @@ export default class QBittorrent implements TorrentClient {
 		if (options?.includeFiles) params.append("includeFiles", "true");
 		if (options?.includeTrackers) params.append("includeTrackers", "true");
 		const responseText = await this.request("/torrents/info", params);
-		if (!responseText) return [];
-		return JSON.parse(responseText) as TorrentInfo[];
+		if (!responseText) {
+			throw new CrossSeedError(
+				`[${this.label}] qBittorrent failed to retrieve torrent list`,
+			);
+		}
+		const torrents: unknown = JSON.parse(responseText);
+		if (!Array.isArray(torrents)) {
+			throw new CrossSeedError(
+				`[${this.label}] qBittorrent returned an invalid torrent list`,
+			);
+		}
+		return torrents as TorrentInfo[];
 	}
 
 	/*
