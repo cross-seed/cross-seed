@@ -555,29 +555,38 @@ export default class Deluge implements TorrentClient {
 	 * generates the label for injection based on searchee and torrentInfo
 	 * @param searchee Searchee that contains the originating torrent
 	 * @param torrentInfo TorrentInfo from the searchee
+	 * @param destinationDir destination directory if linking or data-based
 	 * @return string with the label for the newTorrent
 	 */
 	private calculateLabel(
 		searchee: Searchee,
-		torrentInfo: TorrentInfo,
+		torrentInfo: TorrentInfo | undefined,
+		destinationDir?: string,
 	): string {
 		const { linkCategory, duplicateCategories } = getRuntimeConfig();
-		if (!searchee.infoHash || !torrentInfo.label) {
-			return this.delugeLabel;
+		const normalizedLinkCategory = linkCategory?.toLowerCase();
+		const ogLabel = (
+			torrentInfo?.label || searchee.category
+		)?.toLowerCase();
+		if (!searchee.infoHash || !ogLabel) {
+			return (
+				destinationDir
+					? normalizedLinkCategory || this.delugeLabel
+					: this.delugeLabel
+			).toLowerCase();
 		}
-		const ogLabel = torrentInfo.label;
 		if (!duplicateCategories) {
-			return ogLabel;
+			return (
+				destinationDir ? normalizedLinkCategory || ogLabel : ogLabel
+			).toLowerCase();
 		}
 		const shouldSuffixLabel =
 			!ogLabel.endsWith(this.delugeLabelSuffix) && // no .cross-seed
-			ogLabel !== linkCategory; // not data
+			ogLabel !== normalizedLinkCategory; // not data
 
-		return !searchee.infoHash
-			? (linkCategory ?? "")
-			: shouldSuffixLabel
-				? `${ogLabel}${this.delugeLabelSuffix}`
-				: ogLabel;
+		return (
+			shouldSuffixLabel ? `${ogLabel}${this.delugeLabelSuffix}` : ogLabel
+		).toLowerCase();
 	}
 
 	/**
@@ -588,27 +597,35 @@ export default class Deluge implements TorrentClient {
 	 */
 	private async setLabel(newTorrent: Searchee, label: string): Promise<void> {
 		let setResult: Result<void, ErrorType>;
-		if (!this.isLabelEnabled) return;
+		const normalizedLabel = label.toLowerCase();
+		if (!this.isLabelEnabled || !normalizedLabel.length) return;
 		try {
-			const getCurrentLabels = await this.call<string[]>(
+			let getCurrentLabels = await this.call<string[]>(
 				"label.get_labels",
 				[],
 			);
 			if (getCurrentLabels.isErr()) {
-				this.isLabelEnabled = false;
-				throw new Error("Labels have been disabled.");
+				await this.reconnectBadStateWebUI();
+				await wait(250);
+				getCurrentLabels = await this.call<string[]>(
+					"label.get_labels",
+					[],
+				);
 			}
-			if (getCurrentLabels.unwrap().includes(label)) {
+			if (getCurrentLabels.isErr()) {
+				throw new Error(getCurrentLabels.unwrapErr().message);
+			}
+			if (getCurrentLabels.unwrap().includes(normalizedLabel)) {
 				setResult = await this.call<void>("label.set_torrent", [
 					newTorrent.infoHash,
-					label,
+					normalizedLabel,
 				]);
 			} else {
-				await this.call<void>("label.add", [label]);
+				await this.call<void>("label.add", [normalizedLabel]);
 				await wait(300);
 				setResult = await this.call<void>("label.set_torrent", [
 					newTorrent.infoHash,
-					label,
+					normalizedLabel,
 				]);
 			}
 			if (setResult.isErr()) {
@@ -617,7 +634,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.warn({
 				label: this.label,
-				message: `Failed to label ${getLogString(newTorrent)} as ${label}: ${e.message}`,
+				message: `Failed to label ${getLogString(newTorrent)} as ${normalizedLabel}: ${e.message}`,
 			});
 			logger.debug(e);
 		}
@@ -652,7 +669,7 @@ export default class Deluge implements TorrentClient {
 				}
 				if (torrentInfo) {
 					if (!torrentInfo.label && searchee.category?.length) {
-						torrentInfo.label = searchee.category;
+						torrentInfo.label = searchee.category.toLowerCase();
 					}
 					if (!torrentInfo.save_path && searchee.savePath) {
 						torrentInfo.save_path = searchee.savePath;
@@ -686,7 +703,7 @@ export default class Deluge implements TorrentClient {
 					save_path: searchee.savePath ?? options.destinationDir,
 					label:
 						this.isLabelEnabled && searchee.category?.length
-							? searchee.category
+							? searchee.category.toLowerCase()
 							: undefined,
 				};
 			}
@@ -735,7 +752,11 @@ export default class Deluge implements TorrentClient {
 			// addResponse is known to be OK
 			await this.setLabel(
 				newTorrent,
-				this.calculateLabel(searchee, torrentInfo),
+				this.calculateLabel(
+					searchee,
+					torrentInfo,
+					options.destinationDir,
+				),
 			);
 
 			if (toRecheck) {
@@ -988,7 +1009,7 @@ export default class Deluge implements TorrentClient {
 		}
 		return Object.entries(torrents).map(([hash, torrent]) => ({
 			infoHash: hash,
-			category: torrent.label ?? "",
+			category: torrent.label?.toLowerCase() ?? "",
 		}));
 	}
 
@@ -1080,7 +1101,7 @@ export default class Deluge implements TorrentClient {
 				}
 				const name = torrent.name;
 				const savePath = torrent.save_path;
-				const category = torrent.label ?? "";
+				const category = torrent.label?.toLowerCase() ?? "";
 				const modified = clientSearcheeModified(
 					this.label,
 					dbTorrent,
@@ -1237,7 +1258,7 @@ export default class Deluge implements TorrentClient {
 
 			const torrentLabel =
 				this.isLabelEnabled && torrent.label?.length
-					? torrent.label
+					? torrent.label.toLowerCase()
 					: undefined;
 
 			return {
