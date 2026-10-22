@@ -1,8 +1,8 @@
 import { distance } from "fastest-levenshtein";
-import bencode from "bencode";
 import { readdir, readFile, stat } from "fs/promises";
 import { extname, join, resolve } from "path";
 import { inspect } from "util";
+import { decode } from "./bencode.js";
 import {
 	getClients,
 	TorrentMetadataInClient,
@@ -139,9 +139,7 @@ export async function parseTorrentWithMetadata(
 		if (await exists(fastResumePath)) {
 			updateMetafileMetadata(
 				meta,
-				bencode.decode(
-					await readFile(fastResumePath),
-				) as TorrentMetadata,
+				decode(await readFile(fastResumePath)) as TorrentMetadata,
 			);
 			return meta;
 		} else {
