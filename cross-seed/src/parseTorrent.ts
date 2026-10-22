@@ -80,6 +80,23 @@ function ensure(bool: unknown, fieldName: string) {
 		throw new Error(`Torrent is missing required field: ${fieldName}`);
 }
 
+/**
+ * The name and file paths of a torrent are joined to the directory its files
+ * are linked or downloaded into. A ".." segment would put a file outside of
+ * it, and so would a name that starts at a root. A file's path can start at a
+ * root without harm, as it is joined to the name.
+ */
+function ensureContained(path: string, canStartAtRoot = false) {
+	if (
+		(!canStartAtRoot && /^[\\/]|^[a-z]:[\\/]/i.test(path)) ||
+		path.split(/[\\/]/).includes("..")
+	) {
+		throw new Error(
+			`Torrent has a path outside of its directory: ${JSON.stringify(path.slice(0, 200))}`,
+		);
+	}
+}
+
 function sha1(buf: Buffer): string {
 	const hash = createHash("sha1");
 	hash.update(new Uint8Array(buf));
@@ -120,6 +137,7 @@ export class Metafile {
 		this.raw = raw;
 		this.infoHash = sha1(bencode.encode(raw.info));
 		this.name = fallback(raw.info["name.utf-8"], raw.info.name)!.toString();
+		ensureContained(this.name);
 		this.pieceLength = raw.info["piece length"];
 
 		if (!raw.info.files) {
@@ -143,6 +161,7 @@ export class Metafile {
 					)!;
 					const pathSegments = rawPathSegments.map((buf) => {
 						const seg = buf.toString();
+						ensureContained(seg, true);
 						// convention for zero-length path segments is to treat them as underscores
 						return seg === "" ? "_" : seg;
 					});

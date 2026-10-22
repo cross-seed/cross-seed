@@ -3,11 +3,19 @@ import { fileFactory } from "./factories/file.js";
 import { searcheeFactory } from "./factories/searchee.js";
 
 import { humanReadableSize } from "@cross-seed/shared/utils";
-import { MediaType, SEASON_REGEX } from "../src/constants.js";
+import {
+	ANIME_REGEX,
+	MAX_ANIME_NAME_LENGTH,
+	MediaType,
+	SEASON_REGEX,
+} from "../src/constants.js";
 import { getMediaType } from "../src/searchee.js";
 import {
+	areMediaTitlesSimilar,
 	cleanBookAndAudioTitle,
 	extractInt,
+	getAnimeQueries,
+	matchAnime,
 	sanitizeUrl,
 } from "../src/utils.js";
 
@@ -260,5 +268,53 @@ describe("cleanBookAndAudioTitle", () => {
 
 	it("falls back to the cleansed title rather than emitting an empty query", () => {
 		expect(cleanBookAndAudioTitle("1984.epub")).toBe("1984 epub");
+	});
+});
+
+describe("matchAnime", () => {
+	// ANIME_REGEX takes seconds to fail on a long name made of brackets
+	const hostile = "[a]".repeat(800) + ".mkv";
+
+	it.each([
+		"[GRP] My.Anime - 001",
+		"[Group] Some Show Season 2 - 07 [1080p]",
+		"My Anime - 12 (2020)",
+	])("matches like ANIME_REGEX for %j", (name) => {
+		const match = matchAnime(name);
+		expect(match).not.toBeNull();
+		expect(match!.groups).toEqual(name.match(ANIME_REGEX)!.groups);
+	});
+
+	it("matches a name of the longest length a file can have", () => {
+		const name =
+			"[GRP] " + "a".repeat(MAX_ANIME_NAME_LENGTH - 17) + " - 001";
+		expect(name).toHaveLength(MAX_ANIME_NAME_LENGTH - 5);
+		expect(matchAnime(name)).not.toBeNull();
+		const longest = name + "-".repeat(5);
+		expect(longest).toHaveLength(MAX_ANIME_NAME_LENGTH);
+		expect(matchAnime(longest)).not.toBeNull();
+	});
+
+	it("does not match a name longer than a file can have", () => {
+		const name = "[GRP] " + "a".repeat(MAX_ANIME_NAME_LENGTH) + " - 001";
+		// guards this test: the name does match ANIME_REGEX
+		expect(name.match(ANIME_REGEX)).not.toBeNull();
+		expect(matchAnime(name)).toBeNull();
+	});
+
+	it("returns quickly for a name that is long and does not match", () => {
+		const start = performance.now();
+		expect(matchAnime(hostile)).toBeNull();
+		expect(matchAnime(hostile.slice(0, MAX_ANIME_NAME_LENGTH))).toBeNull();
+		expect(performance.now() - start).toBeLessThan(1000);
+	});
+
+	it("keeps the callers of ANIME_REGEX quick", () => {
+		const start = performance.now();
+		const file = fileFactory({ name: hostile });
+		getMediaType(searcheeFactory({ title: hostile, files: [file] }));
+		areMediaTitlesSimilar(hostile, hostile + "b");
+		getAnimeQueries(hostile);
+		expect(performance.now() - start).toBeLessThan(1000);
 	});
 });
