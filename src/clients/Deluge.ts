@@ -209,7 +209,7 @@ export default class Deluge implements TorrentClient {
 			[],
 			0,
 		);
-		if (isConnectedResponse.isOk() && !isConnectedResponse.unwrap()) {
+		if (!isConnectedResponse.isOk() || !isConnectedResponse.unwrap()) {
 			logger.warn({
 				label: this.label,
 				message:
@@ -273,11 +273,6 @@ export default class Deluge implements TorrentClient {
 				`[${this.label}] failed to get host-list for reconnect.\n\tManual reconnect from the WebUI Connection Manager to potentially resolve this.`,
 			),
 		);
-		if (!webuiHostList.length) {
-			throw new CrossSeedError(
-				`[${this.label}] No Deluge daemon hosts found in WebUI Connection Manager.`,
-			);
-		}
 		let targetHostId = webuiHostList[0][0];
 		let isConnected = false;
 		for (const [hostId] of webuiHostList) {
@@ -286,7 +281,7 @@ export default class Deluge implements TorrentClient {
 				[hostId],
 			);
 			if (hostStatus.isOk()) {
-				const status = hostStatus.unwrap()?.[1];
+				const status = hostStatus.unwrap()[1];
 				if (status === "Connected") {
 					targetHostId = hostId;
 					isConnected = true;
@@ -482,7 +477,7 @@ export default class Deluge implements TorrentClient {
 	 * @return boolean declaring whether the "Label" plugin is enabled
 	 */
 	private async labelEnabled(retries?: number) {
-		const enabledPlugins = await this.call<string>(
+		const enabledPlugins = await this.call<string[]>(
 			"core.get_enabled_plugins",
 			[],
 			retries,
