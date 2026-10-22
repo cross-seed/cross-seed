@@ -101,6 +101,8 @@ export default class Deluge implements TorrentClient {
 	private isLabelEnabled: boolean = false;
 	private delugeRequestId: number = 0;
 	private activeSessions: number = 0;
+	private authPromise: Promise<void> | null = null;
+	private reconnectPromise: Promise<void> | null = null;
 
 	constructor(
 		url: string,
@@ -157,6 +159,15 @@ export default class Deluge implements TorrentClient {
 	 * connects and authenticates to the webui
 	 */
 	async authenticate(): Promise<void> {
+		if (!this.authPromise) {
+			this.authPromise = this.doAuthenticate().finally(() => {
+				this.authPromise = null;
+			});
+		}
+		return this.authPromise;
+	}
+
+	private async doAuthenticate(): Promise<void> {
 		const { href, password } = extractCredentialsFromUrl(
 			this.url,
 		).unwrapOrThrow(
@@ -179,7 +190,7 @@ export default class Deluge implements TorrentClient {
 				),
 			);
 
-			if (!authResponse) {
+			if (!authResponse || !this.delugeCookie) {
 				throw new CrossSeedError(
 					`[${this.label}] Reached Deluge, but failed to authenticate: ${href}`,
 				);
@@ -236,7 +247,7 @@ export default class Deluge implements TorrentClient {
 				);
 			}
 		}
-		this.isLabelEnabled = await this.labelEnabled();
+		this.isLabelEnabled = await this.labelEnabled(0);
 	}
 
 	/**
@@ -244,10 +255,17 @@ export default class Deluge implements TorrentClient {
 	 * @returns void
 	 */
 	private async reconnectBadStateWebUI(): Promise<void> {
-		const isConnectedResponse = await this.call<boolean>(
-			"web.connected",
-			[],
-		);
+		if (!this.reconnectPromise) {
+			this.reconnectPromise = this.doReconnectBadStateWebUI().finally(
+				() => {
+					this.reconnectPromise = null;
+				},
+			);
+		}
+		return this.reconnectPromise;
+	}
+
+	private async doReconnectBadStateWebUI(): Promise<void> {
 		const webuiHostList = (
 			await this.call<WebHostList>("web.get_hosts", [])
 		).unwrapOrThrow(
@@ -261,6 +279,7 @@ export default class Deluge implements TorrentClient {
 			);
 		}
 		let targetHostId = webuiHostList[0][0];
+		let isConnected = false;
 		for (const [hostId] of webuiHostList) {
 			const hostStatus = await this.call<string[]>(
 				"web.get_host_status",
@@ -270,6 +289,7 @@ export default class Deluge implements TorrentClient {
 				const status = hostStatus.unwrap()?.[1];
 				if (status === "Connected") {
 					targetHostId = hostId;
+					isConnected = true;
 					break;
 				}
 				if (status === "Online") {
@@ -277,7 +297,7 @@ export default class Deluge implements TorrentClient {
 				}
 			}
 		}
-		if (isConnectedResponse.isOk() && !isConnectedResponse.unwrap()) {
+		if (!isConnected) {
 			logger.warn({
 				label: this.label,
 				message:
@@ -337,6 +357,7 @@ export default class Deluge implements TorrentClient {
 			);
 		}
 		this.isLabelEnabled = await this.labelEnabled();
+		await wait(250);
 	}
 
 	// web.update_ui method (typed params + forced return)
@@ -460,10 +481,11 @@ export default class Deluge implements TorrentClient {
 	 * checks enabled plugins for "Label"
 	 * @return boolean declaring whether the "Label" plugin is enabled
 	 */
-	private async labelEnabled() {
+	private async labelEnabled(retries?: number) {
 		const enabledPlugins = await this.call<string>(
 			"core.get_enabled_plugins",
 			[],
+			retries,
 		);
 		if (enabledPlugins.isOk()) {
 			return enabledPlugins.unwrap().includes("Label");
@@ -604,7 +626,6 @@ export default class Deluge implements TorrentClient {
 			);
 			if (getCurrentLabels.isErr()) {
 				await this.reconnectBadStateWebUI();
-				await wait(250);
 				getCurrentLabels = await this.call<string[]>(
 					"label.get_labels",
 					[],
@@ -685,8 +706,6 @@ export default class Deluge implements TorrentClient {
 							message: `Searchee torrent may have been deleted, critical data is missing: ${getLogString(searchee)}`,
 						});
 					}
-					await this.reconnectBadStateWebUI();
-					await wait(250);
 					return InjectionResult.FAILURE;
 				}
 				if (searchee.infoHash) {
@@ -715,8 +734,6 @@ export default class Deluge implements TorrentClient {
 					label: this.label,
 					message: `Injection failure: ${getLogString(searchee)} was missing save_path.`,
 				});
-				await this.reconnectBadStateWebUI();
-				await wait(250);
 				return InjectionResult.FAILURE;
 			}
 
@@ -842,7 +859,6 @@ export default class Deluge implements TorrentClient {
 			if (retries > 0) {
 				try {
 					await this.reconnectBadStateWebUI();
-					await wait(250);
 					return await this.getDownloadDir(
 						meta,
 						options,
@@ -867,7 +883,6 @@ export default class Deluge implements TorrentClient {
 			if (retries > 0) {
 				try {
 					await this.reconnectBadStateWebUI();
-					await wait(250);
 					return await this.getDownloadDir(
 						meta,
 						options,
@@ -943,7 +958,6 @@ export default class Deluge implements TorrentClient {
 			if (!torrents) {
 				if (retries > 0) {
 					await this.reconnectBadStateWebUI();
-					await wait(250);
 					return await this.isTorrentInClient(inputHash, retries - 1);
 				}
 				throw new Error("No torrents found");
@@ -1066,7 +1080,6 @@ export default class Deluge implements TorrentClient {
 			if (hasMissingData) {
 				try {
 					await this.reconnectBadStateWebUI();
-					await wait(250);
 					const retryRes = await this.call("web.update_ui", params);
 					if (retryRes.isOk() && retryRes.unwrap().torrents) {
 						torrentsRes = retryRes;
@@ -1223,7 +1236,6 @@ export default class Deluge implements TorrentClient {
 			} else {
 				if (retries > 0) {
 					await this.reconnectBadStateWebUI();
-					await wait(250);
 					return await this.getTorrentInfo(
 						infoHash,
 						options,
@@ -1240,7 +1252,6 @@ export default class Deluge implements TorrentClient {
 			if (!this.isValidTorrentInfo(torrent)) {
 				if (retries > 0) {
 					await this.reconnectBadStateWebUI();
-					await wait(250);
 					return await this.getTorrentInfo(
 						infoHash,
 						options,
