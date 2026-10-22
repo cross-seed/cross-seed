@@ -875,7 +875,7 @@ export default class QBittorrent implements TorrentClient {
 		const infoHash = inputHash.toLowerCase();
 		try {
 			const torrents = await this.getAllTorrentInfo();
-			if (!torrents.length) throw new Error("No torrents found");
+			if (!torrents.length) return resultOf(false);
 			for (const torrent of torrents) {
 				if (
 					torrent.hash.toLowerCase() === infoHash ||
