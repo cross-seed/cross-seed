@@ -185,7 +185,13 @@ export default class Deluge implements TorrentClient {
 				);
 			}
 		} catch (networkError) {
-			throw new CrossSeedError(networkError);
+			if (networkError instanceof CrossSeedError) throw networkError;
+			throw new CrossSeedError(
+				networkError instanceof Error
+					? networkError.message
+					: String(networkError),
+				{ cause: networkError },
+			);
 		}
 		const isConnectedResponse = await this.call<boolean>(
 			"web.connected",
@@ -626,7 +632,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.warn({
 				label: this.label,
-				message: `Failed to label ${getLogString(newTorrent)} as ${label}: ${e.message}`,
+				message: `Failed to label ${getLogString(newTorrent)} as ${label}: ${e instanceof Error ? e.message : e}`,
 			});
 			logger.debug(e);
 		}
@@ -946,7 +952,7 @@ export default class Deluge implements TorrentClient {
 			if (infoHash in torrents) return resultOf(true);
 			return resultOf(false);
 		} catch (e) {
-			return resultOfErr(e);
+			return resultOfErr(e instanceof Error ? e : new Error(String(e)));
 		}
 	}
 
@@ -1265,7 +1271,7 @@ export default class Deluge implements TorrentClient {
 			const log = options?.useVerbose ? logger.verbose : logger.error;
 			log({
 				label: this.label,
-				message: `Failed to fetch torrent data for ${infoHash}: ${e.message}`,
+				message: `Failed to fetch torrent data for ${infoHash}: ${e instanceof Error ? e.message : e}`,
 			});
 			logger.debug(e);
 			throw new Error(
