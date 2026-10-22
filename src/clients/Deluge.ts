@@ -564,29 +564,22 @@ export default class Deluge implements TorrentClient {
 		destinationDir?: string,
 	): string {
 		const { linkCategory, duplicateCategories } = getRuntimeConfig();
-		const normalizedLinkCategory = linkCategory?.toLowerCase();
-		const ogLabel = (
-			torrentInfo?.label || searchee.category
-		)?.toLowerCase();
+		const ogLabel = torrentInfo?.label || searchee.category;
 		if (!searchee.infoHash || !ogLabel) {
-			return (
-				destinationDir
-					? normalizedLinkCategory || this.delugeLabel
-					: this.delugeLabel
-			).toLowerCase();
+			return destinationDir
+				? linkCategory || this.delugeLabel
+				: this.delugeLabel;
 		}
 		if (!duplicateCategories) {
-			return (
-				destinationDir ? normalizedLinkCategory || ogLabel : ogLabel
-			).toLowerCase();
+			return destinationDir ? linkCategory || ogLabel : ogLabel;
 		}
 		const shouldSuffixLabel =
 			!ogLabel.endsWith(this.delugeLabelSuffix) && // no .cross-seed
-			ogLabel !== normalizedLinkCategory; // not data
+			ogLabel !== linkCategory; // not data
 
-		return (
-			shouldSuffixLabel ? `${ogLabel}${this.delugeLabelSuffix}` : ogLabel
-		).toLowerCase();
+		return shouldSuffixLabel
+			? `${ogLabel}${this.delugeLabelSuffix}`
+			: ogLabel;
 	}
 
 	/**
@@ -597,8 +590,7 @@ export default class Deluge implements TorrentClient {
 	 */
 	private async setLabel(newTorrent: Searchee, label: string): Promise<void> {
 		let setResult: Result<void, ErrorType>;
-		const normalizedLabel = label.toLowerCase();
-		if (!this.isLabelEnabled || !normalizedLabel.length) return;
+		if (!this.isLabelEnabled || !label.length) return;
 		try {
 			let getCurrentLabels = await this.call<string[]>(
 				"label.get_labels",
@@ -615,17 +607,17 @@ export default class Deluge implements TorrentClient {
 			if (getCurrentLabels.isErr()) {
 				throw new Error(getCurrentLabels.unwrapErr().message);
 			}
-			if (getCurrentLabels.unwrap().includes(normalizedLabel)) {
+			if (getCurrentLabels.unwrap().includes(label)) {
 				setResult = await this.call<void>("label.set_torrent", [
 					newTorrent.infoHash,
-					normalizedLabel,
+					label,
 				]);
 			} else {
-				await this.call<void>("label.add", [normalizedLabel]);
+				await this.call<void>("label.add", [label]);
 				await wait(300);
 				setResult = await this.call<void>("label.set_torrent", [
 					newTorrent.infoHash,
-					normalizedLabel,
+					label,
 				]);
 			}
 			if (setResult.isErr()) {
@@ -634,7 +626,7 @@ export default class Deluge implements TorrentClient {
 		} catch (e) {
 			logger.warn({
 				label: this.label,
-				message: `Failed to label ${getLogString(newTorrent)} as ${normalizedLabel}: ${e.message}`,
+				message: `Failed to label ${getLogString(newTorrent)} as ${label}: ${e.message}`,
 			});
 			logger.debug(e);
 		}
@@ -669,7 +661,7 @@ export default class Deluge implements TorrentClient {
 				}
 				if (torrentInfo) {
 					if (!torrentInfo.label && searchee.category?.length) {
-						torrentInfo.label = searchee.category.toLowerCase();
+						torrentInfo.label = searchee.category;
 					}
 					if (!torrentInfo.save_path && searchee.savePath) {
 						torrentInfo.save_path = searchee.savePath;
@@ -703,7 +695,7 @@ export default class Deluge implements TorrentClient {
 					save_path: searchee.savePath ?? options.destinationDir,
 					label:
 						this.isLabelEnabled && searchee.category?.length
-							? searchee.category.toLowerCase()
+							? searchee.category
 							: undefined,
 				};
 			}
@@ -1009,7 +1001,7 @@ export default class Deluge implements TorrentClient {
 		}
 		return Object.entries(torrents).map(([hash, torrent]) => ({
 			infoHash: hash,
-			category: torrent.label?.toLowerCase() ?? "",
+			category: torrent.label ?? "",
 		}));
 	}
 
@@ -1101,7 +1093,7 @@ export default class Deluge implements TorrentClient {
 				}
 				const name = torrent.name;
 				const savePath = torrent.save_path;
-				const category = torrent.label?.toLowerCase() ?? "";
+				const category = torrent.label ?? "";
 				const modified = clientSearcheeModified(
 					this.label,
 					dbTorrent,
@@ -1258,7 +1250,7 @@ export default class Deluge implements TorrentClient {
 
 			const torrentLabel =
 				this.isLabelEnabled && torrent.label?.length
-					? torrent.label.toLowerCase()
+					? torrent.label
 					: undefined;
 
 			return {
