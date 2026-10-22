@@ -25,7 +25,7 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                node: [22.23.4, 24.22.1, 26.12.1]
+                node: [20.20.2, 22.23.4, 24.22.1, 26.12.1]
         steps:
             - uses: actions/checkout@v4
             - uses: actions/setup-node@v4

@@ -16,7 +16,7 @@
 		"cross-seed": "dist/cmd.js"
 	},
 	"engines": {
-		"node": "^22.23.4 || ^24.22.1 || >=26.12.1"
+		"node": ">=20"
 	},
 	"files": [
 		"dist/"
@@ -30,7 +30,7 @@
 	"license": "Apache-2.0",
 	"dependencies": {
 		"bencode": "^2.0.1",
-		"better-sqlite3": "^13.0.3",
+		"better-sqlite3": "^12.11.1",
 		"chalk": "^5.0.0",
 		"commander": "^8.3.0",
 		"fastest-levenshtein": "^1.0.16",
