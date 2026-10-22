@@ -19,6 +19,7 @@ import {
 	EP_REGEX,
 	JSON_VALUES_REGEX,
 	LEVENSHTEIN_DIVISOR,
+	MAX_ANIME_NAME_LENGTH,
 	MIN_VIDEO_QUERY_LENGTH,
 	MOVIE_REGEX,
 	NON_UNICODE_ALPHANUM_REGEX,
@@ -279,17 +280,27 @@ export function sanitizeInfoHash(infoHash: string): string {
 
 // ================================== TITLES ==================================
 
+/**
+ * ANIME_REGEX takes longer the longer a name it can't match is, roughly with
+ * the cube of its length. Names from torrents and indexers can be any length,
+ * but a file name can't be longer than MAX_ANIME_NAME_LENGTH, so a longer one
+ * is not matched.
+ */
+export function matchAnime(name: string): RegExpMatchArray | null {
+	return name.length > MAX_ANIME_NAME_LENGTH ? null : name.match(ANIME_REGEX);
+}
+
 export function areMediaTitlesSimilar(a: string, b: string): boolean {
 	const matchA =
 		a.match(EP_REGEX) ??
 		a.match(SEASON_REGEX) ??
 		a.match(MOVIE_REGEX) ??
-		a.match(ANIME_REGEX);
+		matchAnime(a);
 	const matchB =
 		b.match(EP_REGEX) ??
 		b.match(SEASON_REGEX) ??
 		b.match(MOVIE_REGEX) ??
-		b.match(ANIME_REGEX);
+		matchAnime(b);
 	const titlesA: string[] = getAllTitles(
 		matchA
 			? [matchA.groups?.title, matchA.groups?.altTitle].filter(isTruthy)
@@ -382,7 +393,7 @@ export function isBadTitle(title: string): boolean {
  */
 export function getAnimeQueries(stem: string): string[] {
 	const animeQueries: string[] = [];
-	const { title, altTitle, release } = stem.match(ANIME_REGEX)?.groups ?? {};
+	const { title, altTitle, release } = matchAnime(stem)?.groups ?? {};
 	if (title) {
 		const strippedTitle = cleanTitle(title);
 		animeQueries.push(
