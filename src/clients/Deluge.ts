@@ -238,11 +238,11 @@ export default class Deluge implements TorrentClient {
 				[webuiHostList[0][0]],
 				0,
 			);
+			await wait(100);
 			let connected = Boolean(
 				connectResponse.isOk() && connectResponse.unwrap()?.length,
 			);
 			if (!connected) {
-				await wait(300);
 				const reconnectedResponse = await this.call<boolean>(
 					"web.connected",
 					[],
@@ -263,6 +263,7 @@ export default class Deluge implements TorrentClient {
 				);
 			}
 		}
+		await wait(250);
 		this.isLabelEnabled = await this.labelEnabled(0);
 	}
 
@@ -302,6 +303,7 @@ export default class Deluge implements TorrentClient {
 				"web.get_host_status",
 				[hostId],
 			);
+			await wait(100);
 			if (hostStatus.isOk()) {
 				const status = hostStatus.unwrap()[1];
 				if (status === "Connected") {
@@ -330,7 +332,7 @@ export default class Deluge implements TorrentClient {
 				"web.disconnect",
 				[],
 			);
-			await wait(300);
+			await wait(250);
 			const postDisconnectConnected = await this.call<boolean>(
 				"web.connected",
 				[],
@@ -356,11 +358,11 @@ export default class Deluge implements TorrentClient {
 			"web.connect",
 			[targetHostId],
 		);
+		await wait(250);
 		let reconnected = Boolean(
 			connectResponse.isOk() && connectResponse.unwrap()?.length,
 		);
 		if (!reconnected) {
-			await wait(300);
 			const isReConnectedResponse = await this.call<boolean>(
 				"web.connected",
 				[],
@@ -380,8 +382,8 @@ export default class Deluge implements TorrentClient {
 				`[${this.label}] Unable to connect WebUI to Deluge daemon.\n\tManual reconnect the WebUI from Connection Manager to potentially resolve this.`,
 			);
 		}
-		this.isLabelEnabled = await this.labelEnabled();
 		await wait(250);
+		this.isLabelEnabled = await this.labelEnabled();
 	}
 
 	// web.update_ui method (typed params + forced return)
@@ -677,7 +679,7 @@ export default class Deluge implements TorrentClient {
 				]);
 			} else {
 				await this.call<void>("label.add", [label]);
-				await wait(300);
+				await wait(250);
 				setResult = await this.call<void>("label.set_torrent", [
 					newTorrent.infoHash,
 					label,
@@ -841,6 +843,7 @@ export default class Deluge implements TorrentClient {
 	async recheckTorrent(infoHash: string): Promise<void> {
 		// Pause first as it may resume after recheck automatically
 		await this.call<string>("core.pause_torrent", [[infoHash]]);
+		await wait(250);
 		await this.call<string>("core.force_recheck", [[infoHash]]);
 	}
 
