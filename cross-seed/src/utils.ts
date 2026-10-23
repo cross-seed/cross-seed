@@ -33,6 +33,7 @@ import {
 	sourceRegexRemove,
 	YEARS_REGEX,
 } from "./constants.js";
+import { runInBackground } from "./utils/background.js";
 import { logger } from "./logger.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
 import { File, getAllTitles, Searchee } from "./searchee.js";
@@ -758,7 +759,7 @@ export async function* combineAsyncIterables<T>(
 				iterator.return != null
 			) {
 				// no await here - see https://github.com/tc39/proposal-async-iteration/issues/126
-				void iterator.return();
+				runInBackground(iterator.return());
 			}
 		}
 	}

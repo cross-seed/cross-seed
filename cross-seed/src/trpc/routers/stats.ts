@@ -20,12 +20,11 @@ export const statsRouter = router({
 			db("indexer").count({ count: "*" }).first(),
 			db("indexer")
 				.where({ enabled: true, search_cap: true })
-				.where((qb) =>
-					qb
-						.whereNull("status")
+				.where((qb) => {
+					qb.whereNull("status")
 						.orWhere("status", "OK")
-						.orWhere("retry_after", "<", Date.now()),
-				)
+						.orWhere("retry_after", "<", Date.now());
+				})
 				.count({ count: "*" })
 				.first(),
 			db("timestamp").count({ count: "*" }).first(),

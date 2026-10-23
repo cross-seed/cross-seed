@@ -15,12 +15,12 @@ it("startup preserves Node's unhandled rejection policy", async () => {
 		createAppDirHierarchy();
 		const { initializeLogger } = await import("../src/logger.js");
 		initializeLogger({ verbose: false });
-		const { exitGracefully } = await import("../src/startup.js");
+		const { handleExitSignal } = await import("../src/startup.js");
 		try {
 			expect(process.listeners("unhandledRejection")).toEqual(listeners);
 		} finally {
-			process.removeListener("SIGINT", exitGracefully);
-			process.removeListener("SIGTERM", exitGracefully);
+			process.removeListener("SIGINT", handleExitSignal);
+			process.removeListener("SIGTERM", handleExitSignal);
 			const { db } = await import("../src/db.js");
 			await db.destroy();
 		}

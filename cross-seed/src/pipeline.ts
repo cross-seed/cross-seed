@@ -7,6 +7,7 @@ function zip<T, U, V>(arr1: T[], arr2: U[], arr3: V[]): [T, U, V][] {
 }
 import ms from "ms";
 import { basename } from "path";
+import { runInBackground } from "./utils/background.js";
 import { performAction, performActions } from "./action.js";
 import { byClientHostPriority, getClients } from "./clients/TorrentClient.js";
 import {
@@ -650,7 +651,7 @@ export async function checkNewCandidateMatch(
 		]);
 	}
 	if (actionResult === InjectionResult.SUCCESS) {
-		void indexTorrentsAndDataDirs();
+		runInBackground(indexTorrentsAndDataDirs());
 	}
 	return { decision, actionResult };
 }

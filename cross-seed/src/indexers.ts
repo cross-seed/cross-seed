@@ -199,12 +199,11 @@ export async function getEnabledIndexers(): Promise<Indexer[]> {
 				limits_caps: null,
 			})
 			.where({ enabled: true, search_cap: true })
-			.where((i) =>
-				i
-					.where({ status: null })
+			.where((i) => {
+				i.where({ status: null })
 					.orWhere({ status: IndexerStatus.OK })
-					.orWhere("retry_after", "<", Date.now()),
-			)
+					.orWhere("retry_after", "<", Date.now());
+			})
 			.select(allFields)
 	).map(deserialize);
 }

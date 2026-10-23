@@ -73,7 +73,7 @@ export const jobsRouter = router({
 				name: z.nativeEnum(JobName),
 			}),
 		)
-		.mutation(({ input }) => {
+		.mutation(async ({ input }) => {
 			const jobs = getJobs();
 			const job = jobs.find((j) => j.name === input.name);
 
@@ -92,7 +92,7 @@ export const jobsRouter = router({
 			// Clear any config overrides for manual runs
 			job.configOverride = {};
 
-			void checkJobs({ isFirstRun: false, useQueue: true });
+			await checkJobs({ isFirstRun: false, useQueue: true });
 
 			logger.info({
 				label: Label.SCHEDULER,

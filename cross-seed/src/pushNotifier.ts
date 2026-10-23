@@ -1,5 +1,6 @@
 import ms from "ms";
 import { WebhookEntry } from "@cross-seed/shared/configSchema";
+import { runInBackground } from "./utils/background.js";
 import { estimatePausedStatus } from "./clients/TorrentClient.js";
 import {
 	ActionResult,
@@ -235,42 +236,44 @@ export function sendResultsNotification(
 
 		const result = injected ? InjectionResult.SUCCESS : SaveResult.SAVED;
 
-		void pushNotifier.notify({
-			body: `${source}: ${performedAction} ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
-			templateVars: {
-				source,
-				performedAction,
-				name,
-				numTrackers: String(numTrackers),
-				trackersListStr,
-				searcheeSource,
-				decisions: formatAsList(decisions, { sort: true }),
-				trackers: trackers.join(", "),
-				result: String(result),
-				paused: String(paused),
-				infoHashes: infoHashes.join(", "),
-			},
-			extra: {
-				event: Event.RESULTS,
-				name,
-				infoHashes,
-				trackers,
-				source,
-				result,
-				paused,
-				decisions,
-				searchee: {
-					category: searcheeCategory,
-					tags: searcheeTags,
-					trackers: searcheeTrackers,
-					length: searcheeLength,
-					clientHost: searcheeClientHost,
-					infoHash: searcheeInfoHash,
-					path: searcheePath,
-					source: searcheeSource,
+		runInBackground(
+			pushNotifier.notify({
+				body: `${source}: ${performedAction} ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
+				templateVars: {
+					source,
+					performedAction,
+					name,
+					numTrackers: String(numTrackers),
+					trackersListStr,
+					searcheeSource,
+					decisions: formatAsList(decisions, { sort: true }),
+					trackers: trackers.join(", "),
+					result: String(result),
+					paused: String(paused),
+					infoHashes: infoHashes.join(", "),
 				},
-			},
-		});
+				extra: {
+					event: Event.RESULTS,
+					name,
+					infoHashes,
+					trackers,
+					source,
+					result,
+					paused,
+					decisions,
+					searchee: {
+						category: searcheeCategory,
+						tags: searcheeTags,
+						trackers: searcheeTrackers,
+						length: searcheeLength,
+						clientHost: searcheeClientHost,
+						infoHash: searcheeInfoHash,
+						path: searcheePath,
+						source: searcheeSource,
+					},
+				},
+			}),
+		);
 	}
 
 	const failures = results.filter(
@@ -284,42 +287,44 @@ export function sendResultsNotification(
 		const trackersListStr = formatAsList(trackers, { sort: true });
 		const decisions = failures.map(([{ decision }]) => decision);
 
-		void pushNotifier.notify({
-			body: `${source}: Failed to inject ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
-			templateVars: {
-				source,
-				performedAction: "Failed to inject",
-				name,
-				numTrackers: String(numTrackers),
-				trackersListStr,
-				searcheeSource,
-				decisions: formatAsList(decisions, { sort: true }),
-				trackers: trackers.join(", "),
-				result: String(failures[0][2]),
-				paused: "false",
-				infoHashes: infoHashes.join(", "),
-			},
-			extra: {
-				event: Event.RESULTS,
-				name,
-				infoHashes,
-				trackers,
-				source,
-				result: failures[0][2],
-				paused: false,
-				decisions,
-				searchee: {
-					category: searcheeCategory,
-					tags: searcheeTags,
-					trackers: searcheeTrackers,
-					length: searcheeLength,
-					clientHost: searcheeClientHost,
-					infoHash: searcheeInfoHash,
-					path: searcheePath,
-					source: searcheeSource,
+		runInBackground(
+			pushNotifier.notify({
+				body: `${source}: Failed to inject ${name} on ${numTrackers} tracker${numTrackers !== 1 ? "s" : ""} by ${formatAsList(decisions, { sort: true })} from ${searcheeSource}: ${trackersListStr}`,
+				templateVars: {
+					source,
+					performedAction: "Failed to inject",
+					name,
+					numTrackers: String(numTrackers),
+					trackersListStr,
+					searcheeSource,
+					decisions: formatAsList(decisions, { sort: true }),
+					trackers: trackers.join(", "),
+					result: String(failures[0][2]),
+					paused: "false",
+					infoHashes: infoHashes.join(", "),
 				},
-			},
-		});
+				extra: {
+					event: Event.RESULTS,
+					name,
+					infoHashes,
+					trackers,
+					source,
+					result: failures[0][2],
+					paused: false,
+					decisions,
+					searchee: {
+						category: searcheeCategory,
+						tags: searcheeTags,
+						trackers: searcheeTrackers,
+						length: searcheeLength,
+						clientHost: searcheeClientHost,
+						infoHash: searcheeInfoHash,
+						path: searcheePath,
+						source: searcheeSource,
+					},
+				},
+			}),
+		);
 	}
 }
 

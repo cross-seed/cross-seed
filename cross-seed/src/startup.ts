@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, readFile, rename, writeFile } from "fs/promises";
 import path from "path";
+import { runInBackground } from "./utils/background.js";
 import { resetApiKey } from "./auth.js";
 import { instantiateDownloadClients } from "./clients/TorrentClient.js";
 import {
@@ -34,8 +35,12 @@ export async function exitGracefully() {
 	process.exit();
 }
 
-process.on("SIGINT", exitGracefully);
-process.on("SIGTERM", exitGracefully);
+export function handleExitSignal(): void {
+	runInBackground(exitGracefully());
+}
+
+process.on("SIGINT", handleExitSignal);
+process.on("SIGTERM", handleExitSignal);
 
 async function ensureConfiguredDirectories(): Promise<void> {
 	const { outputDir, linkDirs = [] } = getRuntimeConfig();

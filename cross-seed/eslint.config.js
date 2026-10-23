@@ -27,15 +27,11 @@ export default tseslint.config(
 			"import/no-relative-packages": "error",
 			"no-mixed-spaces-and-tabs": "off",
 			"@typescript-eslint/await-thenable": "error",
-			"@typescript-eslint/no-floating-promises": "error",
-			"@typescript-eslint/no-misused-promises": [
+			"@typescript-eslint/no-floating-promises": [
 				"error",
-				{
-					checksVoidReturn: {
-						arguments: false,
-					},
-				},
+				{ ignoreVoid: false },
 			],
+			"@typescript-eslint/no-misused-promises": "error",
 			"@typescript-eslint/no-unnecessary-type-assertion": "error",
 			"@typescript-eslint/no-var-requires": "off",
 			"@typescript-eslint/return-await": "error",

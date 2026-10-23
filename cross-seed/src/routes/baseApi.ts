@@ -197,7 +197,7 @@ export async function baseApiPlugin(app: FastifyInstance) {
 		const injectJob = getJobs().find((job) => job.name === JobName.INJECT);
 		if (injectJob) {
 			injectJob.runAheadOfSchedule = true;
-			void checkJobs({ isFirstRun: false, useQueue: true });
+			await checkJobs({ isFirstRun: false, useQueue: true });
 		}
 		await indexTorrentsAndDataDirs();
 
@@ -371,7 +371,7 @@ export async function baseApiPlugin(app: FastifyInstance) {
 				? Number.MAX_SAFE_INTEGER
 				: undefined,
 		};
-		void checkJobs({ isFirstRun: false, useQueue: true });
+		await checkJobs({ isFirstRun: false, useQueue: true });
 		const message = `${job.name}: running ahead of schedule`;
 		logger.info({ label: Label.SCHEDULER, message });
 		return reply.code(200).send(message);
