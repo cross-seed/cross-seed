@@ -111,6 +111,7 @@ jobs:
             - name: Build and push (${{ matrix.arch }})
               uses: docker/build-push-action@v5
               with:
+                  pull: true
                   push: true
                   platforms: ${{ matrix.platform }}
                   tags: ${{ steps.tags.outputs.tags }}
