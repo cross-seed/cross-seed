@@ -42,9 +42,9 @@
 		"@types/node": "^25.9.1",
 		"@types/xml2js": "^0.4.9",
 		"@types/xmlrpc": "^1.3.6",
-		"@vitest/coverage-v8": "^4.1.0",
+		"@vitest/coverage-v8": "^4.1.12",
 		"bencode": "^4.0.0",
-		"concurrently": "^9.1.2",
+		"concurrently": "^9.2.5",
 		"eslint": "^9.39.4",
 		"eslint-plugin-import-x": "^4.16.2",
 		"globals": "^17.4.0",
@@ -55,8 +55,8 @@
 		"rimraf": "^6.1.3",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.60.0",
-		"vite": "^8.0.14",
-		"vitest": "^4.1.0"
+		"vite": "^8.3.5",
+		"vitest": "^4.1.12"
 	},
 	"prettier": {
 		"tabWidth": 4,
