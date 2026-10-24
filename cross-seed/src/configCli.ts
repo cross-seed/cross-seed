@@ -79,11 +79,8 @@ function remoteSettings(descriptor: DaemonDescriptor): SettingsService {
 	});
 	return {
 		read: (effective = false) => client.config.show.query({ effective }),
-		async save(patch) {
-			await client.config.set.mutate(patch as RuntimeConfigOverrides);
-		},
-		async set(key, value) {
-			await client.config.set.mutate({ [key]: value });
+		async patch(changes) {
+			await client.config.set.mutate(changes as RuntimeConfigOverrides);
 		},
 		async unset(key) {
 			await client.config.unset.mutate({ key });
@@ -123,7 +120,7 @@ export async function setSetting(
 	value: unknown,
 ): Promise<"daemon" | "offline"> {
 	const { service, mode } = await settingsTarget(filename);
-	await service.set(key, value);
+	await service.patch({ [key]: value });
 	return mode;
 }
 export async function unsetSetting(
@@ -242,8 +239,7 @@ export function createConfigCommand(
 	};
 	const settingsService: SettingsService = {
 		read,
-		save: (patch) => mutate((service) => service.save(patch)),
-		set: (key, value) => mutate((service) => service.set(key, value)),
+		patch: (changes) => mutate((service) => service.patch(changes)),
 		unset: (key) => mutate((service) => service.unset(key)),
 		replace: (settings) => mutate((service) => service.replace(settings)),
 	};

@@ -47,7 +47,7 @@ export const settingsApiRouter = t.router({
 		})
 		.input(RUNTIME_CONFIG_SCHEMA.omit({ torznab: true }).partial().strict())
 		.mutation(async ({ ctx, input }) => {
-			await ctx.settingsService.save(input);
+			await ctx.settingsService.patch(input);
 			return { success: true };
 		}),
 	unset: procedure

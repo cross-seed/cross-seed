@@ -5,8 +5,7 @@ import type { SettingsPersistence } from "./settingsPersistence.js";
 
 export interface SettingsService {
 	read(effective?: boolean): Promise<Record<string, unknown>>;
-	save(patch: unknown): Promise<void>;
-	set(key: string, value: unknown): Promise<void>;
+	patch(changes: unknown): Promise<void>;
 	unset(key: string): Promise<void>;
 	replace(settings: unknown): Promise<void>;
 }
@@ -80,7 +79,7 @@ export function createSettingsService(
 				? { ...getDefaultRuntimeConfig(), ...overrides }
 				: overrides;
 		},
-		async save(input) {
+		async patch(input) {
 			const patch = requireSettingsObject(input);
 			for (const key of Object.keys(patch)) checkSettingKey(key);
 			if (Object.hasOwn(patch, "torznab")) throw new Error(indexerAdvice);
@@ -90,14 +89,6 @@ export function createSettingsService(
 				),
 			);
 			await mutate((stored) => ({ ...stored, ...defined }));
-		},
-		async set(key, value) {
-			checkSettingKey(key);
-			if (key === "torznab") throw new Error(indexerAdvice);
-			RUNTIME_CONFIG_SCHEMA.shape[
-				key as keyof typeof RUNTIME_CONFIG_SCHEMA.shape
-			].parse(value);
-			await service.save({ [key]: value });
 		},
 		async unset(key) {
 			await mutate((stored) => {

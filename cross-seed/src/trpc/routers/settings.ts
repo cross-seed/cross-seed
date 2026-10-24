@@ -27,7 +27,7 @@ export const settingsRouter = router({
 	save: cliSettingsProcedure
 		.input(z.object({}).passthrough())
 		.mutation(async ({ input }) => {
-			await daemonSettingsService.save(input);
+			await daemonSettingsService.patch(input);
 			return { success: true };
 		}),
 
