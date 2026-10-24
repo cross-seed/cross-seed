@@ -322,11 +322,9 @@ describe.sequential("full app flows", () => {
 		await injectSavedTorrents();
 
 		expect(fakeTorrent.state.torrents.has(meta.infoHash)).toBe(true);
-		const savedFiles = await readdir(outputDir);
-		const parsed = savedFiles
-			.map((file) => env.parseMetadataFromFilename(file))
-			.filter((entry) => entry.infoHash === meta.infoHash);
-		expect(parsed.length).toBeGreaterThanOrEqual(1);
+		// Successful injection removes the input after completion is confirmed.
+		// That cleanup runs in the background when injectDir is not set.
+		await expect.poll(() => readdir(outputDir)).toEqual([]);
 
 		await env.db.destroy();
 	});
