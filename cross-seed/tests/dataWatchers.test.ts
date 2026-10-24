@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdtemp, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -104,7 +104,13 @@ describe.sequential("data directory watcher lifecycle", () => {
 			"Deleted.Show.S01E01.mkv",
 		);
 		await writeFile(deletedPath, Buffer.alloc(100));
-		await dataFiles.indexDataDirs({ startup: true });
+		let recovery: Promise<void> | undefined;
+		const onWatcherRecovery = vi.fn(() => {
+			recovery = dataFiles.indexDataDirs({ startup: false });
+			return recovery;
+		});
+		await dataFiles.indexDataDirs({ startup: true, onWatcherRecovery });
+		expect(onWatcherRecovery).not.toHaveBeenCalled();
 		vi.useFakeTimers();
 		created[0].emit("error", new Error("EMFILE"));
 		await unlink(deletedPath);
@@ -115,7 +121,8 @@ describe.sequential("data directory watcher lifecycle", () => {
 		await writeFile(path, Buffer.alloc(100));
 		await vi.advanceTimersByTimeAsync(1000);
 		vi.useRealTimers();
-		await dataFiles.indexDataDirs({ startup: false });
+		await recovery;
+		expect(onWatcherRecovery).toHaveBeenCalledOnce();
 		expect(
 			await db("library_item").where({ path }).whereNull("missing_since"),
 		).toHaveLength(1);
@@ -124,5 +131,94 @@ describe.sequential("data directory watcher lifecycle", () => {
 				.where({ path: deletedPath })
 				.whereNull("missing_since"),
 		).toHaveLength(0);
+	});
+	it("retains a recovery request that arrives during a full scan", async () => {
+		const inventory = await import("../src/libraryInventory.js");
+		const begin = inventory.beginLibraryScan;
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const scans = vi
+			.spyOn(inventory, "beginLibraryScan")
+			.mockImplementationOnce(async (options) => {
+				await gate;
+				return begin(options);
+			});
+		const { indexTorrentsAndDataDirs } = await import("../src/torrent.js");
+		const running = indexTorrentsAndDataDirs({ startup: true });
+		await vi.waitFor(() => expect(scans).toHaveBeenCalledOnce());
+		vi.useFakeTimers();
+		created[0].emit("error", new Error("EMFILE"));
+		await vi.advanceTimersByTimeAsync(1000);
+		vi.useRealTimers();
+		release();
+		await running;
+		expect(scans).toHaveBeenCalledTimes(2);
+		scans.mockRestore();
+	});
+
+	it("automatically indexes a returning directory using a real filesystem watcher", async () => {
+		const realFs = await vi.importActual<typeof import("fs")>("fs");
+		watch.mockImplementation(realFs.watch);
+		const dataDir = join(TEST_ROOT, `returning-${Date.now()}`);
+		runtime.setRuntimeConfig({
+			...runtime.getRuntimeConfig(),
+			dataDirs: [dataDir],
+			torznab: [],
+		});
+		const { indexTorrentsAndDataDirs } = await import("../src/torrent.js");
+		await indexTorrentsAndDataDirs({ startup: true });
+		await mkdir(dataDir);
+		const path = join(dataDir, "Recovered.Show.S01E01.mkv");
+		await writeFile(path, Buffer.alloc(100));
+		await vi.waitFor(
+			async () => {
+				expect(
+					await db("library_item")
+						.where({ path })
+						.whereNull("missing_since"),
+				).toHaveLength(1);
+			},
+			{ timeout: 5000 },
+		);
+		await indexTorrentsAndDataDirs(); // Drain any remaining work before teardown.
+	});
+
+	it("throttles retry errors and cancels recovery when the source is removed", async () => {
+		const error = vi.spyOn(logger, "error");
+		watch.mockImplementation(() => {
+			throw new Error("ENOENT");
+		});
+		const onWatcherRecovery = vi.fn().mockResolvedValue(undefined);
+		vi.useFakeTimers();
+		await dataFiles.indexDataDirs({ startup: true, onWatcherRecovery });
+		await vi.advanceTimersByTimeAsync(59_000);
+		expect(watch).toHaveBeenCalledTimes(60);
+		expect(
+			error.mock.calls.filter((call) => {
+				const message: unknown = call[0];
+				return (
+					typeof message === "string" &&
+					message.startsWith("Retrying watcher")
+				);
+			}),
+		).toHaveLength(1);
+		await vi.advanceTimersByTimeAsync(1000);
+		expect(
+			error.mock.calls.filter((call) => {
+				const message: unknown = call[0];
+				return (
+					typeof message === "string" &&
+					message.startsWith("Retrying watcher")
+				);
+			}),
+		).toHaveLength(2);
+		dataFiles.destroyDataDirWatchers();
+		watch.mockImplementation(() => new FakeWatcher());
+		await vi.advanceTimersByTimeAsync(5000);
+		expect(onWatcherRecovery).not.toHaveBeenCalled();
+		expect(vi.getTimerCount()).toBe(0);
+		error.mockRestore();
 	});
 });

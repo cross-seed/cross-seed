@@ -1,3 +1,4 @@
+import { replaceEnsembleEntries } from "./ensemble.js";
 import { distance } from "fastest-levenshtein";
 import type { Stats } from "fs";
 import { readdir, readFile, stat } from "fs/promises";
@@ -621,12 +622,7 @@ async function indexTorrents(options: { startup: boolean }): Promise<void> {
 		async (searchee) =>
 			(await cacheEnsembleTorrentEntry(searchee, infoHashPathMap)) ?? [],
 	);
-	await inBatches(ensembleRows, async (batch) => {
-		await db("ensemble")
-			.insert(batch)
-			.onConflict(["client_host", "path"])
-			.merge();
-	});
+	await replaceEnsembleEntries(db, ensembleRows);
 }
 
 async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
@@ -635,23 +631,27 @@ async function indexTorrentDir(dir: string): Promise<SearcheeWithInfoHash[]> {
 
 let activeIndexing: Promise<void> | undefined;
 let startupIndexingRequested = false;
+let refreshIndexingRequested = false;
 
 export function indexTorrentsAndDataDirs(
-	options = { startup: false },
+	options: { startup: boolean; refresh?: boolean } = { startup: false },
 ): Promise<void> {
 	startupIndexingRequested ||= options.startup;
+	refreshIndexingRequested ||= options.refresh ?? false;
 	if (activeIndexing) return activeIndexing;
 	activeIndexing = (async () => {
 		do {
 			const startup = startupIndexingRequested;
 			startupIndexingRequested = false;
+			refreshIndexingRequested = false;
 			try {
 				await runIndexing({ startup });
 			} catch (error) {
 				// A settings update queued during a failed scan still gets a turn.
-				if (!startupIndexingRequested) throw error;
+				if (!startupIndexingRequested && !refreshIndexingRequested)
+					throw error;
 			}
-		} while (startupIndexingRequested);
+		} while (startupIndexingRequested || refreshIndexingRequested);
 	})().finally(() => {
 		activeIndexing = undefined;
 	});
@@ -793,7 +793,11 @@ async function runIndexing(options: { startup: boolean }): Promise<void> {
 	const maxRetries = 3;
 	for (let attempt = 1; attempt <= maxRetries; attempt++) {
 		try {
-			await indexDataDirs(options); // Running together may increase failures
+			await indexDataDirs({
+				...options,
+				onWatcherRecovery: () =>
+					indexTorrentsAndDataDirs({ startup: false, refresh: true }),
+			}); // Running together may increase failures
 			await indexTorrents(options); // Run second so this data is more fresh
 			break;
 		} catch (e) {

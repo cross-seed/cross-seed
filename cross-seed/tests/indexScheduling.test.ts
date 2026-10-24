@@ -67,6 +67,28 @@ describe.sequential("indexing scheduling", () => {
 		expect(await db("data")).toHaveLength(0);
 	});
 
+	it("coalesces watcher recovery behind an active scan without startup cleanup", async () => {
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const index = vi
+			.spyOn(dataFiles, "indexDataDirs")
+			.mockImplementationOnce(() => gate)
+			.mockResolvedValue(undefined);
+		const running = torrent.indexTorrentsAndDataDirs();
+		const recovery = index.mock.calls[0][0].onWatcherRecovery!;
+		expect(recovery()).toBe(running);
+		expect(recovery()).toBe(running);
+		expect(index).toHaveBeenCalledOnce();
+		release();
+		await running;
+		expect(index.mock.calls.map(([options]) => options.startup)).toEqual([
+			false,
+			false,
+		]);
+	});
+
 	it("runs a queued refresh even when the active startup scan fails", async () => {
 		let reject!: (error: Error) => void;
 		const gate = new Promise<void>((_resolve, rejectPromise) => {

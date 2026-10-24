@@ -18,6 +18,7 @@ import pruneInactiveIndexers from "./16-prune-inactive-indexers.js";
 import apiKeySettingsJson from "./17-api-key-settings-json.js";
 import libraryInventory from "./18-library-inventory.js";
 import libraryFiles from "./19-library-files.js";
+import ensembleIdentity from "./20-ensemble-identity.js";
 
 import { Knex } from "knex";
 type Migration = {
@@ -49,6 +50,7 @@ export const migrations = {
 			apiKeySettingsJson,
 			libraryInventory,
 			libraryFiles,
+			ensembleIdentity,
 		]),
 	getMigrationName: (migration: Migration) => migration.name,
 	getMigration: (migration: Migration) => Promise.resolve(migration),

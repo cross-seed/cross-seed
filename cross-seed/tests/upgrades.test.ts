@@ -74,6 +74,37 @@ describe.sequential("v6 database upgrades", () => {
 		else process.env.CONFIG_DIR = originalConfigDir;
 	});
 
+	it("deduplicates only identical legacy ensemble entries through the complete migration chain", async () => {
+		const dir = await legacyDirectory();
+		const env = await open(dir);
+		const row = {
+			client_host: null,
+			path: "/episodes/one.mkv",
+			info_hash: null,
+			ensemble: "show.1",
+			element: "1",
+		};
+		await env
+			.db("ensemble")
+			.insert([
+				row,
+				row,
+				{ ...row, ensemble: "alias.1" },
+				{ ...row, info_hash: "hash" },
+			]);
+		await env.db.migrate.latest();
+		expect(await env.db("ensemble").select()).toHaveLength(3);
+		const { replaceEnsembleEntries } = await import("../src/ensemble.js");
+		await replaceEnsembleEntries(env.db, [
+			row,
+			{ ...row, ensemble: "alias.1" },
+		]);
+		expect(await env.db("ensemble").select()).toHaveLength(3);
+		const restarted = await reopen(dir);
+		await restarted.db.migrate.latest();
+		expect(await restarted.db("ensemble").select()).toHaveLength(3);
+	});
+
 	it.each([apiKey, null, ""])(
 		"imports the frozen v6 schema and preserves data (legacy key: %s)",
 		async (key) => {
