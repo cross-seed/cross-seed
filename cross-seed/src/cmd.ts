@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
+import { registerConfigCommands } from "./configCli.js";
 import { setTimeout as delay } from "node:timers/promises";
 import { getApiKey, resetApiKey, setApiKey } from "./auth.js";
 import { PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
@@ -240,6 +241,8 @@ program
 			}
 		}),
 	);
+
+registerConfigCommands(program);
 
 program.showHelpAfterError("(add --help for additional information)");
 
