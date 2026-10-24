@@ -144,6 +144,85 @@ describe.sequential("startup config migration", () => {
 		await expect(env.getDbConfig()).resolves.toBeDefined();
 	});
 
+	it.each([false, true])(
+		"imports v6 config with a legacy API key (migration already applied: %s)",
+		async (alreadyApplied) => {
+			const env = await createStartupEnv();
+			const apiKey = "a".repeat(32);
+			await env.db("settings").update({
+				apikey: apiKey,
+				settings_json: alreadyApplied
+					? JSON.stringify({ apiKey })
+					: null,
+			});
+			if (!alreadyApplied) {
+				const migration =
+					await import("../src/migrations/17-api-key-settings-json.js");
+				await migration.default.up(env.db);
+			}
+			await writeFile(
+				env.configPath,
+				'export default { delay: 123, useClientTorrents: false, torznab: ["https://example.com/api?apikey=abc"] };',
+			);
+			await expect(env.determineRuntimeConfig({})).resolves.toMatchObject(
+				{ delay: 123, apiKey },
+			);
+			await expect(env.getDbConfig()).resolves.toMatchObject({
+				delay: 123,
+				apiKey,
+			});
+			expect(
+				await env
+					.db("indexer")
+					.where({ url: "https://example.com/api" }),
+			).toHaveLength(1);
+			await expect(
+				readFile(`${env.configPath}.bak`, "utf8"),
+			).resolves.toContain("delay: 123");
+		},
+	);
+
+	it.each(["populated", "no legacy key", "no file"])(
+		"keeps database settings authoritative: %s",
+		async (kind) => {
+			const env = await createStartupEnv();
+			const apiKey = "b".repeat(32);
+			const config =
+				kind === "populated" ? { apiKey, delay: 456 } : { apiKey };
+			await env.db("settings").update({
+				apikey: kind === "no legacy key" ? null : apiKey,
+				settings_json: JSON.stringify(config),
+			});
+			if (kind !== "no file")
+				await writeFile(
+					env.configPath,
+					"export default { delay: 123 };",
+				);
+			await expect(env.determineRuntimeConfig({})).resolves.toMatchObject(
+				{ apiKey, delay: kind === "populated" ? 456 : 30 },
+			);
+			await expect(env.getDbConfig()).resolves.toEqual(config);
+		},
+	);
+
+	it("preserves the legacy key and file if recovery encounters invalid config", async () => {
+		const env = await createStartupEnv();
+		const apiKey = "c".repeat(32);
+		await env.db("settings").update({
+			apikey: apiKey,
+			settings_json: JSON.stringify({ apiKey }),
+		});
+		const original = await env.db("settings").select();
+		await writeFile(env.configPath, "export default { delay: 1 };");
+		await expect(env.determineRuntimeConfig({})).rejects.toThrow(
+			"Failed to import configuration file",
+		);
+		expect(await env.db("settings").select()).toEqual(original);
+		await expect(readFile(env.configPath, "utf8")).resolves.toContain(
+			"delay: 1",
+		);
+	});
+
 	it("chooses a collision-safe backup filename", async () => {
 		const env = await createStartupEnv();
 		const configContents = `

@@ -161,6 +161,20 @@ export async function determineRuntimeConfig(
 		logger.debug("Unable to load configuration from database", dbError);
 	}
 
+	// Recover upgrades where migration 17 created an API-key-only config before
+	// the file could be imported. Require the legacy key and original file so
+	// ordinary v7 database configuration continues to take precedence.
+	if (
+		dbOverrides?.apiKey &&
+		Object.keys(dbOverrides).length === 1 &&
+		!(await notExists(getFileConfigPath()))
+	) {
+		const legacySettings = await db("settings").select("apikey").first();
+		if (legacySettings?.apikey === dbOverrides.apiKey) {
+			dbOverrides = undefined;
+		}
+	}
+
 	if (dbOverrides !== undefined) {
 		return {
 			...getDefaultRuntimeConfig(),
