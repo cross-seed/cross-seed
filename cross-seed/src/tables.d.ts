@@ -41,6 +41,124 @@ declare module "knex/types/tables.js" {
 		last_run: number;
 	}
 
+	interface LibraryItem {
+		id: number;
+		source: string;
+		source_instance: string | null;
+		source_key: string;
+		client_host: string | null;
+		info_hash: string | null;
+		path: string | null;
+		name: string;
+		title: string;
+		files: string;
+		length: number;
+		save_path: string | null;
+		category: string | null;
+		tags: string | null;
+		trackers: string | null;
+		content_fingerprint: string | null;
+		first_seen_at: number;
+		last_seen_at: number;
+		last_indexed_at: number;
+		missing_since: number | null;
+		last_seen_scan_id: number | null;
+		updated_at: number;
+	}
+
+	interface LibraryFile {
+		id: number;
+		source: string;
+		source_instance: string | null;
+		item_source_key: string;
+		path: string;
+		name: string;
+		length: number;
+		first_seen_at: number;
+		last_seen_at: number;
+		missing_since: number | null;
+		last_seen_scan_id: number | null;
+		updated_at: number;
+	}
+
+	type LibraryFileInsert = Omit<
+		LibraryFile,
+		"id" | "source_instance" | "missing_since" | "last_seen_scan_id"
+	> &
+		Partial<
+			Pick<
+				LibraryFile,
+				"source_instance" | "missing_since" | "last_seen_scan_id"
+			>
+		>;
+
+	type LibraryItemInsert = Omit<
+		LibraryItem,
+		| "id"
+		| "source_instance"
+		| "client_host"
+		| "info_hash"
+		| "path"
+		| "save_path"
+		| "category"
+		| "tags"
+		| "trackers"
+		| "content_fingerprint"
+		| "missing_since"
+		| "last_seen_scan_id"
+	> &
+		Partial<
+			Pick<
+				LibraryItem,
+				| "source_instance"
+				| "client_host"
+				| "info_hash"
+				| "path"
+				| "save_path"
+				| "category"
+				| "tags"
+				| "trackers"
+				| "content_fingerprint"
+				| "missing_since"
+				| "last_seen_scan_id"
+			>
+		>;
+
+	interface LibraryScan {
+		id: number;
+		source: string;
+		source_instance: string | null;
+		status: string;
+		started_at: number;
+		finished_at: number | null;
+		error: string | null;
+		items_seen: number;
+		items_upserted: number;
+		items_removed: number;
+	}
+
+	type LibraryScanInsert = Omit<
+		LibraryScan,
+		| "id"
+		| "source_instance"
+		| "finished_at"
+		| "error"
+		| "items_seen"
+		| "items_upserted"
+		| "items_removed"
+	> &
+		Partial<
+			Pick<
+				LibraryScan,
+				| "source_instance"
+				| "finished_at"
+				| "error"
+				| "items_seen"
+				| "items_upserted"
+				| "items_removed"
+			>
+		>;
+
 	interface Rss {
 		indexer_id: number;
 		last_seen_guid: string;
@@ -77,6 +195,23 @@ declare module "knex/types/tables.js" {
 		decision: Knex.CompositeTableType<Decision, Omit<Decision, "id">>;
 		indexer: Knex.CompositeTableType<Indexer, Omit<Indexer, "id">>;
 		job_log: Knex.CompositeTableType<JobLog, Omit<JobLog, "id">>;
+		library_file: Knex.CompositeTableType<
+			LibraryFile,
+			LibraryFileInsert,
+			Partial<
+				Omit<LibraryFile, "id" | "item_source_key" | "first_seen_at">
+			>
+		>;
+		library_item: Knex.CompositeTableType<
+			LibraryItem,
+			LibraryItemInsert,
+			Partial<Omit<LibraryItem, "id" | "source_key" | "first_seen_at">>
+		>;
+		library_scan: Knex.CompositeTableType<
+			LibraryScan,
+			LibraryScanInsert,
+			Partial<Omit<LibraryScan, "id" | "started_at">>
+		>;
 		rss: Knex.CompositeTableType<
 			Rss,
 			Rss,

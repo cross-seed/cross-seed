@@ -86,6 +86,7 @@ export interface TorrentClient {
 	 * @return an object containing all searchees and new searchees (refreshed searchees are considered new)
 	 */
 	getClientSearchees: (options?: {
+		libraryScanId?: number;
 		newSearcheesOnly?: boolean;
 		refresh?: string[];
 		includeFiles?: boolean;

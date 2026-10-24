@@ -6,6 +6,7 @@ import { mapAsync } from "../../utils.js";
 export const statsRouter = router({
 	getOverview: authedProcedure.query(async () => {
 		const [
+			indexedResult,
 			searcheeResult,
 			searcheeNames,
 			totalIndexerResult,
@@ -15,6 +16,10 @@ export const statsRouter = router({
 			recentMatches,
 			matchAggregates,
 		] = await Promise.all([
+			db("library_item")
+				.whereNull("missing_since")
+				.count({ count: "*" })
+				.first(),
 			db("searchee").count({ count: "*" }).first(),
 			db("searchee").select("name"),
 			db("indexer").count({ count: "*" }).first(),
@@ -101,6 +106,7 @@ export const statsRouter = router({
 		const allIndexersHealthy = unhealthyIndexers === 0;
 
 		return {
+			indexedItems: Number(indexedResult?.count ?? 0),
 			totalSearchees,
 			totalMatches,
 			totalIndexers,

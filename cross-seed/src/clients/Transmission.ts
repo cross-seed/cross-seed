@@ -397,6 +397,7 @@ export default class Transmission implements TorrentClient {
 	}
 
 	async getClientSearchees(options?: {
+		libraryScanId?: number;
 		newSearcheesOnly?: boolean;
 		refresh?: string[];
 	}): Promise<ClientSearcheeResult> {
@@ -431,6 +432,12 @@ export default class Transmission implements TorrentClient {
 				label: this.label,
 				message: "No torrents found in client",
 			});
+			await updateSearcheeClientDB(
+				this.clientHost,
+				[],
+				new Set(),
+				options?.libraryScanId,
+			);
 			return { searchees, newSearchees };
 		}
 		for (const torrent of torrents) {
@@ -498,7 +505,12 @@ export default class Transmission implements TorrentClient {
 			newSearchees.push(searchee);
 			searchees.push(searchee);
 		}
-		await updateSearcheeClientDB(this.clientHost, newSearchees, infoHashes);
+		await updateSearcheeClientDB(
+			this.clientHost,
+			newSearchees,
+			infoHashes,
+			options?.libraryScanId,
+		);
 		return { searchees, newSearchees };
 	}
 

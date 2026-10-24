@@ -774,6 +774,7 @@ export default class QBittorrent implements TorrentClient {
 	 * @return an object containing all searchees and new searchees (refreshed searchees are considered new)
 	 */
 	async getClientSearchees(options?: {
+		libraryScanId?: number;
 		newSearcheesOnly?: boolean;
 		refresh?: string[];
 		includeFiles?: boolean;
@@ -791,6 +792,12 @@ export default class QBittorrent implements TorrentClient {
 				label: this.label,
 				message: "No torrents found in client",
 			});
+			await updateSearcheeClientDB(
+				this.clientHost,
+				[],
+				new Set(),
+				options?.libraryScanId,
+			);
 			return { searchees, newSearchees };
 		}
 		for (const torrent of torrents) {
@@ -877,7 +884,12 @@ export default class QBittorrent implements TorrentClient {
 			newSearchees.push(searchee);
 			searchees.push(searchee);
 		}
-		await updateSearcheeClientDB(this.clientHost, newSearchees, infoHashes);
+		await updateSearcheeClientDB(
+			this.clientHost,
+			newSearchees,
+			infoHashes,
+			options?.libraryScanId,
+		);
 		return { searchees, newSearchees };
 	}
 

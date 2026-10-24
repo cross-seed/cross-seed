@@ -16,20 +16,29 @@ function Home() {
   );
   const showMatchesPerQuery = showDistinctQueryCount;
   const topGridCols = showDistinctQueryCount
-    ? "lg:grid-cols-5"
-    : "lg:grid-cols-4";
+    ? "lg:grid-cols-3"
+    : "lg:grid-cols-5";
   const conversionGridCols = showMatchesPerQuery
     ? "lg:grid-cols-4"
     : "lg:grid-cols-3";
-  const indexerHealthTitle = statsData.allIndexersHealthy
-    ? "Indexer Health"
-    : "Unhealthy Indexers";
-  const indexerHealthValue = statsData.allIndexersHealthy
-    ? `All ${statsData.totalIndexers.toLocaleString()}`
-    : statsData.unhealthyIndexers.toLocaleString();
-  const indexerHealthDescription = statsData.allIndexersHealthy
-    ? "Indexers are all reporting healthy"
-    : `${statsData.unhealthyIndexers.toLocaleString()} of ${statsData.totalIndexers.toLocaleString()} indexers need attention`;
+  const indexerHealthTitle =
+    statsData.totalIndexers === 0
+      ? "Indexer Setup"
+      : statsData.allIndexersHealthy
+        ? "Indexer Health"
+        : "Unhealthy Indexers";
+  const indexerHealthValue =
+    statsData.totalIndexers === 0
+      ? "None"
+      : statsData.allIndexersHealthy
+        ? `All ${statsData.totalIndexers.toLocaleString()}`
+        : statsData.unhealthyIndexers.toLocaleString();
+  const indexerHealthDescription =
+    statsData.totalIndexers === 0
+      ? "Add an indexer to enable searches"
+      : statsData.allIndexersHealthy
+        ? "Indexers are all reporting healthy"
+        : `${statsData.unhealthyIndexers.toLocaleString()} of ${statsData.totalIndexers.toLocaleString()} indexers need attention`;
 
   return (
     <Page breadcrumbs={["Dashboard"]}>
@@ -37,9 +46,14 @@ function Home() {
         <section className="space-y-4">
           <div className={`grid gap-4 md:grid-cols-2 ${topGridCols}`}>
             <StatCard
-              title="Total Searchees"
+              title="Indexed Items"
+              value={statsData.indexedItems.toLocaleString()}
+              description="Items available in Library"
+            />
+            <StatCard
+              title="Searched Titles"
               value={statsData.totalSearchees.toLocaleString()}
-              description="Torrents being monitored"
+              description="Titles recorded in search history"
             />
             {showDistinctQueryCount && (
               <StatCard

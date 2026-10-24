@@ -16,7 +16,11 @@ import {
 import { CrossSeedError } from "./errors.js";
 import { errorCode } from "./utils.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
-import { WebhookEntry } from "@cross-seed/shared/configSchema";
+import {
+	RUNTIME_CONFIG_SCHEMA,
+	WebhookEntry,
+} from "@cross-seed/shared/configSchema";
+import { z } from "zod";
 import { omitUndefined } from "./utils/object.js";
 
 export interface FileConfig {
@@ -175,9 +179,45 @@ export function stripDefaults(
 	return overrides;
 }
 
+// Validate before legacy transformations can discard an invalid supplied value.
+// Keep v6 duration syntax, disabled values, and legacy aliases compatible.
+const legacyDurationSchema = z
+	.unknown()
+	.refine(
+		(value) =>
+			value === undefined || parseDurationValue(value) !== undefined,
+		"Expected a duration string, milliseconds, or null",
+	);
+const fileConfigSchema = RUNTIME_CONFIG_SCHEMA.partial().extend({
+	matchMode: z
+		.union([RUNTIME_CONFIG_SCHEMA.shape.matchMode, z.literal("risky")])
+		.optional(),
+	seasonFromEpisodes: z.union([
+		RUNTIME_CONFIG_SCHEMA.shape.seasonFromEpisodes,
+		z.literal(false),
+		z.null(),
+	]),
+	excludeOlder: legacyDurationSchema.optional(),
+	excludeRecentSearch: legacyDurationSchema.optional(),
+	searchCadence: legacyDurationSchema.optional(),
+	rssCadence: legacyDurationSchema.optional(),
+	snatchTimeout: legacyDurationSchema.optional(),
+	searchTimeout: legacyDurationSchema.optional(),
+	torrentDir: z.string().nullish(),
+	outputDir: z.string().nullish(),
+	linkDir: z.string().nullish(),
+	qbittorrentUrl: z.string().nullish(),
+	rtorrentRpcUrl: z.string().nullish(),
+	transmissionRpcUrl: z.string().nullish(),
+	delugeRpcUrl: z.string().nullish(),
+	notificationWebhookUrl: z.string().nullish(),
+	pconfigVersion: z.number().optional(),
+});
+
 export function transformFileConfig(
 	fileConfig: FileConfig,
 ): Partial<RuntimeConfig> {
+	fileConfigSchema.parse(fileConfig);
 	const result: Partial<RuntimeConfig> = {};
 
 	if (typeof fileConfig.delay === "number") {
@@ -462,22 +502,29 @@ export function getFileConfigPath(): string {
 
 export async function getFileConfig(): Promise<FileConfig | undefined> {
 	const configPath = getFileConfigPath();
-	const require = createRequire(configPath);
-
 	try {
-		if (isSea()) {
-			return require(configPath) as FileConfig;
-		}
-		return (
-			(await import(pathToFileURL(configPath).toString())) as {
-				default: FileConfig;
-			}
-		).default;
+		accessSync(configPath, constants.F_OK);
 	} catch (e) {
-		const code = errorCode(e);
-		if (code === "MODULE_NOT_FOUND" || code === "ERR_MODULE_NOT_FOUND") {
-			return undefined;
-		}
+		if (errorCode(e) === "ENOENT") return undefined;
 		throw e;
 	}
+
+	// Module-not-found errors during evaluation may refer to a dependency of
+	// an existing config. They must not be mistaken for a new installation.
+	const require = createRequire(configPath);
+	const fileConfig: unknown = isSea()
+		? require(configPath)
+		: (
+				(await import(pathToFileURL(configPath).toString())) as {
+					default: unknown;
+				}
+			).default;
+	if (
+		fileConfig === null ||
+		typeof fileConfig !== "object" ||
+		Array.isArray(fileConfig)
+	) {
+		throw new Error("Configuration file must export a settings object");
+	}
+	return fileConfig;
 }

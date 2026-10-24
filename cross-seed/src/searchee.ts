@@ -29,6 +29,12 @@ import {
 	VIDEO_EXTENSIONS,
 } from "./constants.js";
 import { db } from "./db.js";
+import {
+	createClientLibraryItemInput,
+	createClientLibrarySourceKey,
+	LibraryItemSource,
+	syncLibraryItems,
+} from "./libraryInventory.js";
 import { Label, logger } from "./logger.js";
 import { Metafile } from "./parseTorrent.js";
 import { Result, resultOf, resultOfErr } from "./Result.js";
@@ -384,6 +390,7 @@ export async function updateSearcheeClientDB(
 	clientHost: string,
 	newSearchees: SearcheeClient[],
 	infoHashes: Set<string>,
+	scanId?: number,
 ): Promise<void> {
 	const removedInfoHashes = (
 		await db<{ info_hash: string }>("client_searchee")
@@ -422,6 +429,26 @@ export async function updateSearcheeClientDB(
 				.merge();
 		},
 	);
+	const upsertedSourceKeys = new Set(
+		newSearchees.map((searchee) =>
+			createClientLibrarySourceKey({
+				clientHost,
+				infoHash: searchee.infoHash,
+			}),
+		),
+	);
+	await syncLibraryItems({
+		scanId,
+		source: LibraryItemSource.CLIENT,
+		sourceInstance: clientHost,
+		itemsToUpsert: newSearchees.map(createClientLibraryItemInput),
+		sourceKeysSeen: Array.from(infoHashes)
+			.map((infoHash) =>
+				createClientLibrarySourceKey({ clientHost, infoHash }),
+			)
+			.filter((sourceKey) => !upsertedSourceKeys.has(sourceKey)),
+		pruneMissing: true,
+	});
 }
 
 export interface ClientSearcheeRow {
