@@ -2,6 +2,11 @@ name: sea
 
 on:
     workflow_dispatch:
+        inputs:
+            release_tag:
+                description: Existing release to attach validated binaries to
+                type: string
+                required: false
     release:
         types:
             - published
@@ -64,16 +69,22 @@ jobs:
                   name: ${{ matrix.binary }}
                   path: sea/${{ matrix.binary }}
                   if-no-files-found: error
-            - name: Upload SEA to release
-              if:
-                  ${{ github.event_name == 'release' &&
-                  startsWith(github.event.release.tag_name, 'v') }}
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run:
-                  gh release upload "${{ github.event.release.tag_name }}"
-                  "sea/${{ matrix.binary }}" --clobber
             - name: Smoke test SEA
               if: ${{ matrix.smoke != false }}
-              run: ./sea/${{ matrix.binary }} --version
+              run: |
+                  ./sea/${{ matrix.binary }} --version
+                  ./sea/${{ matrix.binary }} config --help
+              shell: bash
+            - name: Upload SEA to release
+              if:
+                  ${{ (github.event_name == 'release' &&
+                  startsWith(github.event.release.tag_name, 'v')) ||
+                  inputs.release_tag != '' }}
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  RELEASE_TAG:
+                      ${{ github.event.release.tag_name || inputs.release_tag }}
+              run:
+                  gh release upload "$RELEASE_TAG" "sea/${{ matrix.binary }}"
+                  --clobber
               shell: bash

@@ -174,6 +174,7 @@ async function buildBundle(bundlePath) {
 					"tedious",
 				],
 				output: {
+					codeSplitting: false,
 					banner: 'import { createRequire as __crossSeedCreateRequire } from "node:module";\nconst require = __crossSeedCreateRequire(import.meta.url);',
 					entryFileNames: basename(bundlePath),
 					format: "es",
