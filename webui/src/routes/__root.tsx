@@ -35,6 +35,7 @@ function RootRoute() {
         <Login>
           <SidebarProvider
             defaultOpen={true}
+            className="h-dvh min-h-0 overflow-hidden"
             style={
               {
                 "--sidebar-width": "calc(var(--spacing) * 48)",
@@ -43,7 +44,7 @@ function RootRoute() {
             }
           >
             <AppSidebar />
-            <SidebarInset>
+            <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
               <Outlet />
             </SidebarInset>
           </SidebarProvider>
