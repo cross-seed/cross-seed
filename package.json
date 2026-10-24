@@ -66,5 +66,15 @@
 	"lint-staged": {
 		"*.{js,jsx,ts,tsx}": "eslint --cache",
 		"*.{js,jsx,json,ts,tsx,css,md}": "prettier --write"
+	},
+	"overrides": {
+		"@docusaurus/core": {
+			"tinypool": "^2.1.2"
+		},
+		"serialize-javascript": "^7.1.3",
+		"postcss-selector-parser": "^7.1.6",
+		"sockjs": {
+			"uuid": "^11.1.1"
+		}
 	}
 }
