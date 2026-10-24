@@ -25,12 +25,12 @@ async function createStartupEnv(configDir?: string): Promise<StartupEnv> {
 	const { db } = await import("../src/db.js");
 	const { createAppDirHierarchy } = await import("../src/configuration.js");
 	const { initializeLogger } = await import("../src/logger.js");
-	const { determineRuntimeConfig, exitGracefully } =
+	const { determineRuntimeConfig, handleExitSignal } =
 		await import("../src/startup.js");
 	// Each isolated module load registers process handlers; these tests manage
 	// database cleanup themselves and must not accumulate shutdown handlers.
-	process.off("SIGINT", exitGracefully);
-	process.off("SIGTERM", exitGracefully);
+	process.off("SIGINT", handleExitSignal);
+	process.off("SIGTERM", handleExitSignal);
 	const { getDbConfig } = await import("../src/dbConfig.js");
 
 	createAppDirHierarchy();
