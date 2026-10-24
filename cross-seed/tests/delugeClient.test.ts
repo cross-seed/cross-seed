@@ -112,7 +112,9 @@ describe("Deluge full status and persistent authentication", () => {
 		}[] = [];
 		const fetchMock = vi.fn(
 			async (_url: unknown, options?: RequestInit) => {
-				const request = JSON.parse(String(options?.body)) as {
+				// Model the asynchronous delivery of an HTTP response.
+				await Promise.resolve();
+				const request = JSON.parse(options?.body as string) as {
 					method: string;
 					params: unknown[];
 				};
@@ -172,7 +174,9 @@ describe("Deluge full status and persistent authentication", () => {
 		const normal = rpc.fetchMock.getMockImplementation()!;
 		let oldRequests = 0;
 		rpc.fetchMock.mockImplementation(async (url, options) => {
-			const req = JSON.parse(String(options?.body)) as { method: string };
+			const req = JSON.parse(options?.body as string) as {
+				method: string;
+			};
 			if (
 				req.method === "core.get_torrents_status" &&
 				new Headers(options?.headers).get("Cookie") ===
@@ -205,7 +209,7 @@ describe("Deluge full status and persistent authentication", () => {
 		await client.authenticate();
 		const normal = rpc.fetchMock.getMockImplementation()!;
 		rpc.fetchMock.mockImplementation(async (url, options) => {
-			const req = JSON.parse(String(options?.body)) as {
+			const req = JSON.parse(options?.body as string) as {
 				method: string;
 				params: unknown[];
 			};
@@ -234,7 +238,9 @@ describe("Deluge full status and persistent authentication", () => {
 		const normal = rpc.fetchMock.getMockImplementation()!;
 		let attempts = 0;
 		rpc.fetchMock.mockImplementation(async (url, options) => {
-			const req = JSON.parse(String(options?.body)) as { method: string };
+			const req = JSON.parse(options?.body as string) as {
+				method: string;
+			};
 			if (req.method === "core.get_torrents_status") {
 				attempts++;
 				return new Response(
@@ -263,7 +269,7 @@ describe("Deluge full status and persistent authentication", () => {
 			releaseLate = resolve;
 		});
 		rpc.fetchMock.mockImplementation(async (url, options) => {
-			const { method } = JSON.parse(String(options?.body)) as {
+			const { method } = JSON.parse(options?.body as string) as {
 				method: string;
 			};
 			if (method === "web.connected") return delugeResult(connected);

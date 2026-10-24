@@ -746,7 +746,7 @@ export default class Deluge implements TorrentClient {
 		if (options.onlyCompleted && !this.isComplete(torrent)) {
 			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}
-		return resultOf(torrent.save_path!);
+		return resultOf(torrent.save_path);
 	}
 
 	/**
@@ -779,7 +779,7 @@ export default class Deluge implements TorrentClient {
 		for (const [hash, torrent] of Object.entries(torrentResponse)) {
 			if (typeof torrent.save_path !== "string") continue;
 			if (options.onlyCompleted && !this.isComplete(torrent)) continue;
-			dirs.set(hash, torrent.save_path!);
+			dirs.set(hash, torrent.save_path);
 		}
 		return dirs;
 	}
@@ -930,8 +930,8 @@ export default class Deluge implements TorrentClient {
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
-			const name = torrent.name!;
-			const savePath = torrent.save_path!;
+			const name = torrent.name;
+			const savePath = torrent.save_path;
 			const category = torrent.label ?? "";
 			const modified = clientSearcheeModified(
 				this.label,
@@ -954,7 +954,7 @@ export default class Deluge implements TorrentClient {
 				}
 				continue;
 			}
-			const files = torrent.files!.map((file) => ({
+			const files = torrent.files.map((file) => ({
 				name: basename(file.path),
 				path: file.path,
 				length: file.size,
@@ -966,9 +966,9 @@ export default class Deluge implements TorrentClient {
 				});
 				continue;
 			}
-			const trackers = organizeTrackers(torrent.trackers!);
+			const trackers = organizeTrackers(torrent.trackers);
 			const title = parseTitle(name, files) ?? name;
-			const length = torrent.total_size!;
+			const length = torrent.total_size;
 			const searchee: SearcheeClient = {
 				infoHash,
 				name,
