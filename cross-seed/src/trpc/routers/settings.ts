@@ -5,55 +5,10 @@ import { Label, logger } from "../../logger.js";
 import { getRuntimeConfig, setRuntimeConfig } from "../../runtimeConfig.js";
 import { apiKeySchema, getApiKey, resetApiKey, setApiKey } from "../../auth.js";
 import { z } from "zod";
-import {
-	getDbConfig,
-	setDbConfig,
-	updateDbConfig,
-	unsetDbConfig,
-} from "../../dbConfig.js";
-import { getDefaultRuntimeConfig } from "../../configuration.js";
-import { omitUndefined } from "../../utils/object.js";
-import {
-	parseRuntimeConfig,
-	RUNTIME_CONFIG_SCHEMA,
-} from "../../configSchema.js";
+import { daemonSettingsService } from "../../daemonSettings.js";
 import { sendTestNotification } from "../../pushNotifier.js";
-import { reloadDownloadClients } from "../../clients/TorrentClient.js";
 import { errorMessage } from "../../utils.js";
-import { indexTorrentsAndDataDirs } from "../../torrent.js";
 import type { RuntimeConfig } from "../../runtimeConfig.js";
-
-function arrayContentsChanged(a: string[], b: string[]): boolean {
-	if (a.length !== b.length) return true;
-	return a.some((value, index) => value !== b[index]);
-}
-
-function torrentSourceConfigChanged(
-	before: RuntimeConfig,
-	after: RuntimeConfig,
-): boolean {
-	return (
-		before.useClientTorrents !== after.useClientTorrents ||
-		before.torrentDir !== after.torrentDir ||
-		before.maxDataDepth !== after.maxDataDepth ||
-		before.seasonFromEpisodes !== after.seasonFromEpisodes ||
-		arrayContentsChanged(
-			before.torrentClients ?? [],
-			after.torrentClients ?? [],
-		) ||
-		arrayContentsChanged(before.dataDirs ?? [], after.dataDirs ?? [])
-	);
-}
-
-function triggerLibraryIndexing(): void {
-	void indexTorrentsAndDataDirs({ startup: true }).catch((error) => {
-		logger.error({
-			label: Label.INDEX,
-			message: `Failed to index library after source config update: ${errorMessage(error)}`,
-		});
-		logger.debug(error);
-	});
-}
 
 // The filesystem capability grants settings access only; ordinary tRPC
 // authentication and all other procedures remain unchanged.
@@ -63,92 +18,17 @@ const cliSettingsProcedure = unauthedProcedure.use(({ ctx, next }) => {
 	return next({ ctx: { ...ctx, localCli } });
 });
 
-async function replaceSettings(
-	input: Record<string, unknown>,
-): Promise<{ success: boolean }> {
-	const previousConfig = getRuntimeConfig();
-	const parsedConfig = parseRuntimeConfig(input);
-	await setDbConfig(parsedConfig);
-	const updatedConfig = {
-		...getDefaultRuntimeConfig(),
-		...omitUndefined(parsedConfig),
-	};
-	setRuntimeConfig(updatedConfig);
-	reloadDownloadClients();
-	if (torrentSourceConfigChanged(previousConfig, updatedConfig))
-		triggerLibraryIndexing();
-	return { success: true };
-}
-
 export const settingsRouter = router({
-	get: cliSettingsProcedure.query(async () => {
-		try {
-			const runtimeOverrides = await getDbConfig();
-			const runtimeConfig = {
-				...getDefaultRuntimeConfig(),
-				...runtimeOverrides,
-			};
-			const apiKey = await getApiKey();
-			return {
-				config: runtimeConfig,
-				apiKey,
-			};
-		} catch (error) {
-			logger.error({ label: Label.SERVER, message: errorMessage(error) });
-			throw new Error(`Failed to read config: ${errorMessage(error)}`);
-		}
-	}),
+	get: cliSettingsProcedure.query(async () => ({
+		config: (await daemonSettingsService.read(true)) as RuntimeConfig,
+		apiKey: await getApiKey(),
+	})),
 
-	// We'll need to implement the save functionality
 	save: cliSettingsProcedure
 		.input(z.object({}).passthrough())
-		.mutation(async ({ input, ctx }) => {
-			try {
-				logger.info({
-					label: Label.SERVER,
-					message: `Saving config updates...`,
-				});
-				const previousConfig = getRuntimeConfig();
-
-				if (ctx.localCli) {
-					if (Object.hasOwn(input, "torznab"))
-						throw new Error(
-							"Manage indexers in Settings → Trackers.",
-						);
-					RUNTIME_CONFIG_SCHEMA.strict().parse({
-						...getDefaultRuntimeConfig(),
-						...(await getDbConfig()),
-						...input,
-					});
-				}
-
-				// Save to database
-				await updateDbConfig(input);
-
-				// Update in-memory config with the merged result
-				const updatedOverrides = await getDbConfig();
-				const updatedConfig = {
-					...getDefaultRuntimeConfig(),
-					...updatedOverrides,
-				};
-				setRuntimeConfig(updatedConfig);
-
-				// Keep in-process torrent clients in sync with updated settings.
-				reloadDownloadClients();
-				if (torrentSourceConfigChanged(previousConfig, updatedConfig)) {
-					triggerLibraryIndexing();
-				}
-
-				return { success: true };
-			} catch (error) {
-				logger.error({
-					label: Label.SERVER,
-					message: errorMessage(error),
-				});
-				throw new Error(
-					`Failed to save config: ${errorMessage(error)}`,
-				);
-			}
+		.mutation(async ({ input }) => {
+			await daemonSettingsService.save(input);
+			return { success: true };
 		}),
 
 	setApiKey: authedProcedure
@@ -180,43 +60,17 @@ export const settingsRouter = router({
 		}
 	}),
 
-	// Full replacement for debug page and local CLI imports.
 	replace: cliSettingsProcedure
 		.input(z.object({}).passthrough())
-		.mutation(async ({ input, ctx }) => {
-			if (ctx.localCli) {
-				if (Array.isArray(input.torznab) && input.torznab.length)
-					throw new TRPCError({
-						code: "BAD_REQUEST",
-						message:
-							"Manage indexers in Settings → Trackers; legacy torznab URLs cannot be imported.",
-					});
-				RUNTIME_CONFIG_SCHEMA.strict().parse({
-					...getDefaultRuntimeConfig(),
-					...input,
-				});
-			}
-			return replaceSettings(input);
+		.mutation(async ({ input }) => {
+			await daemonSettingsService.replace(input);
+			return { success: true };
 		}),
 
 	unset: cliSettingsProcedure
 		.input(z.object({ key: z.string() }).strict())
 		.mutation(async ({ input }) => {
-			if (!Object.hasOwn(RUNTIME_CONFIG_SCHEMA.shape, input.key))
-				throw new TRPCError({
-					code: "BAD_REQUEST",
-					message: `Unknown setting: ${input.key}`,
-				});
-			const previousConfig = getRuntimeConfig();
-			await unsetDbConfig(input.key);
-			const updatedConfig = {
-				...getDefaultRuntimeConfig(),
-				...(await getDbConfig()),
-			};
-			setRuntimeConfig(updatedConfig);
-			reloadDownloadClients();
-			if (torrentSourceConfigChanged(previousConfig, updatedConfig))
-				triggerLibraryIndexing();
+			await daemonSettingsService.unset(input.key);
 			return { success: true };
 		}),
 

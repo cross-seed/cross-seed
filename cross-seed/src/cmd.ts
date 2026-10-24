@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
-import { registerConfigCommands } from "./configCli.js";
+import { registerConfigCommands, reportConfigError } from "./configCli.js";
 import { setTimeout as delay } from "node:timers/promises";
 import { getApiKey, resetApiKey, setApiKey } from "./auth.js";
 import { PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
@@ -244,7 +244,13 @@ registerConfigCommands(program);
 program.showHelpAfterError("(add --help for additional information)");
 
 async function main() {
-	await program.parseAsync();
+	try {
+		await program.parseAsync();
+	} catch (error) {
+		if (["config", "db"].includes(process.argv[2]))
+			reportConfigError(error);
+		else throw error;
+	}
 }
 
 await main();

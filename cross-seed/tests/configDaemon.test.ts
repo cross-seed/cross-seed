@@ -98,6 +98,14 @@ describe.sequential("local settings tRPC capability", () => {
 			(await request("settings.get", undefined, "invalid")).status,
 		).toBe(401);
 		expect((await request("settings.get")).status).toBe(200);
+		expect(
+			(await request("config.show?input=%7B%7D", undefined, "")).status,
+		).toBe(401);
+		expect((await request("config.show?input=%7B%7D")).status).toBe(200);
+		expect(
+			(await request("config.set", { maxDataDepth: 3 }, "")).status,
+		).toBe(401);
+
 		expect((await request("settings.resetApiKey", {})).status).toBe(401);
 	});
 	it("updates persisted and runtime settings, schedules source refresh, and resets optional values", async () => {

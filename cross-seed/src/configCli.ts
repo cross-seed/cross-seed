@@ -3,12 +3,18 @@ import { constants } from "node:fs";
 import { access, open, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
+import { appDir } from "./configuration.js";
+import { createCli } from "trpc-cli";
+import { createTRPCClient, httpLink } from "@trpc/client";
+import type { AppRouter } from "./trpc/routers/index.js";
+import type { RuntimeConfigOverrides } from "@cross-seed/shared/configSchema";
+import type { DaemonDescriptor } from "./configDaemonDiscovery.js";
 import {
-	appDir,
-	getDefaultRuntimeConfig,
-	stripDefaults,
-} from "./configuration.js";
-import { RUNTIME_CONFIG_SCHEMA } from "./configSchema.js";
+	createSettingsService,
+	type SettingsService,
+} from "./settingsService.js";
+import { createSqliteSettingsPersistence } from "./settingsPersistence.js";
+import { settingsApiRouter } from "./settingsApi.js";
 
 const recoveryAdvice =
 	"Stop cross-seed and preserve cross-seed.db and any -wal/-shm files together before recovery. " +
@@ -19,14 +25,11 @@ export function databasePath(): string {
 	return join(appDir(), "cross-seed.db");
 }
 
-// Only absence (or a dead owner) selects offline recovery. A live daemon's
-// authentication, validation, timeout, or transport error must never become a
-// direct SQLite write: a failed response may follow a successful mutation.
-async function daemonRequest(
+// Only absence or a dead owner selects offline recovery. Once selected, a
+// daemon transport/authentication/validation failure never falls back to SQLite.
+async function discoverDaemon(
 	filename: string,
-	procedure: string,
-	input?: unknown,
-): Promise<unknown> {
+): Promise<DaemonDescriptor | undefined> {
 	let raw: string;
 	try {
 		raw = await readFile(join(dirname(filename), "daemon.json"), "utf8");
@@ -35,11 +38,7 @@ async function daemonRequest(
 			return undefined;
 		throw error;
 	}
-	const descriptor = JSON.parse(raw) as {
-		pid: number;
-		url: string | null;
-		token: string;
-	};
+	const descriptor = JSON.parse(raw) as DaemonDescriptor;
 	if (
 		!Number.isSafeInteger(descriptor.pid) ||
 		descriptor.pid <= 0 ||
@@ -60,33 +59,99 @@ async function daemonRequest(
 		throw new Error(
 			"The daemon is running with HTTP disabled. Stop it before using offline settings recovery.",
 		);
-	const response = await fetch(
-		`${descriptor.url.replace(/\/$/, "")}/${procedure}`,
-		{
-			method: input === undefined ? "GET" : "POST",
-			headers: {
-				authorization: `Bearer ${descriptor.token}`,
-				"content-type": "application/json",
-			},
-			body: input === undefined ? undefined : JSON.stringify(input),
-			signal: AbortSignal.timeout(10000),
-			redirect: "error",
+	return descriptor;
+}
+
+function remoteSettings(descriptor: DaemonDescriptor): SettingsService {
+	const client = createTRPCClient<AppRouter>({
+		links: [
+			httpLink({
+				url: descriptor.url!,
+				headers: { authorization: `Bearer ${descriptor.token}` },
+				fetch: (url, options) =>
+					fetch(url, {
+						...options,
+						redirect: "error",
+						signal: AbortSignal.timeout(10000),
+					}),
+			}),
+		],
+	});
+	return {
+		read: (effective = false) => client.config.show.query({ effective }),
+		async save(patch) {
+			await client.config.set.mutate(patch as RuntimeConfigOverrides);
 		},
-	);
-	const envelope = (await response.json()) as {
-		result?: { data?: unknown };
-		error?: { message?: string };
+		async set(key, value) {
+			await client.config.set.mutate({ [key]: value });
+		},
+		async unset(key) {
+			await client.config.unset.mutate({ key });
+		},
+		async replace(settings) {
+			await client.config.replace.mutate(
+				settings as RuntimeConfigOverrides,
+			);
+		},
 	};
-	if (
-		!response.ok ||
-		envelope.error ||
-		!envelope.result ||
-		!("data" in envelope.result)
-	)
-		throw new Error(
-			`Daemon settings request failed: ${envelope.error?.message ?? response.status}. No offline write attempted.`,
-		);
-	return envelope.result.data;
+}
+
+const offlineServices = new Map<string, SettingsService>();
+async function settingsTarget(
+	filename: string,
+): Promise<{ service: SettingsService; mode: "daemon" | "offline" }> {
+	const daemon = await discoverDaemon(filename);
+	if (daemon) return { service: remoteSettings(daemon), mode: "daemon" };
+	const key = resolve(filename);
+	let service = offlineServices.get(key);
+	if (!service) {
+		service = createSettingsService(createSqliteSettingsPersistence(key));
+		offlineServices.set(key, service);
+	}
+	return { service, mode: "offline" };
+}
+
+export async function readSettings(
+	filename: string,
+	effective = false,
+): Promise<Record<string, unknown>> {
+	return (await settingsTarget(filename)).service.read(effective);
+}
+export async function setSetting(
+	filename: string,
+	key: string,
+	value: unknown,
+): Promise<"daemon" | "offline"> {
+	const { service, mode } = await settingsTarget(filename);
+	await service.set(key, value);
+	return mode;
+}
+export async function unsetSetting(
+	filename: string,
+	key: string,
+): Promise<"daemon" | "offline"> {
+	const { service, mode } = await settingsTarget(filename);
+	await service.unset(key);
+	return mode;
+}
+export async function exportSettings(
+	filename: string,
+	destination: string,
+): Promise<void> {
+	await writeFile(
+		destination,
+		JSON.stringify(await readSettings(filename), null, 2) + "\n",
+		{ flag: "wx", mode: 0o600 },
+	);
+}
+export async function importSettings(
+	filename: string,
+	source: string,
+): Promise<"daemon" | "offline"> {
+	const input: unknown = JSON.parse(await readFile(source, "utf8"));
+	const { service, mode } = await settingsTarget(filename);
+	await service.replace(input);
+	return mode;
 }
 
 async function openExisting(
@@ -95,166 +160,6 @@ async function openExisting(
 ): Promise<DatabaseSync> {
 	await access(filename, constants.F_OK);
 	return new DatabaseSync(filename, { readOnly });
-}
-
-function readOverrides(connection: DatabaseSync): Record<string, unknown> {
-	const row = connection
-		.prepare("SELECT settings_json FROM settings LIMIT 1")
-		.get();
-	if (row?.settings_json == null)
-		throw new Error(
-			"No v7 settings found. Start cross-seed once to initialize or migrate your configuration.",
-		);
-	const parsed: unknown = JSON.parse(String(row.settings_json));
-	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-		throw new Error(
-			"Stored settings must be a JSON object. Use config import with a valid settings export to replace them.",
-		);
-	return parsed as Record<string, unknown>;
-}
-
-export async function readSettings(
-	filename: string,
-	effective = false,
-): Promise<Record<string, unknown>> {
-	const live = await daemonRequest(filename, "settings.get");
-	if (live !== undefined) {
-		const config = requireObject(requireObject(live).config);
-		return effective
-			? config
-			: stripDefaults(RUNTIME_CONFIG_SCHEMA.strict().parse(config));
-	}
-	const connection = await openExisting(filename);
-	try {
-		const overrides = readOverrides(connection);
-		return effective
-			? { ...getDefaultRuntimeConfig(), ...overrides }
-			: overrides;
-	} finally {
-		connection.close();
-	}
-}
-
-// This deliberately does not start the daemon, migrate the DB, connect clients,
-// or validate filesystem availability: it must work when startup is broken.
-export async function editSettings(
-	filename: string,
-	edit: (settings: Record<string, unknown>) => unknown,
-	replace = false,
-): Promise<void> {
-	const connection = await openExisting(filename, false);
-	try {
-		connection.exec("BEGIN IMMEDIATE");
-		try {
-			const input = edit(replace ? {} : readOverrides(connection));
-			const validated = RUNTIME_CONFIG_SCHEMA.strict().parse({
-				...getDefaultRuntimeConfig(),
-				...requireObject(input),
-			});
-			const json = JSON.stringify(stripDefaults(validated));
-			// Never silently invent the v7 settings schema or import a config.js.
-			const row = connection
-				.prepare("SELECT rowid FROM settings LIMIT 1")
-				.get();
-			if (row)
-				connection
-					.prepare("UPDATE settings SET settings_json = ?")
-					.run(json);
-			else
-				connection
-					.prepare("INSERT INTO settings (settings_json) VALUES (?)")
-					.run(json);
-			connection.exec("COMMIT");
-		} catch (error) {
-			connection.exec("ROLLBACK");
-			throw error;
-		}
-	} finally {
-		connection.close();
-	}
-}
-
-function requireObject(input: unknown): Record<string, unknown> {
-	if (!input || typeof input !== "object" || Array.isArray(input))
-		throw new Error("Settings must be a JSON object.");
-	return input as Record<string, unknown>;
-}
-
-function checkKey(key: string): void {
-	if (!Object.hasOwn(RUNTIME_CONFIG_SCHEMA.shape, key))
-		throw new Error(`Unknown setting: ${key}`);
-}
-
-export async function setSetting(
-	filename: string,
-	key: string,
-	value: unknown,
-): Promise<"daemon" | "offline"> {
-	checkKey(key);
-	if (key === "torznab")
-		throw new Error(
-			"Manage indexers in Settings → Trackers; changing legacy torznab does not update the indexer table. Use db backup to preserve indexers.",
-		);
-	RUNTIME_CONFIG_SCHEMA.shape[
-		key as keyof typeof RUNTIME_CONFIG_SCHEMA.shape
-	].parse(value);
-	if (
-		(await daemonRequest(filename, "settings.save", { [key]: value })) !==
-		undefined
-	)
-		return "daemon";
-	await editSettings(filename, (settings) => ({ ...settings, [key]: value }));
-	return "offline";
-}
-
-export async function unsetSetting(
-	filename: string,
-	key: string,
-): Promise<"daemon" | "offline"> {
-	if (
-		(await daemonRequest(filename, "settings.unset", { key })) !== undefined
-	)
-		return "daemon";
-	await editSettings(filename, (settings) => {
-		if (!Object.hasOwn(settings, key)) checkKey(key);
-		delete settings[key];
-		return settings;
-	});
-	return "offline";
-}
-
-export async function exportSettings(
-	filename: string,
-	destination: string,
-): Promise<void> {
-	const settings = await readSettings(filename);
-	await writeFile(destination, JSON.stringify(settings, null, 2) + "\n", {
-		flag: "wx",
-		mode: 0o600,
-	});
-}
-
-export async function importSettings(
-	filename: string,
-	source: string,
-): Promise<"daemon" | "offline"> {
-	const parsed: unknown = JSON.parse(await readFile(source, "utf8"));
-	const settings = requireObject(parsed);
-	if (Array.isArray(settings.torznab) && settings.torznab.length > 0)
-		throw new Error(
-			"Legacy torznab URLs cannot be imported as settings. Configure indexers in Settings → Trackers, then remove torznab from this JSON. Use db backup to preserve indexers.",
-		);
-	const validated = RUNTIME_CONFIG_SCHEMA.strict().parse({
-		...getDefaultRuntimeConfig(),
-		...settings,
-	});
-	if (
-		(await daemonRequest(filename, "settings.replace", validated)) !==
-		undefined
-	)
-		return "daemon";
-	await editSettings(filename, () => parsed, true);
-	return "offline";
 }
 
 export async function checkDatabase(filename: string): Promise<void> {
@@ -293,6 +198,14 @@ export async function backupDatabase(
 	}
 }
 
+export function reportConfigError(error: unknown): void {
+	const message = error instanceof Error ? error.message : String(error);
+	console.error(message);
+	if (/malformed|not a database|integrity check failed/i.test(message))
+		console.error(recoveryAdvice);
+	process.exitCode = 1;
+}
+
 function action(
 	run: (...args: never[]) => Promise<void>,
 ): (...args: never[]) => Promise<void> {
@@ -300,14 +213,7 @@ function action(
 		try {
 			await run(...args);
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : String(error);
-			console.error(message);
-			if (
-				/malformed|not a database|integrity check failed/i.test(message)
-			)
-				console.error(recoveryAdvice);
-			process.exitCode = 1;
+			reportConfigError(error);
 		}
 	};
 }
@@ -320,60 +226,66 @@ function reportSave(mode: "daemon" | "offline"): void {
 	);
 }
 
+/** Generated commands are adapters over the same router used by the daemon. */
+export function createConfigCommand(
+	filename = databasePath(),
+	argv?: string[],
+): Command {
+	const read = async (effective?: boolean) =>
+		(await settingsTarget(filename)).service.read(effective);
+	const mutate = async (
+		operation: (service: SettingsService) => Promise<void>,
+	) => {
+		const { service, mode } = await settingsTarget(filename);
+		await operation(service);
+		reportSave(mode);
+	};
+	const settingsService: SettingsService = {
+		read,
+		save: (patch) => mutate((service) => service.save(patch)),
+		set: (key, value) => mutate((service) => service.set(key, value)),
+		unset: (key) => mutate((service) => service.unset(key)),
+		replace: (settings) => mutate((service) => service.replace(settings)),
+	};
+	const command = createCli({
+		router: settingsApiRouter,
+		name: "config",
+		jsonInput: "auto",
+		description:
+			"Inspect and edit v7 settings through the daemon or offline recovery. Output may contain secrets.",
+		context: { settingsService },
+	}).buildProgram({
+		argv,
+		prompts: false,
+		logger: {
+			info: (value) => console.log(JSON.stringify(value, null, 2)),
+			error: (error) => console.error(error),
+		},
+	}) as Command;
+	// Commander's help is presentation text, while procedure results are JSON.
+	const configureHelp = (cmd: Command) => {
+		cmd.configureOutput({
+			writeOut: (text) => {
+				process.stdout.write(text);
+			},
+			writeErr: (text) => {
+				process.stderr.write(text);
+			},
+		});
+		for (const child of cmd.commands) configureHelp(child);
+	};
+	configureHelp(command);
+	return command;
+}
+
 export function registerConfigCommands(program: Command): void {
-	const config = program
-		.command("config")
-		.description(
-			"Inspect or repair stored v7 settings without starting the daemon. JSON output may contain secrets.",
-		)
-		.addHelpText(
-			"after",
-			"\nA running local daemon applies changes through its settings API. With the daemon stopped, edits use SQLite; start it afterward. Values use runtime JSON types (durations are milliseconds).\nExports contain settings only, not indexers/users/history; use db backup for a complete snapshot.",
-		);
-	config
-		.command("show")
-		.description("Print persisted overrides as JSON (including secrets)")
-		.option("--effective", "Include defaults")
-		.action(
-			action(async (options: { effective?: boolean }) => {
-				console.log(
-					JSON.stringify(
-						await readSettings(databasePath(), options.effective),
-						null,
-						2,
-					),
-				);
-			}),
-		);
-	config
-		.command("get <key>")
-		.description("Print one effective setting as JSON")
-		.action(
-			action(async (key: string) => {
-				checkKey(key);
-				const settings = await readSettings(databasePath(), true);
-				console.log(JSON.stringify(settings[key] ?? null));
-			}),
-		);
-	config
-		.command("set <key> <json>")
-		.description("Set one setting to a JSON value")
-		.action(
-			action(async (key: string, json: string) => {
-				const value: unknown = JSON.parse(json);
-				const mode = await setSetting(databasePath(), key, value);
-				reportSave(mode);
-			}),
-		);
-	config
-		.command("unset <key>")
-		.description("Remove an override and restore its default")
-		.action(
-			action(async (key: string) => {
-				const mode = await unsetSetting(databasePath(), key);
-				reportSave(mode);
-			}),
-		);
+	const config = createConfigCommand();
+	program.addCommand(config);
+	config.addHelpText(
+		"after",
+		"\nA running local daemon applies changes through its settings API. Offline edits use the same validation and change settings only. Durations use milliseconds unless stated otherwise. Listener changes require restart.\nExports contain settings only, not indexers/users/history; use db backup for a complete snapshot.",
+	);
+
 	config
 		.command("export <file>")
 		.description(

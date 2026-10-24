@@ -21,7 +21,8 @@ async function createSettingsIndexingEnv(): Promise<SettingsIndexingEnv> {
 	vi.resetModules();
 
 	const { db } = await import("../src/db.js");
-	const { createAppDirHierarchy } = await import("../src/configuration.js");
+	const { createAppDirHierarchy, getDefaultRuntimeConfig } =
+		await import("../src/configuration.js");
 	const { initializeLogger } = await import("../src/logger.js");
 	const { appRouter } = await import("../src/trpc/routers/index.js");
 	const { Action } = await import("../src/constants.js");
@@ -29,6 +30,8 @@ async function createSettingsIndexingEnv(): Promise<SettingsIndexingEnv> {
 	createAppDirHierarchy();
 	initializeLogger({ verbose: false });
 	await db.migrate.latest();
+	const { setDbConfig } = await import("../src/dbConfig.js");
+	await setDbConfig(getDefaultRuntimeConfig());
 
 	const { destroyDataDirWatchers } = await import("../src/dataFiles.js");
 	return { db, appRouter, Action, destroyDataDirWatchers };

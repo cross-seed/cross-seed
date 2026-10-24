@@ -12,7 +12,6 @@ import {
 	unsetSetting,
 	importSettings,
 } from "../src/configCli.js";
-import { getDefaultRuntimeConfig } from "../src/configuration.js";
 
 let server: Server | undefined;
 let directory: string;
@@ -47,7 +46,7 @@ async function setup(status = 200) {
 				chunks.push(Buffer.from(chunk as Uint8Array));
 			const body = Buffer.concat(chunks).toString();
 			calls.push({
-				url: req.url!,
+				url: req.url!.split("?")[0],
 				body: body ? JSON.parse(body) : undefined,
 				authorization: req.headers.authorization,
 			});
@@ -59,16 +58,20 @@ async function setup(status = 200) {
 								result: {
 									data:
 										req.method === "GET"
-											? {
-													config: {
-														...getDefaultRuntimeConfig(),
-														maxDataDepth: 7,
-													},
-												}
+											? { maxDataDepth: 7 }
 											: { success: true },
 								},
 							}
-						: { error: { message: "rejected by daemon" } },
+						: {
+								error: {
+									message: "rejected by daemon",
+									code: -32603,
+									data: {
+										code: "INTERNAL_SERVER_ERROR",
+										httpStatus: status,
+									},
+								},
+							},
 				),
 			);
 		})().catch((e) => res.destroy(e as Error));
@@ -96,10 +99,10 @@ it("routes reads, patches, unset and replacement through the daemon without writ
 	await writeFile(input, '{"maxDataDepth":5}');
 	expect(await importSettings(filename, input)).toBe("daemon");
 	expect(calls.map((c) => c.url)).toEqual([
-		"/custom/api/trpc/settings.get",
-		"/custom/api/trpc/settings.save",
-		"/custom/api/trpc/settings.unset",
-		"/custom/api/trpc/settings.replace",
+		"/custom/api/trpc/config.show",
+		"/custom/api/trpc/config.set",
+		"/custom/api/trpc/config.unset",
+		"/custom/api/trpc/config.replace",
 	]);
 	expect(calls.every((c) => c.authorization === "Bearer local-secret")).toBe(
 		true,
@@ -107,7 +110,6 @@ it("routes reads, patches, unset and replacement through the daemon without writ
 	expect(calls[1].body).toEqual({ maxDataDepth: 4 });
 	expect(calls[2].body).toEqual({ key: "torrentDir" });
 	expect(calls[3].body).toEqual({
-		...getDefaultRuntimeConfig(),
 		maxDataDepth: 5,
 	});
 	const db = new DatabaseSync(filename, { readOnly: true });
@@ -122,7 +124,7 @@ it.each([401, 400, 500])(
 		const { filename } = await setup(status);
 		const before = await readFile(filename);
 		await expect(setSetting(filename, "maxDataDepth", 4)).rejects.toThrow(
-			"No offline write attempted",
+			"rejected by daemon",
 		);
 		expect(await readFile(filename)).toEqual(before);
 	},

@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
 	backupDatabase,
 	checkDatabase,
-	editSettings,
 	exportSettings,
 	importSettings,
 	readSettings,
@@ -72,7 +71,12 @@ describe("offline settings and database recovery CLI", () => {
 			'{"maxDataDepth":0,"unknownOption":true}',
 		);
 		await expect(unsetSetting(filename, "maxDataDepth")).rejects.toThrow();
-		await editSettings(filename, () => ({ maxDataDepth: 3 }));
+		const repair = join(
+			(await import("node:path")).dirname(filename),
+			"repair.json",
+		);
+		await writeFile(repair, JSON.stringify({ maxDataDepth: 3 }));
+		await importSettings(filename, repair);
 		await unsetSetting(filename, "maxDataDepth");
 		expect((await readSettings(filename, true)).maxDataDepth).toBe(2);
 	});
