@@ -27,7 +27,8 @@
 		"format": "prettier --write '{src,tests}/{**/*,*}.{js,ts,cjs,mjs}' package.json"
 	},
 	"bundledDependencies": [
-		"@cross-seed/shared"
+		"@cross-seed/shared",
+		"zod"
 	],
 	"repository": {
 		"type": "git",
@@ -63,6 +64,7 @@
 		"yarn": false
 	},
 	"bundleDependencies": [
-		"@cross-seed/shared"
+		"@cross-seed/shared",
+		"zod"
 	]
 }

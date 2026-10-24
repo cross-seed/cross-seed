@@ -47,8 +47,9 @@ jobs:
             - name: Smoke test npm tarball
               run: |
                   set -euo pipefail
-                  npm -C "$GITHUB_WORKSPACE" install "file:cross-seed.tgz" --no-save --omit=dev
-                  node "$GITHUB_WORKSPACE/node_modules/cross-seed/dist/cmd.js" --version
+                  install_prefix="$(mktemp -d)"
+                  npm install --global --prefix "$install_prefix" "$GITHUB_WORKSPACE/cross-seed.tgz"
+                  "$install_prefix/bin/cross-seed" --version
             - name: Upload npm tarball
               uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
               with:

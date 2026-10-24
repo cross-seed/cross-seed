@@ -43,3 +43,12 @@ for (const bundle of bundles) {
 	);
 	fs.cpSync(distDir, path.join(destDir, "dist"), { recursive: true });
 }
+
+// Shared's runtime dependency is hoisted above the package directory in the
+// workspace. Stage it explicitly so global installs receive a complete bundle.
+const zodDir = path.dirname(
+	fileURLToPath(import.meta.resolve("zod/package.json")),
+);
+const bundledZodDir = packageDirForName("zod");
+fs.rmSync(bundledZodDir, { recursive: true, force: true });
+fs.cpSync(zodDir, bundledZodDir, { recursive: true });
