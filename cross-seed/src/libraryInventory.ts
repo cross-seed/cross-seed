@@ -137,7 +137,7 @@ interface LibraryScanRow {
 
 interface LibraryItemRow {
 	id: number;
-	source: string;
+	source: LibraryItemSource;
 	source_instance: string | null;
 	source_key: string;
 	client_host: string | null;
@@ -220,9 +220,15 @@ function deserializeInventoryItem(
 	row: LibraryItemRow,
 	files?: LibraryInventoryFile[],
 ): LibraryInventoryItem {
+	// Client inventory stores its complete file list on the item. library_file
+	// tracks filesystem inventory and is not populated by client scans.
+	const clientFiles =
+		row.source === LibraryItemSource.CLIENT
+			? (parseJsonArray<LibraryInventoryFile>(row.files) ?? [])
+			: undefined;
 	return {
 		id: row.id,
-		source: row.source as LibraryItemSourceValue,
+		source: row.source,
 		sourceInstance: row.source_instance,
 		sourceKey: row.source_key,
 		clientHost: row.client_host,
@@ -240,8 +246,8 @@ function deserializeInventoryItem(
 		lastSeenAt: timestampToISOString(row.last_seen_at),
 		lastIndexedAt: timestampToISOString(row.last_indexed_at),
 		updatedAt: timestampToISOString(row.updated_at),
-		fileCount: Number(row.file_count ?? 0),
-		...(files ? { files } : {}),
+		fileCount: clientFiles?.length ?? Number(row.file_count ?? 0),
+		...(files ? { files: clientFiles ?? files } : {}),
 	};
 }
 
@@ -658,12 +664,18 @@ export async function getLibraryScanStatuses(
 					}
 				});
 			const [itemCount, fileCount] = (await Promise.all([
-				itemCountQuery.count<CountRow>({
+				itemCountQuery.clone().count<CountRow>({
 					count: "*",
 				}),
-				fileCountQuery.count<CountRow>({
-					count: "*",
-				}),
+				(scan.source as LibraryItemSource) === LibraryItemSource.CLIENT
+					? itemCountQuery
+							.clone()
+							.select(
+								db.raw(
+									"coalesce(sum(json_array_length(files)), 0) as count",
+								),
+							)
+					: fileCountQuery.count<CountRow>({ count: "*" }),
 			])) as unknown as [CountRow[], CountRow[]];
 			return {
 				source: scan.source as LibraryItemSource,

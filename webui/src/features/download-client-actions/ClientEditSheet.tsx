@@ -170,7 +170,11 @@ export default function ClientEditSheet({
               <div className="grid gap-3">
                 <form.AppField name="client">
                   {(field) => (
-                    <field.SelectField label="Client" options={CLIENTS} />
+                    <field.SelectField
+                      label="Client"
+                      options={CLIENTS}
+                      placeholder="Select a client"
+                    />
                   )}
                 </form.AppField>
               </div>

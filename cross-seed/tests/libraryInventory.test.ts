@@ -487,6 +487,99 @@ describe.sequential("library inventory sync", () => {
 		});
 	});
 
+	it("reads client file counts and details from persisted items across cached scans", async () => {
+		const files = [
+			{ name: "episode.mkv", path: "show/episode.mkv", length: 100 },
+			{ name: "extras.txt", path: "show/extras.txt", length: 10 },
+		];
+		const searchee = {
+			infoHash: "hash-a",
+			clientHost: "client-a",
+			name: "Show.S01E01",
+			title: "Show S01E01",
+			files,
+			length: 110,
+			savePath: "/downloads",
+			trackers: [],
+		};
+		await env.updateSearcheeClientDB(
+			"client-a",
+			[searchee],
+			new Set(["hash-a"]),
+		);
+		await env.updateSearcheeClientDB(
+			"client-b",
+			[{ ...searchee, clientHost: "client-b" }],
+			new Set(["hash-a"]),
+		);
+		// This is also the storage layout produced before the count fix: client
+		// files exist only in library_item, with no library_file rows to backfill.
+		expect(await env.db("library_file")).toHaveLength(0);
+		const query = {
+			source: env.inventory.LibraryItemSource.CLIENT,
+			sourceInstance: "client-a",
+		};
+		expect(
+			(await env.inventory.listLibraryItems(query)).items[0],
+		).toMatchObject({ fileCount: 2 });
+		expect(
+			(
+				await env.inventory.listLibraryItems({
+					...query,
+					includeFiles: true,
+				})
+			).items[0],
+		).toMatchObject({ fileCount: 2, files });
+		expect(
+			(await env.inventory.getLibraryScanStatuses(query))[0],
+		).toMatchObject({ activeItems: 1, activeFiles: 2 });
+
+		await env.updateSearcheeClientDB("client-a", [], new Set(["hash-a"]));
+		expect(
+			(
+				await env.inventory.listLibraryItems({
+					...query,
+					includeFiles: true,
+				})
+			).items[0],
+		).toMatchObject({ fileCount: 2, files });
+		expect(
+			(await env.inventory.getLibraryScanStatuses(query))[0],
+		).toMatchObject({ activeItems: 1, activeFiles: 2 });
+
+		await env.updateSearcheeClientDB(
+			"client-a",
+			[{ ...searchee, files: [files[0]], length: 100 }],
+			new Set(["hash-a"]),
+		);
+		expect(
+			(
+				await env.inventory.listLibraryItems({
+					...query,
+					includeFiles: true,
+				})
+			).items[0],
+		).toMatchObject({ fileCount: 1, files: [files[0]] });
+		expect(
+			(await env.inventory.getLibraryScanStatuses(query))[0],
+		).toMatchObject({ activeItems: 1, activeFiles: 1 });
+
+		await env.updateSearcheeClientDB("client-a", [], new Set());
+		expect(
+			(await env.inventory.listLibraryItems(query)).items,
+		).toHaveLength(0);
+		expect(
+			(await env.inventory.getLibraryScanStatuses(query))[0],
+		).toMatchObject({ activeItems: 0, activeFiles: 0 });
+		expect(
+			(
+				await env.inventory.getLibraryScanStatuses({
+					sourceInstance: "client-b",
+				})
+			)[0],
+		).toMatchObject({ activeFiles: 2 });
+	});
+
 	it("dual writes client searchees and tombstones removed client items", async () => {
 		await env.updateSearcheeClientDB(
 			"client-a",

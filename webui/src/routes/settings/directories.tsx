@@ -126,13 +126,11 @@ function DirectorySettings() {
                                         subfield.handleChange(e.target.value)
                                       }
                                     />
-                                    {field.state.value.length > 1 && (
-                                      <DeleteOption
-                                        onClick={() => {
-                                          field.removeValue(index);
-                                        }}
-                                      />
-                                    )}
+                                    <DeleteOption
+                                      onClick={() => {
+                                        field.removeValue(index);
+                                      }}
+                                    />
                                   </div>
 
                                   {subfield.state.meta.isTouched &&
