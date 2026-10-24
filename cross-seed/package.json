@@ -58,6 +58,7 @@
 		"zod": "^4.6.7"
 	},
 	"devDependencies": {
+		"@types/ws": "^8.18.2",
 		"bencode": "^2.0.1",
 		"fast-xml-parser": "^5.7.0",
 		"rimraf": "^6.1.3"
