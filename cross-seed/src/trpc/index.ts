@@ -1,3 +1,6 @@
+import { daemonSettingsService } from "../daemonSettings.js";
+import type { SettingsService } from "../settingsService.js";
+import { validSettingsCliToken } from "../configDaemonDiscovery.js";
 import { initTRPC, TRPCError } from "@trpc/server";
 import type { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify";
 import { validateSession } from "../userAuth.js";
@@ -16,6 +19,7 @@ type AuthenticatedUser = {
 };
 
 export interface Context {
+	settingsService?: SettingsService;
 	req: CreateFastifyContextOptions["req"];
 	res: CreateFastifyContextOptions["res"];
 	user: AuthenticatedUser | null;
@@ -43,6 +47,10 @@ export async function createContext({
 	}
 
 	return {
+		settingsService:
+			user || validSettingsCliToken(req.headers.authorization)
+				? daemonSettingsService
+				: undefined,
 		req,
 		res,
 		user,

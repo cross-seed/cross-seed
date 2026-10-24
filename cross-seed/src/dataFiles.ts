@@ -1,3 +1,4 @@
+import { replaceEnsembleEntries } from "./ensemble.js";
 import { FSWatcher, watch } from "fs";
 import { readdir, readFile, stat } from "fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "path";
@@ -67,12 +68,15 @@ const modifiedPaths: Map<string, Set<string>> = new Map();
 const modifiedPathTimes: Map<string, Map<string, number>> = new Map();
 const STABILITY_WINDOW_MS = 60_000;
 const WATCHER_RETRY_MS = 1000;
+const WATCHER_ERROR_LOG_INTERVAL_MS = 60_000;
+const watcherErrorTimes = new Map<string, number>();
 const failedDataDirs = new Set<string>();
 const watcherRetries = new Map<string, NodeJS.Timeout>();
 
 export function destroyDataDirWatchers(): void {
 	for (const timer of watcherRetries.values()) clearTimeout(timer);
 	watcherRetries.clear();
+	watcherErrorTimes.clear();
 	failedDataDirs.clear();
 	for (const watcher of watchers.values()) watcher.close();
 	watchers.clear();
@@ -92,16 +96,30 @@ function getDataSourceInstance(path: string, dataDirs: string[]): string {
 	);
 }
 
-function createWatcher(dataDir: string): void {
+function createWatcher(
+	dataDir: string,
+	onRecovery?: () => Promise<void>,
+	recovering = false,
+): void {
 	const retry = (e: Error) => {
-		logger.error(`Retrying watcher for dataDir ${dataDir}: ${e.message}`);
-		logger.debug(e);
+		const lastError = watcherErrorTimes.get(dataDir);
+		if (
+			lastError === undefined ||
+			Date.now() - lastError >= WATCHER_ERROR_LOG_INTERVAL_MS
+		) {
+			logger.error(
+				`Retrying watcher for dataDir ${dataDir}: ${e.message}`,
+			);
+			logger.debug(e);
+			watcherErrorTimes.set(dataDir, Date.now());
+		}
+		failedDataDirs.add(dataDir);
 		watchers.get(dataDir)?.close();
 		watchers.delete(dataDir);
 		if (watcherRetries.has(dataDir)) return;
 		const timer = setTimeout(() => {
 			watcherRetries.delete(dataDir);
-			createWatcher(dataDir);
+			createWatcher(dataDir, onRecovery, true);
 		}, WATCHER_RETRY_MS);
 		timer.unref();
 		watcherRetries.set(dataDir, timer);
@@ -124,6 +142,18 @@ function createWatcher(dataDir: string): void {
 		watcher.on("error", (e) => {
 			if (watchers.get(dataDir) === watcher) retry(e);
 		});
+		if (recovering) {
+			logger.info({
+				label: Label.INDEX,
+				message: `Watcher recovered for dataDir ${dataDir}; refreshing inventory`,
+			});
+			if (onRecovery)
+				onRecovery().catch((error: unknown) => {
+					logger.error(
+						`Unable to refresh recovered dataDir ${dataDir}: ${errorMessage(error)}`,
+					);
+				});
+		}
 	} catch (e) {
 		retry(e as Error);
 	}
@@ -131,6 +161,7 @@ function createWatcher(dataDir: string): void {
 
 export async function indexDataDirs(options: {
 	startup: boolean;
+	onWatcherRecovery?: () => Promise<void>;
 }): Promise<void> {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
 	if (options.startup) destroyDataDirWatchers();
@@ -141,8 +172,11 @@ export async function indexDataDirs(options: {
 		if (options.startup) {
 			modifiedPaths.set(dataDir, new Set());
 			modifiedPathTimes.set(dataDir, new Map());
-			createWatcher(dataDir);
+			createWatcher(dataDir, options.onWatcherRecovery);
 		}
+		// Consume this scan request before awaiting: a watcher recovery during the
+		// scan must remain pending for the scheduler's next pass.
+		failedDataDirs.delete(dataDir);
 		const scan = await beginLibraryScan({
 			source: LibraryItemSource.DATA,
 			sourceInstance: dataDir,
@@ -177,7 +211,6 @@ export async function indexDataDirs(options: {
 					),
 				},
 			);
-			failedDataDirs.delete(dataDir);
 			logger.info({
 				label: Label.INDEX,
 				message: `Validated ${count} entries from dataDir ${dataDir}`,
@@ -322,12 +355,7 @@ async function indexDataPaths(
 	await inBatches(dataRows, async (batch) => {
 		await db("data").insert(batch).onConflict("path").merge();
 	});
-	await inBatches(ensembleRows, async (batch) => {
-		await db("ensemble")
-			.insert(batch)
-			.onConflict(["client_host", "path"])
-			.merge();
-	});
+	await replaceEnsembleEntries(db, ensembleRows);
 	const itemsBySourceInstance = new Map<string | null, LibraryItemInput[]>();
 	for (const item of libraryItems) {
 		const sourceInstance = item.sourceInstance ?? null;

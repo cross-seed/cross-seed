@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import chalk from "chalk";
 import { Option, program } from "commander";
+import { registerConfigCommands, reportConfigError } from "./configCli.js";
 import { setTimeout as delay } from "node:timers/promises";
 import { getApiKey, resetApiKey, setApiKey } from "./auth.js";
 import { PROGRAM_NAME, PROGRAM_VERSION } from "./constants.js";
@@ -172,9 +173,6 @@ program
 				options.basePath,
 				startStartupWork!,
 			);
-			if (!options.port) {
-				startStartupWork!();
-			}
 			// technically this will never resolve, but it's necessary to keep the process running
 			await Promise.all([serverPromise, startupWorkPromise]);
 		}),
@@ -241,10 +239,18 @@ program
 		}),
 	);
 
+registerConfigCommands(program);
+
 program.showHelpAfterError("(add --help for additional information)");
 
 async function main() {
-	await program.parseAsync();
+	try {
+		await program.parseAsync();
+	} catch (error) {
+		if (["config", "db"].includes(process.argv[2]))
+			reportConfigError(error);
+		else throw error;
+	}
 }
 
 await main();

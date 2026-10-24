@@ -1,3 +1,4 @@
+import { settingsApiRouter } from "../../settingsApi.js";
 import { router } from "../index.js";
 import { authRouter } from "./auth.js";
 import { settingsRouter } from "./settings.js";
@@ -14,6 +15,7 @@ import { libraryRouter } from "./library.js";
 export const appRouter = router({
 	auth: authRouter,
 	settings: settingsRouter,
+	config: settingsApiRouter,
 	logs: logsRouter,
 	jobs: jobsRouter,
 	stats: statsRouter,

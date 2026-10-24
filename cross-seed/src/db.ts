@@ -1,3 +1,5 @@
+import { pruneMissingFileEntries } from "./ensembleCleanup.js";
+import { replaceEnsembleEntries } from "./ensemble.js";
 import { unlink } from "fs/promises";
 import knex from "knex";
 import type { Knex } from "knex";
@@ -20,13 +22,11 @@ import {
 	snatchHistory,
 } from "./torrent.js";
 import {
-	filterAsync,
 	flatMapAsync,
 	errorMessage,
 	getLogString,
 	humanReadableDate,
 	inBatches,
-	notExists,
 	yieldToEventLoop,
 } from "./utils.js";
 
@@ -168,12 +168,7 @@ export async function cleanupDB(): Promise<void> {
 			async (searchee) =>
 				(await cacheEnsembleTorrentEntry(searchee)) ?? [],
 		);
-		await inBatches(ensembleRows, async (batch) => {
-			await db("ensemble")
-				.insert(batch)
-				.onConflict(["client_host", "path"])
-				.merge();
-		});
+		await replaceEnsembleEntries(db, ensembleRows);
 	})();
 	await (async () => {
 		if (!dataDirs.length) return;
@@ -181,16 +176,7 @@ export async function cleanupDB(): Promise<void> {
 			label: Label.CLEANUP,
 			message: "Pruning deleted dataDirs entries...",
 		});
-		const deletedPaths = await filterAsync(
-			(await db<{ path: string }>("data").select("path")).map(
-				(e) => e.path,
-			),
-			(p) => notExists(p),
-		);
-		await inBatches(deletedPaths, async (batch) => {
-			await db("data").whereIn("path", batch).del();
-			await db("ensemble").whereIn("path", batch).del();
-		});
+		await pruneMissingFileEntries(db, "data");
 	})();
 	await (async () => {
 		if (!seasonFromEpisodes) return;
@@ -198,16 +184,7 @@ export async function cleanupDB(): Promise<void> {
 			label: Label.CLEANUP,
 			message: "Pruning deleted ensemble entries...",
 		});
-		const deletedPaths = await filterAsync(
-			(await db<{ path: string }>("ensemble").select("path")).map(
-				(e) => e.path,
-			),
-			(p) => notExists(p),
-		);
-		await inBatches(deletedPaths, async (batch) => {
-			await db("data").whereIn("path", batch).del();
-			await db("ensemble").whereIn("path", batch).del();
-		});
+		await pruneMissingFileEntries(db, "ensemble");
 	})();
 	(() => {
 		logger.verbose({

@@ -15,6 +15,7 @@ import { useFormValidation } from "@/contexts/Form/use-form-validation-context";
 type SelectFieldProps<T extends Record<string, string>> = {
   className?: string;
   label: string;
+  placeholder?: string;
   options: T;
 };
 
@@ -36,6 +37,7 @@ function SelectField<T extends Record<string, string>>({
   className,
   label,
   options,
+  placeholder = `Select ${label.toLowerCase()}`,
 }: SelectFieldProps<T>) {
   const field = useFieldContext();
   const { isFieldRequired } = useFormValidation();
@@ -54,7 +56,7 @@ function SelectField<T extends Record<string, string>>({
         onValueChange={(value) => field.handleChange(value)}
       >
         <SelectTrigger className="w-full shadow-none">
-          <SelectValue placeholder="Select a link type" />
+          <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
           {Object.values(options).map((option) => (
