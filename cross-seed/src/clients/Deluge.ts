@@ -62,8 +62,7 @@ interface TorrentInfo {
 }
 
 type TorrentInfoField = keyof TorrentInfo;
-type UpdateUiFilter = { hash?: string } & Record<string, unknown>;
-type UpdateUiParams = [fields: TorrentInfoField[], filter: UpdateUiFilter];
+type StatusQuery = [fields: TorrentInfoField[], filter: { hash?: string }];
 
 enum DelugeErrorCode {
 	NO_AUTH = 1,
@@ -84,7 +83,7 @@ type InjectData = [
 ];
 type WebHostList = [string, string, number, string][];
 type ErrorType = { message: string; code?: DelugeErrorCode };
-type TorrentStatus = { torrents?: Record<string, TorrentInfo> };
+type TorrentStatus = Record<string, TorrentInfo>;
 
 type DelugeJSON<ResultType> = {
 	result?: ResultType;
@@ -101,7 +100,10 @@ export default class Deluge implements TorrentClient {
 	private delugeCookie: string | null = null;
 	readonly delugeLabel = TORRENT_TAG;
 	readonly delugeLabelSuffix = TORRENT_CATEGORY_SUFFIX;
-	private isLabelEnabled: boolean;
+	private isLabelEnabled = false;
+	private authPromise: Promise<void> | null = null;
+	private connectionPromise: Promise<void> | null = null;
+	private connectionGeneration = 0;
 	private delugeRequestId: number = 0;
 
 	constructor(
@@ -127,7 +129,6 @@ export default class Deluge implements TorrentClient {
 			label: this.label,
 			message: `Logged in successfully${this.readonly ? " (readonly)" : ""}`,
 		});
-		await this.call<boolean>("auth.delete_session", [], 0);
 		if (!torrentDir) return;
 		if (!(await readdir(torrentDir)).some((f) => f.endsWith(".state"))) {
 			throw new CrossSeedError(
@@ -140,6 +141,20 @@ export default class Deluge implements TorrentClient {
 	 * connects and authenticates to the webui
 	 */
 	async authenticate(): Promise<void> {
+		if (this.authPromise) return this.authPromise;
+		if (this.delugeCookie) return;
+		this.authPromise = this.doAuthenticate()
+			.catch((error: unknown) => {
+				this.delugeCookie = null;
+				throw error;
+			})
+			.finally(() => {
+				this.authPromise = null;
+			});
+		return this.authPromise;
+	}
+
+	private async doAuthenticate(): Promise<void> {
 		const { href, password } = extractCredentialsFromUrl(
 			this.url,
 		).unwrapOrThrow(
@@ -161,7 +176,7 @@ export default class Deluge implements TorrentClient {
 				),
 			);
 
-			if (!authResponse) {
+			if (!authResponse || !this.delugeCookie) {
 				throw new CrossSeedError(
 					`[${this.label}] Reached Deluge, but failed to authenticate: ${href}`,
 				);
@@ -169,56 +184,72 @@ export default class Deluge implements TorrentClient {
 		} catch (networkError) {
 			throw new CrossSeedError(errorMessage(networkError));
 		}
-		const isConnectedResponse = await this.call<boolean>(
-			"web.connected",
-			[],
-			0,
-		);
-		if (isConnectedResponse.isOk() && !isConnectedResponse.unwrap()) {
-			logger.warn({
-				label: this.label,
-				message:
-					"Deluge WebUI disconnected from daemon...attempting to reconnect.",
-			});
-			const webuiHostList = (
-				await this.call<WebHostList>("web.get_hosts", [], 0)
-			).unwrapOrThrow(
-				new Error(
-					`[${this.label}] failed to get host-list for reconnect`,
-				),
-			);
-			const connectResponse = await this.call<undefined>(
-				"web.connect",
-				[webuiHostList[0][0]],
-				0,
-			);
-			if (connectResponse.isOk() && connectResponse.unwrap()) {
-				logger.info({
-					label: this.label,
-					message: "Deluge WebUI connected to the daemon.",
-				});
-			} else {
-				throw new CrossSeedError(
-					`[${this.label}] Unable to connect WebUI to Deluge daemon. Connect to the WebUI to resolve this.`,
-				);
-			}
-		}
+		await this.ensureDaemonConnected();
 		this.isLabelEnabled = await this.labelEnabled();
 	}
 
-	// web.update_ui method (typed params + forced return)
-	private async call(
-		method: "web.update_ui",
-		params: UpdateUiParams,
-		retries?: number,
-	): Promise<Result<TorrentStatus, ErrorType>>;
+	private async ensureDaemonConnected(): Promise<void> {
+		if (!this.connectionPromise) {
+			this.connectionPromise = this.connectDaemon().finally(() => {
+				this.connectionPromise = null;
+			});
+		}
+		return this.connectionPromise;
+	}
 
-	// standard RPC method fallback
-	private async call<ResultType>(
-		method: string,
-		params: unknown[],
-		retries?: number,
-	): Promise<Result<ResultType, ErrorType>>;
+	private async connectDaemon(): Promise<void> {
+		const connected = (
+			await this.call<boolean>("web.connected", [], 0)
+		).unwrapOrThrow(
+			new Error("Failed to read Deluge daemon connection state"),
+		);
+		if (connected) return;
+		const hosts = (
+			await this.call<WebHostList>("web.get_hosts", [], 0)
+		).unwrapOrThrow(new Error("Failed to read Deluge hosts"));
+		if (!hosts.length)
+			throw new CrossSeedError(
+				`[${this.label}] No Deluge daemon is configured in the WebUI.`,
+			);
+		const result = await this.call<string[] | null>(
+			"web.connect",
+			[hosts[0][0]],
+			0,
+		);
+		const afterConnect = await this.call<boolean>("web.connected", [], 0);
+		if (result.isErr() || afterConnect.isErr() || !afterConnect.unwrap()) {
+			throw new CrossSeedError(
+				`[${this.label}] Unable to connect WebUI to Deluge daemon.`,
+			);
+		}
+		this.connectionGeneration++;
+	}
+
+	// Core status with diff=false bypasses both SessionProxy and daemon diff state.
+	// Single-torrent lookups avoid fetching the entire client's inventory.
+	private async getTorrents([fields, filter]: StatusQuery): Promise<
+		Result<TorrentStatus, ErrorType>
+	> {
+		if (filter.hash) {
+			const hash = filter.hash.toLowerCase();
+			const response = await this.call<TorrentInfo>(
+				"core.get_torrent_status",
+				[hash, fields, false],
+			);
+			return response.mapOk((torrent) => {
+				if (!torrent || typeof torrent !== "object")
+					throw new Error(
+						"Missing torrent status in Deluge response",
+					);
+				return Object.keys(torrent).length ? { [hash]: torrent } : {};
+			});
+		}
+		return this.call<TorrentStatus>("core.get_torrents_status", [
+			{},
+			fields,
+			false,
+		]);
+	}
 
 	/**
 	 * ensures authentication and sends JSON-RPC calls to deluge
@@ -232,6 +263,22 @@ export default class Deluge implements TorrentClient {
 		params: unknown[],
 		retries = 1,
 	): Promise<Result<ResultType, ErrorType>> {
+		if (retries > 0 && method !== "auth.login") {
+			await this.authenticate();
+			// Deluge 2.0 can leave core requests unanswered while disconnected.
+			// Check the connection before dispatch, without reconnecting a
+			// healthy daemon or resetting its WebUI cache.
+			if (method.startsWith("core.") || method.startsWith("label.")) {
+				const connected = (
+					await this.call<boolean>("web.connected", [])
+				).unwrapOrThrow(
+					new Error("Failed to read Deluge daemon connection state"),
+				);
+				if (!connected) await this.ensureDaemonConnected();
+			}
+		}
+		const requestCookie = this.delugeCookie;
+		const connectionGeneration = this.connectionGeneration;
 		const truncate = (message: string) =>
 			message.length > 1000 ? `${message.slice(0, 1000)}...` : message;
 		const { href } = extractCredentialsFromUrl(this.url).unwrapOrThrow(
@@ -313,7 +360,8 @@ export default class Deluge implements TorrentClient {
 			}
 		}
 		if (json.error?.code === DelugeErrorCode.NO_AUTH && retries > 0) {
-			this.delugeCookie = null;
+			// A late failure from an old session must not invalidate a newer login.
+			if (this.delugeCookie === requestCookie) this.delugeCookie = null;
 			await this.authenticate();
 			if (this.delugeCookie) {
 				return this.call<ResultType>(method, params, 0);
@@ -323,7 +371,24 @@ export default class Deluge implements TorrentClient {
 				);
 			}
 		}
-		this.handleResponseHeaders(response.headers);
+		if (method === "auth.login" || this.delugeCookie === requestCookie) {
+			this.handleResponseHeaders(response.headers);
+		}
+		if (
+			json.error &&
+			retries > 0 &&
+			(method.startsWith("core.") || method.startsWith("label."))
+		) {
+			const connected = await this.call<boolean>("web.connected", [], 0);
+			if (connected.isOk() && !connected.unwrap()) {
+				await this.ensureDaemonConnected();
+			}
+			// Another caller may already have repaired the connection while this
+			// request was in flight. Retry against that connection only once.
+			if (this.connectionGeneration !== connectionGeneration) {
+				return this.call<ResultType>(method, params, 0);
+			}
+		}
 
 		if (json.error) {
 			return resultOfErr(json.error);
@@ -346,9 +411,10 @@ export default class Deluge implements TorrentClient {
 	 * @return boolean declaring whether the "Label" plugin is enabled
 	 */
 	private async labelEnabled() {
-		const enabledPlugins = await this.call<string>(
+		const enabledPlugins = await this.call<string[]>(
 			"core.get_enabled_plugins",
 			[],
+			0,
 		);
 		if (enabledPlugins.isOk()) {
 			return enabledPlugins.unwrap().includes("Label");
@@ -380,7 +446,7 @@ export default class Deluge implements TorrentClient {
 				stop = true;
 			}
 			await wait(sleepTime);
-			let torrentInfo: TorrentInfo;
+			let torrentInfo: TorrentInfo | undefined;
 			let torrentLog: string;
 			try {
 				torrentInfo = await this.getTorrentInfo(infoHash);
@@ -440,19 +506,25 @@ export default class Deluge implements TorrentClient {
 	 */
 	private calculateLabel(
 		searchee: Searchee,
-		torrentInfo: TorrentInfo,
+		torrentInfo: TorrentInfo | undefined,
+		destinationDir?: string,
 	): string {
 		const { linkCategory, duplicateCategories } = getRuntimeConfig();
-		if (!searchee.infoHash || !torrentInfo.label) {
-			return this.delugeLabel;
+		// deluge labels all deal in lowercases, but label.set_torrent requires lowercase on lookup
+		// labels from deluge are already lowercase; only linkCategory from cross-seed configs could have uppers
+		const delugeLinkCategory = linkCategory?.toLowerCase();
+		const ogLabel = torrentInfo?.label || searchee.category;
+		if (!searchee.infoHash || !ogLabel) {
+			return destinationDir
+				? delugeLinkCategory || this.delugeLabel
+				: this.delugeLabel;
 		}
-		const ogLabel = torrentInfo.label;
 		if (!duplicateCategories) {
-			return ogLabel;
+			return destinationDir ? delugeLinkCategory || ogLabel : ogLabel;
 		}
 		const shouldSuffixLabel =
 			!ogLabel.endsWith(this.delugeLabelSuffix) && // no .cross-seed
-			ogLabel !== linkCategory; // not data
+			ogLabel !== delugeLinkCategory; // not data
 
 		return shouldSuffixLabel
 			? `${ogLabel}${this.delugeLabelSuffix}`
@@ -521,7 +593,7 @@ export default class Deluge implements TorrentClient {
 			const existsRes = await this.isTorrentInClient(newTorrent.infoHash);
 			if (existsRes.isErr()) return InjectionResult.FAILURE;
 			if (existsRes.unwrap()) return InjectionResult.ALREADY_EXISTS;
-			let torrentInfo: TorrentInfo;
+			let torrentInfo: TorrentInfo | undefined;
 			if (options.onlyCompleted && searchee.infoHash) {
 				torrentInfo = await this.getTorrentInfo(searchee.infoHash);
 				if (!torrentInfo.complete)
@@ -571,7 +643,11 @@ export default class Deluge implements TorrentClient {
 			// addResponse is known to be OK
 			await this.setLabel(
 				newTorrent,
-				this.calculateLabel(searchee, torrentInfo!),
+				this.calculateLabel(
+					searchee,
+					torrentInfo,
+					options.destinationDir,
+				),
 			);
 
 			if (toRecheck) {
@@ -640,30 +716,37 @@ export default class Deluge implements TorrentClient {
 		Result<string, "NOT_FOUND" | "TORRENT_NOT_COMPLETE" | "UNKNOWN_ERROR">
 	> {
 		let response: Result<TorrentStatus, ErrorType>;
-		const params: UpdateUiParams = [
+		const params: StatusQuery = [
 			["save_path", "progress", "state", "total_remaining"],
 			{ hash: meta.infoHash },
 		];
 		try {
-			response = await this.call("web.update_ui", params);
+			response = await this.getTorrents(params);
 		} catch {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
 		if (!response.isOk()) {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		const torrentResponse = response.unwrap().torrents;
+		const torrentResponse = response.unwrap();
 		if (!torrentResponse) {
 			return resultOfErr("UNKNOWN_ERROR");
 		}
-		const torrent = torrentResponse[meta.infoHash];
+		const torrent = torrentResponse[meta.infoHash.toLowerCase()];
 		if (!torrent) {
 			return resultOfErr("NOT_FOUND");
 		}
+		if (
+			typeof torrent.save_path !== "string" ||
+			typeof torrent.progress !== "number" ||
+			typeof torrent.total_remaining !== "number" ||
+			typeof torrent.state !== "string"
+		)
+			return resultOfErr("UNKNOWN_ERROR");
 		if (options.onlyCompleted && !this.isComplete(torrent)) {
 			return resultOfErr("TORRENT_NOT_COMPLETE");
 		}
-		return resultOf(torrent.save_path!);
+		return resultOf(torrent.save_path);
 	}
 
 	/**
@@ -677,25 +760,26 @@ export default class Deluge implements TorrentClient {
 	}): Promise<Map<string, string>> {
 		const dirs = new Map<string, string>();
 		let response: Result<TorrentStatus, ErrorType>;
-		const params: UpdateUiParams = [
+		const params: StatusQuery = [
 			["save_path", "progress", "state", "total_remaining"],
 			{},
 		];
 		try {
-			response = await this.call("web.update_ui", params);
+			response = await this.getTorrents(params);
 		} catch {
 			return dirs;
 		}
 		if (!response.isOk()) {
 			return dirs;
 		}
-		const torrentResponse = response.unwrap().torrents;
+		const torrentResponse = response.unwrap();
 		if (!torrentResponse) {
 			return dirs;
 		}
 		for (const [hash, torrent] of Object.entries(torrentResponse)) {
+			if (typeof torrent.save_path !== "string") continue;
 			if (options.onlyCompleted && !this.isComplete(torrent)) continue;
-			dirs.set(hash, torrent.save_path!);
+			dirs.set(hash, torrent.save_path);
 		}
 		return dirs;
 	}
@@ -710,15 +794,15 @@ export default class Deluge implements TorrentClient {
 	): Promise<Result<boolean, Error>> {
 		const infoHash = inputHash.toLowerCase();
 		try {
-			const params: UpdateUiParams = [[], { hash: infoHash }];
-			const torrentsRes = await this.call("web.update_ui", params);
+			const params: StatusQuery = [["hash"], { hash: infoHash }];
+			const torrentsRes = await this.getTorrents(params);
 			if (torrentsRes.isErr()) {
 				const err = torrentsRes.unwrapErr();
 				throw new Error(
 					`${err.code ? err.code + ": " : ""}${err.message}`,
 				);
 			}
-			const torrents = torrentsRes.unwrap().torrents;
+			const torrents = torrentsRes.unwrap();
 			if (!torrents) throw new Error("No torrents found");
 			// torrents infoHash are already toLower() in deluge
 			if (infoHash in torrents) return resultOf(true);
@@ -768,12 +852,12 @@ export default class Deluge implements TorrentClient {
 	 * @return All torrents in the client
 	 */
 	async getAllTorrents(): Promise<TorrentMetadataInClient[]> {
-		const params: UpdateUiParams = [["hash", "label"], {}];
-		const response = await this.call("web.update_ui", params);
+		const params: StatusQuery = [["hash", "label"], {}];
+		const response = await this.getTorrents(params);
 		if (!response.isOk()) {
 			return [];
 		}
-		const torrents = response.unwrap().torrents;
+		const torrents = response.unwrap();
 		if (!torrents) {
 			return [];
 		}
@@ -797,20 +881,22 @@ export default class Deluge implements TorrentClient {
 		const searchees: SearcheeClient[] = [];
 		const newSearchees: SearcheeClient[] = [];
 		const infoHashes = new Set<string>();
-		const params: UpdateUiParams = [
+		const params: StatusQuery = [
 			["name", "label", "save_path", "total_size", "files", "trackers"],
 			{},
 		];
-		const torrentsRes = await this.call("web.update_ui", params);
+		const torrentsRes = await this.getTorrents(params);
 		if (torrentsRes.isErr()) {
 			logger.error({
 				label: this.label,
 				message: "Failed to get torrents from client",
 			});
 			logger.debug(torrentsRes.unwrapErr());
-			return { searchees, newSearchees };
+			throw new Error("Failed to read Deluge inventory", {
+				cause: torrentsRes.unwrapErr(),
+			});
 		}
-		const torrents = torrentsRes.unwrap().torrents;
+		const torrents = torrentsRes.unwrap();
 		if (!torrents)
 			throw new Error("Missing torrent list in Deluge response");
 		if (!Object.keys(torrents).length) {
@@ -829,12 +915,23 @@ export default class Deluge implements TorrentClient {
 		for (const [hash, torrent] of Object.entries(torrents)) {
 			const infoHash = hash.toLowerCase();
 			infoHashes.add(infoHash);
+			if (
+				!torrent.name ||
+				!torrent.save_path ||
+				!Array.isArray(torrent.files) ||
+				!Array.isArray(torrent.trackers) ||
+				typeof torrent.total_size !== "number"
+			) {
+				throw new Error(
+					`Incomplete Deluge inventory response for ${infoHash}`,
+				);
+			}
 			const dbTorrent = await db<ClientSearcheeRow>("client_searchee")
 				.where("info_hash", infoHash)
 				.where("client_host", this.clientHost)
 				.first();
-			const name = torrent.name!;
-			const savePath = torrent.save_path!;
+			const name = torrent.name;
+			const savePath = torrent.save_path;
 			const category = torrent.label ?? "";
 			const modified = clientSearcheeModified(
 				this.label,
@@ -857,7 +954,7 @@ export default class Deluge implements TorrentClient {
 				}
 				continue;
 			}
-			const files = torrent.files!.map((file) => ({
+			const files = torrent.files.map((file) => ({
 				name: basename(file.path),
 				path: file.path,
 				length: file.size,
@@ -869,9 +966,9 @@ export default class Deluge implements TorrentClient {
 				});
 				continue;
 			}
-			const trackers = organizeTrackers(torrent.trackers!);
+			const trackers = organizeTrackers(torrent.trackers);
 			const title = parseTitle(name, files) ?? name;
-			const length = torrent.total_size!;
+			const length = torrent.total_size;
 			const searchee: SearcheeClient = {
 				infoHash,
 				name,
@@ -917,7 +1014,7 @@ export default class Deluge implements TorrentClient {
 	): Promise<TorrentInfo> {
 		let torrent: TorrentInfo;
 		try {
-			const params: UpdateUiParams = [
+			const params: StatusQuery = [
 				[
 					"name",
 					"state",
@@ -929,12 +1026,12 @@ export default class Deluge implements TorrentClient {
 				{ hash: infoHash },
 			];
 
-			const response = (
-				await this.call("web.update_ui", params)
-			).unwrapOrThrow(new Error("failed to fetch the torrent list"));
+			const response = (await this.getTorrents(params)).unwrapOrThrow(
+				new Error("failed to fetch the torrent list"),
+			);
 
-			if (response.torrents) {
-				torrent = response.torrents?.[infoHash];
+			if (response) {
+				torrent = response[infoHash.toLowerCase()];
 			} else {
 				throw new Error(
 					"Client returned unexpected response (object missing)",
@@ -944,6 +1041,15 @@ export default class Deluge implements TorrentClient {
 				throw new Error(`Torrent not found in client (${infoHash})`);
 			}
 
+			if (
+				!torrent.name ||
+				!torrent.save_path ||
+				typeof torrent.state !== "string" ||
+				typeof torrent.progress !== "number" ||
+				typeof torrent.total_remaining !== "number"
+			) {
+				throw new Error(`Incomplete Deluge status for ${infoHash}`);
+			}
 			const completedTorrent = this.isComplete(torrent);
 
 			const torrentLabel =
@@ -967,7 +1073,7 @@ export default class Deluge implements TorrentClient {
 			});
 			logger.debug(e);
 			throw new Error(
-				`[${this.label}] web.update_ui: failed to fetch data from client`,
+				`[${this.label}] core.get_torrent_status: failed to fetch data from client`,
 				{
 					cause: e,
 				},
