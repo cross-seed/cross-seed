@@ -14,12 +14,14 @@ async function up(knex: Knex.Knex): Promise<void> {
 	);
 
 	for (const row of rows) {
-		if (!row.apikey) continue;
+		// A legacy API key is not evidence that file configuration was imported.
+		// Startup preserves this key when it imports the v6 config.
+		if (!row.apikey || row.settings_json == null) continue;
 
-		const settings =
-			row.settings_json == null
-				? {}
-				: (JSON.parse(row.settings_json) as Record<string, unknown>);
+		const settings = JSON.parse(row.settings_json) as Record<
+			string,
+			unknown
+		>;
 		if (typeof settings.apiKey === "string" && settings.apiKey.length > 0) {
 			continue;
 		}
