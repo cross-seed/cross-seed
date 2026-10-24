@@ -50,7 +50,7 @@ function stubClient(client: RTorrent, response: unknown): Call[] {
 			calls.push({ method, args });
 			callback(null, method === "system.multicall" ? response : "0");
 		},
-	} as unknown as RTorrent["client"];
+	};
 	return calls;
 }
 

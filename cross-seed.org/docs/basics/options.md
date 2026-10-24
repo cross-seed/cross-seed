@@ -1083,12 +1083,41 @@ The url of your **rTorrent** XMLRPC interface prefixed with `rtorrent`:
 `rtorrent:http://user:pass@localhost:8080/RPC2` or
 `rtorrent:http://user:pass@localhost:8080/rutorrent/plugins/httprpc/action.php`
 
+`cross-seed` can also speak SCGI directly, which needs no webserver in front of
+rTorrent:
+
+- `rtorrent:scgi:///path/to/.rpc.socket` for a socket, set in `.rtorrent.rc` by
+  `network.scgi.open_local` (older configs spell this `scgi_local`).
+- `rtorrent:scgi://localhost:5000` for a port, set by `network.scgi.open_port`
+  (older configs spell this `scgi_port`). IPv6 literals go in brackets, as in
+  `rtorrent:scgi://[::1]:5000`.
+
+Prefer the socket where you can, and only ever bind the port to localhost:
+anyone who can reach either endpoint can run commands as the user rTorrent runs
+as. SCGI has no authentication of its own, so any credentials in an `scgi://`
+url are ignored — restrict the socket with filesystem permissions instead.
+
+:::caution
+
+`cross-seed` sends the whole `.torrent` in one XML-RPC call when it injects, so
+a torrent with many files can exceed rTorrent's `network.xmlrpc.size_limit` and
+fail to inject. Raise it in `.rtorrent.rc` if injections fail on large torrents:
+
+```ini
+network.xmlrpc.size_limit.set = 8M
+```
+
+:::
+
+If `cross-seed` runs in a container, the socket has to be reachable inside it at
+the same path and make sure the container user can write to it.
+
 :::info
 
 If you use **Sonarr** or **Radarr**, `cross-seed` is configured the same way.
 **ruTorrent** installations come with this endpoint configured, but naked
 **rTorrent** does not provide this wrapper. If you don't use **ruTorrent**,
-you'll have to
+connect over SCGI as shown above, or
 [set up the endpoint yourself](https://github.com/linuxserver/docker-rutorrent/issues/122#issuecomment-769009432)
 with a webserver.
 

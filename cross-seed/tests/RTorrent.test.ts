@@ -2,7 +2,6 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Client } from "xmlrpc";
 import { searcheeFactory } from "./factories/searchee.js";
 
 const TEST_ROOT = await mkdtemp(join(tmpdir(), "cross-seed-rtorrent-tests-"));
@@ -74,34 +73,34 @@ function installXmlRpc(
 	options: { checkHashError?: Error } = {},
 ) {
 	let loaded = false;
-	return vi.spyOn(client.client, "methodCall").mockImplementation(((
-		method: string,
-		_params: unknown[],
-		callback: XmlRpcCallback,
-	) => {
-		if (method === "download_list") {
-			callback(null, loaded ? [infoHash] : []);
-			return;
-		}
-		if (method === "load.raw" || method === "load.raw_start") {
-			loaded = true;
-			callback(null, 0);
-			return;
-		}
-		if (method === "d.pause") {
-			callback(null, 0);
-			return;
-		}
-		if (method === "d.check_hash") {
-			if (options.checkHashError) {
-				callback(options.checkHashError);
-				return;
-			}
-			callback(null, 0);
-			return;
-		}
-		callback(new Error(`unexpected XML-RPC method: ${method}`));
-	}) as Client["methodCall"]);
+	return vi
+		.spyOn(client.client, "methodCall")
+		.mockImplementation(
+			(method: string, _params: unknown[], callback: XmlRpcCallback) => {
+				if (method === "download_list") {
+					callback(null, loaded ? [infoHash] : []);
+					return;
+				}
+				if (method === "load.raw" || method === "load.raw_start") {
+					loaded = true;
+					callback(null, 0);
+					return;
+				}
+				if (method === "d.pause") {
+					callback(null, 0);
+					return;
+				}
+				if (method === "d.check_hash") {
+					if (options.checkHashError) {
+						callback(options.checkHashError);
+						return;
+					}
+					callback(null, 0);
+					return;
+				}
+				callback(new Error(`unexpected XML-RPC method: ${method}`));
+			},
+		);
 }
 
 function loadCalls(methodCall: ReturnType<typeof installXmlRpc>) {

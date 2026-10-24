@@ -7,7 +7,6 @@ import {
 	it,
 	vi,
 } from "vitest";
-import type { Client } from "xmlrpc";
 import RTorrent from "../src/clients/RTorrent.js";
 import { initializeLogger } from "../src/logger.js";
 
@@ -25,7 +24,7 @@ function stubMethodCall(
 		callback: MethodCallCallback,
 	) => void,
 ) {
-	client.client = { methodCall: implementation } as unknown as Client;
+	client.client = { methodCall: implementation };
 }
 
 describe("RTorrent methodCallP retries", () => {
