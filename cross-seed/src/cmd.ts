@@ -173,9 +173,6 @@ program
 				options.basePath,
 				startStartupWork!,
 			);
-			if (!options.port) {
-				startStartupWork!();
-			}
 			// technically this will never resolve, but it's necessary to keep the process running
 			await Promise.all([serverPromise, startupWorkPromise]);
 		}),

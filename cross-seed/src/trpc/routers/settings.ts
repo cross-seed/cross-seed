@@ -1,12 +1,22 @@
-import { authedProcedure, router } from "../index.js";
+import { TRPCError } from "@trpc/server";
+import { validSettingsCliToken } from "../../configDaemonDiscovery.js";
+import { authedProcedure, unauthedProcedure, router } from "../index.js";
 import { Label, logger } from "../../logger.js";
 import { getRuntimeConfig, setRuntimeConfig } from "../../runtimeConfig.js";
 import { apiKeySchema, getApiKey, resetApiKey, setApiKey } from "../../auth.js";
 import { z } from "zod";
-import { getDbConfig, setDbConfig, updateDbConfig } from "../../dbConfig.js";
+import {
+	getDbConfig,
+	setDbConfig,
+	updateDbConfig,
+	unsetDbConfig,
+} from "../../dbConfig.js";
 import { getDefaultRuntimeConfig } from "../../configuration.js";
 import { omitUndefined } from "../../utils/object.js";
-import { parseRuntimeConfig } from "../../configSchema.js";
+import {
+	parseRuntimeConfig,
+	RUNTIME_CONFIG_SCHEMA,
+} from "../../configSchema.js";
 import { sendTestNotification } from "../../pushNotifier.js";
 import { reloadDownloadClients } from "../../clients/TorrentClient.js";
 import { errorMessage } from "../../utils.js";
@@ -45,8 +55,33 @@ function triggerLibraryIndexing(): void {
 	});
 }
 
+// The filesystem capability grants settings access only; ordinary tRPC
+// authentication and all other procedures remain unchanged.
+const cliSettingsProcedure = unauthedProcedure.use(({ ctx, next }) => {
+	const localCli = validSettingsCliToken(ctx.req?.headers.authorization);
+	if (!ctx.user && !localCli) throw new TRPCError({ code: "UNAUTHORIZED" });
+	return next({ ctx: { ...ctx, localCli } });
+});
+
+async function replaceSettings(
+	input: Record<string, unknown>,
+): Promise<{ success: boolean }> {
+	const previousConfig = getRuntimeConfig();
+	const parsedConfig = parseRuntimeConfig(input);
+	await setDbConfig(parsedConfig);
+	const updatedConfig = {
+		...getDefaultRuntimeConfig(),
+		...omitUndefined(parsedConfig),
+	};
+	setRuntimeConfig(updatedConfig);
+	reloadDownloadClients();
+	if (torrentSourceConfigChanged(previousConfig, updatedConfig))
+		triggerLibraryIndexing();
+	return { success: true };
+}
+
 export const settingsRouter = router({
-	get: authedProcedure.query(async () => {
+	get: cliSettingsProcedure.query(async () => {
 		try {
 			const runtimeOverrides = await getDbConfig();
 			const runtimeConfig = {
@@ -65,15 +100,27 @@ export const settingsRouter = router({
 	}),
 
 	// We'll need to implement the save functionality
-	save: authedProcedure
+	save: cliSettingsProcedure
 		.input(z.object({}).passthrough())
-		.mutation(async ({ input }) => {
+		.mutation(async ({ input, ctx }) => {
 			try {
 				logger.info({
 					label: Label.SERVER,
 					message: `Saving config updates...`,
 				});
 				const previousConfig = getRuntimeConfig();
+
+				if (ctx.localCli) {
+					if (Object.hasOwn(input, "torznab"))
+						throw new Error(
+							"Manage indexers in Settings → Trackers.",
+						);
+					RUNTIME_CONFIG_SCHEMA.strict().parse({
+						...getDefaultRuntimeConfig(),
+						...(await getDbConfig()),
+						...input,
+					});
+				}
 
 				// Save to database
 				await updateDbConfig(input);
@@ -133,44 +180,44 @@ export const settingsRouter = router({
 		}
 	}),
 
-	// Full replacement for debug page
-	replace: authedProcedure
+	// Full replacement for debug page and local CLI imports.
+	replace: cliSettingsProcedure
 		.input(z.object({}).passthrough())
-		.mutation(async ({ input }) => {
-			try {
-				logger.info({
-					label: Label.SERVER,
-					message: `Replacing full config...`,
-				});
-				const previousConfig = getRuntimeConfig();
-
-				const parsedConfig = parseRuntimeConfig(
-					input satisfies Record<string, unknown>,
-				);
-				await setDbConfig(parsedConfig);
-
-				// Update in-memory config so changes are visible immediately
-				const sanitizedInput = omitUndefined(parsedConfig);
-				const updatedConfig = {
+		.mutation(async ({ input, ctx }) => {
+			if (ctx.localCli) {
+				if (Array.isArray(input.torznab) && input.torznab.length)
+					throw new TRPCError({
+						code: "BAD_REQUEST",
+						message:
+							"Manage indexers in Settings → Trackers; legacy torznab URLs cannot be imported.",
+					});
+				RUNTIME_CONFIG_SCHEMA.strict().parse({
 					...getDefaultRuntimeConfig(),
-					...sanitizedInput,
-				};
-				setRuntimeConfig(updatedConfig);
-				reloadDownloadClients();
-				if (torrentSourceConfigChanged(previousConfig, updatedConfig)) {
-					triggerLibraryIndexing();
-				}
-
-				return { success: true };
-			} catch (error) {
-				logger.error({
-					label: Label.SERVER,
-					message: errorMessage(error),
+					...input,
 				});
-				throw new Error(
-					`Failed to replace config: ${errorMessage(error)}`,
-				);
 			}
+			return replaceSettings(input);
+		}),
+
+	unset: cliSettingsProcedure
+		.input(z.object({ key: z.string() }).strict())
+		.mutation(async ({ input }) => {
+			if (!Object.hasOwn(RUNTIME_CONFIG_SCHEMA.shape, input.key))
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: `Unknown setting: ${input.key}`,
+				});
+			const previousConfig = getRuntimeConfig();
+			await unsetDbConfig(input.key);
+			const updatedConfig = {
+				...getDefaultRuntimeConfig(),
+				...(await getDbConfig()),
+			};
+			setRuntimeConfig(updatedConfig);
+			reloadDownloadClients();
+			if (torrentSourceConfigChanged(previousConfig, updatedConfig))
+				triggerLibraryIndexing();
+			return { success: true };
 		}),
 
 	validate: authedProcedure.query(() => {

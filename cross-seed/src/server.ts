@@ -1,3 +1,7 @@
+import {
+	registerSettingsCliDiscovery,
+	publishDisabledSettingsCli,
+} from "./configDaemonDiscovery.js";
 import fastifyCookie from "@fastify/cookie";
 import fastify, { FastifyInstance } from "fastify";
 import { Label, logger } from "./logger.js";
@@ -23,8 +27,11 @@ async function rootPlugin(
 	await app.register(staticFrontendPlugin, { basePath });
 }
 
-async function createServer(basePath: string): Promise<FastifyInstance> {
+async function createServer(
+	basePath: string,
+): Promise<{ app: FastifyInstance; cliReady: Promise<void> }> {
 	const app = fastify({ logger: false });
+	const cliReady = registerSettingsCliDiscovery(app, basePath);
 	if (basePath) {
 		await app.register(rootPlugin, { prefix: basePath, basePath });
 		app.get("*", async (request, reply) => {
@@ -34,7 +41,7 @@ async function createServer(basePath: string): Promise<FastifyInstance> {
 		await app.register(rootPlugin, { basePath: "" });
 	}
 
-	return app;
+	return { app, cliReady };
 }
 
 /**
@@ -46,10 +53,14 @@ export async function serve(
 	basePath = "",
 	onListening?: () => void,
 ): Promise<void> {
-	if (!port) return;
-	const server = await createServer(basePath);
+	if (!port) {
+		await publishDisabledSettingsCli();
+		onListening?.();
+		return;
+	}
+	const { app: server, cliReady } = await createServer(basePath);
 
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		server.listen({ port, host }, (err) => {
 			if (err) {
 				logger.error({
@@ -58,11 +69,25 @@ export async function serve(
 				});
 				process.exit(1);
 			}
-			logger.info({
-				label: Label.SERVER,
-				message: `Server is running on port ${port}, ^C to stop.`,
-			});
-			onListening?.();
+			void cliReady
+				.then(() => {
+					logger.info({
+						label: Label.SERVER,
+						message: `Server is running on port ${port}, ^C to stop.`,
+					});
+					onListening?.();
+				})
+				.catch((error: unknown) => {
+					logger.error({
+						label: Label.SERVER,
+						message: `Unable to publish local CLI discovery: ${String(error)}`,
+					});
+					reject(
+						error instanceof Error
+							? error
+							: new Error(String(error)),
+					);
+				});
 		});
 
 		function stop() {

@@ -106,3 +106,23 @@ export async function updateDbConfig(
 		}
 	});
 }
+
+/** Remove an override without replaying legacy config-file indexer migration. */
+export async function unsetDbConfig(key: string): Promise<void> {
+	await db.transaction(async (trx) => {
+		const row = await trx("settings").first();
+		const overrides: Record<string, unknown> =
+			row?.settings_json == null
+				? {}
+				: parseRuntimeConfigOverrides(JSON.parse(row.settings_json));
+		delete overrides[key];
+		const validated = parseRuntimeConfig({
+			...getDefaultRuntimeConfig(),
+			...overrides,
+		});
+		if (!row) throw new Error("Settings have not been initialized");
+		await trx("settings").update({
+			settings_json: JSON.stringify(stripDefaults(validated)),
+		});
+	});
+}
