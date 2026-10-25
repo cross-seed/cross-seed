@@ -13,6 +13,8 @@
 	],
 	"scripts": {
 		"test": "npm --workspaces run test --if-present",
+		"test:daemon": "npm -w cross-seed run build && node --test scripts/test-environment/daemon.test.js",
+		"demo:daemon": "npm -w cross-seed run build && node scripts/test-environment/demo.js",
 		"coverage": "npm --workspaces run coverage --if-present",
 		"build": "npm -w cross-seed run build:all",
 		"build:docs": "npm -w cross-seed.org run build",

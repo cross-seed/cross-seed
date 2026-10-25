@@ -36,6 +36,8 @@ jobs:
             - run: npm run lint
             - run: npm run typecheck
             - run: npm run test
+            - name: Exercise daemon with simulated indexer and torrent client
+              run: npm run test:daemon
             - name: Build npm tarball
               run: |
                   set -euo pipefail
