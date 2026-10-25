@@ -100,7 +100,7 @@ async function makeArrApiCall<ResponseType>(
 		);
 	}
 	try {
-		const responseBody = await response.json();
+		const responseBody: unknown = await response.json();
 		return resultOf(responseBody as ResponseType);
 	} catch {
 		const responseText = await clonedResponse.text();

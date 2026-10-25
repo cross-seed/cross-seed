@@ -1,34 +1,37 @@
-import { FastifyReply, FastifyRequest } from "fastify";
+import { parse, serialize } from "hono/utils/cookie";
 import { validateSession } from "./userAuth.js";
 
 const COOKIE_NAME = "cross-seed-session";
-const COOKIE_OPTIONS = {
-	httpOnly: true,
-	secure: process.env.NODE_ENV === "production", // Only set secure in production
-	maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds (match session expiry)
-	path: "/",
-	sameSite: "lax" as const,
-};
 
-export function setSessionCookie(reply: FastifyReply, sessionId: string): void {
-	void reply.setCookie(COOKIE_NAME, sessionId, COOKIE_OPTIONS);
+export function setSessionCookie(headers: Headers, sessionId: string): void {
+	headers.append(
+		"Set-Cookie",
+		serialize(COOKIE_NAME, sessionId, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			maxAge: 30 * 24 * 60 * 60,
+			path: "/",
+			sameSite: "lax",
+		}),
+	);
 }
 
-export function clearSessionCookie(reply: FastifyReply): void {
-	void reply.clearCookie(COOKIE_NAME, { path: "/" });
+export function clearSessionCookie(headers: Headers): void {
+	headers.append(
+		"Set-Cookie",
+		serialize(COOKIE_NAME, "", {
+			path: "/",
+			maxAge: 0,
+			expires: new Date(0),
+		}),
+	);
 }
 
-export function getSessionCookie(request: FastifyRequest): string | undefined {
-	return request.cookies[COOKIE_NAME];
+export function getSessionCookie(request: Request): string | undefined {
+	return parse(request.headers.get("cookie") ?? "")[COOKIE_NAME];
 }
 
-export async function validateAuth(request: FastifyRequest): Promise<boolean> {
+export async function validateAuth(request: Request): Promise<boolean> {
 	const sessionId = getSessionCookie(request);
-
-	if (!sessionId) {
-		return false;
-	}
-
-	const user = await validateSession(sessionId);
-	return !!user;
+	return !!sessionId && !!(await validateSession(sessionId));
 }

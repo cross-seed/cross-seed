@@ -53,7 +53,7 @@ export const logsRouter = router({
 				limit: z.number().min(1).max(500).default(100),
 			}),
 		)
-		.subscription(async function* ({ input }) {
+		.subscription(async function* ({ input, signal }) {
 			const logQueue: LogEntry[] = [];
 			let resolve: (() => void) | null = null;
 
@@ -86,9 +86,11 @@ export const logsRouter = router({
 				}
 			});
 
+			const onAbort = () => resolve?.();
+			signal?.addEventListener("abort", onAbort);
 			try {
-				// Stream new logs indefinitely
-				while (true) {
+				// Stream new logs until the HTTP subscription is cancelled.
+				while (!signal?.aborted) {
 					if (logQueue.length > 0) {
 						yield logQueue.shift()!;
 					} else {
@@ -98,6 +100,7 @@ export const logsRouter = router({
 					}
 				}
 			} finally {
+				signal?.removeEventListener("abort", onAbort);
 				unsubscribe();
 			}
 		}),

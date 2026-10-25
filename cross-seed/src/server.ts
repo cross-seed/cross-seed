@@ -1,50 +1,190 @@
+import { getRequestListener } from "@hono/node-server";
+import { Hono, type Context, type Next } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { cors } from "hono/cors";
+import { createServer as createNodeServer } from "node:http";
+import type { AddressInfo, ListenOptions } from "node:net";
 import {
-	registerSettingsCliDiscovery,
+	createSettingsCliDiscovery,
 	publishDisabledSettingsCli,
 } from "./configDaemonDiscovery.js";
-import fastifyCookie from "@fastify/cookie";
-import fastify, { FastifyInstance } from "fastify";
+import type { HttpEnv } from "./httpTypes.js";
 import { Label, logger } from "./logger.js";
-import { baseApiPlugin } from "./routes/baseApi.js";
-import { devLoginPlugin } from "./routes/devLogin.js";
-import { staticFrontendPlugin } from "./routes/staticFrontendPlugin.js";
-import { appTrpcPlugin } from "./trpc/fastifyAdapter.js";
+import { baseApiRoutes } from "./routes/baseApi.js";
+import { devLoginRoutes } from "./routes/devLogin.js";
+import { serveFrontend } from "./routes/staticFrontendPlugin.js";
+import { handleTrpcRequest } from "./trpc/fetchAdapter.js";
+import { errorMessage } from "./utils.js";
+import { runInBackground } from "./utils/background.js";
+import { registerShutdownHook } from "./utils/shutdown.js";
 
-async function apiPlugin(app: FastifyInstance) {
-	await app.register(appTrpcPlugin, { prefix: "/trpc" });
-	await app.register(baseApiPlugin);
+export function createHttpApp(
+	basePath = "",
+	options: {
+		trackBackground?: (task: Promise<void>) => void;
+		signal?: AbortSignal;
+	} = {},
+): Hono<HttpEnv> {
+	const app = new Hono<HttpEnv>();
+	const integrationPaths = new Set(
+		["ping", "webhook", "announce"].map(
+			(name) => `${basePath}/api/${name}`,
+		),
+	);
+	const integrationCors = cors({
+		origin: "*",
+		allowMethods: ["GET", "HEAD", "POST"],
+	});
+	// Run before parsing/limits so browser integrations can read error responses.
+	app.use("*", async (c: Context<HttpEnv, string>, next: Next) => {
+		if (!integrationPaths.has(c.req.path)) {
+			await next();
+			return;
+		}
+		if (
+			c.req.method === "OPTIONS" &&
+			(!c.req.header("origin") ||
+				!c.req.header("access-control-request-method"))
+		) {
+			return c.text("Invalid Preflight Request", 400);
+		}
+		return integrationCors(c, next);
+	});
+
+	app.use(
+		"*",
+		bodyLimit({
+			maxSize: 1024 * 1024,
+			onError: (c) =>
+				c.json(
+					{
+						statusCode: 413,
+						code: "FST_ERR_CTP_BODY_TOO_LARGE",
+						error: "Payload Too Large",
+						message: "Request body is too large",
+					},
+					413,
+				),
+		}),
+	);
+	app.onError((error, c) => {
+		logger.error({ label: Label.SERVER, message: errorMessage(error) });
+		return c.json(
+			{
+				statusCode: 500,
+				error: "Internal Server Error",
+				message: errorMessage(error),
+			},
+			500,
+		);
+	});
+	const endpoint = `${basePath}/api/trpc`;
+	app.all(`${endpoint}/*`, (c) => {
+		// The Node adapter supplies a Fetch-compatible request, not a native Request
+		// instance. Copy its fields explicitly when adding the shutdown signal.
+		const incoming = c.req.raw;
+		const init = {
+			method: incoming.method,
+			headers: incoming.headers,
+			body:
+				incoming.method === "GET" || incoming.method === "HEAD"
+					? undefined
+					: incoming.body,
+			signal: options.signal
+				? AbortSignal.any([incoming.signal, options.signal])
+				: incoming.signal,
+			duplex: "half",
+		};
+		return handleTrpcRequest(new Request(incoming.url, init), endpoint);
+	});
+	app.route(basePath || "/", devLoginRoutes(basePath));
+	app.route(`${basePath}/api`, baseApiRoutes(options.trackBackground));
+	if (basePath) app.get(basePath, (c) => serveFrontend(c, basePath));
+	app.get(`${basePath}/*`, (c) => serveFrontend(c, basePath));
+	if (basePath) app.get("*", (c) => c.redirect(`${basePath}/`, 302));
+	// Preserve the JSON 404 shape for unmatched non-GET requests.
+	app.notFound((c) =>
+		c.json(
+			{
+				message: `Route ${c.req.method}:${c.req.path}${new URL(c.req.url).search} not found`,
+				error: "Not Found",
+				statusCode: 404,
+			},
+			404,
+		),
+	);
+	return app;
 }
 
-async function rootPlugin(
-	app: FastifyInstance,
-	{ basePath }: { basePath: string },
-) {
-	await app.register(fastifyCookie);
-	await app.register(devLoginPlugin, { basePath });
-	await app.register(apiPlugin, { prefix: "/api" });
-	await app.register(staticFrontendPlugin, { basePath });
-}
-
-export async function createServer(
-	basePath: string,
-): Promise<{ app: FastifyInstance; cliReady: Promise<void> }> {
-	const app = fastify({ logger: false });
-	const cliReady = registerSettingsCliDiscovery(app, basePath);
-	if (basePath) {
-		await app.register(rootPlugin, { prefix: basePath, basePath });
-		app.get("*", async (request, reply) => {
-			return reply.redirect(`${basePath}/`);
-		});
-	} else {
-		await app.register(rootPlugin, { basePath: "" });
+export function createServer(basePath = "") {
+	const pending = new Set<Promise<void>>();
+	function trackBackground(task: Promise<void>) {
+		const tracked = task.finally(() => pending.delete(tracked));
+		pending.add(tracked);
+		runInBackground(tracked);
 	}
-
-	return { app, cliReady };
+	const shutdown = new AbortController();
+	const app = createHttpApp(basePath, {
+		trackBackground,
+		signal: shutdown.signal,
+	});
+	const listener = getRequestListener(app.fetch, {
+		overrideGlobalObjects: false,
+	});
+	const server = createNodeServer((req, res) => {
+		runInBackground(Promise.resolve(listener(req, res)));
+	});
+	let discovery: ReturnType<typeof createSettingsCliDiscovery> | undefined;
+	let closing: Promise<void> | undefined;
+	let resolveClosed!: () => void;
+	const closed = new Promise<void>((resolve) => {
+		resolveClosed = resolve;
+	});
+	const unregister = registerShutdownHook(close);
+	async function close() {
+		closing ??= (async () => {
+			shutdown.abort();
+			try {
+				await new Promise<void>((resolve, reject) => {
+					if (!server.listening) {
+						resolve();
+						return;
+					}
+					server.close((error) =>
+						error ? reject(error) : resolve(),
+					);
+				});
+				await Promise.allSettled(pending);
+			} finally {
+				discovery?.close();
+				unregister();
+				resolveClosed();
+			}
+		})();
+		return closing;
+	}
+	async function listen(options: ListenOptions) {
+		discovery = createSettingsCliDiscovery(basePath);
+		try {
+			await new Promise<void>((resolve, reject) => {
+				server.once("error", reject);
+				server.listen(options, () => {
+					server.removeListener("error", reject);
+					resolve();
+				});
+			});
+			await discovery.publish(server.address() as AddressInfo);
+		} catch (error) {
+			await close();
+			throw error;
+		}
+	}
+	return { app, server, listen, close, closed };
 }
 
-/**
- * Listens (daemon) on configured port for http API calls
- */
+export type HttpServer = ReturnType<typeof createServer>;
+
+/** Serve until shutdown, publishing CLI discovery before reporting readiness. */
 export async function serve(
 	port = 2468,
 	host = "0.0.0.0",
@@ -56,49 +196,17 @@ export async function serve(
 		onListening?.();
 		return;
 	}
-	const { app: server, cliReady } = await createServer(basePath);
-
-	return new Promise((resolve, reject) => {
-		server.listen({ port, host }, (err) => {
-			if (err) {
-				logger.error({
-					label: Label.SERVER,
-					message: `Failed to start server: ${err.message}`,
-				});
-				process.exit(1);
-			}
-			void cliReady
-				.then(() => {
-					logger.info({
-						label: Label.SERVER,
-						message: `Server is running on port ${port}, ^C to stop.`,
-					});
-					onListening?.();
-				})
-				.catch((error: unknown) => {
-					logger.error({
-						label: Label.SERVER,
-						message: `Unable to publish local CLI discovery: ${String(error)}`,
-					});
-					reject(
-						error instanceof Error
-							? error
-							: new Error(String(error)),
-					);
-				});
-		});
-
-		function stop() {
-			server.close(() => {
-				logger.info({
-					label: Label.SERVER,
-					message: "Server stopped",
-				});
-				resolve();
-			});
-		}
-
-		process.on("SIGINT", stop);
-		process.on("SIGTERM", stop);
+	const server = createServer(basePath);
+	await server.listen({ port, host });
+	logger.info({
+		label: Label.SERVER,
+		message: `Server is running on port ${port}, ^C to stop.`,
 	});
+	try {
+		onListening?.();
+		await server.closed;
+		logger.info({ label: Label.SERVER, message: "Server stopped" });
+	} finally {
+		await server.close();
+	}
 }

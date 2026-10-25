@@ -3,7 +3,6 @@ import { readFileSync, unlinkSync } from "node:fs";
 import { rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
-import type { FastifyInstance } from "fastify";
 import { appDir } from "./configuration.js";
 
 export interface DaemonDescriptor {
@@ -17,28 +16,16 @@ export function daemonDescriptorPath(): string {
 }
 
 /** A private, per-process capability for local CLI settings commands. */
-export function registerSettingsCliDiscovery(
-	app: FastifyInstance,
-	basePath: string,
-): Promise<void> {
+export function createSettingsCliDiscovery(basePath: string): {
+	publish(address: AddressInfo): Promise<void>;
+	close(): void;
+} {
 	const token = randomBytes(32).toString("hex");
 	tokens.add(token);
 	const filename = daemonDescriptorPath();
-	const exitCleanup = registerDescriptorExitCleanup(filename, token);
-	const path = `${basePath}/api/trpc`;
-	let publish: Promise<void> = Promise.resolve();
-	let readyResolve!: () => void;
-	let readyReject!: (error: unknown) => void;
-	const ready = new Promise<void>((resolve, reject) => {
-		readyResolve = resolve;
-		readyReject = reject;
-	});
-	// A caller can await readiness after listen resolves without a transient
-	// unhandled rejection if publication fails in the meantime.
-	void ready.catch(() => undefined);
-	app.addHook("onListen", async () => {
-		publish = (async () => {
-			const address = app.server.address() as AddressInfo;
+	const cleanup = registerDescriptorExitCleanup(filename, token);
+	return {
+		async publish(address) {
 			const host =
 				address.address === "0.0.0.0"
 					? "127.0.0.1"
@@ -47,7 +34,7 @@ export function registerSettingsCliDiscovery(
 						: address.address;
 			const descriptor: DaemonDescriptor = {
 				pid: process.pid,
-				url: `http://${host.includes(":") ? `[${host}]` : host}:${address.port}${path}`,
+				url: `http://${host.includes(":") ? `[${host}]` : host}:${address.port}${basePath}/api/trpc`,
 				token,
 			};
 			const temporary = `${filename}.${token}.tmp`;
@@ -60,26 +47,12 @@ export function registerSettingsCliDiscovery(
 			} finally {
 				await unlink(temporary).catch(() => undefined);
 			}
-		})();
-		try {
-			await publish;
-			readyResolve();
-		} catch (error) {
-			// Fastify logs and ignores onListen errors. Explicitly stop serving so
-			// CLI commands cannot mistake an undiscoverable daemon for offline.
-			try {
-				await app.close();
-			} finally {
-				readyReject(error);
-			}
-		}
-	});
-	app.addHook("onClose", async () => {
-		tokens.delete(token);
-		await publish.catch(() => undefined);
-		exitCleanup();
-	});
-	return ready;
+		},
+		close() {
+			tokens.delete(token);
+			cleanup();
+		},
+	};
 }
 
 const tokens = new Set<string>();

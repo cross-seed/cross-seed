@@ -94,9 +94,14 @@ export function createInjectedFetch(
 		const responseHeaders = applyResponseHeaders(res.headers);
 		const responseBody = res.rawPayload ?? res.payload;
 
-		return new Response(responseBody, {
-			status: res.statusCode,
-			headers: responseHeaders,
-		});
+		return new Response(
+			typeof responseBody === "string"
+				? responseBody
+				: new Uint8Array(responseBody),
+			{
+				status: res.statusCode,
+				headers: responseHeaders,
+			},
+		);
 	};
 }

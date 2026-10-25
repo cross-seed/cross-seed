@@ -1,8 +1,7 @@
 import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import fastifyCookie from "@fastify/cookie";
-import fastify, { type FastifyInstance } from "fastify";
+import type { HttpServer } from "../src/server.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { index, reload } = vi.hoisted(() => ({
@@ -19,7 +18,7 @@ vi.mock("../src/clients/TorrentClient.js", async (original) => ({
 }));
 
 describe.sequential("local settings tRPC capability", () => {
-	let app: FastifyInstance;
+	let app: HttpServer;
 	let db: typeof import("../src/db.js").db;
 	let logger: typeof import("../src/logger.js").logger;
 	let runtime: typeof import("../src/runtimeConfig.js");
@@ -45,18 +44,11 @@ describe.sequential("local settings tRPC capability", () => {
 		const { setDbConfig } = await import("../src/dbConfig.js");
 		await setDbConfig(config.getDefaultRuntimeConfig());
 		const discovery = await import("../src/configDaemonDiscovery.js");
-		const { appTrpcPlugin } = await import("../src/trpc/fastifyAdapter.js");
-		app = fastify();
-		await app.register(fastifyCookie);
-		const ready = discovery.registerSettingsCliDiscovery(
-			app,
-			"/cross-seed",
-		);
-		await app.register(appTrpcPlugin, { prefix: "/cross-seed/api/trpc" });
+		const { createServer } = await import("../src/server.js");
+		app = createServer("/cross-seed");
 		path = discovery.daemonDescriptorPath();
 		await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
 		await app.listen({ port: 0, host: "127.0.0.1" });
-		await ready;
 		await vi.waitFor(async () => {
 			descriptor = JSON.parse(
 				await readFile(path, "utf8"),
@@ -173,13 +165,10 @@ describe.sequential("local settings tRPC capability", () => {
 	it("closes the listener when discovery cannot be published", async () => {
 		await app.close();
 		await mkdir(path);
-		app = fastify();
-		const { registerSettingsCliDiscovery } =
-			await import("../src/configDaemonDiscovery.js");
-		const ready = registerSettingsCliDiscovery(app, "");
-		const rejected = expect(ready).rejects.toThrow();
-		await app.listen({ port: 0, host: "127.0.0.1" });
-		await rejected;
+		app = (await import("../src/server.js")).createServer();
+		await expect(
+			app.listen({ port: 0, host: "127.0.0.1" }),
+		).rejects.toThrow();
 		expect(app.server.listening).toBe(false);
 	});
 

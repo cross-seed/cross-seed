@@ -3,7 +3,7 @@
 		"composite": true,
 		"types": [],
 		"target": "es2022",
-		"lib": ["es2023"],
+		"lib": ["es2023", "DOM", "DOM.Iterable"],
 		"module": "nodenext",
 		"moduleResolution": "nodenext",
 		"allowImportingTsExtensions": true,
@@ -18,6 +18,10 @@
 			"@cross-seed/backend/*": ["../cross-seed/dist/*"]
 		}
 	},
-	"references": [{ "path": "../cross-seed/tsconfig.build.json" }],
+	"references": [
+		{
+			"path": "../cross-seed/tsconfig.build.json"
+		}
+	],
 	"include": ["./src/**/*"]
 }

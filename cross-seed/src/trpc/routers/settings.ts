@@ -13,7 +13,9 @@ import type { RuntimeConfig } from "../../runtimeConfig.js";
 // The filesystem capability grants settings access only; ordinary tRPC
 // authentication and all other procedures remain unchanged.
 const cliSettingsProcedure = unauthedProcedure.use(({ ctx, next }) => {
-	const localCli = validSettingsCliToken(ctx.req?.headers.authorization);
+	const localCli = validSettingsCliToken(
+		ctx.req?.headers.get("authorization") ?? undefined,
+	);
 	if (!ctx.user && !localCli) throw new TRPCError({ code: "UNAUTHORIZED" });
 	return next({ ctx: { ...ctx, localCli } });
 });

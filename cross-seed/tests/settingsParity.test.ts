@@ -1,8 +1,7 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import fastifyCookie from "@fastify/cookie";
-import fastify, { type FastifyInstance } from "fastify";
+import type { HttpServer } from "../src/server.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { index, reload } = vi.hoisted(() => ({
@@ -23,7 +22,7 @@ for (const online of [false, true]) {
 	describe.sequential(
 		`settings contract via ${online ? "HTTP daemon" : "offline SQLite"}`,
 		() => {
-			let app: FastifyInstance | undefined;
+			let app: HttpServer | undefined;
 			let db: typeof import("../src/db.js").db;
 			let logger: typeof import("../src/logger.js").logger;
 			let cli: typeof import("../src/configCli.js");
@@ -68,21 +67,9 @@ for (const online of [false, true]) {
 				);
 				cli = await import("../src/configCli.js");
 				if (online) {
-					const discovery =
-						await import("../src/configDaemonDiscovery.js");
-					const { appTrpcPlugin } =
-						await import("../src/trpc/fastifyAdapter.js");
-					app = fastify();
-					await app.register(fastifyCookie);
-					const ready = discovery.registerSettingsCliDiscovery(
-						app,
-						"/parity",
-					);
-					await app.register(appTrpcPlugin, {
-						prefix: "/parity/api/trpc",
-					});
+					const { createServer } = await import("../src/server.js");
+					app = createServer("/parity");
 					await app.listen({ port: 0, host: "127.0.0.1" });
-					await ready;
 				}
 			});
 			afterEach(async () => {

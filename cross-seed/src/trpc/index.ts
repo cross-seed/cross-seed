@@ -2,7 +2,7 @@ import { daemonSettingsService } from "../daemonSettings.js";
 import type { SettingsService } from "../settingsService.js";
 import { validSettingsCliToken } from "../configDaemonDiscovery.js";
 import { initTRPC, TRPCError } from "@trpc/server";
-import type { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify";
+import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { validateSession } from "../userAuth.js";
 import {
 	getSessionCookie,
@@ -20,8 +20,8 @@ type AuthenticatedUser = {
 
 export interface Context {
 	settingsService?: SettingsService;
-	req: CreateFastifyContextOptions["req"];
-	res: CreateFastifyContextOptions["res"];
+	req: Request;
+	res: Headers;
 	user: AuthenticatedUser | null;
 	setSession: (sessionId: string) => void;
 	deleteSession: () => void;
@@ -30,8 +30,8 @@ export interface Context {
 // Context creator function
 export async function createContext({
 	req,
-	res,
-}: CreateFastifyContextOptions): Promise<Context> {
+	resHeaders,
+}: FetchCreateContextFnOptions): Promise<Context> {
 	const sessionId = getSessionCookie(req);
 
 	let user: AuthenticatedUser | null = null;
@@ -48,14 +48,16 @@ export async function createContext({
 
 	return {
 		settingsService:
-			user || validSettingsCliToken(req.headers.authorization)
+			user ||
+			validSettingsCliToken(req.headers.get("authorization") ?? undefined)
 				? daemonSettingsService
 				: undefined,
 		req,
-		res,
+		res: resHeaders,
 		user,
-		setSession: (sessionId: string) => setSessionCookie(res, sessionId),
-		deleteSession: () => clearSessionCookie(res),
+		setSession: (sessionId: string) =>
+			setSessionCookie(resHeaders, sessionId),
+		deleteSession: () => clearSessionCookie(resHeaders),
 	};
 }
 

@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"allowJs": true,
 		"target": "es2022",
-		"lib": ["es2023"],
+		"lib": ["es2023", "DOM", "DOM.Iterable"],
 		"module": "nodenext",
 		"moduleResolution": "nodenext",
 		"esModuleInterop": true,

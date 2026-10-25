@@ -1,6 +1,7 @@
-import cors from "@fastify/cors";
+import { Hono } from "hono";
+import type { HttpEnv } from "../httpTypes.js";
+import { runInBackground } from "../utils/background.js";
 import chalk from "chalk";
-import { FastifyInstance } from "fastify";
 import { existsSync } from "fs";
 import { parse as qsParse } from "querystring";
 import { inspect } from "util";
@@ -22,7 +23,7 @@ import {
 import { getRuntimeConfig, RuntimeConfig } from "../runtimeConfig.js";
 import { indexTorrentsAndDataDirs } from "../torrent.js";
 import { errorMessage, formatAsList, sanitizeInfoHash } from "../utils.js";
-import { authorize } from "../utils/authUtils.js";
+import { authorize, API_KEY_REQUIRED } from "../utils/authUtils.js";
 
 export const ANNOUNCE_SCHEMA = z
 	.object({
@@ -143,56 +144,56 @@ function determineResponse(result: {
 	return { status, state };
 }
 
-export async function baseApiPlugin(app: FastifyInstance) {
-	// Add query string parsing support
-	app.addContentTypeParser(
-		"application/x-www-form-urlencoded",
-		{ parseAs: "string" },
-		function (req, body, done) {
-			try {
-				const parsed = parseData(body as string);
-				done(null, parsed);
-			} catch (error) {
-				done(error as Error, undefined);
+export function baseApiRoutes(
+	trackBackground: (task: Promise<void>) => void = runInBackground,
+): Hono<HttpEnv> {
+	const app = new Hono<HttpEnv>();
+	for (const path of ["/webhook", "/announce", "/job"]) {
+		app.post(path, async (c, next) => {
+			const text = await c.req.text();
+			const type = c.req
+				.header("content-type")
+				?.split(";")[0]
+				.trim()
+				.toLowerCase();
+			if (text || type) {
+				if (
+					type === "application/json" ||
+					type === "application/x-www-form-urlencoded"
+				) {
+					try {
+						c.set("parsedBody", parseData(text));
+					} catch (error) {
+						return c.json(
+							{
+								statusCode: 500,
+								error: "Internal Server Error",
+								message: errorMessage(error),
+							},
+							500,
+						);
+					}
+				} else if (type === "text/plain") c.set("parsedBody", text);
+				else
+					return c.json(
+						{
+							statusCode: 415,
+							code: "FST_ERR_CTP_INVALID_MEDIA_TYPE",
+							error: "Unsupported Media Type",
+							message: `Unsupported Media Type: ${type}`,
+						},
+						415,
+					);
 			}
-		},
-	);
-
-	// Add JSON body parsing support
-	app.addContentTypeParser(
-		"application/json",
-		{ parseAs: "string" },
-		function (req, body, done) {
-			try {
-				const parsed = parseData(body as string);
-				done(null, parsed);
-			} catch (error) {
-				done(error as Error, undefined);
-			}
-		},
-	);
-
-	// Enable CORS for /ping, /webhook, and /announce endpoints
-	const CORS_ENABLED_ROUTES = ["/api/ping", "/api/webhook", "/api/announce"];
-	await app.register(cors, {
-		delegator: (req, callback) => {
-			if (
-				CORS_ENABLED_ROUTES.some((route) => req.url.startsWith(route))
-			) {
-				callback(null, { origin: "*" });
-			} else {
-				callback(null, { origin: false });
-			}
-		},
-	});
+			await next();
+		});
+	}
 
 	/**
 	 * Trigger a search for a torrent
 	 */
-	app.post<{
-		Querystring: { apikey?: string };
-	}>("/webhook", async (request, reply) => {
-		if (!(await authorize(request, reply))) return;
+	app.post("/webhook", async (c) => {
+		if (!(await authorize(c))) return c.text(API_KEY_REQUIRED, 401);
 
 		const injectJob = getJobs().find((job) => job.name === JobName.INJECT);
 		if (injectJob) {
@@ -201,75 +202,78 @@ export async function baseApiPlugin(app: FastifyInstance) {
 		}
 		await indexTorrentsAndDataDirs();
 
-		const rawData: unknown = request.body;
+		const rawData: unknown = c.get("parsedBody");
 		let data: z.infer<typeof WEBHOOK_SCHEMA>;
 		try {
 			data = WEBHOOK_SCHEMA.parse(rawData);
 		} catch {
 			const message = `A valid infoHash or an accessible path must be provided (infoHash is recommended: see https://www.cross-seed.org/docs/reference/api#post-apiwebhook): ${inspect(rawData)}`;
 			logger.error({ label: Label.WEBHOOK, message });
-			return reply.code(400).send(message);
+			return c.text(message, 400);
 		}
 
-		void reply.code(204).send();
+		trackBackground(
+			(async () => {
+				const criteriaStr = data.infoHash
+					? inspect(data).replace(
+							data.infoHash,
+							sanitizeInfoHash(data.infoHash),
+						)
+					: inspect(data);
 
-		const criteriaStr = data.infoHash
-			? inspect(data).replace(
-					data.infoHash,
-					sanitizeInfoHash(data.infoHash),
-				)
-			: inspect(data);
-
-		logger.info({
-			label: Label.WEBHOOK,
-			message: `Received search request: ${criteriaStr}`,
-		});
-
-		const configOverride: Partial<RuntimeConfig> = {
-			includeSingleEpisodes: data.includeSingleEpisodes,
-			includeNonVideos: data.includeNonVideos,
-			excludeRecentSearch: data.ignoreExcludeRecentSearch ? 1 : undefined,
-			excludeOlder: data.ignoreExcludeOlder
-				? Number.MAX_SAFE_INTEGER
-				: undefined,
-			blockList: data.ignoreBlockList ? [] : undefined,
-		};
-
-		try {
-			let numFound: number | null = null;
-			if (data) {
-				numFound = await searchForLocalTorrentByCriteria(data, {
-					configOverride,
-					ignoreCrossSeeds: data.ignoreCrossSeeds ?? true,
-				});
-			}
-
-			if (numFound !== null) {
 				logger.info({
 					label: Label.WEBHOOK,
-					message: `Found ${numFound} torrents for ${criteriaStr}`,
+					message: `Received search request: ${criteriaStr}`,
 				});
-			}
-		} catch (e) {
-			logger.error({
-				label: Label.WEBHOOK,
-				message: errorMessage(e),
-			});
-			logger.debug(e);
-		}
+
+				const configOverride: Partial<RuntimeConfig> = {
+					includeSingleEpisodes: data.includeSingleEpisodes,
+					includeNonVideos: data.includeNonVideos,
+					excludeRecentSearch: data.ignoreExcludeRecentSearch
+						? 1
+						: undefined,
+					excludeOlder: data.ignoreExcludeOlder
+						? Number.MAX_SAFE_INTEGER
+						: undefined,
+					blockList: data.ignoreBlockList ? [] : undefined,
+				};
+
+				try {
+					let numFound: number | null = null;
+					if (data) {
+						numFound = await searchForLocalTorrentByCriteria(data, {
+							configOverride,
+							ignoreCrossSeeds: data.ignoreCrossSeeds ?? true,
+						});
+					}
+
+					if (numFound !== null) {
+						logger.info({
+							label: Label.WEBHOOK,
+							message: `Found ${numFound} torrents for ${criteriaStr}`,
+						});
+					}
+				} catch (e) {
+					logger.error({
+						label: Label.WEBHOOK,
+						message: errorMessage(e),
+					});
+					logger.debug(e);
+				}
+			})(),
+		);
+		return c.body(null, 204);
 	});
 
 	/**
 	 * Reverse lookup for a torrent
 	 */
-	app.post<{
-		Querystring: { apikey?: string };
-	}>("/announce", async (request, reply) => {
-		if (!(await authorize(request, reply))) return;
+	app.post("/announce", async (c) => {
+		if (!(await authorize(c))) return c.text(API_KEY_REQUIRED, 401);
 
 		const { dataDirs, torrentDir, useClientTorrents } = getRuntimeConfig();
 
-		const rawData: unknown = request.body;
+		const rawData: unknown = c.get("parsedBody");
 		let data: z.infer<typeof ANNOUNCE_SCHEMA>;
 		try {
 			data = ANNOUNCE_SCHEMA.parse(rawData);
@@ -285,7 +289,7 @@ export async function baseApiPlugin(app: FastifyInstance) {
 				{ sort: true, type: "unit" },
 			)}} in ${inspect(rawData)}\n${inspect(errors)}`;
 			logger.error({ label: Label.ANNOUNCE, message });
-			return reply.code(400).send(message);
+			return c.text(message, 400);
 		}
 
 		logger.verbose({
@@ -307,7 +311,7 @@ export async function baseApiPlugin(app: FastifyInstance) {
 				Label.ANNOUNCE,
 			);
 			if (!result.decision) {
-				return await reply.code(204).send();
+				return c.body(null, 204);
 			}
 
 			const { status, state } = determineResponse(result);
@@ -317,33 +321,31 @@ export async function baseApiPlugin(app: FastifyInstance) {
 					message: `${state} ${candidateLog} (status: ${status})`,
 				});
 			}
-			return await reply.code(status).send();
+			return new Response(null, { status });
 		} catch (e) {
 			logger.error({
 				label: Label.ANNOUNCE,
 				message: errorMessage(e),
 			});
 			logger.debug(e);
-			return reply.code(500).send(errorMessage(e));
+			return c.text(errorMessage(e), 500);
 		}
 	});
 
 	/**
 	 * Run a job ahead of schedule if eligible
 	 */
-	app.post<{
-		Querystring: { apikey?: string };
-	}>("/job", async (request, reply) => {
-		if (!(await authorize(request, reply))) return;
+	app.post("/job", async (c) => {
+		if (!(await authorize(c))) return c.text(API_KEY_REQUIRED, 401);
 
-		const rawData: unknown = request.body;
+		const rawData: unknown = c.get("parsedBody");
 		let data: z.infer<typeof JOB_SCHEMA>;
 		try {
 			data = JOB_SCHEMA.parse(rawData);
 		} catch {
 			const message = `Job name must be one of ${formatAsList(Object.values(JobName), { sort: true, style: "narrow", type: "unit" })} - received: ${inspect(rawData)}`;
 			logger.error({ label: Label.SERVER, message });
-			return reply.code(400).send(message);
+			return c.text(message, 400);
 		}
 
 		logger.info({
@@ -355,13 +357,13 @@ export async function baseApiPlugin(app: FastifyInstance) {
 		if (!job) {
 			const message = `${data.name}: unable to run, disabled in config`;
 			logger.error({ label: Label.SCHEDULER, message });
-			return reply.code(404).send(message);
+			return c.text(message, 404);
 		}
 
 		if (job.isActive) {
 			const message = `${job.name}: already running`;
 			logger.error({ label: Label.SCHEDULER, message });
-			return reply.code(409).send(message);
+			return c.text(message, 409);
 		}
 
 		job.runAheadOfSchedule = true;
@@ -374,7 +376,7 @@ export async function baseApiPlugin(app: FastifyInstance) {
 		await checkJobs({ isFirstRun: false, useQueue: true });
 		const message = `${job.name}: running ahead of schedule`;
 		logger.info({ label: Label.SCHEDULER, message });
-		return reply.code(200).send(message);
+		return c.text(message, 200);
 	});
 
 	/**
@@ -382,17 +384,16 @@ export async function baseApiPlugin(app: FastifyInstance) {
 	 * future: respond with current state and job status details via API
 	 * uses: potential usage of this in dashbrr
 	 */
-	app.get<{
-		Querystring: { apikey?: string };
-	}>("/status", async (request, reply) => {
-		if (!(await authorize(request, reply))) return;
-		return reply.code(200).send("OK");
+	app.get("/status", async (c) => {
+		if (!(await authorize(c))) return c.text(API_KEY_REQUIRED, 401);
+		return c.text("OK", 200);
 	});
 
 	/**
 	 * cross-seed health check
 	 */
-	app.get("/ping", async (request, reply) => {
-		return reply.code(200).send("OK");
+	app.get("/ping", (c) => {
+		return c.text("OK", 200);
 	});
+	return app;
 }

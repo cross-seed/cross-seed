@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, rename, writeFile } from "fs/promises";
 import path from "path";
 import { runInBackground } from "./utils/background.js";
+import { drainShutdownHooks } from "./utils/shutdown.js";
 import { resetApiKey } from "./auth.js";
 import { instantiateDownloadClients } from "./clients/TorrentClient.js";
 import {
@@ -32,10 +33,15 @@ import { Awaitable, notExists } from "./utils.js";
 import { getLogWatcher } from "./utils/logWatcher.js";
 import { omitUndefined } from "./utils/object.js";
 
-export async function exitGracefully() {
-	destroyDataDirWatchers();
-	await db.destroy();
-	process.exit();
+let exiting: Promise<void> | undefined;
+export function exitGracefully(): Promise<void> {
+	exiting ??= (async () => {
+		await drainShutdownHooks();
+		destroyDataDirWatchers();
+		await db.destroy();
+		process.exit();
+	})();
+	return exiting;
 }
 
 export function handleExitSignal(): void {

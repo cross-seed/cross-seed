@@ -1,7 +1,8 @@
-import { FastifyInstance } from "fastify";
+import type { Context } from "hono";
+import type { HttpEnv } from "../httpTypes.js";
 import { readFile } from "node:fs/promises";
 import { getAsset, getAssetKeys, isSea } from "node:sea";
-import { extname, join, relative, sep } from "path";
+import { extname, isAbsolute, join, relative, sep } from "path";
 import { isTruthy } from "../utils.js";
 import ErrnoException = NodeJS.ErrnoException;
 
@@ -69,44 +70,60 @@ async function readStaticFile(
 	return typeof asset === "string" ? asset : Buffer.from(asset);
 }
 
-// eslint-disable-next-line @typescript-eslint/require-await
-export async function staticFrontendPlugin(
-	app: FastifyInstance,
-	{ basePath }: { basePath: string },
-) {
-	// Custom static file handler that replaces sentinel values
-	app.get("*", async (request, reply) => {
-		const requestPath = request.url.split("?")[0];
-		const basePathRelativeUrl = requestPath.startsWith(basePath)
-			? requestPath.slice(basePath.length)
-			: "MALFORMED_REQUEST_URL"; // should never happen because this route is only registered under basePath
-		const desiredFilePath = join(
-			STATIC_ROOT,
-			...basePathRelativeUrl.split("/").filter(isTruthy),
-		);
-		let fileContents: string | Buffer;
-		let fileExtension = extname(desiredFilePath);
+export async function serveFrontend(
+	c: Context<HttpEnv>,
+	basePath: string,
+): Promise<Response> {
+	const requestPath = c.req.path;
+	const basePathRelativeUrl = requestPath.startsWith(basePath)
+		? requestPath.slice(basePath.length)
+		: "MALFORMED_REQUEST_URL"; // should never happen because this route is only registered under basePath
+	// Hono decodes some URL escapes. Backslashes become path separators on
+	// Windows, so reject them before resolving any filesystem or embedded asset.
+	if (
+		basePathRelativeUrl.includes("\\") ||
+		basePathRelativeUrl.includes("\0")
+	) {
+		return c.text("Not Found", 404);
+	}
+	const desiredFilePath = join(
+		STATIC_ROOT,
+		...basePathRelativeUrl.split("/").filter(isTruthy),
+	);
+	const assetPath = relative(STATIC_ROOT, desiredFilePath);
+	if (
+		assetPath === ".." ||
+		assetPath.startsWith(`..${sep}`) ||
+		isAbsolute(assetPath)
+	) {
+		return c.text("Not Found", 404);
+	}
+	let fileContents: string | Buffer;
+	let fileExtension = extname(desiredFilePath);
 
-		try {
-			const isText = TEXT_EXT.includes(fileExtension);
-			fileContents = await readStaticFile(desiredFilePath, isText);
-		} catch (e) {
-			if (
-				(e as ErrnoException).code == "ENOENT" ||
-				(e as ErrnoException).code == "EISDIR"
-			) {
-				if (!(request.headers.accept?.includes("text/html") ?? false)) {
-					return reply.code(404).type("text/plain").send("Not Found");
-				}
-				fileContents = await readStaticFile(INDEX_HTML_PATH, true);
-				fileExtension = ".html";
-			} else {
-				throw e;
+	try {
+		const isText = TEXT_EXT.includes(fileExtension);
+		fileContents = await readStaticFile(desiredFilePath, isText);
+	} catch (e) {
+		if (
+			(e as ErrnoException).code == "ENOENT" ||
+			(e as ErrnoException).code == "EISDIR"
+		) {
+			if (!(c.req.header("accept")?.includes("text/html") ?? false)) {
+				return c.text("Not Found", 404);
 			}
+			fileContents = await readStaticFile(INDEX_HTML_PATH, true);
+			fileExtension = ".html";
+		} else {
+			throw e;
 		}
+	}
 
-		return reply
-			.type(getContentType(fileExtension))
-			.send(injectBasePath(fileContents, basePath));
-	});
+	const content = injectBasePath(fileContents, basePath);
+	return new Response(
+		typeof content === "string" ? content : new Uint8Array(content),
+		{
+			headers: { "Content-Type": getContentType(fileExtension) },
+		},
+	);
 }

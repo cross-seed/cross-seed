@@ -1,4 +1,5 @@
-import { FastifyInstance } from "fastify";
+import { Hono } from "hono";
+import type { HttpEnv } from "../httpTypes.js";
 import { setSessionCookie } from "../sessionCookies.js";
 import { validateSession } from "../userAuth.js";
 
@@ -18,28 +19,18 @@ function normalizeRedirectTo(redirectTo: unknown): string {
 	return redirectTo;
 }
 
-// eslint-disable-next-line @typescript-eslint/require-await
-export async function devLoginPlugin(
-	app: FastifyInstance,
-	{ basePath }: { basePath: string },
-) {
-	if (!isDevLoginEnabled()) return;
-
-	app.get<{
-		Params: { sessionId: string };
-		Querystring: { redirectTo?: string };
-	}>("/api/dev-login/:sessionId", async (request, reply) => {
-		const sessionId = request.params.sessionId;
+export function devLoginRoutes(basePath: string): Hono<HttpEnv> {
+	const app = new Hono<HttpEnv>();
+	if (!isDevLoginEnabled()) return app;
+	app.get("/api/dev-login/:sessionId", async (c) => {
+		const sessionId = c.req.param("sessionId");
 		const user = await validateSession(sessionId);
-		if (!user) {
-			return reply
-				.code(404)
-				.send({ error: "Dev login session not found" });
-		}
-
-		setSessionCookie(reply, sessionId);
-		return reply.redirect(
-			`${basePath}${normalizeRedirectTo(request.query.redirectTo)}`,
-		);
+		if (!user) return c.json({ error: "Dev login session not found" }, 404);
+		const headers = new Headers({
+			Location: `${basePath}${normalizeRedirectTo(c.req.query("redirectTo"))}`,
+		});
+		setSessionCookie(headers, sessionId);
+		return new Response(null, { status: 302, headers });
 	});
+	return app;
 }
