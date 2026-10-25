@@ -1,7 +1,7 @@
-import bencode from "bencode";
 import { readFile, stat, unlink, utimes, writeFile } from "fs/promises";
 import ms from "ms";
 import path from "path";
+import { decode, encode } from "./bencode.js";
 import { appDir } from "./configuration.js";
 import {
 	ANIME_GROUP_REGEX,
@@ -549,9 +549,7 @@ export async function updateTorrentCache(
 	let count = 0;
 	for (const torrentPath of torrentPaths) {
 		try {
-			const torrent: Torrent = bencode.decode(
-				await readFile(torrentPath),
-			);
+			const torrent = decode(await readFile(torrentPath)) as Torrent;
 			const announce = torrent.announce?.toString();
 			const announceList = torrent["announce-list"]?.map((tier) =>
 				tier.map((url) => url.toString()),
@@ -587,10 +585,7 @@ export async function updateTorrentCache(
 				);
 			}
 			if (updated) {
-				await writeFile(
-					torrentPath,
-					new Uint8Array(bencode.encode(torrent)),
-				);
+				await writeFile(torrentPath, new Uint8Array(encode(torrent)));
 			}
 		} catch (e) {
 			console.error(`Error reading ${torrentPath}: ${e}`);
