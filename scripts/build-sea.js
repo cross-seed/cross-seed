@@ -1,11 +1,13 @@
 import { spawn } from "node:child_process";
 import { chmod, cp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
 import { basename, dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as viteBuild } from "vite";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const require = createRequire(import.meta.url);
 const seaDir = join(repoRoot, "sea");
 const nodeVersion = process.env.NODE_VERSION ?? process.version;
 const targetFilter = process.env.SEA_TARGETS?.split(",")
@@ -156,6 +158,11 @@ async function buildBundle(bundlePath) {
 		root: repoRoot,
 		publicDir: false,
 		logLevel: "warn",
+		resolve: {
+			// file-stream-rotator calls require("moment") as a function. Resolving
+			// Moment's ESM module field turns that into an incompatible namespace.
+			alias: { moment: require.resolve("moment") },
+		},
 		build: {
 			emptyOutDir: false,
 			minify: false,

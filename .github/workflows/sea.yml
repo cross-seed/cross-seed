@@ -74,6 +74,7 @@ jobs:
               run: |
                   ./sea/${{ matrix.binary }} --version
                   ./sea/${{ matrix.binary }} config --help
+                  node scripts/smoke-runtime.js ./sea/${{ matrix.binary }}
               shell: bash
             - name: Upload SEA to release
               if:
