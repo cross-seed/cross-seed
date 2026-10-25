@@ -1,0 +1,103 @@
+name: Publish npm release
+
+on:
+    workflow_dispatch:
+        inputs:
+            release_tag:
+                description: Existing immutable v7+ release tag, e.g. v7.0.0-27
+                type: string
+                required: true
+
+permissions:
+    contents: read
+
+env:
+    FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# Serialize channel changes, including different release tags. Never interrupt a publish.
+concurrency:
+    group: npm-publish
+    cancel-in-progress: false
+
+jobs:
+    package:
+        if: github.repository == 'cross-seed/cross-seed'
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        outputs:
+            commit: ${{ steps.release.outputs.commit }}
+            version: ${{ steps.release.outputs.version }}
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+              with:
+                  ref: refs/tags/${{ inputs.release_tag }}
+                  fetch-depth: 0
+                  persist-credentials: false
+            - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+              with:
+                  node-version: 26
+                  package-manager-cache: false
+            - name: Check release tag, source, and workflow provenance
+              env:
+                  RELEASE_TAG: ${{ inputs.release_tag }}
+              run: node scripts/npm-release.js check-source "$RELEASE_TAG"
+            - run: npm ci
+            - run: npm run format:check
+            - run: npm run build
+            - run: npm run lint
+            - run: npm run typecheck
+            - run: npm test
+            - run: node --test scripts/npm-release.test.js
+            - name: Pack the release once and bind it to its source
+              id: release
+              env:
+                  RELEASE_TAG: ${{ inputs.release_tag }}
+              run: |
+                  mkdir release-artifact
+                  (cd cross-seed && npm pack --workspaces=false --pack-destination ../release-artifact)
+                  mv release-artifact/cross-seed-*.tgz release-artifact/cross-seed.tgz
+                  node scripts/npm-release.js prepare release-artifact "$RELEASE_TAG"
+            - name: Install and smoke-test the exact tarball
+              run: |
+                  install_prefix="$(mktemp -d)"
+                  npm install --global --prefix "$install_prefix" "$GITHUB_WORKSPACE/release-artifact/cross-seed.tgz"
+                  "$install_prefix/bin/cross-seed" --version
+                  node scripts/smoke-runtime.js "$install_prefix/bin/cross-seed"
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+              with:
+                  name: npm-release-${{ steps.release.outputs.commit }}
+                  path: release-artifact/
+                  if-no-files-found: error
+                  retention-days: 30
+
+    publish:
+        needs: package
+        runs-on: ubuntu-latest
+        timeout-minutes: 40
+        environment: npm
+        permissions:
+            contents: read
+            id-token: write
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+              with:
+                  ref: ${{ needs.package.outputs.commit }}
+                  fetch-depth: 0
+                  persist-credentials: false
+            - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+              with:
+                  node-version: 26
+                  registry-url: https://registry.npmjs.org
+                  package-manager-cache: false
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+              with:
+                  name: npm-release-${{ needs.package.outputs.commit }}
+                  path: release-artifact
+            - name: Publish tested artifact and verify public availability
+              run: node scripts/npm-release.js publish release-artifact
+            - name: Record verified release
+              env:
+                  RELEASE_VERSION: ${{ needs.package.outputs.version }}
+                  RELEASE_COMMIT: ${{ needs.package.outputs.commit }}
+              run: |
+                  echo "Verified cross-seed@$RELEASE_VERSION from $RELEASE_COMMIT; see publish logs for checksum and dist-tag verification." >> "$GITHUB_STEP_SUMMARY"
