@@ -941,7 +941,9 @@ export default class QBittorrent implements TorrentClient {
 		const torrentInfo = await this.getTorrentInfo(infoHash);
 		if (!torrentInfo) return resultOfErr("NOT_FOUND");
 		return resultOf(
-			["checkingDL", "checkingUP"].includes(torrentInfo.state),
+			["checkingDL", "checkingUP", "checkingResumeData"].includes(
+				torrentInfo.state,
+			),
 		);
 	}
 
@@ -1036,7 +1038,11 @@ export default class QBittorrent implements TorrentClient {
 				sleepTime = resumeErrSleepTime; // Dropping connections or restart
 				continue;
 			}
-			if (["checkingDL", "checkingUP"].includes(torrentInfo.state)) {
+			if (
+				["checkingDL", "checkingUP", "checkingResumeData"].includes(
+					torrentInfo.state,
+				)
+			) {
 				continue;
 			}
 			const torrentLog = `${torrentInfo.name} [${sanitizeInfoHash(infoHash)}]`;
