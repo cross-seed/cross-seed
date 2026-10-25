@@ -549,21 +549,34 @@ export default class Deluge implements TorrentClient {
 				this.isLabelEnabled = false;
 				throw new Error("Labels have been disabled.");
 			}
-			if (getCurrentLabels.unwrap().includes(label)) {
-				setResult = await this.call<void>("label.set_torrent", [
-					newTorrent.infoHash,
-					label,
-				]);
-			} else {
-				await this.call<void>("label.add", [label]);
-				await wait(300);
-				setResult = await this.call<void>("label.set_torrent", [
-					newTorrent.infoHash,
-					label,
-				]);
-			}
-			if (setResult.isErr()) {
-				throw new Error(setResult.unwrapErr().message);
+			// injection may take longer to actually modify state in deluge than the 250ms
+			// this gives 4 attempts to check if torrent exists, totalling 1 second from injection
+			for (let i = 0; i < 4; i++) {
+				const existsRes = await this.isTorrentInClient(
+					newTorrent.infoHash!,
+				);
+				if (existsRes.isErr())
+					throw new Error("Labeling failed. Unknown error.");
+				if (existsRes.unwrap()) {
+					if (getCurrentLabels.unwrap().includes(label)) {
+						setResult = await this.call<void>("label.set_torrent", [
+							newTorrent.infoHash,
+							label,
+						]);
+					} else {
+						await this.call<void>("label.add", [label]);
+						await wait(250);
+						setResult = await this.call<void>("label.set_torrent", [
+							newTorrent.infoHash,
+							label,
+						]);
+					}
+					if (setResult.isErr()) {
+						throw new Error(setResult.unwrapErr().message);
+					}
+				} else {
+					await wait(250);
+				}
 			}
 		} catch (e) {
 			logger.warn({
