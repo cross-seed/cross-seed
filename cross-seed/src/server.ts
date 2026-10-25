@@ -7,13 +7,11 @@ import fastify, { FastifyInstance } from "fastify";
 import { Label, logger } from "./logger.js";
 import { baseApiPlugin } from "./routes/baseApi.js";
 import { devLoginPlugin } from "./routes/devLogin.js";
-import { indexerApiPlugin } from "./routes/indexerApi.js";
 import { staticFrontendPlugin } from "./routes/staticFrontendPlugin.js";
 import { appTrpcPlugin } from "./trpc/fastifyAdapter.js";
 
 async function apiPlugin(app: FastifyInstance) {
 	await app.register(appTrpcPlugin, { prefix: "/trpc" });
-	await app.register(indexerApiPlugin, { prefix: "/indexer/v1" });
 	await app.register(baseApiPlugin);
 }
 
@@ -27,7 +25,7 @@ async function rootPlugin(
 	await app.register(staticFrontendPlugin, { basePath });
 }
 
-async function createServer(
+export async function createServer(
 	basePath: string,
 ): Promise<{ app: FastifyInstance; cliReady: Promise<void> }> {
 	const app = fastify({ logger: false });
