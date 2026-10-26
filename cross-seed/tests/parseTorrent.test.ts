@@ -103,6 +103,22 @@ describe("Metafile with a v1 torrent", () => {
 		expect(Metafile.decode(encoded).encode().equals(encoded)).toBe(true);
 	});
 
+	it.each([
+		["a byte string", Buffer.from("abcd")],
+		["zero", 0],
+		["a negative number", -1],
+	])("rejects a piece length that is %s", (_name, pieceLength) => {
+		const bad = Buffer.from(
+			bencode.encode({
+				...raw,
+				info: { ...raw.info, "piece length": pieceLength },
+			}),
+		);
+		expect(() => Metafile.decode(bad)).toThrow(
+			"Torrent is missing required field: info['piece length']",
+		);
+	});
+
 	it("rejects a dictionary that is not a torrent", () => {
 		expect(() => Metafile.decode(Buffer.from("d3:fooi1ee"))).toThrow(
 			"Torrent is missing required field: info",
