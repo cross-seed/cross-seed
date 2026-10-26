@@ -340,7 +340,7 @@ export default class Transmission implements TorrentClient {
 					fields: ["hashString"],
 				})
 			).torrents;
-			if (!torrents.length) throw new Error("No torrents found");
+			if (!torrents.length) return resultOf(false);
 			for (const torrent of torrents) {
 				if (torrent.hashString.toLowerCase() === infoHash) {
 					return resultOf(true);
