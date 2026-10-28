@@ -18,6 +18,22 @@ import { errorMessage } from "./utils.js";
 import { runInBackground } from "./utils/background.js";
 import { registerShutdownHook } from "./utils/shutdown.js";
 
+// The Node adapter's Request-shaped object is not a native Request. Copy its
+// fields before middleware (including bodyLimit) attempts to clone it.
+function copyRequest(incoming: Request, signal = incoming.signal): Request {
+	const init = {
+		method: incoming.method,
+		headers: incoming.headers,
+		body:
+			incoming.method === "GET" || incoming.method === "HEAD"
+				? undefined
+				: incoming.body,
+		signal,
+		duplex: "half",
+	};
+	return new Request(incoming.url, init);
+}
+
 export function createHttpApp(
 	basePath = "",
 	options: {
@@ -80,22 +96,11 @@ export function createHttpApp(
 	});
 	const endpoint = `${basePath}/api/trpc`;
 	app.all(`${endpoint}/*`, (c) => {
-		// The Node adapter supplies a Fetch-compatible request, not a native Request
-		// instance. Copy its fields explicitly when adding the shutdown signal.
 		const incoming = c.req.raw;
-		const init = {
-			method: incoming.method,
-			headers: incoming.headers,
-			body:
-				incoming.method === "GET" || incoming.method === "HEAD"
-					? undefined
-					: incoming.body,
-			signal: options.signal
-				? AbortSignal.any([incoming.signal, options.signal])
-				: incoming.signal,
-			duplex: "half",
-		};
-		return handleTrpcRequest(new Request(incoming.url, init), endpoint);
+		const signal = options.signal
+			? AbortSignal.any([incoming.signal, options.signal])
+			: incoming.signal;
+		return handleTrpcRequest(copyRequest(incoming, signal), endpoint);
 	});
 	app.route(basePath || "/", devLoginRoutes(basePath));
 	app.route(`${basePath}/api`, baseApiRoutes(options.trackBackground));
@@ -128,9 +133,14 @@ export function createServer(basePath = "") {
 		trackBackground,
 		signal: shutdown.signal,
 	});
-	const listener = getRequestListener(app.fetch, {
-		overrideGlobalObjects: false,
-	});
+	const listener = getRequestListener(
+		(incoming, bindings: HttpEnv["Bindings"]) =>
+			app.fetch(
+				incoming.body ? copyRequest(incoming) : incoming,
+				bindings,
+			),
+		{ overrideGlobalObjects: false },
+	);
 	const server = createNodeServer((req, res) => {
 		runInBackground(Promise.resolve(listener(req, res)));
 	});

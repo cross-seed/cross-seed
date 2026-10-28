@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { request as httpRequest } from "node:http";
 import {
 	afterAll,
 	beforeAll,
@@ -351,6 +352,86 @@ describe.sequential("Hono HTTP behavior", () => {
 			).status,
 		).toBe(401);
 	});
+	it.each(["", "/cross-seed"])(
+		"handles chunked requests through the real Node adapter at %s",
+		async (basePath) => {
+			const nativeRequest = globalThis.Request;
+			const server = serverModule.createServer(basePath);
+			await server.listen({ port: 0, host: "127.0.0.1" });
+			const address = server.server.address();
+			if (!address || typeof address === "string")
+				throw new Error("No listener");
+			const postStream = (path: string, body: string) => {
+				const init = {
+					method: "POST",
+					headers: {
+						"content-type": "application/json",
+						"x-api-key": key,
+					},
+					body: new ReadableStream<Uint8Array>({
+						start(controller) {
+							controller.enqueue(new TextEncoder().encode(body));
+							controller.close();
+						},
+					}),
+					duplex: "half",
+				};
+				return fetch(
+					`http://127.0.0.1:${address.port}${basePath}${path}`,
+					init,
+				);
+			};
+			try {
+				const login = await postStream(
+					"/api/trpc/auth.logIn",
+					JSON.stringify({
+						username: "http-user",
+						password: "http-test-password",
+					}),
+				);
+				const result: unknown = await login.json();
+				expect(login.status, JSON.stringify(result)).toBe(200);
+				expect(result).toHaveProperty("result");
+				expect(login.headers.get("set-cookie")).toContain("HttpOnly");
+				const webhook = await postStream(
+					"/api/webhook",
+					JSON.stringify({ infoHash: hash }),
+				);
+				expect(await webhook.text()).toBe("");
+				expect(webhook.status).toBe(204);
+				expect(search).toHaveBeenCalled();
+				const oversized = await postStream(
+					"/api/announce",
+					JSON.stringify({ name: "x".repeat(1024 * 1024) }),
+				);
+				expect(oversized.status).toBe(413);
+				expect(await oversized.json()).toHaveProperty(
+					"code",
+					"FST_ERR_CTP_BODY_TOO_LARGE",
+				);
+				expect(globalThis.Request).toBe(nativeRequest);
+				const traceStatus = await new Promise<number>(
+					(resolve, reject) => {
+						const request = httpRequest(
+							`http://127.0.0.1:${address.port}${basePath}/api/ping`,
+							{ method: "TRACE" },
+							(response) => {
+								response.resume();
+								response.on("end", () =>
+									resolve(response.statusCode!),
+								);
+							},
+						);
+						request.on("error", reject);
+						request.end();
+					},
+				);
+				expect(traceStatus).toBe(404);
+			} finally {
+				await server.close();
+			}
+		},
+	);
 	it("streams authenticated tRPC subscriptions and releases them on disconnect", async () => {
 		const server = serverModule.createServer();
 		await server.listen({ port: 0, host: "127.0.0.1" });
