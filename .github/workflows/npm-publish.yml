@@ -1,6 +1,9 @@
 name: Publish npm release
 
 on:
+    release:
+        types:
+            - published
     workflow_dispatch:
         inputs:
             release_tag:
@@ -21,7 +24,10 @@ concurrency:
 
 jobs:
     package:
-        if: github.repository == 'cross-seed/cross-seed'
+        if: >-
+            github.repository == 'cross-seed/cross-seed' && (github.event_name
+            == 'workflow_dispatch' || !startsWith(github.event.release.tag_name,
+            'v6.'))
         runs-on: ubuntu-latest
         timeout-minutes: 25
         outputs:
@@ -30,7 +36,9 @@ jobs:
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
               with:
-                  ref: refs/tags/${{ inputs.release_tag }}
+                  ref:
+                      refs/tags/${{ github.event.release.tag_name ||
+                      inputs.release_tag }}
                   fetch-depth: 0
                   persist-credentials: false
             - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
@@ -39,7 +47,8 @@ jobs:
                   package-manager-cache: false
             - name: Check release tag, source, and workflow provenance
               env:
-                  RELEASE_TAG: ${{ inputs.release_tag }}
+                  RELEASE_TAG:
+                      ${{ github.event.release.tag_name || inputs.release_tag }}
               run: node scripts/npm-release.js check-source "$RELEASE_TAG"
             - run: npm ci
             - run: npm run format:check
@@ -47,11 +56,15 @@ jobs:
             - run: npm run lint
             - run: npm run typecheck
             - run: npm test
-            - run: node --test scripts/npm-release.test.js
+            - run: npm run test:daemon
+            - run:
+                  node --test scripts/npm-release.test.js
+                  scripts/release.test.js
             - name: Pack the release once and bind it to its source
               id: release
               env:
-                  RELEASE_TAG: ${{ inputs.release_tag }}
+                  RELEASE_TAG:
+                      ${{ github.event.release.tag_name || inputs.release_tag }}
               run: |
                   mkdir release-artifact
                   (cd cross-seed && npm pack --workspaces=false --pack-destination ../release-artifact)

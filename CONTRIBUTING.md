@@ -40,13 +40,13 @@ one at a time
 
 # Releasing
 
-For the v7+ monorepo, use [the npm release workflow](docs/releasing.md). It
-publishes an explicitly selected, existing release tag with npm trusted
-publishing, then verifies the public artifact and dist-tag. Version bumps,
-review, tags, release notes, Docker, and standalone binaries remain separate
-release steps.
+For the v7+ monorepo, follow [the release procedure](docs/releasing.md).
+`npm run release -- --release=prerelease` prepares/pushes a version commit/tag
+and publishes a GitHub release. GitHub Actions publishes npm with trusted
+credentials, verifies the public artifact/dist-tag, and builds standalone
+binaries. Docker builds run from the pushed tag. Use `--draft` to review the
+release notes before npm publication, or `--no-push` for local preparation.
 
 The `v6` branch retains its legacy release process. Do not dispatch the v7
-workflow for a v6 backport. The old `scripts/release.js` local helper still
-publishes directly and is not part of the new workflow; avoid combining it with
-an Actions publication of the same version.
+workflow for a v6 backport. The v7 helper never logs in to npm or publishes from
+your machine.

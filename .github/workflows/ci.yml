@@ -38,7 +38,9 @@ jobs:
             - run: npm run test
             - name: Exercise daemon with simulated indexer and torrent client
               run: npm run test:daemon
-            - run: node --test scripts/npm-release.test.js
+            - run:
+                  node --test scripts/npm-release.test.js
+                  scripts/release.test.js
             - name: Build npm tarball
               run: |
                   set -euo pipefail

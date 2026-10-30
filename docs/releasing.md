@@ -1,8 +1,9 @@
 # Publishing npm releases
 
-The `Publish npm release` workflow is a deliberately dispatched **v7+** npm
-publication step. It does not create commits, tags, GitHub releases, or Docker
-images. The `v6` branch keeps its legacy packaging/release process.
+Publishing a **v7+ GitHub release** starts npm publication automatically.
+Pushing its tag starts Docker builds; publishing the release also starts
+standalone binary builds. No local npm login or publish is part of this process.
+The `v6` branch keeps its legacy packaging/release process.
 
 ## One-time setup
 
@@ -29,38 +30,65 @@ npm CLI (trusted publishing requires npm 11.5.1+ and Node 22.14+). Provenance is
 requested. Build/test steps have read-only repository permissions and no OIDC.
 The initial trust/environment setup and a live OIDC publish still need a
 maintainer to perform them; local tests cannot prove npm trusts the workflow.
+The trust can also be configured with the current npm CLI (a one-time
+interactive authentication may be required):
+
+```sh
+npm trust github cross-seed --repo cross-seed/cross-seed --file npm-publish.yml --env npm --allow-publish
+```
 
 ## Release procedure
 
-1. Review and merge the release changes, including this workflow for its first
-   use. Update `cross-seed/package.json` and the workspace lockfile, validate,
-   and commit the version using the normal review/push approval process.
-2. Create and push the corresponding immutable `v<version>` tag on a commit
-   reachable from `master`. This workflow accepts v7+ canonical versions, such
-   as `v7.0.0-27` or `v7.0.0`, not branches or build-metadata aliases.
-3. Dispatch **Publish npm release** at that exact tag in GitHub Actions,
-   supplying the same tag as `release_tag`. For example:
+1. Review, validate and merge the release changes, including this workflow for
+   its first use. Start with a clean local `master` matching `origin/master`.
+2. Run the release helper, for example:
 
     ```sh
-    gh workflow run npm-publish.yml --ref v7.0.0-27 -f release_tag=v7.0.0-27
+    npm run release -- --release=prerelease
     ```
 
-    The workflow must already exist on the default branch and on the selected
-    tag. Do not dispatch from `master` and merely supply a tag input: npm
-    provenance uses the workflow event ref/SHA, not just the checkout. The
-    helper rejects that mismatch. This is an external publication; do not
-    dispatch while work is intended to remain local.
+    This bumps the package/workspace lockfile, commits, tags, pushes only that
+    release tag, and creates a GitHub release with generated notes. It never
+    runs `npm login`, `npm whoami`, or `npm publish`. The helper uses your
+    GitHub CLI credentials; this is an external release operation and requires
+    the normal authorization to push/publish.
 
-4. Review/approve the `npm` environment deployment if configured. Check the
+    Use `--release=7.0.0` for the first stable v7 release. Add `--draft` to
+    review release notes before publication: npm and standalone builds wait
+    until the draft is published. `--no-push` prepares the local commit/tag
+    without any remote publication; `--no-release` pushes the tag (starting
+    Docker) but does not create a GitHub release or start npm publication.
+    `--tag` is accepted only when it agrees with the version's automatic
+    channel.
+
+    Alternatively, prepare the version commit and exact immutable `v<version>`
+    tag manually, push them, then publish the GitHub release. Both paths trigger
+    the same npm workflow. The tag must be reachable from `master` and match the
+    package version exactly; branches/build-metadata aliases are rejected.
+
+3. Review/approve the `npm` environment deployment if configured. Check the
    final verified-release summary and logs, not just npm's upload message.
-5. Complete the GitHub release notes and check Docker and standalone assets for
+4. Complete the GitHub release notes and check Docker and standalone assets for
    the same tag/commit. Those are independent jobs and can fail independently.
 
+For a deliberate retry, dispatch **Publish npm release** at the same tag:
+
+```sh
+gh workflow run npm-publish.yml --ref v7.0.0-28 -f release_tag=v7.0.0-28
+```
+
+The workflow must exist on the selected tag. Do not dispatch from `master` and
+merely supply a tag input: npm provenance uses the workflow event ref/SHA, not
+just the checkout. The helper rejects that mismatch. A dispatch can publish; it
+is not a dry run. v6 release events are skipped; manual v6 dispatches are
+rejected by the source/version checks.
+
 The package job checks out the explicit tag, runs formatting, build, lint,
-TypeScript checks, workspace tests, and release-helper tests. It packs once,
-records the source SHA/version/channel/SHA-512 in `release.json`, installs that
-exact tarball into an isolated prefix, and boots the installed daemon to verify
-HTTP auth/validation, embedded UI, a base path, CLI discovery, and shutdown. The
+TypeScript checks, workspace tests, the daemon acceptance test, and
+release-helper tests. It packs once, records the source
+SHA/version/channel/SHA-512 in `release.json`, installs that exact tarball into
+an isolated prefix, and boots the installed daemon to verify HTTP
+auth/validation, embedded UI, a base path, CLI discovery, and shutdown. The
 artifact includes both that tested tarball and its manifest.
 
 The publish job checks out the resolved SHA, downloads that same artifact,
@@ -122,7 +150,7 @@ if investigating a partial release.
 ## Local checks without publishing
 
 ```sh
-node --test scripts/npm-release.test.js
+node --test scripts/npm-release.test.js scripts/release.test.js
 npm run format:check
 npm run build
 npm run lint
@@ -130,11 +158,15 @@ npm run typecheck
 npm test
 ```
 
-The release tests inject a registry and a publication adapter: they never call
-`npm publish` or modify the real registry. They exercise channel selection,
+The npm release tests inject a registry and a publication adapter: they never
+call `npm publish` or modify the real registry. They exercise channel selection,
 version/tag rejection, immutable bytes, stable-channel preservation, scan
 pending responses, bounded retries, authentication/network failures, reruns, and
-public checksum mismatch.
+public checksum mismatch. The release-command tests exercise real Git
+commits/tags/pushes against a temporary local bare repository, with record-only
+npm/GitHub adapters. They verify local npm publication is never invoked,
+unrelated tags are not pushed, and draft/local-only/skip-release options
+preserve their publication boundaries.
 
 For a local packaging rehearsal at an existing matching release-tag checkout:
 

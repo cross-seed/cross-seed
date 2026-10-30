@@ -459,6 +459,10 @@ test("workflow provenance must identify the exact release tag and SHA", () => {
 		GITHUB_SHA: manifest.commit,
 	};
 	validateWorkflowContext(manifest, environment);
+	validateWorkflowContext(manifest, {
+		...environment,
+		GITHUB_EVENT_NAME: "release",
+	});
 	validateWorkflowContext(manifest, {});
 	for (const override of [
 		{ GITHUB_REF: "refs/heads/master" },

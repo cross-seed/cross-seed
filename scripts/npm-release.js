@@ -84,15 +84,16 @@ export function validateWorkflowContext(manifest, environment = process.env) {
 		"cross-seed/cross-seed",
 		"Only the canonical repository can publish",
 	);
-	assert.equal(
-		environment.GITHUB_EVENT_NAME,
-		"workflow_dispatch",
-		"Publication must be deliberately dispatched",
+	assert.ok(
+		["release", "workflow_dispatch"].includes(
+			environment.GITHUB_EVENT_NAME,
+		),
+		"Publication requires a published release or deliberate workflow dispatch",
 	);
 	assert.equal(
 		environment.GITHUB_REF,
 		`refs/tags/${manifest.tag}`,
-		"Dispatch the workflow at the release tag, not a branch, so npm provenance identifies the tested source",
+		"Run the workflow at the release tag, not a branch, so npm provenance identifies the tested source",
 	);
 	assert.equal(
 		environment.GITHUB_SHA,
