@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const TEST_ROOT = await mkdtemp(join(tmpdir(), "cross-seed-startup-tests-"));
+const originalConfigDir = process.env.CONFIG_DIR;
 const MIGRATED_CONFIG_COMMENT =
 	"// This config.js file was imported into the cross-seed v7 database. Use the Web UI to view or change settings.\n\n";
 
@@ -49,9 +50,93 @@ async function createStartupEnv(configDir?: string): Promise<StartupEnv> {
 
 describe.sequential("startup config migration", () => {
 	afterEach(async () => {
+		vi.restoreAllMocks();
 		await currentDb?.destroy();
 		currentDb = undefined;
-		delete process.env.CONFIG_DIR;
+		if (originalConfigDir === undefined) delete process.env.CONFIG_DIR;
+		else process.env.CONFIG_DIR = originalConfigDir;
+	});
+
+	it.each([
+		["malformed JSON", "{broken"],
+		["empty JSON", ""],
+		["null JSON", "null"],
+		["array JSON", "[]"],
+		["invalid setting", JSON.stringify({ delay: 1 })],
+		["invalid API key", JSON.stringify({ apiKey: "short" })],
+	])(
+		"preserves stored settings and the API key after %s, then starts after explicit repair",
+		async (_name, settingsJson) => {
+			const env = await createStartupEnv();
+			const apiKey = "d".repeat(32);
+			await env.db("settings").update({
+				apikey: apiKey,
+				settings_json: settingsJson,
+			});
+			const originalSettings = await env.db("settings").select();
+
+			await expect(env.determineRuntimeConfig({})).rejects.toThrow(
+				"Failed to load settings from the database",
+			);
+			expect(await env.db("settings").select()).toEqual(originalSettings);
+
+			// Use the supported offline import path rather than a startup fallback.
+			const { importSettings } = await import("../src/configCli.js");
+			const repairPath = join(env.configDir, "repaired-settings.json");
+			await writeFile(repairPath, JSON.stringify({ apiKey, delay: 123 }));
+			await importSettings(
+				join(env.configDir, "cross-seed.db"),
+				repairPath,
+			);
+			await env.db.destroy();
+			const restarted = await createStartupEnv(env.configDir);
+			await expect(
+				restarted.determineRuntimeConfig({}),
+			).resolves.toMatchObject({ apiKey, delay: 123 });
+		},
+	);
+
+	it("does not reimport a legacy file over invalid stored settings", async () => {
+		const env = await createStartupEnv();
+		await env.db("settings").update({
+			apikey: "e".repeat(32),
+			settings_json: "{broken",
+		});
+		const originalSettings = await env.db("settings").select();
+		const fileConfig = "export default { delay: 123 };";
+		await writeFile(env.configPath, fileConfig);
+
+		await expect(env.determineRuntimeConfig({})).rejects.toThrow(
+			"Failed to load settings from the database",
+		);
+		expect(await env.db("settings").select()).toEqual(originalSettings);
+		await expect(readFile(env.configPath, "utf8")).resolves.toBe(
+			fileConfig,
+		);
+		await expect(
+			readFile(`${env.configPath}.bak`, "utf8"),
+		).rejects.toMatchObject({
+			code: "ENOENT",
+		});
+	});
+
+	it("preserves settings on a database read failure and retains its cause", async () => {
+		const env = await createStartupEnv();
+		const apiKey = "f".repeat(32);
+		await env.db("settings").update({
+			apikey: apiKey,
+			settings_json: JSON.stringify({ apiKey, delay: 456 }),
+		});
+		const originalSettings = await env.db("settings").select();
+		const readError = new Error("database read failed");
+		const config = await import("../src/dbConfig.js");
+		vi.spyOn(config, "getDbConfig").mockRejectedValue(readError);
+
+		await expect(env.determineRuntimeConfig({})).rejects.toHaveProperty(
+			"cause",
+			readError,
+		);
+		expect(await env.db("settings").select()).toEqual(originalSettings);
 	});
 
 	it("renames config.js after importing file config into the database", async () => {

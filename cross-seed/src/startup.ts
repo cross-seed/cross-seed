@@ -164,7 +164,12 @@ export async function determineRuntimeConfig(
 	try {
 		dbOverrides = await getDbConfig();
 	} catch (dbError) {
-		logger.debug("Unable to load configuration from database", dbError);
+		throw new CrossSeedError(
+			"Failed to load settings from the database. Stored settings and the API key have not been changed. " +
+				"Back up your database before recovery. Use `cross-seed db check` to diagnose database errors, " +
+				"or `cross-seed config import <file>` to restore settings from valid JSON.",
+			{ cause: dbError },
+		);
 	}
 
 	// Recover upgrades where migration 17 created an API-key-only config before
