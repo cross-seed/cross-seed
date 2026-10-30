@@ -21,8 +21,8 @@ const rel =
 	args.find((arg) => !arg.startsWith("-"));
 const explicitTag = process.env.npm_config_tag || getArg("tag");
 const draftRelease = hasFlag("draft");
-const skipRelease = hasFlag("no-release");
 const skipPush = hasFlag("no-push");
+const skipRelease = hasFlag("no-release") || skipPush;
 
 if (!rel) {
 	console.error(
@@ -32,7 +32,13 @@ if (!rel) {
 }
 
 const isPrerelease = rel.startsWith("pre") || rel.includes("-");
-const tag = explicitTag ?? (isPrerelease ? "next" : undefined);
+const channel = isPrerelease ? "next" : "latest";
+if (explicitTag && explicitTag !== channel) {
+	console.error(
+		`Release workflows select ${channel} for this version; --tag cannot override it.`,
+	);
+	process.exit(1);
+}
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
 const ghCmd = process.platform === "win32" ? "gh.exe" : "gh";
@@ -80,6 +86,23 @@ if (gitStatus()) {
 	process.exit(1);
 }
 
+if (gitOutput(["branch", "--show-current"]) !== "master") {
+	console.error(
+		"Release from master after the reviewed changes have landed.",
+	);
+	process.exit(1);
+}
+
+if (
+	gitOutput(["rev-parse", "HEAD"]) !==
+	gitOutput(["rev-parse", "refs/remotes/origin/master"])
+) {
+	console.error(
+		"Local master must match origin/master before preparing a release.",
+	);
+	process.exit(1);
+}
+
 if (!skipRelease) {
 	const ghCheck = spawnSync(ghCmd, ["--version"], {
 		stdio: "ignore",
@@ -93,19 +116,31 @@ if (!skipRelease) {
 	}
 }
 
-const npmWhoami = spawnSync(npmCmd, ["--workspaces=false", "whoami"], {
-	stdio: "ignore",
-	cwd: pkgDir,
-});
-if (npmWhoami.status !== 0) {
-	run(npmCmd, ["--workspaces=false", "login"]);
-}
-run(npmCmd, ["--workspaces=false", "version", rel]);
-runRoot(npmCmd, ["install", "--package-lock-only"]);
+run(npmCmd, [
+	"--workspaces=false",
+	"version",
+	rel,
+	"--git-tag-version=false",
+	"--ignore-scripts",
+]);
+runRoot(npmCmd, [
+	"install",
+	"--package-lock-only",
+	"--ignore-scripts",
+	"--no-audit",
+	"--no-fund",
+]);
 
 const pkgJson = JSON.parse(
 	fs.readFileSync(path.join(pkgDir, "package.json"), "utf8"),
 );
+const tagName = `v${pkgJson.version}`;
+if (gitOutput(["tag", "-l", tagName])) {
+	console.error(
+		`${tagName} already exists. Retry its Actions workflow instead of preparing the release again.`,
+	);
+	process.exit(1);
+}
 const dirty = gitStatus();
 if (dirty) {
 	const files = [
@@ -115,30 +150,15 @@ if (dirty) {
 	].filter((file) => fs.existsSync(path.join(rootDir, file)));
 	runGit(["add", ...files]);
 	runGit(["commit", "-m", `v${pkgJson.version}`]);
-	const tagCheck = spawnSync(gitCmd, ["tag", "-l", `v${pkgJson.version}`], {
-		encoding: "utf8",
-		cwd: rootDir,
-	});
-	if (tagCheck.status !== 0) process.exit(tagCheck.status ?? 1);
-	if (!tagCheck.stdout.trim()) {
-		runGit(["tag", `v${pkgJson.version}`]);
-	}
+	runGit(["tag", tagName]);
 }
 
-const publishArgs = ["--workspaces=false", "publish"];
-if (tag) publishArgs.push("--tag", tag);
-run(npmCmd, publishArgs);
-
 if (!skipPush) {
-	runGit(["push"]);
-	runGit(["push", "--tags"]);
+	runGit(["push", "--no-follow-tags", "origin", "HEAD:refs/heads/master"]);
+	runGit(["push", "--no-follow-tags", "origin", `refs/tags/${tagName}`]);
 }
 
 if (!skipRelease) {
-	const tagName = `v${pkgJson.version}`;
-	console.log(
-		"read the commits and generate a changelog for the github issue",
-	);
 	const releaseArgs = [
 		"release",
 		"create",
@@ -150,4 +170,15 @@ if (!skipRelease) {
 	if (draftRelease) releaseArgs.push("--draft");
 	if (isPrerelease) releaseArgs.push("--prerelease");
 	runGh(releaseArgs);
+	console.log(
+		draftRelease
+			? "Draft created. Publish it on GitHub to start npm and standalone releases. Docker builds run from the pushed tag."
+			: "GitHub Actions will publish npm with trusted credentials and build standalone binaries. Check the release workflows for completion; Docker builds run from the pushed tag.",
+	);
+} else {
+	console.log(
+		skipPush
+			? "Release commit and tag prepared locally. Nothing was pushed or published."
+			: "Release tag pushed. Publish the GitHub release to start npm and standalone releases; npm was not published locally.",
+	);
 }

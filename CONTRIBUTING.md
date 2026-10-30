@@ -40,71 +40,13 @@ one at a time
 
 # Releasing
 
-```
-git checkout master
-git pull
-cd packages/cross-seed
-npx np
-```
+For the v7+ monorepo, follow [the release procedure](docs/releasing.md).
+`npm run release -- --release=prerelease` prepares/pushes a version commit/tag
+and publishes a GitHub release. GitHub Actions publishes npm with trusted
+credentials, verifies the public artifact/dist-tag, and builds standalone
+binaries. Docker builds run from the pushed tag. Use `--draft` to review the
+release notes before npm publication, or `--no-push` for local preparation.
 
-If there's a new typescript file, it'll tell you it won't be included. That's
-correct - the typescript files in `packages/cross-seed/src` aren't included, but
-they compile down to javascript files in `packages/cross-seed/dist` which _are_
-included.
-
-It'll ask you if you want to increment patch, minor, or major version. I think
-I'd say _don't bump major_ unless we've talked about it in `#development`. Minor
-vs patch is kind of meaningless but mostly patch for fixes and minor for
-features.
-
-For pre-releases, you first select the `prepatch/preminor/premajor` option the
-first time, then for subsequent pre-releases you use the `prerelease` option to
-increment.
-
-Then it'll do a bunch of compiling, etc. Eventually it will open a tab in your
-browser asking you to create a release. Then you can just click the Submit
-button and you're done.
-
-If a non-pre-release version has been published, update the @next tag to point
-to latest as it's not done automatically.
-
-```
-npm dist-tag add cross-seed@x.x.x next
-```
-
-If you ever fuck up (often due to forgetting the github release), just release
-again with a `patch` version bump. no big deal
-
-# Publishing without np
-
-If you want to publish directly with npm instead of `np`, do it from the repo
-root using workspaces (since the root is private):
-
-```
-npm run build
-npm publish -w packages/cross-seed --tag next
-```
-
-For stable releases, drop the `--tag next`.
-
-You can also use the helper script, which bumps the version, publishes, pushes,
-and creates the GitHub release (requires the `gh` CLI). Pass `--tag next` for
-pre-releases or `--no-release` to skip the GitHub release step:
-
-```
-npm run release -- --release=patch --tag=next
-```
-
-You can also pass the bump type as a positional arg:
-
-```
-npm run release -- patch --tag=next
-```
-
-Other options:
-
-```
-npm run release -- --release=patch --draft
-npm run release -- --release=patch --no-release
-npm run release -- --release=patch --no-push
-```
+The `v6` branch retains its legacy release process. Do not dispatch the v7
+workflow for a v6 backport. The v7 helper never logs in to npm or publishes from
+your machine.
