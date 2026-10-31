@@ -310,17 +310,47 @@ async function getSavePath(
 	return resultOf(savePath);
 }
 
+/**
+ * Whether injectInPlaceWithoutLinkDir applies: only hardlinks and reflinks can
+ * lack a linkDir on the data's drive (symlinks fall back to the first linkDir,
+ * reflinkOrCopy copies).
+ */
+export function injectInPlaceApplies(): boolean {
+	const { injectInPlaceWithoutLinkDir, linkType } = getRuntimeConfig();
+	return (
+		injectInPlaceWithoutLinkDir &&
+		(linkType === LinkType.HARDLINK || linkType === LinkType.REFLINK)
+	);
+}
+
+/**
+ * Whether a match may be injected in place, without a link, when no linkDir
+ * shares a drive with its data (e.g. a network share that cannot be
+ * hardlinked). Requires injectInPlaceWithoutLinkDir, and only a perfect match
+ * qualifies: the client then seeds the original files as it does when linkDirs
+ * is unset. Renamed or partial matches need a link.
+ */
+export function canInjectWithoutLink(decision: DecisionAnyMatch): boolean {
+	return injectInPlaceApplies() && decision === Decision.MATCH;
+}
+
 async function getClientAndDestinationDir(
 	client: TorrentClient | undefined,
 	searchee: Searchee,
 	savePath: string | undefined,
 	newMeta: Metafile,
 	tracker: string,
-): Promise<{
-	client: TorrentClient;
-	destinationDir: string;
-	destinationDirFromClient: boolean;
-} | null> {
+	decision: DecisionAnyMatch,
+): Promise<
+	| {
+			client: TorrentClient;
+			destinationDir: string;
+			destinationDirFromClient: boolean;
+			skipLinking: false;
+	  }
+	| { client: TorrentClient; skipLinking: true }
+	| null
+> {
 	const { flatLinking, linkType } = getRuntimeConfig();
 	if (!client) {
 		let srcPath: string;
@@ -400,13 +430,29 @@ async function getClientAndDestinationDir(
 		if (clientSavePathRes.unwrapErr() === "INVALID_DATA") {
 			return null;
 		}
+		// A virtual searchee has no savePath and cannot be seeded in place.
+		const inPlace = !!savePath && canInjectWithoutLink(decision);
 		const linkDir = savePath
-			? await getLinkDir(savePath)
+			? await getLinkDir(savePath, { quiet: inPlace })
 			: await getLinkDirVirtual(searchee as SearcheeVirtual);
-		if (!linkDir) return null;
+		if (!linkDir) {
+			if (!inPlace) return null;
+			const warnOrVerbose =
+				searchee.label === Label.INJECT ? logger.verbose : logger.warn;
+			warnOrVerbose({
+				label: searchee.label,
+				message: `No usable linkDir for ${savePath}, injecting ${getLogString(newMeta)} in place without a link (perfect match, injectInPlaceWithoutLinkDir)`,
+			});
+			return { client, skipLinking: true };
+		}
 		destinationDir = flatLinking ? linkDir : join(linkDir, tracker);
 	}
-	return { client, destinationDir, destinationDirFromClient };
+	return {
+		client,
+		destinationDir,
+		destinationDirFromClient,
+		skipLinking: false,
+	};
 }
 
 function logActionResultImpl(
@@ -540,6 +586,7 @@ export async function performActionWithoutMutex(
 	let destinationDirFromClient = false;
 	let unlinkOk = false;
 	let linkedNewFiles = false;
+	let skipLinking = false;
 
 	try {
 		const clients = getClients();
@@ -577,8 +624,14 @@ export async function performActionWithoutMutex(
 				savePath,
 				newMeta,
 				tracker,
+				decision,
 			);
-			if (res) {
+			if (res?.skipLinking) {
+				// In place: the no-linkDirs branches below set destinationDir,
+				// so every searchee kind is injected as without linking.
+				client = res.client;
+				skipLinking = true;
+			} else if (res) {
 				client = res.client;
 				destinationDir = res.destinationDir;
 				destinationDirFromClient = res.destinationDirFromClient;
@@ -628,7 +681,7 @@ export async function performActionWithoutMutex(
 			return { actionResult, linkedNewFiles };
 		}
 
-		if (linkDirs.length) {
+		if (linkDirs.length && !skipLinking) {
 			const res = await linkAllFilesInMetafile(
 				searchee,
 				newMeta,
@@ -745,7 +798,10 @@ export async function performActions(
 	return results;
 }
 
-async function getLinkDir(pathStr: string): Promise<string | null> {
+async function getLinkDir(
+	pathStr: string,
+	options = { quiet: false },
+): Promise<string | null> {
 	const { linkDirs, linkType } = getRuntimeConfig();
 	const pathStat = await stat(pathStr);
 	const pathDev = pathStat.dev; // Windows always returns 0
@@ -796,9 +852,11 @@ async function getLinkDir(pathStr: string): Promise<string | null> {
 	}
 	if (tempFile && (await exists(tempFile))) await rm(tempFile);
 	if (linkType !== LinkType.SYMLINK) {
-		logger.error(
-			`Cannot find any linkDir from linkDirs on the same drive to ${linkType} ${pathStr}`,
-		);
+		if (!options.quiet) {
+			logger.error(
+				`Cannot find any linkDir from linkDirs on the same drive to ${linkType} ${pathStr}`,
+			);
+		}
 		return null;
 	}
 	if (linkDirs.length > 1) {

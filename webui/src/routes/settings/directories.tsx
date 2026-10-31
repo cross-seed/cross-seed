@@ -169,6 +169,14 @@ function DirectorySettings() {
                     />
                   )}
                 </form.AppField>
+                <form.AppField name="injectInPlaceWithoutLinkDir">
+                  {(field) => (
+                    <field.SwitchField
+                      label="Inject In Place Without LinkDir"
+                      className="form-field__switch flex flex-col items-start gap-5"
+                    />
+                  )}
+                </form.AppField>
                 <div className="">
                   <form.AppField name="linkType">
                     {(field) => (

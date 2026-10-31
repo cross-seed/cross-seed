@@ -1,8 +1,9 @@
 import ms from "ms";
+import { stat } from "fs/promises";
 import path from "path";
 import { isDeepStrictEqual } from "util";
 import { humanReadableSize } from "@cross-seed/shared/utils";
-import { testLinking } from "../action.js";
+import { injectInPlaceApplies, testLinking } from "../action.js";
 import type { Problem } from "../problems.js";
 import {
 	ABS_WIN_PATH_REGEX,
@@ -461,9 +462,29 @@ export async function collectClientLinkingProblems(): Promise<Problem[]> {
 
 	if (!clients.length || linkDirs.length === 0) return [];
 
+	const inPlace = injectInPlaceApplies();
+
 	const problems: Problem[] = [];
 	const linkingHelp =
 		"If you have multiple drives, add extra linkDirs or blocklist categories, tags, or trackers for those drives. https://www.cross-seed.org/docs/tutorials/linking#setting-up-linking";
+	// Devices of the linkDirs (0 on Windows, which disables the shortcut).
+	const linkDirDevs = inPlace
+		? await Promise.all(
+				linkDirs.map((dir) =>
+					stat(dir).then(
+						(s) => s.dev,
+						() => 0,
+					),
+				),
+			)
+		: [];
+	const noLinkDirOnDevice = async (savePath: string): Promise<boolean> => {
+		const dev = await stat(savePath).then(
+			(s) => s.dev,
+			() => 0,
+		);
+		return dev !== 0 && !linkDirDevs.includes(dev);
+	};
 
 	for (const client of clients) {
 		let searchees: SearcheeWithInfoHash[];
@@ -511,6 +532,20 @@ export async function collectClientLinkingProblems(): Promise<Problem[]> {
 					summary: `${client.label} save paths are incompatible with this platform.`,
 					details: `Path ${savePath} indicates the torrent client runs on a different platform than cross-seed. Run cross-seed alongside the client or adjust your linkDirs.`,
 					metadata: { ...metadata, issue: "cross-platform" },
+				});
+				continue;
+			}
+
+			if (inPlace && (await noLinkDirOnDevice(savePath))) {
+				problems.push({
+					id: clientProblemId(
+						"linking-in-place",
+						`${client.label}:${savePath}`,
+					),
+					severity: "warning",
+					summary: `${client.label} will inject perfect matches from ${savePath} in place, without a link (injectInPlaceWithoutLinkDir).`,
+					details: `No linkDir shares a device with ${savePath}: renamed or partial matches from there will fail. ${linkingHelp}`,
+					metadata: { ...metadata, issue: "linking-in-place" },
 				});
 				continue;
 			}

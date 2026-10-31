@@ -120,6 +120,9 @@ export const directoryValidationSchema = z.object({
   flatLinking: z
     .boolean()
     .transform((v) => (typeof v === "boolean" ? v : false)),
+  injectInPlaceWithoutLinkDir: z
+    .boolean()
+    .transform((v) => (typeof v === "boolean" ? v : false)),
   linkDir: z.string().nullish(),
   linkDirs: z.array(z.string()),
   linkType: z.nativeEnum(LinkType),

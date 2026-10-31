@@ -59,6 +59,11 @@ export const RUNTIME_CONFIG_SCHEMA = z.object({
 	flatLinking: z
 		.boolean()
 		.describe("Create links directly within each link directory."),
+	injectInPlaceWithoutLinkDir: z
+		.boolean()
+		.describe(
+			"Inject perfect matches in place, without a link, when no linkDir shares a drive with their data.",
+		),
 	maxDataDepth: z
 		.number()
 		.int()
