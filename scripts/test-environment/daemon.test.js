@@ -8,3 +8,13 @@ test(
 		await runScenario((message) => context.diagnostic(message));
 	},
 );
+
+import { runOverlapScenario } from "./overlap.js";
+
+test(
+	"shared and nested source/destination roots → injection → live rescan → restart",
+	{ timeout: 60000 },
+	async (context) => {
+		await runOverlapScenario((message) => context.diagnostic(message));
+	},
+);

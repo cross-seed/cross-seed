@@ -46,6 +46,7 @@ import {
 } from "./utils.js";
 import { isOk } from "./Result.js";
 import { distance } from "fastest-levenshtein";
+import { createDataPathFilter, type DataPathFilter } from "./sourcePaths.js";
 
 interface DataEntry {
 	title: string;
@@ -159,13 +160,50 @@ function createWatcher(
 	}
 }
 
+async function retireExcludedDataPaths(
+	includePath: DataPathFilter,
+): Promise<void> {
+	for (const table of ["data", "ensemble"] as const) {
+		let cursor: string | undefined;
+		for (;;) {
+			const query = db<{ path: string }>(table)
+				.distinct("path")
+				.whereNotNull("path")
+				.orderBy("path")
+				.limit(500);
+			if (table === "ensemble") query.whereNull("client_host");
+			if (cursor !== undefined) query.where("path", ">", cursor);
+			const rows = await query;
+			if (!rows.length) break;
+			cursor = rows[rows.length - 1].path;
+			const excluded = await filterAsync(
+				rows.map((row) => row.path),
+				async (path) => !(await includePath(path)),
+			);
+			if (excluded.length) {
+				const removal = db(table).whereIn("path", excluded);
+				if (table === "ensemble") removal.whereNull("client_host");
+				await removal.del();
+				if (table === "data")
+					await markLibraryItemsMissingBySourceKeys(
+						excluded.map(createDataLibrarySourceKey),
+					);
+			}
+			await yieldToEventLoop();
+		}
+	}
+}
+
 export async function indexDataDirs(options: {
 	startup: boolean;
 	onWatcherRecovery?: () => Promise<void>;
 }): Promise<void> {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
+	const includePath = await createDataPathFilter();
 	if (options.startup) destroyDataDirWatchers();
 	if (!dataDirs.length) return;
+	if (options.startup && includePath.hasExcludedSubtrees)
+		await retireExcludedDataPaths(includePath);
 
 	for (const dataDir of dataDirs) {
 		if (!options.startup && !failedDataDirs.has(dataDir)) continue;
@@ -185,6 +223,7 @@ export async function indexDataDirs(options: {
 			const candidates = await findSearcheeCandidatesFromDataDir(
 				dataDir,
 				maxDataDepth,
+				includePath,
 			);
 			const maxUserWatchesPath = "/proc/sys/fs/inotify/max_user_watches";
 			if (await exists(maxUserWatchesPath)) {
@@ -237,7 +276,7 @@ export async function indexDataDirs(options: {
 			if (now - lastSeen < STABILITY_WINDOW_MS) continue;
 			if (!modified.delete(path)) continue;
 			modifiedTimes.delete(path);
-			eventPaths.push(path);
+			if (await includePath(path)) eventPaths.push(path);
 		}
 		if (!eventPaths.length) return;
 		const scan = await beginLibraryScan({
@@ -316,6 +355,7 @@ async function indexDataPaths(
 	} = {},
 ): Promise<number> {
 	const { seasonFromEpisodes } = getRuntimeConfig();
+	const includePath = await createDataPathFilter();
 	const dataDirs = options.dataDirs ?? getRuntimeConfig().dataDirs;
 	const memoizedPaths = new Map<string, string[]>();
 	const memoizedLengths = new Map<string, number>();
@@ -324,13 +364,19 @@ async function indexDataPaths(
 	const libraryItems: LibraryItemInput[] = [];
 	let processed = 0;
 	for (const path of paths) {
+		if (!(await includePath(path))) continue;
 		processed += 1;
 		if (processed % 500 === 0) {
 			await yieldToEventLoop();
 		}
 		const files =
 			options.precomputedFiles?.get(path) ??
-			(await getFilesFromDataRoot(path, memoizedPaths, memoizedLengths));
+			(await getFilesFromDataRoot(
+				path,
+				memoizedPaths,
+				memoizedLengths,
+				includePath,
+			));
 		if (!files.length) continue;
 		const title = parseTitle(basename(path), files, path);
 		if (!title) continue;
@@ -470,7 +516,10 @@ export async function findPotentialNestedRoots(
 	root: string,
 	depth: number,
 	isDirHint?: boolean,
+	includePath?: DataPathFilter,
 ): Promise<string[]> {
+	includePath ??= await createDataPathFilter();
+	if (!(await includePath(root))) return [];
 	try {
 		const isDir =
 			isDirHint !== undefined
@@ -487,6 +536,7 @@ export async function findPotentialNestedRoots(
 						join(root, dirent.name),
 						depth - 1,
 						dirent.isDirectory(),
+						includePath,
 					),
 			);
 			return [...allDescendants, root]; // deepest paths first for memoization
@@ -512,8 +562,10 @@ function createFilesForRoot(root: string, files: DataFileStat[]): File[] {
 async function collectPotentialNestedRootCandidates(
 	root: string,
 	depth: number,
-	isDirHint?: boolean,
+	isDirHint: boolean | undefined,
+	includePath: DataPathFilter,
 ): Promise<{ candidates: DataRootCandidate[]; files: DataFileStat[] }> {
+	if (!(await includePath(root))) return { candidates: [], files: [] };
 	try {
 		const rootStat = isDirHint !== undefined ? null : await stat(root);
 		const isDir =
@@ -545,6 +597,7 @@ async function collectPotentialNestedRootCandidates(
 				join(root, dirent.name),
 				depth - 1,
 				dirent.isDirectory(),
+				includePath,
 			),
 		);
 		const files = childResults.flatMap((result) => result.files);
@@ -569,11 +622,14 @@ async function collectPotentialNestedRootCandidates(
 async function findSearcheeCandidatesFromDataDir(
 	dataDir: string,
 	maxDataDepth: number,
+	includePath: DataPathFilter,
 ): Promise<DataRootCandidate[]> {
 	return flatMapAsync(await readdir(dataDir), async (dirent) => {
 		const result = await collectPotentialNestedRootCandidates(
 			join(dataDir, dirent),
 			maxDataDepth,
+			undefined,
+			includePath,
 		);
 		return result.candidates;
 	});

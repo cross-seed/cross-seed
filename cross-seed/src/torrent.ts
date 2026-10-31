@@ -81,6 +81,7 @@ import {
 	stripExtension,
 	wait,
 } from "./utils.js";
+import { isGeneratedTorrent } from "./sourcePaths.js";
 
 export interface TorrentLocator {
 	infoHash?: string;
@@ -837,7 +838,9 @@ export async function getInfoHashesToExclude(): Promise<Set<string>> {
 export async function loadTorrentDirLight(
 	torrentDir: string,
 ): Promise<SearcheeWithInfoHash[]> {
-	const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
+	const torrentFilePaths = (
+		await findAllTorrentFilesInDir(torrentDir)
+	).filter((path) => !isGeneratedTorrent(path));
 
 	const searchees: SearcheeWithInfoHash[] = [];
 	const client = getClients()[0];
@@ -916,7 +919,9 @@ async function loadTorrentDirIncremental(
 		sourceInstance: torrentDir,
 	});
 	try {
-		const torrentFilePaths = await findAllTorrentFilesInDir(torrentDir);
+		const torrentFilePaths = (
+			await findAllTorrentFilesInDir(torrentDir)
+		).filter((path) => !isGeneratedTorrent(path));
 		const sourceKeys = torrentFilePaths.map(createTorrentLibrarySourceKey);
 		const existingRows = await db("library_item")
 			.where({

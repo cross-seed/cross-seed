@@ -23,6 +23,8 @@ function torrentSourceConfigChanged(
 	return (
 		before.useClientTorrents !== after.useClientTorrents ||
 		before.torrentDir !== after.torrentDir ||
+		before.outputDir !== after.outputDir ||
+		arrayContentsChanged(before.linkDirs, after.linkDirs) ||
 		before.maxDataDepth !== after.maxDataDepth ||
 		before.seasonFromEpisodes !== after.seasonFromEpisodes ||
 		arrayContentsChanged(
