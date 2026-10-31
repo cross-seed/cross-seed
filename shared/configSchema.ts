@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { Action, LinkType, MatchMode } from "./constants.js";
+import {
+	blocklistEntrySchema,
+	torrentClientEntrySchema,
+} from "./configValidation.js";
 
 export const WebhookObjectSchema = z.object({
 	url: z.string().url(),
@@ -125,7 +129,7 @@ export const RUNTIME_CONFIG_SCHEMA = z.object({
 			"Whether to save matched torrent files or inject them into a client.",
 		),
 	torrentClients: z
-		.array(z.string())
+		.array(torrentClientEntrySchema)
 		.describe("Torrent client connection URLs."),
 	duplicateCategories: z
 		.boolean()
@@ -178,7 +182,7 @@ export const RUNTIME_CONFIG_SCHEMA = z.object({
 			"Maximum unique search queries per indexer per run (0 for unlimited).",
 		),
 	blockList: z
-		.array(z.string())
+		.array(blocklistEntrySchema)
 		.describe(
 			"Release names, hashes or tracker values excluded from matching.",
 		),

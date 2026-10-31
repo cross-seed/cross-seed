@@ -112,6 +112,78 @@ for (const online of [false, true]) {
 				expect(index).not.toHaveBeenCalled();
 				expect(reload).not.toHaveBeenCalled();
 			});
+			it("rejects malformed blocklists and clients before any persisted or live change", async () => {
+				const before = await db("settings").first();
+				const unrelated = await unrelatedState();
+				for (const [key, value] of [
+					["blockList", ["nameRegex:["]],
+					["blockList", ["folderRegex:("]],
+					["blockList", ["unknown:value"]],
+					["torrentClients", ["nonsense"]],
+					["torrentClients", ["unknown:http://localhost"]],
+					["torrentClients", ["qbittorrent:ftp://localhost"]],
+					["torrentClients", ["rtorrent:scgi://localhost"]],
+				] as const) {
+					await expect(
+						cli.setSetting(filename, key, value),
+					).rejects.toThrow();
+					expect(await db("settings").first()).toEqual(before);
+				}
+				expect(await unrelatedState()).toEqual(unrelated);
+				expect(runtime.getRuntimeConfig()).toEqual(initialRuntime);
+				expect(index).not.toHaveBeenCalled();
+				expect(reload).not.toHaveBeenCalled();
+			});
+			it("normalizes stored hashes so the real blocklist matcher excludes them", async () => {
+				const hash = "Ab".repeat(20);
+				await cli.setSetting(filename, "blockList", [
+					`infoHash:${hash}`,
+					"name:CaseSensitive",
+				]);
+				const blockList = (await cli.readSettings(filename))
+					.blockList as string[];
+				expect(blockList).toEqual([
+					`infoHash:${hash.toLowerCase()}`,
+					"name:CaseSensitive",
+				]);
+				const { findBlockedStringInReleaseMaybe } =
+					await import("../src/preFilter.js");
+				expect(
+					findBlockedStringInReleaseMaybe(
+						{
+							title: "Other.Title",
+							name: "Other.Title",
+							infoHash: hash.toLowerCase(),
+							files: [],
+							length: 0,
+						},
+						blockList,
+					),
+				).toBe(`infoHash:${hash.toLowerCase()}`);
+				if (online)
+					expect(runtime.getRuntimeConfig().blockList).toEqual(
+						blockList,
+					);
+			});
+			it("rejects malformed replacement imports atomically", async () => {
+				const before = await db("settings").first();
+				const path = join(directory, "invalid-settings.json");
+				for (const invalid of [
+					{ blockList: ["nameRegex:["] },
+					{ torrentClients: ["nonsense"] },
+				]) {
+					await writeFile(
+						path,
+						JSON.stringify({ apiKey, maxDataDepth: 4, ...invalid }),
+					);
+					await expect(
+						cli.importSettings(filename, path),
+					).rejects.toThrow();
+					expect(await db("settings").first()).toEqual(before);
+				}
+				expect(runtime.getRuntimeConfig()).toEqual(initialRuntime);
+				expect(reload).not.toHaveBeenCalled();
+			});
 			it("repairs invalid known values and removes unknown stored overrides", async () => {
 				await store({ apiKey, maxDataDepth: 0 });
 				expect((await cli.readSettings(filename)).maxDataDepth).toBe(0);

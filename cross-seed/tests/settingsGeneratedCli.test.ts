@@ -105,6 +105,30 @@ it("generates setting flags from the runtime schema and supports show defaults",
 	});
 });
 
+it("retains typed blocklist/client flags with semantic validation and normalization", async () => {
+	const hash = "Ab".repeat(20);
+	const client = "rtorrent:readonly:scgi:///run/test.sock";
+	await command([
+		"set",
+		"--block-list",
+		`infoHash:${hash}`,
+		"--torrent-clients",
+		client,
+	]);
+	const before = await cli.readSettings(filename);
+	expect(before).toMatchObject({
+		blockList: [`infoHash:${hash.toLowerCase()}`],
+		torrentClients: [client],
+	});
+	for (const flags of [
+		["--block-list", "nameRegex:["],
+		["--torrent-clients", "nonsense"],
+	]) {
+		await expect(command(["set", ...flags])).rejects.toThrow();
+		expect(await cli.readSettings(filename)).toEqual(before);
+	}
+});
+
 it("writes generated help with literal newlines rather than JSON string quoting", () => {
 	const chunks: string[] = [];
 	const stdout = vi

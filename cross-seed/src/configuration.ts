@@ -18,6 +18,7 @@ import { errorCode } from "./utils.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
 import {
 	RUNTIME_CONFIG_SCHEMA,
+	parseRuntimeConfigOverrides,
 	WebhookEntry,
 } from "@cross-seed/shared/configSchema";
 import { z } from "zod";
@@ -403,7 +404,8 @@ export function transformFileConfig(
 		result.radarr = fileConfig.radarr;
 	}
 
-	return omitUndefined(result);
+	// Validate collected client aliases and retain normalized blocklist values.
+	return parseRuntimeConfigOverrides(omitUndefined(result));
 }
 
 function isStringArray(value: unknown): value is string[] {
