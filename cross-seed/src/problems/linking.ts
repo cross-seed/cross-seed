@@ -1,4 +1,4 @@
-import { testLinking } from "../action.js";
+import { injectInPlaceApplies, testLinking } from "../action.js";
 import { Label, logger } from "../logger.js";
 import type { Problem } from "../problems.js";
 import { getRuntimeConfig } from "../runtimeConfig.js";
@@ -12,6 +12,7 @@ async function collectDataLinkingProblemDescriptors(
 	linkDirs: string[],
 	dataDirs: string[],
 ): Promise<PathProblemDescriptor[]> {
+	const inPlace = injectInPlaceApplies();
 	const problems: PathProblemDescriptor[] = [];
 	if (!linkDirs.length || !dataDirs.length) return problems;
 
@@ -67,9 +68,10 @@ async function collectDataLinkingProblemDescriptors(
 					name: "linkDir",
 					path: validLinkDirs.map((dir) => dir.path).join(", "),
 					issue: "cross-platform-linking",
-					message:
-						"No linkDir shares a filesystem with this dataDir, so linking will fail. Add a linkDir on the same device.",
-					severity: "error",
+					message: inPlace
+						? "No linkDir shares a filesystem with this dataDir: perfect matches will be injected in place without a link (injectInPlaceWithoutLinkDir), other matches will fail."
+						: "No linkDir shares a filesystem with this dataDir, so linking will fail. Add a linkDir on the same device.",
+					severity: inPlace ? "warning" : "error",
 				});
 				continue;
 			}

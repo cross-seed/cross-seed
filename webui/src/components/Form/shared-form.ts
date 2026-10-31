@@ -62,6 +62,7 @@ export const defaultConnectFormValues: Partial<RuntimeConfig> = {
 export const defaultDirectoriesFormValues: Partial<RuntimeConfig> = {
   dataDirs: [],
   flatLinking: false,
+  injectInPlaceWithoutLinkDir: false,
   injectDir: "",
   linkDirs: [],
   linkType: LinkType.HARDLINK,

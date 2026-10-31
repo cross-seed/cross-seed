@@ -46,6 +46,7 @@ export interface FileConfig {
 	linkDirs?: string[];
 	linkType?: string;
 	flatLinking?: boolean;
+	injectInPlaceWithoutLinkDir?: boolean;
 	maxDataDepth?: number;
 	linkCategory?: string;
 	torrentDir?: string;
@@ -130,6 +131,7 @@ export function getDefaultRuntimeConfig(): RuntimeConfig {
 		linkDirs: [],
 		linkType: LinkType.HARDLINK,
 		flatLinking: false,
+		injectInPlaceWithoutLinkDir: false,
 		maxDataDepth: 2,
 		linkCategory: "cross-seed-link",
 		outputDir: path.join(appDir(), "cross-seeds"),
@@ -277,6 +279,11 @@ export function transformFileConfig(
 
 	if (typeof fileConfig.flatLinking === "boolean") {
 		result.flatLinking = fileConfig.flatLinking;
+	}
+
+	if (typeof fileConfig.injectInPlaceWithoutLinkDir === "boolean") {
+		result.injectInPlaceWithoutLinkDir =
+			fileConfig.injectInPlaceWithoutLinkDir;
 	}
 
 	if (typeof fileConfig.maxDataDepth === "number") {
