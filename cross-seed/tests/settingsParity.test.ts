@@ -134,6 +134,25 @@ for (const online of [false, true]) {
 				expect(index).not.toHaveBeenCalled();
 				expect(reload).not.toHaveBeenCalled();
 			});
+			it("rejects exact shared link/data roots atomically through either transport", async () => {
+				const before = await cli.readSettings(filename);
+				const unrelated = await unrelatedState();
+				const source = join(directory, "overlap.json");
+				await writeFile(
+					source,
+					JSON.stringify({
+						dataDirs: [directory],
+						linkDirs: [directory],
+					}),
+				);
+				await expect(
+					cli.importSettings(filename, source),
+				).rejects.toThrow(/must differ/);
+				expect(await cli.readSettings(filename)).toEqual(before);
+				expect(await unrelatedState()).toEqual(unrelated);
+				expect(runtime.getRuntimeConfig()).toEqual(initialRuntime);
+				expect(index).not.toHaveBeenCalled();
+			});
 			it("normalizes stored hashes so the real blocklist matcher excludes them", async () => {
 				const hash = "Ab".repeat(20);
 				await cli.setSetting(filename, "blockList", [

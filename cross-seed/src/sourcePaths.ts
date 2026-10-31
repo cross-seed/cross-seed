@@ -45,30 +45,23 @@ export function isGeneratedTorrent(path: string): boolean {
 	);
 }
 
-// If a link root also contains explicit sources, reserve a child destination
-// rather than excluding the sources themselves or changing existing torrents.
-export async function getEffectiveLinkDirs(
-	config: RuntimeConfig = getRuntimeConfig(),
-): Promise<string[]> {
-	const roots = await Promise.all(config.dataDirs.map(canonicalPath));
-	return Promise.all(
-		config.linkDirs.map(async (dir) => {
-			const canonical = await canonicalPath(dir);
-			if (!roots.some((root) => containsPath(canonical, root)))
-				return dir;
-			for (let suffix = 0; ; suffix++) {
-				const candidate = join(
-					dir,
-					suffix
-						? `.cross-seed-links-${suffix}`
-						: ".cross-seed-links",
-				);
-				const target = await canonicalPath(candidate);
-				if (!roots.some((root) => containsPath(target, root)))
-					return candidate;
-			}
-		}),
-	);
+/** Exact shared roots cannot distinguish original files from generated links. */
+export async function validateSourceLayout(
+	config: RuntimeConfig,
+): Promise<void> {
+	if (!config.dataDirs.length || !config.linkDirs.length) return;
+	// Saving settings must remain possible while a mount is unavailable. Resolve
+	// aliases when accessible and still catch lexical equality otherwise.
+	const identity = (path: string) =>
+		canonicalPath(path).catch(() => resolve(path));
+	const roots = await Promise.all(config.dataDirs.map(identity));
+	for (const linkDir of config.linkDirs) {
+		if (roots.includes(await identity(linkDir))) {
+			throw new Error(
+				"linkDir and dataDir must differ. Use a dedicated link directory inside or outside your data directory; cross-seed automatically excludes nested link directories.",
+			);
+		}
+	}
 }
 
 export type DataPathFilter = ((path: string) => Promise<boolean>) & {
@@ -78,20 +71,29 @@ export type DataPathFilter = ((path: string) => Promise<boolean>) & {
 export async function createDataPathFilter(
 	config: RuntimeConfig = getRuntimeConfig(),
 ): Promise<DataPathFilter> {
+	await validateSourceLayout(config);
 	const roots = await Promise.all(config.dataDirs.map(canonicalPath));
 	const managed = await Promise.all(
 		[
-			...(await getEffectiveLinkDirs(config)),
+			...config.linkDirs,
 			config.outputDir,
 			...(config.torrentDir ? [config.torrentDir] : []),
 		].map(canonicalPath),
 	);
 	// Explicit source roots win when a destination also contains those sources.
-	const excluded = managed.filter(
-		(dest) =>
-			roots.some((root) => root !== dest && containsPath(root, dest)) &&
-			!roots.some((root) => containsPath(dest, root)),
+	const excluded = managed.filter((dest) =>
+		roots.some((root) => root !== dest && containsPath(root, dest)),
 	);
+	const excludedAt = (path: string) =>
+		excluded.some(
+			(dest) =>
+				containsPath(dest, path) &&
+				!roots.some(
+					(root) =>
+						containsPath(dest, root) &&
+						(containsPath(root, path) || containsPath(path, root)),
+				),
+		);
 	const metadataDirs = await Promise.all(
 		[
 			config.outputDir,
@@ -106,10 +108,8 @@ export async function createDataPathFilter(
 		);
 		const canonical = await canonicalPath(path);
 		return (
-			!excluded.some(
-				(dir) =>
-					containsPath(dir, canonical) || containsPath(dir, location),
-			) &&
+			!excludedAt(canonical) &&
+			!excludedAt(location) &&
 			!(
 				canonical.endsWith(".torrent") &&
 				(metadataDirs.includes(dirname(canonical)) ||

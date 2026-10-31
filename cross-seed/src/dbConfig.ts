@@ -1,3 +1,4 @@
+import { validateSourceLayout } from "./sourcePaths.js";
 import { getDefaultRuntimeConfig, stripDefaults } from "./configuration.js";
 import { db } from "./db.js";
 import { RuntimeConfig } from "./runtimeConfig.js";
@@ -27,6 +28,7 @@ export async function setDbConfig(
 		...sanitizedConfig,
 	};
 	const validatedConfig = parseRuntimeConfig(mergedConfig);
+	await validateSourceLayout(validatedConfig);
 	const overrides = stripDefaults(validatedConfig);
 	const indexersToAdd: { url: string; apikey: string }[] = [];
 	await db.transaction(async (trx) => {
@@ -90,6 +92,7 @@ export async function updateDbConfig(
 				...sanitizedPartial,
 			};
 			const validatedConfig = parseRuntimeConfig(mergedConfig);
+			await validateSourceLayout(validatedConfig);
 			await trx("settings").update({
 				settings_json: JSON.stringify(stripDefaults(validatedConfig)),
 			});
@@ -99,6 +102,7 @@ export async function updateDbConfig(
 				...sanitizedPartial,
 			};
 			const validatedConfig = parseRuntimeConfig(mergedConfig);
+			await validateSourceLayout(validatedConfig);
 			await trx("settings").insert({
 				apikey: null,
 				settings_json: JSON.stringify(stripDefaults(validatedConfig)),

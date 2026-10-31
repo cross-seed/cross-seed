@@ -1,3 +1,4 @@
+import { validateSourceLayout } from "./sourcePaths.js";
 import { spawn } from "node:child_process";
 import { mkdir, readFile, rename, writeFile } from "fs/promises";
 import path from "path";
@@ -187,11 +188,13 @@ export async function determineRuntimeConfig(
 	}
 
 	if (dbOverrides !== undefined) {
-		return {
+		const resolved = {
 			...getDefaultRuntimeConfig(),
 			...dbOverrides,
 			...cliOptions,
 		};
+		await validateSourceLayout(resolved);
+		return resolved;
 	}
 
 	// then, try to migrate from file config (v6 to v7 upgrade path)

@@ -1,3 +1,5 @@
+import { reconcileJobs } from "./jobs.js";
+import { initializePushNotifier } from "./pushNotifier.js";
 import { db } from "./db.js";
 import { createSettingsService } from "./settingsService.js";
 import { createKnexSettingsPersistence } from "./settingsPersistence.js";
@@ -52,6 +54,8 @@ export const daemonSettingsService = createSettingsService(
 			const previous = getRuntimeConfig();
 			setRuntimeConfig(config);
 			reloadDownloadClients();
+			reconcileJobs();
+			initializePushNotifier();
 			if (torrentSourceConfigChanged(previous, config))
 				triggerLibraryIndexing();
 		},

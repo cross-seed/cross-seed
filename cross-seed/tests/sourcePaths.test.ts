@@ -132,29 +132,69 @@ describe.sequential("automatic source exclusions", () => {
 		);
 	});
 
-	it.each(["same", "ancestor"])(
-		"isolates new links for %s roots while keeping original source files",
+	it.each(["same", "alias"])(
+		"rejects exact %s link/source roots without changing settings",
 		async (layout) => {
-			const linkDir = layout === "same" ? dir : root;
-			runtime.setRuntimeConfig({
-				...runtime.getRuntimeConfig(),
-				linkDirs: [linkDir],
-			});
-			const [effective] = await paths.getEffectiveLinkDirs();
-			expect(effective).not.toBe(linkDir);
-			await mkdir(effective, { recursive: true });
-			const original = join(dir, "Original.S01E01.mkv");
-			await writeFile(original, "original");
-			await writeFile(
-				join(effective, "Generated.S01E01.mkv"),
-				"generated",
-			);
-			await data.indexDataDirs({ startup: true });
-			expect(
-				(await db<{ path: string }>("data")).map((row) => row.path),
-			).toEqual([original]);
+			const linkDir =
+				layout === "same"
+					? dir
+					: join(dir, "..", `alias-${Date.now()}`);
+			if (layout === "alias") await symlink(dir, linkDir);
+			const { daemonSettingsService } =
+				await import("../src/daemonSettings.js");
+			const { setDbConfig } = await import("../src/dbConfig.js");
+			await setDbConfig(runtime.getRuntimeConfig());
+			const before = await db("settings").first();
+			await expect(
+				daemonSettingsService.patch({
+					linkDirs: [linkDir],
+					maxDataDepth: 2,
+				}),
+			).rejects.toThrow(/must differ/);
+			expect(await db("settings").first()).toEqual(before);
+			expect(runtime.getRuntimeConfig().maxDataDepth).toBe(4);
 		},
 	);
+
+	it("allows a link root containing the source root without hiding original files", async () => {
+		runtime.setRuntimeConfig({
+			...runtime.getRuntimeConfig(),
+			linkDirs: [root],
+		});
+		await paths.validateSourceLayout(runtime.getRuntimeConfig());
+		const original = join(dir, "Original.S01E01.mkv");
+		await writeFile(original, "original");
+		await data.indexDataDirs({ startup: true });
+		expect(
+			(await db<{ path: string }>("data")).map((row) => row.path),
+		).toEqual([original]);
+	});
+
+	it("preserves an explicit source inside an excluded destination while skipping its generated siblings", async () => {
+		const links = join(dir, "links");
+		const originals = join(links, "Original.Show.S01");
+		await mkdir(originals, { recursive: true });
+		const original = join(originals, "Original.Show.S01E01.mkv");
+		const generated = join(links, "Generated.Show.S01E01.mkv");
+		await writeFile(original, "original");
+		await writeFile(generated, "generated");
+		runtime.setRuntimeConfig({
+			...runtime.getRuntimeConfig(),
+			dataDirs: [dir, originals],
+			linkDirs: [links],
+		});
+		await data.indexDataDirs({ startup: true });
+		expect(
+			await db<{ path: string }>("data").where({ path: original }),
+		).toHaveLength(1);
+		expect(
+			await db<{ path: string }>("data").where({ path: generated }),
+		).toHaveLength(0);
+		const { getFilesFromDataRoot } = await import("../src/searchee.js");
+		expect(
+			await getFilesFromDataRoot(links, new Map(), new Map()),
+		).toHaveLength(1);
+	});
 
 	it("keeps original metainfo in a shared output/torrent directory and ignores saved candidates", async () => {
 		const torrent = await import("../src/torrent.js");

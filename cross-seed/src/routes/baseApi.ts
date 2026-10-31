@@ -196,7 +196,7 @@ export function baseApiRoutes(
 		if (!(await authorize(c))) return c.text(API_KEY_REQUIRED, 401);
 
 		const injectJob = getJobs().find((job) => job.name === JobName.INJECT);
-		if (injectJob) {
+		if (injectJob?.shouldRun()) {
 			injectJob.runAheadOfSchedule = true;
 			await checkJobs({ isFirstRun: false, useQueue: true });
 		}
@@ -354,7 +354,7 @@ export function baseApiRoutes(
 		});
 
 		const job = getJobs().find((j) => j.name === data.name);
-		if (!job) {
+		if (!job || !job.shouldRun()) {
 			const message = `${data.name}: unable to run, disabled in config`;
 			logger.error({ label: Label.SCHEDULER, message });
 			return c.text(message, 404);

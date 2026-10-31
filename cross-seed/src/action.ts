@@ -62,7 +62,6 @@ import {
 	withMutex,
 } from "./utils.js";
 import winston from "winston";
-import { getEffectiveLinkDirs } from "./sourcePaths.js";
 
 const linkDirSrcName = "linkDirSrc.cross-seed";
 const linkDirDestName = "linkDirDest.cross-seed";
@@ -747,9 +746,7 @@ export async function performActions(
 }
 
 async function getLinkDir(pathStr: string): Promise<string | null> {
-	const { linkType } = getRuntimeConfig();
-	const linkDirs = await getEffectiveLinkDirs();
-	for (const dir of linkDirs) await mkdir(dir, { recursive: true });
+	const { linkDirs, linkType } = getRuntimeConfig();
 	const pathStat = await stat(pathStr);
 	const pathDev = pathStat.dev; // Windows always returns 0
 	if (pathDev) {

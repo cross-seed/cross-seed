@@ -12,9 +12,19 @@ test(
 import { runOverlapScenario } from "./overlap.js";
 
 test(
-	"shared and nested source/destination roots → injection → live rescan → restart",
+	"exact shared-root rejection and nested roots → injection → live rescan → restart",
 	{ timeout: 60000 },
 	async (context) => {
 		await runOverlapScenario((message) => context.diagnostic(message));
+	},
+);
+
+import { runSchedulingScenario } from "./scheduling.js";
+
+test(
+	"live HTTP/CLI scheduler changes and internal bounds survive restart",
+	{ timeout: 60000 },
+	async (context) => {
+		await runSchedulingScenario((message) => context.diagnostic(message));
 	},
 );

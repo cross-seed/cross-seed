@@ -19,7 +19,7 @@ its HTTP API; no application services, database calls, filesystem operations, or
 client adapters are replaced. The harness only opens ephemeral loopback ports
 and cleans up its processes, servers, and files on completion or failure.
 
-The scenario checks:
+The scenarios check:
 
 - First-user setup and authenticated settings changes.
 - Completed client content appearing in Library, including file counts.
@@ -35,12 +35,20 @@ The scenario checks:
   clean shutdown.
 - Restarting the same database with the session and inventory intact; repeated
   searches do not add the torrent again.
+- Exact shared link/data roots rejected before persistence, while nested link
+  directories support injection and stay out of source inventory after refresh
+  and restart.
+- Updated notification webhooks receiving real HTTP result events.
+- Enabling, changing and disabling scheduler jobs through HTTP and the online
+  CLI, with internally bounded intervals retained after restart.
 
 `daemon.js` owns process lifecycle and HTTP access. `protocols.js` implements
 narrow, stateful Torznab and qBittorrent simulators. `scenario.js` drives the
-workflow and checks observable API, client, database, and filesystem results.
-Assertions do not depend on diagnostic log messages. Unknown client operations
-fail instead of silently pretending to succeed.
+main workflow; `overlap.js` checks source/destination overlap and live
+notifications, and `scheduling.js` checks live scheduler settings. They inspect
+observable API, client, database, and filesystem results. Assertions do not
+depend on diagnostic log messages. Unknown client operations fail instead of
+silently pretending to succeed.
 
 This first slice exercises one completed single-file v1 torrent, hardlink mode,
 and qBittorrent 5.1 protocol behavior. The simulator does **not** implement a

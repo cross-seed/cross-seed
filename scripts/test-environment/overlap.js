@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import assert from "node:assert/strict";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -14,11 +15,19 @@ export async function runOverlapScenario(report = () => {}) {
 	const env = await createEnvironment();
 	let client;
 	let indexer;
+	const notifications = [];
+	const webhook = createServer(async (request, response) => {
+		let body = "";
+		for await (const chunk of request) body += chunk;
+		notifications.push(JSON.parse(body));
+		response.writeHead(200).end("ok");
+	});
 	try {
 		await writeFile(join(env.dataDir, filename), content);
 		client = await startQbittorrent(env.dataDir);
 		indexer = await startIndexer();
 		await env.start();
+		await new Promise((resolve) => webhook.listen(0, "127.0.0.1", resolve));
 		await env.trpc(
 			"auth.setup",
 			{
@@ -27,7 +36,20 @@ export async function runOverlapScenario(report = () => {}) {
 			},
 			true,
 		);
-		const linkDir = env.dataDir;
+		await assert.rejects(
+			env.trpc(
+				"settings.save",
+				{ dataDirs: [env.dataDir], linkDirs: [env.dataDir] },
+				true,
+			),
+			/must differ/,
+		);
+		assert.deepEqual((await env.trpc("settings.get")).config.dataDirs, []);
+		report(
+			"Exact shared root rejected before persistence; previous settings preserved",
+		);
+		const linkDir = join(env.dataDir, "links");
+		await mkdir(linkDir);
 		await env.trpc(
 			"settings.save",
 			{
@@ -41,6 +63,9 @@ export async function runOverlapScenario(report = () => {}) {
 				action: "inject",
 				linkType: "hardlink",
 				includeSingleEpisodes: true,
+				notificationWebhookUrls: [
+					`http://127.0.0.1:${webhook.address().port}/notify`,
+				],
 				searchCadence: 0,
 				rssCadence: 0,
 			},
@@ -67,12 +92,13 @@ export async function runOverlapScenario(report = () => {}) {
 		);
 		assert.equal(result.totalFound, 1);
 		assert.equal(client.additions.length, 1);
-		const addition = client.additions[0];
-		assert.ok(
-			addition.savepath.startsWith(
-				join(linkDir, ".cross-seed-links") + "/",
+		await eventually("live notifier", () =>
+			notifications.some(
+				(notification) => notification.extra?.event === "RESULTS",
 			),
 		);
+		const addition = client.additions[0];
+		assert.ok(addition.savepath.startsWith(linkDir + "/"));
 		const linked = join(addition.savepath, filename);
 		assert.deepEqual(await readFile(linked), content);
 		assert.equal(
@@ -80,7 +106,7 @@ export async function runOverlapScenario(report = () => {}) {
 			(await stat(join(env.dataDir, filename))).ino,
 		);
 		report(
-			"Shared link/data root: HTTP search injected a real hardlink into the automatic subfolder",
+			"Nested roots: HTTP search hardlinked and injected into the configured destination; live webhook received RESULTS",
 		);
 		// Re-save through HTTP so the daemon must apply its new source policy live.
 		await env.trpc("settings.save", { maxDataDepth: 3 }, true);
@@ -99,25 +125,13 @@ export async function runOverlapScenario(report = () => {}) {
 				items[0].path === join(env.dataDir, filename)
 			);
 		});
-		// A dedicated nested link root can change live without removing originals.
-		const nested = join(env.dataDir, "nested-links");
-		await mkdir(nested);
-		await writeFile(join(nested, "Generated.S01E01.mkv"), "generated");
-		await env.trpc("settings.save", { linkDirs: [nested] }, true);
-		await eventually("nested link policy", async () => {
-			const items = (await env.trpc("library.listItems")).items;
-			return (
-				items.length >= 1 &&
-				items.every((item) => !item.path?.startsWith(nested))
-			);
-		});
 		await env.stop();
 		await env.start();
 		const items = (await env.trpc("library.listItems")).items;
 		assert.ok(
 			items.some((item) => item.path === join(env.dataDir, filename)),
 		);
-		assert.ok(items.every((item) => !item.path?.startsWith(nested)));
+		assert.ok(items.every((item) => !item.path?.startsWith(linkDir)));
 		assert.deepEqual(await readFile(linked), content);
 		assert.deepEqual(client.errors, []);
 		assert.deepEqual(indexer.errors, []);
@@ -129,6 +143,11 @@ export async function runOverlapScenario(report = () => {}) {
 			cause: error,
 		});
 	} finally {
-		await Promise.all([env.close(), client?.close(), indexer?.close()]);
+		await Promise.all([
+			env.close(),
+			client?.close(),
+			indexer?.close(),
+			new Promise((resolve) => webhook.close(resolve)),
+		]);
 	}
 }
