@@ -556,7 +556,9 @@ to create a link to the original file in one of the `linkDirs` during searches
 where the original data is accessible (both torrent and data-based matches). The
 correct linkDir is chosen by matching the `stat.st_dev` for the source and link
 paths. If no linkDir shares a `stat.st_dev` with the source, the injection will
-fail for hardlinks and fallback to the first linkDir for symlinks.
+fail for hardlinks and reflinks (unless
+[`injectInPlaceWithoutLinkDir`](#injectinplacewithoutlinkdir) lets a perfect
+match be injected in place) and fallback to the first linkDir for symlinks.
 
 :::caution Docker
 
@@ -1550,6 +1552,53 @@ cross-seed search --flat-linking
 flatLinking: true,
 
 flatLinking: false,
+```
+
+### `injectInPlaceWithoutLinkDir`
+
+| Config File Name              | CLI Short Form | CLI Long Form                        | Format    | Config Default | Fallback |
+| ----------------------------- | -------------- | ------------------------------------ | --------- | -------------- | -------- |
+| `injectInPlaceWithoutLinkDir` | N/A            | `--inject-in-place-without-link-dir` | `boolean` | `false`        | `false`  |
+
+By default, when linking is enabled, every injected torrent is linked, and an
+injection fails when no linkDir shares a drive with its data (hardlinks and
+reflinks cannot cross mountpoints, for example to a network share) or when the
+data cannot be hardlinked or reflinked there. With `true`, a perfect match whose
+data sits on such a drive is instead injected **in place**, without a link,
+exactly as it would be without linking: the new torrent points at the original
+files, and in qBittorrent it takes the save path, category (subject to
+`duplicateCategories`) and content layout of the source torrent rather than
+`linkCategory`. Renamed or partial matches on such a drive still fail, since
+they cannot be seeded without a link.
+
+This only matters with `linkType: "hardlink"` or `"reflink"`: `symlink` never
+fails for lack of a linkDir and `reflinkOrCopy` copies instead, so the option is
+a no-op for them. The match's client must also be known: with several clients, a
+data-based or read-only-client match is still routed to a client by a link test
+and may fail before this fallback applies. On Windows, the linking health check
+cannot tell drives apart and keeps reporting an error for such save paths,
+although injection in place works.
+
+:::caution
+
+An in-place cross-seed shares its files with the original torrent: deleting one
+of them "with files" removes the data of the other. Leave this `false` if you
+rely on linking to keep cross-seeds apart from your originals.
+
+:::
+
+#### `injectInPlaceWithoutLinkDir` Examples (CLI)
+
+```shell
+cross-seed config set --inject-in-place-without-link-dir
+```
+
+#### `injectInPlaceWithoutLinkDir` Examples (Config file)
+
+```js
+injectInPlaceWithoutLinkDir: true,
+
+injectInPlaceWithoutLinkDir: false,
 ```
 
 ### `blockList`
