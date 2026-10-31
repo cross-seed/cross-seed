@@ -302,8 +302,11 @@ describe.sequential("Hono HTTP behavior", () => {
 			name: "search",
 			isActive: true,
 			runAheadOfSchedule: false,
+			shouldRun: vi.fn().mockReturnValue(false),
 		};
 		jobs.mockReturnValue([job]);
+		expect((await post("job", { name: "search" })).status).toBe(404);
+		job.shouldRun.mockReturnValue(true);
 		expect((await post("job", { name: "search" })).status).toBe(409);
 		job.isActive = false;
 		expect((await post("job", { name: "search" })).status).toBe(200);

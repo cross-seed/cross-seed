@@ -1,7 +1,7 @@
 import { z } from "zod";
 import ms from "ms";
 import { router, authedProcedure } from "../index.js";
-import { getJobs, JobName, checkJobs } from "../../jobs.js";
+import { getJobs, JobName, checkJobs, getJobNextRun } from "../../jobs.js";
 import { Label, logger } from "../../logger.js";
 import { db } from "../../db.js";
 
@@ -34,7 +34,7 @@ export const jobsRouter = router({
 
 		const jobStatuses: JobStatus[] = jobs.map((job) => {
 			const lastRun = lastRunMap.get(job.name);
-			const eligibilityTs = lastRun ? lastRun + job.cadence : now;
+			const eligibilityTs = getJobNextRun(job, lastRun, now);
 
 			// Format interval (cadence) as human readable
 			const interval = ms(job.cadence, { long: true });
@@ -77,7 +77,7 @@ export const jobsRouter = router({
 			const jobs = getJobs();
 			const job = jobs.find((j) => j.name === input.name);
 
-			if (!job) {
+			if (!job || !job.shouldRun()) {
 				throw new Error(
 					`${input.name}: unable to run, disabled in config`,
 				);

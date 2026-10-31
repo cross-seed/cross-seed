@@ -1,4 +1,4 @@
-import { RuntimeConfig } from "./configSchema.js";
+import type { RuntimeConfig } from "./configSchema.js";
 import { formatAsList } from "./utils.js";
 
 export enum Action {

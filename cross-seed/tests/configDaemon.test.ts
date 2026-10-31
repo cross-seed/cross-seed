@@ -149,6 +149,32 @@ describe.sequential("local settings tRPC capability", () => {
 		);
 		expect(reload).not.toHaveBeenCalled();
 	});
+	it("rejects malformed UI saves before applying any of the submitted changes", async () => {
+		const before = await db("settings").first();
+		const live = runtime.getRuntimeConfig();
+		for (const invalid of [
+			{ blockList: ["unknown:value"] },
+			{ blockList: ["nameRegex:["] },
+			{
+				torrentClients: [
+					"qbittorrent:ftp://user:secret-for-validation@localhost",
+				],
+			},
+		]) {
+			const response = await request("settings.save", {
+				maxDataDepth: 4,
+				...invalid,
+			});
+			expect(response.ok).toBe(false);
+			expect(await response.text()).not.toContain(
+				"secret-for-validation",
+			);
+			expect(await db("settings").first()).toEqual(before);
+			expect(runtime.getRuntimeConfig()).toEqual(live);
+		}
+		expect(reload).not.toHaveBeenCalled();
+		expect(index).not.toHaveBeenCalled();
+	});
 	it("unset never reimports legacy indexers", async () => {
 		await db("settings").update({
 			settings_json: JSON.stringify({

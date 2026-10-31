@@ -57,6 +57,74 @@ describe.sequential("startup config migration", () => {
 		else process.env.CONFIG_DIR = originalConfigDir;
 	});
 
+	it("rejects exact shared roots on import and stored startup without overwriting settings", async () => {
+		const env = await createStartupEnv();
+		const settings = {
+			dataDirs: [env.configDir],
+			linkDirs: [env.configDir],
+			apiKey: "preserve-api-key-123456789012345",
+		};
+		const contents = `export default ${JSON.stringify(settings)};`;
+		await writeFile(env.configPath, contents);
+		const initial = await env.db("settings").first();
+		await expect(env.determineRuntimeConfig({})).rejects.toThrow(
+			/Failed to import/,
+		);
+		expect(await env.db("settings").first()).toEqual(initial);
+		expect(await readFile(env.configPath, "utf8")).toBe(contents);
+		await env
+			.db("settings")
+			.update({ settings_json: JSON.stringify(settings) });
+		const before = await env.db("settings").first();
+		await expect(env.determineRuntimeConfig({})).rejects.toThrow(
+			/must differ/,
+		);
+		expect(await env.db("settings").first()).toEqual(before);
+	});
+
+	it("normalizes imported and already-stored blocklist hashes before use", async () => {
+		const env = await createStartupEnv();
+		const hash = "Ab".repeat(20);
+		await writeFile(
+			env.configPath,
+			`export default ${JSON.stringify({ blockList: [`infoHash:${hash}`] })};`,
+		);
+		const expected = [`infoHash:${hash.toLowerCase()}`];
+		expect((await env.determineRuntimeConfig({})).blockList).toEqual(
+			expected,
+		);
+		expect((await env.getDbConfig())?.blockList).toEqual(expected);
+		// Existing v7 users also benefit without a write or a new migration.
+		await env.db("settings").update({
+			settings_json: JSON.stringify({ blockList: [`infoHash:${hash}`] }),
+		});
+		const stored = await env.db("settings").first();
+		expect((await env.determineRuntimeConfig({})).blockList).toEqual(
+			expected,
+		);
+		expect(await env.db("settings").first()).toEqual(stored);
+	});
+
+	it.each([
+		{ blockList: ["nameRegex:["] },
+		{ blockList: ["unknown:value"] },
+		{ torrentClients: ["nonsense"] },
+		{ qbittorrentUrl: "not-a-url" },
+	])(
+		"rejects malformed legacy settings without writes or file backup: %j",
+		async (settings) => {
+			const env = await createStartupEnv();
+			const stored = await env.db("settings").first();
+			const contents = `export default ${JSON.stringify(settings)};`;
+			await writeFile(env.configPath, contents);
+			await expect(env.determineRuntimeConfig({})).rejects.toThrow(
+				"Failed to import configuration file",
+			);
+			expect(await env.db("settings").first()).toEqual(stored);
+			expect(await readFile(env.configPath, "utf8")).toBe(contents);
+		},
+	);
+
 	it.each([
 		["malformed JSON", "{broken"],
 		["empty JSON", ""],
@@ -64,6 +132,8 @@ describe.sequential("startup config migration", () => {
 		["array JSON", "[]"],
 		["invalid setting", JSON.stringify({ delay: 1 })],
 		["invalid API key", JSON.stringify({ apiKey: "short" })],
+		["invalid blocklist", JSON.stringify({ blockList: ["nameRegex:["] })],
+		["invalid client", JSON.stringify({ torrentClients: ["nonsense"] })],
 	])(
 		"preserves stored settings and the API key after %s, then starts after explicit repair",
 		async (_name, settingsJson) => {

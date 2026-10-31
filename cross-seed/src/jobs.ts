@@ -18,12 +18,16 @@ export enum JobName {
 }
 
 const jobs: Job[] = [];
+let schedulerInitialized = false;
+const FAILURE_RETRY_MS = ms("5 minutes");
 
 class Job {
 	name: JobName;
 	cadence: number;
 	exec: () => Promise<void>;
 	isActive: boolean;
+	lastAttempt?: number;
+	lastFailure?: number;
 	runAheadOfSchedule: boolean;
 	configOverride: Partial<RuntimeConfig>;
 	shouldRunFn: () => boolean;
@@ -50,6 +54,8 @@ class Job {
 	async run(): Promise<boolean> {
 		if (this.isActive) return false;
 		this.isActive = true;
+		this.lastAttempt = Date.now();
+		this.lastFailure = undefined;
 		try {
 			logger.info({
 				label: Label.SCHEDULER,
@@ -60,42 +66,111 @@ class Job {
 			} else {
 				await this.exec();
 			}
+		} catch (error) {
+			this.lastFailure = Date.now();
+			throw error;
 		} finally {
 			this.isActive = false;
 			this.runAheadOfSchedule = false;
 			this.configOverride = {};
+			reconcileJobs();
 		}
 		return true;
 	}
 }
 
-function createJobs(): void {
+function automaticCadence(
+	value: number,
+	minimum: number,
+	maximum = Number.MAX_SAFE_INTEGER,
+): number {
+	return Number.isFinite(value) && value > 0
+		? Math.min(maximum, Math.max(minimum, value))
+		: minimum;
+}
+
+/** Update jobs in place so an active run cannot be replaced by another run. */
+export function reconcileJobs(initialize = false): void {
+	if (initialize) schedulerInitialized = true;
+	if (!schedulerInitialized) return;
 	const { action, rssCadence, searchCadence } = getRuntimeConfig();
-	if (rssCadence) {
-		jobs.push(
-			new Job(
-				JobName.RSS,
-				rssCadence,
-				scanRssFeeds,
-				() => !!getRuntimeConfig().rssCadence,
-			),
-		);
+	const desired = [
+		...(rssCadence
+			? [
+					new Job(
+						JobName.RSS,
+						automaticCadence(
+							rssCadence,
+							ms("10 minutes"),
+							ms("2 hours"),
+						),
+						scanRssFeeds,
+						() => !!getRuntimeConfig().rssCadence,
+					),
+				]
+			: []),
+		...(searchCadence
+			? [
+					new Job(
+						JobName.SEARCH,
+						automaticCadence(searchCadence, ms("1 day")),
+						() =>
+							bulkSearch({
+								configOverride: {
+									excludeRecentSearch: Math.max(
+										getRuntimeConfig()
+											.excludeRecentSearch ?? 0,
+										ms("1 day"),
+									),
+								},
+							}),
+						() => !!getRuntimeConfig().searchCadence,
+					),
+				]
+			: []),
+		new Job(JobName.UPDATE_INDEXER_CAPS, ms("1 day"), updateCaps),
+		...(action === Action.INJECT
+			? [
+					new Job(
+						JobName.INJECT,
+						ms("1 hour"),
+						injectSavedTorrents,
+						() => getRuntimeConfig().action === Action.INJECT,
+					),
+				]
+			: []),
+		new Job(JobName.CLEANUP, ms("1 day"), cleanupDB),
+	];
+	for (const next of desired) {
+		const current = jobs.find((job) => job.name === next.name);
+		if (current) current.cadence = next.cadence;
+		else jobs.push(next);
 	}
-	if (searchCadence) {
-		jobs.push(
-			new Job(
-				JobName.SEARCH,
-				searchCadence,
-				bulkSearch,
-				() => !!getRuntimeConfig().searchCadence,
-			),
-		);
+	const order = new Map(desired.map((job, index) => [job.name, index]));
+	jobs.sort(
+		(a, b) =>
+			(order.get(a.name) ?? desired.length) -
+			(order.get(b.name) ?? desired.length),
+	);
+	for (let index = jobs.length - 1; index >= 0; index--) {
+		const job = jobs[index];
+		if (!job.isActive && !desired.some((next) => next.name === job.name))
+			jobs.splice(index, 1);
 	}
-	jobs.push(new Job(JobName.UPDATE_INDEXER_CAPS, ms("1 day"), updateCaps));
-	if (action === Action.INJECT) {
-		jobs.push(new Job(JobName.INJECT, ms("1 hour"), injectSavedTorrents));
-	}
-	jobs.push(new Job(JobName.CLEANUP, ms("1 day"), cleanupDB));
+}
+
+export function getJobNextRun(
+	job: Job,
+	lastRun: number | undefined | null,
+	now = Date.now(),
+): number {
+	const attemptEligibility =
+		job.lastFailure !== undefined
+			? job.lastFailure + FAILURE_RETRY_MS
+			: job.lastAttempt === undefined
+				? 0
+				: job.lastAttempt + job.cadence;
+	return Math.max(lastRun ? lastRun + job.cadence : now, attemptEligibility);
 }
 
 export function getJobs(): Job[] {
@@ -140,13 +215,25 @@ export async function checkJobs(
 		{ useQueue: options.useQueue },
 		async () => {
 			const now = Date.now();
-			for (const job of jobs) {
+			for (const job of [...jobs]) {
 				if (!job.shouldRun()) {
 					continue;
 				}
+				// Cleanup must stay isolated even when jobs are enabled live or
+				// explicitly requested while another job is already running.
+				if (
+					job.name === JobName.CLEANUP &&
+					jobs.some((j) => j.isActive)
+				)
+					continue;
+				if (
+					job.name !== JobName.CLEANUP &&
+					jobs.some((j) => j.name === JobName.CLEANUP && j.isActive)
+				)
+					continue;
 
 				const lastRun = await getJobLastRun(job.name);
-				const eligibilityTs = lastRun ? lastRun + job.cadence : now;
+				const eligibilityTs = getJobNextRun(job, lastRun, now);
 				if (options.isFirstRun) {
 					logNextRun(job.name, job.cadence, lastRun);
 				}
@@ -154,9 +241,6 @@ export async function checkJobs(
 				if (!job.runAheadOfSchedule) {
 					if (jobs.find((j) => j.name === JobName.RSS)?.isActive) {
 						continue;
-					}
-					if (job.name === JobName.CLEANUP) {
-						if (jobs.some((j) => j.isActive)) continue;
 					}
 				}
 
@@ -179,7 +263,7 @@ export async function checkJobs(
 }
 
 export async function jobsLoop(): Promise<void> {
-	createJobs();
+	reconcileJobs(true);
 
 	setInterval(() => runInBackground(checkJobs()), ms("1 minute"));
 	await checkJobs({ isFirstRun: true, useQueue: false });

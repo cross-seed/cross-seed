@@ -70,6 +70,39 @@ describe.sequential("data directory watcher lifecycle", () => {
 		expect(created[1].close).toHaveBeenCalledOnce();
 	});
 
+	it("ignores linked-file watcher events but refreshes ordinary source changes", async () => {
+		const dataDir = runtime.getRuntimeConfig().dataDirs[0];
+		const links = join(dataDir, "links");
+		await mkdir(links);
+		runtime.setRuntimeConfig({
+			...runtime.getRuntimeConfig(),
+			linkDirs: [links],
+		});
+		await dataFiles.indexDataDirs({ startup: true });
+		const before = await db("library_scan").count({ count: "*" }).first();
+		const callback = watch.mock.calls[0][2] as (
+			event: string,
+			filename: string,
+		) => void;
+		await writeFile(join(links, "Linked.S01E01.mkv"), "linked");
+		callback("rename", "links/Linked.S01E01.mkv");
+		const now = Date.now();
+		const clock = vi.spyOn(Date, "now").mockReturnValue(now + 61_000);
+		await dataFiles.indexDataDirs({ startup: false });
+		expect(await db("library_scan").count({ count: "*" }).first()).toEqual(
+			before,
+		);
+		const original = join(dataDir, "Original.S01E01.mkv");
+		await writeFile(original, "original");
+		callback("rename", "Original.S01E01.mkv");
+		clock.mockReturnValue(now + 122_000);
+		await dataFiles.indexDataDirs({ startup: false });
+		expect(await db("data").where({ path: original })).toHaveLength(1);
+		expect(
+			await db("data").where({ path: join(links, "Linked.S01E01.mkv") }),
+		).toHaveLength(0);
+		clock.mockRestore();
+	});
 	it("delays retries and cancels pending retries on cleanup", async () => {
 		await dataFiles.indexDataDirs({ startup: true });
 		vi.useFakeTimers();

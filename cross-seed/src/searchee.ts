@@ -62,6 +62,7 @@ import {
 	withMutex,
 	Mutex,
 } from "./utils.js";
+import { createDataPathFilter, type DataPathFilter } from "./sourcePaths.js";
 
 export interface File {
 	name: string;
@@ -237,8 +238,10 @@ export async function getSearcheeNewestFileAge(
 async function getFileNamesFromRootRec(
 	root: string,
 	memoizedPaths: Map<string, string[]>,
-	isDirHint?: boolean,
+	isDirHint: boolean | undefined,
+	includePath: DataPathFilter,
 ): Promise<string[]> {
+	if (!(await includePath(root))) return [];
 	if (memoizedPaths.has(root)) return memoizedPaths.get(root)!;
 	const isDir =
 		isDirHint !== undefined ? isDirHint : (await stat(root)).isDirectory();
@@ -251,6 +254,7 @@ async function getFileNamesFromRootRec(
 						join(root, dirent.name),
 						memoizedPaths,
 						dirent.isDirectory(),
+						includePath,
 					),
 			);
 	memoizedPaths.set(root, paths);
@@ -261,11 +265,18 @@ export async function getFilesFromDataRoot(
 	rootPath: string,
 	memoizedPaths: Map<string, string[]>,
 	memoizedLengths: Map<string, number>,
+	includePath?: DataPathFilter,
 ): Promise<File[]> {
+	includePath ??= await createDataPathFilter();
 	const parentDir = dirname(rootPath);
 	try {
 		return await mapAsync(
-			await getFileNamesFromRootRec(rootPath, memoizedPaths),
+			await getFileNamesFromRootRec(
+				rootPath,
+				memoizedPaths,
+				undefined,
+				includePath,
+			),
 			async (file) => ({
 				path: relative(parentDir, file),
 				name: basename(file),

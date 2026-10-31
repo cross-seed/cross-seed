@@ -1,3 +1,4 @@
+import { validateSourceLayout } from "./sourcePaths.js";
 import { getDefaultRuntimeConfig, stripDefaults } from "./configuration.js";
 import { RUNTIME_CONFIG_SCHEMA } from "./configSchema.js";
 import type { RuntimeConfig } from "./runtimeConfig.js";
@@ -59,6 +60,7 @@ export function createSettingsService(
 						...getDefaultRuntimeConfig(),
 						...requireSettingsObject(edit(stored)),
 					});
+					await validateSourceLayout(validated);
 					await transaction.write(
 						JSON.stringify(stripDefaults(validated)),
 					);

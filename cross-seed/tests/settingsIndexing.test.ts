@@ -102,6 +102,8 @@ describe.sequential("settings source indexing", () => {
 	it.each([
 		{ torrentClients: ["qbittorrent:http://localhost:8080"] },
 		{ maxDataDepth: 3 },
+		{ linkDirs: [join(TEST_ROOT, "links")] },
+		{ outputDir: join(TEST_ROOT, "new-output") },
 		{ seasonFromEpisodes: 0.5 },
 	])("refreshes inventory after changing %j", async (patch) => {
 		const torrent = await import("../src/torrent.js");
