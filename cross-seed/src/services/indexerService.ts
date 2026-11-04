@@ -6,6 +6,7 @@ import { USER_AGENT } from "../constants.js";
 import { getAllIndexers, type Indexer } from "../indexers.js";
 import { Result, resultOf, resultOfErr } from "../Result.js";
 import ms from "ms";
+import type { Knex } from "knex";
 import { errorMessage } from "../utils.js";
 
 // Helper function to deserialize raw database row (snake_case columns) to Indexer
@@ -155,11 +156,13 @@ export async function testIndexerConnection(
 	}
 }
 
-export async function createIndexer(
+/** Persist without network access so imports can include this in a transaction. */
+export async function insertIndexer(
 	input: z.infer<typeof indexerCreateSchema>,
+	connection: Knex = db,
 ): Promise<Indexer> {
 	// Create new indexer only (no upsert)
-	const [result] = await db("indexer")
+	const [result] = await connection("indexer")
 		.insert({
 			name: input.name || null,
 			url: input.url,
@@ -182,9 +185,15 @@ export async function createIndexer(
 		.returning("id");
 
 	// Query the created record
-	const rawRow = await db("indexer").where({ id: result.id }).first();
+	const rawRow = await connection("indexer").where({ id: result.id }).first();
 
-	const indexer = deserializeRawRow(rawRow);
+	return deserializeRawRow(rawRow);
+}
+
+export async function createIndexer(
+	input: z.infer<typeof indexerCreateSchema>,
+): Promise<Indexer> {
+	const indexer = await insertIndexer(input);
 
 	await updateCapsForIndexer(indexer);
 	const refreshedRow = await db("indexer").where({ id: indexer.id }).first();

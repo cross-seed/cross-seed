@@ -7,7 +7,9 @@ import {
 	parseRuntimeConfig,
 	parseRuntimeConfigOverrides,
 } from "./configSchema.js";
-import { createIndexer } from "./services/indexerService.js";
+import { insertIndexer } from "./services/indexerService.js";
+import type { Indexer } from "./indexers.js";
+import { updateCapsForIndexer } from "./torznab.js";
 
 export async function getDbConfig(): Promise<
 	Partial<RuntimeConfig> | undefined
@@ -30,7 +32,16 @@ export async function setDbConfig(
 	const validatedConfig = parseRuntimeConfig(mergedConfig);
 	await validateSourceLayout(validatedConfig);
 	const overrides = stripDefaults(validatedConfig);
-	const indexersToAdd: { url: string; apikey: string }[] = [];
+	const importedIndexers = new Map(
+		validatedConfig.torznab.map((tracker) => {
+			const baseUrl = new URL(tracker);
+			return [
+				`${baseUrl.origin}${baseUrl.pathname}`,
+				baseUrl.searchParams.get("apikey") ?? "",
+			];
+		}),
+	);
+	const addedIndexers: Indexer[] = [];
 	await db.transaction(async (trx) => {
 		const existingRow = await trx("settings").first();
 		if (existingRow) {
@@ -43,33 +54,30 @@ export async function setDbConfig(
 				settings_json: JSON.stringify(overrides),
 			});
 		}
-		// Also add any torznab links to indexers table
-		if (validatedConfig.torznab && Array.isArray(validatedConfig.torznab)) {
-			for (const tracker of validatedConfig.torznab) {
-				const baseUrl = new URL(tracker);
-				const url = `${baseUrl.origin}${baseUrl.pathname}`;
-				const apiKey = new URLSearchParams(baseUrl.searchParams).get(
-					"apikey",
+		// Persist the whole import atomically. A failed indexer write must leave
+		// startup able to retry the file rather than accepting partial settings.
+		for (const [url, apiKey] of importedIndexers) {
+			const existingIndexer = await trx("indexer").where({ url }).first();
+			if (existingIndexer) {
+				// Preserve IDs, history, capabilities and enabled state. Only the
+				// credential supplied by the imported URL is authoritative here.
+				await trx("indexer")
+					.where({ url })
+					.update({ apikey: apiKey ?? "" });
+			} else {
+				addedIndexers.push(
+					await insertIndexer(
+						{ url, apikey: apiKey ?? "", enabled: true },
+						trx,
+					),
 				);
-				const existingIndexer = await trx("indexer").where({
-					url: url,
-				});
-				if (existingIndexer.length === 0) {
-					indexersToAdd.push({
-						url,
-						apikey: apiKey ?? "",
-					});
-				}
 			}
 		}
 	});
 
-	for (const tracker of indexersToAdd) {
-		await createIndexer({
-			url: tracker.url,
-			apikey: tracker.apikey ?? "",
-			enabled: true,
-		});
+	// Capability discovery is best effort and must never hold the import transaction.
+	for (const indexer of addedIndexers) {
+		await updateCapsForIndexer(indexer);
 	}
 }
 

@@ -73,6 +73,80 @@ describe.sequential("v6 database upgrades", () => {
 		if (originalConfigDir === undefined) delete process.env.CONFIG_DIR;
 		else process.env.CONFIG_DIR = originalConfigDir;
 	});
+	it("imports updated indexer keys without replacing identity, disabled state or history", async () => {
+		const dir = await legacyDirectory();
+		await writeFile(
+			join(dir, "config.js"),
+			fileConfig.replace("apikey=test-key", "apikey=updated-key"),
+		);
+		const env = await open(dir);
+		await env.db.migrate.latest();
+		await env
+			.db("indexer")
+			.where({ id: 1 })
+			.update({ enabled: false, name: "My indexer" });
+		const original = await env.db("indexer").where({ id: 1 }).first();
+		const timestamps = await env.db("timestamp").select();
+		const rss = await env.db("rss").select();
+		await env.determineRuntimeConfig({});
+		expect(await env.db("indexer").select()).toEqual([
+			{ ...original, apikey: "updated-key" },
+		]);
+		expect(await env.db("timestamp").select()).toEqual(timestamps);
+		expect(await env.db("rss").select()).toEqual(rss);
+		const restarted = await reopen(dir);
+		await restarted.db.migrate.latest();
+		await restarted.determineRuntimeConfig({});
+		expect(await restarted.db("indexer").select()).toEqual([
+			{ ...original, apikey: "updated-key" },
+		]);
+	});
+
+	it("rolls back settings and all indexer changes on an import write failure, then retries without duplicates", async () => {
+		const dir = await legacyDirectory();
+		const contents = fileConfig.replace(
+			'apikey=test-key"',
+			'apikey=updated-key", "https://new.example/api?apikey=new-key", "https://new.example/api?apikey=new-key"',
+		);
+		await writeFile(join(dir, "config.js"), contents);
+		const env = await open(dir);
+		await env.db.migrate.latest();
+		const settings = await env.db("settings").select();
+		const indexers = await env.db("indexer").select();
+		await env.db.raw(
+			"CREATE TRIGGER fail_import BEFORE INSERT ON indexer WHEN NEW.url = 'https://new.example/api' BEGIN SELECT RAISE(ABORT, 'simulated indexer write failure'); END",
+		);
+		await expect(env.determineRuntimeConfig({})).rejects.toThrow(
+			"Failed to import configuration file",
+		);
+		expect(await env.db("settings").select()).toEqual(settings);
+		expect(await env.db("indexer").select()).toEqual(indexers);
+		expect(await readFile(join(dir, "config.js"), "utf8")).toBe(contents);
+		await env.db.raw("DROP TRIGGER fail_import");
+		// An offline indexer must not prevent successful persistence and backup.
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockRejectedValue(new Error("indexer offline")),
+		);
+		try {
+			const config = await env.determineRuntimeConfig({});
+			expect(config.apiKey).toBe(apiKey);
+			expect(await env.db("indexer").select("url", "apikey")).toEqual([
+				{ url: "https://indexer.example/api", apikey: "updated-key" },
+				{ url: "https://new.example/api", apikey: "new-key" },
+			]);
+			expect(
+				await readFile(join(dir, "config.js.bak"), "utf8"),
+			).toContain(contents);
+			const persisted = await env.db("indexer").select();
+			const restarted = await reopen(dir);
+			await restarted.db.migrate.latest();
+			expect(await restarted.determineRuntimeConfig({})).toEqual(config);
+			expect(await restarted.db("indexer").select()).toEqual(persisted);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 
 	it("deduplicates only identical legacy ensemble entries through the complete migration chain", async () => {
 		const dir = await legacyDirectory();
