@@ -206,11 +206,115 @@ describe.sequential("Hono HTTP behavior", () => {
 			}
 		},
 	);
-	it("retains validation, parsing, unsupported media, and size errors", async () => {
+	it.each(
+		[
+			undefined,
+			"text/plain",
+			"application/octet-stream",
+			"application/json",
+			"application/x-www-form-urlencoded",
+		].flatMap((type) =>
+			["json", "form"].flatMap((encoding) =>
+				["", "/cross-seed"].map((basePath) => ({
+					type,
+					encoding,
+					basePath,
+				})),
+			),
+		),
+	)(
+		"parses $encoding integration bodies with Content-Type $type at $basePath",
+		async ({ type, encoding, basePath }) => {
+			const app = serverModule.createHttpApp(basePath);
+			const job = {
+				name: "search",
+				isActive: false,
+				runAheadOfSchedule: false,
+				shouldRun: () => true,
+			};
+			jobs.mockReturnValue([job]);
+			match.mockResolvedValue({ decision: null, actionResult: null });
+			for (const [path, data, status] of [
+				["webhook", { infoHash: hash }, 204],
+				["announce", candidate, 204],
+				["job", { name: "search" }, 200],
+			] as const) {
+				const headers = new Headers({ "x-api-key": key });
+				if (type) headers.set("content-type", `${type}; charset=utf-8`);
+				const body =
+					encoding === "json"
+						? JSON.stringify(data)
+						: new URLSearchParams(data).toString();
+				const response = await app.request(`${basePath}/api/${path}`, {
+					method: "POST",
+					headers,
+					body: new TextEncoder().encode(body),
+				});
+				expect(
+					response.status,
+					`${path}: ${await response.text()}`,
+				).toBe(status);
+			}
+			expect(search).toHaveBeenCalledWith(
+				expect.objectContaining({ infoHash: hash.toLowerCase() }),
+				expect.anything(),
+			);
+			expect(match).toHaveBeenCalledWith(candidate, expect.anything());
+			expect(job.runAheadOfSchedule).toBe(true);
+			expect(runJobs).toHaveBeenCalledOnce();
+		},
+	);
+	it.each([undefined, "text/plain", "application/octet-stream"])(
+		"retains authentication and payload validation with Content-Type %s",
+		async (type) => {
+			const app = serverModule.createHttpApp();
+			for (const path of ["webhook", "announce", "job"]) {
+				const headers = new Headers();
+				if (type) headers.set("content-type", type);
+				const body = new TextEncoder().encode("not a valid payload");
+				expect(
+					(
+						await app.request(`/api/${path}`, {
+							method: "POST",
+							headers,
+							body,
+						})
+					).status,
+				).toBe(401);
+				headers.set("x-api-key", key);
+				expect(
+					(
+						await app.request(`/api/${path}`, {
+							method: "POST",
+							headers,
+							body,
+						})
+					).status,
+				).toBe(400);
+			}
+			expect(search).not.toHaveBeenCalled();
+			expect(match).not.toHaveBeenCalled();
+			expect(runJobs).not.toHaveBeenCalled();
+		},
+	);
+	it("keeps tRPC content-type parsing strict", async () => {
+		const response = await serverModule
+			.createHttpApp()
+			.request("/api/trpc/auth.logIn", {
+				method: "POST",
+				headers: { "content-type": "text/plain" },
+				body: JSON.stringify({
+					username: "http-user",
+					password: "http-test-password",
+				}),
+			});
+		expect(response.status).toBe(415);
+	});
+	it("retains validation, parsing, and size errors", async () => {
 		expect((await post("announce", {})).status).toBe(400);
 		expect((await post("job", { name: "not-a-job" })).status).toBe(400);
 		const app = serverModule.createHttpApp();
-		const unsupported = await app.request("/api/announce", {
+		const invalid = await app.request("/api/announce", {
 			method: "POST",
 			headers: {
 				"x-api-key": key,
@@ -218,10 +322,7 @@ describe.sequential("Hono HTTP behavior", () => {
 			},
 			body: "bad",
 		});
-		expect(unsupported.status).toBe(415);
-		expect(await unsupported.json()).toMatchObject({
-			code: "FST_ERR_CTP_INVALID_MEDIA_TYPE",
-		});
+		expect(invalid.status).toBe(400);
 		expect((await post("announce", null)).status).toBe(500);
 		expect(
 			(await post("announce", { name: "x".repeat(1024 * 1024) })).status,
@@ -364,13 +465,16 @@ describe.sequential("Hono HTTP behavior", () => {
 			const address = server.server.address();
 			if (!address || typeof address === "string")
 				throw new Error("No listener");
-			const postStream = (path: string, body: string) => {
+			const postStream = (
+				path: string,
+				body: string,
+				type: string | undefined = "application/json",
+			) => {
+				const headers = new Headers({ "x-api-key": key });
+				if (type) headers.set("content-type", type);
 				const init = {
 					method: "POST",
-					headers: {
-						"content-type": "application/json",
-						"x-api-key": key,
-					},
+					headers,
 					body: new ReadableStream<Uint8Array>({
 						start(controller) {
 							controller.enqueue(new TextEncoder().encode(body));
@@ -403,6 +507,19 @@ describe.sequential("Hono HTTP behavior", () => {
 				expect(await webhook.text()).toBe("");
 				expect(webhook.status).toBe(204);
 				expect(search).toHaveBeenCalled();
+				match.mockResolvedValue({ decision: null, actionResult: null });
+				for (const type of [
+					"",
+					"text/plain",
+					"application/octet-stream",
+				]) {
+					const response = await postStream(
+						"/api/announce",
+						JSON.stringify(candidate),
+						type,
+					);
+					expect(response.status, await response.text()).toBe(204);
+				}
 				const oversized = await postStream(
 					"/api/announce",
 					JSON.stringify({ name: "x".repeat(1024 * 1024) }),
@@ -429,10 +546,69 @@ describe.sequential("Hono HTTP behavior", () => {
 						request.end();
 					},
 				);
-				expect(traceStatus).toBe(404);
+				expect(traceStatus).toBe(405);
 			} finally {
 				await server.close();
 			}
+		},
+	);
+	it.each(["", "/cross-seed"])(
+		"reserves API paths from the SPA at %s",
+		async (basePath) => {
+			const app = serverModule.createHttpApp(basePath);
+			for (const path of [
+				"/api",
+				"/api/",
+				"/api/unknown",
+				"/api/webhook/unknown",
+			]) {
+				for (const method of ["GET", "POST"]) {
+					const response = await app.request(
+						`${basePath}${path}?test=1`,
+						{ method, headers: { accept: "text/html" } },
+					);
+					expect(response.status, path).toBe(404);
+					expect(response.headers.get("content-type")).toContain(
+						"application/json",
+					);
+					expect(await response.json()).toMatchObject({
+						statusCode: 404,
+						error: "Not Found",
+					});
+				}
+			}
+			for (const path of [
+				"webhook",
+				"announce",
+				"job",
+				"ping",
+				"status",
+			]) {
+				const method =
+					path === "ping" || path === "status" ? "POST" : "GET";
+				const response = await app.request(`${basePath}/api/${path}`, {
+					method,
+					headers: { accept: "text/html" },
+				});
+				expect(response.status, path).toBe(405);
+				expect(response.headers.get("allow")).toBe(
+					method === "POST" ? "GET, HEAD" : "POST",
+				);
+				expect(await response.json()).toMatchObject({
+					statusCode: 405,
+					error: "Method Not Allowed",
+				});
+			}
+			expect(
+				(await app.request(`${basePath}/api/ping`, { method: "HEAD" }))
+					.status,
+			).toBe(200);
+			const trpc = await app.request(
+				`${basePath}/api/trpc/noSuchProcedure`,
+				{ headers: { accept: "text/html", cookie } },
+			);
+			expect(trpc.status).toBe(404);
+			expect(await trpc.json()).toHaveProperty("error");
 		},
 	);
 	it("streams authenticated tRPC subscriptions and releases them on disconnect", async () => {

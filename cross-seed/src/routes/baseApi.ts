@@ -151,39 +151,21 @@ export function baseApiRoutes(
 	for (const path of ["/webhook", "/announce", "/job"]) {
 		app.post(path, async (c, next) => {
 			const text = await c.req.text();
-			const type = c.req
-				.header("content-type")
-				?.split(";")[0]
-				.trim()
-				.toLowerCase();
-			if (text || type) {
-				if (
-					type === "application/json" ||
-					type === "application/x-www-form-urlencoded"
-				) {
-					try {
-						c.set("parsedBody", parseData(text));
-					} catch (error) {
-						return c.json(
-							{
-								statusCode: 500,
-								error: "Internal Server Error",
-								message: errorMessage(error),
-							},
-							500,
-						);
-					}
-				} else if (type === "text/plain") c.set("parsedBody", text);
-				else
+			// Legacy integrations send JSON or form bytes regardless of Content-Type.
+			// Keep this compatibility local to these routes; their schemas validate it.
+			if (text) {
+				try {
+					c.set("parsedBody", parseData(text));
+				} catch (error) {
 					return c.json(
 						{
-							statusCode: 415,
-							code: "FST_ERR_CTP_INVALID_MEDIA_TYPE",
-							error: "Unsupported Media Type",
-							message: `Unsupported Media Type: ${type}`,
+							statusCode: 500,
+							error: "Internal Server Error",
+							message: errorMessage(error),
 						},
-						415,
+						500,
 					);
+				}
 			}
 			await next();
 		});
@@ -395,5 +377,24 @@ export function baseApiRoutes(
 	app.get("/ping", (c) => {
 		return c.text("OK", 200);
 	});
+	for (const [path, allow] of [
+		["/webhook", "POST"],
+		["/announce", "POST"],
+		["/job", "POST"],
+		["/status", "GET, HEAD"],
+		["/ping", "GET, HEAD"],
+	] as const) {
+		app.all(path, (c) => {
+			c.header("Allow", allow);
+			return c.json(
+				{
+					statusCode: 405,
+					error: "Method Not Allowed",
+					message: `Method ${c.req.method} is not allowed for ${c.req.path}`,
+				},
+				405,
+			);
+		});
+	}
 	return app;
 }

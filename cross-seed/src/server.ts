@@ -104,10 +104,13 @@ export function createHttpApp(
 	});
 	app.route(basePath || "/", devLoginRoutes(basePath));
 	app.route(`${basePath}/api`, baseApiRoutes(options.trackBackground));
+	// API misses must not reach the SPA fallback, even for browser navigation.
+	app.all(`${basePath}/api`, (c) => c.notFound());
+	app.all(`${basePath}/api/*`, (c) => c.notFound());
 	if (basePath) app.get(basePath, (c) => serveFrontend(c, basePath));
 	app.get(`${basePath}/*`, (c) => serveFrontend(c, basePath));
 	if (basePath) app.get("*", (c) => c.redirect(`${basePath}/`, 302));
-	// Preserve the JSON 404 shape for unmatched non-GET requests.
+	// Preserve the JSON 404 shape for unmatched API and non-GET requests.
 	app.notFound((c) =>
 		c.json(
 			{
