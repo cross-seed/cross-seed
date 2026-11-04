@@ -179,6 +179,18 @@ interface CategoryInfo {
 	savePath: string;
 }
 
+class TorrentAddRejectedError extends CrossSeedError {
+	constructor(
+		readonly status: number,
+		body: string,
+	) {
+		const explanation = body.trim().slice(0, 1000);
+		super(
+			`qBittorrent rejected torrent: HTTP ${status}${explanation ? `: ${explanation}` : ""}`,
+		);
+	}
+}
+
 export default class QBittorrent implements TorrentClient {
 	cookie: string;
 	url: { username: string; password: string; href: string };
@@ -365,8 +377,13 @@ export default class QBittorrent implements TorrentClient {
 				// (e.g. "SocketError: other side closed"), and that failure
 				// deserves the same retry treatment as a failed fetch()
 				// instead of escaping unretried and unhandled.
-				return await response.text();
+				const text = await response.text();
+				if (path === "/torrents/add" && !response.ok) {
+					throw new TorrentAddRejectedError(response.status, text);
+				}
+				return text;
 			} catch (e) {
+				if (e instanceof TorrentAddRejectedError) throw e;
 				if (i >= retries) {
 					logger.error({
 						label: this.label,
@@ -544,7 +561,10 @@ export default class QBittorrent implements TorrentClient {
 	}
 
 	async addTorrent(formData: FormData): Promise<void> {
-		await this.request("/torrents/add", formData);
+		const response = await this.request("/torrents/add", formData);
+		if (response?.trim() === "Fails.") {
+			throw new CrossSeedError("qBittorrent rejected torrent: Fails.");
+		}
 	}
 
 	async recheckTorrent(infoHash: string): Promise<void> {
@@ -1182,6 +1202,11 @@ export default class QBittorrent implements TorrentClient {
 			try {
 				await this.addTorrent(formData);
 			} catch (e) {
+				// Invalid metainfo cannot become an added torrent. Other failures
+				// may follow a successful add (e.g. a lost response or conflict).
+				if (e instanceof TorrentAddRejectedError && e.status === 415) {
+					throw e;
+				}
 				logger.error({
 					label: this.label,
 					message: `Failed to add torrent (polling client to confirm): ${errorMessage(e)}`,
