@@ -122,7 +122,11 @@ export class Metafile {
 	constructor(raw: Torrent) {
 		ensure(raw.info, "info");
 		ensure(raw.info["name.utf-8"] || raw.info.name, "info.name");
-		ensure(raw.info["piece length"], "info['piece length']");
+		ensure(
+			typeof raw.info["piece length"] === "number" &&
+				raw.info["piece length"] > 0,
+			"info['piece length']",
+		);
 		ensure(raw.info.pieces, "info.pieces");
 
 		if (raw.info.files) {
