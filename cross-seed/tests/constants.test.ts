@@ -38,6 +38,9 @@ describe("BAD_GROUP_PARSE_REGEX", () => {
 		"full blu ray",
 		"Season 1 720p",
 		"x2 6",
+		"HEVC.AAC.5.1",
+		"AVC.DTS.HD.MA",
+		"HEVC.DDP5.1.Atmos",
 	])("matches %j, which is not a release group", (text) => {
 		expect(text).toMatch(BAD_GROUP_PARSE_REGEX);
 	});
@@ -60,6 +63,8 @@ describe("BAD_GROUP_PARSE_REGEX", () => {
 		["a long run of digits", "1".repeat(30) + "x"],
 		["dots before digits", ".4".repeat(30) + "x"],
 		["dots before x and a digit", ".x4".repeat(30) + "!z"],
+		["dots", ".".repeat(40) + "x"],
+		["codec tags", "aac".repeat(14) + "hevc.avc.heaac" + "x"],
 	])("returns quickly for %s that end in a mismatch", (_, text) => {
 		const start = performance.now();
 		expect(text).not.toMatch(BAD_GROUP_PARSE_REGEX);
