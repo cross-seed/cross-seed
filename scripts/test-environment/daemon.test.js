@@ -1,6 +1,18 @@
 import { test } from "node:test";
 import { runScenario } from "./scenario.js";
 import { runStartupScenario } from "./startup.js";
+import { runWatcherScenario } from "./watcher.js";
+
+test(
+	"Linux watcher exceptions preserve the daemon and recover inventory",
+	{
+		timeout: 60000,
+		skip: process.platform !== "linux" || process.getuid?.() === 0,
+	},
+	async (context) => {
+		await runWatcherScenario((message) => context.diagnostic(message));
+	},
+);
 
 test(
 	"saved startup settings and explicit CLI precedence",

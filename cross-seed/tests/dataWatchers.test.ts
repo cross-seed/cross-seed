@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { watch } = vi.hoisted(() => ({ watch: vi.fn() }));
-vi.mock("fs", async (importOriginal) => ({
-	...(await importOriginal<typeof import("fs")>()),
-	watch,
+vi.mock("../src/dataDirWatcher.js", () => ({
+	watchDataDir: watch,
 }));
 
 class FakeWatcher extends EventEmitter {
-	close = vi.fn();
+	ready = Promise.resolve();
+	close = vi.fn().mockResolvedValue(undefined);
 }
 
 const TEST_ROOT = await mkdtemp(join(tmpdir(), "cross-seed-watchers-"));
@@ -50,7 +50,7 @@ describe.sequential("data directory watcher lifecycle", () => {
 	});
 
 	afterEach(async () => {
-		dataFiles.destroyDataDirWatchers();
+		await dataFiles.destroyDataDirWatchers();
 		vi.useRealTimers();
 		logger.close();
 		await db.destroy();
@@ -69,6 +69,24 @@ describe.sequential("data directory watcher lifecycle", () => {
 		await dataFiles.indexDataDirs({ startup: true });
 		expect(created[1].close).toHaveBeenCalledOnce();
 	});
+	it("waits for asynchronous watcher shutdown before teardown completes", async () => {
+		await dataFiles.indexDataDirs({ startup: true });
+		let finish!: () => void;
+		created[0].close.mockReturnValue(
+			new Promise<void>((resolve) => {
+				finish = resolve;
+			}),
+		);
+		let drained = false;
+		const closing = dataFiles.destroyDataDirWatchers().then(() => {
+			drained = true;
+		});
+		await Promise.resolve();
+		expect(drained).toBe(false);
+		finish();
+		await closing;
+		expect(drained).toBe(true);
+	});
 
 	it("ignores linked-file watcher events but refreshes ordinary source changes", async () => {
 		const dataDir = runtime.getRuntimeConfig().dataDirs[0];
@@ -80,12 +98,9 @@ describe.sequential("data directory watcher lifecycle", () => {
 		});
 		await dataFiles.indexDataDirs({ startup: true });
 		const before = await db("library_scan").count({ count: "*" }).first();
-		const callback = watch.mock.calls[0][2] as (
-			event: string,
-			filename: string,
-		) => void;
+		const callback = watch.mock.calls[0][1] as (filename: string) => void;
 		await writeFile(join(links, "Linked.S01E01.mkv"), "linked");
-		callback("rename", "links/Linked.S01E01.mkv");
+		callback("links/Linked.S01E01.mkv");
 		const now = Date.now();
 		const clock = vi.spyOn(Date, "now").mockReturnValue(now + 61_000);
 		await dataFiles.indexDataDirs({ startup: false });
@@ -94,7 +109,7 @@ describe.sequential("data directory watcher lifecycle", () => {
 		);
 		const original = join(dataDir, "Original.S01E01.mkv");
 		await writeFile(original, "original");
-		callback("rename", "Original.S01E01.mkv");
+		callback("Original.S01E01.mkv");
 		clock.mockReturnValue(now + 122_000);
 		await dataFiles.indexDataDirs({ startup: false });
 		expect(await db("data").where({ path: original })).toHaveLength(1);
@@ -114,7 +129,7 @@ describe.sequential("data directory watcher lifecycle", () => {
 		await vi.advanceTimersByTimeAsync(1);
 		expect(watch).toHaveBeenCalledTimes(2);
 		created[1].emit("error", new Error("EMFILE"));
-		dataFiles.destroyDataDirWatchers();
+		await dataFiles.destroyDataDirWatchers();
 		await vi.advanceTimersByTimeAsync(5000);
 		expect(watch).toHaveBeenCalledTimes(2);
 		// A queued error from a closed watcher must not restart it.
@@ -192,8 +207,10 @@ describe.sequential("data directory watcher lifecycle", () => {
 	});
 
 	it("automatically indexes a returning directory using a real filesystem watcher", async () => {
-		const realFs = await vi.importActual<typeof import("fs")>("fs");
-		watch.mockImplementation(realFs.watch);
+		const real = await vi.importActual<
+			typeof import("../src/dataDirWatcher.js")
+		>("../src/dataDirWatcher.js");
+		watch.mockImplementation(real.watchDataDir);
 		const dataDir = join(TEST_ROOT, `returning-${Date.now()}`);
 		runtime.setRuntimeConfig({
 			...runtime.getRuntimeConfig(),
@@ -247,7 +264,7 @@ describe.sequential("data directory watcher lifecycle", () => {
 				);
 			}),
 		).toHaveLength(2);
-		dataFiles.destroyDataDirWatchers();
+		await dataFiles.destroyDataDirWatchers();
 		watch.mockImplementation(() => new FakeWatcher());
 		await vi.advanceTimersByTimeAsync(5000);
 		expect(onWatcherRecovery).not.toHaveBeenCalled();

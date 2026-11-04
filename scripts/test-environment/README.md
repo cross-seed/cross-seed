@@ -34,6 +34,10 @@ The scenarios check:
 - Saved URL prefix and verbosity survive ordinary restarts; explicit CLI flags
   affect only that invocation. Console output reflects saved verbosity, and
   disabled-port CLI options fail without changing saved settings.
+- On non-root Linux, a recursive watcher permission exception stays inside its
+  worker: HTTP and healthy sources remain available, failed inventory survives,
+  restored permissions trigger a rescan, and shutdown drains the watcher
+  workers.
 - SQLite integrity, inventory rows, and a persisted matching decision after
   clean shutdown.
 - Restarting the same database with the session and inventory intact; repeated

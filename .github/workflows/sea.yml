@@ -76,6 +76,11 @@ jobs:
                   ./sea/${{ matrix.binary }} config --help
                   node scripts/smoke-runtime.js ./sea/${{ matrix.binary }}
               shell: bash
+            - name: Verify Linux watcher recovery in SEA
+              if: ${{ startsWith(matrix.target, 'linux-') }}
+              run: |
+                  node --input-type=module -e 'import { runWatcherScenario } from "./scripts/test-environment/watcher.js"; await runWatcherScenario(console.log, { executable: process.argv[1] });' "$PWD/sea/${{ matrix.binary }}"
+              shell: bash
             - name: Upload SEA to release
               if:
                   ${{ (github.event_name == 'release' &&

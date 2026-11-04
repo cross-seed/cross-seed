@@ -29,7 +29,9 @@ export async function eventually(description, check, timeout = 15000) {
 	});
 }
 
-export async function createEnvironment() {
+export async function createEnvironment({ executable } = {}) {
+	const command = executable ?? process.execPath;
+	const prefix = executable ? [] : [entrypoint];
 	const directory = await mkdtemp(join(tmpdir(), "cross-seed-environment-"));
 	const configDir = join(directory, "config");
 	const dataDir = join(directory, "data");
@@ -54,7 +56,7 @@ export async function createEnvironment() {
 	}
 	async function start({ basePath = "", args = [] } = {}) {
 		assert.ok(!child, "Stop the previous daemon before restarting");
-		await readFile(entrypoint); // Fail immediately with the build command's missing-file error.
+		await readFile(executable ?? entrypoint); // Fail immediately if the build is missing.
 		const socket = createServer();
 		await new Promise((resolve, reject) => {
 			socket.once("error", reject);
@@ -64,9 +66,9 @@ export async function createEnvironment() {
 		await new Promise((resolve) => socket.close(resolve));
 		base = `http://127.0.0.1:${port}${basePath}`;
 		child = spawn(
-			process.execPath,
+			command,
 			[
-				entrypoint,
+				...prefix,
 				"daemon",
 				"--host",
 				"127.0.0.1",
@@ -136,7 +138,7 @@ export async function createEnvironment() {
 		trpc,
 		request,
 		cli: (...args) =>
-			promisify(execFile)(process.execPath, [entrypoint, ...args], {
+			promisify(execFile)(command, [...prefix, ...args], {
 				env: { ...process.env, CONFIG_DIR: configDir },
 				timeout: 15000,
 			}),

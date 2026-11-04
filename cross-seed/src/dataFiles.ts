@@ -1,5 +1,6 @@
 import { replaceEnsembleEntries } from "./ensemble.js";
-import { FSWatcher, watch } from "fs";
+import { watchDataDir, type DataDirWatcher } from "./dataDirWatcher.js";
+import { runInBackground } from "./utils/background.js";
 import { readdir, readFile, stat } from "fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "path";
 import {
@@ -64,7 +65,8 @@ interface DataRootCandidate {
 	files: File[];
 }
 
-const watchers: Map<string, FSWatcher> = new Map();
+const watchers: Map<string, DataDirWatcher> = new Map();
+const closingWatchers = new Set<Promise<void>>();
 const modifiedPaths: Map<string, Set<string>> = new Map();
 const modifiedPathTimes: Map<string, Map<string, number>> = new Map();
 const STABILITY_WINDOW_MS = 60_000;
@@ -74,15 +76,23 @@ const watcherErrorTimes = new Map<string, number>();
 const failedDataDirs = new Set<string>();
 const watcherRetries = new Map<string, NodeJS.Timeout>();
 
-export function destroyDataDirWatchers(): void {
+function closeWatcher(watcher: DataDirWatcher): void {
+	const closing = watcher.close();
+	closingWatchers.add(closing);
+	runInBackground(closing.finally(() => closingWatchers.delete(closing)));
+}
+
+export async function destroyDataDirWatchers(): Promise<void> {
 	for (const timer of watcherRetries.values()) clearTimeout(timer);
 	watcherRetries.clear();
 	watcherErrorTimes.clear();
 	failedDataDirs.clear();
-	for (const watcher of watchers.values()) watcher.close();
+	const oldWatchers = [...watchers.values()];
 	watchers.clear();
+	for (const watcher of oldWatchers) closeWatcher(watcher);
 	modifiedPaths.clear();
 	modifiedPathTimes.clear();
+	await Promise.all([...closingWatchers]);
 }
 
 function getDataSourceInstance(path: string, dataDirs: string[]): string {
@@ -97,11 +107,11 @@ function getDataSourceInstance(path: string, dataDirs: string[]): string {
 	);
 }
 
-function createWatcher(
+async function createWatcher(
 	dataDir: string,
 	onRecovery?: () => Promise<void>,
 	recovering = false,
-): void {
+): Promise<void> {
 	const retry = (e: Error) => {
 		const lastError = watcherErrorTimes.get(dataDir);
 		if (
@@ -115,34 +125,35 @@ function createWatcher(
 			watcherErrorTimes.set(dataDir, Date.now());
 		}
 		failedDataDirs.add(dataDir);
-		watchers.get(dataDir)?.close();
+		const previous = watchers.get(dataDir);
 		watchers.delete(dataDir);
+		if (previous) closeWatcher(previous);
 		if (watcherRetries.has(dataDir)) return;
 		const timer = setTimeout(() => {
 			watcherRetries.delete(dataDir);
-			createWatcher(dataDir, onRecovery, true);
+			runInBackground(createWatcher(dataDir, onRecovery, true));
 		}, WATCHER_RETRY_MS);
 		timer.unref();
 		watcherRetries.set(dataDir, timer);
 	};
+	let watcher: DataDirWatcher | undefined;
 	try {
-		const watcher = watch(
-			dataDir,
-			{ recursive: true, persistent: false },
-			(_, f) => {
-				if (!f || watchers.get(dataDir) !== watcher) return;
-				const fullPath = resolve(join(dataDir, f));
-				if (fullPath === resolve(dataDir)) return;
-				modifiedPaths.get(dataDir)!.add(fullPath);
-				modifiedPathTimes.get(dataDir)!.set(fullPath, Date.now());
-			},
-		);
+		watcher = watchDataDir(dataDir, (f) => {
+			if (!f || watchers.get(dataDir) !== watcher) return;
+			const fullPath = resolve(join(dataDir, f));
+			if (fullPath === resolve(dataDir)) return;
+			modifiedPaths.get(dataDir)!.add(fullPath);
+			modifiedPathTimes.get(dataDir)!.set(fullPath, Date.now());
+		});
 		watchers.set(dataDir, watcher);
-		// Events during an outage cannot be recovered by reopening the watcher.
-		failedDataDirs.add(dataDir);
-		watcher.on("error", (e) => {
+		watcher.on("error", (e: Error) => {
 			if (watchers.get(dataDir) === watcher) retry(e);
 		});
+		await watcher.ready;
+		if (watchers.get(dataDir) !== watcher) return;
+		// Wait for the worker to install its subscription before scanning. Events
+		// during an outage cannot be recovered by reopening the watcher alone.
+		failedDataDirs.add(dataDir);
 		if (recovering) {
 			logger.info({
 				label: Label.INDEX,
@@ -156,7 +167,7 @@ function createWatcher(
 				});
 		}
 	} catch (e) {
-		retry(e as Error);
+		if (!watcher || watchers.get(dataDir) === watcher) retry(e as Error);
 	}
 }
 
@@ -200,7 +211,7 @@ export async function indexDataDirs(options: {
 }): Promise<void> {
 	const { dataDirs, maxDataDepth } = getRuntimeConfig();
 	const includePath = await createDataPathFilter();
-	if (options.startup) destroyDataDirWatchers();
+	if (options.startup) await destroyDataDirWatchers();
 	if (!dataDirs.length) return;
 	if (options.startup && includePath.hasExcludedSubtrees)
 		await retireExcludedDataPaths(includePath);
@@ -210,7 +221,7 @@ export async function indexDataDirs(options: {
 		if (options.startup) {
 			modifiedPaths.set(dataDir, new Set());
 			modifiedPathTimes.set(dataDir, new Map());
-			createWatcher(dataDir, options.onWatcherRecovery);
+			await createWatcher(dataDir, options.onWatcherRecovery);
 		}
 		// Consume this scan request before awaiting: a watcher recovery during the
 		// scan must remain pending for the scheduler's next pass.

@@ -88,7 +88,7 @@ async function createRuntimeEnv(): Promise<RuntimeEnv> {
 	await db.migrate.latest();
 	const { destroyDataDirWatchers } = await import("../src/dataFiles.js");
 	cleanupRuntime = async () => {
-		destroyDataDirWatchers();
+		await destroyDataDirWatchers();
 		await db.destroy();
 	};
 

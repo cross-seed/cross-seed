@@ -43,7 +43,7 @@ describe.sequential("automatic source exclusions", () => {
 		});
 	});
 	afterEach(async () => {
-		data.destroyDataDirWatchers();
+		await data.destroyDataDirWatchers();
 		logger.close();
 		await db.destroy();
 		vi.restoreAllMocks();

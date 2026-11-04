@@ -39,7 +39,7 @@ let exiting: Promise<void> | undefined;
 export function exitGracefully(): Promise<void> {
 	exiting ??= (async () => {
 		await drainShutdownHooks();
-		destroyDataDirWatchers();
+		await destroyDataDirWatchers();
 		await db.destroy();
 		process.exit();
 	})();

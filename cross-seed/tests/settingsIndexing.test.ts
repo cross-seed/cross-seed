@@ -54,7 +54,7 @@ describe.sequential("settings source indexing", () => {
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
-		env.destroyDataDirWatchers();
+		await env.destroyDataDirWatchers();
 		await env.db.destroy();
 	});
 

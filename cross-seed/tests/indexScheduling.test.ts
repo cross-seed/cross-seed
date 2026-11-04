@@ -33,7 +33,7 @@ describe.sequential("indexing scheduling", () => {
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
-		dataFiles.destroyDataDirWatchers();
+		await dataFiles.destroyDataDirWatchers();
 		logger.close();
 		await db.destroy();
 		delete process.env.CONFIG_DIR;
