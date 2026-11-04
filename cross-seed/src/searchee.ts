@@ -10,6 +10,7 @@ import {
 import type { Problem } from "./problems.js";
 import {
 	ABS_WIN_PATH_REGEX,
+	Action,
 	AKA_REGEX,
 	ANIME_GROUP_REGEX,
 	ARR_DIR_REGEX,
@@ -967,10 +968,13 @@ export async function createEnsembleSearchees(
 		Mutex.CREATE_ALL_SEARCHEES,
 		{ useQueue: true },
 		async () => {
-			const { seasonFromEpisodes, useClientTorrents } =
+			const { seasonFromEpisodes, useClientTorrents, action, linkDirs } =
 				getRuntimeConfig();
 			if (!allSearchees.length) return [];
 			if (!seasonFromEpisodes) return [];
+			// Virtual packs assemble independent episode files; injection needs links
+			// to give the client the candidate's complete directory layout.
+			if (action === Action.INJECT && !linkDirs.length) return [];
 			const searcheeLabel = allSearchees[0].label;
 			if (options.useFilters) {
 				logger.info({

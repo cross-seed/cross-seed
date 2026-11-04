@@ -386,7 +386,8 @@ export default class RTorrent implements TorrentClient {
 				directoryBase,
 			});
 		} else {
-			const result = await this.checkOriginalTorrent(searchee.infoHash!, {
+			if (!searchee.infoHash) return resultOfErr("NOT_FOUND");
+			const result = await this.checkOriginalTorrent(searchee.infoHash, {
 				onlyCompleted: options.onlyCompleted,
 			});
 			return result.mapOk(({ directoryBase }) => ({

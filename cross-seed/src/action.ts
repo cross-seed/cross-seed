@@ -534,6 +534,14 @@ export async function performActionWithoutMutex(
 		await saveTorrent();
 		return { actionResult };
 	}
+	if (!linkDirs.length && !searchee.infoHash && !searchee.path) {
+		warnOrVerbose({
+			label: searchee.label,
+			message: `Saving ${getLogString(newMeta)}: injecting a virtual season pack requires linkDirs to assemble its episode files`,
+		});
+		await saveTorrent();
+		return { actionResult: SaveResult.SAVED };
+	}
 
 	let savePath: string | undefined;
 	let destinationDir: string | undefined;

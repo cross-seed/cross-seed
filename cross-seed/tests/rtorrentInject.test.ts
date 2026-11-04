@@ -31,6 +31,31 @@ interface Payload {
 }
 
 describe("RTorrent.inject with a hybrid torrent", () => {
+	it("rejects a virtual source without a destination instead of querying an undefined source hash", async () => {
+		const client = new RTorrent(
+			"http://localhost:8000/RPC2",
+			"rtorrent",
+			0,
+			false,
+		);
+		vi.spyOn(client, "isTorrentInClient").mockResolvedValue(
+			resultOf(false),
+		);
+		const call = vi.spyOn(
+			client as unknown as { methodCallP: XmlRpcCall },
+			"methodCallP",
+		);
+		const meta = Metafile.decode(buildHybridTorrent().torrent);
+		await expect(
+			client.inject(
+				meta,
+				{ name: meta.name, title: meta.name, files: [], length: 0 },
+				Decision.MATCH,
+				{ onlyCompleted: true },
+			),
+		).resolves.toBe(InjectionResult.FAILURE);
+		expect(call).not.toHaveBeenCalled();
+	});
 	it("sends rTorrent the piece layers with the bytes they had in the torrent", async () => {
 		// no recheck, so that injecting does not wait for rTorrent to hash
 		setRuntimeConfig({ skipRecheck: true } as RuntimeConfig);
