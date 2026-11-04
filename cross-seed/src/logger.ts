@@ -115,7 +115,12 @@ export function logOnce(cacheKey: string, cb: () => void, ttl?: number) {
 	}
 }
 
-export function initializeLogger(options: Record<string, unknown>): void {
+export function initializeLogger(
+	initialOptions: Record<string, unknown>,
+): (resolvedOptions: Record<string, unknown>) => void {
+	// Bootstrap logging must work during migration; retain the same transports
+	// and update their configuration once persisted settings have been resolved.
+	const options = { ...initialOptions };
 	logger = winston.createLogger({
 		level: "info",
 		format: winston.format.combine(
@@ -206,6 +211,15 @@ export function initializeLogger(options: Record<string, unknown>): void {
 			}),
 		],
 	});
+	const transports = logger.transports;
+	return (resolvedOptions) => {
+		Object.assign(options, resolvedOptions);
+		for (const transport of transports) {
+			if (transport instanceof winston.transports.Console) {
+				transport.level = options.verbose ? "silly" : "info";
+			}
+		}
+	};
 }
 
 export function exitOnCrossSeedErrors(error: unknown): void {

@@ -19,9 +19,7 @@ import { withFullRuntime, withMinimalRuntime } from "./startup.js";
 import { indexTorrentsAndDataDirs, parseTorrentFromPath } from "./torrent.js";
 import { resetUsers } from "./userAuth.js";
 
-const verboseOption = new Option("-v, --verbose", "Log verbose output").default(
-	false,
-);
+const verboseOption = new Option("-v, --verbose", "Log verbose output");
 
 async function runDaemonStartupWork(): Promise<void> {
 	await indexTorrentsAndDataDirs({ startup: true });
@@ -154,8 +152,7 @@ program
 	.description("Start the cross-seed daemon")
 	.option("-p, --port <port>", "Listen on a custom port", (n) => parseInt(n))
 	.option("--host <host>", "Bind to a specific IP address")
-	.option("--base-path <path>", "Serve cross-seed behind this base path", "")
-	.option("--no-port", "Do not listen on any port")
+	.option("--base-path <path>", "Serve cross-seed behind this base path")
 	.addOption(verboseOption)
 	.action(
 		withFullRuntime(async (options) => {

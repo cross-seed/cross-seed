@@ -1,5 +1,14 @@
 import { test } from "node:test";
 import { runScenario } from "./scenario.js";
+import { runStartupScenario } from "./startup.js";
+
+test(
+	"saved startup settings and explicit CLI precedence",
+	{ timeout: 60000 },
+	async (context) => {
+		await runStartupScenario((message) => context.diagnostic(message));
+	},
+);
 
 test(
 	"fresh daemon → settings → inventory → search → hardlink/inject → disconnect recovery → restart",

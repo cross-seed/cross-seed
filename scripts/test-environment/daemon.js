@@ -52,7 +52,7 @@ export async function createEnvironment() {
 			child = undefined;
 		}
 	}
-	async function start() {
+	async function start({ basePath = "", args = [] } = {}) {
 		assert.ok(!child, "Stop the previous daemon before restarting");
 		await readFile(entrypoint); // Fail immediately with the build command's missing-file error.
 		const socket = createServer();
@@ -62,7 +62,7 @@ export async function createEnvironment() {
 		});
 		const port = socket.address().port;
 		await new Promise((resolve) => socket.close(resolve));
-		base = `http://127.0.0.1:${port}`;
+		base = `http://127.0.0.1:${port}${basePath}`;
 		child = spawn(
 			process.execPath,
 			[
@@ -72,6 +72,7 @@ export async function createEnvironment() {
 				"127.0.0.1",
 				"--port",
 				String(port),
+				...args,
 			],
 			{
 				env: {

@@ -31,6 +31,9 @@ The scenarios check:
   reconciliation.
 - Settings changes through the CLI's daemon connection and offline reads after
   shutdown.
+- Saved URL prefix and verbosity survive ordinary restarts; explicit CLI flags
+  affect only that invocation. Console output reflects saved verbosity, and
+  disabled-port CLI options fail without changing saved settings.
 - SQLite integrity, inventory rows, and a persisted matching decision after
   clean shutdown.
 - Restarting the same database with the session and inventory intact; repeated

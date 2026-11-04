@@ -33,6 +33,7 @@ import {
 import { Awaitable, notExists } from "./utils.js";
 import { getLogWatcher } from "./utils/logWatcher.js";
 import { omitUndefined } from "./utils/object.js";
+import { parseRuntimeConfigOverrides } from "./configSchema.js";
 
 let exiting: Promise<void> | undefined;
 export function exitGracefully(): Promise<void> {
@@ -158,7 +159,15 @@ async function backupFileConfig(): Promise<string> {
 export async function determineRuntimeConfig(
 	rawOptions: Record<string, unknown>,
 ) {
-	const cliOptions = omitUndefined(rawOptions) as Partial<RuntimeConfig>;
+	let cliOptions: Partial<RuntimeConfig>;
+	try {
+		cliOptions = parseRuntimeConfigOverrides(omitUndefined(rawOptions));
+	} catch (cause) {
+		throw new CrossSeedError(
+			"Invalid command-line settings. Check the supplied values and use --help for supported options.",
+			{ cause },
+		);
+	}
 
 	// first, try to load from database (existing user happy path)
 	let dbOverrides: Partial<RuntimeConfig> | undefined;
@@ -251,8 +260,9 @@ export function withFullRuntime(
 ): CommanderActionCb {
 	return withMinimalRuntime(async (options: Record<string, unknown>) => {
 		createAppDirHierarchy();
-		initializeLogger(options);
+		const configureLogger = initializeLogger(options);
 		const runtimeConfig = await determineRuntimeConfig(options);
+		configureLogger(runtimeConfig);
 		setRuntimeConfig(runtimeConfig);
 		initializePushNotifier();
 		getLogWatcher();
