@@ -30,25 +30,25 @@ export interface FileConfig {
 	delay?: number;
 	includeSingleEpisodes?: boolean;
 	outputDir?: string;
-	injectDir?: string;
+	injectDir?: string | null;
 	ignoreTitles?: boolean;
 	includeNonVideos?: boolean;
 	seasonFromEpisodes?: number;
 	fuzzySizeThreshold?: number;
-	excludeOlder?: string;
-	excludeRecentSearch?: string;
+	excludeOlder?: string | number | false | null;
+	excludeRecentSearch?: string | number | false | null;
 	useClientTorrents?: boolean;
-	dataDirs?: string[];
-	matchMode?: MatchMode;
+	dataDirs?: string[] | null;
+	matchMode?: MatchMode | "safe" | "risky";
 	skipRecheck?: boolean;
 	autoResumeMaxDownload?: number;
-	ignoreNonRelevantFilesToResume?: boolean;
+	ignoreNonRelevantFilesToResume?: boolean | null;
 	linkDir?: string;
 	linkDirs?: string[];
 	linkType?: string;
-	flatLinking?: boolean;
+	flatLinking?: boolean | null;
 	maxDataDepth?: number;
-	linkCategory?: string;
+	linkCategory?: string | null;
 	torrentDir?: string;
 	torznab?: string[];
 	torrentClients?: string[];
@@ -59,17 +59,19 @@ export interface FileConfig {
 	duplicateCategories?: boolean;
 	notificationWebhookUrls?: WebhookEntry[];
 	notificationWebhookUrl?: string;
-	port?: number;
-	host?: string;
+	port?: number | false | null;
+	host?: string | null;
+	basePath?: string;
+	verbose?: boolean;
 	searchCadence?: string;
 	rssCadence?: string;
 	snatchTimeout?: string;
 	searchTimeout?: string;
-	searchLimit?: number;
-	blockList?: string[];
-	apiKey?: string;
-	sonarr?: string[];
-	radarr?: string[];
+	searchLimit?: number | null;
+	blockList?: string[] | null;
+	apiKey?: string | null;
+	sonarr?: string[] | null;
+	radarr?: string[] | null;
 }
 
 export const UNPARSABLE_CONFIG_MESSAGE = `
@@ -218,6 +220,46 @@ const fileConfigSchema = RUNTIME_CONFIG_SCHEMA.partial().extend({
 export function transformFileConfig(
 	fileConfig: FileConfig,
 ): Partial<RuntimeConfig> {
+	if (fileConfig.port === false || fileConfig.port === null) {
+		throw new CrossSeedError(
+			"cross-seed v7 requires an HTTP port for the Web UI, integrations and settings CLI. " +
+				"Set port to a number from 1 to 65535, or remove port to use 2468. " +
+				'For local-only access, set host to "127.0.0.1".',
+		);
+	}
+	// Convert only supported legacy representations before v7 validation. Do not
+	// widen the settings API or materialize v6 defaults for omitted properties.
+	fileConfig = {
+		...fileConfig,
+		matchMode:
+			fileConfig.matchMode === "safe"
+				? MatchMode.STRICT
+				: fileConfig.matchMode,
+		excludeOlder:
+			fileConfig.excludeOlder === false ? 0 : fileConfig.excludeOlder,
+		excludeRecentSearch:
+			fileConfig.excludeRecentSearch === false
+				? 0
+				: fileConfig.excludeRecentSearch,
+		dataDirs: fileConfig.dataDirs === null ? [] : fileConfig.dataDirs,
+		blockList: fileConfig.blockList === null ? [] : fileConfig.blockList,
+		sonarr: fileConfig.sonarr === null ? [] : fileConfig.sonarr,
+		radarr: fileConfig.radarr === null ? [] : fileConfig.radarr,
+		searchLimit:
+			fileConfig.searchLimit === null ? 0 : fileConfig.searchLimit,
+		linkCategory:
+			fileConfig.linkCategory === null ? "" : fileConfig.linkCategory,
+		injectDir:
+			fileConfig.injectDir === null ? undefined : fileConfig.injectDir,
+		flatLinking:
+			fileConfig.flatLinking === null ? false : fileConfig.flatLinking,
+		ignoreNonRelevantFilesToResume:
+			fileConfig.ignoreNonRelevantFilesToResume === null
+				? false
+				: fileConfig.ignoreNonRelevantFilesToResume,
+		apiKey: fileConfig.apiKey === null ? undefined : fileConfig.apiKey,
+		host: fileConfig.host === null ? undefined : fileConfig.host,
+	};
 	fileConfigSchema.parse(fileConfig);
 	const result: Partial<RuntimeConfig> = {};
 
@@ -362,6 +404,12 @@ export function transformFileConfig(
 
 	if (typeof fileConfig.host === "string") {
 		result.host = fileConfig.host;
+	}
+	if (typeof fileConfig.basePath === "string") {
+		result.basePath = fileConfig.basePath;
+	}
+	if (typeof fileConfig.verbose === "boolean") {
+		result.verbose = fileConfig.verbose;
 	}
 
 	const searchCadence = parseDurationValue(fileConfig.searchCadence);

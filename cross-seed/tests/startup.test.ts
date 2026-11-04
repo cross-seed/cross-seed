@@ -411,4 +411,83 @@ export default {
 			matchMode: "flexible",
 		});
 	});
+	it.each([
+		[{ matchMode: "safe" }, { matchMode: "strict" }],
+		[
+			{ excludeOlder: false, excludeRecentSearch: false },
+			{ excludeOlder: 0, excludeRecentSearch: 0 },
+		],
+		[
+			{ dataDirs: null, blockList: null, sonarr: null, radarr: null },
+			{ dataDirs: [], blockList: [], sonarr: [], radarr: [] },
+		],
+		[{ searchLimit: null }, { searchLimit: 0 }],
+		[{ linkCategory: null }, { linkCategory: "" }],
+		[{ injectDir: null }, {}],
+		[
+			{ flatLinking: null, ignoreNonRelevantFilesToResume: null },
+			{ flatLinking: false, ignoreNonRelevantFilesToResume: false },
+		],
+		[{ apiKey: null, host: null }, { host: "0.0.0.0" }],
+		[
+			{ verbose: true, basePath: "/legacy" },
+			{ verbose: true, basePath: "/legacy" },
+		],
+	])(
+		"normalizes legacy values only at import and preserves them across restart: %j",
+		async (settings, expected) => {
+			const env = await createStartupEnv();
+			await writeFile(
+				env.configPath,
+				`export default ${JSON.stringify(settings)};`,
+			);
+			const runtime = await env.determineRuntimeConfig({});
+			expect(runtime).toMatchObject(expected);
+			if ("injectDir" in settings)
+				expect(runtime.injectDir).toBeUndefined();
+			const persisted = await env.db("settings").select();
+			await env.db.destroy();
+			const restarted = await createStartupEnv(env.configDir);
+			expect(await restarted.determineRuntimeConfig({})).toEqual(runtime);
+			expect(await restarted.db("settings").select()).toEqual(persisted);
+		},
+	);
+	it.each([false, null])(
+		"rejects explicitly disabled legacy HTTP with migration guidance: %s",
+		async (port) => {
+			const env = await createStartupEnv();
+			const contents = `export default ${JSON.stringify({ port })};`;
+			await writeFile(env.configPath, contents);
+			const stored = await env.db("settings").select();
+			await expect(env.determineRuntimeConfig({})).rejects.toHaveProperty(
+				"cause.message",
+				expect.stringContaining("v7 requires an HTTP port"),
+			);
+			expect(await env.db("settings").select()).toEqual(stored);
+			expect(await readFile(env.configPath, "utf8")).toBe(contents);
+		},
+	);
+	it("keeps v7 defaults for omissions and rejects legacy forms in ordinary v7 settings", async () => {
+		const env = await createStartupEnv();
+		await writeFile(env.configPath, "export default {};");
+		const runtime = await env.determineRuntimeConfig({});
+		expect(runtime).toMatchObject({
+			action: "inject",
+			matchMode: "flexible",
+			useClientTorrents: true,
+			searchLimit: 400,
+		});
+		const { parseRuntimeConfigOverrides } =
+			await import("../src/configSchema.js");
+		for (const input of [
+			{ matchMode: "safe" },
+			{ excludeOlder: false },
+			{ dataDirs: null },
+			{ searchLimit: null },
+			{ linkCategory: null },
+			{ port: 0 },
+		]) {
+			expect(() => parseRuntimeConfigOverrides(input)).toThrow();
+		}
+	});
 });
