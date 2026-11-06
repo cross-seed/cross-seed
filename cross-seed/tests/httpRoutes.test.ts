@@ -92,6 +92,7 @@ describe.sequential("Hono HTTP behavior", () => {
 	});
 	beforeEach(() => {
 		vi.clearAllMocks();
+		match.mockReset();
 		search.mockResolvedValue(0);
 		jobs.mockReturnValue([]);
 	});
@@ -335,40 +336,39 @@ describe.sequential("Hono HTTP behavior", () => {
 		["/cross-seed", "application/json"],
 		["/cross-seed", "application/x-www-form-urlencoded"],
 	])(
-		"explains mismatched announce URLs at %s with %s",
+		"accepts optional and distinct announce identities at %s with %s",
 		async (basePath, type) => {
 			const app = serverModule.createHttpApp(basePath);
-			const payload = {
-				...candidate,
-				guid: "https://example.invalid/details/1",
-			};
-			const response = await app.request(`${basePath}/api/announce`, {
-				method: "POST",
-				headers: { "x-api-key": key, "content-type": type },
-				body:
-					type === "application/json"
-						? JSON.stringify(payload)
-						: new URLSearchParams(payload).toString(),
-			});
-			expect(response.status).toBe(400);
-			const message = await response.text();
-			expect(message).toContain("guid must equal link");
-			expect(message).toContain("download URL");
-			expect(message).not.toContain("Missing required params");
-			expect(index).not.toHaveBeenCalled();
-			expect(match).not.toHaveBeenCalled();
-
-			match.mockResolvedValueOnce({ decision: null, actionResult: null });
-			const corrected = await app.request(`${basePath}/api/announce`, {
-				method: "POST",
-				headers: { "x-api-key": key, "content-type": type },
-				body:
-					type === "application/json"
-						? JSON.stringify(candidate)
-						: new URLSearchParams(candidate).toString(),
-			});
-			expect(corrected.status, await corrected.text()).toBe(204);
-			expect(match).toHaveBeenCalledOnce();
+			for (const guid of [
+				undefined,
+				candidate.link,
+				"https://example.invalid/details/1",
+				"tracker.example/torrent/1",
+			]) {
+				const payload = {
+					name: candidate.name,
+					link: candidate.link,
+					tracker: candidate.tracker,
+					...(guid === undefined ? {} : { guid }),
+				};
+				match.mockResolvedValueOnce({
+					decision: null,
+					actionResult: null,
+				});
+				const response = await app.request(`${basePath}/api/announce`, {
+					method: "POST",
+					headers: { "x-api-key": key, "content-type": type },
+					body:
+						type === "application/json"
+							? JSON.stringify(payload)
+							: new URLSearchParams(payload).toString(),
+				});
+				expect(response.status, await response.text()).toBe(204);
+				expect(match).toHaveBeenLastCalledWith(
+					{ ...candidate, guid: guid ?? candidate.link },
+					logging.Label.ANNOUNCE,
+				);
+			}
 		},
 	);
 	it("names missing announce fields", async () => {
@@ -376,9 +376,17 @@ describe.sequential("Hono HTTP behavior", () => {
 		expect(response.status).toBe(400);
 		const message = await response.text();
 		expect(message).toContain("Invalid announce payload");
-		for (const field of ["name", "guid", "link", "tracker"]) {
+		for (const field of ["name", "link", "tracker"]) {
 			expect(message).toContain(`${field}:`);
 		}
+		expect(message).not.toContain("guid:");
+	});
+	it("explains an invalid supplied announce identifier", async () => {
+		const response = await post("announce", { ...candidate, guid: " " });
+		expect(response.status).toBe(400);
+		expect(await response.text()).toContain("guid: must not be blank");
+		expect(index).not.toHaveBeenCalled();
+		expect(match).not.toHaveBeenCalled();
 	});
 	it("explains root-level announce errors without an empty field name", async () => {
 		const response = await post("announce", { ...candidate, extra: true });

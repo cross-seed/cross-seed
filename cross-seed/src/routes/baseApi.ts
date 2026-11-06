@@ -31,7 +31,10 @@ export const ANNOUNCE_SCHEMA = z
 			.string()
 			.transform((name) => name.trim())
 			.refine((name) => name.length > 0),
-		guid: z.string().url(),
+		guid: z
+			.string()
+			.refine((guid) => guid.trim().length > 0, "must not be blank")
+			.optional(),
 		link: z.string().url(),
 		tracker: z
 			.string()
@@ -43,10 +46,7 @@ export const ANNOUNCE_SCHEMA = z
 			.transform((cookie) => cookie?.trim() || undefined),
 	})
 	.strict()
-	.refine((data) => data.guid === data.link, {
-		path: ["guid"],
-		message: "guid must equal link; set both to the torrent download URL",
-	});
+	.transform((data) => ({ ...data, guid: data.guid ?? data.link }));
 
 const WEBHOOK_SCHEMA = z
 	.object({

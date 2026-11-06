@@ -2,6 +2,15 @@ import { test } from "node:test";
 import { runScenario } from "./scenario.js";
 import { runStartupScenario } from "./startup.js";
 import { runWatcherScenario } from "./watcher.js";
+import { runAnnounceScenario } from "./announce.js";
+
+test(
+	"announce identities persist and cached retries survive changed URLs and restart",
+	{ timeout: 60000 },
+	async (context) => {
+		await runAnnounceScenario((message) => context.diagnostic(message));
+	},
+);
 
 test(
 	"Linux watcher exceptions preserve the daemon and recover inventory",

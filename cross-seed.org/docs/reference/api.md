@@ -149,11 +149,19 @@ match was found `cross-seed` will respond with a `204 No Content`.
 POST /api/announce
 {
     "name": "string", // torrent name
-    "guid": "string", // usually the download link, used for caching purposes
-    "link": "string", // download link
+    "link": "string", // required torrent download URL
+    "guid": "string", // v7: optional stable identifier; defaults to link
     "tracker": "string" // used for linking path and logging
 }
 ```
+
+In v7, `guid` identifies the torrent for caching; `link` is the URL cross-seed
+downloads. They may differ. If you supply a `guid`, use a nonblank, stable,
+globally unique identifier for that torrent, such as its tracker details URL. It
+does not need to be a URL. Existing integrations that send the download URL for
+both fields continue to work.
+
+For v6, continue to send the download URL for both `guid` and `link`.
 
 ## POST `/api/job`
 

@@ -24,6 +24,9 @@ The scenarios check:
 - First-user setup and authenticated settings changes.
 - Completed client content appearing in Library, including file counts.
 - Torznab capabilities, search, and downloaded bencoded metainfo.
+- Announces with omitted, distinct URL, and opaque `guid` values: only `link` is
+  downloaded, identity is persisted, and cached metainfo can recreate saved
+  output when the download URL changes, including after daemon restart.
 - Matching and injection using the production qBittorrent adapter, including its
   authentication and multipart request.
 - Linked file bytes and matching inode/device, proving a real hardlink.
