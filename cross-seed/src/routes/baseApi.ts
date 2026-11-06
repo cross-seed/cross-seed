@@ -43,7 +43,10 @@ export const ANNOUNCE_SCHEMA = z
 			.transform((cookie) => cookie?.trim() || undefined),
 	})
 	.strict()
-	.refine((data) => data.guid === data.link);
+	.refine((data) => data.guid === data.link, {
+		path: ["guid"],
+		message: "guid must equal link; set both to the torrent download URL",
+	});
 
 const WEBHOOK_SCHEMA = z
 	.object({
@@ -262,14 +265,12 @@ export function baseApiRoutes(
 		} catch (zodErr) {
 			const zodError = zodErr instanceof z.ZodError ? zodErr : null;
 			const errors: string[] = zodError
-				? zodError.issues.map((issue) =>
-						(issue.path as (string | number)[]).join("."),
+				? zodError.issues.map(
+						(issue) =>
+							`${issue.path.map(String).join(".") || "request"}: ${issue.message}`,
 					)
-				: [];
-			const message = `Missing required params (https://www.cross-seed.org/docs/v6-migration#autobrr-update): {${formatAsList(
-				errors,
-				{ sort: true, type: "unit" },
-			)}} in ${inspect(rawData)}\n${inspect(errors)}`;
+				: [`request: ${errorMessage(zodErr)}`];
+			const message = `Invalid announce payload: ${errors.join("; ")}\nSee https://www.cross-seed.org/docs/reference/api#post-apiannounce`;
 			logger.error({ label: Label.ANNOUNCE, message });
 			return c.text(message, 400);
 		}

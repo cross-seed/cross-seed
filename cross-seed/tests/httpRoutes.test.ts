@@ -329,6 +329,65 @@ describe.sequential("Hono HTTP behavior", () => {
 		).toBe(413);
 		expect(match).not.toHaveBeenCalled();
 	});
+	it.each([
+		["", "application/json"],
+		["", "application/x-www-form-urlencoded"],
+		["/cross-seed", "application/json"],
+		["/cross-seed", "application/x-www-form-urlencoded"],
+	])(
+		"explains mismatched announce URLs at %s with %s",
+		async (basePath, type) => {
+			const app = serverModule.createHttpApp(basePath);
+			const payload = {
+				...candidate,
+				guid: "https://example.invalid/details/1",
+			};
+			const response = await app.request(`${basePath}/api/announce`, {
+				method: "POST",
+				headers: { "x-api-key": key, "content-type": type },
+				body:
+					type === "application/json"
+						? JSON.stringify(payload)
+						: new URLSearchParams(payload).toString(),
+			});
+			expect(response.status).toBe(400);
+			const message = await response.text();
+			expect(message).toContain("guid must equal link");
+			expect(message).toContain("download URL");
+			expect(message).not.toContain("Missing required params");
+			expect(index).not.toHaveBeenCalled();
+			expect(match).not.toHaveBeenCalled();
+
+			match.mockResolvedValueOnce({ decision: null, actionResult: null });
+			const corrected = await app.request(`${basePath}/api/announce`, {
+				method: "POST",
+				headers: { "x-api-key": key, "content-type": type },
+				body:
+					type === "application/json"
+						? JSON.stringify(candidate)
+						: new URLSearchParams(candidate).toString(),
+			});
+			expect(corrected.status, await corrected.text()).toBe(204);
+			expect(match).toHaveBeenCalledOnce();
+		},
+	);
+	it("names missing announce fields", async () => {
+		const response = await post("announce", {});
+		expect(response.status).toBe(400);
+		const message = await response.text();
+		expect(message).toContain("Invalid announce payload");
+		for (const field of ["name", "guid", "link", "tracker"]) {
+			expect(message).toContain(`${field}:`);
+		}
+	});
+	it("explains root-level announce errors without an empty field name", async () => {
+		const response = await post("announce", { ...candidate, extra: true });
+		expect(response.status).toBe(400);
+		const message = await response.text();
+		expect(message).toContain("request:");
+		expect(message).toContain("extra");
+		expect(message).not.toContain("Missing required params");
+	});
 	it("retains form fallback for JSON-labelled integration requests", async () => {
 		const response = await serverModule
 			.createHttpApp()
