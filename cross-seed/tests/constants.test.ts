@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { BAD_GROUP_PARSE_REGEX, EP_REGEX } from "../src/constants.js";
+import {
+	BAD_EP_REGEX,
+	BAD_GROUP_PARSE_REGEX,
+	EP_REGEX,
+} from "../src/constants.js";
 
 describe("EP_REGEX", () => {
 	it("matches episode titles", () => {
@@ -23,6 +27,31 @@ describe("EP_REGEX", () => {
 		invalidTitles.forEach((title) => {
 			expect(title).not.toMatch(EP_REGEX);
 		});
+	});
+});
+
+describe("BAD_EP_REGEX", () => {
+	it.each([
+		"S01E02.Title.1080p",
+		"S01.E02.Title",
+		"S01 E02 Title",
+		"s01e02.title",
+		"S01E02E03.Title",
+		"E05.Title.720p",
+		"ShowS01E02.1080p",
+		"[Group]S01E02.mkv",
+		"2024.01.05.Show",
+	])("matches %j, which does not start with a title", (title) => {
+		expect(title).toMatch(BAD_EP_REGEX);
+	});
+
+	it.each([
+		"Se7en.1995.1080p.MA.WEBRip.DDP5.1.x264-ZoroSenpai.mkv",
+		"Re4.2020.1080p",
+		"My.Show.S01E01",
+		"Seven.1995.1080p",
+	])("does not match %j", (title) => {
+		expect(title).not.toMatch(BAD_EP_REGEX);
 	});
 });
 
