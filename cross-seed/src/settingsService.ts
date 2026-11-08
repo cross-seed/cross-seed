@@ -40,6 +40,7 @@ const indexerAdvice =
 export function createSettingsService(
 	persistence: SettingsPersistence,
 	options: {
+		beforeWrite?: () => void | Promise<void>;
 		afterWrite?: (effective: RuntimeConfig) => void | Promise<void>;
 	} = {},
 ): SettingsService {
@@ -51,6 +52,7 @@ export function createSettingsService(
 		replace = false,
 	): Promise<void> {
 		const result = pending.then(async () => {
+			await options.beforeWrite?.();
 			const effective = await persistence.transaction(
 				async (transaction) => {
 					const stored = replace

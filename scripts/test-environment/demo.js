@@ -15,3 +15,6 @@ await runAnnounceScenario((message) => console.log(`✓ ${message}`));
 if (process.platform === "linux" && process.getuid?.() !== 0) {
 	await runWatcherScenario((message) => console.log(`✓ ${message}`));
 }
+
+import { runRecoveryScenario } from "./recovery.js";
+await runRecoveryScenario((message) => console.log(`✓ ${message}`));

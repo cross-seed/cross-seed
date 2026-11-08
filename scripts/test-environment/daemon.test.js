@@ -58,3 +58,13 @@ test(
 		await runSchedulingScenario((message) => context.diagnostic(message));
 	},
 );
+
+import { runRecoveryScenario } from "./recovery.js";
+
+test(
+	"invalid settings keep authenticated recovery available and resume after repair",
+	{ timeout: 60000 },
+	async (context) => {
+		await runRecoveryScenario((message) => context.diagnostic(message));
+	},
+);

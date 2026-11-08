@@ -7,6 +7,32 @@ title: Common Setup Failures
 Start here for path, mount, networking, Torznab URL, permission, recovery, and
 cleanup-scope problems.
 
+## Invalid settings in v7
+
+The v7 daemon keeps its authenticated Web UI available when stored settings are
+invalid. A recovery banner explains the error. Searches, indexing, and injection
+stay paused; API requests that would start work return HTTP 503.
+
+For a directory layout error, open **Settings → Directories**, correct the
+paths, and save. A link directory can be inside a data directory, but they must
+not be the same directory, including through symlink aliases. A successful
+repair resumes the daemon automatically; changing the HTTP address, port, or URL
+prefix still requires a restart.
+
+If stored settings contain invalid values or malformed JSON, the UI provides a
+JSON repair editor. It shows the original stored text, including secrets. A
+successful save replaces settings after validation; it does not replace users,
+indexers, or history. Preserve the API key in the repaired settings to keep
+existing integrations working. Failed validation leaves the stored text intact.
+
+If a legacy `config.js` import fails, fix the original file and restart to retry
+the complete import, including indexers. Recovery mode does not replace an
+unsuccessful import with default settings.
+
+This mode requires a readable SQLite database and a usable HTTP listener. It
+cannot repair a corrupt database or bind an occupied port. Back up the database
+before offline recovery; do not delete it to reset settings.
+
 ## Docker paths and mounts
 
 `cross-seed` and your torrent client must see the same data at the same path.

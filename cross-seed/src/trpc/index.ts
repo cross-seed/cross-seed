@@ -1,3 +1,4 @@
+import { getDaemonRecovery, RECOVERY_MESSAGE } from "../daemonRecovery.js";
 import { daemonSettingsService } from "../daemonSettings.js";
 import type { SettingsService } from "../settingsService.js";
 import { validSettingsCliToken } from "../configDaemonDiscovery.js";
@@ -69,7 +70,7 @@ export const router = t.router;
 export const unauthedProcedure = t.procedure;
 
 // Procedure that requires authentication
-export const authedProcedure = t.procedure.use(async ({ ctx, next }) => {
+export const authedProcedure = t.procedure.use(async ({ ctx, next, path }) => {
 	if (!ctx.user) {
 		logger.warn({
 			label: Label.AUTH,
@@ -79,6 +80,16 @@ export const authedProcedure = t.procedure.use(async ({ ctx, next }) => {
 		throw new TRPCError({ code: "UNAUTHORIZED" });
 	}
 
+	if (
+		getDaemonRecovery() &&
+		!["settings", "health", "logs", "clients", "indexers"].includes(
+			path.split(".")[0],
+		)
+	)
+		throw new TRPCError({
+			code: "PRECONDITION_FAILED",
+			message: RECOVERY_MESSAGE,
+		});
 	return next({ ctx: { ...ctx, user: ctx.user } });
 });
 

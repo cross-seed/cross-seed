@@ -19,6 +19,8 @@ import { withFullRuntime, withMinimalRuntime } from "./startup.js";
 import { indexTorrentsAndDataDirs, parseTorrentFromPath } from "./torrent.js";
 import { resetUsers } from "./userAuth.js";
 
+import { getDaemonRecovery } from "./daemonRecovery.js";
+
 const verboseOption = new Option("-v, --verbose", "Log verbose output");
 
 async function runDaemonStartupWork(): Promise<void> {
@@ -154,26 +156,29 @@ program
 	.option("--host <host>", "Bind to a specific IP address")
 	.option("--base-path <path>", "Serve cross-seed behind this base path")
 	.addOption(verboseOption)
-	.action(
-		withFullRuntime(async (options) => {
-			let startStartupWork: () => void;
-			const startupWorkPromise = new Promise<void>((resolve, reject) => {
-				startStartupWork = () => {
-					delay(1000)
-						.then(runDaemonStartupWork)
-						.then(resolve, reject);
-				};
-			});
-			const serverPromise = serve(
-				options.port,
-				options.host,
-				options.basePath,
-				startStartupWork!,
-			);
-			// technically this will never resolve, but it's necessary to keep the process running
-			await Promise.all([serverPromise, startupWorkPromise]);
-		}),
-	);
+	.action(async (options: Record<string, unknown>) => {
+		let startStartupWork: () => void;
+		let started = false;
+		const startupWorkPromise = new Promise<void>((resolve, reject) => {
+			startStartupWork = () => {
+				if (started || getDaemonRecovery()) return;
+				started = true;
+				delay(1000).then(runDaemonStartupWork).then(resolve, reject);
+			};
+		});
+		await withFullRuntime(
+			async (config) => {
+				const serverPromise = serve(
+					config.port,
+					config.host,
+					config.basePath,
+					startStartupWork!,
+				);
+				await Promise.all([serverPromise, startupWorkPromise]);
+			},
+			{ recoverSettings: true, onRecovered: () => startStartupWork!() },
+		)(options);
+	});
 
 program
 	.command("rss")

@@ -1,3 +1,4 @@
+import { getDaemonRecovery, resumeRecoveredDaemon } from "./daemonRecovery.js";
 import { reconcileJobs } from "./jobs.js";
 import { initializePushNotifier } from "./pushNotifier.js";
 import { db } from "./db.js";
@@ -50,7 +51,20 @@ function triggerLibraryIndexing(): void {
 export const daemonSettingsService = createSettingsService(
 	createKnexSettingsPersistence(db),
 	{
-		afterWrite(config) {
+		beforeWrite() {
+			if (getDaemonRecovery()?.source === "file")
+				throw new Error(
+					"Fix config.js and restart to retry the complete legacy import, including indexers.",
+				);
+		},
+		async afterWrite(config) {
+			if (await resumeRecoveredDaemon(config)) {
+				logger.info({
+					label: Label.SERVER,
+					message: "Settings repaired; resuming cross-seed.",
+				});
+				return;
+			}
 			const previous = getRuntimeConfig();
 			setRuntimeConfig(config);
 			reloadDownloadClients();

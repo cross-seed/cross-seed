@@ -1,3 +1,4 @@
+import { getDaemonRecovery } from "../../daemonRecovery.js";
 import { authedProcedure, router } from "../index.js";
 import { collectDbDiagnostics } from "../../diagnostics/db.js";
 import { collectProblems } from "../../problems.js";
@@ -7,7 +8,17 @@ export const healthRouter = router({
 	get: authedProcedure.query(async () => {
 		try {
 			const [problems, db] = await Promise.all([
-				collectProblems(),
+				getDaemonRecovery()
+					? Promise.resolve([
+							{
+								id: "daemon:recovery",
+								severity: "error" as const,
+								summary:
+									"Cross-seed is paused until its settings are repaired",
+								details: getDaemonRecovery()!.message,
+							},
+						])
+					: collectProblems(),
 				collectDbDiagnostics(),
 			]);
 			return { problems, diagnostics: { db } };

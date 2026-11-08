@@ -22,6 +22,11 @@ and cleans up its processes, servers, and files on completion or failure.
 The scenarios check:
 
 - First-user setup and authenticated settings changes.
+- Invalid stored settings keep authenticated recovery available without
+  resetting settings or rotating the API key. Unsafe directory layouts block
+  work until a valid settings save resumes indexing; schema errors and malformed
+  JSON can be repaired through the online CLI. Invalid legacy files remain
+  intact for a complete import after repair and restart.
 - Completed client content appearing in Library, including file counts.
 - Torznab capabilities, search, and downloaded bencoded metainfo.
 - Announces with omitted, distinct URL, and opaque `guid` values: only `link` is

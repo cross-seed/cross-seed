@@ -1,3 +1,5 @@
+import { getDaemonRecovery } from "../../daemonRecovery.js";
+import { db } from "../../db.js";
 import { TRPCError } from "@trpc/server";
 import { validSettingsCliToken } from "../../configDaemonDiscovery.js";
 import { authedProcedure, unauthedProcedure, router } from "../index.js";
@@ -21,6 +23,17 @@ const cliSettingsProcedure = unauthedProcedure.use(({ ctx, next }) => {
 });
 
 export const settingsRouter = router({
+	recovery: authedProcedure.query(async () => {
+		const state = getDaemonRecovery();
+		if (!state) return null;
+		const row = await db("settings").select("settings_json").first();
+		return {
+			...state,
+			rawSettings: state.useJsonEditor
+				? (row?.settings_json ?? "")
+				: null,
+		};
+	}),
 	get: cliSettingsProcedure.query(async () => ({
 		config: (await daemonSettingsService.read(true)) as RuntimeConfig,
 		apiKey: await getApiKey(),

@@ -9,6 +9,9 @@ export const useSaveConfigHook = () => {
   const options = trpc.settings.save.mutationOptions({
     onSuccess: async () => {
       await queryClient.invalidateQueries({
+        queryKey: trpc.settings.recovery.queryKey(),
+      });
+      await queryClient.invalidateQueries({
         queryKey: trpc.settings.get.queryKey(),
         exact: false,
       });

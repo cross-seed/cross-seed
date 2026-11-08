@@ -1,3 +1,4 @@
+import { DaemonRecovery } from "@/components/DaemonRecovery";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
@@ -45,7 +46,9 @@ function RootRoute() {
           >
             <AppSidebar />
             <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
-              <Outlet />
+              <DaemonRecovery>
+                <Outlet />
+              </DaemonRecovery>
             </SidebarInset>
           </SidebarProvider>
         </Login>

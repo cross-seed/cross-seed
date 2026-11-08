@@ -1,3 +1,4 @@
+import { getDaemonRecovery } from "./daemonRecovery.js";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { updateDbConfig } from "./dbConfig.js";
@@ -33,10 +34,19 @@ export async function resetApiKey(): Promise<string> {
 export async function getApiKey(): Promise<string> {
 	const row = await db("settings").select("apikey", "settings_json").first();
 	if (row?.settings_json != null) {
-		const { apiKey } = JSON.parse(row.settings_json) as {
-			apiKey?: unknown;
-		};
-		if (typeof apiKey === "string" && apiKey.length > 0) return apiKey;
+		try {
+			const value: unknown = JSON.parse(row.settings_json);
+			if (
+				value &&
+				typeof value === "object" &&
+				"apiKey" in value &&
+				typeof value.apiKey === "string" &&
+				value.apiKey.length > 0
+			)
+				return value.apiKey;
+		} catch (error) {
+			if (!getDaemonRecovery()) throw error;
+		}
 	}
 
 	// Migration 17 copies legacy settings.apikey into settings_json.apiKey.
@@ -46,11 +56,14 @@ export async function getApiKey(): Promise<string> {
 	const { apiKey: runtimeConfigApiKey } = getRuntimeConfig();
 	if (runtimeConfigApiKey) return runtimeConfigApiKey;
 
+	// Recovery must never generate a key or rewrite invalid settings.
+	if (getDaemonRecovery()) return "";
+
 	// No API key found anywhere, generate one
 	return resetApiKey();
 }
 
 export async function checkApiKey(keyToCheck: string): Promise<boolean> {
 	const apikey = await getApiKey();
-	return apikey === keyToCheck;
+	return !!apikey && apikey === keyToCheck;
 }

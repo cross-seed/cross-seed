@@ -1,4 +1,5 @@
-import { Hono } from "hono";
+import { getDaemonRecovery, RECOVERY_MESSAGE } from "../daemonRecovery.js";
+import { Hono, type Context, type Next } from "hono";
 import type { HttpEnv } from "../httpTypes.js";
 import { runInBackground } from "../utils/background.js";
 import chalk from "chalk";
@@ -151,6 +152,15 @@ export function baseApiRoutes(
 	trackBackground: (task: Promise<void>) => void = runInBackground,
 ): Hono<HttpEnv> {
 	const app = new Hono<HttpEnv>();
+	for (const path of ["/webhook", "/announce", "/job", "/status"]) {
+		app.use(path, async (c: Context<HttpEnv>, next: Next) => {
+			if (getDaemonRecovery()) {
+				if (!(await authorize(c))) return c.text(API_KEY_REQUIRED, 401);
+				return c.text(RECOVERY_MESSAGE, 503);
+			}
+			await next();
+		});
+	}
 	for (const path of ["/webhook", "/announce", "/job"]) {
 		app.post(path, async (c, next) => {
 			const text = await c.req.text();
