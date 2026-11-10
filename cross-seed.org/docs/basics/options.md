@@ -860,6 +860,13 @@ For games and other non-video releases, set this to `true`. Expect lower match
 quality than movies or TV because folder layouts, extras, patches, and release
 names vary more across trackers.
 
+With this set to `true`, a single ebook file in your [`dataDirs`](#datadirs)
+(`.epub`, `.mobi`, `.azw`, `.azw3`, `.azw4`, `.pdf`, `.djvu`, `.chm`, `.cbr`,
+`.cbz`, `.cb7`, `.cbt` or `.cba`) is also searched on its own, as videos are, up
+to [`maxDataDepth`](#maxdatadepth). Extensions are matched case-sensitively, as
+for videos. Libraries with many single-volume files will send more search
+queries.
+
 #### `includeNonVideos` Examples (CLI)
 
 ```shell
