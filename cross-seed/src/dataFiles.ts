@@ -4,6 +4,7 @@ import { runInBackground } from "./utils/background.js";
 import { readdir, readFile, stat } from "fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "path";
 import {
+	BOOK_EXTENSIONS,
 	IGNORED_FOLDERS_SUBSTRINGS,
 	LEVENSHTEIN_DIVISOR,
 	VIDEO_EXTENSIONS,
@@ -22,7 +23,7 @@ import {
 } from "./libraryInventory.js";
 import type { LibraryItemInput } from "./libraryInventory.js";
 import { Label, logger } from "./logger.js";
-import { getRuntimeConfig } from "./runtimeConfig.js";
+import { getRuntimeConfig, type RuntimeConfig } from "./runtimeConfig.js";
 import {
 	createSearcheeFromPath,
 	File,
@@ -64,6 +65,12 @@ interface DataRootCandidate {
 	path: string;
 	files: File[];
 }
+
+// Ebook extensions a standalone file can have to be its own searchee; .html is
+// left out, it is far more often a stray readme than a book torrent.
+const STANDALONE_BOOK_EXTENSIONS = BOOK_EXTENSIONS.filter(
+	(ext) => ext !== ".html",
+);
 
 const watchers: Map<string, DataDirWatcher> = new Map();
 const closingWatchers = new Set<Promise<void>>();
@@ -512,14 +519,24 @@ export async function getDataByFuzzyName(
 		.map((r) => r.unwrap());
 }
 
-export function shouldIgnorePathHeuristically(root: string, isDir: boolean) {
+export function shouldIgnorePathHeuristically(
+	root: string,
+	isDir: boolean,
+	configOverride: Partial<RuntimeConfig> = {},
+) {
 	const searchBasename = basename(root);
 	if (isDir) {
 		return IGNORED_FOLDERS_SUBSTRINGS.includes(
 			searchBasename.toLowerCase(),
 		);
+	} else if (VIDEO_EXTENSIONS.includes(extname(searchBasename))) {
+		return false;
 	} else {
-		return !VIDEO_EXTENSIONS.includes(extname(searchBasename));
+		// A lone ebook is a torrent of its own: keep it when non-videos are wanted
+		return !(
+			STANDALONE_BOOK_EXTENSIONS.includes(extname(searchBasename)) &&
+			getRuntimeConfig(configOverride).includeNonVideos
+		);
 	}
 }
 
@@ -528,6 +545,7 @@ export async function findPotentialNestedRoots(
 	depth: number,
 	isDirHint?: boolean,
 	includePath?: DataPathFilter,
+	configOverride: Partial<RuntimeConfig> = {},
 ): Promise<string[]> {
 	includePath ??= await createDataPathFilter();
 	if (!(await includePath(root))) return [];
@@ -536,7 +554,10 @@ export async function findPotentialNestedRoots(
 			isDirHint !== undefined
 				? isDirHint
 				: (await stat(root)).isDirectory();
-		if (depth <= 0 || shouldIgnorePathHeuristically(root, isDir)) {
+		if (
+			depth <= 0 ||
+			shouldIgnorePathHeuristically(root, isDir, configOverride)
+		) {
 			return [];
 		} else if (depth > 0 && isDir) {
 			const directChildren = await readdir(root, { withFileTypes: true });
@@ -548,6 +569,7 @@ export async function findPotentialNestedRoots(
 						depth - 1,
 						dirent.isDirectory(),
 						includePath,
+						configOverride,
 					),
 			);
 			return [...allDescendants, root]; // deepest paths first for memoization
