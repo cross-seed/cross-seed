@@ -25,7 +25,7 @@ jobs:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                node: [20.20.2, 22.23.4, 24.22.1, 26.12.1]
+                node: [20.20.2, 22.23.4, 24.22.1, 26.13.1]
         steps:
             - uses: actions/checkout@v4
             - uses: actions/setup-node@v4
@@ -55,7 +55,12 @@ jobs:
                       type=semver,pattern={{version}}
                       type=semver,pattern={{major}}.{{minor}}
                       type=semver,pattern={{major}}
-                      type=ref,event=branch
+                      type=ref,event=branch,enable=${{ github.ref != 'refs/heads/docker-v6-node-security' }}
+                      type=raw,value=6.13.9,enable=${{ github.ref == 'refs/heads/docker-v6-node-security' }}
+                      type=raw,value=version-6.13.9,enable=${{ github.ref == 'refs/heads/docker-v6-node-security' }}
+                      type=raw,value=6.13,enable=${{ github.ref == 'refs/heads/docker-v6-node-security' }}
+                      type=raw,value=6,enable=${{ github.ref == 'refs/heads/docker-v6-node-security' }}
+                      type=raw,value=latest,enable=${{ github.ref == 'refs/heads/docker-v6-node-security' }}
                       type=ref,event=pr
 
     docker-build:
@@ -108,17 +113,44 @@ jobs:
                       exit 1
                   fi
                   printf 'tags<<EOF\n%s\nEOF\n' "$tags" >> "$GITHUB_OUTPUT"
-            - name: Build and push (${{ matrix.arch }})
+            - name: Build and push temporary image (${{ matrix.arch }})
               uses: docker/build-push-action@v5
               with:
                   push: true
                   platforms: ${{ matrix.platform }}
-                  tags: ${{ steps.tags.outputs.tags }}
+                  tags: |
+                      ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
+                      crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
                   labels: ${{ needs.docker-meta.outputs.labels }}
+            - name: Smoke test image and promote architecture tags
+              env:
+                  GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
+                  DOCKERHUB_IMAGE: crossseed/cross-seed:ci-${{ github.sha }}-${{ matrix.arch }}
+                  TAGS: ${{ steps.tags.outputs.tags }}
+              run: |
+                  set -euo pipefail
+                  node_version="$(docker run --rm --entrypoint node "$GHCR_IMAGE" --version)"
+                  cross_seed_version="$(docker run --rm "$GHCR_IMAGE" --version | tail -n 1)"
+                  test "$node_version" = v26.13.1
+                  test "$cross_seed_version" = 6.13.9
+                  docker run --rm --workdir /usr/src/cross-seed --entrypoint node "$GHCR_IMAGE" -e '
+                      const db = new (require("better-sqlite3"))(":memory:");
+                      if (db.prepare("SELECT 1 AS ok").get().ok !== 1) process.exit(1);
+                      db.close();
+                  '
+                  while IFS= read -r tag; do
+                      [ -z "$tag" ] && continue
+                      if [[ "$tag" == ghcr.io/* ]]; then
+                          docker buildx imagetools create --tag "$tag" "$GHCR_IMAGE"
+                      else
+                          docker buildx imagetools create --tag "$tag" "$DOCKERHUB_IMAGE"
+                      fi
+                  done <<< "$TAGS"
 
     docker-manifest:
         if: ${{ github.event_name != 'pull_request' }}
         needs:
+            - native
             - docker-meta
             - docker-build
         environment: Docker Hub
