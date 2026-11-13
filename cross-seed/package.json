@@ -38,7 +38,7 @@
 	"license": "Apache-2.0",
 	"dependencies": {
 		"@cross-seed/shared": "file:../shared",
-		"@hono/node-server": "^2.1.5",
+		"@hono/node-server": "^2.1.6",
 		"@trpc/client": "^11.13.4",
 		"@trpc/server": "^11.13.4",
 		"bcryptjs": "^3.0.2",
