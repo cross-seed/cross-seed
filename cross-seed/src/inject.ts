@@ -39,6 +39,7 @@ import {
 	createEnsembleSearchees,
 	createSearcheeFromMetafile,
 	getMediaType,
+	SearcheeWithInfoHash,
 	SearcheeWithLabel,
 } from "./searchee.js";
 import {
@@ -50,6 +51,7 @@ import {
 import {
 	areMediaTitlesSimilar,
 	comparing,
+	errorCode,
 	exists,
 	findFallback,
 	formatAsList,
@@ -329,6 +331,69 @@ function injectionFailed({
 	summary.FAILED++;
 }
 
+/**
+ * Locate the directory a source's files are expected to live in, or undefined
+ * when it can't be resolved (e.g. a torrent file that isn't in a queried
+ * client).
+ */
+async function getSearcheeFileRoot(
+	searchee: SearcheeWithLabel,
+	client: TorrentClient | undefined,
+): Promise<string | undefined> {
+	if (searchee.savePath) return searchee.savePath;
+	if (searchee.path) return path.dirname(searchee.path);
+	if (!searchee.infoHash || !client) return undefined;
+	try {
+		const savePathRes = await client.getDownloadDir(
+			searchee as SearcheeWithInfoHash,
+			{ onlyCompleted: false },
+		);
+		return savePathRes.orElse(undefined);
+	} catch (e) {
+		logger.debug(e);
+		return undefined;
+	}
+}
+
+type PathPresence = "present" | "missing" | "unknown";
+
+async function getPathPresence(filePath: string): Promise<PathPresence> {
+	try {
+		await stat(filePath);
+		return "present";
+	} catch (e) {
+		// Unreachable mounts and permission failures are not proof that the
+		// source has no files.
+		const code = errorCode(e);
+		return code === "ENOENT" || code === "ENOTDIR" ? "missing" : "unknown";
+	}
+}
+
+/**
+ * A source that was added to a client but never started (stopped at 0%) has
+ * none of its files on disk, so there is nothing to link from. Injecting from
+ * it can only fail with "Linking failed ... not found", so such sources are
+ * skipped to avoid repeating the attempt on every run. Returns true when any
+ * of the files is on disk and undefined when that can't be determined because
+ * the paths are unresolvable or unreadable, in which case the caller keeps the
+ * normal error path instead of treating an I/O problem as "no downloaded data".
+ */
+async function searcheeHasFiles(
+	searchee: SearcheeWithLabel,
+	client: TorrentClient | undefined,
+): Promise<boolean | undefined> {
+	const root = await getSearcheeFileRoot(searchee, client);
+	if (root === undefined) return undefined;
+	const rootPresence = await getPathPresence(root);
+	if (rootPresence !== "present") return undefined;
+	for (const file of searchee.files) {
+		const presence = await getPathPresence(path.join(root, file.path));
+		if (presence === "present") return true;
+		if (presence === "unknown") return undefined;
+	}
+	return false;
+}
+
 async function injectFromStalledTorrent({
 	meta,
 	client,
@@ -340,9 +405,18 @@ async function injectFromStalledTorrent({
 }: InjectionAftermath): Promise<void> {
 	let injected = false;
 	let linkedNewFiles = false;
+	let attemptedInjection = false;
 	const stalledDecision = Decision.MATCH_PARTIAL; // Should always be considered partial
 	for (const { searchee } of clientMatches) {
 		const searcheeLog = getLogString(searchee, chalk.bold.white);
+		if ((await searcheeHasFiles(searchee, client)) === false) {
+			logger.verbose({
+				label: Label.INJECT,
+				message: `${progress} Not injecting ${filePathLog} from stalled source ${searcheeLog} - none of its files are on disk yet`,
+			});
+			continue;
+		}
+		attemptedInjection = true;
 		const res = await performActionWithoutMutex(
 			meta,
 			stalledDecision,
@@ -374,6 +448,16 @@ async function injectFromStalledTorrent({
 	}
 
 	if (injected) return;
+	if (!attemptedInjection) {
+		// Only stalled sources without any files on disk matched. Keep the
+		// saved torrent around so a later run can use the source once it has
+		// downloaded data.
+		logger.info({
+			label: Label.INJECT,
+			message: `${progress} Deferring injection of ${filePathLog} - no matched source has downloaded any files yet, will retry when one does - ${chalk.yellow(injectionResult)}`,
+		});
+		return;
+	}
 	if (!(await client!.isTorrentInClient(meta.infoHash)).orElse(false)) return;
 	if (linkedNewFiles) {
 		logger.info({
