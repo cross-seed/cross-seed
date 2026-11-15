@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { basename } from "node:path";
 import { Label } from "../../src/logger.js";
 import type {
 	ClientSearcheeResult,
@@ -176,9 +177,25 @@ export class FakeTorrentClient implements TorrentClient {
 		}));
 	}
 
-	// eslint-disable-next-line @typescript-eslint/require-await
 	async getClientSearchees(): Promise<ClientSearcheeResult> {
-		return { searchees: [], newSearchees: [] };
+		const res = await this.request<FakeTorrent[]>("GET", "/torrents");
+		const searchees = (res.body ?? []).map((torrent) => ({
+			infoHash: torrent.infoHash,
+			name: torrent.name,
+			title: torrent.name,
+			files: torrent.files.map((file) => ({
+				name: basename(file.path),
+				path: file.path,
+				length: file.length,
+			})),
+			length: torrent.files.reduce((sum, file) => sum + file.length, 0),
+			clientHost: this.clientHost,
+			savePath: torrent.savePath,
+			category: torrent.category,
+			tags: torrent.tags,
+			trackers: torrent.trackers ?? [],
+		}));
+		return { searchees, newSearchees: searchees };
 	}
 
 	async getDownloadDir(

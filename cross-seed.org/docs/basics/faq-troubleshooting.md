@@ -717,6 +717,12 @@ and link files even from an incomplete source if
 enabled. These injections will always be treated as `partial` matches which are
 paused and rechecked.
 
+A source that hasn't downloaded any files yet, such as one that was added and
+stopped at 0%, has nothing to link from. In that case `cross-seed` keeps the
+saved .torrent in [`outputDir`](./options.md#outputdir) and retries the
+injection later, once the source has started downloading, instead of failing on
+every run.
+
 Once the torrent has finished rechecking, it's progress may be anywhere from 0%
 to 100%. You will then have to choose between resuming the torrent or removing
 it from client with the corresponding .torrent file in
