@@ -22,8 +22,15 @@ export const BAD_EP_REGEX =
 export const IS_MULTI_EP_REGEX = /E\d+(?:[-.]?S\d+E\d|[-.]?E\d|[-.]\d)/i;
 export const SEASON_REGEX =
 	/^(?<title>.+?)[[(_.\s-]+(?<season>S(?:eason)?\s*\d+)(?=\b(?![_.\s~-]*E\d+))/i;
+/**
+ * Catches titles whose leading token is a season marker, so no title can be
+ * parsed from them, e.g. "S03.1080p" or "Season 2". The marker must start a
+ * token: without that boundary the first token of a title is chewed up to
+ * manufacture one, so a release group such as "voices38" reads as "voice" +
+ * "S38" and a game like "voices38-star.wars.galactic.racer" gets filtered out.
+ */
 export const BAD_SEASON_REGEX =
-	/^[[_.\s-]*[^[_.\s-]*?(?<season>S\d+|(?:season)\s*\d+)(?=\b(?![_.\s~-]*E\d+))/i;
+	/^[[_.\s-]*[^[_.\s-]*?(?<![\p{L}\p{N}])(?<season>S\d+|(?:season)\s*\d+)(?=\b(?![_.\s~-]*E\d+))/iu;
 export const MOVIE_REGEX =
 	/^(?<title>.+?)-?[_.\s][[(]?(?<year>(?:18|19|20)\d{2})[)\]]?(?![pix])/i;
 export const ANIME_REGEX =

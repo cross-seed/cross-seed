@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { BAD_GROUP_PARSE_REGEX, EP_REGEX } from "../src/constants.js";
+import {
+	BAD_GROUP_PARSE_REGEX,
+	BAD_SEASON_REGEX,
+	EP_REGEX,
+} from "../src/constants.js";
 
 describe("EP_REGEX", () => {
 	it("matches episode titles", () => {
@@ -23,6 +27,24 @@ describe("EP_REGEX", () => {
 		invalidTitles.forEach((title) => {
 			expect(title).not.toMatch(EP_REGEX);
 		});
+	});
+});
+
+describe("BAD_SEASON_REGEX", () => {
+	it.each(["S03", "S01.1080p", "Season 2 Complete", ".S01.1080p"])(
+		"matches %j, which begins with a season marker",
+		(text) => {
+			expect(text).toMatch(BAD_SEASON_REGEX);
+		},
+	);
+
+	it.each([
+		"voices38-star.wars.galactic.racer",
+		"voices38",
+		"Show.S02.1080p",
+		"My.Show.S01E01.1080p",
+	])("does not match %j, which is not a season marker", (text) => {
+		expect(text).not.toMatch(BAD_SEASON_REGEX);
 	});
 });
 
