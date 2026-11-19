@@ -61,8 +61,8 @@ function redactMessage(message: unknown, options: Record<string, unknown>) {
 	}
 	let ret = message;
 
-	ret = ret.replace(/key=[a-zA-Z0-9]+/g, `key=${REDACTED_MSG}`);
-	ret = ret.replace(/pass=[a-zA-Z0-9]+/g, `pass=${REDACTED_MSG}`);
+	ret = ret.replace(/key=\w+/g, `key=${REDACTED_MSG}`);
+	ret = ret.replace(/pass=\w+/g, `pass=${REDACTED_MSG}`);
 	ret = ret.replace(
 		/(?:(?:auto|download)[./]\d+[./])([a-zA-Z0-9]+)/g,
 		(match, key: string) => match.replace(key, REDACTED_MSG),
