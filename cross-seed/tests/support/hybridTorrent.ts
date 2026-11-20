@@ -39,6 +39,8 @@ export interface HybridTorrent {
 export function buildHybridTorrent(
 	options: {
 		announce?: string;
+		/** Adds an `announce-list`, which sorts between `announce` and `info` */
+		announceList?: string[][];
 		/**
 		 * Adds a key that is not valid UTF-8 to the info dictionary, so that
 		 * the infohash depends on keeping its bytes intact. Torrents with such
@@ -90,6 +92,24 @@ export function buildHybridTorrent(
 	]);
 	const torrent = dict([
 		["announce", bytes(announce)],
+		...(options.announceList
+			? [
+					[
+						"announce-list",
+						Buffer.concat([
+							Buffer.from("l"),
+							...options.announceList.map((tier) =>
+								Buffer.concat([
+									Buffer.from("l"),
+									...tier.map((url) => bytes(url)),
+									Buffer.from("e"),
+								]),
+							),
+							Buffer.from("e"),
+						]),
+					] as [string, Buffer],
+				]
+			: []),
 		["info", info],
 		["piece layers", dict([[piecesRoot, bytes(pieceLayer)]])],
 	]);
