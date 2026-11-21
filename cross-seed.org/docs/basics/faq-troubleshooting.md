@@ -504,6 +504,47 @@ Try adding at least one torrent file to the client, and then retry injecting.
 You will be able to see the circumstances around the failure and start
 investigating why this occurred.
 
+### Hybrid torrents fail with `Failed to retrieve torrent after adding`
+
+Versions of `cross-seed` before `7.0.0-23` re-encoded hybrid (v1 + v2) and v2
+torrents incorrectly. The binary keys of their `piece layers` were changed, so
+the `.torrent` files `cross-seed` wrote were invalid and clients refused them.
+qBittorrent reports `Failed to retrieve torrent after adding`, and libtorrent
+reports `a piece layer is invalid`. Torrents without `piece layers` (v1
+torrents) are not affected.
+
+The fix is in `7.0.0-23` and later. It is not in `6.13.9`.
+
+Updating only fixes the files written from then on. An invalid `.torrent` that
+is already in `torrent_cache`, or in your [`outputDir`](./options.md#outputdir),
+stays invalid until you delete it, and `cross-seed` downloads it again the next
+time it matches. To do that:
+
+1. Update `cross-seed` to a version with the fix, and stop it.
+2. In the [config directory](#where-is-the-config-directory-for-cross-seed),
+   count the files that have `piece layers`, then delete them. Replace
+   `cross-seeds` if your `outputDir` is somewhere else.
+
+    ```shell
+    grep -rla --include='*.torrent' 'piece layers' torrent_cache cross-seeds | wc -l
+    grep -rlaZ --include='*.torrent' 'piece layers' torrent_cache cross-seeds | xargs -0 -r rm --
+    ```
+
+3. Start `cross-seed`.
+
+:::caution
+
+Run the deletion once, after updating and before starting `cross-seed`. It
+deletes every torrent that has `piece layers`, including the valid ones written
+by a fixed version. Copy `torrent_cache` and your `outputDir` first if you want
+to be able to go back.
+
+These commands use GNU `grep` and `xargs`, as found on Linux. With Docker, run
+them in the directory that is mounted at `/config`. On other systems, list the
+files with the first command, without `| wc -l`, and delete them yourself.
+
+:::
+
 ### My data-based search is searching torrent files!
 
 Torrents from your client take precedence over data files. If possible,
